@@ -29,26 +29,18 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Hadoop HDDS Tools</name>
   <packaging>jar</packaging>
 
-  <properties>
-    <hadoop.component>hdds</hadoop.component>
-    <is.hadoop.component>true</is.hadoop.component>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-common</artifactId>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-client</artifactId>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>commons-cli</groupId>
