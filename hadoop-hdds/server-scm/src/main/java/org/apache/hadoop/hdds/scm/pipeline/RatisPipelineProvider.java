@@ -25,10 +25,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms
-    .ContainerPlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .SCMContainerPlacementRandom;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -94,16 +93,16 @@ public class RatisPipelineProvider implements PipelineProvider {
    * @return SCM container placement policy implementation instance.
    */
   @SuppressWarnings("unchecked")
-  // TODO: should we rename ContainerPlacementPolicy to PipelinePlacementPolicy?
-  private static ContainerPlacementPolicy createContainerPlacementPolicy(
+  // TODO: should we rename PlacementPolicy to PipelinePlacementPolicy?
+  private static PlacementPolicy createContainerPlacementPolicy(
       final NodeManager nodeManager, final Configuration conf) {
-    Class<? extends ContainerPlacementPolicy> implClass =
-        (Class<? extends ContainerPlacementPolicy>) conf.getClass(
+    Class<? extends PlacementPolicy> implClass =
+        (Class<? extends PlacementPolicy>) conf.getClass(
             ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
             SCMContainerPlacementRandom.class);
 
     try {
-      Constructor<? extends ContainerPlacementPolicy> ctor =
+      Constructor<? extends PlacementPolicy> ctor =
           implClass.getDeclaredConstructor(NodeManager.class,
               Configuration.class);
       return ctor.newInstance(nodeManager, conf);
@@ -116,7 +115,7 @@ public class RatisPipelineProvider implements PipelineProvider {
 //      LOG.error("Unhandled exception occurred, Placement policy will not " +
 //          "be functional.");
       throw new IllegalArgumentException("Unable to load " +
-          "ContainerPlacementPolicy", e);
+          "PlacementPolicy", e);
     }
   }
 
