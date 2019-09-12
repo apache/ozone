@@ -37,6 +37,7 @@ import java.util.concurrent.Callable;
         ListPipelinesSubcommand.class,
         ActivatePipelineSubcommand.class,
         DeactivatePipelineSubcommand.class,
+        CreatePipelineSubcommand.class,
         ClosePipelineSubcommand.class
     })
 public class PipelineCommands implements Callable<Void> {
