@@ -36,8 +36,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
-
 /**
  * Interface used for MiniOzoneClusters.
  */
@@ -240,6 +238,7 @@ public interface MiniOzoneCluster {
     protected static final int DEFAULT_HB_INTERVAL_MS = 1000;
     protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
+    protected static final int DEFAULT_PIPELIME_LIMIT = 3;
 
     protected final OzoneConfiguration conf;
     protected String path;
@@ -268,11 +267,10 @@ public interface MiniOzoneCluster {
     protected int numOfDatanodes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
+    protected int pipelineNumLimit = DEFAULT_PIPELIME_LIMIT;
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
-      // MiniOzoneCluster doesn't have pipeline engagement limit.
-      conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 0);
       setClusterId(UUID.randomUUID().toString());
     }
 
@@ -353,6 +351,16 @@ public interface MiniOzoneCluster {
      */
     public Builder setNumDatanodes(int val) {
       numOfDatanodes = val;
+      return this;
+    }
+
+    /**
+     * Sets the total number of pipelines to create.
+     * @param val number of pipelines
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setTotalPipelineNumLimit(int val) {
+      pipelineNumLimit = val;
       return this;
     }
 
