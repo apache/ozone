@@ -17,17 +17,17 @@
 version: "3"
 services:
    datanode:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      build: .
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
       ports:
         - 9864
-      command: ["/opt/hadoop/bin/ozone","datanode"]
+      command: sh -c "sudo /usr/sbin/sshd -E /tmp/sshd.log && /opt/hadoop/bin/ozone datanode"
       env_file:
         - ./docker-config
    om1:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      build: .
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -38,9 +38,9 @@ services:
          ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       env_file:
           - ./docker-config
-      command: ["/opt/hadoop/bin/ozone","om"]
+      command: sleep 1d
    om2:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      build: .
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -51,9 +51,9 @@ services:
          ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       env_file:
          - ./docker-config
-      command: ["/opt/hadoop/bin/ozone","om"]
+      command: sleep 1d
    om3:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      build: .
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -64,9 +64,9 @@ services:
          ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       env_file:
          - ./docker-config
-      command: ["/opt/hadoop/bin/ozone","om"]
+      command: sleep 1d
    scm:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+      build: .
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -76,4 +76,4 @@ services:
           - ./docker-config
       environment:
           ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
-      command: ["/opt/hadoop/bin/ozone","scm"]
+      command: sh -c "sudo /usr/sbin/sshd -E /tmp/sshd.log && /opt/hadoop/bin/ozone scm"
