@@ -6,7 +6,7 @@
 
 (Please create an issue in ASF JIRA before opening a pull request,
 and you need to set the title of the pull request which starts with
-the corresponding JIRA issue number. (e.g. HADOOP-XXXXX. Fix a typo in YYY.
+the corresponding JIRA issue number. (e.g. HDDS-XXXX. Fix a typo in YYY.)
 
 Pease replace this section with the link to the original pull request)
 
