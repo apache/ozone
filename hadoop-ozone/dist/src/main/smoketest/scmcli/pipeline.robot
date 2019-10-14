@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -13,19 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "$DIR/../../.." || exit 1
 
-export MAVEN_OPTS="-Xmx4096m"
-mvn -B -fn test -pl \!:hadoop-ozone-integration-test,\!:hadoop-ozone-filesystem,\!:hadoop-ozone-tools "$@"
+*** Settings ***
+Documentation       Smoketest ozone cluster startup
+Library             OperatingSystem
+Library             BuiltIn
+Resource            ../commonlib.robot
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/unit"}
-mkdir -p "$REPORT_DIR"
+*** Variables ***
 
-# shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
-source "$DIR/_mvn_unit_report.sh"
 
-if [[ -s "$REPORT_DIR/summary.txt" ]] ; then
-    exit 1
-fi
-exit 0
+*** Test Cases ***
+Run list pipeline
+    ${output} =         Execute          ozone scmcli pipeline list
+                        Should contain   ${output}   Type:RATIS, Factor:ONE, State:OPEN
