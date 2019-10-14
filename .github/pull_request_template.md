@@ -8,7 +8,7 @@
 and you need to set the title of the pull request which starts with
 the corresponding JIRA issue number. (e.g. HDDS-XXXX. Fix a typo in YYY.)
 
-Please replace this section with the link to the original pull request)
+Please replace this section with the link to the Apache JIRA)
 
 ## How was this patch tested?
 
