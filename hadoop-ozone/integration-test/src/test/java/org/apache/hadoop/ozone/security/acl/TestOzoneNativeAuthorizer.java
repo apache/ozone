@@ -70,6 +70,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.WORLD;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
@@ -108,6 +109,7 @@ public class TestOzoneNativeAuthorizer {
   private static OzoneObj buckObj;
   private static OzoneObj keyObj;
   private static OzoneObj prefixObj;
+  private static long keySessionId;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -193,6 +195,7 @@ public class TestOzoneNativeAuthorizer {
           keySession.getKeyInfo().getLatestVersionLocations()
               .getLocationList());
       keyManager.commitKey(keyArgs, keySession.getId());
+      keySessionId = keySession.getId();
     }
 
     keyObj = new OzoneObjInfo.Builder()
@@ -359,11 +362,21 @@ public class TestOzoneNativeAuthorizer {
       List<ACLType> aclsToBeAdded =
           Arrays.stream(ACLType.values()).collect(Collectors.toList());
       aclsToBeValidated.remove(NONE);
+      // Do not validate "WRITE" since write acl type requires object to be
+      // present in OpenKeyTable.
+      aclsToBeValidated.remove(WRITE);
       aclsToBeValidated.remove(a1);
 
       aclsToBeAdded.remove(NONE);
       aclsToBeAdded.remove(ALL);
+      // AclType "CREATE" is skipped from access check on objects
+      // since the object will not exist during access check.
       aclsToBeAdded.remove(CREATE);
+      // AclType "WRITE" is removed from being tested here,
+      // because object must always be present in OpenKeyTable for write
+      // acl requests. But, here the objects are already committed
+      // and will move to keyTable.
+      aclsToBeAdded.remove(WRITE);
 
       // Fetch acls again.
       for (ACLType a2 : aclsToBeAdded) {
@@ -372,7 +385,7 @@ public class TestOzoneNativeAuthorizer {
           acls = aclImplementor.getAcl(obj);
           List right = acls.stream().map(a -> a.getAclList()).collect(
               Collectors.toList());
-          assertFalse("Do not expected client to have " + a2 + " acl. " +
+          assertFalse("Did not expect client to have " + a2 + " acl. " +
                   "Current acls found:" + right + ". Type:" + accessType + ","
                   + " name:" + (accessType == USER ? user : group),
               nativeAuthorizer.checkAccess(obj,
@@ -422,7 +435,6 @@ public class TestOzoneNativeAuthorizer {
         }
       }
     }
-
   }
 
   private String getAclName(ACLIdentityType identityType) {
@@ -464,7 +476,9 @@ public class TestOzoneNativeAuthorizer {
       builder) throws OMException {
     List<ACLType> allAcls = new ArrayList<>(Arrays.asList(ACLType.values()));
     allAcls.remove(NONE);
+    // Removing CREATE, WRITE since they need special handling.
     allAcls.remove(CREATE);
+    allAcls.remove(WRITE);
     for (ACLType a : allAcls) {
       assertFalse("User shouldn't have right " + a + ".", 
           nativeAuthorizer.checkAccess(obj, builder.setAclRights(a).build()));

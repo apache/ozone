@@ -62,7 +62,6 @@ public final class OzoneObjInfo extends OzoneObj {
       return OZONE_URI_DELIMITER + getVolumeName()
           + OZONE_URI_DELIMITER + getBucketName();
     case KEY:
-    case OPEN_KEY:
       return OZONE_URI_DELIMITER + getVolumeName()
           + OZONE_URI_DELIMITER + getBucketName()
           + OZONE_URI_DELIMITER + getKeyName();

@@ -89,6 +89,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
@@ -123,7 +124,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.OPEN_KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1657,7 +1657,9 @@ public class KeyManagerImpl implements KeyManager {
       validateBucket(volume, bucket);
       OmKeyInfo keyInfo;
 
-      if (ozObject.getResourceType() == OPEN_KEY) {
+      // For Acl Type "WRITE", the key can only be found in
+      // OpenKeyTable since appends to existing keys are not supported.
+      if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
         keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
       } else {
         try {

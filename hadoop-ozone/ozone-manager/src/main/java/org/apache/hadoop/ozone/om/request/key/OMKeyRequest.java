@@ -551,19 +551,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected void checkKeyAclsInOpenKeyTable(OzoneManager ozoneManager,
       String volume, String bucket, String key,
       IAccessAuthorizer.ACLType aclType, long clientId) throws IOException {
+    String keyNameForAclCheck = key;
     // Native authorizer requires client id as part of key name to check
     // write ACL on key. Add client id to key name if ozone native
     // authorizer is configured.
     if (ozoneManager.isNativeAuthorizerEnabled()) {
-      String keyNameForAclCheck = key + "/" + clientId;
-      // During key commit request, it is possible that key is
-      // not present in the key table and hence setting the resource type
-      // to OPEN_KEY to check the openKeyTable.
-      checkKeyAcls(ozoneManager, volume, bucket, keyNameForAclCheck,
-          aclType, OzoneObj.ResourceType.OPEN_KEY);
-    } else {
-      checkKeyAcls(ozoneManager, volume, bucket, key,
-          aclType, OzoneObj.ResourceType.KEY);
+      keyNameForAclCheck = key + "/" + clientId;
     }
+
+    checkKeyAcls(ozoneManager, volume, bucket, keyNameForAclCheck,
+          aclType, OzoneObj.ResourceType.KEY);
   }
 }
