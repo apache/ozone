@@ -21,7 +21,7 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/checkstyle"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-mvn -B -fn checkstyle:check -f pom.ozone.xml
+mvn -B -fn checkstyle:check
 
 #Print out the exact violations with parsing XML results with sed
 find "." -name checkstyle-errors.xml -print0 \

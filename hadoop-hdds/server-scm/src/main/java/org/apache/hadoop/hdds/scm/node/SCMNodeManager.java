@@ -301,8 +301,10 @@ public class SCMNodeManager implements NodeManager {
       processNodeReport(datanodeDetails, nodeReport);
       LOG.info("Registered Data node : {}", datanodeDetails);
     } catch (NodeAlreadyExistsException e) {
-      LOG.trace("Datanode is already registered. Datanode: {}",
-          datanodeDetails.toString());
+      if (LOG.isTraceEnabled()) {
+        LOG.trace("Datanode is already registered. Datanode: {}",
+            datanodeDetails.toString());
+      }
     }
 
     return RegisteredCommand.newBuilder().setErrorCode(ErrorCode.success)
@@ -677,7 +679,9 @@ public class SCMNodeManager implements NodeManager {
     List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
     if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
       String location = resolvedHosts.get(0);
-      LOG.debug("Resolve datanode {} return location {}", hostname, location);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Resolve datanode {} return location {}", hostname, location);
+      }
       return location;
     } else {
       LOG.error("Node {} Resolution failed. Please make sure that DNS table " +

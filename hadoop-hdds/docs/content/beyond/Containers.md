@@ -155,7 +155,7 @@ To test a development build you can create your own image and upload it to your 
 
 
 ```bash
-mvn clean install -f pom.ozone.xml -DskipTests -Pdocker-build,docker-push -Ddocker.image=myregistry:9000/name/ozone
+mvn clean install -DskipTests -Pdocker-build,docker-push -Ddocker.image=myregistry:9000/name/ozone
 ```
 
 The configured image will be used in all the generated kubernetes resources files (`image:` keys are adjusted during the build)
