@@ -124,7 +124,7 @@ function ozonecmd_case
     ;;
     freon)
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
-      OZONE_FREON_OPTS="${OZONE_FREON_OPTS} -Dhadoop.log.file=ozone-freon.log -Dlog4j.configuration=file:${ozone_shell_log4j}"
+      OZONE_FREON_OPTS="${OZONE_FREON_OPTS}"
       HADOOP_OPTS="${HADOOP_OPTS} ${OZONE_FREON_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
