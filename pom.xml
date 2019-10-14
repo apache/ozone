@@ -71,6 +71,15 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <properties>
     <hadoop.version>3.2.0</hadoop.version>
 
+    <!-- version for hdds/ozone components -->
+    <hdds.version>${ozone.version}</hdds.version>
+    <ozone.version>0.5.0-SNAPSHOT</ozone.version>
+    <ozone.release>Crater Lake</ozone.release>
+    <declared.ozone.version>${ozone.version}</declared.ozone.version>
+
+    <!-- Apache Ratis version -->
+    <ratis.version>0.5.0-3f446aa-SNAPSHOT</ratis.version>
+
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
     <distMgmtSnapshotsUrl>https://repository.apache.org/content/repositories/snapshots</distMgmtSnapshotsUrl>
@@ -117,6 +126,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- avro version -->
     <avro.version>1.7.7</avro.version>
 
+    <bouncycastle.version>1.60</bouncycastle.version>
+
     <!-- jersey version -->
     <jersey.version>1.19</jersey.version>
 
@@ -155,8 +166,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <apacheds.version>2.0.0-M21</apacheds.version>
     <ldap-api.version>1.0.0-M33</ldap-api.version>
 
-    <!-- Apache Ratis version -->
-    <ratis.version>0.5.0-3f446aa-SNAPSHOT</ratis.version>
     <jcache.version>1.0-alpha-1</jcache.version>
     <ehcache.version>3.3.1</ehcache.version>
     <hikari.version>2.4.12</hikari.version>
@@ -182,7 +191,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- Plugin versions and config -->
     <maven-surefire-plugin.argLine>-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
-    <maven-surefire-plugin.version>2.21.0</maven-surefire-plugin.version>
+    <maven-surefire-plugin.version>3.0.0-M1</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
 
