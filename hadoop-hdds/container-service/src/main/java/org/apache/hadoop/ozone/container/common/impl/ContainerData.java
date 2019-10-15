@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
@@ -33,9 +34,12 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.yaml.snakeyaml.Yaml;
+
+import javax.annotation.Nullable;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CHECKSUM;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_ID;
@@ -91,7 +95,12 @@ public abstract class ContainerData {
   private HddsVolume volume;
 
   private String checksum;
-  private Long dataScanTimestamp;
+
+  /** Timestamp of last data scan (milliseconds since Unix Epoch).
+   * {@code null} if not yet scanned (or timestamp not recorded,
+   * eg. in prior versions). */
+  private Long dataScanTimestamp; // for serialization
+  private transient Optional<Instant> lastDataScanTime = Optional.empty();
 
   public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
   private static final String DUMMY_CHECKSUM = new String(new byte[64],
@@ -511,12 +520,25 @@ public abstract class ContainerData {
     return this.checksum;
   }
 
-  public long getDataScanTimestamp() {
-    return dataScanTimestamp != null ? dataScanTimestamp : 0;
+  /**
+   * @return {@code Optional} with the timestamp of last data scan.
+   * {@code absent} if not yet scanned or timestamp was not recorded.
+   */
+  public Optional<Instant> lastDataScanTime() {
+    return lastDataScanTime;
   }
 
-  public void setDataScanTimestamp(long timestamp) {
-    this.dataScanTimestamp = timestamp;
+  public void updateDataScanTime(@Nullable Instant time) {
+    lastDataScanTime = Optional.ofNullable(time);
+    dataScanTimestamp = time != null ? time.toEpochMilli() : null;
+  }
+
+  // for deserialization
+  public void setDataScanTimestamp(Long timestamp) {
+    dataScanTimestamp = timestamp;
+    lastDataScanTime = timestamp != null
+        ? Optional.of(Instant.ofEpochMilli(timestamp))
+        : Optional.empty();
   }
 
   /**
@@ -569,4 +591,5 @@ public abstract class ContainerData {
    * Returns the blockCommitSequenceId.
    */
   public abstract long getBlockCommitSequenceId();
+
 }

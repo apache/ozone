@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -105,7 +106,7 @@ public class ContainerDataScanner extends Thread {
             metrics.incNumUnHealthyContainers();
             controller.markContainerUnhealthy(containerId);
           } else {
-            long now = System.currentTimeMillis();
+            Instant now = Instant.now();
             logScanCompleted(containerData, now);
             controller.updateDataScanTimestamp(containerId, now);
           }
@@ -144,18 +145,18 @@ public class ContainerDataScanner extends Thread {
 
   private static void logScanStart(ContainerData containerData) {
     if (LOG.isDebugEnabled()) {
-      long scanTimestamp = containerData.getDataScanTimestamp();
-      Object lastScanTime = scanTimestamp <= 0 ? "never"
-          : ("at " + Instant.ofEpochMilli(scanTimestamp));
+      Optional<Instant> scanTimestamp = containerData.lastDataScanTime();
+      Object lastScanTime = scanTimestamp.map(ts -> "at " + ts).orElse("never");
       LOG.debug("Scanning container {}, last scanned {}",
           containerData.getContainerID(), lastScanTime);
     }
   }
 
-  private static void logScanCompleted(ContainerData containerData, long now) {
+  private static void logScanCompleted(
+      ContainerData containerData, Instant timestamp) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Completed scan of container {} at {}",
-          containerData.getContainerID(), Instant.ofEpochMilli(now));
+          containerData.getContainerID(), timestamp);
     }
   }
 

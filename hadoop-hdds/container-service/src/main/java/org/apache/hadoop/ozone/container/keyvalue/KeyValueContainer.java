@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -338,11 +339,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public void updateDataScanTimestamp(long timestamp)
+  public void updateDataScanTimestamp(Instant time)
       throws StorageContainerException {
     writeLock();
     try {
-      updateContainerData(() -> containerData.setDataScanTimestamp(timestamp));
+      updateContainerData(() -> containerData.updateDataScanTime(time));
     } finally {
       writeUnlock();
     }

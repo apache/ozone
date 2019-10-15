@@ -29,9 +29,11 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -45,6 +47,7 @@ public class TestContainerDataYaml {
   private static String testRoot = new FileSystemTestHelper().getTestRootDir();
 
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
+  private static final Instant SCAN_TIME = Instant.now();
 
   /**
    * Creates a .container file. cleanup() should be called at the end of the
@@ -61,6 +64,7 @@ public class TestContainerDataYaml {
     keyValueContainerData.setContainerDBType("RocksDB");
     keyValueContainerData.setMetadataPath(testRoot);
     keyValueContainerData.setChunksPath(testRoot);
+    keyValueContainerData.updateDataScanTime(SCAN_TIME);
 
     File containerFile = new File(testRoot, containerPath);
 
@@ -98,6 +102,9 @@ public class TestContainerDataYaml {
     assertEquals(1, kvData.getLayOutVersion());
     assertEquals(0, kvData.getMetadata().size());
     assertEquals(MAXSIZE, kvData.getMaxSize());
+    assertEquals(MAXSIZE, kvData.getMaxSize());
+    assertTrue(kvData.lastDataScanTime().isPresent());
+    assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
 
     // Update ContainerData.
     kvData.addMetadata("VOLUME", "hdfs");
@@ -126,6 +133,8 @@ public class TestContainerDataYaml {
     assertEquals("hdfs", kvData.getMetadata().get("VOLUME"));
     assertEquals("ozone", kvData.getMetadata().get("OWNER"));
     assertEquals(MAXSIZE, kvData.getMaxSize());
+    assertTrue(kvData.lastDataScanTime().isPresent());
+    assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
   }
 
   @Test

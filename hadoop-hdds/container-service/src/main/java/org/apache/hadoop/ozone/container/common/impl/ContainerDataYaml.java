@@ -93,7 +93,6 @@ public final class ContainerDataYaml {
           containerFile);
       writer = new OutputStreamWriter(out, "UTF-8");
       yaml.dump(containerData, writer);
-
     } finally {
       try {
         if (writer != null) {
@@ -273,9 +272,7 @@ public final class ContainerDataYaml {
         kvData.setMetadata(meta);
         kvData.setChecksum((String) nodes.get(OzoneConsts.CHECKSUM));
         Long timestamp = (Long) nodes.get(OzoneConsts.DATA_SCAN_TIMESTAMP);
-        if (timestamp != null) {
-          kvData.setDataScanTimestamp(timestamp);
-        }
+        kvData.setDataScanTimestamp(timestamp);
         String state = (String) nodes.get(OzoneConsts.STATE);
         kvData
             .setState(ContainerProtos.ContainerDataProto.State.valueOf(state));
