@@ -98,7 +98,7 @@ public class TestBlockManager {
     // Override the default Node Manager in SCM with this Mock Node Manager.
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
+        new SCMPipelineManager(conf, nodeManager, new EventQueue());
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
