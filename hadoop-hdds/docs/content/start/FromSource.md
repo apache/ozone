@@ -38,7 +38,7 @@ dependencies to build Hadoop on your build machine. If you need instructions
 on how to build Hadoop, please look at the Apache Hadoop Website.
 
 ```bash
-mvn -f pom.ozone.xml clean package -DskipTests=true
+mvn clean package -DskipTests=true
 ```
 
 This will build an ozone-\<version\>.tar.gz in your `hadoop-ozone/dist/target` directory.
