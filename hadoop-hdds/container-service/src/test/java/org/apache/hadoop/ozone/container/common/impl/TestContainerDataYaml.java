@@ -33,7 +33,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -105,6 +104,8 @@ public class TestContainerDataYaml {
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
     assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
+    assertEquals(SCAN_TIME.toEpochMilli(),
+        kvData.getDataScanTimestamp().longValue());
 
     // Update ContainerData.
     kvData.addMetadata("VOLUME", "hdfs");
@@ -135,6 +136,8 @@ public class TestContainerDataYaml {
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
     assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
+    assertEquals(SCAN_TIME.toEpochMilli(),
+        kvData.getDataScanTimestamp().longValue());
   }
 
   @Test

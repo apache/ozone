@@ -541,6 +541,10 @@ public abstract class ContainerData {
         : Optional.empty();
   }
 
+  public Long getDataScanTimestamp() {
+    return dataScanTimestamp;
+  }
+
   /**
    * Returns the origin pipeline Id of this container.
    * @return origin node Id
