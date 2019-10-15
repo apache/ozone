@@ -207,6 +207,41 @@ public class TestNodeDecommissionManager {
         nodeManager.getNodeStatus(dns.get(10)).getOperationalState());
   }
 
+  @Test
+  public void testNodesCannotTransitionFromDecomToMaint() throws Exception {
+    List<DatanodeDetails> dns = generateDatanodes();
+
+    // Put 1 node into maintenance and another into decom
+    decom.startMaintenance(dns.get(1), 100);
+    decom.startDecommission(dns.get(2));
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+
+    // Try to go from maint to decom:
+    try {
+      decom.startDecommission(dns.get(1));
+      fail("Expected InvalidNodeStateException");
+    } catch (InvalidNodeStateException e) {
+    }
+
+    // Try to go from decom to maint:
+    try {
+      decom.startMaintenance(dns.get(2), 100);
+      fail("Expected InvalidNodeStateException");
+    } catch (InvalidNodeStateException e) {
+    }
+
+    // Ensure the states are still as before
+    assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+        nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+  }
+
+
+
   private SCMNodeManager createNodeManager(OzoneConfiguration config)
       throws IOException, AuthenticationException {
     scm = HddsTestUtils.getScm(config);
