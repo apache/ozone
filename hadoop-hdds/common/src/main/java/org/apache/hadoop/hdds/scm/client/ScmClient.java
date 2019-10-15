@@ -179,12 +179,15 @@ public interface ScmClient extends Closeable {
   void recommissionNodes(List<String> hosts) throws IOException;
 
   /**
-   * Place the list of datanodes into maintenance mode. If a non-null endDtm
+   * Place the list of datanodes into maintenance mode. If a non-zero endDtm
    * is passed, the hosts will automatically exit maintenance mode after the
-   * given time has passed. The hosts are identified by their hostname and
-   * optionally port in the format foo.com:port.
+   * given time has passed. Passing an end time of zero means the hosts will
+   * remain in maintenance indefinitely.
+   * The hosts are identified by their hostname and optionally port in the
+   * format foo.com:port.
    * @param hosts A list of hostnames, optionally with port
-   * @param endHours The number of hours from now which maintenance will end
+   * @param endHours The number of hours from now which maintenance will end or
+   *                 zero if maintenance must be manually ended.
    * @throws IOException
    */
   void startMaintenanceNodes(List<String> hosts, int endHours)

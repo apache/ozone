@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -76,7 +77,7 @@ public class NodeDecommissionManager {
     private void parseHostname() throws InvalidHostStringException{
       try {
         // A URI *must* have a scheme, so just create a fake one
-        URI uri = new URI("my://"+rawHostname.trim());
+        URI uri = new URI("empty://"+rawHostname.trim());
         this.hostname = uri.getHost();
         this.port = uri.getPort();
 
@@ -184,24 +185,32 @@ public class NodeDecommissionManager {
         // log a warning and ignore the exception
         LOG.warn("The host {} was not found in SCM. Ignoring the request to "+
             "decommission it", dn.getHostName());
+      } catch (InvalidNodeStateException e) {
+        // TODO - decide how to handle this. We may not want to fail all nodes
+        //        only one is in a bad state, as some nodes may have been OK
+        //        and already processed. Perhaps we should return a list of
+        //        error and feed that all the way back to the client?
       }
     }
   }
 
   public synchronized void startDecommission(DatanodeDetails dn)
-      throws NodeNotFoundException {
+      throws NodeNotFoundException, InvalidNodeStateException {
     NodeStatus nodeStatus = getNodeStatus(dn);
     NodeOperationalState opState = nodeStatus.getOperationalState();
-    LOG.info("In decommission the op state is {}", opState);
-    if (opState != NodeOperationalState.DECOMMISSIONING
-        && opState != NodeOperationalState.DECOMMISSIONED) {
+    if (opState == NodeOperationalState.IN_SERVICE) {
       LOG.info("Starting Decommission for node {}", dn);
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.DECOMMISSIONING);
       pendingNodes.add(dn);
-    } else {
+    } else if (opState == NodeOperationalState.DECOMMISSIONING
+        || opState == NodeOperationalState.DECOMMISSIONED) {
       LOG.info("Start Decommission called on node {} in state {}. Nothing to "+
           "do.", dn, opState);
+    } else {
+      LOG.error("Cannot decommission node {} in state {}", dn, opState);
+      throw new InvalidNodeStateException("Cannot decommission node "+
+          dn +" in state "+ opState);
     }
   }
 
@@ -252,6 +261,11 @@ public class NodeDecommissionManager {
         // log a warning and ignore the exception
         LOG.warn("The host {} was not found in SCM. Ignoring the request to "+
             "start maintenance on it", dn.getHostName());
+      } catch (InvalidNodeStateException e) {
+        // TODO - decide how to handle this. We may not want to fail all nodes
+        //        only one is in a bad state, as some nodes may have been OK
+        //        and already processed. Perhaps we should return a list of
+        //        error and feed that all the way back to the client?
       }
     }
   }
@@ -259,18 +273,22 @@ public class NodeDecommissionManager {
   // TODO - If startMaintenance is called on a host already in maintenance,
   //        then we should update the end time?
   public synchronized void startMaintenance(DatanodeDetails dn, int endInHours)
-      throws NodeNotFoundException {
+      throws NodeNotFoundException, InvalidNodeStateException {
     NodeStatus nodeStatus = getNodeStatus(dn);
     NodeOperationalState opState = nodeStatus.getOperationalState();
-    if (opState != NodeOperationalState.ENTERING_MAINTENANCE &&
-        opState != NodeOperationalState.IN_MAINTENANCE) {
+    if (opState == NodeOperationalState.IN_SERVICE) {
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.ENTERING_MAINTENANCE);
       pendingNodes.add(dn);
       LOG.info("Starting Maintenance for node {}", dn);
-    } else {
+    } else if (opState == NodeOperationalState.ENTERING_MAINTENANCE ||
+        opState == NodeOperationalState.IN_MAINTENANCE) {
       LOG.info("Starting Maintenance called on node {} with state {}. "+
           "Nothing to do.", dn, opState);
+    } else {
+      LOG.error("Cannot start maintenance on node {} in state {}", dn, opState);
+      throw new InvalidNodeStateException("Cannot start maintenance on node "+
+          dn +" in state "+ opState);
     }
   }
 

@@ -30,7 +30,7 @@ import java.util.concurrent.Callable;
  */
 @Command(
     name = "dnadmin",
-    description = "Datanode Administration specific operations",
+    description = "Datanode Administration operations",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
