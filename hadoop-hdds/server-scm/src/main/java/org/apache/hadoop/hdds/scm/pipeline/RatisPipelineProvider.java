@@ -58,8 +58,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import com.google.common.annotations.VisibleForTesting;
-
 /**
  * Implements Api for creating ratis pipelines.
  */
@@ -247,10 +245,5 @@ public class RatisPipelineProvider implements PipelineProvider {
     if (!exceptions.isEmpty()) {
       throw MultipleIOException.createIOException(exceptions);
     }
-  }
-
-  @VisibleForTesting
-  PipelineStateManager getStateManager() {
-    return stateManager;
   }
 }
