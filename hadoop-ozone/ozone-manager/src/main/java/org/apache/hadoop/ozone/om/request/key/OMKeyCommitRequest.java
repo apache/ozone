@@ -131,7 +131,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, commitKeyRequest.getClientID());
 
-      bucketLockAcquired = omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
+      bucketLockAcquired = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -169,13 +169,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omClientResponse.setFlushFuture(
             ozoneManagerDoubleBufferHelper.add(omClientResponse,
                 transactionLogIndex));
-        if(bucketLockAcquired) {
-          omMetadataManager.getLock().releaseLock(BUCKET_LOCK, volumeName,
-              bucketName);
-        }
       }
-      omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-          bucketName);
+      if(bucketLockAcquired) {
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+                bucketName);
+      }
     }
 
     // Performing audit logging outside of the lock.
