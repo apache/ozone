@@ -105,12 +105,15 @@ public interface StorageContainerLocationProtocol extends Closeable {
   void deleteContainer(long containerID) throws IOException;
 
   /**
-   *  Queries a list of Node Statuses.
-   * @param state
+   *  Queries a list of Node Statuses. Passing a null for either opState or
+   *  state acts like a wildcard returning all nodes in that state.
+   * @param opState The node operational state
+   * @param state The node health
    * @return List of Datanodes.
    */
-  List<HddsProtos.Node> queryNode(HddsProtos.NodeState state,
-      HddsProtos.QueryScope queryScope, String poolName) throws IOException;
+  List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
+      HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
+      String poolName) throws IOException;
 
   void decommissionNodes(List<String> nodes) throws IOException;
 

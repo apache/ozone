@@ -2394,8 +2394,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setType(ServicePort.Type.RPC)
             .setValue(scmAddr.getPort()).build());
     services.add(scmServiceInfoBuilder.build());
-
-    List<HddsProtos.Node> nodes = scmContainerClient.queryNode(HEALTHY,
+    List<HddsProtos.Node> nodes = scmContainerClient.queryNode(
+        HddsProtos.NodeOperationalState.IN_SERVICE, HEALTHY,
         HddsProtos.QueryScope.CLUSTER, "");
 
     for (HddsProtos.Node node : nodes) {

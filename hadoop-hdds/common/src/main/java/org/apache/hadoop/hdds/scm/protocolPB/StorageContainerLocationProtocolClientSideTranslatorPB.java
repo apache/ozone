@@ -240,23 +240,34 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   /**
-   * Queries a list of Node Statuses.
+   * Queries a list of Nodes based on their operational state or health state.
+   * Passing a null for either value acts as a wildcard for that state.
+   *
+   * @param opState The operation state of the node
+   * @param nodeState The health of the node
+   * @return List of Datanodes.
    */
   @Override
-  public List<HddsProtos.Node> queryNode(HddsProtos.NodeState
-      nodeStatuses, HddsProtos.QueryScope queryScope, String poolName)
+  public List<HddsProtos.Node> queryNode(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState
+      nodeState, HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     // TODO : We support only cluster wide query right now. So ignoring checking
     // queryScope and poolName
-    Preconditions.checkNotNull(nodeStatuses);
-    NodeQueryRequestProto request = NodeQueryRequestProto.newBuilder()
-        .setState(nodeStatuses)
+    NodeQueryRequestProto.Builder builder = NodeQueryRequestProto.newBuilder()
         .setTraceID(TracingUtil.exportCurrentSpan())
-        .setScope(queryScope).setPoolName(poolName).build();
+        .setScope(queryScope).setPoolName(poolName);
+    if (opState != null) {
+      builder.setOpState(opState);
+    }
+    if (nodeState != null) {
+      builder.setState(nodeState);
+    }
+    NodeQueryRequestProto request = builder.build();
     NodeQueryResponseProto response = submitRequest(Type.QueryNode,
-        builder -> builder.setNodeQueryRequest(request)).getNodeQueryResponse();
+        builder1 -> builder1.setNodeQueryRequest(request))
+        .getNodeQueryResponse();
     return response.getDatanodesList();
-
   }
 
   /**

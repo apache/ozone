@@ -118,6 +118,7 @@ enum QueryScope {
 message Node {
     required DatanodeDetailsProto nodeID = 1;
     repeated NodeState nodeStates = 2;
+    repeated NodeOperationalState nodeOperationalStates = 3;
 }
 
 message NodePool {
