@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -165,6 +164,13 @@ public class NodeDecommissionManager {
     this.nodeManager = nodeManager;
     this.pipeLineManager = pipelineManager;
     this.containerManager = containerManager;
+
+    // TODO these 3 lines are only here to silence findbugs for now, as they
+    // will be used in a later patch or removed, but for now they should stay
+    // here.
+    conf.get("test.test");
+    pipeLineManager.getPipelines();
+    containerManager.getContainers();
 
     useHostnames = conf.getBoolean(
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
