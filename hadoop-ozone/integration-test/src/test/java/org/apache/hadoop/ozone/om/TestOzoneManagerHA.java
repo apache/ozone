@@ -23,8 +23,11 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -32,6 +35,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -1270,6 +1274,48 @@ public class TestOzoneManagerHA {
     validateListParts(ozoneBucket, keyName, uploadID, partsMap);
 
   }
+
+  @Test
+  public void testListVolumes() throws Exception {
+    String userName = UserGroupInformation.getCurrentUser().getUserName();
+    String adminName = userName;
+
+    Set<String> expectedVolumes = new TreeSet<>();
+    for (int i=0; i < 100; i++) {
+      String volumeName = "vol" + i;
+      expectedVolumes.add(volumeName);
+      VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+          .setOwner(userName)
+          .setAdmin(adminName)
+          .build();
+      objectStore.createVolume(volumeName, createVolumeArgs);
+    }
+
+    validateVolumesList(userName, expectedVolumes);
+
+    // Stop leader OM, and then validate list volumes for user.
+    stopLeaderOM();
+
+    validateVolumesList(userName, expectedVolumes);
+
+  }
+
+  private void validateVolumesList(String userName,
+      Set<String> expectedVolumes) throws Exception {
+
+    int expectedCount = 0;
+    Iterator<? extends OzoneVolume> volumeIterator =
+        objectStore.listVolumesByUser(userName, "", "");
+
+    while (volumeIterator.hasNext()) {
+      OzoneVolume next = volumeIterator.next();
+      Assert.assertTrue(expectedVolumes.contains(next.getName()));
+      expectedCount++;
+    }
+
+    Assert.assertEquals(expectedVolumes.size(),  expectedCount);
+  }
+
 
   /**
    * Stop the current leader OM.
