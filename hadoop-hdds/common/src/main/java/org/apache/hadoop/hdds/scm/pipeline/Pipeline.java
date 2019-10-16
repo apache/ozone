@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
+
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -50,6 +52,8 @@ public final class Pipeline {
   private Map<DatanodeDetails, Long> nodeStatus;
   // nodes with ordered distance to client
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
+  // Current reported Leader for the pipeline
+  private ByteString leaderId = ByteString.EMPTY;
 
   /**
    * The immutable properties of pipeline object is used in
@@ -100,6 +104,17 @@ public final class Pipeline {
    */
   public PipelineState getPipelineState() {
     return state;
+  }
+
+  public ByteString getLeaderId() {
+    return leaderId;
+  }
+
+  /**
+   * Pipeline object, outside of letting leader id to be set, is immutable.
+   */
+  void setLeaderId(ByteString leaderId) {
+    this.leaderId = leaderId;
   }
 
   /**
@@ -174,7 +189,7 @@ public final class Pipeline {
         .setType(type)
         .setFactor(factor)
         .setState(PipelineState.getProtobuf(state))
-        .setLeaderID("")
+        .setLeaderID(leaderId)
         .addAllMembers(nodeStatus.keySet().stream()
             .map(DatanodeDetails::getProtoBufMessage)
             .collect(Collectors.toList()));
@@ -206,6 +221,7 @@ public final class Pipeline {
         .setFactor(pipeline.getFactor())
         .setType(pipeline.getType())
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
+        .setLeaderId(pipeline.getLeaderID())
         .setNodes(pipeline.getMembersList().stream()
             .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList()))
         .setNodesInOrder(pipeline.getMemberOrdersList())
@@ -274,6 +290,7 @@ public final class Pipeline {
     private Map<DatanodeDetails, Long> nodeStatus = null;
     private List<Integer> nodeOrder = null;
     private List<DatanodeDetails> nodesInOrder = null;
+    private ByteString leaderId = ByteString.EMPTY;
 
     public Builder() {}
 
@@ -306,6 +323,11 @@ public final class Pipeline {
       return this;
     }
 
+    public Builder setLeaderId(ByteString leaderId1) {
+      this.leaderId = leaderId1;
+      return this;
+    }
+
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
@@ -324,6 +346,7 @@ public final class Pipeline {
       Preconditions.checkNotNull(state);
       Preconditions.checkNotNull(nodeStatus);
       Pipeline pipeline = new Pipeline(id, type, factor, state, nodeStatus);
+      pipeline.setLeaderId(leaderId);
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         // This branch is for build from ProtoBuf
