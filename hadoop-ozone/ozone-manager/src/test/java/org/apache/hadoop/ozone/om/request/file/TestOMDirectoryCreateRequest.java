@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 
 /**
  * Test OM directory create request.
@@ -175,13 +176,12 @@ public class TestOMDirectoryCreateRequest {
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND);
+    Assert.assertEquals(VOLUME_NOT_FOUND,
+        omClientResponse.getOMResponse().getStatus());
 
     // Key should not exist in DB
-    Assert.assertTrue(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(
-            volumeName, bucketName, keyName)) == null);
+    Assert.assertNull(omMetadataManager.getKeyTable().
+        get(omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
 
   }
 
