@@ -169,10 +169,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omClientResponse.setFlushFuture(
             ozoneManagerDoubleBufferHelper.add(omClientResponse,
                 transactionLogIndex));
-        if (bucketLockAcquired) {
-          omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-              bucketName);
-        }
+      }
+
+      if (bucketLockAcquired) {
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+            bucketName);
       }
     }
 
