@@ -40,9 +40,9 @@ import java.util.List;
 public class NodeDecommissionManager {
 
   private NodeManager nodeManager;
-  private PipelineManager pipeLineManager;
-  private ContainerManager containerManager;
-  private OzoneConfiguration conf;
+ // private PipelineManager pipeLineManager;
+ // private ContainerManager containerManager;
+ // private OzoneConfiguration conf;
   private boolean useHostnames;
 
   private List<DatanodeDetails> pendingNodes = new LinkedList<>();
@@ -160,17 +160,10 @@ public class NodeDecommissionManager {
   public NodeDecommissionManager(OzoneConfiguration conf,
       NodeManager nodeManager, PipelineManager pipelineManager,
       ContainerManager containerManager) {
-    this.conf = conf;
     this.nodeManager = nodeManager;
-    this.pipeLineManager = pipelineManager;
-    this.containerManager = containerManager;
-
-    // TODO these 3 lines are only here to silence findbugs for now, as they
-    // will be used in a later patch or removed, but for now they should stay
-    // here.
-    conf.get("test.test");
-    pipeLineManager.getPipelines();
-    containerManager.getContainers();
+    //this.conf = conf;
+    //this.pipeLineManager = pipelineManager;
+    //this.containerManager = containerManager;
 
     useHostnames = conf.getBoolean(
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
