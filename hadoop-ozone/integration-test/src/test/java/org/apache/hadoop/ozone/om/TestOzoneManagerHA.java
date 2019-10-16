@@ -29,6 +29,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.junit.After;
@@ -1244,5 +1245,93 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(followerOM1lastAppliedIndex,
         followerOM2lastAppliedIndex);
 
+  }
+
+  @Test
+  public void testListParts() throws Exception {
+
+    OzoneBucket ozoneBucket = setupBucket();
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(ozoneBucket, keyName);
+
+    Map<Integer, String> partsMap = new HashMap<>();
+    partsMap.put(1, createMultipartUploadPartKey(ozoneBucket, 1, keyName,
+        uploadID));
+    partsMap.put(2, createMultipartUploadPartKey(ozoneBucket, 2, keyName,
+        uploadID));
+    partsMap.put(3, createMultipartUploadPartKey(ozoneBucket, 3, keyName,
+        uploadID));
+
+    validateListParts(ozoneBucket, keyName, uploadID, partsMap);
+
+    // Stop leader OM, and then validate list parts.
+    stopLeaderOM();
+
+    validateListParts(ozoneBucket, keyName, uploadID, partsMap);
+
+  }
+
+  /**
+   * Stop the current leader OM.
+   * @throws Exception
+   */
+  private void stopLeaderOM() {
+    //Stop the leader OM.
+    OMFailoverProxyProvider omFailoverProxyProvider =
+        objectStore.getClientProxy().getOMProxyProvider();
+
+    // The OMFailoverProxyProvider will point to the current leader OM node.
+    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+
+    // Stop one of the ozone manager, to see when the OM leader changes
+    // multipart upload is happening successfully or not.
+    cluster.stopOzoneManager(leaderOMNodeId);
+  }
+
+  /**
+   * Validate parts uploaded to a MPU Key.
+   * @param ozoneBucket
+   * @param keyName
+   * @param uploadID
+   * @param partsMap
+   * @throws Exception
+   */
+  private void validateListParts(OzoneBucket ozoneBucket, String keyName,
+      String uploadID, Map<Integer, String> partsMap) throws Exception {
+    OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
+        ozoneBucket.listParts(keyName, uploadID, 0, 1000);
+
+    List<OzoneMultipartUploadPartListParts.PartInfo> partInfoList =
+        ozoneMultipartUploadPartListParts.getPartInfoList();
+
+    Assert.assertTrue(partInfoList.size() == partsMap.size());
+
+    for (int i=0; i< partsMap.size(); i++) {
+      Assert.assertEquals(partsMap.get(partInfoList.get(i).getPartNumber()),
+          partInfoList.get(i).getPartName());
+
+    }
+
+    Assert.assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
+  }
+
+  /**
+   * Create an Multipart upload part Key with specified partNumber and uploadID.
+   * @param ozoneBucket
+   * @param partNumber
+   * @param keyName
+   * @param uploadID
+   * @return Part name for the uploaded part.
+   * @throws Exception
+   */
+  private String createMultipartUploadPartKey(OzoneBucket ozoneBucket,
+      int partNumber, String keyName, String uploadID) throws Exception {
+    String value = "random data";
+    OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
+        keyName, value.length(), partNumber, uploadID);
+    ozoneOutputStream.write(value.getBytes(), 0, value.length());
+    ozoneOutputStream.close();
+
+    return ozoneOutputStream.getCommitUploadPartInfo().getPartName();
   }
 }
