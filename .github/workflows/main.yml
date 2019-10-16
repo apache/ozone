@@ -1,0 +1,44 @@
+name: Ozone Build
+on: push
+jobs:
+  build:
+    name: Compile
+    runs-on: ubuntu-18.04
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/actions/build
+          env:
+            TEST_TYPE: build
+  unit:
+    name: Unit test
+    runs-on: ubuntu-18.04
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/actions/build
+          env:
+            TEST_TYPE: unit
+  rat:
+    name: Licence check
+    runs-on: ubuntu-18.04
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/actions/build
+          env:
+            TEST_TYPE: rat
+  author:
+    name: Author tag usage check
+    runs-on: ubuntu-18.04
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/actions/build
+          env:
+            TEST_TYPE: author
+  checkstyle:
+    name: Checkstyle
+    runs-on: ubuntu-18.04
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/actions/build
+          env:
+            TEST_TYPE: checkstyle
+
