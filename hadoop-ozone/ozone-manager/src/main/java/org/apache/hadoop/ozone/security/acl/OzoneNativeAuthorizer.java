@@ -69,9 +69,6 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     Objects.requireNonNull(ozObject);
     Objects.requireNonNull(context);
     OzoneObjInfo objInfo;
-    RequestContext parentContext;
-    boolean isACLTypeCreate = (context.getAclRights() == ACLType.CREATE);
-    boolean isACLTypeDelete = (context.getAclRights() == ACLType.DELETE);
 
     if (ozObject instanceof OzoneObjInfo) {
       objInfo = (OzoneObjInfo) ozObject;

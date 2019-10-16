@@ -64,7 +64,7 @@ public interface IAccessAuthorizer {
 
     public static ACLType getAclTypeFromOrdinal(int ordinal) {
       if (ordinal > length - 1 && ordinal > -1) {
-        throw new IllegalArgumentException("Ordinal greater than array length" +
+        throw new IllegalArgumentException("Ordinal greater than array lentgh" +
             ". ordinal:" + ordinal);
       }
       return vals[ordinal];

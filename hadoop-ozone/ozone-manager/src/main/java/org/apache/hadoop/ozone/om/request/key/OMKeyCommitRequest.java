@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,14 +111,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     IOException exception = null;
     OmKeyInfo omKeyInfo = null;
     OMClientResponse omClientResponse = null;
-    boolean bucketLockAcquired = false;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     try {
       // check Acl
-      checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName,
-          keyName, IAccessAuthorizer.ACLType.WRITE,
-          commitKeyRequest.getClientID());
+      checkBucketAcls(ozoneManager, volumeName, bucketName, keyName);
 
       List<OmKeyLocationInfo> locationInfoList = commitKeyArgs
           .getKeyLocationsList().stream()
@@ -131,8 +127,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, commitKeyRequest.getClientID());
 
-      bucketLockAcquired = omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+          bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
@@ -169,10 +165,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omClientResponse.setFlushFuture(
             ozoneManagerDoubleBufferHelper.add(omClientResponse,
                 transactionLogIndex));
-        if(bucketLockAcquired) {
-          omMetadataManager.getLock().releaseLock(BUCKET_LOCK, volumeName,
-              bucketName);
-        }
       }
       omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
           bucketName);
