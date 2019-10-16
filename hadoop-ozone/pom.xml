@@ -39,16 +39,11 @@
     <module>common</module>
     <module>client</module>
     <module>ozone-manager</module>
-    <module>ozonefs</module>
-    <module>ozonefs-lib-current</module>
-    <module>ozonefs-lib-legacy</module>
     <module>tools</module>
     <module>integration-test</module>
     <module>datanode</module>
     <module>s3gateway</module>
     <module>dist</module>
-    <module>recon</module>
-    <module>recon-codegen</module>
     <module>upgrade</module>
     <module>csi</module>
     <module>fault-injection-test</module>
@@ -362,6 +357,31 @@
       <properties>
         <docker.image>${user.name}/ozone:${project.version}</docker.image>
       </properties>
+    </profile>
+    <profile>
+      <id>build-with-ozonefs</id>
+      <activation>
+        <property>
+          <name>!skipShade</name>
+        </property>
+      </activation>
+      <modules>
+        <module>ozonefs</module>
+        <module>ozonefs-lib-current</module>
+        <module>ozonefs-lib-legacy</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>build-with-recon</id>
+      <activation>
+        <property>
+          <name>!skipRecon</name>
+        </property>
+      </activation>
+      <modules>
+        <module>recon</module>
+        <module>recon-codegen</module>
+      </modules>
     </profile>
     <profile>
       <id>parallel-tests</id>
