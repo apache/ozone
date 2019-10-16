@@ -89,6 +89,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
@@ -1656,8 +1657,15 @@ public class KeyManagerImpl implements KeyManager {
       validateBucket(volume, bucket);
       OmKeyInfo keyInfo = null;
       try {
-        OzoneFileStatus fileStatus = getFileStatus(args);
-        keyInfo = fileStatus.getKeyInfo();
+        // For Acl Type "WRITE", the key can only be found in
+        // OpenKeyTable since appends to existing keys are not supported.
+        if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
+          keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
+        } else {
+          OzoneFileStatus fileStatus = getFileStatus(args);
+          keyInfo = fileStatus.getKeyInfo();
+        }
+
         if (keyInfo == null) {
           // the key does not exist, but it is a parent "dir" of some key
           // let access be determined based on volume/bucket/prefix ACL

@@ -25,11 +25,6 @@
   <includeBaseDirectory>true</includeBaseDirectory>
   <files>
     <file>
-      <source>pom.ozone.xml</source>
-      <outputDirectory>/</outputDirectory>
-      <destName>pom.xml</destName>
-    </file>
-    <file>
       <source>hadoop-ozone/dist/src/main/license/src/LICENSE.txt</source>
       <outputDirectory>/</outputDirectory>
     </file>
@@ -62,7 +57,7 @@
     <fileSet>
       <directory>.</directory>
       <includes>
-        <include>pom.ozone.xml</include>
+        <include>pom.xml</include>
         <include>README.txt</include>
       </includes>
     </fileSet>
