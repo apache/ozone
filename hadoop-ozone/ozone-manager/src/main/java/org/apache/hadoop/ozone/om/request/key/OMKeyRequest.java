@@ -507,11 +507,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @throws IOException
    */
   protected void checkBucketAcls(OzoneManager ozoneManager, String volume,
-      String bucket, String key, IAccessAuthorizer.ACLType aclType)
-      throws IOException {
+      String bucket, String key) throws IOException {
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-          OzoneObj.StoreType.OZONE, aclType,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
           volume, bucket, key);
     }
   }
@@ -523,43 +522,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @param volume
    * @param bucket
    * @param key
-   * @param aclType
-   * @param resourceType
    * @throws IOException
    */
   protected void checkKeyAcls(OzoneManager ozoneManager, String volume,
-      String bucket, String key, IAccessAuthorizer.ACLType aclType,
-      OzoneObj.ResourceType resourceType)
-      throws IOException {
+      String bucket, String key) throws IOException {
     if (ozoneManager.getAclsEnabled()) {
-      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
+      checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE,
           volume, bucket, key);
     }
   }
 
-  /**
-   * Check ACLs for Ozone Key in OpenKey table
-   * if ozone native authorizer is enabled.
-   * @param ozoneManager
-   * @param volume
-   * @param bucket
-   * @param key
-   * @param aclType
-   * @param clientId
-   * @throws IOException
-   */
-  protected void checkKeyAclsInOpenKeyTable(OzoneManager ozoneManager,
-      String volume, String bucket, String key,
-      IAccessAuthorizer.ACLType aclType, long clientId) throws IOException {
-    String keyNameForAclCheck = key;
-    // Native authorizer requires client id as part of key name to check
-    // write ACL on key. Add client id to key name if ozone native
-    // authorizer is configured.
-    if (ozoneManager.isNativeAuthorizerEnabled()) {
-      keyNameForAclCheck = key + "/" + clientId;
-    }
-
-    checkKeyAcls(ozoneManager, volume, bucket, keyNameForAclCheck,
-          aclType, OzoneObj.ResourceType.KEY);
-  }
 }
