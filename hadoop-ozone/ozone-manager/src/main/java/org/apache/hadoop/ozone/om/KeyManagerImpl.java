@@ -89,6 +89,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
@@ -1654,28 +1655,28 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       validateBucket(volume, bucket);
-      OmKeyInfo keyInfo = null;
-      try {
-        OzoneFileStatus fileStatus = getFileStatus(args);
-        keyInfo = fileStatus.getKeyInfo();
-        if (keyInfo == null) {
-          // the key does not exist, but it is a parent "dir" of some key
-          // let access be determined based on volume/bucket/prefix ACL
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("key:{} is non-existent parent, permit access to user:{}",
-                keyName, context.getClientUgi());
-          }
-          return true;
-        }
-      } catch (OMException e) {
-        if (e.getResult() == FILE_NOT_FOUND) {
-          keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
+      OmKeyInfo keyInfo;
+
+      // For Acl Type "WRITE", the key can only be found in
+      // OpenKeyTable since appends to existing keys are not supported.
+      if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
+        keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
+      } else {
+        try {
+          OzoneFileStatus fileStatus = getFileStatus(args);
+          keyInfo = fileStatus.getKeyInfo();
+        } catch (IOException e) {
+          throw new OMException("Key not found, checkAccess failed. Key:" +
+              objectKey, KEY_NOT_FOUND);
         }
       }
 
       if (keyInfo == null) {
-        throw new OMException("Key not found, checkAccess failed. Key:" +
-            objectKey, KEY_NOT_FOUND);
+        // the key does not exist, but it is a parent "dir" of some key
+        // let access be determined based on volume/bucket/prefix ACL
+        LOG.debug("key:{} is non-existent parent, permit access to user:{}",
+            keyName, context.getClientUgi());
+        return true;
       }
 
       boolean hasAccess = OzoneAclUtil.checkAclRight(
