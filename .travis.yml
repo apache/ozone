@@ -10,7 +10,6 @@ services:
   - docker
 before_script:
   - docker --version
-  - cd /usr/local/src/
   - wget https://github.com/google/protobuf/releases/download/v2.5.0/$PROTOC_ZIP
   - tar xvf $PROTOC_ZIP
   - rm -f $PROTOC_ZIP
@@ -25,7 +24,6 @@ before_script:
   - chmod +x docker-compose
   - sudo mv docker-compose /usr/local/bin
   - docker-compose --version
-  - cd $TRAVIS_BUILD_DIR
 script:
   - ./hadoop-ozone/dev-support/checks/checkstyle.sh
   - ./hadoop-ozone/dev-support/checks/rat.sh
