@@ -185,11 +185,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         .getCachedLeaderPeerId();
 
     NotLeaderException notLeaderException;
-    if (leaderRaftPeerId.isPresent()) {
+    if (!leaderRaftPeerId.isPresent()) {
       notLeaderException = new NotLeaderException(raftPeerId.toString());
     } else {
       notLeaderException = new NotLeaderException(
-          raftPeerId.toString(), leaderRaftPeerId.toString());
+          raftPeerId.toString(), leaderRaftPeerId.get().toString());
     }
 
     if (LOG.isDebugEnabled()) {
