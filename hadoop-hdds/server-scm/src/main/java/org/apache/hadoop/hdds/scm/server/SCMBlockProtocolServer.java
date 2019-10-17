@@ -176,6 +176,10 @@ public class SCMBlockProtocolServer implements
     auditMap.put("owner", owner);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
     boolean auditSuccess = true;
+    LOG.info("Allocating blocks {} of size {}, with excludeList: " +
+        "datanodes = {}, pipelines = {}, containers = {}",
+        excludeList.getDatanodes(), excludeList.getPipelineIds(),
+        excludeList.getContainerIds());
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
