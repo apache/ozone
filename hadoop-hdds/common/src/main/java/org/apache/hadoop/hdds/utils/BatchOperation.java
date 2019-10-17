@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils;
 import com.google.common.collect.Lists;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * An utility class to store a batch of DB write operations.
@@ -60,19 +61,16 @@ public class BatchOperation {
    * A SingleOperation represents a PUT or DELETE operation
    * and the data the operation needs to manipulates.
    */
-  public static class SingleOperation {
+  static class SingleOperation {
 
-    private Operation opt;
-    private byte[] key;
-    private byte[] value;
+    private final Operation opt;
+    private final byte[] key;
+    private final byte[] value;
 
-    public SingleOperation(Operation opt, byte[] key, byte[] value) {
+    SingleOperation(Operation opt, byte[] key, byte[] value) {
       this.opt = opt;
-      if (key == null) {
-        throw new IllegalArgumentException("key cannot be null");
-      }
-      this.key = key.clone();
-      this.value = value == null ? null : value.clone();
+      this.key = Objects.requireNonNull(key, "key cannot be null");
+      this.value = value;
     }
 
     public Operation getOpt() {
@@ -80,11 +78,11 @@ public class BatchOperation {
     }
 
     public byte[] getKey() {
-      return key.clone();
+      return key;
     }
 
     public byte[] getValue() {
-      return value == null ? null : value.clone();
+      return value;
     }
   }
 }
