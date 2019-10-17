@@ -113,8 +113,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
           try {
             OMClientRequest omClientRequest =
                 OzoneManagerRatisUtils.createClientRequest(request);
-            Preconditions.checkState(omClientRequest != null,
-                "Unrecognized write command type request" + request.toString());
             request = omClientRequest.preExecute(ozoneManager);
           } catch (IOException ex) {
             // As some of the preExecute returns error. So handle here.

@@ -146,7 +146,8 @@ public final class OzoneManagerRatisUtils {
     case GetS3Secret:
       return new S3GetSecretRequest(omRequest);
     default:
-      return null;
+      throw new IllegalStateException("Unrecognized write command " +
+          "type request" + cmdType);
     }
   }
 
