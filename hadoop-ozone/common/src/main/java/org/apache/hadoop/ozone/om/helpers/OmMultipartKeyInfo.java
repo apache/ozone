@@ -31,14 +31,17 @@ import java.util.TreeMap;
  */
 public class OmMultipartKeyInfo {
   private String uploadID;
+  private long creationTime;
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
 
   /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
    * information for a key.
    */
-  public OmMultipartKeyInfo(String id, Map<Integer, PartKeyInfo> list) {
+  public OmMultipartKeyInfo(String id, long creationTime,
+                            Map<Integer, PartKeyInfo> list) {
     this.uploadID = id;
+    this.creationTime = creationTime;
     this.partKeyInfoList = new TreeMap<>(list);
   }
 
@@ -48,6 +51,10 @@ public class OmMultipartKeyInfo {
    */
   public String getUploadID() {
     return uploadID;
+  }
+
+  public long getCreationTime() {
+    return creationTime;
   }
 
   public TreeMap<Integer, PartKeyInfo> getPartKeyInfoMap() {
@@ -68,12 +75,13 @@ public class OmMultipartKeyInfo {
    * @param multipartKeyInfo
    * @return OmMultipartKeyInfo
    */
-  public static OmMultipartKeyInfo getFromProto(MultipartKeyInfo
-                                                 multipartKeyInfo) {
+  public static OmMultipartKeyInfo getFromProto(
+      MultipartKeyInfo multipartKeyInfo) {
     Map<Integer, PartKeyInfo> list = new HashMap<>();
     multipartKeyInfo.getPartKeyInfoListList().stream().forEach(partKeyInfo
         -> list.put(partKeyInfo.getPartNumber(), partKeyInfo));
-    return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(), list);
+    return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
+        multipartKeyInfo.getCreationTime(), list);
   }
 
   /**
@@ -82,7 +90,8 @@ public class OmMultipartKeyInfo {
    */
   public MultipartKeyInfo getProto() {
     MultipartKeyInfo.Builder builder = MultipartKeyInfo.newBuilder()
-        .setUploadID(uploadID);
+        .setUploadID(uploadID)
+        .setCreationTime(creationTime);
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
   }

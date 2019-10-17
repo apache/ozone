@@ -75,7 +75,7 @@ public class TestS3MultipartResponse {
       String volumeName, String bucketName, String keyName,
       String multipartUploadID) {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
-        multipartUploadID, new HashMap<>());
+        multipartUploadID, Time.now(), new HashMap<>());
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
         .setVolumeName(volumeName)

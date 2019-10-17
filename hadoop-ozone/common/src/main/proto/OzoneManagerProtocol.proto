@@ -969,8 +969,9 @@ message MultipartInfoInitiateResponse {
 }
 
 message MultipartKeyInfo {
-    required string uploadID = 4;
-    repeated PartKeyInfo partKeyInfoList = 5;
+    required string uploadID = 1;
+    required uint64 creationTime = 2;
+    repeated PartKeyInfo partKeyInfoList = 3;
 }
 
 message PartKeyInfo {

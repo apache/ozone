@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -35,7 +36,7 @@ public class TestOmMultipartKeyInfoCodec {
   public void testOmMultipartKeyInfoCodec() {
     OmMultipartKeyInfoCodec codec = new OmMultipartKeyInfoCodec();
     OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo(UUID
-        .randomUUID().toString(), new HashMap<>());
+        .randomUUID().toString(), Time.now(), new HashMap<>());
     byte[] data = new byte[0];
     try {
       data = codec.toPersistedFormat(omMultipartKeyInfo);

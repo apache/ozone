@@ -144,7 +144,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
 
       multipartKeyInfo = new OmMultipartKeyInfo(
-          keyArgs.getMultipartUploadID(), new HashMap<>());
+          keyArgs.getMultipartUploadID(), keyArgs.getModificationTime(),
+          new HashMap<>());
 
       omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
