@@ -1,7 +1,10 @@
 env:
   global:
     - DOCKER_COMPOSE_VERSION=1.24.1
-sudo: required
+sudo: false
+cache:
+  directories:
+    - $HOME/.m2
 services:
   - docker
 before_script:
@@ -12,10 +15,11 @@ before_script:
   - sudo mv docker-compose /usr/local/bin
   - docker-compose --version
 script:
-  - ./hadoop-ozone/dev-support/checks/build.sh
   - ./hadoop-ozone/dev-support/checks/checkstyle.sh
   - ./hadoop-ozone/dev-support/checks/rat.sh
   - ./hadoop-ozone/dev-support/checks/author.sh
+  - ./hadoop-ozone/dev-support/checks/build.sh
+  - ./hadoop-ozone/dev-support/checks/acceptance.sh
 branches:
   only:
     - master
