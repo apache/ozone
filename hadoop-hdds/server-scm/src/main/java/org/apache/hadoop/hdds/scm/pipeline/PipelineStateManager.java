@@ -32,8 +32,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 
-import com.google.common.annotations.VisibleForTesting;
-
 /**
  * Manages the state of pipelines in SCM. All write operations like pipeline
  * creation, removal and updates should come via SCMPipelineManager.
