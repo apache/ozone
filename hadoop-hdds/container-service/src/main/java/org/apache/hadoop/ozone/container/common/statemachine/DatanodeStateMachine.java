@@ -486,8 +486,4 @@ public class DatanodeStateMachine implements Closeable {
   public ReplicationSupervisor getSupervisor() {
     return supervisor;
   }
-
-  public ReportManager getReportManager() {
-    return reportManager;
-  }
 }
