@@ -12,10 +12,10 @@ before_script:
   - sudo mv docker-compose /usr/local/bin
   - docker-compose --version
 script:
-  - sh hadoop-ozone/dev-support/checks/build.sh
-  - sh hadoop-ozone/dev-support/checks/checkstyle.sh
-  - sh hadoop-ozone/dev-support/checks/rat.sh
-  - sh hadoop-ozone/dev-support/checks/author.sh
+  - ./hadoop-ozone/dev-support/checks/build.sh
+  - ./hadoop-ozone/dev-support/checks/checkstyle.sh
+  - ./hadoop-ozone/dev-support/checks/rat.sh
+  - ./hadoop-ozone/dev-support/checks/author.sh
 branches:
   only:
     - master
