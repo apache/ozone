@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.NotLeaderException;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -57,7 +56,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final boolean isRatisEnabled;
-  private final boolean propagateExceptionStack;
   private final OzoneManager ozoneManager;
   private final OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final AtomicLong transactionIndex = new AtomicLong(0L);
@@ -73,13 +71,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       OzoneManager impl,
       OzoneManagerRatisServer ratisServer,
       ProtocolMessageMetrics metrics,
-      boolean enableRatis,
-      boolean propagateExceptionStack) {
+      boolean enableRatis) {
     this.ozoneManager = impl;
     handler = new OzoneManagerRequestHandler(impl);
     this.omRatisServer = ratisServer;
     this.isRatisEnabled = enableRatis;
-    this.propagateExceptionStack = propagateExceptionStack;
     this.ozoneManagerDoubleBuffer =
         new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(), (i) -> {
           // Do nothing.
@@ -122,7 +118,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
             request = omClientRequest.preExecute(ozoneManager);
           } catch (IOException ex) {
             // As some of the preExecute returns error. So handle here.
-            return failRequestWithException(request, ex);
+            return createErrorResponse(request, ex);
           }
           return submitRequestToRatis(request);
         } else {
@@ -135,27 +131,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         }
       }
     } else {
-      try {
-        OMResponse response = submitRequestDirectlyToOM(request);
-        return response;
-      } catch (IOException ex) {
-        return failRequestWithException(request, ex);
-      }
-    }
-  }
-
-  private OMResponse failRequestWithException(OMRequest request, IOException e)
-      throws ServiceException {
-    // send summary error response for business exceptions.
-    if (e instanceof OMException) {
-      return createErrorResponse(request, e);
-    }
-    // propagate full stack trace for System Exceptions?
-    if (propagateExceptionStack) {
-      throw new ServiceException(e.getMessage(), e);
-    } else {
-      LOG.error(e.getMessage(), e);
-      return createErrorResponse(request, e);
+      return submitRequestDirectlyToOM(request);
     }
   }
 
@@ -226,8 +202,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   /**
    * Submits request directly to OM.
    */
-  private OMResponse submitRequestDirectlyToOM(OMRequest request)
-      throws IOException {
+  private OMResponse submitRequestDirectlyToOM(OMRequest request) {
     OMClientResponse omClientResponse = null;
     long index = 0L;
     try {
@@ -244,7 +219,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         omClientResponse = omClientRequest.validateAndUpdateCache(
             ozoneManager, index, ozoneManagerDoubleBuffer::add);
       }
-    } catch(OMException ex) {
+    } catch(IOException ex) {
       // As some of the preExecute returns error. So handle here.
       return createErrorResponse(request, ex);
     }
