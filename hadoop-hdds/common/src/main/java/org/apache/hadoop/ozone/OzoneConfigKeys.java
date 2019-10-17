@@ -80,10 +80,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_TRACE_ENABLED_KEY =
       "ozone.trace.enabled";
   public static final boolean OZONE_TRACE_ENABLED_DEFAULT = false;
-  public static final String OZONE_PROPAGATE_SYSTEM_EXCEPTION_STACKTRACE =
-      "ozone.exception.stacktrace.propagate";
-  public static final boolean
-      OZONE_PROPAGATE_SYSTEM_EXCEPTION_STACKTRACE_DEFAULT = true;
 
   public static final String OZONE_METADATA_STORE_IMPL =
       "ozone.metastore.impl";

@@ -230,20 +230,24 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       throws IOException {
     OMClientResponse omClientResponse = null;
     long index = 0L;
-    if (OmUtils.isReadOnly(request)) {
-      return handler.handle(request);
-    } else {
-      OMClientRequest omClientRequest =
-          OzoneManagerRatisUtils.createClientRequest(request);
-      Preconditions.checkState(omClientRequest != null,
-          "Unrecognized write command type request" + request.toString());
-      request = omClientRequest.preExecute(ozoneManager);
-      index = transactionIndex.incrementAndGet();
-      omClientRequest = OzoneManagerRatisUtils.createClientRequest(request);
-      omClientResponse = omClientRequest.validateAndUpdateCache(
-          ozoneManager, index, ozoneManagerDoubleBuffer::add);
+    try {
+      if (OmUtils.isReadOnly(request)) {
+        return handler.handle(request);
+      } else {
+        OMClientRequest omClientRequest =
+            OzoneManagerRatisUtils.createClientRequest(request);
+        Preconditions.checkState(omClientRequest != null,
+            "Unrecognized write command type request" + request.toString());
+        request = omClientRequest.preExecute(ozoneManager);
+        index = transactionIndex.incrementAndGet();
+        omClientRequest = OzoneManagerRatisUtils.createClientRequest(request);
+        omClientResponse = omClientRequest.validateAndUpdateCache(
+            ozoneManager, index, ozoneManagerDoubleBuffer::add);
+      }
+    } catch(OMException ex) {
+      // As some of the preExecute returns error. So handle here.
+      return createErrorResponse(request, ex);
     }
-
     try {
       omClientResponse.getFlushFuture().get();
       if (LOG.isTraceEnabled()) {
