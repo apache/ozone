@@ -177,7 +177,7 @@ public class SCMBlockProtocolServer implements
     List<AllocatedBlock> blocks = new ArrayList<>(num);
     boolean auditSuccess = true;
     LOG.info("Allocating blocks {} of size {}, with excludeList: " +
-        "datanodes = {}, pipelines = {}, containers = {}",
+        "datanodes = {}, pipelines = {}, containers = {}", num, size,
         excludeList.getDatanodes(), excludeList.getPipelineIds(),
         excludeList.getContainerIds());
     try {
