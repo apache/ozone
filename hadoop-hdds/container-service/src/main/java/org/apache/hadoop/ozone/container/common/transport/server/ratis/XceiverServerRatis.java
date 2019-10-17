@@ -78,6 +78,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -112,7 +113,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // pipelines
   private final Set<RaftGroupId> raftGids = new HashSet<>();
   // pipeline leaders
-  private Map<RaftGroupId, ByteString> leaderIdMap = new HashMap<>();
+  private Map<RaftGroupId, ByteString> leaderIdMap = new ConcurrentHashMap<>();
 
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
