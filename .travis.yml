@@ -1,7 +1,7 @@
 env:
   global:
     - DOCKER_COMPOSE_VERSION=1.24.1
-    - PROTOC_ZIP=protobuf-2.5.0.zip
+    - PROTOC_ZIP=protobuf-2.5.0.tar.gz
 sudo: false
 cache:
   directories:
@@ -10,16 +10,22 @@ services:
   - docker
 before_script:
   - docker --version
+  - cd /usr/local/src/
   - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v2.5.0/$PROTOC_ZIP
-  - sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
-  - sudo unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
+  - tar xvf protobuf-2.5.0.tar.gz
   - rm -f $PROTOC_ZIP
+  - cd protobuf-2.5.0
+  - ./autogen.sh
+  - ./configure --prefix=/usr
+  - make
+  - make install
   - protoc --version
   - sudo rm /usr/local/bin/docker-compose
   - curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
   - chmod +x docker-compose
   - sudo mv docker-compose /usr/local/bin
   - docker-compose --version
+  - cd $TRAVIS_BUILD_DIR
 script:
   - ./hadoop-ozone/dev-support/checks/checkstyle.sh
   - ./hadoop-ozone/dev-support/checks/rat.sh
