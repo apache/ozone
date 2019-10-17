@@ -1,7 +1,7 @@
 env:
   global:
     - DOCKER_COMPOSE_VERSION=1.24.1
-    - PROTOC_ZIP=protoc-3.7.1-linux-x86_64.zip
+    - PROTOC_ZIP=protobuf-2.5.0.zip
 sudo: false
 cache:
   directories:
@@ -10,7 +10,7 @@ services:
   - docker
 before_script:
   - docker --version
-  - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v3.7.1/$PROTOC_ZIP
+  - curl -OL https://github.com/protocolbuffers/protobuf/releases/download/v2.5.0/$PROTOC_ZIP
   - sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
   - sudo unzip -o $PROTOC_ZIP -d /usr/local 'include/*'
   - rm -f $PROTOC_ZIP
