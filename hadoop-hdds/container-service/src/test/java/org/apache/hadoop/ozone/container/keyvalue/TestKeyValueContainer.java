@@ -391,9 +391,9 @@ public class TestKeyValueContainer {
     // Create Container 1
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     Assert.assertTrue("Rocks DB options should be cached.",
-        MetadataStoreBuilder.cachedOpts.containsKey(conf));
+        MetadataStoreBuilder.CACHED_OPTS.containsKey(conf));
 
-    Options opts = MetadataStoreBuilder.cachedOpts.get(conf);
+    Options opts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
 
     // Create Container 2
     keyValueContainerData = new KeyValueContainerData(2L,
@@ -403,8 +403,8 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    Assert.assertEquals(1, MetadataStoreBuilder.cachedOpts.size());
-    Options cachedOpts = MetadataStoreBuilder.cachedOpts.get(conf);
+    Assert.assertEquals(1, MetadataStoreBuilder.CACHED_OPTS.size());
+    Options cachedOpts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
     Assert.assertEquals("Cache object should not be updated.",
         opts, cachedOpts);
 

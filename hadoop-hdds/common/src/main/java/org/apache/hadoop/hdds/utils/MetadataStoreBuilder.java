@@ -55,10 +55,10 @@ public class MetadataStoreBuilder {
   private Optional<Configuration> optionalConf = Optional.empty();
   private String dbType;
   @VisibleForTesting
-  public static final Map<Configuration, org.rocksdb.Options> cachedOpts =
+  public static final Map<Configuration, org.rocksdb.Options> CACHED_OPTS =
       new ConcurrentHashMap<>();
   @VisibleForTesting
-  public static final OzoneConfiguration defaultConf =
+  public static final OzoneConfiguration DEFAULT_CONF =
       new OzoneConfiguration();
 
   public static MetadataStoreBuilder newBuilder() {
@@ -102,7 +102,7 @@ public class MetadataStoreBuilder {
     }
 
     // Build db store based on configuration
-    final Configuration conf = optionalConf.orElse(defaultConf);
+    final Configuration conf = optionalConf.orElse(DEFAULT_CONF);
 
     if (dbType == null) {
       LOG.debug("dbType is null, using ");
@@ -123,8 +123,8 @@ public class MetadataStoreBuilder {
     } else if (OZONE_METADATA_STORE_IMPL_ROCKSDB.equals(dbType)) {
       org.rocksdb.Options opts;
       // Used cached options if config object passed down is the same
-      if (cachedOpts.containsKey(conf)) {
-        opts = cachedOpts.get(conf);
+      if (CACHED_OPTS.containsKey(conf)) {
+        opts = CACHED_OPTS.get(conf);
       } else {
         opts = new org.rocksdb.Options();
         opts.setCreateIfMissing(createIfMissing);
@@ -143,7 +143,7 @@ public class MetadataStoreBuilder {
           statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
           opts = opts.setStatistics(statistics);
         }
-        cachedOpts.put(conf, opts);
+        CACHED_OPTS.put(conf, opts);
       }
       return new RocksDBStore(dbFile, opts);
     }
