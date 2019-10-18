@@ -62,6 +62,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
@@ -500,13 +501,23 @@ public class TestContainerStateMachineFailures {
       }
     };
 
+    List<Thread> threadList = new ArrayList<>();
+
     for (int i=0 ; i < 100; i++) {
       count++;
-      new Thread(r2).start();
+      Thread r = new Thread(r2);
+      r.start();
+      threadList.add(r);
     }
 
-    new Thread(r1).start();
+    Thread closeContainerThread = new Thread(r1);
+    closeContainerThread.start();
+    threadList.add(closeContainerThread);
     latch.await(600, TimeUnit.SECONDS);
+    for (int i = 0 ; i < 101; i++) {
+      threadList.get(i).join();
+    }
+
     if (failCount.get() > 0) {
       fail("testWriteStateMachineDataIdempotencyWithClosedContainer failed");
     }
