@@ -28,9 +28,6 @@ public class AuditMessage implements Message {
   private String message;
   private Throwable throwable;
 
-  private static final String MSG_PATTERN =
-      "user=%s | ip=%s | op=%s %s | ret=%s";
-
   public AuditMessage(){
 
   }
@@ -122,8 +119,8 @@ public class AuditMessage implements Message {
 
     public AuditMessage build(){
       AuditMessage auditMessage = new AuditMessage();
-      auditMessage.message = String.format(MSG_PATTERN,
-          this.user, this.ip, this.op, this.params, this.ret);
+      auditMessage.message = "user=" + this.user + " | ip=" + this.ip + " | " +
+          "op=" + this.op + " | " + "ret=" + this.ret;
       auditMessage.throwable = this.throwable;
       return auditMessage;
     }
