@@ -223,10 +223,11 @@ message ObjectStageChangeResponseProto {
  match the NodeState that we are requesting.
 */
 message NodeQueryRequestProto {
-  required NodeState state = 1;
+  optional NodeState state = 1;
   required QueryScope scope = 2;
   optional string poolName = 3; // if scope is pool, then pool name is needed.
   optional string traceID = 4;
+  optional NodeOperationalState opState = 5;
 }
 
 message NodeQueryResponseProto {

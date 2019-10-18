@@ -347,7 +347,8 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public List<HddsProtos.Node> queryNode(HddsProtos.NodeState state,
+  public List<HddsProtos.Node> queryNode(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
       HddsProtos.QueryScope queryScope, String poolName) throws
       IOException {
 
@@ -356,9 +357,11 @@ public class SCMClientProtocolServer implements
     }
 
     List<HddsProtos.Node> result = new ArrayList<>();
-    queryNode(state).forEach(node -> result.add(HddsProtos.Node.newBuilder()
+    queryNode(opState, state)
+        .forEach(node -> result.add(HddsProtos.Node.newBuilder()
         .setNodeID(node.getProtoBufMessage())
         .addNodeStates(state)
+        .addNodeOperationalStates(opState)
         .build()));
 
     return result;
@@ -565,12 +568,14 @@ public class SCMClientProtocolServer implements
    * operation between the
    * operators.
    *
-   * @param state - NodeStates.
+   * @param opState - NodeOperational State
+   * @param state - NodeState.
    * @return List of Datanodes.
    */
-  public List<DatanodeDetails> queryNode(HddsProtos.NodeState state) {
+  public List<DatanodeDetails> queryNode(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state) {
     Preconditions.checkNotNull(state, "Node Query set cannot be null");
-    return new ArrayList<>(queryNodeState(state));
+    return new ArrayList<>(queryNodeState(opState, state));
   }
 
   @VisibleForTesting
@@ -589,14 +594,15 @@ public class SCMClientProtocolServer implements
   /**
    * Query the System for Nodes.
    *
+   * @params opState - The node operational state
    * @param nodeState - NodeState that we are interested in matching.
    * @return Set of Datanodes that match the NodeState.
    */
-  private Set<DatanodeDetails> queryNodeState(HddsProtos.NodeState nodeState) {
+  private Set<DatanodeDetails> queryNodeState(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodeState) {
     Set<DatanodeDetails> returnSet = new TreeSet<>();
-    // TODO - decomm states needed
     List<DatanodeDetails> tmp = scm.getScmNodeManager()
-        .getNodes(null, nodeState);
+        .getNodes(opState, nodeState);
     if ((tmp != null) && (tmp.size() > 0)) {
       returnSet.addAll(tmp);
     }
