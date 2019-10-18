@@ -16,14 +16,16 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.server.blockmanagement.DatanodeAdminManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,23 +35,28 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Class used to manage datanodes scheduled for maintenance or decommission.
  */
 public class NodeDecommissionManager {
 
-  private NodeManager nodeManager;
- // private PipelineManager pipeLineManager;
- // private ContainerManager containerManager;
- // private OzoneConfiguration conf;
-  private boolean useHostnames;
+  private ScheduledExecutorService executor;
+  private DatanodeAdminMonitorInterface monitor;
 
-  private List<DatanodeDetails> pendingNodes = new LinkedList<>();
+  private NodeManager nodeManager;
+  private PipelineManager pipelineManager;
+ // private ContainerManager containerManager;
+  private EventPublisher eventQueue;
+  private OzoneConfiguration conf;
+  private boolean useHostnames;
+  private long monitorInterval;
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeAdminManager.class);
-
+      LoggerFactory.getLogger(NodeDecommissionManager.class);
 
   static class HostDefinition {
     private String rawHostname;
@@ -157,17 +164,47 @@ public class NodeDecommissionManager {
     return false;
   }
 
-  public NodeDecommissionManager(OzoneConfiguration conf,
-      NodeManager nodeManager, PipelineManager pipelineManager,
-      ContainerManager containerManager) {
-    this.nodeManager = nodeManager;
-    //this.conf = conf;
-    //this.pipeLineManager = pipelineManager;
+  public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
+      PipelineManager pm, ContainerManager containerManager,
+      EventPublisher eventQueue) {
+    this.nodeManager = nm;
+    conf = config;
+    this.pipelineManager = pm;
     //this.containerManager = containerManager;
+    this.eventQueue = eventQueue;
+
+    executor = Executors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder().setNameFormat("DatanodeAdminManager-%d")
+            .setDaemon(true).build());
 
     useHostnames = conf.getBoolean(
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+
+    monitorInterval = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
+        TimeUnit.SECONDS);
+    if (monitorInterval <= 0) {
+      LOG.warn("{} must be greater than zero, defaulting to {}",
+          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
+          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
+      conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
+          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
+      monitorInterval = conf.getTimeDuration(
+          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
+          ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
+          TimeUnit.SECONDS);
+    }
+
+    monitor = new DatanodeAdminMonitor(conf);
+    monitor.setConf(conf);
+    monitor.setEventQueue(this.eventQueue);
+    monitor.setNodeManager(nodeManager);
+    monitor.setPipelineManager(pipelineManager);
+
+    executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
+        TimeUnit.SECONDS);
   }
 
   public synchronized void decommissionNodes(List nodes)
@@ -201,7 +238,7 @@ public class NodeDecommissionManager {
       LOG.info("Starting Decommission for node {}", dn);
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.DECOMMISSIONING);
-      pendingNodes.add(dn);
+      monitor.startMonitoring(dn, 0);
     } else if (opState == NodeOperationalState.DECOMMISSIONING
         || opState == NodeOperationalState.DECOMMISSIONED) {
       LOG.info("Start Decommission called on node {} in state {}. Nothing to "+
@@ -238,7 +275,7 @@ public class NodeDecommissionManager {
     if (opState != NodeOperationalState.IN_SERVICE) {
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.IN_SERVICE);
-      pendingNodes.remove(dn);
+      monitor.stopMonitoring(dn);
       LOG.info("Recommissioned node {}", dn);
     } else {
       LOG.info("Recommission called on node {} with state {}. "+
@@ -278,7 +315,7 @@ public class NodeDecommissionManager {
     if (opState == NodeOperationalState.IN_SERVICE) {
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.ENTERING_MAINTENANCE);
-      pendingNodes.add(dn);
+      monitor.startMonitoring(dn, endInHours);
       LOG.info("Starting Maintenance for node {}", dn);
     } else if (opState == NodeOperationalState.ENTERING_MAINTENANCE ||
         opState == NodeOperationalState.IN_MAINTENANCE) {
