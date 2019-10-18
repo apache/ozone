@@ -2,25 +2,25 @@ version: 2
 jobs:
   build:
     docker:
-      - image: elek/ozone-build:20191009-1-centos
+      - image: vivekratnavel/hadoop-ozone-build:v1
     steps:
       - checkout
       - run: ./hadoop-ozone/dev-support/checks/build.sh
   checkstyle:
     docker:
-      - image: elek/ozone-build:20191009-1-centos
+      - image: vivekratnavel/hadoop-ozone-build:v1
     steps:
       - checkout
       - run: ./hadoop-ozone/dev-support/checks/checkstyle.sh
   rat:
     docker:
-      - image: elek/ozone-build:20191009-1-centos
+      - image: vivekratnavel/hadoop-ozone-build:v1
     steps:
       - checkout
       - run: ./hadoop-ozone/dev-support/checks/rat.sh
   author:
     docker:
-      - image: elek/ozone-build:20191009-1-centos
+      - image: vivekratnavel/hadoop-ozone-build:v1
     steps:
       - checkout
       - run: ./hadoop-ozone/dev-support/checks/author.sh
