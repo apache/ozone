@@ -193,7 +193,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     if (ex instanceof OMException) {
       return ex.getMessage();
     } else {
-        return org.apache.hadoop.util.StringUtils.stringifyException(ex);
+      return org.apache.hadoop.util.StringUtils.stringifyException(ex);
     }
   }
 
