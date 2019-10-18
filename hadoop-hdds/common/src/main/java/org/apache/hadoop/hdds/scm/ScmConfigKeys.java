@@ -366,6 +366,11 @@ public final class ScmConfigKeys {
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
   public static final boolean HDDS_TRACING_ENABLED_DEFAULT = true;
 
+  public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL =
+      "ozone.scm.datanode.admin.monitor.interval";
+  public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
+      "30s";
+
   /**
    * Never constructed.
    */

@@ -69,6 +69,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreRDBImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NewNodeHandler;
+import org.apache.hadoop.hdds.scm.node.StartDatanodeAdminHandler;
 import org.apache.hadoop.hdds.scm.node.NonHealthyToHealthyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
@@ -296,6 +297,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new StaleNodeHandler(scmNodeManager, pipelineManager, conf);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
         pipelineManager, containerManager);
+    StartDatanodeAdminHandler datanodeStartAdminHandler =
+        new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     NonHealthyToHealthyNodeHandler nonHealthyToHealthyNodeHandler =
         new NonHealthyToHealthyNodeHandler(pipelineManager, conf);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
@@ -338,7 +341,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         pipelineManager);
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
-        pipelineManager, containerManager);
+        pipelineManager, containerManager, eventQueue);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
@@ -353,6 +356,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
         nonHealthyToHealthyNodeHandler);
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
+    eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE,
+        datanodeStartAdminHandler);
     eventQueue.addHandler(SCMEvents.CMD_STATUS_REPORT, cmdStatusReportHandler);
     eventQueue
         .addHandler(SCMEvents.PENDING_DELETE_STATUS, pendingDeleteHandler);
