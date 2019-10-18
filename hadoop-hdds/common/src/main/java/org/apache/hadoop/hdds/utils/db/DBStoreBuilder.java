@@ -155,10 +155,8 @@ public final class DBStoreBuilder {
     DBOptions options = getDbProfile();
 
     WriteOptions writeOptions = new WriteOptions();
-    if (rocksDBConfiguration.getSyncOption()) {
-      LOG.info("Bharat enabled sync flag");
-      writeOptions.setSync(true);
-    }
+    writeOptions.setSync(rocksDBConfiguration.getSyncOption());
+
 
     File dbFile = getDBFile();
     if (!dbFile.getParentFile().exists()) {
