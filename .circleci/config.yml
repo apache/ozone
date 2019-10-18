@@ -24,9 +24,49 @@ jobs:
     steps:
       - checkout
       - run: ./hadoop-ozone/dev-support/checks/author.sh
+  findbugs:
+    docker:
+      - image: vivekratnavel/hadoop-ozone-build:v1
+    steps:
+      - checkout
+      - run: ./hadoop-ozone/dev-support/checks/findbugs.sh
+  unit:
+    docker:
+      - image: vivekratnavel/hadoop-ozone-build:v1
+    steps:
+      - checkout
+      - run: ./hadoop-ozone/dev-support/checks/unit.sh
+  acceptance:
+    docker:
+      - image: vivekratnavel/hadoop-ozone-build:v1
+    steps:
+      - checkout
+      - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
+  integration:
+    docker:
+      - image: vivekratnavel/hadoop-ozone-build:v1
+    steps:
+      - checkout
+      - run: ./hadoop-ozone/dev-support/checks/integration.sh
 workflows:
   version: 2
   ci_run:
     jobs:
       - build
-      - checkstyle
+      - checkstyle:
+          requires:
+            - build
+      - rat
+      - author
+      - findbugs:
+          requires:
+            - build
+      - unit:
+          requires:
+            - build
+      - acceptance:
+          requires:
+            - build
+      - integration:
+          requires:
+            - build
