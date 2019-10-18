@@ -26,8 +26,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Type;
 
 /**
  * Command Handler for OM requests. OM State Machine calls this handler for
@@ -48,58 +46,11 @@ public class OzoneManagerHARequestHandlerImpl
   @Override
   public OMResponse handleApplyTransaction(OMRequest omRequest,
       long transactionLogIndex) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Received OMRequest: {}, ", omRequest);
-    }
-    Type cmdType = omRequest.getCmdType();
-    switch (cmdType) {
-    case CreateVolume:
-    case SetVolumeProperty:
-    case DeleteVolume:
-    case CreateBucket:
-    case DeleteBucket:
-    case SetBucketProperty:
-    case AllocateBlock:
-    case CreateKey:
-    case CommitKey:
-    case DeleteKey:
-    case RenameKey:
-    case CreateDirectory:
-    case CreateFile:
-    case PurgeKeys:
-    case CreateS3Bucket:
-    case DeleteS3Bucket:
-    case InitiateMultiPartUpload:
-    case CommitMultiPartUpload:
-    case AbortMultiPartUpload:
-    case CompleteMultiPartUpload:
-    case AddAcl:
-    case RemoveAcl:
-    case SetAcl:
-    case GetDelegationToken:
-    case CancelDelegationToken:
-    case RenewDelegationToken:
-      //TODO: We don't need to pass transactionID, this will be removed when
-      // complete write requests is changed to new model. And also we can
-      // return OMClientResponse, then adding to doubleBuffer can be taken
-      // care by stateMachine. And also integrate both HA and NON HA code
-      // paths.
-      OMClientRequest omClientRequest =
-          OzoneManagerRatisUtils.createClientRequest(omRequest);
-      if (omClientRequest != null) {
-        OMClientResponse omClientResponse =
-            omClientRequest.validateAndUpdateCache(getOzoneManager(),
-                transactionLogIndex, ozoneManagerDoubleBuffer::add);
-        return omClientResponse.getOMResponse();
-      } else {
-        //TODO: remove this once we have all HA support for all write request.
-        return handle(omRequest);
-      }
-
-    default:
-      // As all request types are not changed so we need to call handle
-      // here.
-      return handle(omRequest);
-    }
+    OMClientRequest omClientRequest =
+        OzoneManagerRatisUtils.createClientRequest(omRequest);
+    OMClientResponse omClientResponse =
+        omClientRequest.validateAndUpdateCache(getOzoneManager(),
+            transactionLogIndex, ozoneManagerDoubleBuffer::add);
+    return omClientResponse.getOMResponse();
   }
 }
