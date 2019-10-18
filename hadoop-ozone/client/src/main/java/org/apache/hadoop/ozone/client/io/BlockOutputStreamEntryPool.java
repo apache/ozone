@@ -254,9 +254,7 @@ public class BlockOutputStreamEntryPool {
    * @throws IOException
    */
   private void allocateNewBlock() throws IOException {
-    LOG.info("Allocating block with excludeList: datanodes = {}, " +
-        "pipelines = {}, containers = {}", excludeList.getDatanodes(),
-        excludeList.getPipelineIds(), excludeList.getContainerIds());
+    LOG.info("Allocating block with {}", excludeList);
     OmKeyLocationInfo subKeyInfo =
         omClient.allocateBlock(keyArgs, openID, excludeList);
     addKeyLocationInfo(subKeyInfo);
