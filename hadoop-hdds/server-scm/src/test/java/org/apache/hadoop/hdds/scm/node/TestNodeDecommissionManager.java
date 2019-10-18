@@ -55,7 +55,7 @@ public class TestNodeDecommissionManager {
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     nodeManager = createNodeManager(conf);
-    decom = new NodeDecommissionManager(conf, nodeManager, null, null);
+    decom = new NodeDecommissionManager(conf, nodeManager, null, null, null);
   }
 
   @Test
