@@ -71,10 +71,11 @@ public class RDBStore implements DBStore {
   @VisibleForTesting
   public RDBStore(File dbFile, DBOptions options,
                   Set<TableConfig> families) throws IOException {
-    this(dbFile, options, families, new CodecRegistry());
+    this(dbFile, options, new WriteOptions(), families, new CodecRegistry());
   }
 
-  public RDBStore(File dbFile, DBOptions options, Set<TableConfig> families,
+  public RDBStore(File dbFile, DBOptions options,
+      WriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry)
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
@@ -92,8 +93,7 @@ public class RDBStore implements DBStore {
 
     dbOptions = options;
     dbLocation = dbFile;
-    // TODO: Read from the next Config.
-    writeOptions = new WriteOptions();
+    this.writeOptions = writeOptions;
 
     try {
       db = RocksDB.open(dbOptions, dbLocation.getAbsolutePath(),

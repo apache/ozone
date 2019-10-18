@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -244,9 +245,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     if (store == null) {
       File metaDir = OmUtils.getOmDbDir(configuration);
 
-      DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration)
-          .setName(OM_DB_NAME)
+      RocksDBConfiguration rocksDBConfiguration =
+          configuration.getObject(RocksDBConfiguration.class);
+
+      // As When ratis is not enabled, when we perform put/commit to rocksdb we
+      // should turn on sync flag. This needs to be done as when we return
+      // response to client it is considered as complete, but if we have
+      // power failure or machine crashes the recent writes will be lost. To
+      // avoid those kind of failures we need to enable sync. When Ratis is
+      // enabled, ratis log provides us this guaranty. This check is needed
+      // until HA code path becomes default in OM.
+
+      // When ratis is not enabled override and set the sync.
+      if (!isRatisEnabled) {
+        rocksDBConfiguration.setSyncOption(true);
+      }
+
+      DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
+          rocksDBConfiguration).setName(OM_DB_NAME)
           .setPath(Paths.get(metaDir.getPath()));
+
       this.store = addOMTablesAndCodecs(dbStoreBuilder).build();
       initializeOmTables();
     }
