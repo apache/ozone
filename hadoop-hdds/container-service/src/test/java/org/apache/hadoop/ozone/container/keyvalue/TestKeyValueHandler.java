@@ -244,8 +244,10 @@ public class TestKeyValueHandler {
       Mockito.when(stateMachine.getDatanodeDetails())
           .thenReturn(datanodeDetails);
       Mockito.when(context.getParent()).thenReturn(stateMachine);
-      KeyValueHandler keyValueHandler = new KeyValueHandler(conf, context, cset,
-          volumeSet, metrics);
+      KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
+          context.getParent().getDatanodeDetails().getUuidString(), cset,
+          volumeSet, metrics, c -> {
+      });
       assertEquals("org.apache.hadoop.ozone.container.common" +
           ".volume.RoundRobinVolumeChoosingPolicy",
           keyValueHandler.getVolumeChoosingPolicyForTesting()
@@ -255,7 +257,9 @@ public class TestKeyValueHandler {
       conf.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
           "org.apache.hadoop.ozone.container.common.impl.HddsDispatcher");
       try {
-        new KeyValueHandler(conf, context, cset, volumeSet, metrics);
+        new KeyValueHandler(conf,
+            context.getParent().getDatanodeDetails().getUuidString(),
+            cset, volumeSet, metrics, c->{});
       } catch (RuntimeException ex) {
         GenericTestUtils.assertExceptionContains("class org.apache.hadoop" +
             ".ozone.container.common.impl.HddsDispatcher not org.apache" +
