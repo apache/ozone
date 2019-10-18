@@ -18,21 +18,22 @@
 
 package org.apache.hadoop.hdds.security.token;
 
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Ozone GRPC token header verifier.
  */
 public interface TokenVerifier {
   /**
-   * Given a user and tokenStr header, return a UGI object with token if
-   * verified.
+   * Given a user, tokenStr, cmd and container/block id, verify the token.
    * @param user user of the request
    * @param tokenStr token str of the request
+   * @param cmd container command type
+   * @param id blockID/containerID
    * @return UGI
-   * @throws SCMSecurityException
+   * @throws SCMSecurityException if token verification fails.
    */
-  UserGroupInformation verify(String user, String tokenStr)
-      throws SCMSecurityException;
+  void verify(String user, String tokenStr,
+      ContainerProtos.Type cmd, String id) throws SCMSecurityException;
 }

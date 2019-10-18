@@ -125,7 +125,7 @@ public class TestSecureOzoneContainer {
 
   @Test
   public void testCreateOzoneContainer() throws Exception {
-    LOG.info("Test case: requireBlockToken: {} hasBlockToken: {} " +
+    LOG.info("Test case: requireOmBlockToken: {} hasBlockToken: {} " +
         "blockTokenExpired: {}.", requireBlockToken, hasBlockToken,
         blockTokeExpired);
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED,

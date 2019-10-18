@@ -102,7 +102,7 @@ public class TestHddsDispatcher {
                 containerSet, volumeSet, metrics));
       }
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
-          conf, containerSet, volumeSet, handlers, context, metrics);
+          conf, containerSet, volumeSet, handlers, context, metrics, null);
       hddsDispatcher.setScmId(scmId.toString());
       ContainerCommandResponseProto responseOne = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
@@ -219,7 +219,7 @@ public class TestHddsDispatcher {
     }
 
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
-        conf, containerSet, volumeSet, handlers, context, metrics);
+        conf, containerSet, volumeSet, handlers, context, metrics, null);
     hddsDispatcher.setScmId(scmId.toString());
     return hddsDispatcher;
   }

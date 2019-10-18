@@ -489,7 +489,7 @@ public class TestContainerStateMachineFailures {
       try {
         xceiverClient.sendCommand(ContainerTestHelper
             .getWriteChunkRequest(pipeline, omKeyLocationInfo.getBlockID(),
-                1024, new Random().nextInt()));
+                1024, new Random().nextInt(), null));
         latch.countDown();
       } catch (IOException e) {
         latch.countDown();

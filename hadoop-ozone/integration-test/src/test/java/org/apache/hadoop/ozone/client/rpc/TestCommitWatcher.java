@@ -149,7 +149,7 @@ public class TestCommitWatcher {
       bufferList.clear();
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
-              .getWriteChunkRequest(pipeline, blockID, chunkSize);
+              .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
       // add the data to the buffer pool
       ByteBuffer byteBuffer = bufferPool.allocateBufferIfNeeded().put(
           writeChunkRequest.getWriteChunk().getData().asReadOnlyByteBuffer());
@@ -225,7 +225,7 @@ public class TestCommitWatcher {
       bufferList.clear();
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
-              .getWriteChunkRequest(pipeline, blockID, chunkSize);
+              .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
       // add the data to the buffer pool
       ByteBuffer byteBuffer = bufferPool.allocateBufferIfNeeded().put(
           writeChunkRequest.getWriteChunk().getData().asReadOnlyByteBuffer());

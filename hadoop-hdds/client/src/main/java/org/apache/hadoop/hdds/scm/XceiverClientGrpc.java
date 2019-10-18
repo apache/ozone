@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 
 import io.opentracing.Scope;
@@ -166,7 +165,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
 
     // Add credential context to the client call
-    String userName = UserGroupInformation.getCurrentUser().getShortUserName();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Nodes in pipeline : {}", pipeline.getNodes().toString());
       LOG.debug("Connecting to server : {}", dn.getIpAddress());
@@ -174,8 +172,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(dn.getIpAddress(), port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-            .intercept(new ClientCredentialInterceptor(userName, encodedToken),
-                new GrpcClientInterceptor());
+            .intercept(new GrpcClientInterceptor());
     if (secConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
       if (caCert != null) {
