@@ -25,8 +25,8 @@ Resource            ../commonlib.robot
 *** Test Cases ***
 Run printTopology
     ${output} =         Execute          ozone scmcli printTopology
-                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)    /rack2
+                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)    IN_SERVICE    /rack2
 Run printTopology -o
     ${output} =         Execute          ozone scmcli printTopology -o
                         Should contain   ${output}         Location: /rack2
-                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)
+                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net) IN_SERVICE

@@ -65,7 +65,7 @@ public class TopologySubcommand implements Callable<Void> {
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.createScmClient()) {
       for (HddsProtos.NodeState state : stateArray) {
-        List<HddsProtos.Node> nodes = scmClient.queryNode(state,
+        List<HddsProtos.Node> nodes = scmClient.queryNode(null, state,
             HddsProtos.QueryScope.CLUSTER, "");
         if (nodes != null && nodes.size() > 0) {
           // show node state
@@ -83,36 +83,40 @@ public class TopologySubcommand implements Callable<Void> {
 
   // Format
   // Location: rack1
-  //  ipAddress(hostName)
+  //  ipAddress(hostName) OperationalState
   private void printOrderedByLocation(List<HddsProtos.Node> nodes) {
     HashMap<String, TreeSet<DatanodeDetails>> tree =
         new HashMap<>();
+    HashMap<DatanodeDetails, HddsProtos.NodeOperationalState> state =
+        new HashMap<>();
+
     for (HddsProtos.Node node : nodes) {
       String location = node.getNodeID().getNetworkLocation();
       if (location != null && !tree.containsKey(location)) {
         tree.put(location, new TreeSet<>());
       }
-      tree.get(location).add(DatanodeDetails.getFromProtoBuf(node.getNodeID()));
+      DatanodeDetails dn = DatanodeDetails.getFromProtoBuf(node.getNodeID());
+      tree.get(location).add(dn);
+      state.put(dn, node.getNodeOperationalStates(0));
     }
     ArrayList<String> locations = new ArrayList<>(tree.keySet());
     Collections.sort(locations);
 
     locations.forEach(location -> {
       System.out.println("Location: " + location);
-      tree.get(location).forEach(node -> {
-        System.out.println(" " + node.getIpAddress() + "(" + node.getHostName()
-            + ")");
+      tree.get(location).forEach(n -> {
+        System.out.println(" " + n.getIpAddress() + "(" + n.getHostName()
+            + ") "+state.get(n));
       });
     });
   }
 
-
-  // Format "ipAddress(hostName)    networkLocation"
+  // Format "ipAddress(hostName)    OperationalState    networkLocation"
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes) {
     nodes.forEach(node -> {
       System.out.print(" " + node.getNodeID().getIpAddress() + "(" +
           node.getNodeID().getHostName() + ")");
-      System.out.println("    " +
+      System.out.println("    " + node.getNodeOperationalStates(0) + "    " +
           (node.getNodeID().getNetworkLocation() != null ?
               node.getNodeID().getNetworkLocation() : "NA"));
     });

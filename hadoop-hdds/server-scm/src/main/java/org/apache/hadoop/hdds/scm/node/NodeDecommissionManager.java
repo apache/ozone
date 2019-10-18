@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -41,9 +40,9 @@ import java.util.List;
 public class NodeDecommissionManager {
 
   private NodeManager nodeManager;
-  private PipelineManager pipeLineManager;
-  private ContainerManager containerManager;
-  private OzoneConfiguration conf;
+ // private PipelineManager pipeLineManager;
+ // private ContainerManager containerManager;
+ // private OzoneConfiguration conf;
   private boolean useHostnames;
 
   private List<DatanodeDetails> pendingNodes = new LinkedList<>();
@@ -161,10 +160,10 @@ public class NodeDecommissionManager {
   public NodeDecommissionManager(OzoneConfiguration conf,
       NodeManager nodeManager, PipelineManager pipelineManager,
       ContainerManager containerManager) {
-    this.conf = conf;
     this.nodeManager = nodeManager;
-    this.pipeLineManager = pipelineManager;
-    this.containerManager = containerManager;
+    //this.conf = conf;
+    //this.pipeLineManager = pipelineManager;
+    //this.containerManager = containerManager;
 
     useHostnames = conf.getBoolean(
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,

@@ -198,18 +198,23 @@ public class ContainerOperationClient implements ScmClient {
   /**
    * Returns a set of Nodes that meet a query criteria.
    *
-   * @param nodeStatuses - Criteria that we want the node to have.
+   * @param opState - The operational state we want the node to have
+   *                eg IN_SERVICE, DECOMMISSIONED, etc
+   * @param nodeState - The health we want the node to have, eg HEALTHY, STALE,
+   *                  etc
    * @param queryScope - Query scope - Cluster or pool.
    * @param poolName - if it is pool, a pool name is required.
    * @return A set of nodes that meet the requested criteria.
    * @throws IOException
    */
   @Override
-  public List<HddsProtos.Node> queryNode(HddsProtos.NodeState
-      nodeStatuses, HddsProtos.QueryScope queryScope, String poolName)
+  public List<HddsProtos.Node> queryNode(
+      HddsProtos.NodeOperationalState opState,
+      HddsProtos.NodeState nodeState,
+      HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
-    return storageContainerLocationClient.queryNode(nodeStatuses, queryScope,
-        poolName);
+    return storageContainerLocationClient.queryNode(opState, nodeState,
+        queryScope, poolName);
   }
 
   @Override

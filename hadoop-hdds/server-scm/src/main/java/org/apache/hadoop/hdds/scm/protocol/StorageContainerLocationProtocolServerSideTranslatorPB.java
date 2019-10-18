@@ -322,12 +322,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
 
     HddsProtos.NodeState nodeState = request.getState();
-    List<HddsProtos.Node> datanodes = impl.queryNode(nodeState,
+    HddsProtos.NodeOperationalState opState = request.getOpState();
+    List<HddsProtos.Node> datanodes = impl.queryNode(opState, nodeState,
         request.getScope(), request.getPoolName());
     return NodeQueryResponseProto.newBuilder()
         .addAllDatanodes(datanodes)
         .build();
-
   }
 
   public ObjectStageChangeResponseProto notifyObjectStageChange(

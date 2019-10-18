@@ -151,15 +151,20 @@ public interface ScmClient extends Closeable {
       String owner) throws IOException;
 
   /**
-   * Returns a set of Nodes that meet a query criteria.
-   * @param nodeStatuses - Criteria that we want the node to have.
+   * Returns a set of Nodes that meet a query criteria. Passing null for opState
+   * or nodeState acts like a wild card, returning all nodes in that state.
+   * @param opState - Operational State of the node, eg IN_SERVICE,
+   *                DECOMMISSIONED, etc
+   * @param nodeState - Health of the nodeCriteria that we want the node to
+   *                  have, eg HEALTHY, STALE etc
    * @param queryScope - Query scope - Cluster or pool.
    * @param poolName - if it is pool, a pool name is required.
    * @return A set of nodes that meet the requested criteria.
    * @throws IOException
    */
-  List<HddsProtos.Node> queryNode(HddsProtos.NodeState nodeStatuses,
-      HddsProtos.QueryScope queryScope, String poolName) throws IOException;
+  List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
+      HddsProtos.NodeState nodeState, HddsProtos.QueryScope queryScope,
+      String poolName) throws IOException;
 
   /**
    * Allows a list of hosts to be decommissioned. The hosts are identified
