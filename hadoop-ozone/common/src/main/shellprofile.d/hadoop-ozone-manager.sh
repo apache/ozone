@@ -21,6 +21,6 @@ fi
 _ozone_manager_hadoop_finalize() {
   if [[ "${HADOOP_CLASSNAME}" == "org.apache.hadoop.ozone.om.OzoneManagerStarter" ]]; then
    echo "Ozone Manager classpath extended by ${OZONE_MANAGER_CLASSPATH}"
-   hadoop_add_classpath ${OZONE_MANAGER_CLASSPATH}
+   hadoop_add_classpath "${OZONE_MANAGER_CLASSPATH}"
   fi
 }
