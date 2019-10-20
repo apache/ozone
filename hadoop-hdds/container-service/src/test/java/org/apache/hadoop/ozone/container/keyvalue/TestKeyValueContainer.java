@@ -63,6 +63,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -232,18 +233,18 @@ public class TestKeyValueContainer {
       container.importContainerData(fis, packer);
     }
 
-    Assert.assertEquals("value1", containerData.getMetadata().get("key1"));
-    Assert.assertEquals(keyValueContainerData.getContainerDBType(),
+    assertEquals("value1", containerData.getMetadata().get("key1"));
+    assertEquals(keyValueContainerData.getContainerDBType(),
         containerData.getContainerDBType());
-    Assert.assertEquals(keyValueContainerData.getState(),
+    assertEquals(keyValueContainerData.getState(),
         containerData.getState());
-    Assert.assertEquals(numberOfKeysToWrite,
+    assertEquals(numberOfKeysToWrite,
         containerData.getKeyCount());
-    Assert.assertEquals(keyValueContainerData.getLayOutVersion(),
+    assertEquals(keyValueContainerData.getLayOutVersion(),
         containerData.getLayOutVersion());
-    Assert.assertEquals(keyValueContainerData.getMaxSize(),
+    assertEquals(keyValueContainerData.getMaxSize(),
         containerData.getMaxSize());
-    Assert.assertEquals(keyValueContainerData.getBytesUsed(),
+    assertEquals(keyValueContainerData.getBytesUsed(),
         containerData.getBytesUsed());
 
     //Can't overwrite existing container
@@ -388,6 +389,8 @@ public class TestKeyValueContainer {
 
   @Test
   public void testRocksDBCreateUsesCachedOptions() throws Exception {
+    int initialSize = MetadataStoreBuilder.CACHED_OPTS.size();
+
     // Create Container 1
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     Assert.assertTrue("Rocks DB options should be cached.",
@@ -403,10 +406,8 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    Assert.assertEquals(1, MetadataStoreBuilder.CACHED_OPTS.size());
+    assertEquals(initialSize + 1, MetadataStoreBuilder.CACHED_OPTS.size());
     Options cachedOpts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
-    Assert.assertEquals("Cache object should not be updated.",
-        opts, cachedOpts);
-
+    assertSame("Cache object should not be updated.", opts, cachedOpts);
   }
 }
