@@ -113,4 +113,13 @@ public class ExcludeList {
     containerIds.clear();
     pipelineIds.clear();
   }
+
+  @Override
+  public String toString() {
+    return "ExcludeList {" +
+        "datanodes = " + datanodes +
+        ", containerIds = " + containerIds +
+        ", pipelineIds = " + pipelineIds +
+        '}';
+  }
 }
