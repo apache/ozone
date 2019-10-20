@@ -50,8 +50,7 @@ import java.util.Map;
  */
 public class RocksDBStore implements MetadataStore {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(RocksDBStore.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RocksDBStore.class);
 
   private RocksDB db = null;
   private File dbLocation;
@@ -59,24 +58,20 @@ public class RocksDBStore implements MetadataStore {
   private Options dbOptions;
   private ObjectName statMBeanName;
 
-  public RocksDBStore(File dbFile, Options options)
-      throws IOException {
+  public RocksDBStore(File dbFile, Options options) throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     RocksDB.loadLibrary();
     dbOptions = options;
     dbLocation = dbFile;
     writeOptions = new WriteOptions();
     try {
-
       db = RocksDB.open(dbOptions, dbLocation.getAbsolutePath());
       if (dbOptions.statistics() != null) {
-
         Map<String, String> jmxProperties = new HashMap<String, String>();
         jmxProperties.put("dbName", dbFile.getName());
         statMBeanName = HddsUtils.registerWithJmxProperties(
             "Ozone", "RocksDbStore", jmxProperties,
-            RocksDBStoreMBean.create(dbOptions.statistics(),
-                dbFile.getName()));
+            RocksDBStoreMBean.create(dbOptions.statistics(), dbFile.getName()));
         if (statMBeanName == null) {
           LOG.warn("jmx registration failed during RocksDB init, db path :{}",
               dbFile.getAbsolutePath());
