@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
+import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -45,6 +46,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import org.mockito.Mockito;
+import org.rocksdb.Options;
 
 import java.io.File;
 
@@ -74,7 +76,6 @@ public class TestKeyValueContainer {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
-
   private OzoneConfiguration conf;
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
@@ -100,9 +101,7 @@ public class TestKeyValueContainer {
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 
-    keyValueContainer = new KeyValueContainer(
-        keyValueContainerData, conf);
-
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
   }
 
   @Test
@@ -159,17 +158,15 @@ public class TestKeyValueContainer {
     // Create Container.
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    keyValueContainerData = keyValueContainer
-        .getContainerData();
+    keyValueContainerData = keyValueContainer.getContainerData();
 
-    String containerMetaDataPath = keyValueContainerData
-        .getMetadataPath();
+    String containerMetaDataPath = keyValueContainerData.getMetadataPath();
     String chunksPath = keyValueContainerData.getChunksPath();
 
     // Check whether containerMetaDataPath and chunksPath exists or not.
     assertTrue(containerMetaDataPath != null);
     assertTrue(chunksPath != null);
-    //Check whether container file and container db file exists or not.
+    // Check whether container file and container db file exists or not.
     assertTrue(keyValueContainer.getContainerFile().exists(),
         ".Container File does not exist");
     assertTrue(keyValueContainer.getContainerDBFile().exists(), "Container " +
@@ -313,7 +310,6 @@ public class TestKeyValueContainer {
         keyValueContainer.getContainerDBFile().exists());
   }
 
-
   @Test
   public void testCloseContainer() throws Exception {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -390,5 +386,27 @@ public class TestKeyValueContainer {
     }
   }
 
+  @Test
+  public void testRocksDBCreateUsesCachedOptions() throws Exception {
+    // Create Container 1
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    Assert.assertTrue("Rocks DB options should be cached.",
+        MetadataStoreBuilder.CACHED_OPTS.containsKey(conf));
 
+    Options opts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
+
+    // Create Container 2
+    keyValueContainerData = new KeyValueContainerData(2L,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+        datanodeId.toString());
+
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    Assert.assertEquals(1, MetadataStoreBuilder.CACHED_OPTS.size());
+    Options cachedOpts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
+    Assert.assertEquals("Cache object should not be updated.",
+        opts, cachedOpts);
+
+  }
 }
