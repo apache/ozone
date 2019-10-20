@@ -77,15 +77,8 @@ public final class ChunkUtils {
       ByteBuffer data, VolumeIOStats volumeIOStats, boolean sync)
       throws StorageContainerException, ExecutionException,
       InterruptedException, NoSuchAlgorithmException {
-    final int bufferSize = data.remaining();
     Logger log = LoggerFactory.getLogger(ChunkManagerImpl.class);
-    if (bufferSize != chunkInfo.getLen()) {
-      String err = String.format("data array does not match the length " +
-              "specified. DataLen: %d Byte Array: %d",
-          chunkInfo.getLen(), bufferSize);
-      log.error(err);
-      throw new StorageContainerException(err, INVALID_WRITE_SIZE);
-    }
+    final int bufferSize = validateBufferSize(chunkInfo, data, log);
 
     Path path = chunkFile.toPath();
     long startTime = Time.monotonicNow();
@@ -128,6 +121,20 @@ public final class ChunkUtils {
       log.debug("Write Chunk completed for chunkFile: {}, size {}", chunkFile,
           bufferSize);
     }
+  }
+
+  public static int validateBufferSize(
+      ChunkInfo chunkInfo, ByteBuffer data, Logger log)
+      throws StorageContainerException {
+    final int bufferSize = data.remaining();
+    if (bufferSize != chunkInfo.getLen()) {
+      String err = String.format("data array does not match the length " +
+              "specified. DataLen: %d Byte Array: %d",
+          chunkInfo.getLen(), bufferSize);
+      log.error(err);
+      throw new StorageContainerException(err, INVALID_WRITE_SIZE);
+    }
+    return bufferSize;
   }
 
   /**
