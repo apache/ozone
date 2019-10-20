@@ -205,7 +205,6 @@ public final class ContainerTestHelper {
    *
    * @param info - chunk info.
    * @param data - data array
-   * @throws NoSuchAlgorithmException
    */
   public static void setDataChecksum(ChunkInfo info, ByteBuffer data)
       throws OzoneChecksumException {
@@ -221,11 +220,10 @@ public final class ContainerTestHelper {
    * @param datalen - Length of data.
    * @return ContainerCommandRequestProto
    * @throws IOException
-   * @throws NoSuchAlgorithmException
    */
   public static ContainerCommandRequestProto getWriteChunkRequest(
       Pipeline pipeline, BlockID blockID, int datalen) throws IOException {
-    LOG.trace("writeChunk {} (blockID={}) to pipeline=",
+    LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
         datalen, blockID, pipeline);
     return getWriteChunkRequest(pipeline, blockID, datalen, 0);
   }
@@ -238,11 +236,11 @@ public final class ContainerTestHelper {
    * @param datalen - Length of data.
    * @return ContainerCommandRequestProto
    * @throws IOException
-   * @throws NoSuchAlgorithmException
    */
   public static ContainerCommandRequestProto getWriteChunkRequest(
-      Pipeline pipeline, BlockID blockID, int datalen, int seq) throws IOException {
-    LOG.trace("writeChunk {} (blockID={}) to pipeline=",
+      Pipeline pipeline, BlockID blockID, int datalen, int seq)
+      throws IOException {
+    LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
         datalen, blockID, pipeline);
     ContainerProtos.WriteChunkRequestProto.Builder writeRequest =
         ContainerProtos.WriteChunkRequestProto
@@ -504,7 +502,7 @@ public final class ContainerTestHelper {
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
     LOG.trace("putBlock: {} to pipeline={}",
-        writeRequest.getBlockID());
+        writeRequest.getBlockID(), pipeline);
 
     ContainerProtos.PutBlockRequestProto.Builder putRequest =
         ContainerProtos.PutBlockRequestProto.newBuilder();
