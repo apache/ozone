@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.protobuf.ByteString;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -52,8 +51,6 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.Collection;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -88,9 +85,7 @@ public class SCMPipelineManager implements PipelineManager {
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
   private GrpcTlsConfig grpcTlsConfig;
-  private Map<PipelineID, Map<UUID, ByteString>>
-      reportedLeadersForPipeline = new ConcurrentHashMap<>();
-
+  
   public SCMPipelineManager(Configuration conf, NodeManager nodeManager,
       EventPublisher eventPublisher, GrpcTlsConfig grpcTlsConfig)
       throws IOException {
@@ -295,28 +290,6 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void processReportedLeaderInfo(PipelineID pipelineID,
-      DatanodeDetails dn, ByteString leaderID) throws IOException {
-    Pipeline pipeline = stateManager.getPipeline(pipelineID);
-    Map<UUID, ByteString> ids =
-        reportedLeadersForPipeline.computeIfAbsent(pipelineID,
-            k -> new HashMap<>());
-
-    ids.put(dn.getUuid(), leaderID);
-    pipeline.setLeaderId(leaderID);
-
-    Map<UUID, ByteString> leaderIdPairs =
-        reportedLeadersForPipeline.get(pipelineID);
-    if (leaderIdPairs.size() == pipeline.getFactor().getNumber() &&
-        leaderIdPairs.values().stream().distinct().count() == 1) {
-      // All datanodes reported same leader
-      LOG.info("Opening pipeline {} with reported leader {}",
-          pipelineID, leaderID);
-      openPipeline(pipelineID);
-    }
-  }
-
-  @Override
   public void openPipeline(PipelineID pipelineId) throws IOException {
     lock.writeLock().lock();
     try {
@@ -439,7 +412,6 @@ public class SCMPipelineManager implements PipelineManager {
     RatisPipelineUtils.destroyPipeline(pipeline, conf, grpcTlsConfig);
     // remove the pipeline from the pipeline manager
     removePipeline(pipeline.getId());
-    reportedLeadersForPipeline.remove(pipeline.getId());
     triggerPipelineCreation();
   }
 

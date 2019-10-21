@@ -19,7 +19,9 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -35,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 
 /**
  * Handles Pipeline Reports from datanode.
@@ -100,12 +103,22 @@ public class PipelineReportHandler implements
       return;
     }
 
-    if (report.hasLeaderID() &&
-        pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
+    if (report.hasLeaderID()) {
+      pipeline.getReportedLeaders().put(dn.getUuid(), report.getLeaderID());
+      pipeline.setLeaderId(report.getLeaderID());
+    }
+
+    if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
       LOGGER.info("Pipeline {} reported by {} with leaderId {}",
           pipeline.getId(), dn, report.getLeaderID().toStringUtf8());
-      pipelineManager.processReportedLeaderInfo(pipelineID, dn,
-          report.getLeaderID());
+
+      Map<UUID, ByteString> reportedLeaderIds = pipeline.getReportedLeaders();
+      if (reportedLeaderIds.size() == pipeline.getFactor().getNumber() &&
+          reportedLeaderIds.values().stream().distinct().count() == 1) {
+        // All datanodes reported same leader
+        pipelineManager.openPipeline(pipelineID);
+      }
+
     }
     pipeline.reportDatanode(dn);
   }

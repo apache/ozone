@@ -32,10 +32,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -54,6 +56,7 @@ public final class Pipeline {
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
   // Current reported Leader for the pipeline
   private ByteString leaderId = ByteString.EMPTY;
+  private final Map<UUID, ByteString> reportedLeaders = new HashMap<>();
 
   /**
    * The immutable properties of pipeline object is used in
@@ -108,6 +111,10 @@ public final class Pipeline {
 
   public ByteString getLeaderId() {
     return leaderId;
+  }
+
+  public Map<UUID, ByteString> getReportedLeaders() {
+    return reportedLeaders;
   }
 
   /**
