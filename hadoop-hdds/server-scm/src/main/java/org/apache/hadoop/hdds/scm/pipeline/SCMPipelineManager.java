@@ -298,11 +298,6 @@ public class SCMPipelineManager implements PipelineManager {
   public void processReportedLeaderInfo(PipelineID pipelineID,
       DatanodeDetails dn, ByteString leaderID) throws IOException {
     Pipeline pipeline = stateManager.getPipeline(pipelineID);
-    if (pipeline == null) {
-      LOG.error("Pipeline with id {} not found.", pipelineID);
-      return;
-    }
-
     Map<UUID, ByteString> ids =
         reportedLeadersForPipeline.computeIfAbsent(pipelineID,
             k -> new HashMap<>());
