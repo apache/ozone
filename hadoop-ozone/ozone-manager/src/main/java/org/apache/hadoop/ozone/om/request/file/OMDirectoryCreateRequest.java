@@ -198,6 +198,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     if (exception == null) {
       LOG.debug("Directory is successfully created for Key: {} in " +
               "volume/bucket:{}/{}", keyName, volumeName, bucketName);
+      omMetrics.incNumKeys();
       return omClientResponse;
     } else {
       LOG.error("CreateDirectory failed for Key: {} in volume/bucket:{}/{}",
