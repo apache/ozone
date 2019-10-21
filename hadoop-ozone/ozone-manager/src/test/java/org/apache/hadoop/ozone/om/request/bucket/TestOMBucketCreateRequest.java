@@ -19,11 +19,8 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -154,17 +151,6 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     OMClientResponse omClientResponse =
         omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1,
             ozoneManagerDoubleBufferHelper);
-
-    OmBucketInfo omBucketInfoRes =
-        ((OMBucketCreateResponse) omClientResponse).getOmBucketInfo();
-
-    OmBucketInfo omBucketInfoCache =
-        omMetadataManager.getBucketTable().get(bucketKey);
-
-    omBucketInfoCache.setMetadata(new HashMap<>());
-
-    System.out.println(omBucketInfoCache.getMetadata());
-    System.out.println(omBucketInfoRes.getMetadata());
 
     // As now after validateAndUpdateCache it should add entry to cache, get
     // should return non null value.
