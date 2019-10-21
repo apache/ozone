@@ -98,8 +98,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   // Timeout for the cluster to be ready
   private int waitForClusterToBeReadyTimeout = 60000; // 1 min
-  // Timeout for all/any pipelines to be in open state
-  private int waitForPipelineOpenTimeout = 60000;
   private CertificateClient caClient;
 
   /**

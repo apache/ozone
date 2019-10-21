@@ -30,6 +30,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 
+import com.google.protobuf.ByteString;
+
 /**
  * Interface which exposes the api for pipeline management.
  */
@@ -67,6 +69,9 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
       throws IOException;
 
   int getNumberOfContainers(PipelineID pipelineID) throws IOException;
+
+  void processReportedLeaderInfo(PipelineID pipelineID, DatanodeDetails dn,
+                                    ByteString leaderID) throws IOException;
 
   void openPipeline(PipelineID pipelineId) throws IOException;
 

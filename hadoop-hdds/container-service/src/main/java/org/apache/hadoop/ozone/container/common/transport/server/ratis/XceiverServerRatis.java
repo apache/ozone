@@ -683,6 +683,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   void notifyGroupRemove(RaftGroupId gid) {
     raftGids.remove(gid);
+    // Remove any entries for group leader map
+    leaderIdMap.remove(gid);
   }
 
   void notifyGroupAdd(RaftGroupId gid) {

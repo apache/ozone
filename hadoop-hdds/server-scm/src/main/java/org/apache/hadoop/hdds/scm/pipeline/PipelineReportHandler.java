@@ -19,10 +19,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -38,7 +35,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.ByteString;
 
 /**
  * Handles Pipeline Reports from datanode.
@@ -46,14 +42,12 @@ import com.google.protobuf.ByteString;
 public class PipelineReportHandler implements
     EventHandler<PipelineReportFromDatanode> {
 
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(PipelineReportHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(
+      PipelineReportHandler.class);
   private final PipelineManager pipelineManager;
   private final Configuration conf;
   private final SCMSafeModeManager scmSafeModeManager;
   private final boolean pipelineAvailabilityCheck;
-  private Map<PipelineID, Map<UUID, ByteString>>
-      reportedLeadersForPipeline = new HashMap<>();
 
   public PipelineReportHandler(SCMSafeModeManager scmSafeModeManager,
       PipelineManager pipelineManager,
@@ -66,7 +60,6 @@ public class PipelineReportHandler implements
     this.pipelineAvailabilityCheck = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT);
-
   }
 
   @Override
@@ -107,27 +100,13 @@ public class PipelineReportHandler implements
       return;
     }
 
-    if (report.hasLeaderID()) {
-      Map<UUID, ByteString> ids =
-          reportedLeadersForPipeline.computeIfAbsent(pipelineID,
-              k -> new HashMap<>());
-      ids.put(dn.getUuid(), report.getLeaderID());
-      pipeline.setLeaderId(report.getLeaderID());
-    }
-
-    if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
+    if (report.hasLeaderID() &&
+        pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
       LOGGER.info("Pipeline {} reported by {} with leaderId {}",
           pipeline.getId(), dn, report.getLeaderID().toStringUtf8());
-      Map<UUID, ByteString> leaderIdPairs =
-          reportedLeadersForPipeline.get(pipelineID);
-      if (leaderIdPairs.size() == pipeline.getFactor().getNumber() &&
-          leaderIdPairs.values().stream().distinct().count() == 1) {
-        // All datanodes reported same leader
-        pipelineManager.openPipeline(pipelineID);
-      }
-    } else {
-      // In OPEN state case just report the datanode
-      pipeline.reportDatanode(dn);
+      pipelineManager.processReportedLeaderInfo(pipelineID, dn,
+          report.getLeaderID());
     }
+    pipeline.reportDatanode(dn);
   }
 }
