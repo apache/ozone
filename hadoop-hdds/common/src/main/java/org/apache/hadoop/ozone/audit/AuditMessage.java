@@ -120,7 +120,7 @@ public class AuditMessage implements Message {
     public AuditMessage build(){
       AuditMessage auditMessage = new AuditMessage();
       auditMessage.message = "user=" + this.user + " | ip=" + this.ip + " | " +
-          "op=" + this.op + " | " + "ret=" + this.ret;
+          "op=" + this.op + " " + this.params + " | " + "ret=" + this.ret;
       auditMessage.throwable = this.throwable;
       return auditMessage;
     }
