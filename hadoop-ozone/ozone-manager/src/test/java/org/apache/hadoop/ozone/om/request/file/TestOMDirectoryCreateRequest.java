@@ -349,6 +349,47 @@ public class TestOMDirectoryCreateRequest {
 
   }
 
+  @Test
+  public void testCreateDirectoryOMMetric()
+      throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    String keyName = RandomStringUtils.randomAlphabetic(5);
+    for (int i =0; i< 3; i++) {
+      keyName += "/" + RandomStringUtils.randomAlphabetic(5);
+    }
+
+    // Add volume and bucket entries to DB.
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+
+    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+        OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
+    OMDirectoryCreateRequest omDirectoryCreateRequest =
+        new OMDirectoryCreateRequest(omRequest);
+
+    OMRequest modifiedOmRequest =
+        omDirectoryCreateRequest.preExecute(ozoneManager);
+
+    omDirectoryCreateRequest = new OMDirectoryCreateRequest(modifiedOmRequest);
+
+    Assert.assertEquals(0L, omMetrics.getNumKeys());
+    OMClientResponse omClientResponse =
+        omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
+        == OzoneManagerProtocolProtos.Status.OK);
+
+    // Key should exist in DB
+    Assert.assertTrue(omMetadataManager.getKeyTable().get(
+        omMetadataManager.getOzoneDirKey(
+            volumeName, bucketName, keyName)) != null);
+
+    Assert.assertEquals(1L, omMetrics.getNumKeys());
+  }
+
+
   /**
    * Create OMRequest which encapsulates CreateDirectory request.
    * @param volumeName
