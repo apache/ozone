@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -503,7 +502,7 @@ public class TestContainerStateMachineFailures {
 
     List<Thread> threadList = new ArrayList<>();
 
-    for (int i=0 ; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
       count++;
       Thread r = new Thread(r2);
       r.start();
@@ -514,7 +513,7 @@ public class TestContainerStateMachineFailures {
     closeContainerThread.start();
     threadList.add(closeContainerThread);
     latch.await(600, TimeUnit.SECONDS);
-    for (int i = 0 ; i < 101; i++) {
+    for (int i = 0; i < 101; i++) {
       threadList.get(i).join();
     }
 

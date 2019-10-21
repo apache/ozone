@@ -48,10 +48,13 @@ public class TestOzoneAuditLogger {
   private static final Map<String, String> PARAMS =
       new DummyEntity().toAuditMap();
 
+  private static final String IP_ADDRESS = "192.168.0.1";
+  private static final String USER = "john";
+
   private static final AuditMessage WRITE_FAIL_MSG =
       new AuditMessage.Builder()
-          .setUser("john")
-          .atIp("192.168.0.1")
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
           .forOperation(DummyAction.CREATE_VOLUME.name())
           .withParams(PARAMS)
           .withResult(FAILURE)
@@ -59,8 +62,8 @@ public class TestOzoneAuditLogger {
 
   private static final AuditMessage WRITE_SUCCESS_MSG =
       new AuditMessage.Builder()
-          .setUser("john")
-          .atIp("192.168.0.1")
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
           .forOperation(DummyAction.CREATE_VOLUME.name())
           .withParams(PARAMS)
           .withResult(SUCCESS)
@@ -68,8 +71,8 @@ public class TestOzoneAuditLogger {
 
   private static final AuditMessage READ_FAIL_MSG =
       new AuditMessage.Builder()
-          .setUser("john")
-          .atIp("192.168.0.1")
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
           .forOperation(DummyAction.READ_VOLUME.name())
           .withParams(PARAMS)
           .withResult(FAILURE)
@@ -77,8 +80,8 @@ public class TestOzoneAuditLogger {
 
   private static final AuditMessage READ_SUCCESS_MSG =
       new AuditMessage.Builder()
-          .setUser("john")
-          .atIp("192.168.0.1")
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
           .forOperation(DummyAction.READ_VOLUME.name())
           .withParams(PARAMS)
           .withResult(SUCCESS)
@@ -120,6 +123,16 @@ public class TestOzoneAuditLogger {
     String expected =
         "ERROR | OMAudit | " + WRITE_FAIL_MSG.getFormattedMessage();
     verifyLog(expected);
+  }
+
+  @Test
+  public void messageIncludesAllParts() {
+    String message = WRITE_FAIL_MSG.getMessage();
+    assertTrue(message, message.contains(USER));
+    assertTrue(message, message.contains(IP_ADDRESS));
+    assertTrue(message, message.contains(DummyAction.CREATE_VOLUME.name()));
+    assertTrue(message, message.contains(PARAMS.toString()));
+    assertTrue(message, message.contains(FAILURE));
   }
 
   /**

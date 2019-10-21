@@ -174,6 +174,8 @@ public class BaseFreonGenerator {
    */
   public void init() {
 
+    freonCommand.startHttpServer();
+
     successCounter = new AtomicLong(0);
     failureCounter = new AtomicLong(0);
 
@@ -188,7 +190,14 @@ public class BaseFreonGenerator {
     pathSchema = new PathSchema(prefix);
 
     Runtime.getRuntime().addShutdownHook(
-        new Thread(this::printReport));
+        new Thread(() -> {
+          try {
+            freonCommand.stopHttpServer();
+          } catch (Exception ex) {
+            LOG.error("HTTP server can't be stopped.", ex);
+          }
+          printReport();
+        }));
   }
 
   /**
