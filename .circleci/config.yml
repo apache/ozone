@@ -53,11 +53,11 @@ workflows:
   ci_run:
     jobs:
       - build
+      - rat
+      - author
       - checkstyle:
           requires:
             - build
-      - rat
-      - author
       - findbugs:
           requires:
             - build
