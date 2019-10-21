@@ -462,7 +462,7 @@ public class ContainerStateMachine extends BaseStateMachine {
                 + write.getChunkData().getChunkName() + e);
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
-            // see the stateMachine is marked unhealthy by other parallel thread.
+            // see the stateMachine is marked unhealthy by other parallel thread
             stateMachineHealthy.set(false);
             raftFuture.completeExceptionally(e);
             throw e;
