@@ -378,13 +378,11 @@ public class TestOMDirectoryCreateRequest {
         omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.OK);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
 
-    // Key should exist in DB
-    Assert.assertTrue(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(
-            volumeName, bucketName, keyName)) != null);
+    Assert.assertNotNull(omMetadataManager.getKeyTable().get(
+        omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
 
     Assert.assertEquals(1L, omMetrics.getNumKeys());
   }
