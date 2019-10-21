@@ -896,7 +896,8 @@ public class KeyManagerImpl implements KeyManager {
       long currentTime = Time.now();
       Map<Integer, PartKeyInfo> partKeyInfoMap = new HashMap<>();
       OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
-          multipartUploadID, currentTime, partKeyInfoMap);
+          multipartUploadID, currentTime, keyArgs.getType(),
+          keyArgs.getFactor(), partKeyInfoMap);
       List<OmKeyLocationInfo> locations = new ArrayList<>();
       OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
@@ -1337,17 +1338,10 @@ public class KeyManagerImpl implements KeyManager {
 
               upload.setCreationTime(
                   Instant.ofEpochMilli(multipartKeyInfo.getCreationTime()));
-
-              TreeMap<Integer, PartKeyInfo> partKeyInfoMap =
-                  multipartKeyInfo.getPartKeyInfoMap();
-              if (!partKeyInfoMap.isEmpty()) {
-                PartKeyInfo partKeyInfo =
-                    partKeyInfoMap.firstEntry().getValue();
-                upload.setReplicationType(
-                    partKeyInfo.getPartKeyInfo().getType());
-                upload.setReplicationFactor(
-                    partKeyInfo.getPartKeyInfo().getFactor());
-              }
+              upload.setReplicationType(
+                  multipartKeyInfo.getReplicationType());
+              upload.setReplicationFactor(
+                  multipartKeyInfo.getReplicationFactor());
             } catch (IOException e) {
               LOG.warn(
                   "Open key entry for multipart upload record can be read  {}",

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -35,8 +36,10 @@ public class TestOmMultipartKeyInfoCodec {
   @Test
   public void testOmMultipartKeyInfoCodec() {
     OmMultipartKeyInfoCodec codec = new OmMultipartKeyInfoCodec();
-    OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo(UUID
-        .randomUUID().toString(), Time.now(), new HashMap<>());
+    OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo(
+        UUID.randomUUID().toString(), Time.now(),
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
+        new HashMap<>());
     byte[] data = new byte[0];
     try {
       data = codec.toPersistedFormat(omMultipartKeyInfo);
