@@ -51,7 +51,6 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
   }
 
 
-
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     String volumeName = UUID.randomUUID().toString();
