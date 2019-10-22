@@ -16,10 +16,10 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .MultipartKeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .PartKeyInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,15 +30,24 @@ import java.util.TreeMap;
  * upload part information of the key.
  */
 public class OmMultipartKeyInfo {
-  private String uploadID;
+  private final String uploadID;
+  private final long creationTime;
+  private final ReplicationType replicationType;
+  private final ReplicationFactor replicationFactor;
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
 
   /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
    * information for a key.
    */
-  public OmMultipartKeyInfo(String id, Map<Integer, PartKeyInfo> list) {
+  public OmMultipartKeyInfo(String id, long creationTime,
+                            ReplicationType replicationType,
+                            ReplicationFactor replicationFactor,
+                            Map<Integer, PartKeyInfo> list) {
     this.uploadID = id;
+    this.creationTime = creationTime;
+    this.replicationType = replicationType;
+    this.replicationFactor = replicationFactor;
     this.partKeyInfoList = new TreeMap<>(list);
   }
 
@@ -48,6 +57,10 @@ public class OmMultipartKeyInfo {
    */
   public String getUploadID() {
     return uploadID;
+  }
+
+  public long getCreationTime() {
+    return creationTime;
   }
 
   public TreeMap<Integer, PartKeyInfo> getPartKeyInfoMap() {
@@ -62,18 +75,27 @@ public class OmMultipartKeyInfo {
     return partKeyInfoList.get(partNumber);
   }
 
+  public ReplicationType getReplicationType() {
+    return replicationType;
+  }
+
+  public ReplicationFactor getReplicationFactor() {
+    return replicationFactor;
+  }
 
   /**
    * Construct OmMultipartInfo from MultipartKeyInfo proto object.
    * @param multipartKeyInfo
    * @return OmMultipartKeyInfo
    */
-  public static OmMultipartKeyInfo getFromProto(MultipartKeyInfo
-                                                 multipartKeyInfo) {
+  public static OmMultipartKeyInfo getFromProto(
+      MultipartKeyInfo multipartKeyInfo) {
     Map<Integer, PartKeyInfo> list = new HashMap<>();
-    multipartKeyInfo.getPartKeyInfoListList().stream().forEach(partKeyInfo
-        -> list.put(partKeyInfo.getPartNumber(), partKeyInfo));
-    return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(), list);
+    multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
+        list.put(partKeyInfo.getPartNumber(), partKeyInfo));
+    return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
+        multipartKeyInfo.getCreationTime(), multipartKeyInfo.getType(),
+        multipartKeyInfo.getFactor(), list);
   }
 
   /**
@@ -82,7 +104,10 @@ public class OmMultipartKeyInfo {
    */
   public MultipartKeyInfo getProto() {
     MultipartKeyInfo.Builder builder = MultipartKeyInfo.newBuilder()
-        .setUploadID(uploadID);
+        .setUploadID(uploadID)
+        .setCreationTime(creationTime)
+        .setType(replicationType)
+        .setFactor(replicationFactor);
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
   }
