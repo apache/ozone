@@ -969,7 +969,10 @@ message MultipartInfoInitiateResponse {
 }
 
 message MultipartKeyInfo {
-    required string uploadID = 4;
+    required string uploadID = 1;
+    required uint64 creationTime = 2;
+    required hadoop.hdds.ReplicationType type = 3;
+    required hadoop.hdds.ReplicationFactor factor = 4;
     repeated PartKeyInfo partKeyInfoList = 5;
 }
 
