@@ -76,7 +76,7 @@ public class TestS3MultipartResponse {
       String multipartUploadID) {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
         multipartUploadID, Time.now(),
-        HddsProtos.ReplicationType.RATIS,HddsProtos.ReplicationFactor.ONE,
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
         new HashMap<>());
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
