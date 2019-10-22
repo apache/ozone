@@ -30,11 +30,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.stream.Collectors;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
-import com.google.common.base.Preconditions;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -52,9 +53,9 @@ import org.apache.commons.io.IOUtils;
 public class TarContainerPacker
     implements ContainerPacker<KeyValueContainerData> {
 
-  private static final String CHUNKS_DIR_NAME = OzoneConsts.STORAGE_DIR_CHUNKS;
+  static final String CHUNKS_DIR_NAME = OzoneConsts.STORAGE_DIR_CHUNKS;
 
-  private static final String DB_DIR_NAME = "db";
+  static final String DB_DIR_NAME = "db";
 
   private static final String CONTAINER_FILE_NAME = "container.yaml";
 
@@ -66,7 +67,6 @@ public class TarContainerPacker
    *
    * @param container container which defines the destination structure.
    * @param inputStream the input stream.
-   * @throws IOException
    */
   @Override
   public byte[] unpackContainerData(Container<KeyValueContainerData> container,
@@ -87,13 +87,15 @@ public class TarContainerPacker
       while (entry != null) {
         String name = entry.getName();
         if (name.startsWith(DB_DIR_NAME + "/")) {
-          Path destinationPath = containerData.getDbFile().toPath()
+          Path dbRoot = containerData.getDbFile().toPath();
+          Path destinationPath = dbRoot
               .resolve(name.substring(DB_DIR_NAME.length() + 1));
-          extractEntry(tarInput, entry.getSize(), destinationPath);
+          extractEntry(tarInput, entry.getSize(), dbRoot, destinationPath);
         } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
-          Path destinationPath = Paths.get(containerData.getChunksPath())
+          Path chunksRoot = Paths.get(containerData.getChunksPath());
+          Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
-          extractEntry(tarInput, entry.getSize(), destinationPath);
+          extractEntry(tarInput, entry.getSize(), chunksRoot, destinationPath);
         } else if (name.equals(CONTAINER_FILE_NAME)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
@@ -114,12 +116,11 @@ public class TarContainerPacker
     }
   }
 
+  @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
   private void extractEntry(TarArchiveInputStream tarInput, long size,
-      Path path) throws IOException {
-    Preconditions.checkNotNull(path, "Path element should not be null");
-    Path parent = Preconditions.checkNotNull(path.getParent(),
-        "Path element should have a parent directory");
-    Files.createDirectories(parent);
+                            Path ancestor, Path path) throws IOException {
+    HddsUtils.validatePath(path, ancestor);
+    Files.createDirectories(path.getParent());
     try (BufferedOutputStream bos = new BufferedOutputStream(
         new FileOutputStream(path.toAbsolutePath().toString()))) {
       int bufferSize = 1024;
@@ -145,7 +146,6 @@ public class TarContainerPacker
    *
    * @param container Container to archive (data + metadata).
    * @param destination   Destination tar file/stream.
-   * @throws IOException
    */
   @Override
   public void pack(Container<KeyValueContainerData> container,
@@ -235,7 +235,7 @@ public class TarContainerPacker
     }
   }
 
-  private void includeFile(File file, String entryName,
+  static void includeFile(File file, String entryName,
       ArchiveOutputStream archiveOutputStream) throws IOException {
     ArchiveEntry archiveEntry =
         archiveOutputStream.createArchiveEntry(file, entryName);
