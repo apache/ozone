@@ -319,6 +319,7 @@ message VolumeInfo {
 message UserInfo {
     optional string userName = 1;
     optional string remoteAddress = 3;
+    optional string hostName = 4;
 }
 
 /**
