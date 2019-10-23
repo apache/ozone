@@ -75,7 +75,6 @@ public class ClosePipelineCommandHandler implements CommandHandler {
     try {
       XceiverServerSpi server = ozoneContainer.getWriteChannel();
       server.removeGroup(pipelineID);
-      context.getParent().triggerHeartbeat();
       LOG.info("Close Pipeline #{} command on datanode #{}.", pipelineID,
           dn.getUuidString());
     } catch (IOException e) {

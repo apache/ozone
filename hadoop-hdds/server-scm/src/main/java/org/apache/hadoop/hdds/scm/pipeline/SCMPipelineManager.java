@@ -46,7 +46,6 @@ import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -83,9 +82,6 @@ public class SCMPipelineManager implements PipelineManager {
   private final NodeManager nodeManager;
   private final SCMPipelineMetrics metrics;
   private final Configuration conf;
-  private boolean pipelineAvailabilityCheck;
-  private boolean createPipelineInSafemode;
-  private Set<PipelineID> oldRatisThreeFactorPipelineIDSet = new HashSet<>();
   private long pipelineWaitDefaultTimeout;
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
@@ -118,12 +114,6 @@ public class SCMPipelineManager implements PipelineManager {
     this.metrics = SCMPipelineMetrics.create();
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
-    this.pipelineAvailabilityCheck = conf.getBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT);
-    this.createPipelineInSafemode = conf.getBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
     this.pipelineWaitDefaultTimeout = conf.getTimeDuration(
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
@@ -141,16 +131,9 @@ public class SCMPipelineManager implements PipelineManager {
     pipelineFactory.setProvider(replicationType, provider);
   }
 
-  public Set<PipelineID> getOldPipelineIdSet() {
-    return oldRatisThreeFactorPipelineIDSet;
-  }
-
   private void initializePipelineState() throws IOException {
     if (pipelineStore.isEmpty()) {
       LOG.info("No pipeline exists in current db");
-      if (pipelineAvailabilityCheck && createPipelineInSafemode) {
-        startPipelineCreator();
-      }
       return;
     }
     List<Map.Entry<byte[], byte[]>> pipelines =
@@ -165,10 +148,6 @@ public class SCMPipelineManager implements PipelineManager {
       Preconditions.checkNotNull(pipeline);
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
-      if (pipeline.getType() == ReplicationType.RATIS &&
-          pipeline.getFactor() == ReplicationFactor.THREE) {
-        oldRatisThreeFactorPipelineIDSet.add(pipeline.getId());
-      }
     }
   }
 
@@ -422,7 +401,7 @@ public class SCMPipelineManager implements PipelineManager {
    * Wait a pipeline to be OPEN.
    *
    * @param pipelineID ID of the pipeline to wait for.
-   * @param timeout    wait timeout, millisecond
+   * @param timeout    wait timeout, millisecond, 0 to use default value
    * @throws IOException in case of any Exception, such as timeout
    */
   @Override
@@ -432,8 +411,8 @@ public class SCMPipelineManager implements PipelineManager {
     try {
       pipeline = stateManager.getPipeline(pipelineID);
     } catch (PipelineNotFoundException e) {
-      throw new IOException(String.format("Pipeline %s cannot be found",
-          pipelineID));
+      throw new PipelineNotFoundException(String.format(
+          "Pipeline %s cannot be found", pipelineID));
     }
 
     boolean ready;
@@ -445,7 +424,7 @@ public class SCMPipelineManager implements PipelineManager {
         !ready && Time.monotonicNow() - st < timeout;
         ready = pipeline.isOpen()) {
       try {
-        Thread.sleep((long)1000);
+        Thread.sleep((long)100);
       } catch (InterruptedException e) {
 
       }
