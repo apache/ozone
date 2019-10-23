@@ -60,16 +60,16 @@ import org.slf4j.LoggerFactory;
  * number of datanode registered is met or not.
  *
  * 3. HealthyPipelineSafeModeRule:
- * Once the SCMPipelineManager processes the
- * {@link SCMEvents#CREATE_PIPELINE_STATUS}, it fires
+ * Once the PipelineReportHandler processes the
+ * {@link SCMEvents#PIPELINE_REPORT}, it fires
  * {@link SCMEvents#OPEN_PIPELINE}. This rule handles this
  * event. This rule processes this report, and check if pipeline is healthy
  * and increments current healthy pipeline count. Then validate it cutoff
  * threshold for healthy pipeline is met or not.
  *
  * 4. OneReplicaPipelineSafeModeRule:
- * Once the SCMPipelineManager processes the
- * {@link SCMEvents#CREATE_PIPELINE_STATUS}, it fires
+ * Once the PipelineReportHandler processes the
+ * {@link SCMEvents#PIPELINE_REPORT}, it fires
  * {@link SCMEvents#OPEN_PIPELINE}. This rule handles this
  * event. This rule processes this report, and add the reported pipeline to
  * reported pipeline set. Then validate it cutoff threshold for one replica
