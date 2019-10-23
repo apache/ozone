@@ -73,7 +73,7 @@ message Pipeline {
     optional ReplicationType type = 3 [default = STAND_ALONE];
     optional ReplicationFactor factor = 4 [default = ONE];
     required PipelineID id = 5;
-    optional bytes leaderID = 6;
+    optional string leaderID = 6;
     repeated uint32 memberOrders = 7;
 }
 

@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.ByteString;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -112,7 +111,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // pipelines
   private final Set<RaftGroupId> raftGids = new HashSet<>();
   // pipeline leaders
-  private Map<RaftGroupId, ByteString> leaderIdMap = new ConcurrentHashMap<>();
+  private Map<RaftGroupId, RaftPeerId> leaderIdMap = new ConcurrentHashMap<>();
 
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -599,7 +598,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       for (RaftGroupId groupId : gids) {
         reports.add(PipelineReport.newBuilder()
             .setPipelineID(PipelineID.valueOf(groupId.getUuid()).getProtobuf())
-            .setLeaderID(leaderIdMap.getOrDefault(groupId, ByteString.EMPTY))
+            .setIsLeader(RatisHelper.toRaftPeerId(datanodeDetails).equals(
+                leaderIdMap.get(groupId)))
             .build());
       }
       return reports;
@@ -696,8 +696,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     LOG.info("Leader change notification received for group: {} with new " +
         "leaderId: {}", groupMemberId.getGroupId(), raftPeerId);
     // Save the reported leader to be sent with the report to SCM
-    leaderIdMap.put(groupMemberId.getGroupId(),
-        ByteString.copyFromUtf8(raftPeerId.toString()));
+    leaderIdMap.put(groupMemberId.getGroupId(), raftPeerId);
     // Publish new reports with leaderID
     context.addReport(context.getParent().getContainer().getPipelineReport());
     // Trigger HB immediately

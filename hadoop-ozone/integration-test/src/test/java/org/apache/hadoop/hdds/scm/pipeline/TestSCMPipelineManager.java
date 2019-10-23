@@ -354,16 +354,17 @@ public class TestSCMPipelineManager {
     // Report pipelines with leaders
     List<DatanodeDetails> nodes = pipeline.getNodes();
     Assert.assertEquals(3, nodes.size());
-    // Send leader for only first 2 dns
-    nodes.subList(0, 2).forEach(dn ->
-        sendPipelineReport(dn, pipeline, pipelineReportHandler, true));
-    sendPipelineReport(nodes.get(2), pipeline, pipelineReportHandler, false);
+    // Send report for all but no leader
+    nodes.forEach(dn ->
+        sendPipelineReport(dn, pipeline, pipelineReportHandler, false));
 
     Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
-    nodes.forEach(dn ->
-        sendPipelineReport(dn, pipeline, pipelineReportHandler, true));
+    nodes.subList(0, 2).forEach(dn ->
+        sendPipelineReport(dn, pipeline, pipelineReportHandler, false));
+    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
+        pipelineReportHandler, true);
 
     Assert.assertEquals(Pipeline.PipelineState.OPEN,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
@@ -371,15 +372,13 @@ public class TestSCMPipelineManager {
 
   private void sendPipelineReport(DatanodeDetails dn,
       Pipeline pipeline, PipelineReportHandler pipelineReportHandler,
-      boolean sendLeaderId) {
+      boolean isLeader) {
 
     PipelineReportsProto.Builder reportProtoBuilder =
         PipelineReportsProto.newBuilder();
     PipelineReport.Builder reportBuilder = PipelineReport.newBuilder();
     reportBuilder.setPipelineID(pipeline.getId().getProtobuf());
-    if (sendLeaderId) {
-      reportBuilder.setLeaderID(ByteString.copyFromUtf8("raftPeer-1"));
-    }
+    reportBuilder.setIsLeader(isLeader);
 
     pipelineReportHandler.onMessage(new PipelineReportFromDatanode(dn,
         reportProtoBuilder.addPipelineReport(
