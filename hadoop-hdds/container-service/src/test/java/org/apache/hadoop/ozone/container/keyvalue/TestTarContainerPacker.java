@@ -47,6 +47,7 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -78,12 +79,23 @@ public class TestTarContainerPacker {
   private static final Path DEST_CONTAINER_ROOT =
       Paths.get("target/test/data/packer-dest-dir");
 
+  private static final Path TEMP_DIR =
+      Paths.get("target/test/data/packer-tmp-dir");
+
   private static final AtomicInteger CONTAINER_ID = new AtomicInteger(1);
 
   @BeforeClass
   public static void init() throws IOException {
     initDir(SOURCE_CONTAINER_ROOT);
     initDir(DEST_CONTAINER_ROOT);
+    initDir(TEMP_DIR);
+  }
+
+  @AfterClass
+  public static void cleanup() throws IOException {
+    FileUtils.deleteDirectory(SOURCE_CONTAINER_ROOT.toFile());
+    FileUtils.deleteDirectory(DEST_CONTAINER_ROOT.toFile());
+    FileUtils.deleteDirectory(TEMP_DIR.toFile());
   }
 
   private static void initDir(Path path) throws IOException {
@@ -132,8 +144,7 @@ public class TestTarContainerPacker {
     //sample container descriptor file
     writeDescriptor(sourceContainer);
 
-    Path targetFile =
-        SOURCE_CONTAINER_ROOT.getParent().resolve("container.tar.gz");
+    Path targetFile = TEMP_DIR.resolve("container.tar.gz");
 
     //WHEN: pack it
     try (FileOutputStream output = new FileOutputStream(targetFile.toFile())) {
@@ -180,9 +191,11 @@ public class TestTarContainerPacker {
     }
 
     assertExampleMetadataDbIsGood(
-        destinationContainerData.getDbFile().toPath());
+        destinationContainerData.getDbFile().toPath(),
+        TEST_DB_FILE_NAME);
     assertExampleChunkFileIsGood(
-        Paths.get(destinationContainerData.getChunksPath()));
+        Paths.get(destinationContainerData.getChunksPath()),
+        TEST_CHUNK_FILE_NAME);
     Assert.assertFalse(
         "Descriptor file should not have been extracted by the "
             + "unpackContainerData Call",
@@ -204,10 +217,10 @@ public class TestTarContainerPacker {
     File containerFile = packContainerWithSingleFile(file, entryName);
 
     // WHEN
-    unpackContainerData(containerFile);
+    KeyValueContainerData dest = unpackContainerData(containerFile);
 
     // THEN
-    assertExampleMetadataDbIsGood(file.toPath().getParent());
+    assertExampleMetadataDbIsGood(dest.getDbFile().toPath(), fileName);
   }
 
   @Test
@@ -224,10 +237,10 @@ public class TestTarContainerPacker {
     File containerFile = packContainerWithSingleFile(file, entryName);
 
     // WHEN
-    unpackContainerData(containerFile);
+    KeyValueContainerData dest = unpackContainerData(containerFile);
 
     // THEN
-    assertExampleChunkFileIsGood(file.toPath().getParent());
+    assertExampleChunkFileIsGood(Paths.get(dest.getChunksPath()), fileName);
   }
 
   @Test
@@ -264,12 +277,14 @@ public class TestTarContainerPacker {
         () -> unpackContainerData(containerFile));
   }
 
-  private void unpackContainerData(File containerFile) throws IOException {
+  private KeyValueContainerData unpackContainerData(File containerFile)
+      throws IOException {
     try (FileInputStream input = new FileInputStream(containerFile)) {
       OzoneConfiguration conf = new OzoneConfiguration();
       KeyValueContainerData data = createContainer(DEST_CONTAINER_ROOT);
       KeyValueContainer container = new KeyValueContainer(data, conf);
       packer.unpackContainerData(container, input);
+      return data;
     }
   }
 
@@ -307,8 +322,7 @@ public class TestTarContainerPacker {
 
   private File packContainerWithSingleFile(File file, String entryName)
       throws Exception {
-    File targetFile = SOURCE_CONTAINER_ROOT.getParent()
-        .resolve("container.tar.gz").toFile();
+    File targetFile = TEMP_DIR.resolve("container.tar.gz").toFile();
     try (FileOutputStream output = new FileOutputStream(targetFile);
          CompressorOutputStream gzipped = new CompressorStreamFactory()
              .createCompressorOutputStream(GZIP, output);
@@ -318,10 +332,10 @@ public class TestTarContainerPacker {
     return targetFile;
   }
 
-  private void assertExampleMetadataDbIsGood(Path dbPath)
+  private void assertExampleMetadataDbIsGood(Path dbPath, String filename)
       throws IOException {
 
-    Path dbFile = dbPath.resolve(TEST_DB_FILE_NAME);
+    Path dbFile = dbPath.resolve(filename);
 
     Assert.assertTrue(
         "example DB file is missing after pack/unpackContainerData: " + dbFile,
@@ -335,10 +349,10 @@ public class TestTarContainerPacker {
     }
   }
 
-  private void assertExampleChunkFileIsGood(Path chunkDirPath)
+  private void assertExampleChunkFileIsGood(Path chunkPath, String filename)
       throws IOException {
 
-    Path chunkFile = chunkDirPath.resolve(TEST_CHUNK_FILE_NAME);
+    Path chunkFile = chunkPath.resolve(filename);
 
     Assert.assertTrue(
         "example chunk file is missing after pack/unpackContainerData: "
