@@ -22,7 +22,6 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -35,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ScmUtils;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -358,14 +358,15 @@ public class SCMClientProtocolServer implements
 
     List<HddsProtos.Node> result = new ArrayList<>();
     queryNode(opState, state)
-        .forEach(node -> result.add(HddsProtos.Node.newBuilder()
-        .setNodeID(node.getProtoBufMessage())
-        .addNodeStates(state)
-        .addNodeOperationalStates(opState)
-        .build()));
-
+        .forEach(node -> {
+          NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
+          result.add(HddsProtos.Node.newBuilder()
+              .setNodeID(node.getProtoBufMessage())
+              .addNodeStates(ns.getHealth())
+              .addNodeOperationalStates(ns.getOperationalState())
+              .build());
+        });
     return result;
-
   }
 
   @Override
@@ -574,7 +575,6 @@ public class SCMClientProtocolServer implements
    */
   public List<DatanodeDetails> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state) {
-    Preconditions.checkNotNull(state, "Node Query set cannot be null");
     return new ArrayList<>(queryNodeState(opState, state));
   }
 

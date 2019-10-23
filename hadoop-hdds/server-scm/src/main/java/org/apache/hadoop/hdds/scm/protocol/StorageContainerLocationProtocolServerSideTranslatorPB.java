@@ -321,8 +321,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       StorageContainerLocationProtocolProtos.NodeQueryRequestProto request)
       throws IOException {
 
-    HddsProtos.NodeState nodeState = request.getState();
-    HddsProtos.NodeOperationalState opState = request.getOpState();
+    HddsProtos.NodeOperationalState opState = null;
+    HddsProtos.NodeState nodeState = null;
+    if (request.hasState()) {
+      nodeState = request.getState();
+    }
+    if (request.hasOpState()) {
+      opState = request.getOpState();
+    }
     List<HddsProtos.Node> datanodes = impl.queryNode(opState, nodeState,
         request.getScope(), request.getPoolName());
     return NodeQueryResponseProto.newBuilder()
