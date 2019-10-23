@@ -30,7 +30,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.stream.Collectors;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -116,11 +115,13 @@ public class TarContainerPacker
     }
   }
 
-  @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
   private void extractEntry(TarArchiveInputStream tarInput, long size,
                             Path ancestor, Path path) throws IOException {
     HddsUtils.validatePath(path, ancestor);
-    Files.createDirectories(path.getParent());
+    Path parent = path.getParent();
+    if (parent != null) {
+      Files.createDirectories(parent);
+    }
     try (BufferedOutputStream bos = new BufferedOutputStream(
         new FileOutputStream(path.toAbsolutePath().toString()))) {
       int bufferSize = 1024;
