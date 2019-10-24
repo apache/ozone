@@ -60,15 +60,6 @@ services:
      command: ["--config.file","/etc/prometheus.yml"]
      ports:
         - 9090:9090
-   freon:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
-      volumes:
-         - ../..:/opt/hadoop
-      environment:
-         SLEEP_SECONDS: 30
-      env_file:
-         - ./docker-config
-      command: ["ozone","freon","rk"]
    grafana:
       image: grafana/grafana
       volumes:

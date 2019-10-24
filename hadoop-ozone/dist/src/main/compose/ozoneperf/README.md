@@ -31,7 +31,25 @@ Start the cluster with `docker-compose`
 docker-compose up -d
 ```
 
-Note: The freon test will be started after 30 seconds.
+Scale datanodes up:
+
+```
+docker-compose up -d --scale datanode=3
+```
+
+You can enter to the SCM container and start a freon test:
+
+```
+docker-compose exec scm bash
+ozone freon ockg -n1000
+```
+
+Or you can start freon instances in containers (to make it possible to scale them up):
+If all the datanodes are started, start the freon instance:
+
+```
+docker-compose -f docker-compose.yaml -f freon-ockg.yaml up --scale datanode=3 -d
+```
 
 ## How to use
 
