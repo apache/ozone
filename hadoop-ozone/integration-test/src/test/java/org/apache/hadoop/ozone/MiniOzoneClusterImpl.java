@@ -153,7 +153,26 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       LOG.info(exitSafeMode? "Cluster exits safe mode" :
               "Waiting for cluster to exit safe mode",
           healthy, hddsDatanodes.size());
-      return isNodeReady && exitSafeMode;
+
+      boolean ready = isNodeReady && exitSafeMode;
+      if (ready) {
+        // Wait a while for as many as new pipelines to be ready
+        boolean createPipelineInSafeMode = conf.getBoolean(
+            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
+            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
+        if (createPipelineInSafeMode) {
+          long sleepTime = conf.getTimeDuration(
+              HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+              HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+              TimeUnit.MILLISECONDS);
+          try {
+            Thread.sleep(sleepTime);
+          } catch (InterruptedException e) {
+          }
+        }
+      }
+
+      return ready;
     }, 1000, waitForClusterToBeReadyTimeout);
   }
 
