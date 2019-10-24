@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -98,7 +97,6 @@ public class SCMSafeModeManager {
   private final PipelineManager pipelineManager;
 
   private final SafeModeMetrics safeModeMetrics;
-  private boolean createPipelineInSafeMode = false;
 
   public SCMSafeModeManager(Configuration conf,
       List<ContainerInfo> allContainers, PipelineManager pipelineManager,
@@ -136,9 +134,6 @@ public class SCMSafeModeManager {
         exitRules.put(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE,
             oneReplicaPipelineSafeModeRule);
       }
-      createPipelineInSafeMode = conf.getBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
       emitSafeModeStatus();
     } else {
       this.safeModeMetrics = null;
@@ -196,18 +191,6 @@ public class SCMSafeModeManager {
    */
   @VisibleForTesting
   public void exitSafeMode(EventPublisher eventQueue) {
-    // Wait a while for as many as new pipelines to be ready
-    if (createPipelineInSafeMode) {
-      long sleepTime = config.getTimeDuration(
-          HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
-          HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      try {
-        Thread.sleep(sleepTime);
-      } catch (InterruptedException e) {
-      }
-    }
-
     LOG.info("SCM exiting safe mode.");
     setInSafeMode(false);
 
