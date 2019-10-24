@@ -102,8 +102,7 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
    */
   @Override
   public void onMessage(SafeModeStatus safeModeStatus,
-      EventPublisher publisher) {
-
+                        EventPublisher publisher) {
     isInSafeMode.set(safeModeStatus.getSafeModeStatus());
     scmClientProtocolServer.setSafeModeStatus(isInSafeMode.get());
     scmBlockManager.setSafeModeStatus(isInSafeMode.get());
@@ -129,7 +128,7 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
     List<Pipeline> pipelineList = scmPipelineManager.getPipelines();
     pipelineList.forEach((pipeline) -> {
       try {
-        if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
+        if (!pipeline.isHealthy()) {
           scmPipelineManager.finalizeAndDestroyPipeline(pipeline, false);
         }
       } catch (IOException ex) {

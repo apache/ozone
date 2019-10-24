@@ -175,13 +175,13 @@ public final class Pipeline {
     nodeStatus.put(dn, System.currentTimeMillis());
   }
 
-  boolean isHealthy() {
+  public boolean isHealthy() {
     for (Long reportedTime : nodeStatus.values()) {
       if (reportedTime < 0) {
         return false;
       }
     }
-    return true;
+    return leaderId != null;
   }
 
   public boolean isEmpty() {

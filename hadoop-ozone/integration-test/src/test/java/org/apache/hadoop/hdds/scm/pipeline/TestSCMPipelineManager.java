@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -48,8 +47,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.google.protobuf.ByteString;
 
 /**
  * Test cases to verify PipelineManager.
@@ -139,72 +136,6 @@ public class TestSCMPipelineManager {
     // new pipeline manager should not be able to load removed pipelines
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
-    try {
-      pipelineManager.getPipeline(pipeline.getId());
-      Assert.fail("Pipeline should not have been retrieved");
-    } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().contains("not found"));
-    }
-
-    // clean up
-    pipelineManager.close();
-  }
-
-  @Test
-  public void testPipelineReport() throws IOException {
-    EventQueue eventQueue = new EventQueue();
-    SCMPipelineManager pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, eventQueue, null);
-    PipelineProvider mockRatisProvider =
-        new MockRatisPipelineProvider(nodeManager,
-            pipelineManager.getStateManager(), conf);
-    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
-        mockRatisProvider);
-
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(new OzoneConfiguration(),
-            new ArrayList<>(), pipelineManager, eventQueue);
-
-    // create a pipeline in allocated state with no dns yet reported
-    Pipeline pipeline = pipelineManager
-        .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
-    Assert
-        .assertFalse(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isOpen());
-
-    // get pipeline report from each dn in the pipeline
-    PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
-    for (DatanodeDetails dn: pipeline.getNodes()) {
-      PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
-      // pipeline is not healthy until all dns report
-      Assert.assertFalse(
-          pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-      pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
-    }
-
-    // pipeline is healthy when all dns report
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-    // pipeline should now move to open state
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isOpen());
-
-    // close the pipeline
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
-
-    for (DatanodeDetails dn: pipeline.getNodes()) {
-      PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
-      // pipeline report for destroyed pipeline should be ignored
-      pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
-    }
-
     try {
       pipelineManager.getPipeline(pipeline.getId());
       Assert.fail("Pipeline should not have been retrieved");

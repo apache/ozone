@@ -110,8 +110,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
   private final Set<RaftGroupId> raftGids = new HashSet<>();
-  // pipeline leaders
-  private Map<RaftGroupId, RaftPeerId> leaderIdMap = new ConcurrentHashMap<>();
+  private final RaftPeerId raftPeerId;
+  // pipelines for which I am the leader
+  private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
 
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -141,9 +142,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         TimeUnit.MILLISECONDS);
     this.dispatcher = dispatcher;
     this.containerController = containerController;
+    this.raftPeerId = RatisHelper.toRaftPeerId(dd);
 
     RaftServer.Builder builder =
-        RaftServer.newBuilder().setServerId(RatisHelper.toRaftPeerId(dd))
+        RaftServer.newBuilder().setServerId(raftPeerId)
             .setProperties(serverProperties)
             .setStateMachineRegistry(this::getStateMachine);
     if (tlsConfig != null) {
@@ -598,8 +600,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       for (RaftGroupId groupId : gids) {
         reports.add(PipelineReport.newBuilder()
             .setPipelineID(PipelineID.valueOf(groupId.getUuid()).getProtobuf())
-            .setIsLeader(RatisHelper.toRaftPeerId(datanodeDetails).equals(
-                leaderIdMap.get(groupId)))
+            .setIsLeader(groupLeaderMap.get(groupId))
             .build());
       }
       return reports;
@@ -684,7 +685,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   void notifyGroupRemove(RaftGroupId gid) {
     raftGids.remove(gid);
     // Remove any entries for group leader map
-    leaderIdMap.remove(gid);
+    groupLeaderMap.remove(gid);
   }
 
   void notifyGroupAdd(RaftGroupId gid) {
@@ -696,10 +697,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     LOG.info("Leader change notification received for group: {} with new " +
         "leaderId: {}", groupMemberId.getGroupId(), raftPeerId);
     // Save the reported leader to be sent with the report to SCM
-    leaderIdMap.put(groupMemberId.getGroupId(), raftPeerId);
-    // Publish new reports with leaderID
-    context.addReport(context.getParent().getContainer().getPipelineReport());
-    // Trigger HB immediately
-    context.getParent().triggerHeartbeat();
+    boolean leaderForGroup = this.raftPeerId.equals(raftPeerId);
+    groupLeaderMap.put(groupMemberId.getGroupId(), leaderForGroup);
+    if (context != null && leaderForGroup) {
+      // Publish new report from leader
+      context.addReport(context.getParent().getContainer().getPipelineReport());
+      // Trigger HB immediately
+      context.getParent().triggerHeartbeat();
+    }
   }
 }

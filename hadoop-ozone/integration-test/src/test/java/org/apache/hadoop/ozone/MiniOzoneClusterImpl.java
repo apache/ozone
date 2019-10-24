@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -290,7 +291,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       final int healthy = scm.getNodeCount(HEALTHY);
       boolean isReady = healthy == hddsDatanodes.size();
       if (!isReady) {
-        LOG.info("Waiting on {} datanodes to be marked unhealthy.", healthy);
+        LOG.info("Waiting on {} datanodes out of {} to be marked unhealthy.",
+            healthy, hddsDatanodes.size());
       }
       return isReady;
     }, 1000, waitForClusterToBeReadyTimeout);
@@ -548,7 +550,15 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       configureSCM();
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
-      return StorageContainerManager.createSCM(conf);
+      StorageContainerManager scm = StorageContainerManager.createSCM(conf);
+      HealthyPipelineSafeModeRule rule =
+          scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
+      if (rule != null) {
+        // Set threshold to wait for safe mode exit - this is needed since a
+        // pipeline is marked open only after leader election.
+        rule.setHealthyPipelineThresholdCount(numOfDatanodes / 3);
+      }
+      return scm;
     }
 
     private void initializeScmStorage(SCMStorageConfig scmStore)
