@@ -50,4 +50,8 @@ public class OmVolumeArgsCodec implements Codec<OmVolumeArgs> {
     }
   }
 
+  @Override
+  public OmVolumeArgs copyObject(OmVolumeArgs omVolumeArgs) {
+    return omVolumeArgs.copyObject();
+  }
 }
