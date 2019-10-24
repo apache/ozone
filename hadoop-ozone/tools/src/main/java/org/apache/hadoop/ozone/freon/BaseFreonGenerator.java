@@ -43,6 +43,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
+import io.opentracing.Scope;
+import io.opentracing.util.GlobalTracer;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.ratis.protocol.ClientId;
@@ -123,7 +125,13 @@ public class BaseFreonGenerator {
 
       final long counter = i;
 
+      //provider is usually a lambda, print out only the owner class name:
+      String spanName = provider.getClass().getSimpleName().split("\\$")[0];
+
       executor.execute(() -> {
+        Scope scope =
+            GlobalTracer.get().buildSpan(spanName)
+                .startActive(true);
         try {
 
           //in case of an other failed test, we shouldn't execute more tasks.
@@ -134,8 +142,11 @@ public class BaseFreonGenerator {
           provider.executeNextTask(counter);
           successCounter.incrementAndGet();
         } catch (Exception e) {
+          scope.span().setTag("failure", true);
           failureCounter.incrementAndGet();
           LOG.error("Error on executing task", e);
+        } finally {
+          scope.close();
         }
       });
     }
@@ -332,6 +343,7 @@ public class BaseFreonGenerator {
   public OzoneConfiguration createOzoneConfiguration() {
     return freonCommand.createOzoneConfiguration();
   }
+
   /**
    * Simple contract to execute a new step during a freon test.
    */
