@@ -56,6 +56,12 @@ public class OmKeyGenerator extends BaseFreonGenerator
       defaultValue = "bucket1")
   private String bucketName;
 
+  @Option(names = { "-F", "--factor" },
+      description = "Replication factor (ONE, THREE)",
+      defaultValue = "THREE"
+  )
+  private ReplicationFactor factor = ReplicationFactor.THREE;
+
   private OzoneManagerProtocol ozoneManagerClient;
 
   private Timer timer;
@@ -84,7 +90,7 @@ public class OmKeyGenerator extends BaseFreonGenerator
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
         .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setFactor(factor)
         .setKeyName(generateObjectName(counter))
         .setLocationInfoList(new ArrayList<>())
         .build();
