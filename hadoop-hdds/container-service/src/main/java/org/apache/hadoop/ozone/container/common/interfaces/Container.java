@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -64,6 +65,9 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    * @throws StorageContainerException
    */
   void update(Map<String, String> metaData, boolean forceUpdate)
+      throws StorageContainerException;
+
+  void updateDataScanTimestamp(Instant timestamp)
       throws StorageContainerException;
 
   /**
