@@ -66,6 +66,12 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
       defaultValue = "4096")
   private int bufferSize;
 
+  @Option(names = { "-F", "--factor" },
+      description = "Replication factor (ONE, THREE)",
+      defaultValue = "THREE"
+  )
+  private ReplicationFactor factor = ReplicationFactor.THREE;
+
   private Timer timer;
 
   private OzoneBucket bucket;
@@ -103,7 +109,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
       try (OutputStream stream = bucket
           .createKey(generateObjectName(counter), keySize,
               ReplicationType.RATIS,
-              ReplicationFactor.THREE,
+              factor,
               new HashMap<>())) {
         contentGenerator.write(stream);
         stream.flush();
