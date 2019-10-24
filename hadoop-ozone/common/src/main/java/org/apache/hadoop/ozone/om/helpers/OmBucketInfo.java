@@ -367,6 +367,7 @@ public final class OmBucketInfo extends WithMetadata implements Auditable{
     return obib.build();
   }
 
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
