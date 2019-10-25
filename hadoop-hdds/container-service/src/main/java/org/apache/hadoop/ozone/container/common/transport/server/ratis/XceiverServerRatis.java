@@ -695,7 +695,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   void handleLeaderChangedNotification(RaftGroupMemberId groupMemberId,
                                        RaftPeerId raftPeerId1) {
     LOG.info("Leader change notification received for group: {} with new " +
-        "leaderId: {}", groupMemberId.getGroupId(), raftPeerId);
+        "leaderId: {}", groupMemberId.getGroupId(), raftPeerId1);
     // Save the reported leader to be sent with the report to SCM
     boolean leaderForGroup = this.raftPeerId.equals(raftPeerId1);
     groupLeaderMap.put(groupMemberId.getGroupId(), leaderForGroup);
