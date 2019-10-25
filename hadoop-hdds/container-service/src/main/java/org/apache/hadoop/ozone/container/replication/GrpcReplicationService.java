@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,17 +18,12 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .CopyContainerRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .CopyContainerResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .IntraDatanodeProtocolServiceGrpc;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
@@ -44,41 +39,37 @@ public class GrpcReplicationService extends
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcReplicationService.class);
 
-  private final ContainerReplicationSource containerReplicationSource;
+  private final ContainerReplicationSource source;
 
-  public GrpcReplicationService(
-      ContainerReplicationSource containerReplicationSource) {
-    this.containerReplicationSource = containerReplicationSource;
+  public GrpcReplicationService(ContainerReplicationSource source) {
+    this.source = source;
   }
 
   @Override
   public void download(CopyContainerRequestProto request,
       StreamObserver<CopyContainerResponseProto> responseObserver) {
-    LOG.info("Streaming container data ({}) to other datanode",
-        request.getContainerID());
+    long containerID = request.getContainerID();
+    LOG.info("Streaming container data ({}) to other datanode", containerID);
     try {
       GrpcOutputStream outputStream =
-          new GrpcOutputStream(responseObserver, request.getContainerID());
-      containerReplicationSource
-          .copyData(request.getContainerID(), outputStream);
+          new GrpcOutputStream(responseObserver, containerID);
+      source.copyData(containerID, outputStream);
     } catch (IOException e) {
-      LOG.error("Can't stream the container data", e);
+      LOG.error("Error streaming container {}", containerID, e);
       responseObserver.onError(e);
     }
   }
 
-  private static class GrpcOutputStream extends OutputStream
-      implements Closeable {
+  private static class GrpcOutputStream extends OutputStream {
 
     private static final int BUFFER_SIZE_IN_BYTES = 1024 * 1024;
 
     private final StreamObserver<CopyContainerResponseProto> responseObserver;
 
-    private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+    private final ByteString.Output buffer =
+        ByteString.newOutput(BUFFER_SIZE_IN_BYTES);
 
-    private long containerId;
-
-    private int readOffset = 0;
+    private final long containerId;
 
     private int writtenBytes;
 
@@ -90,10 +81,10 @@ public class GrpcReplicationService extends
     }
 
     @Override
-    public void write(int b) throws IOException {
+    public void write(int b) {
       try {
         buffer.write(b);
-        if (buffer.size() > BUFFER_SIZE_IN_BYTES) {
+        if (buffer.size() >= BUFFER_SIZE_IN_BYTES) {
           flushBuffer(false);
         }
       } catch (Exception ex) {
@@ -102,18 +93,21 @@ public class GrpcReplicationService extends
     }
 
     private void flushBuffer(boolean eof) {
-      if (buffer.size() > 0) {
+      int length = buffer.size();
+      if (length > 0) {
+        ByteString data = buffer.toByteString();
+        LOG.debug("Sending {} bytes (of type {}) for container {}",
+            length, data.getClass().getSimpleName(), containerId);
         CopyContainerResponseProto response =
             CopyContainerResponseProto.newBuilder()
                 .setContainerID(containerId)
-                .setData(ByteString.copyFrom(buffer.toByteArray()))
+                .setData(data)
                 .setEof(eof)
-                .setReadOffset(readOffset)
-                .setLen(buffer.size())
+                .setReadOffset(writtenBytes)
+                .setLen(length)
                 .build();
         responseObserver.onNext(response);
-        readOffset += buffer.size();
-        writtenBytes += buffer.size();
+        writtenBytes += length;
         buffer.reset();
       }
     }
