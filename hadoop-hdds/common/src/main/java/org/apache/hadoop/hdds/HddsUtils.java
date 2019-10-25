@@ -24,6 +24,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.file.Path;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.HashSet;
@@ -32,6 +33,7 @@ import java.util.Optional;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -501,5 +503,26 @@ public final class HddsUtils {
         configuration.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
         DefaultMetricsSystem.instance());
     return metricsSystem;
+  }
+
+  /**
+   * Basic validation for {@code path}: checks that it is a descendant of
+   * (or the same as) the given {@code ancestor}.
+   * @param path the path to be validated
+   * @param ancestor a trusted path that is supposed to be the ancestor of
+   *     {@code path}
+   * @throws NullPointerException if either {@code path} or {@code ancestor} is
+   *     null
+   * @throws IllegalArgumentException if {@code ancestor} is not really the
+   *     ancestor of {@code path}
+   */
+  public static void validatePath(Path path, Path ancestor) {
+    Preconditions.checkNotNull(path,
+        "Path should not be null");
+    Preconditions.checkNotNull(ancestor,
+        "Ancestor should not be null");
+    Preconditions.checkArgument(
+        path.normalize().startsWith(ancestor.normalize()),
+        "Path should be a descendant of " + ancestor);
   }
 }
