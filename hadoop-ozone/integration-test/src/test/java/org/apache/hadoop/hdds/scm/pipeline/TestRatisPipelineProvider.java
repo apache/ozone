@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,25 +18,33 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import static org.apache.commons.collections.CollectionUtils.intersection;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test for RatisPipelineProvider.
  */
 public class TestRatisPipelineProvider {
+
+  private static final HddsProtos.ReplicationType REPLICATION_TYPE =
+      HddsProtos.ReplicationType.RATIS;
 
   private NodeManager nodeManager;
   private PipelineProvider provider;
@@ -53,49 +61,33 @@ public class TestRatisPipelineProvider {
   private void createPipelineAndAssertions(
           HddsProtos.ReplicationFactor factor) throws IOException {
     Pipeline pipeline = provider.create(factor);
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
     stateManager.addPipeline(pipeline);
-    Assert.assertEquals(pipeline.getType(), HddsProtos.ReplicationType.RATIS);
-    Assert.assertEquals(pipeline.getFactor(), factor);
-    Assert.assertEquals(pipeline.getPipelineState(),
-            Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
+
     Pipeline pipeline1 = provider.create(factor);
-    stateManager.addPipeline(pipeline1);
+    assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE);
     // New pipeline should not overlap with the previous created pipeline
-    Assert.assertTrue(
-        CollectionUtils.intersection(pipeline.getNodes(), pipeline1.getNodes())
+    assertTrue(
+        intersection(pipeline.getNodes(), pipeline1.getNodes())
             .isEmpty());
-    Assert.assertEquals(pipeline1.getType(), HddsProtos.ReplicationType.RATIS);
-    Assert.assertEquals(pipeline1.getFactor(), factor);
-    Assert.assertEquals(pipeline1.getPipelineState(),
-            Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline1.getNodes().size(), factor.getNumber());
+    stateManager.addPipeline(pipeline1);
   }
 
   @Test
   public void testCreatePipelineWithFactor() throws IOException {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline = provider.create(factor);
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
     stateManager.addPipeline(pipeline);
-    Assert.assertEquals(pipeline.getType(), HddsProtos.ReplicationType.RATIS);
-    Assert.assertEquals(pipeline.getFactor(), factor);
-    Assert.assertEquals(pipeline.getPipelineState(),
-        Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
 
     factor = HddsProtos.ReplicationFactor.ONE;
     Pipeline pipeline1 = provider.create(factor);
+    assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE);
     stateManager.addPipeline(pipeline1);
     // New pipeline should overlap with the previous created pipeline,
     // and one datanode should overlap between the two types.
-    Assert.assertEquals(
-        CollectionUtils.intersection(pipeline.getNodes(),
-            pipeline1.getNodes()).size(), 1);
-    Assert.assertEquals(pipeline1.getType(), HddsProtos.ReplicationType.RATIS);
-    Assert.assertEquals(pipeline1.getFactor(), factor);
-    Assert.assertEquals(pipeline1.getPipelineState(),
-        Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline1.getNodes().size(), factor.getNumber());
+    assertEquals(1,
+        intersection(pipeline.getNodes(), pipeline1.getNodes()).size());
   }
 
   @Test
@@ -121,87 +113,68 @@ public class TestRatisPipelineProvider {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
         provider.create(factor, createListOfNodes(factor.getNumber()));
-    Assert.assertEquals(pipeline.getType(), HddsProtos.ReplicationType.RATIS);
-    Assert.assertEquals(pipeline.getFactor(), factor);
-    Assert.assertEquals(
-        pipeline.getPipelineState(), Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
 
     factor = HddsProtos.ReplicationFactor.ONE;
     pipeline = provider.create(factor, createListOfNodes(factor.getNumber()));
-    Assert.assertEquals(pipeline.getType(), HddsProtos.ReplicationType.RATIS);
-    Assert.assertEquals(pipeline.getFactor(), factor);
-    Assert.assertEquals(pipeline.getPipelineState(),
-        Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
   }
 
   @Test
   public void testCreatePipelinesDnExclude() throws IOException {
+    List<DatanodeDetails> healthyNodes =
+        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
 
-    // We need 9 Healthy DNs in MockNodeManager.
-    NodeManager mockNodeManager = new MockNodeManager(true, 12);
-    PipelineStateManager stateManagerMock =
-        new PipelineStateManager(new OzoneConfiguration());
-    PipelineProvider providerMock = new MockRatisPipelineProvider(
-        mockNodeManager, stateManagerMock, new OzoneConfiguration());
+    Assume.assumeTrue(healthyNodes.size() == 8);
 
-    // Use up first 3 DNs for an open pipeline.
-    List<DatanodeDetails> openPiplineDns = mockNodeManager.getAllNodes()
-        .subList(0, 3);
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
 
+    // Use up first 3 DNs for an open pipeline.
+    List<DatanodeDetails> dns = healthyNodes.subList(0, 3);
+    addPipeline(dns, factor, Pipeline.PipelineState.OPEN, REPLICATION_TYPE);
+    Set<DatanodeDetails> membersOfOpenPipelines = new HashSet<>(dns);
+
+    // Use up next 3 DNs for a closed pipeline.
+    dns = healthyNodes.subList(3, 6);
+    addPipeline(dns, factor, Pipeline.PipelineState.CLOSED, REPLICATION_TYPE);
+    Set<DatanodeDetails> membersOfClosedPipelines = new HashSet<>(dns);
+
+    // only 2 healthy DNs left that are not part of any pipeline
+    Pipeline pipeline = provider.create(factor);
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
+
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+
+    assertTrue(
+        "nodes of new pipeline cannot be from open pipelines",
+        nodes.stream().noneMatch(membersOfOpenPipelines::contains));
+
+    assertTrue(
+        "at least 1 node should have been from members of closed pipelines",
+        nodes.stream().anyMatch(membersOfClosedPipelines::contains));
+  }
+
+  private static void assertPipelineProperties(
+      Pipeline pipeline, HddsProtos.ReplicationFactor expectedFactor,
+      HddsProtos.ReplicationType expectedReplicationType) {
+    assertEquals(Pipeline.PipelineState.OPEN, pipeline.getPipelineState());
+    assertEquals(expectedReplicationType, pipeline.getType());
+    assertEquals(expectedFactor, pipeline.getFactor());
+    assertEquals(expectedFactor.getNumber(), pipeline.getNodes().size());
+  }
+
+  private void addPipeline(
+      List<DatanodeDetails> dns, HddsProtos.ReplicationFactor factor,
+      Pipeline.PipelineState open, HddsProtos.ReplicationType replicationType)
+      throws IOException {
     Pipeline openPipeline = Pipeline.newBuilder()
-        .setType(HddsProtos.ReplicationType.RATIS)
+        .setType(replicationType)
         .setFactor(factor)
-        .setNodes(openPiplineDns)
-        .setState(Pipeline.PipelineState.OPEN)
+        .setNodes(dns)
+        .setState(open)
         .setId(PipelineID.randomId())
         .build();
 
-    stateManagerMock.addPipeline(openPipeline);
-
-    // Use up next 3 DNs also for an open pipeline.
-    List<DatanodeDetails> moreOpenPiplineDns = mockNodeManager.getAllNodes()
-        .subList(3, 6);
-    Pipeline anotherOpenPipeline = Pipeline.newBuilder()
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(factor)
-        .setNodes(moreOpenPiplineDns)
-        .setState(Pipeline.PipelineState.OPEN)
-        .setId(PipelineID.randomId())
-        .build();
-    stateManagerMock.addPipeline(anotherOpenPipeline);
-
-    // Use up next 3 DNs also for a closed pipeline.
-    List<DatanodeDetails> closedPiplineDns = mockNodeManager.getAllNodes()
-        .subList(6, 9);
-    Pipeline anotherClosedPipeline = Pipeline.newBuilder()
-        .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(factor)
-        .setNodes(closedPiplineDns)
-        .setState(Pipeline.PipelineState.CLOSED)
-        .setId(PipelineID.randomId())
-        .build();
-    stateManagerMock.addPipeline(anotherClosedPipeline);
-
-    Pipeline pipeline = providerMock.create(factor);
-    Assert.assertEquals(pipeline.getType(), HddsProtos.ReplicationType.RATIS);
-    Assert.assertEquals(pipeline.getFactor(), factor);
-    Assert.assertEquals(pipeline.getPipelineState(),
-        Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
-    List<DatanodeDetails> pipelineNodes = pipeline.getNodes();
-
-    // Pipline nodes cannot be from open pipelines.
-    Assert.assertTrue(
-        pipelineNodes.parallelStream().filter(dn ->
-        (openPiplineDns.contains(dn) || moreOpenPiplineDns.contains(dn)))
-        .count() == 0);
-
-    // Since we have only 9 Healthy DNs, at least 1 pipeline node should have
-    // been from the closed pipeline DN list.
-    Assert.assertTrue(pipelineNodes.parallelStream().filter(
-        closedPiplineDns::contains).count() > 0);
+    stateManager.addPipeline(openPipeline);
   }
 }
