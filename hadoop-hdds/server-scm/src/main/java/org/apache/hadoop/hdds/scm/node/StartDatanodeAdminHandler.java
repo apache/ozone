@@ -37,7 +37,7 @@ import java.util.Set;
 public class StartDatanodeAdminHandler
     implements EventHandler<DatanodeDetails> {
   private static final Logger LOG =
-      LoggerFactory.getLogger(StaleNodeHandler.class);
+      LoggerFactory.getLogger(StartDatanodeAdminHandler.class);
 
   private final NodeManager nodeManager;
   private final PipelineManager pipelineManager;
