@@ -22,11 +22,13 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrefixInfo;
 
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Wrapper class for Ozone prefix path info, currently mainly target for ACL but
@@ -178,6 +180,22 @@ public final class OmPrefixInfo extends WithMetadata {
   @Override
   public int hashCode() {
     return Objects.hash(name);
+  }
+
+  /**
+   * Return a new copy of the object.
+   */
+  public OmPrefixInfo copyObject() {
+    List<OzoneAcl> aclList = acls.stream().map(acl ->
+        new OzoneAcl(acl.getType(), acl.getName(),
+            (BitSet) acl.getAclBitSet().clone(), acl.getAclScope()))
+        .collect(Collectors.toList());
+
+    Map<String, String> metadataList = new HashMap<>();
+    if (metadata != null) {
+      metadata.forEach((k, v) -> metadataList.put(k, v));
+    }
+    return new OmPrefixInfo(name, aclList, metadataList);
   }
 }
 

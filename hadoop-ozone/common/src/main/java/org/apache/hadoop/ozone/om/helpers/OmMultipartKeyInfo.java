@@ -126,4 +126,11 @@ public class OmMultipartKeyInfo {
     return uploadID.hashCode();
   }
 
+  public OmMultipartKeyInfo copyObject() {
+    // For partKeyInfoList we can do shallow copy here, as the PartKeyInfo is
+    // immutable here.
+    return new OmMultipartKeyInfo(uploadID, creationTime, replicationType,
+        replicationFactor, new TreeMap<>(partKeyInfoList));
+  }
+
 }
