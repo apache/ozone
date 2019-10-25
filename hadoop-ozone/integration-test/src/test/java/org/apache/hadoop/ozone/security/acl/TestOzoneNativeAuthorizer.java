@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
+import com.google.common.base.Optional;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -24,6 +25,8 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.BucketManagerImpl;
 import org.apache.hadoop.ozone.om.IOzoneAcl;
@@ -54,6 +57,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -253,7 +257,10 @@ public class TestOzoneNativeAuthorizer {
     OzoneAcl groupAcl = new OzoneAcl(GROUP, ugi.getGroups().size() > 0 ?
         ugi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
     // Set access for volume.
-    volumeManager.setAcl(volObj, Arrays.asList(userAcl, groupAcl));
+    // We should directly add to table because old API's update to DB.
+
+    setVolumeAcl(Arrays.asList(userAcl, groupAcl));
+
 
     resetAclsAndValidateAccess(buckObj, USER, bucketManager);
     resetAclsAndValidateAccess(buckObj, GROUP, bucketManager);
@@ -267,10 +274,11 @@ public class TestOzoneNativeAuthorizer {
         ACCESS);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, ugi.getGroups().size() > 0 ?
         ugi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
-    // Set access for volume, bucket & prefix.
-    volumeManager.setAcl(volObj, Arrays.asList(userAcl, groupAcl));
-    bucketManager.setAcl(buckObj, Arrays.asList(userAcl, groupAcl));
-    //prefixManager.setAcl(prefixObj, Arrays.asList(userAcl, groupAcl));
+    // Set access for volume & bucket. We should directly add to table
+    // because old API's update to DB.
+
+    setVolumeAcl(Arrays.asList(userAcl, groupAcl));
+    setBucketAcl(Arrays.asList(userAcl, groupAcl));
 
     resetAclsAndValidateAccess(keyObj, USER, keyManager);
     resetAclsAndValidateAccess(keyObj, GROUP, keyManager);
@@ -292,14 +300,61 @@ public class TestOzoneNativeAuthorizer {
         ACCESS);
     OzoneAcl groupAcl = new OzoneAcl(GROUP, ugi.getGroups().size() > 0 ?
         ugi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
-    // Set access for volume & bucket.
-    volumeManager.setAcl(volObj, Arrays.asList(userAcl, groupAcl));
-    bucketManager.setAcl(buckObj, Arrays.asList(userAcl, groupAcl));
+    // Set access for volume & bucket. We should directly add to table
+    // because old API's update to DB.
+
+    setVolumeAcl(Arrays.asList(userAcl, groupAcl));
+
+    setBucketAcl(Arrays.asList(userAcl, groupAcl));
+
 
     resetAclsAndValidateAccess(prefixObj, USER, prefixManager);
     resetAclsAndValidateAccess(prefixObj, GROUP, prefixManager);
     resetAclsAndValidateAccess(prefixObj, WORLD, prefixManager);
     resetAclsAndValidateAccess(prefixObj, ANONYMOUS, prefixManager);
+  }
+
+
+  private void setVolumeAcl(List<OzoneAcl> ozoneAcls) throws IOException {
+    String volumeKey = metadataManager.getVolumeKey(volObj.getVolumeName());
+    OmVolumeArgs omVolumeArgs =
+        metadataManager.getVolumeTable().get(volumeKey);
+
+    omVolumeArgs.setAcls(ozoneAcls);
+
+    metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
+        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+  }
+
+  private void setBucketAcl(List<OzoneAcl> ozoneAcls) throws IOException {
+    String bucketKey = metadataManager.getBucketKey(vol, buck);
+    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().get(bucketKey);
+
+    omBucketInfo.setAcls(ozoneAcls);
+
+    metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
+        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+  }
+
+  private void addVolumeAcl(OzoneAcl ozoneAcl) throws IOException {
+    String volumeKey = metadataManager.getVolumeKey(volObj.getVolumeName());
+    OmVolumeArgs omVolumeArgs =
+        metadataManager.getVolumeTable().get(volumeKey);
+
+    omVolumeArgs.addAcl(ozoneAcl);
+
+    metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
+        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+  }
+
+  private void addBucketAcl(OzoneAcl ozoneAcl) throws IOException {
+    String bucketKey = metadataManager.getBucketKey(vol, buck);
+    OmBucketInfo omBucketInfo = metadataManager.getBucketTable().get(bucketKey);
+
+    omBucketInfo.addAcl(ozoneAcl);
+
+    metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
+        new CacheValue<>(Optional.of(omBucketInfo), 1L));
   }
 
   private void resetAclsAndValidateAccess(OzoneObj obj,
@@ -334,7 +389,14 @@ public class TestOzoneNativeAuthorizer {
           ACCESS);
 
       // Reset acls to only one right.
-      aclImplementor.setAcl(obj, Arrays.asList(newAcl));
+      if (obj.getResourceType() == VOLUME) {
+        setVolumeAcl(Collections.singletonList(newAcl));
+      } else if (obj.getResourceType() == BUCKET){
+        setBucketAcl(Collections.singletonList(newAcl));
+      } else {
+        aclImplementor.setAcl(obj, Collections.singletonList(newAcl));
+      }
+
 
       // Fetch current acls and validate.
       acls = aclImplementor.getAcl(obj);
@@ -397,7 +459,16 @@ public class TestOzoneNativeAuthorizer {
           // Add remaining acls one by one and then check access.
           OzoneAcl addAcl = new OzoneAcl(identityType, 
               getAclName(identityType), a2, ACCESS);
-          aclImplementor.addAcl(obj, addAcl);
+
+          // For volume and bucket update to cache. As Old API's update to
+          // only DB not cache.
+          if (obj.getResourceType() == VOLUME) {
+            addVolumeAcl(addAcl);
+          } else if (obj.getResourceType() == BUCKET){
+            addBucketAcl(addAcl);
+          } else {
+            aclImplementor.addAcl(obj, addAcl);
+          }
 
           // Fetch acls again.
           acls = aclImplementor.getAcl(obj);
