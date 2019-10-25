@@ -600,7 +600,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       for (RaftGroupId groupId : gids) {
         reports.add(PipelineReport.newBuilder()
             .setPipelineID(PipelineID.valueOf(groupId.getUuid()).getProtobuf())
-            .setIsLeader(groupLeaderMap.get(groupId))
+            .setIsLeader(groupLeaderMap.getOrDefault(groupId, Boolean.FALSE))
             .build());
       }
       return reports;
@@ -693,11 +693,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   void handleLeaderChangedNotification(RaftGroupMemberId groupMemberId,
-                                       RaftPeerId raftPeerId) {
+                                       RaftPeerId raftPeerId1) {
     LOG.info("Leader change notification received for group: {} with new " +
         "leaderId: {}", groupMemberId.getGroupId(), raftPeerId);
     // Save the reported leader to be sent with the report to SCM
-    boolean leaderForGroup = this.raftPeerId.equals(raftPeerId);
+    boolean leaderForGroup = this.raftPeerId.equals(raftPeerId1);
     groupLeaderMap.put(groupMemberId.getGroupId(), leaderForGroup);
     if (context != null && leaderForGroup) {
       // Publish new report from leader
