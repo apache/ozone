@@ -61,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -111,7 +112,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
     this.caCert = caCert;
-    this.getBlockDNcache = new HashMap<>();
+    this.getBlockDNcache = new ConcurrentHashMap<>();
   }
 
   /**
