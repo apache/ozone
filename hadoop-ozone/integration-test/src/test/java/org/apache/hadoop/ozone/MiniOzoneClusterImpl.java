@@ -465,7 +465,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * @throws IOException
      */
     void initializeConfiguration() throws IOException {
-      conf.setBoolean(OzoneConfigKeys.OZONE_ENABLED, ozoneEnabled);
       Path metaDir = Paths.get(path, "ozone-meta");
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());

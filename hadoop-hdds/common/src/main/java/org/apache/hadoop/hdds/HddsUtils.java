@@ -62,8 +62,6 @@ import com.google.common.net.HostAndPort;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED_DEFAULT;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -322,12 +320,7 @@ public final class HddsUtils {
     }
     return addresses;
   }
-
-  public static boolean isHddsEnabled(Configuration conf) {
-    return conf.getBoolean(OZONE_ENABLED, OZONE_ENABLED_DEFAULT);
-  }
-
-
+  
   /**
    * Returns the hostname for this datanode. If the hostname is not
    * explicitly configured in the given config, then it is determined

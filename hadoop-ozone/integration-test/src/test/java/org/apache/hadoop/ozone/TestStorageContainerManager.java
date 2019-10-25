@@ -478,7 +478,6 @@ public class TestStorageContainerManager {
         GenericTestUtils.getTempPath(UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    conf.setBoolean(OzoneConfigKeys.OZONE_ENABLED, true);
     exception.expect(SCMException.class);
     exception.expectMessage(
         "SCM not initialized due to storage config failure");
@@ -493,7 +492,6 @@ public class TestStorageContainerManager {
     try {
       Path scmPath = Paths.get(path, "scm-meta");
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-      conf.setBoolean(OzoneConfigKeys.OZONE_ENABLED, true);
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       String clusterId = UUID.randomUUID().toString();
       String scmId = UUID.randomUUID().toString();
