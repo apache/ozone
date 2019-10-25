@@ -51,4 +51,9 @@ public class X509CertificateCodec implements Codec<X509Certificate> {
       throw new IOException(exp);
     }
   }
+
+  @Override
+  public X509Certificate copyObject(X509Certificate object) {
+    return object;
+  }
 }

@@ -178,8 +178,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());
-      omClientResponse =
-          new OMBucketCreateResponse((OmBucketInfo) omBucketInfo.clone(),
+      omClientResponse = new OMBucketCreateResponse(omBucketInfo,
           omResponse.build());
     } catch (IOException ex) {
       exception = ex;

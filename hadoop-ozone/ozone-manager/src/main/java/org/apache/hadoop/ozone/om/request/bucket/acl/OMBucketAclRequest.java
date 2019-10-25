@@ -109,8 +109,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
             new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
       }
 
-      omClientResponse = onSuccess(omResponse,
-          (OmBucketInfo) omBucketInfo.clone(), operationResult);
+      omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);
 
     } catch (IOException ex) {
       exception = ex;
