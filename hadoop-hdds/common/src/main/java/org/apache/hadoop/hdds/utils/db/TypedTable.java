@@ -167,7 +167,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
         cache.lookup(new CacheKey<>(key));
 
     if (cacheResult.getCacheStatus() == EXISTS) {
-      return cacheResult.getValue().getCacheValue();
+      return codecRegistry.copyObject(cacheResult.getValue().getCacheValue(),
+          valueType);
     } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
       return null;
     } else {

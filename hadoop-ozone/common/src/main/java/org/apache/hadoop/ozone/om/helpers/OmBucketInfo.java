@@ -39,8 +39,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithMetadata implements Auditable,
-    Cloneable {
+public final class OmBucketInfo extends WithMetadata implements Auditable{
   /**
    * Name of the volume in which the bucket belongs to.
    */
@@ -215,8 +214,10 @@ public final class OmBucketInfo extends WithMetadata implements Auditable,
     return auditMap;
   }
 
-  @Override
-  public Object clone() {
+  /**
+   * Return a new copy of the object.
+   */
+  public OmBucketInfo copyObject() {
     OmBucketInfo.Builder builder = new OmBucketInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)

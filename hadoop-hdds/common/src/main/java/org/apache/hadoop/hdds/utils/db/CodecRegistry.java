@@ -55,6 +55,22 @@ public class CodecRegistry {
   }
 
   /**
+   * Copy object, and return a new object.
+   * @param object
+   * @param format
+   * @param <T>
+   * @return new object copied from the given object.
+   * @throws IOException
+   */
+  public <T> T copyObject(T object, Class<T> format) throws IOException {
+    if (object == null) {
+      return null;
+    }
+    Codec codec = getCodec(format);
+    return (T) codec.copyObject(object);
+  }
+
+  /**
    * Convert strongly typed object to raw data to store it in the kv store.
    *
    * @param object typed object.

@@ -54,4 +54,9 @@ public class S3SecretValueCodec implements Codec<S3SecretValue> {
           "Can't encode the the raw data from the byte array", e);
     }
   }
+
+  @Override
+  public S3SecretValue copyObject(S3SecretValue object) {
+    return object;
+  }
 }

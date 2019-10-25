@@ -49,4 +49,9 @@ public class RepeatedOmKeyInfoCodec implements Codec<RepeatedOmKeyInfo> {
           "Can't encode the the raw data from the byte array", e);
     }
   }
+
+  @Override
+  public RepeatedOmKeyInfo copyObject(RepeatedOmKeyInfo object) {
+    return object;
+  }
 }
