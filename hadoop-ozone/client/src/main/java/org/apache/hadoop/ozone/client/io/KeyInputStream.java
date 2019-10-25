@@ -175,10 +175,10 @@ public class KeyInputStream extends InputStream implements Seekable {
         // This implies that there is either data loss or corruption in the
         // chunk entries. Even EOF in the current stream would be covered in
         // this case.
-        throw new IOException(String.format("Inconsistent read for blockID=%s " +
-                "length=%d numBytesToRead=%d numBytesRead=%d",
-            current.getBlockID(), current.getLength(), numBytesToRead,
-            numBytesRead));
+        throw new IOException(String.format("Inconsistent read for blockID=%s "
+                        + "length=%d numBytesToRead=%d numBytesRead=%d",
+                current.getBlockID(), current.getLength(), numBytesToRead,
+                numBytesRead));
       }
       totalReadLen += numBytesRead;
       off += numBytesRead;
