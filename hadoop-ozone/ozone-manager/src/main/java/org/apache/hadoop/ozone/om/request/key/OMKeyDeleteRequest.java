@@ -23,6 +23,8 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,8 +49,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
-    .KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -109,7 +110,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     try {
       // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName);
+      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
 
       String objectKey = omMetadataManager.getOzoneKey(
           volumeName, bucketName, keyName);
@@ -117,12 +119,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
-      // Not doing bucket/volume checks here. In this way we can avoid db
-      // checks for them.
-      // TODO: Once we have volume/bucket full cache, we can add
-      // them back, as these checks will be inexpensive at that time.
-      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
+      // Validate bucket and volume exists or not.
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
       if (omKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }

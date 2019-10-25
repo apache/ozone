@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB
@@ -72,6 +73,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -221,6 +223,23 @@ public class RpcClient implements ClientProtocol {
     topologyAwareReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
+  }
+
+  @Override
+  public List<OMRoleInfo> getOmRoleInfos() throws IOException {
+
+    List<ServiceInfo> serviceList = ozoneManagerClient.getServiceList();
+    List<OMRoleInfo> roleInfos = new ArrayList<>();
+
+    for (ServiceInfo serviceInfo : serviceList) {
+      if (serviceInfo.getNodeType().equals(HddsProtos.NodeType.OM)) {
+        OMRoleInfo omRoleInfo = serviceInfo.getOmRoleInfo();
+        if (omRoleInfo != null) {
+          roleInfos.add(omRoleInfo);
+        }
+      }
+    }
+    return roleInfos;
   }
 
   @Override

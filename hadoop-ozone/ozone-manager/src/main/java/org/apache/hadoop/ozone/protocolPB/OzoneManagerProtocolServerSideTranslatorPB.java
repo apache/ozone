@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.NotLeaderException;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -113,8 +115,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
           try {
             OMClientRequest omClientRequest =
                 OzoneManagerRatisUtils.createClientRequest(request);
-            Preconditions.checkState(omClientRequest != null,
-                "Unrecognized write command type request" + request.toString());
             request = omClientRequest.preExecute(ozoneManager);
           } catch (IOException ex) {
             // As some of the preExecute returns error. So handle here.
@@ -153,10 +153,19 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
             OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
         .setCmdType(cmdType)
         .setSuccess(false);
-    if (exception.getMessage() != null) {
-      omResponse.setMessage(exception.getMessage());
+    String errorMsg = exceptionErrorMessage(exception);
+    if (errorMsg != null) {
+      omResponse.setMessage(errorMsg);
     }
     return omResponse.build();
+  }
+
+  private String exceptionErrorMessage(IOException ex) {
+    if (ex instanceof OMException) {
+      return ex.getMessage();
+    } else {
+      return StringUtils.stringifyException(ex);
+    }
   }
 
   /**
@@ -185,11 +194,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         .getCachedLeaderPeerId();
 
     NotLeaderException notLeaderException;
-    if (leaderRaftPeerId.isPresent()) {
+    if (!leaderRaftPeerId.isPresent()) {
       notLeaderException = new NotLeaderException(raftPeerId.toString());
     } else {
       notLeaderException = new NotLeaderException(
-          raftPeerId.toString(), leaderRaftPeerId.toString());
+          raftPeerId.toString(), leaderRaftPeerId.get().toString());
     }
 
     if (LOG.isDebugEnabled()) {

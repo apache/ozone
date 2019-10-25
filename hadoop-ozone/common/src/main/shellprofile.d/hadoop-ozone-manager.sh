@@ -13,23 +13,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-cd "$DIR/../../.." || exit 1
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/acceptance"}
-mkdir -p "$REPORT_DIR"
-
-OZONE_VERSION=$(grep "<ozone.version>" "pom.xml" | sed 's/<[^>]*>//g'|  sed 's/^[ \t]*//')
-DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
-
-if [ ! -d "$DIST_DIR" ]; then
-    echo "Distribution dir is missing. Doing a full build"
-    "$DIR/build.sh"
+if [[ "${HADOOP_SHELL_EXECNAME}" == ozone ]]; then
+   hadoop_add_profile ozone_manager
 fi
 
-cd "$DIST_DIR/compose" || exit 1
-./test-all.sh
-RES=$?
-cp result/* "$REPORT_DIR/"
-cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
-exit $RES
+_ozone_manager_hadoop_finalize() {
+  if [[ "${HADOOP_CLASSNAME}" == "org.apache.hadoop.ozone.om.OzoneManagerStarter" ]]; then
+   echo "Ozone Manager classpath extended by ${OZONE_MANAGER_CLASSPATH}"
+   hadoop_add_classpath "${OZONE_MANAGER_CLASSPATH}"
+  fi
+}

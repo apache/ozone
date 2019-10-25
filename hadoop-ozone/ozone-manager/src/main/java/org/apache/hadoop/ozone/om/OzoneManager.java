@@ -86,6 +86,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.security.OzoneSecurityException;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -154,6 +155,7 @@ import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
+import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
@@ -300,6 +302,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final int preallocateBlocksMax;
   private final boolean grpcBlockTokenEnabled;
   private final boolean useRatisForReplication;
+
+  private boolean isNativeAuthorizerEnabled;
 
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
@@ -473,6 +477,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (accessAuthorizer instanceof OzoneNativeAuthorizer) {
         OzoneNativeAuthorizer authorizer =
             (OzoneNativeAuthorizer) accessAuthorizer;
+        isNativeAuthorizerEnabled = true;
         authorizer.setVolumeManager(volumeManager);
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
@@ -2381,6 +2386,43 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           .setValue(httpServer.getHttpsAddress().getPort())
           .build());
     }
+
+    // Since this OM is processing the request, we can assume it to be the
+    // leader OM
+
+    OMRoleInfo omRole = OMRoleInfo.newBuilder()
+        .setNodeId(getOMNodeId())
+        .setServerRole(RaftPeerRole.LEADER.name())
+        .build();
+    omServiceInfoBuilder.setOmRoleInfo(omRole);
+
+    if (isRatisEnabled) {
+      if (omRatisServer != null) {
+        omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
+            .setType(ServicePort.Type.RATIS)
+            .setValue(omNodeDetails.getRatisPort())
+            .build());
+      }
+
+      for (OMNodeDetails peerNode : peerNodes) {
+        ServiceInfo.Builder peerOmServiceInfoBuilder = ServiceInfo.newBuilder()
+            .setNodeType(HddsProtos.NodeType.OM)
+            .setHostname(peerNode.getAddress().getHostName())
+            .addServicePort(ServicePort.newBuilder()
+                .setType(ServicePort.Type.RPC)
+                .setValue(peerNode.getRpcPort())
+                .build());
+
+        OMRoleInfo peerOmRole = OMRoleInfo.newBuilder()
+            .setNodeId(peerNode.getOMNodeId())
+            .setServerRole(RaftPeerRole.FOLLOWER.name())
+            .build();
+        peerOmServiceInfoBuilder.setOmRoleInfo(peerOmRole);
+
+        services.add(peerOmServiceInfoBuilder.build());
+      }
+    }
+
     services.add(omServiceInfoBuilder.build());
 
     // For client we have to return SCM with container protocol port,
@@ -3292,4 +3334,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return ozAdmins;
   }
 
+  /**
+   * Returns true if OzoneNativeAuthorizer is enabled and false if otherwise.
+   * @return if native authorizer is enabled.
+   */
+  public boolean isNativeAuthorizerEnabled() {
+    return isNativeAuthorizerEnabled;
+  }
 }

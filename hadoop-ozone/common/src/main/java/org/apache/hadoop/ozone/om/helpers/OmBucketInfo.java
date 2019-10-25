@@ -39,7 +39,8 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithMetadata implements Auditable {
+public final class OmBucketInfo extends WithMetadata implements Auditable,
+    Cloneable {
   /**
    * Name of the volume in which the bucket belongs to.
    */
@@ -212,6 +213,28 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
         (this.storageType != null) ? this.storageType.name() : null);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
     return auditMap;
+  }
+
+  @Override
+  public Object clone() {
+    OmBucketInfo.Builder builder = new OmBucketInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setAcls(acls.stream().map(acl -> new OzoneAcl(acl.getType(),
+            acl.getName(), acl.getAclBitSet(), acl.getAclScope()))
+            .collect(Collectors.toList()))
+        .setStorageType(storageType)
+        .setIsVersionEnabled(isVersionEnabled)
+        .setCreationTime(creationTime)
+        .setBucketEncryptionKey(bekInfo != null ?
+            new BucketEncryptionKeyInfo(bekInfo.getVersion(),
+                bekInfo.getSuite(), bekInfo.getKeyName()) : null);
+
+    if (metadata != null) {
+      metadata.forEach((k, v) -> builder.addMetadata(k, v));
+    }
+    return builder.build();
+
   }
 
   /**

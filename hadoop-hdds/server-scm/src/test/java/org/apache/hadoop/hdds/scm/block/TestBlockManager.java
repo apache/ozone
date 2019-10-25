@@ -41,7 +41,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
+import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
+import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -66,7 +68,7 @@ public class TestBlockManager {
   private StorageContainerManager scm;
   private SCMContainerManager mapping;
   private MockNodeManager nodeManager;
-  private PipelineManager pipelineManager;
+  private SCMPipelineManager pipelineManager;
   private BlockManagerImpl blockManager;
   private File testDir;
   private final static long DEFAULT_BLOCK_SIZE = 128 * MB;
@@ -96,13 +98,20 @@ public class TestBlockManager {
 
     // Override the default Node Manager in SCM with this Mock Node Manager.
     nodeManager = new MockNodeManager(true, 10);
+    pipelineManager =
+        new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
+    PipelineProvider mockRatisProvider =
+        new MockRatisPipelineProvider(nodeManager,
+            pipelineManager.getStateManager(), conf);
+    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        mockRatisProvider);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
+    configurator.setPipelineManager(pipelineManager);
     scm = TestUtils.getScm(conf, configurator);
 
     // Initialize these fields so that the tests can pass.
     mapping = (SCMContainerManager) scm.getContainerManager();
-    pipelineManager = scm.getPipelineManager();
     blockManager = (BlockManagerImpl) scm.getScmBlockManager();
 
     eventQueue = new EventQueue();
@@ -113,14 +122,8 @@ public class TestBlockManager {
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, mapping);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
-    if(conf.getBoolean(ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY,
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT)){
-      factor = HddsProtos.ReplicationFactor.THREE;
-      type = HddsProtos.ReplicationType.RATIS;
-    } else {
-      factor = HddsProtos.ReplicationFactor.ONE;
-      type = HddsProtos.ReplicationType.STAND_ALONE;
-    }
+    factor = HddsProtos.ReplicationFactor.THREE;
+    type = HddsProtos.ReplicationType.RATIS;
   }
 
   @After
@@ -137,6 +140,39 @@ public class TestBlockManager {
     AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
         type, factor, containerOwner, new ExcludeList());
     Assert.assertNotNull(block);
+  }
+
+  @Test
+  public void testAllocateBlockWithExclusion() throws Exception {
+    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
+    GenericTestUtils.waitFor(() -> {
+      return !blockManager.isScmInSafeMode();
+    }, 10, 1000 * 5);
+    try {
+      while (true) {
+        pipelineManager.createPipeline(type, factor);
+      }
+    } catch (IOException e) {
+    }
+    ExcludeList excludeList = new ExcludeList();
+    excludeList
+        .addPipeline(pipelineManager.getPipelines(type, factor).get(0).getId());
+    AllocatedBlock block = blockManager
+        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, containerOwner,
+            excludeList);
+    Assert.assertNotNull(block);
+    Assert.assertNotEquals(block.getPipeline().getId(),
+        excludeList.getPipelineIds().get(0));
+
+    for (Pipeline pipeline : pipelineManager.getPipelines(type, factor)) {
+      excludeList.addPipeline(pipeline.getId());
+    }
+    block = blockManager
+        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, containerOwner,
+            excludeList);
+    Assert.assertNotNull(block);
+    Assert.assertTrue(
+        excludeList.getPipelineIds().contains(block.getPipeline().getId()));
   }
 
   @Test

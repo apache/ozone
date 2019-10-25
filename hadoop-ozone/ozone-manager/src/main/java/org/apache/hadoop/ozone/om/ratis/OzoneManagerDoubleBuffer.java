@@ -144,6 +144,18 @@ public class OzoneManagerDoubleBuffer {
           });
 
           omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+          // Complete futures first and then do other things. So, that
+          // handler threads will be released.
+          if (!isRatisEnabled) {
+            // Once all entries are flushed, we can complete their future.
+            readyFutureQueue.iterator().forEachRemaining((entry) -> {
+              entry.complete(null);
+            });
+
+            readyFutureQueue.clear();
+          }
+
           int flushedTransactionsSize = readyBuffer.size();
           flushedTransactionCount.addAndGet(flushedTransactionsSize);
           flushIterations.incrementAndGet();
@@ -173,14 +185,7 @@ public class OzoneManagerDoubleBuffer {
           // set metrics.
           updateMetrics(flushedTransactionsSize);
 
-          if (!isRatisEnabled) {
-            // Once all entries are flushed, we can complete their future.
-            readyFutureQueue.iterator().forEachRemaining((entry) -> {
-              entry.complete(null);
-            });
 
-            readyFutureQueue.clear();
-          }
         }
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
