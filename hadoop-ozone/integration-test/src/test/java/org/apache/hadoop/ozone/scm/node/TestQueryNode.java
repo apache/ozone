@@ -51,6 +51,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.
     NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.
+    NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.
     NodeOperationalState.IN_MAINTENANCE;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
@@ -142,10 +144,14 @@ public class TestQueryNode {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     NodeManager nm = scm.getScmNodeManager();
 
+    // Set one node to be something other than IN_SERVICE
+    DatanodeDetails node = nm.getAllNodes().get(0);
+    nm.setNodeOperationalState(node, DECOMMISSIONING);
+
     // All nodes should be returned as they are all in service
     int nodeCount = scmClient.queryNode(IN_SERVICE, HEALTHY,
         HddsProtos.QueryScope.CLUSTER, "").size();
-    assertEquals(numOfDatanodes, nodeCount);
+    assertEquals(numOfDatanodes - 1, nodeCount);
 
     // null acts as wildcard for opState
     nodeCount = scmClient.queryNode(null, HEALTHY,
@@ -155,7 +161,7 @@ public class TestQueryNode {
     // null acts as wildcard for nodeState
     nodeCount = scmClient.queryNode(IN_SERVICE, null,
         HddsProtos.QueryScope.CLUSTER, "").size();
-    assertEquals(numOfDatanodes, nodeCount);
+    assertEquals(numOfDatanodes - 1, nodeCount);
 
     // Both null - should return all nodes
     nodeCount = scmClient.queryNode(null, null,
@@ -169,7 +175,7 @@ public class TestQueryNode {
 
     // Test all operational states by looping over them all and setting the
     // state manually.
-    DatanodeDetails node = nm.getAllNodes().get(0);
+    node = nm.getAllNodes().get(0);
     for (HddsProtos.NodeOperationalState s :
         HddsProtos.NodeOperationalState.values()) {
       nm.setNodeOperationalState(node, s);
