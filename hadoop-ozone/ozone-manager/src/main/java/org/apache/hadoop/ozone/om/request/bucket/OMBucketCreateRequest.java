@@ -143,7 +143,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     try {
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
             volumeName, bucketName, null);
       }
@@ -178,7 +178,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());
-      omClientResponse = new OMBucketCreateResponse(omBucketInfo,
+      omClientResponse =
+          new OMBucketCreateResponse((OmBucketInfo) omBucketInfo.clone(),
           omResponse.build());
     } catch (IOException ex) {
       exception = ex;

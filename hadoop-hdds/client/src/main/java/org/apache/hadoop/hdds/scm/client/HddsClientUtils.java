@@ -304,9 +304,12 @@ public final class HddsClientUtils {
     return scmSecurityClient;
   }
 
+  // This will return the underlying exception after unwrapping
+  // the exception to see if it matches with expected exception
+  // list otherwise will return the exception back.
   public static Throwable checkForException(Exception e) {
     Throwable t = e;
-    while (t != null) {
+    while (t != null && t.getCause() != null) {
       for (Class<? extends Exception> cls : getExceptionList()) {
         if (cls.isInstance(t)) {
           return t;

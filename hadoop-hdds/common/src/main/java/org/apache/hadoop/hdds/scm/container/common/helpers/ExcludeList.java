@@ -103,9 +103,23 @@ public class ExcludeList {
     return excludeList;
   }
 
+  public boolean isEmpty() {
+    return datanodes.isEmpty() && containerIds.isEmpty() && pipelineIds
+        .isEmpty();
+  }
+
   public void clear() {
     datanodes.clear();
     containerIds.clear();
     pipelineIds.clear();
+  }
+
+  @Override
+  public String toString() {
+    return "ExcludeList {" +
+        "datanodes = " + datanodes +
+        ", containerIds = " + containerIds +
+        ", pipelineIds = " + pipelineIds +
+        '}';
   }
 }

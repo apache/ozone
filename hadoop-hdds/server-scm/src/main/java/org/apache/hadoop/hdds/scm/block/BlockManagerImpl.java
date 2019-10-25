@@ -185,6 +185,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
               .getPipelines(type, factor, Pipeline.PipelineState.OPEN,
                   excludeList.getDatanodes(), excludeList.getPipelineIds());
       Pipeline pipeline = null;
+      if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
+        // if no pipelines can be found, try finding pipeline without
+        // exclusion
+        availablePipelines = pipelineManager
+            .getPipelines(type, factor, Pipeline.PipelineState.OPEN);
+      }
       if (availablePipelines.size() == 0) {
         try {
           // TODO: #CLUTIL Remove creation logic when all replication types and
@@ -196,6 +202,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
           availablePipelines = pipelineManager
               .getPipelines(type, factor, Pipeline.PipelineState.OPEN,
                   excludeList.getDatanodes(), excludeList.getPipelineIds());
+          if (availablePipelines.size() == 0 && !excludeList.isEmpty()) {
+            // if no pipelines can be found, try finding pipeline without
+            // exclusion
+            availablePipelines = pipelineManager
+                .getPipelines(type, factor, Pipeline.PipelineState.OPEN);
+          }
           if (availablePipelines.size() == 0) {
             LOG.info("Could not find available pipeline of type:{} and " +
                 "factor:{} even after retrying", type, factor);

@@ -32,6 +32,7 @@ import org.rocksdb.InfoLogLevel;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +71,10 @@ public final class DBStoreBuilder {
   private RocksDBConfiguration rocksDBConfiguration;
 
   private DBStoreBuilder(OzoneConfiguration configuration) {
+    this(configuration, configuration.getObject(RocksDBConfiguration.class));
+  }
+  private DBStoreBuilder(OzoneConfiguration configuration,
+      RocksDBConfiguration rocksDBConfiguration) {
     tables = new HashSet<>();
     tableNames = new LinkedList<>();
     this.configuration = configuration;
@@ -77,12 +82,17 @@ public final class DBStoreBuilder {
     this.rocksDbStat = configuration.getTrimmed(
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
-    this.rocksDBConfiguration =
-        configuration.getObject(RocksDBConfiguration.class);
+    this.rocksDBConfiguration = rocksDBConfiguration;
   }
+
 
   public static DBStoreBuilder newBuilder(OzoneConfiguration configuration) {
     return new DBStoreBuilder(configuration);
+  }
+
+  public static DBStoreBuilder newBuilder(OzoneConfiguration configuration,
+      RocksDBConfiguration rocksDBConfiguration) {
+    return new DBStoreBuilder(configuration, rocksDBConfiguration);
   }
 
   public DBStoreBuilder setProfile(DBProfile profile) {
@@ -143,11 +153,16 @@ public final class DBStoreBuilder {
     processDBProfile();
     processTables();
     DBOptions options = getDbProfile();
+
+    WriteOptions writeOptions = new WriteOptions();
+    writeOptions.setSync(rocksDBConfiguration.getSyncOption());
+
+
     File dbFile = getDBFile();
     if (!dbFile.getParentFile().exists()) {
       throw new IOException("The DB destination directory should exist.");
     }
-    return new RDBStore(dbFile, options, tables, registry);
+    return new RDBStore(dbFile, options, writeOptions, tables, registry);
   }
 
   /**

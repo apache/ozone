@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.utils;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,6 +34,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
+
 import org.iq80.leveldb.Options;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.Statistics;
@@ -45,13 +48,18 @@ import org.slf4j.LoggerFactory;
 public class MetadataStoreBuilder {
 
   @VisibleForTesting
-  static final Logger LOG =
-      LoggerFactory.getLogger(MetadataStoreBuilder.class);
+  static final Logger LOG = LoggerFactory.getLogger(MetadataStoreBuilder.class);
   private File dbFile;
   private long cacheSize;
   private boolean createIfMissing = true;
   private Optional<Configuration> optionalConf = Optional.empty();
   private String dbType;
+  @VisibleForTesting
+  public static final Map<Configuration, org.rocksdb.Options> CACHED_OPTS =
+      new ConcurrentHashMap<>();
+  @VisibleForTesting
+  public static final OzoneConfiguration DEFAULT_CONF =
+      new OzoneConfiguration();
 
   public static MetadataStoreBuilder newBuilder() {
     return new MetadataStoreBuilder();
@@ -87,7 +95,6 @@ public class MetadataStoreBuilder {
     return this;
   }
 
-
   public MetadataStore build() throws IOException {
     if (dbFile == null) {
       throw new IllegalArgumentException("Failed to build metadata store, "
@@ -95,10 +102,9 @@ public class MetadataStoreBuilder {
     }
 
     // Build db store based on configuration
-    final Configuration conf = optionalConf.orElseGet(
-        () -> new OzoneConfiguration());
+    final Configuration conf = optionalConf.orElse(DEFAULT_CONF);
 
-    if(dbType == null) {
+    if (dbType == null) {
       LOG.debug("dbType is null, using ");
       dbType = conf.getTrimmed(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL,
               OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_DEFAULT);
@@ -115,24 +121,29 @@ public class MetadataStoreBuilder {
       }
       return new LevelDBStore(dbFile, options);
     } else if (OZONE_METADATA_STORE_IMPL_ROCKSDB.equals(dbType)) {
-      org.rocksdb.Options opts = new org.rocksdb.Options();
-      opts.setCreateIfMissing(createIfMissing);
+      org.rocksdb.Options opts;
+      // Used cached options if config object passed down is the same
+      if (CACHED_OPTS.containsKey(conf)) {
+        opts = CACHED_OPTS.get(conf);
+      } else {
+        opts = new org.rocksdb.Options();
+        opts.setCreateIfMissing(createIfMissing);
+        if (cacheSize > 0) {
+          BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
+          tableConfig.setBlockCacheSize(cacheSize);
+          opts.setTableFormatConfig(tableConfig);
+        }
 
-      if (cacheSize > 0) {
-        BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
-        tableConfig.setBlockCacheSize(cacheSize);
-        opts.setTableFormatConfig(tableConfig);
-      }
+        String rocksDbStat = conf.getTrimmed(
+            OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
+            OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
 
-      String rocksDbStat = conf.getTrimmed(
-          OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
-          OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
-
-      if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-        Statistics statistics = new Statistics();
-        statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-        opts = opts.setStatistics(statistics);
-
+        if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
+          Statistics statistics = new Statistics();
+          statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+          opts = opts.setStatistics(statistics);
+        }
+        CACHED_OPTS.put(conf, opts);
       }
       return new RocksDBStore(dbFile, opts);
     }

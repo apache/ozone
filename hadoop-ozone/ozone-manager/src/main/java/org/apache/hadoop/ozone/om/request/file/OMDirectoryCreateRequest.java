@@ -32,6 +32,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,9 +64,8 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
-import static  org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.NONE;
@@ -127,7 +128,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     try {
       // check Acl
-      checkBucketAcls(ozoneManager, volumeName, bucketName, keyName);
+      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
@@ -139,16 +141,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
-      // TODO: Not checking volume exist here, once we have full cache we can
-      //  add volume exist check also.
-
-      OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
-              omMetadataManager.getBucketKey(volumeName, bucketName));
-
-      if (omBucketInfo == null) {
-        throw new OMException("Bucket not found " + bucketName,
-            BUCKET_NOT_FOUND);
-      }
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       // Need to check if any files exist in the given path, if they exist we
       // cannot create a directory with the given key.
@@ -156,6 +149,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
           OMFileRequest.verifyFilesInPath(omMetadataManager,
           volumeName, bucketName, keyName, Paths.get(keyName));
 
+      OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(volumeName, bucketName));
       OmKeyInfo dirKeyInfo = null;
       if (omDirectoryResult == FILE_EXISTS ||
           omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
@@ -203,6 +198,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     if (exception == null) {
       LOG.debug("Directory is successfully created for Key: {} in " +
               "volume/bucket:{}/{}", keyName, volumeName, bucketName);
+      omMetrics.incNumKeys();
       return omClientResponse;
     } else {
       LOG.error("CreateDirectory failed for Key: {} in volume/bucket:{}/{}",

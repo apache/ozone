@@ -31,6 +31,8 @@ import javax.annotation.Nonnull;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,20 +179,14 @@ public class OMFileCreateRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     try {
       // check Acl
-      checkBucketAcls(ozoneManager, volumeName, bucketName, keyName);
+      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
       // acquire lock
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
-      OmBucketInfo bucketInfo =
-          omMetadataManager.getBucketTable().get(
-              omMetadataManager.getBucketKey(volumeName, bucketName));
-
-      if (bucketInfo == null) {
-        throw new OMException("Bucket " + bucketName + " not found",
-            OMException.ResultCodes.BUCKET_NOT_FOUND);
-      }
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       if (keyName.length() == 0) {
         // Check if this is the root of the filesystem.
@@ -255,6 +251,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
       }
 
       // do open key
+      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(volumeName, bucketName));
       encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs,
           omMetadataManager.getOzoneKey(volumeName, bucketName,

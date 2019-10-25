@@ -59,4 +59,20 @@ public class RocksDBConfiguration {
     return rocksdbLogLevel;
   }
 
+  private boolean syncOption;
+  @Config(key = "rocksdb.writeoption.sync",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "false",
+      tags = {ConfigTag.OM},
+      description = "Enable/Disable Sync option. If true write will be " +
+          "considered complete, once flushed to persistent storage. If false," +
+          " writes are flushed asynchronously.")
+  public void setSyncOption(boolean enabled) {
+    this.syncOption = enabled;
+  }
+
+  public boolean getSyncOption() {
+    return syncOption;
+  }
+
 }
