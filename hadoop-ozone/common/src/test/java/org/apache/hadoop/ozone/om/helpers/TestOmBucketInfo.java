@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 
 import org.junit.Assert;
 import org.junit.Test;
+import org.apache.hadoop.util.Time;
 
 /**
  * Test BucketInfo.
@@ -41,6 +42,21 @@ public class TestOmBucketInfo {
         OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
 
     Assert.assertEquals(bucket, afterSerialization);
+  }
 
+  @Test
+  public void testClone() {
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setCreationTime(Time.now())
+        .setIsVersionEnabled(false)
+        .setStorageType(StorageType.ARCHIVE)
+        .build();
+
+    /* Clone an omBucketInfo. */
+    OmBucketInfo cloneBucketInfo = omBucketInfo.copyObject();
+
+    Assert.assertEquals(omBucketInfo, cloneBucketInfo);
   }
 }
