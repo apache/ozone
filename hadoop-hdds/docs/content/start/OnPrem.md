@@ -51,21 +51,6 @@ Let us look at the settings inside the generated file (ozone-site.xml) and
 how they control ozone. Once the right values are defined, this file
 needs to be copied to ```ozone directory/etc/hadoop```.
 
-
-* **ozone.enabled** This is the most critical setting for ozone.
-Ozone is a work in progress and users have to enable this service explicitly.
-By default, Ozone is disabled. Setting this flag to `true` enables ozone in the
-HDFS or Ozone cluster.
-
-Here is an example,
-
-{{< highlight xml >}}
-    <property>
-       <name>ozone.enabled</name>
-       <value>true</value>
-    </property>
-{{< /highlight >}}
-
 * **ozone.metadata.dirs** Allows Administrators to specify where the
  metadata must reside. Usually you pick your fastest disk (SSD if
  you have them on your nodes). OzoneManager, SCM and datanode will  write the
@@ -124,7 +109,6 @@ Here is an  example,
 
 | Setting                        | Value                        | Comment |
 |--------------------------------|------------------------------|------------------------------------------------------------------|
-| ozone.enabled                  | true                         | This enables SCM and  containers in HDFS cluster.                |
 | ozone.metadata.dirs            | file path                    | The metadata will be stored here.                                |
 | ozone.scm.names                | SCM server name              | Hostname:port or IP:port address of SCM.                      |
 | ozone.scm.block.client.address | SCM server name and port     | Used by services like OM                                         |
