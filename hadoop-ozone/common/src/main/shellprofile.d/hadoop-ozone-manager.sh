@@ -19,7 +19,7 @@ if [[ "${HADOOP_SHELL_EXECNAME}" == ozone ]]; then
 fi
 
 _ozone_manager_hadoop_finalize() {
-  if [[ "${HADOOP_CLASSNAME}" == "org.apache.hadoop.ozone.om.OzoneManagerStarter" ]] &
+  if [[ "${HADOOP_CLASSNAME}" == "org.apache.hadoop.ozone.om.OzoneManagerStarter" ]] &&
      [[ -n ${OZONE_MANAGER_CLASSPATH} ]];
   then
        echo "Ozone Manager classpath extended by ${OZONE_MANAGER_CLASSPATH}"
