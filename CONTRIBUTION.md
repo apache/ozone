@@ -32,7 +32,7 @@ We welcome contributions of:
 If you have any questions, please don't hesitate to contact
 
  * **email**: use hdfs-dev@hadoop.apache.org.
- * in **chat**: You can find the #ozone channel at the ASF slack. Invite link is [here](http://s.apache.org/slack-invite) 
+ * **chat**: You can find the #ozone channel at the ASF slack. Invite link is [here](http://s.apache.org/slack-invite)
  * **meeting**: [We have weekly meetings](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Community+Calls) which is open to anybody. Feel free to join and ask any questions
     
 ## Building from the source code
