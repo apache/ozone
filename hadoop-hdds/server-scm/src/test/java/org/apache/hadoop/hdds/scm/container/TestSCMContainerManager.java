@@ -71,6 +71,8 @@ public class TestSCMContainerManager {
   private static XceiverClientManager xceiverClientManager;
   private static String containerOwner = "OZONE";
   private static Random random;
+  private static HddsProtos.ReplicationFactor replicationFactor;
+  private static HddsProtos.ReplicationType replicationType;
 
   private static final long TIMEOUT = 10000;
 
@@ -98,6 +100,8 @@ public class TestSCMContainerManager {
     containerManager = new SCMContainerManager(conf, nodeManager,
         pipelineManager, new EventQueue());
     xceiverClientManager = new XceiverClientManager(conf);
+    replicationFactor = SCMTestUtils.getReplicationFactor(conf);
+    replicationType = SCMTestUtils.getReplicationType(conf);
     random = new Random();
   }
 
@@ -120,9 +124,7 @@ public class TestSCMContainerManager {
   @Test
   public void testallocateContainer() throws Exception {
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        xceiverClientManager.getType(),
-        xceiverClientManager.getFactor(),
-        containerOwner);
+        replicationType, replicationFactor, containerOwner);
     Assert.assertNotNull(containerInfo);
   }
 
@@ -137,9 +139,7 @@ public class TestSCMContainerManager {
     Set<UUID> pipelineList = new TreeSet<>();
     for (int x = 0; x < 30; x++) {
       ContainerInfo containerInfo = containerManager.allocateContainer(
-          xceiverClientManager.getType(),
-          xceiverClientManager.getFactor(),
-          containerOwner);
+          replicationType, replicationFactor, containerOwner);
 
       Assert.assertNotNull(containerInfo);
       Assert.assertNotNull(containerInfo.getPipelineID());
@@ -164,8 +164,8 @@ public class TestSCMContainerManager {
       CompletableFuture.supplyAsync(() -> {
         try {
           ContainerInfo containerInfo = containerManager
-              .allocateContainer(xceiverClientManager.getType(),
-                  xceiverClientManager.getFactor(), containerOwner);
+              .allocateContainer(replicationType, replicationFactor,
+                  containerOwner);
 
           Assert.assertNotNull(containerInfo);
           Assert.assertNotNull(containerInfo.getPipelineID());
@@ -190,9 +190,7 @@ public class TestSCMContainerManager {
   @Test
   public void testGetContainer() throws IOException {
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        xceiverClientManager.getType(),
-        xceiverClientManager.getFactor(),
-        containerOwner);
+        replicationType, replicationFactor, containerOwner);
     Assert.assertNotNull(containerInfo);
     Pipeline pipeline  = pipelineManager
         .getPipeline(containerInfo.getPipelineID());
@@ -204,8 +202,8 @@ public class TestSCMContainerManager {
   @Test
   public void testGetContainerWithPipeline() throws Exception {
     ContainerInfo contInfo = containerManager
-        .allocateContainer(xceiverClientManager.getType(),
-            xceiverClientManager.getFactor(), containerOwner);
+        .allocateContainer(replicationType, replicationFactor,
+            containerOwner);
     // Add dummy replicas for container.
     Iterator<DatanodeDetails> nodes = pipelineManager
         .getPipeline(contInfo.getPipelineID()).getNodes().iterator();
@@ -311,8 +309,7 @@ public class TestSCMContainerManager {
       throws IOException {
     nodeManager.setSafemode(false);
     return containerManager
-        .allocateContainer(xceiverClientManager.getType(),
-            xceiverClientManager.getFactor(), containerOwner);
+        .allocateContainer(replicationType, replicationFactor, containerOwner);
   }
 
 }

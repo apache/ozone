@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -158,13 +159,13 @@ public class TestContainerPlacement {
       assertEquals(remaining * nodeCount,
           (long) nodeManager.getStats().getRemaining().get());
 
-      xceiverClientManager= new XceiverClientManager(new OzoneConfiguration());
+      xceiverClientManager= new XceiverClientManager(conf);
 
       ContainerInfo container = containerManager
           .allocateContainer(
-          xceiverClientManager.getType(),
-          xceiverClientManager.getFactor(), "OZONE");
-      assertEquals(xceiverClientManager.getFactor().getNumber(),
+              SCMTestUtils.getReplicationType(conf),
+              SCMTestUtils.getReplicationFactor(conf), "OZONE");
+      assertEquals(SCMTestUtils.getReplicationFactor(conf).getNumber(),
           containerManager.getContainerReplicas(
               container.containerID()).size());
     } finally {

@@ -74,6 +74,7 @@ import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -180,7 +181,7 @@ public class TestStorageContainerManager {
 
       try {
         ContainerWithPipeline container2 = mockClientServer
-            .allocateContainer(xceiverClientManager.getType(),
+            .allocateContainer(SCMTestUtils.getReplicationType(ozoneConf),
             HddsProtos.ReplicationFactor.ONE,  "OZONE");
         if (expectPermissionDenied) {
           fail("Operation should fail, expecting an IOException here.");
@@ -193,7 +194,7 @@ public class TestStorageContainerManager {
 
       try {
         ContainerWithPipeline container3 = mockClientServer
-            .allocateContainer(xceiverClientManager.getType(),
+            .allocateContainer(SCMTestUtils.getReplicationType(ozoneConf),
             HddsProtos.ReplicationFactor.ONE, "OZONE");
         if (expectPermissionDenied) {
           fail("Operation should fail, expecting an IOException here.");

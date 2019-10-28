@@ -86,7 +86,6 @@ public abstract class BaseInsightPoint implements InsightPoint {
    */
   public ScmClient createScmClient(OzoneConfiguration ozoneConf)
       throws IOException {
-
     if (!HddsUtils.getHostNameFromConfigKeys(ozoneConf,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY).isPresent()) {
 
@@ -95,29 +94,7 @@ public abstract class BaseInsightPoint implements InsightPoint {
               + " should be set in ozone-site.xml");
     }
 
-    long version = RPC.getProtocolVersion(
-        StorageContainerLocationProtocolPB.class);
-    InetSocketAddress scmAddress =
-        getScmAddressForClients(ozoneConf);
-    int containerSizeGB = (int) ozoneConf.getStorageSize(
-        OZONE_SCM_CONTAINER_SIZE, OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-        StorageUnit.GB);
-    ContainerOperationClient
-        .setContainerSizeB(containerSizeGB * OzoneConsts.GB);
-
-    RPC.setProtocolEngine(ozoneConf, StorageContainerLocationProtocolPB.class,
-        ProtobufRpcEngine.class);
-    StorageContainerLocationProtocol client =
-        TracingUtil.createProxy(
-            new StorageContainerLocationProtocolClientSideTranslatorPB(
-                RPC.getProxy(StorageContainerLocationProtocolPB.class, version,
-                    scmAddress, UserGroupInformation.getCurrentUser(),
-                    ozoneConf,
-                    NetUtils.getDefaultSocketFactory(ozoneConf),
-                    Client.getRpcTimeout(ozoneConf))),
-            StorageContainerLocationProtocol.class, ozoneConf);
-    return new ContainerOperationClient(
-        client, new XceiverClientManager(ozoneConf));
+    return new ContainerOperationClient(ozoneConf);
   }
 
   /**
