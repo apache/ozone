@@ -91,10 +91,15 @@ public class AddAclKeyHandler extends Handler {
             OzoneObj.StoreType.valueOf(storeType))
         .build();
 
-    boolean result = client.getObjectStore().addAcl(obj,
+    boolean aclExisted = client.getObjectStore().checkAclExist(obj,
         OzoneAcl.parseAcl(acl));
-
-    System.out.printf("%s%n", "Acl added successfully: " + result);
+    if (aclExisted) {
+      System.out.println("ACL already exists.");
+    } else {
+      boolean result = client.getObjectStore().addAcl(obj,
+          OzoneAcl.parseAcl(acl));
+      System.out.printf("%s%n", "Acl added successfully: " + result);
+    }
 
     client.close();
     return null;
