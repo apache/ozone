@@ -68,7 +68,7 @@ The `compose` folder contains different set of configured clusters (secure, HA, 
 
 ### Run on Kubernetes
 
-Ozone is first class citizen of the Cloud-Native environments. The binary package contains multiple set of K8s resource files to show how it can be deployed.
+Ozone is a first class citizen of the Cloud-Native environments. The binary package contains multiple sets of K8s resource files to show how it can be deployed.
 
 ## Build from source
 
