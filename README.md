@@ -32,9 +32,7 @@ Ozone is part of the [Apache Hadoop](https://hadoop.apache.org) project.
 
 ## Download
 
-Latest release artifacts (source release and binary packages) are available from the Ozone web page:
-
-https://hadoop.apache.org/ozone/downloads/
+Latest release artifacts (source release and binary packages) are [available](https://hadoop.apache.org/ozone/downloads/) from the Ozone web page.
 
 ## Quick start
 
