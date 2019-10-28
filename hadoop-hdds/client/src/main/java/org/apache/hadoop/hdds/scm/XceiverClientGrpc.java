@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -60,6 +61,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -81,6 +83,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private SecurityConfig secConfig;
   private final boolean topologyAwareRead;
   private X509Certificate caCert;
+  // Cache the DN which returned the GetBlock command so that the ReadChunk
+  // command can be sent to the same DN.
+  private Map<DatanodeBlockID, DatanodeDetails> getBlockDNcache;
 
   /**
    * Constructs a client that can communicate with the Container framework on
@@ -107,6 +112,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
     this.caCert = caCert;
+    this.getBlockDNcache = new ConcurrentHashMap<>();
   }
 
   /**
@@ -272,17 +278,36 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // TODO: cache the correct leader info in here, so that any subsequent calls
     // should first go to leader
     XceiverClientReply reply = new XceiverClientReply(null);
-    List<DatanodeDetails> datanodeList;
-    if ((request.getCmdType() == ContainerProtos.Type.ReadChunk ||
-        request.getCmdType() == ContainerProtos.Type.GetSmallFile) &&
-        topologyAwareRead) {
-      datanodeList = pipeline.getNodesInOrder();
-    } else {
+    List<DatanodeDetails> datanodeList = null;
+
+    DatanodeBlockID blockID = null;
+    if (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+      blockID = request.getReadChunk().getBlockID();
+    } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
+      blockID = request.getGetSmallFile().getBlock().getBlockID();
+    }
+
+    if (blockID != null) {
+      // Check if the DN to which the GetBlock command was sent has been cached.
+      DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
+      if (cachedDN != null) {
+        datanodeList = pipeline.getNodes();
+        int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
+        if (getBlockDNCacheIndex > 0) {
+          // Pull the Cached DN to the top of the DN list
+          Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
+        }
+      } else if (topologyAwareRead) {
+        datanodeList = pipeline.getNodesInOrder();
+      }
+    }
+    if (datanodeList == null) {
       datanodeList = pipeline.getNodes();
       // Shuffle datanode list so that clients do not read in the same order
       // every time.
       Collections.shuffle(datanodeList);
     }
+
     for (DatanodeDetails dn : datanodeList) {
       try {
         if (LOG.isDebugEnabled()) {
@@ -297,6 +322,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           for (CheckedBiFunction validator : validators) {
             validator.apply(request, responseProto);
           }
+        }
+        if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+          DatanodeBlockID getBlockID = request.getGetBlock().getBlockID();
+          getBlockDNcache.put(getBlockID, dn);
         }
         break;
       } catch (ExecutionException | InterruptedException | IOException e) {
