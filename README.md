@@ -90,7 +90,7 @@ For more information, you can check the [Contribution guideline](./CONTRIBUTION.
 
 All contributions are welcome.
 
- 1. Please open a [Jira](https://issues.apache.org/) issue
+ 1. Please open a [Jira](https://issues.apache.org/jira) issue
  2. And create a pull request
 
 For more information, you can check the [Contribution guideline](./CONTRIBUTION.md)
