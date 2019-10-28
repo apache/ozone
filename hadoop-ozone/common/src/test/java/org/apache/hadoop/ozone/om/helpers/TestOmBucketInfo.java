@@ -75,12 +75,16 @@ public class TestOmBucketInfo {
         IAccessAuthorizer.ACLType.WRITE_ACL,
         OzoneAcl.AclScope.ACCESS
     )));
-    Assert.assertNotEquals(omBucketInfo.getAcls().get(0), cloneBucketInfo.getAcls().get(0));
+    Assert.assertNotEquals(
+        omBucketInfo.getAcls().get(0),
+        cloneBucketInfo.getAcls().get(0));
 
     /* Clone acl & check equal. */
     cloneBucketInfo = omBucketInfo.copyObject();
     Assert.assertEquals(omBucketInfo, cloneBucketInfo);
-    Assert.assertEquals(omBucketInfo.getAcls().get(0), cloneBucketInfo.getAcls().get(0));
+    Assert.assertEquals(
+        omBucketInfo.getAcls().get(0),
+        cloneBucketInfo.getAcls().get(0));
 
     /* Remove acl & check. */
     omBucketInfo.removeAcl(new OzoneAcl(
