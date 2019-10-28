@@ -135,6 +135,13 @@ public class SCMSafeModeManager {
             oneReplicaPipelineSafeModeRule);
       }
       emitSafeModeStatus();
+      boolean createPipelineInSafemode = conf.getBoolean(
+          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
+          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
+
+      if (createPipelineInSafemode) {
+        pipelineManager.startPipelineCreator();
+      }
     } else {
       this.safeModeMetrics = null;
       exitSafeMode(eventQueue);

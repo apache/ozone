@@ -82,14 +82,6 @@ public class OneReplicaPipelineSafeModeRule extends
 
     getSafeModeMetrics().setNumPipelinesWithAtleastOneReplicaReportedThreshold(
         thresholdCount);
-
-    boolean createPipelineInSafemode = configuration.getBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
-
-    if (createPipelineInSafemode) {
-      pipelineManager.startPipelineCreator();
-    }
   }
 
   @Override
