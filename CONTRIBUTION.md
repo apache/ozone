@@ -7,7 +7,7 @@ If you are familiar with contributing to Apache Hadoop, then you already know ev
 
 If you have never contributed to Apache Hadoop before, then you may find it useful to read [How To Contribute](https://cwiki.apache.org/confluence/display/HADOOP/How+To+Contribute+to+Ozone).
 
-This document summarize the contribution process and defines the differenceis.  
+This document summarize the contribution process and defines the differences.  
 
 ## What can I contribute?
 
@@ -24,14 +24,14 @@ We welcome contributions of:
       * Unit Tests (JUnit / Java)
       * Acceptance Tests (docker + robot framework)
       * Blockade tests (python + blockade) 
-      * Performance: We have multiple type of load generator / benchmark tools (`ozone freon`, `ozone genesis`). Which can be used to test cluster and report problems.
+      * Performance: We have multiple type of load generator / benchmark tools (`ozone freon`, `ozone genesis`), which can be used to test cluster and report problems.
  * **Bug reports** pointing out broken functionality, docs, or suggestions for improvements are always welcome!
  
 ## Who To Contact
 
 If you have any questions, please don't hesitate to contact
 
- * in **mail**: use hdfs-dev@hadoop.apache.org.
+ * **email**: use hdfs-dev@hadoop.apache.org.
  * in **chat**: You can find the #ozone channel at the ASF slack. Invite link is [here](http://s.apache.org/slack-invite) 
  * **meeting**: [We have weekly meetings](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Community+Calls) which is open to anybody. Feel free to join and ask any questions
     
@@ -52,7 +52,7 @@ Additional requirements to run your first pseudo cluster:
 * docker
 * docker-compose
 
-Additional rquirements to execute different type of tests:
+Additional requirements to execute different type of tests:
 
 * [Robot framework](https://robotframework.org/) (for executing acceptance tests)
 * docker-compose (to start pseudo cluster, also used for blockade and acceptance tests)
@@ -70,7 +70,7 @@ The build is as simple as:
 mvn clean install -DskipTests
 ```
 
-And you can start our first cluster:
+And you can start your first cluster:
 
 ```
 cd hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone
@@ -79,22 +79,22 @@ docker-compose up -d --scale datanode=3
 
 ### Helper scripts
 
-`hadoop-ozone/dev-support/checks` directory contains helper scripts to build and check your code. (Including findbugs and checkstyle). Use them if you don't know the exact maven gools / parameters.
+`hadoop-ozone/dev-support/checks` directory contains helper scripts to build and check your code. (Including findbugs and checkstyle). Use them if you don't know the exact maven goals / parameters.
 
 These scripts are executed by the CI servers, so it's always good to run them locally before creating a PR.
 
 ### Maven build options:
 
-  * Use `-DskipShade` to exclude ozonefs jar file creation from the relase. It's way more faster, but you can't test Hadoop Compatible file system.
+  * Use `-DskipShade` to exclude ozonefs jar file creation from the release. It's way more faster, but you can't test Hadoop Compatible file system.
   * Use `-DskipRecon` to exclude the Recon build (Web UI and monitoring) from the build. It saves about 2 additional minutes.
   * Use `-Pdist` to build a distribution (Without this profile you won't have the final tar file)
   * Use `-Pdocker-build` to build a docker image which includes Ozone
   * Use `-Ddocker.image=repo/name` to define the name of your docker image
-  * USe `-Pdocker-push` to puseh the created docker image to the docker registry
+  * USe `-Pdocker-push` to push the created docker image to the docker registry
   
 ## Contribute your modifications
 
-We  use github pull requests instead of uploading patches to JIRA. The main contribution workflow is the following:
+We use github pull requests instead of uploading patches to JIRA. The main contribution workflow is as follows:
 
   1. Fork `apache/hadoop-ozone` github repository (first time)
   2. Create a new Jira in HDDS project (eg. HDDS-1234)
@@ -103,16 +103,18 @@ We  use github pull requests instead of uploading patches to JIRA. The main cont
   5. Create a pull request on github UI 
       * Please include the Jira link, problem description and testing instruction
   6. Set the Jira to "Patch Available" state
+  7. Address any review comments if applicable by pushing new commits to the PR.
+  8. When addressing review comments, there is no need to squash your commits. This makes it easy for reviewers to only review the incremental changes. The committer will take care to squash all your commits before merging to master.
     
 ## Code convention and tests
 
 We follow the code convention of Hadoop project (2 spaces instead of tabs, 80 char line width, ASF licence headers). The code checked with checkstyle, findbugs and various test frameworks.
 
-Please don't post / commit any code with any code violations (all checks are not checking the introduced violations as checks in Hadoop but all the available violations. One committed checkstyle issue will be reported in all of ht next pull requests.)
+Please don't post / commit any code with any code violations (all checks are not checking the introduced violations as checks in Hadoop but all the available violations).
 
 ### Check your contribution
 
-The easiest way to check your contribution is using the simplified shell scripts under `hadoop-ozone/dev-support/checks`. The problems will be printed out the standard output:
+The easiest way to check your contribution is using the simplified shell scripts under `hadoop-ozone/dev-support/checks`. The problems will be printed out on the standard output.
 
 For example:
 ```
@@ -136,7 +138,7 @@ cd hadoop-ozone/dist/target/ozone-*-SNAPSHOT/compose/ozone
 
 ### False positive findbugs violation
 
-If you have __very good__ reasons, you can ignore any Fingbugs warning. Your good reason can be be persisted with the `@SuppressFBWarnings` annotation.
+If you have __very good__ reasons, you can ignore any Fingbugs warning. Your good reason can be persisted with the `@SuppressFBWarnings` annotation.
 
 ```java
 @SuppressFBWarnings(value="AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
@@ -148,9 +150,9 @@ private synchronized void addEntryTodnsToUuidMap(
 
 ## Using IDE
 
-As Ozone uses Apache Maven it can be developed from any IDE. As IntelliJ is a common choice here are some suggestions to use it for Ozone development:
+As Ozone uses Apache Maven it can be developed from any IDE. As IntelliJ is a common choice, here are some suggestions to use it for Ozone development:
 
-### Run Ozone from Intellij
+### Run Ozone from IntelliJ
 
 Ozone components depends on maven classpath. We generate classpath descriptor from the maven pom.xml files to use exactly the same classpath at runtime.
 
@@ -165,7 +167,7 @@ To start Ozone from IntelliJ:
 
 ### Common problems
 
-Intellij may not picking up protoc generated classes as they can be very huge. If the protoc files can't be compiled try the following:
+IntelliJ may not pick up protoc generated classes as they can be very huge. If the protoc files can't be compiled try the following:
 
 1. Open _Help_ -> _Edit custom properties_ menu.
 2. Add `idea.max.intellisense.filesize=5000` entry
