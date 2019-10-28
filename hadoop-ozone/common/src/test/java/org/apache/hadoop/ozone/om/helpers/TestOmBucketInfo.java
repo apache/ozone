@@ -19,8 +19,13 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.protocol.StorageType;
 
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.Assert;
 import org.junit.Test;
+import org.apache.hadoop.util.Time;
+
+import java.util.Collections;
 
 /**
  * Test BucketInfo.
@@ -41,6 +46,55 @@ public class TestOmBucketInfo {
         OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
 
     Assert.assertEquals(bucket, afterSerialization);
+  }
+
+  @Test
+  public void testClone() {
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setCreationTime(Time.now())
+        .setIsVersionEnabled(false)
+        .setStorageType(StorageType.ARCHIVE)
+        .setAcls(Collections.singletonList(new OzoneAcl(
+            IAccessAuthorizer.ACLIdentityType.USER,
+            "defaultUser",
+            IAccessAuthorizer.ACLType.WRITE_ACL,
+            OzoneAcl.AclScope.ACCESS
+        )))
+        .build();
+
+    /* Clone an omBucketInfo. */
+    OmBucketInfo cloneBucketInfo = omBucketInfo.copyObject();
+    Assert.assertEquals(omBucketInfo, cloneBucketInfo);
+
+    /* Reset acl & check not equal. */
+    omBucketInfo.setAcls(Collections.singletonList(new OzoneAcl(
+        IAccessAuthorizer.ACLIdentityType.USER,
+        "newUser",
+        IAccessAuthorizer.ACLType.WRITE_ACL,
+        OzoneAcl.AclScope.ACCESS
+    )));
+    Assert.assertNotEquals(
+        omBucketInfo.getAcls().get(0),
+        cloneBucketInfo.getAcls().get(0));
+
+    /* Clone acl & check equal. */
+    cloneBucketInfo = omBucketInfo.copyObject();
+    Assert.assertEquals(omBucketInfo, cloneBucketInfo);
+    Assert.assertEquals(
+        omBucketInfo.getAcls().get(0),
+        cloneBucketInfo.getAcls().get(0));
+
+    /* Remove acl & check. */
+    omBucketInfo.removeAcl(new OzoneAcl(
+        IAccessAuthorizer.ACLIdentityType.USER,
+        "newUser",
+        IAccessAuthorizer.ACLType.WRITE_ACL,
+        OzoneAcl.AclScope.ACCESS
+    ));
+    Assert.assertEquals((int) 0, omBucketInfo.getAcls().size());
+    Assert.assertEquals((int) 1, cloneBucketInfo.getAcls().size());
 
   }
 }
