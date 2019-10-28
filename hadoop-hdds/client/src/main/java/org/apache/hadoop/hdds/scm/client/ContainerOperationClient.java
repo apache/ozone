@@ -93,20 +93,20 @@ public class ContainerOperationClient implements ScmClient {
 
   private XceiverClientManager newXCeiverClientManager(Configuration conf)
       throws IOException {
-    XceiverClientManager xceiverClientManager;
+    XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       SecurityConfig securityConfig = new SecurityConfig(conf);
       SCMSecurityProtocol scmSecurityProtocolClient = getScmSecurityClient(
           (OzoneConfiguration) securityConfig.getConfiguration());
       String caCertificate =
           scmSecurityProtocolClient.getCACertificate();
-      xceiverClientManager = new XceiverClientManager(conf,
+      manager = new XceiverClientManager(conf,
           OzoneConfiguration.of(conf).getObject(XceiverClientManager
               .ScmClientConfig.class), caCertificate);
     } else {
-      xceiverClientManager = new XceiverClientManager(conf);
+      manager = new XceiverClientManager(conf);
     }
-    return xceiverClientManager;
+    return manager;
   }
 
   private StorageContainerLocationProtocol newContainerRpcClient(
