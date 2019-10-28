@@ -43,7 +43,7 @@ https://hadoop.apache.org/ozone/downloads/
 The easiest way to start a cluster with docker is:
 
 ```
-docker run -P 9878 apache/ozone
+docker run -p 9878:9878 apache/ozone
 ```
 
 And you can use AWS S3 cli:
