@@ -166,7 +166,8 @@ public class TestSCMPipelineManager {
         mockRatisProvider);
 
     SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(conf, new ArrayList<>(), pipelineManager, eventQueue);
+        new SCMSafeModeManager(conf, new ArrayList<>(), pipelineManager,
+            eventQueue);
 
     // create a pipeline in allocated state with no dns yet reported
     Pipeline pipeline = pipelineManager
