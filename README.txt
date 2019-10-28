@@ -1,7 +1,8 @@
-For the latest information about Hadoop, please visit our website at:
+For the latest information about Apache Hadoop Ozone, please visit our website
+at:
 
-   http://hadoop.apache.org/
+   https://hadoop.apache.org/ozone/
 
 and our wiki, at:
 
-   https://cwiki.apache.org/confluence/display/HADOOP/
+   https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Contributor+Guide
