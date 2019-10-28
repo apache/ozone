@@ -57,7 +57,7 @@ aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /
 
 If you need a more realistic cluster, you can [download](https://hadoop.apache.org/ozone/downloads/) the last (binary) release package, and start a cluster with the help of docker-compose:
 
-After untar the binary:
+After you untar the binary:
 
 ```
 cd compose/ozone
