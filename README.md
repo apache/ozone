@@ -64,7 +64,7 @@ cd compose/ozone
 docker-compose up -d --scale datanode=3
 ```
 
-The `compose` folder contains different set of configured clusters (secure, HA, mapreduce example), you can check the different subfolders for more examples.
+The `compose` folder contains different sets of configured clusters (secure, HA, mapreduce example), you can check the various subfolders for more examples.
 
 ### Run on Kubernetes
 
