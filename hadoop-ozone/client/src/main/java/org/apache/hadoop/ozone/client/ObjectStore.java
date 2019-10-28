@@ -459,6 +459,23 @@ public class ObjectStore {
   }
 
   /**
+   *
+   * @param obj Ozone object for which acl should be checked.
+   * @param acl ozone acl to be checked.
+   * @return true if acl exists in the obj, else false.
+   * @throws IOException if there is error.
+   */
+  public boolean checkAclExist(OzoneObj obj, OzoneAcl acl) throws IOException {
+    for (OzoneAcl existAcl : proxy.getAcl(obj)) {
+      if (existAcl.equals(acl)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Remove acl for Ozone object. Return true if acl is removed successfully
    * else false.
    *
