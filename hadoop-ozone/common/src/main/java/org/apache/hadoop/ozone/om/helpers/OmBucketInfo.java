@@ -229,7 +229,7 @@ public final class OmBucketInfo extends WithMetadata implements Auditable{
             new BucketEncryptionKeyInfo(bekInfo.getVersion(),
                 bekInfo.getSuite(), bekInfo.getKeyName()) : null);
 
-    acls.stream().map(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
+    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
         acl.getName(), (BitSet) acl.getAclBitSet().clone(),
         acl.getAclScope())));
 

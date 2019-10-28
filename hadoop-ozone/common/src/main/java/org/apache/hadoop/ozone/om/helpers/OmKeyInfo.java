@@ -459,7 +459,7 @@ public final class OmKeyInfo extends WithMetadata {
           keyLocationVersion.getVersion(), keyLocationInfos));
     });
 
-    acls.stream().map(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
+    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
             acl.getName(), (BitSet) acl.getAclBitSet().clone(),
         acl.getAclScope())));
 

@@ -44,9 +44,18 @@ public class TestOmMultipartKeyInfo {
 
     Assert.assertEquals(cloneMultipartKeyInfo, omMultipartKeyInfo);
 
-    omMultipartKeyInfo.addPartKeyInfo(1, PartKeyInfo.newBuilder()
-            .setPartKeyInfo(KeyInfo.newBuilder().getDefaultInstanceForType())
-        .build());
+    // Just setting dummy values for this test.
+    omMultipartKeyInfo.addPartKeyInfo(1,
+        PartKeyInfo.newBuilder().setPartNumber(1).setPartName("/path")
+            .setPartKeyInfo(KeyInfo.newBuilder()
+        .setVolumeName(UUID.randomUUID().toString())
+        .setBucketName(UUID.randomUUID().toString())
+        .setKeyName(UUID.randomUUID().toString())
+        .setDataSize(100L) // Just set dummy size for testing
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build());
 
     Assert.assertEquals(0, cloneMultipartKeyInfo.getPartKeyInfoMap().size());
     Assert.assertEquals(1, omMultipartKeyInfo.getPartKeyInfoMap().size());
