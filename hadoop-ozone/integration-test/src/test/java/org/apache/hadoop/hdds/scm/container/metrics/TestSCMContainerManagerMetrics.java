@@ -56,7 +56,7 @@ public class TestSCMContainerManagerMetrics {
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "3000s");
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
   }

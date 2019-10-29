@@ -73,7 +73,7 @@ public class TestContainerReplication {
   @Before
   public void setup() throws Exception {
     conf = newOzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(2)
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .setRandomContainerPort(true).build();
   }
 

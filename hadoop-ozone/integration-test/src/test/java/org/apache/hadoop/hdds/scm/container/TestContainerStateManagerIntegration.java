@@ -73,7 +73,7 @@ public class TestContainerStateManagerIntegration {
     numContainerPerOwnerInPipeline =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
     xceiverClientManager = new XceiverClientManager(conf);

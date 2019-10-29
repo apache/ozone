@@ -84,6 +84,7 @@ public class TestCloseContainerEventHandler {
         new CloseContainerEventHandler(pipelineManager, containerManager));
     eventQueue.addHandler(DATANODE_COMMAND, nodeManager);
     // Move all pipelines created by background from ALLOCATED to OPEN state
+    Thread.sleep(2000);
     TestUtils.openAllRatisPipelines(pipelineManager);
   }
 

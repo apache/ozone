@@ -59,8 +59,8 @@ public class TestRatisPipelineProvider {
     stateManager.addPipeline(pipeline);
     Assert.assertEquals(pipeline.getType(), HddsProtos.ReplicationType.RATIS);
     Assert.assertEquals(pipeline.getFactor(), factor);
-    Assert.assertEquals(pipeline.getPipelineState(),
-            Pipeline.PipelineState.ALLOCATED);
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipeline.getPipelineState());
     Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
     Pipeline pipeline1 = provider.create(factor);
     stateManager.addPipeline(pipeline1);
@@ -70,8 +70,8 @@ public class TestRatisPipelineProvider {
             .isEmpty());
     Assert.assertEquals(pipeline1.getType(), HddsProtos.ReplicationType.RATIS);
     Assert.assertEquals(pipeline1.getFactor(), factor);
-    Assert.assertEquals(pipeline1.getPipelineState(),
-            Pipeline.PipelineState.ALLOCATED);
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipeline1.getPipelineState());
     Assert.assertEquals(pipeline1.getNodes().size(), factor.getNumber());
   }
 
@@ -82,8 +82,8 @@ public class TestRatisPipelineProvider {
     stateManager.addPipeline(pipeline);
     Assert.assertEquals(pipeline.getType(), HddsProtos.ReplicationType.RATIS);
     Assert.assertEquals(pipeline.getFactor(), factor);
-    Assert.assertEquals(pipeline.getPipelineState(),
-        Pipeline.PipelineState.ALLOCATED);
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipeline.getPipelineState());
     Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
 
     factor = HddsProtos.ReplicationFactor.ONE;
@@ -96,8 +96,8 @@ public class TestRatisPipelineProvider {
             pipeline1.getNodes()).size(), 1);
     Assert.assertEquals(pipeline1.getType(), HddsProtos.ReplicationType.RATIS);
     Assert.assertEquals(pipeline1.getFactor(), factor);
-    Assert.assertEquals(pipeline1.getPipelineState(),
-        Pipeline.PipelineState.ALLOCATED);
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipeline1.getPipelineState());
     Assert.assertEquals(pipeline1.getNodes().size(), factor.getNumber());
   }
 
@@ -191,8 +191,8 @@ public class TestRatisPipelineProvider {
     Pipeline pipeline = providerMock.create(factor);
     Assert.assertEquals(pipeline.getType(), HddsProtos.ReplicationType.RATIS);
     Assert.assertEquals(pipeline.getFactor(), factor);
-    Assert.assertEquals(pipeline.getPipelineState(),
-        Pipeline.PipelineState.ALLOCATED);
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipeline.getPipelineState());
     Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
     List<DatanodeDetails> pipelineNodes = pipeline.getNodes();
 
