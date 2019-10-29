@@ -59,7 +59,7 @@ public class TestCloseContainerHandler {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1).build();
+        .setNumDatanodes(3).build();
   }
 
   @After

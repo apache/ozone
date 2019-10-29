@@ -94,7 +94,7 @@ public class TestContainerStateMachine {
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     //  conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
             .setHbInterval(200)
             .setCertificateClient(new CertificateClientTestImpl(conf))
             .build();

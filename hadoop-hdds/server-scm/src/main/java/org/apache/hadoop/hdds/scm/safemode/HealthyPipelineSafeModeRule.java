@@ -75,10 +75,12 @@ public class HealthyPipelineSafeModeRule
             HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT
             + " value should be >= 0.0 and <= 1.0");
 
-    // As we want to wait for THREE Replica RATIS write pipelines
+    // We want to wait for RATIS THREE factor write pipelines
     int pipelineCount = pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS, Pipeline.PipelineState.OPEN).size() +
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
+        Pipeline.PipelineState.OPEN).size() +
         pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE,
             Pipeline.PipelineState.ALLOCATED).size();
 
     // This value will be zero when pipeline count is 0.
@@ -120,7 +122,8 @@ public class HealthyPipelineSafeModeRule
     // datanode can send pipeline report again, or SCMPipelineManager will
     // create new pipelines.
     Preconditions.checkNotNull(pipeline);
-    if (pipeline.getType() == HddsProtos.ReplicationType.RATIS) {
+    if (pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
+        pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE) {
       getSafeModeMetrics().incCurrentHealthyPipelinesCount();
       currentHealthyPipelineCount++;
     }

@@ -85,7 +85,7 @@ public class TestDataScrubber {
     ozoneConfig.set(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, "1s");
     ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, ContainerPlacementPolicy.class);
-    cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(1)
+    cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(ozoneConfig);
@@ -145,7 +145,7 @@ public class TestDataScrubber {
     Thread.sleep(5000);
 
 
-    Assert.assertEquals(1, cluster.getHddsDatanodes().size());
+    Assert.assertEquals(3, cluster.getHddsDatanodes().size());
 
     HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
     OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();

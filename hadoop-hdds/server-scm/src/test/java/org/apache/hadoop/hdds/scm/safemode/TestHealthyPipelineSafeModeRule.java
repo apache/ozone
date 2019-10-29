@@ -227,7 +227,7 @@ public class TestHealthyPipelineSafeModeRule {
       GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
           "reported count is 1"),
           1000, 5000);
-      Assert.assertTrue(healthyPipelineSafeModeRule.validate());
+      Assert.assertFalse(healthyPipelineSafeModeRule.validate());
 
       firePipelineEvent(pipeline2, eventQueue);
       firePipelineEvent(pipeline3, eventQueue);

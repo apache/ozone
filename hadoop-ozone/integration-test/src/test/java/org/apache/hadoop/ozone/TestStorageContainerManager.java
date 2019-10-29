@@ -23,6 +23,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys
+    .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
@@ -330,6 +332,7 @@ public class TestStorageContainerManager {
         100, TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
+    conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setHbInterval(1000)
@@ -460,7 +463,7 @@ public class TestStorageContainerManager {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
     //This will set the cluster id in the version file
     MiniOzoneCluster cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
     try {
       // This will initialize SCM
@@ -577,7 +580,7 @@ public class TestStorageContainerManager {
         .setHbInterval(1000)
         .setHbProcessorInterval(3000)
         .setTrace(false)
-        .setNumDatanodes(1)
+        .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
 
@@ -599,7 +602,7 @@ public class TestStorageContainerManager {
 
       scm.getContainerManager().updateContainerState(selectedContainer
           .containerID(), HddsProtos.LifeCycleEvent.FINALIZE);
-      cluster.restartStorageContainerManager(true);
+      cluster.restartStorageContainerManager(false);
       scm = cluster.getStorageContainerManager();
       EventPublisher publisher = mock(EventPublisher.class);
       ReplicationManager replicationManager = scm.getReplicationManager();
@@ -609,8 +612,7 @@ public class TestStorageContainerManager {
       modifiersField.setAccessible(true);
       modifiersField.setInt(f, f.getModifiers() & ~Modifier.FINAL);
       f.set(replicationManager, publisher);
-      scm.getReplicationManager().start();
-      Thread.sleep(2000);
+      Thread.sleep(12000);
 
       UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
           .getDatanodeDetails().getUuid();
