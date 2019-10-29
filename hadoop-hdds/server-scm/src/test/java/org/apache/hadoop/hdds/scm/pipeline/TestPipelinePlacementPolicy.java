@@ -34,11 +34,14 @@ import org.junit.Test;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
+
 /**
  * Test for PipelinePlacementPolicy.
  */
 public class TestPipelinePlacementPolicy {
   private MockNodeManager nodeManager;
+  private OzoneConfiguration conf;
   private PipelinePlacementPolicy placementPolicy;
   private static final int PIPELINE_PLACEMENT_MAX_NODES_COUNT = 10;
 
@@ -46,8 +49,10 @@ public class TestPipelinePlacementPolicy {
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true,
         PIPELINE_PLACEMENT_MAX_NODES_COUNT);
-    placementPolicy =
-        new PipelinePlacementPolicy(nodeManager, new OzoneConfiguration());
+    conf = new OzoneConfiguration();
+    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 5);
+    placementPolicy = new PipelinePlacementPolicy(
+        nodeManager, new PipelineStateManager(conf), conf);
   }
 
   @Test
@@ -123,7 +128,7 @@ public class TestPipelinePlacementPolicy {
   public void testHeavyNodeShouldBeExcluded() throws SCMException{
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
-    int nodesRequired = healthyNodes.size()/2;
+    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
     // only minority of healthy NODES are heavily engaged in pipelines.
     int minorityHeavy = healthyNodes.size()/2 - 1;
     List<DatanodeDetails> pickedNodes1 = placementPolicy.chooseDatanodes(
@@ -179,7 +184,9 @@ public class TestPipelinePlacementPolicy {
     }
 
     int considerHeavyCount =
-        ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT + 1;
+        conf.getInt(
+            ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT,
+            ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT) + 1;
 
     Node2PipelineMap mockMap = new Node2PipelineMap();
     for (DatanodeDetails node : nodes) {
