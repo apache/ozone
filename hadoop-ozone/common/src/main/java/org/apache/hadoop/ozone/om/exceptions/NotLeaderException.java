@@ -59,7 +59,8 @@ public class NotLeaderException extends IOException {
     if (currentLeaderMatcher.matches()) {
       this.currentPeerId = currentLeaderMatcher.group(1);
 
-      Matcher suggestedLeaderMatcher = SUGGESTED_LEADER_PATTERN.matcher(message);
+      Matcher suggestedLeaderMatcher =
+          SUGGESTED_LEADER_PATTERN.matcher(message);
       if (suggestedLeaderMatcher.matches()) {
         this.leaderPeerId = suggestedLeaderMatcher.group(1);
       } else {

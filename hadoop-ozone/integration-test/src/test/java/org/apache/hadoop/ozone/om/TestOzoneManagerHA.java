@@ -733,8 +733,9 @@ public class TestOzoneManagerHA {
     } catch (ConnectException e) {
       // Each retry attempt tries upto 10 times to connect. So there should be
       // 10 * OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY "Retrying connect to
-      // server" messages
-      Assert.assertEquals(60,
+      // server" messages. Also, the first call will result in EOFException.
+      // That will result in another 10 retry attempts.
+      Assert.assertEquals(70,
           appender.countLinesWithMessage("Retrying connect to server:"));
 
       Assert.assertEquals(1,
