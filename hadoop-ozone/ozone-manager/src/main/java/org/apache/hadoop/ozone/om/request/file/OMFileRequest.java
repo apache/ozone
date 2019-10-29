@@ -60,7 +60,7 @@ public final class OMFileRequest {
       String dbDirKeyName = omMetadataManager.getOzoneDirKey(volumeName,
           bucketName, pathName);
 
-      if (omMetadataManager.getKeyTable().get(dbKeyName) != null) {
+      if (omMetadataManager.getKeyTable().isExist(dbKeyName)) {
         // Found a file in the given path.
         // Check if this is actual file or a file in the given path
         if (dbKeyName.equals(fileNameFromDetails)) {
@@ -68,7 +68,7 @@ public final class OMFileRequest {
         } else {
           return OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
         }
-      } else if (omMetadataManager.getKeyTable().get(dbDirKeyName) != null) {
+      } else if (omMetadataManager.getKeyTable().isExist(dbDirKeyName)) {
         // Found a directory in the given path.
         // Check if this is actual directory or a directory in the given path
         if (dbDirKeyName.equals(dirNameFromDetails)) {
