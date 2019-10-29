@@ -185,7 +185,7 @@ public class ContainerDBServiceProviderImpl
    */
   @Override
   public boolean doesContainerExists(Long containerID) throws IOException {
-    return containerKeyCountTable.get(containerID) != null;
+    return containerKeyCountTable.isExist(containerID);
   }
 
   /**
