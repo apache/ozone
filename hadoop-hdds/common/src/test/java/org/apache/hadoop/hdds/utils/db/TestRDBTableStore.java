@@ -246,6 +246,9 @@ public class TestRDBTableStore {
       byte[] invalidKey =
           RandomStringUtils.random(5).getBytes(StandardCharsets.UTF_8);
       Assert.assertFalse(testTable.isExist(invalidKey));
+      RDBMetrics rdbMetrics = rdbStore.getMetrics();
+      Assert.assertEquals(3, rdbMetrics.getNumDBKeyMayExistChecks());
+      Assert.assertTrue(rdbMetrics.getNumDBKeyMayExistMisses() <= 1);
     }
   }
 
