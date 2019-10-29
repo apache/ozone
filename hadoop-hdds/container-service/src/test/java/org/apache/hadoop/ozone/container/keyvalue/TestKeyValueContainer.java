@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -138,8 +139,9 @@ public class TestKeyValueContainer {
         // Creating BlockData
         BlockID blockID = new BlockID(containerId, i);
         BlockData blockData = new BlockData(blockID);
-        blockData.addMetadata("VOLUME", "ozone");
-        blockData.addMetadata("OWNER", "hdfs");
+        blockData.addMetadata(OzoneConsts.VOLUME, OzoneConsts.OZONE);
+        blockData.addMetadata(OzoneConsts.OWNER,
+            OzoneConsts.OZONE_SIMPLE_HDFS_USER);
         List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
         ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", blockID
             .getLocalID(), 0), 0, 1024);
@@ -350,8 +352,8 @@ public class TestKeyValueContainer {
   public void testUpdateContainer() throws IOException {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     Map<String, String> metadata = new HashMap<>();
-    metadata.put("VOLUME", "ozone");
-    metadata.put("OWNER", "hdfs");
+    metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
+    metadata.put(OzoneConsts.OWNER, OzoneConsts.OZONE_SIMPLE_HDFS_USER);
     keyValueContainer.update(metadata, true);
 
     keyValueContainerData = keyValueContainer
@@ -376,7 +378,7 @@ public class TestKeyValueContainer {
       keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
       Map<String, String> metadata = new HashMap<>();
-      metadata.put("VOLUME", "ozone");
+      metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
       keyValueContainer.update(metadata, false);
       fail("testUpdateContainerUnsupportedRequest failed");
     } catch (StorageContainerException ex) {

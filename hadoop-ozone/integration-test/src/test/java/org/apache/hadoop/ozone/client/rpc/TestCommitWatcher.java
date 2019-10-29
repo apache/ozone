@@ -72,7 +72,6 @@ public class TestCommitWatcher {
   private static String keyString;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-  private static String containerOwner = "OZONE";
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -132,7 +131,7 @@ public class TestCommitWatcher {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, containerOwner);
+            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
     Pipeline pipeline = container.getPipeline();
     long containerId = container.getContainerInfo().getContainerID();
     XceiverClientSpi xceiverClient = clientManager.acquireClient(pipeline);
@@ -208,7 +207,7 @@ public class TestCommitWatcher {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, containerOwner);
+            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
     Pipeline pipeline = container.getPipeline();
     long containerId = container.getContainerInfo().getContainerID();
     XceiverClientSpi xceiverClient = clientManager.acquireClient(pipeline);

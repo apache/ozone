@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.util;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.ClassUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.VersionInfo;
@@ -36,7 +37,7 @@ public final class OzoneVersionInfo {
       LoggerFactory.getLogger(OzoneVersionInfo.class);
 
   public static final VersionInfo OZONE_VERSION_INFO =
-      new VersionInfo("ozone");
+      new VersionInfo(OzoneConsts.OZONE);
 
   private OzoneVersionInfo() {}
 

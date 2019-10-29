@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -73,7 +74,6 @@ public class TestWatchForCommit {
   private int blockSize;
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-  private static String containerOwner = "OZONE";
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -279,7 +279,7 @@ public class TestWatchForCommit {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, containerOwner);
+            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());
@@ -321,7 +321,7 @@ public class TestWatchForCommit {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, containerOwner);
+            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());
@@ -369,7 +369,7 @@ public class TestWatchForCommit {
 
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, containerOwner);
+            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());
@@ -417,7 +417,7 @@ public class TestWatchForCommit {
 
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, containerOwner);
+            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());

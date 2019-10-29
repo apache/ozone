@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -53,7 +54,6 @@ public class TestContainerSmallFile {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
-  private static String containerOwner = "OZONE";
 
   @BeforeClass
   public static void init() throws Exception {
@@ -81,7 +81,7 @@ public class TestContainerSmallFile {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
             xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
@@ -103,7 +103,7 @@ public class TestContainerSmallFile {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
             xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
@@ -126,7 +126,7 @@ public class TestContainerSmallFile {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
             xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
@@ -152,7 +152,7 @@ public class TestContainerSmallFile {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
             HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,

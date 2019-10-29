@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -56,7 +57,6 @@ public class TestGetCommittedBlockLengthAndPutKey {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
-  private static String containerOwner = "OZONE";
 
   @BeforeClass
   public static void init() throws Exception {
@@ -84,7 +84,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
     ContainerProtos.GetCommittedBlockLengthResponseProto response;
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);
@@ -117,7 +117,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
   public void testGetCommittedBlockLengthForInvalidBlock() throws Exception {
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
@@ -142,7 +142,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
     ContainerProtos.PutBlockResponseProto response;
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);

@@ -181,7 +181,7 @@ public class TestStorageContainerManager {
       try {
         ContainerWithPipeline container2 = mockClientServer
             .allocateContainer(xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE,  "OZONE");
+            HddsProtos.ReplicationFactor.ONE,  OzoneConsts.OZONE);
         if (expectPermissionDenied) {
           fail("Operation should fail, expecting an IOException here.");
         } else {
@@ -194,7 +194,7 @@ public class TestStorageContainerManager {
       try {
         ContainerWithPipeline container3 = mockClientServer
             .allocateContainer(xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, "OZONE");
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
         if (expectPermissionDenied) {
           fail("Operation should fail, expecting an IOException here.");
         } else {

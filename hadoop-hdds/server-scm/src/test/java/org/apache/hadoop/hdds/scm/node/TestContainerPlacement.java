@@ -163,7 +163,7 @@ public class TestContainerPlacement {
       ContainerInfo container = containerManager
           .allocateContainer(
           xceiverClientManager.getType(),
-          xceiverClientManager.getFactor(), "OZONE");
+          xceiverClientManager.getFactor(), OzoneConsts.OZONE);
       assertEquals(xceiverClientManager.getFactor().getNumber(),
           containerManager.getContainerReplicas(
               container.containerID()).size());

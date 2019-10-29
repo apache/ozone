@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -40,7 +41,6 @@ public class TestAllocateContainer {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
-  private static String containerOwner = "OZONE";
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
@@ -67,8 +67,7 @@ public class TestAllocateContainer {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
             xceiverClientManager.getType(),
-            xceiverClientManager.getFactor(),
-            containerOwner);
+            xceiverClientManager.getFactor(), OzoneConsts.OZONE);
     Assert.assertNotNull(container);
     Assert.assertNotNull(container.getPipeline().getFirstNode());
 
