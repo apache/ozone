@@ -88,15 +88,10 @@ public class AddAclBucketHandler extends Handler {
             OzoneObj.StoreType.valueOf(storeType))
         .build();
 
-    boolean aclExisted = client.getObjectStore().checkAclExist(obj,
+    boolean result = client.getObjectStore().addAcl(obj,
         OzoneAcl.parseAcl(acl));
-    if (aclExisted) {
-      System.out.println("ACL already exists.");
-    } else {
-      boolean result = client.getObjectStore().addAcl(obj,
-          OzoneAcl.parseAcl(acl));
-      System.out.printf("%s%n", "Acl added successfully: " + result);
-    }
+
+    System.out.printf("%s%n", "Acl added successfully: " + result);
 
     client.close();
     return null;
