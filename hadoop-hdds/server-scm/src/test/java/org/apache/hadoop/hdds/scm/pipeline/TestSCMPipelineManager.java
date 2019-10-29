@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
@@ -34,12 +35,13 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .PipelineReportFromDatanode;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -59,6 +61,7 @@ public class TestSCMPipelineManager {
   @Before
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 1);
     testDir = GenericTestUtils
         .getTestDir(TestSCMPipelineManager.class.getSimpleName());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -253,10 +256,10 @@ public class TestSCMPipelineManager {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
       Assert.fail();
-    } catch (InsufficientDatanodesException idEx) {
-      Assert.assertEquals(
-          "Cannot create pipeline of factor 3 using 1 nodes.",
-          idEx.getMessage());
+    } catch (SCMException ioe) {
+      // pipeline creation failed this time.
+      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+          ioe.getResult());
     }
 
     metrics = getMetrics(
@@ -266,7 +269,7 @@ public class TestSCMPipelineManager {
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
-    Assert.assertTrue(numPipelineCreateFailed == 0);
+    Assert.assertTrue(numPipelineCreateFailed == 1);
     
     // clean up
     pipelineManager.close();

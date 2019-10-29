@@ -115,6 +115,7 @@ class BackgroundPipelineCreator {
           if (scheduler.isClosed()) {
             break;
           }
+
           pipelineManager.createPipeline(type, factor);
         } catch (IOException ioe) {
           break;
