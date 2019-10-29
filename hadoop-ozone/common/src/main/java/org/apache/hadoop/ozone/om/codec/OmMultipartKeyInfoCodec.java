@@ -59,6 +59,6 @@ public class OmMultipartKeyInfoCodec implements Codec<OmMultipartKeyInfo> {
 
   @Override
   public OmMultipartKeyInfo copyObject(OmMultipartKeyInfo object) {
-    return object;
+    return object.copyObject();
   }
 }
