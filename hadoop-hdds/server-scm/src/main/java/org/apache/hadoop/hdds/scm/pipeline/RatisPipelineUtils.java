@@ -66,8 +66,8 @@ public final class RatisPipelineUtils {
       try {
         destroyPipeline(dn, pipeline.getId(), ozoneConf, grpcTlsConfig);
       } catch (IOException e) {
-        LOG.warn("Pipeline destroy failed for pipeline={} dn={}",
-            pipeline.getId(), dn);
+        LOG.warn("Pipeline destroy failed for pipeline={} dn={} exception={}",
+            pipeline.getId(), dn, e.getMessage());
       }
     }
   }

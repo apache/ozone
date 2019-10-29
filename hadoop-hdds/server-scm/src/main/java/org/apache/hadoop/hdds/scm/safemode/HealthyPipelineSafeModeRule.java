@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.safemode;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -54,8 +54,9 @@ public class HealthyPipelineSafeModeRule
   private final PipelineManager pipelineManager;
   private int healthyPipelineThresholdCount;
   private int currentHealthyPipelineCount = 0;
-  private final Map<PipelineID, Boolean> processedPipelines = new HashMap<>();
   private final double healthyPipelinesPercent;
+  private final Set<PipelineID> processedPipelineIDs =
+      new HashSet<>();
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager,
@@ -121,29 +122,34 @@ public class HealthyPipelineSafeModeRule
     // from datanode again during threshold calculation.
     Preconditions.checkNotNull(pipelineReportFromDatanode);
 
+    Pipeline pipeline;
     PipelineReportsProto pipelineReport =
         pipelineReportFromDatanode.getReport();
 
     for (PipelineReport report : pipelineReport.getPipelineReportList()) {
-      PipelineID pipelineID = PipelineID.getFromProtobuf(
-          report.getPipelineID());
-      Pipeline pipeline;
+      PipelineID pipelineID = PipelineID
+          .getFromProtobuf(report.getPipelineID());
+      if (processedPipelineIDs.contains(pipelineID)) {
+        continue;
+      }
+
       try {
         pipeline = pipelineManager.getPipeline(pipelineID);
       } catch (PipelineNotFoundException e) {
         continue;
       }
 
-      if (!processedPipelines.containsKey(pipelineID)) {
-        if (pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE &&
+      if (pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE &&
             report.getIsLeader()) {
-          // If the pipeline gets reported with a leader we mark it as healthy
-          currentHealthyPipelineCount++;
-          getSafeModeMetrics().incCurrentHealthyPipelinesCount();
-          processedPipelines.put(pipelineID, Boolean.TRUE);
-        }
+        // If the pipeline gets reported with a leader we mark it as healthy
+        // for this pipeline.
+        currentHealthyPipelineCount++;
+        getSafeModeMetrics().incCurrentHealthyPipelinesCount();
+        processedPipelineIDs.add(pipelineID);
       }
+
     }
+
     if (scmInSafeMode()) {
       SCMSafeModeManager.getLogger().info(
           "SCM in safe mode. Healthy pipelines reported count is {}, " +
@@ -154,7 +160,7 @@ public class HealthyPipelineSafeModeRule
 
   @Override
   protected void cleanup() {
-    processedPipelines.clear();
+    processedPipelineIDs.clear();
   }
 
   @VisibleForTesting
