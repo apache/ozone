@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
@@ -69,7 +70,6 @@ public class TestSCMContainerManager {
   private static PipelineManager pipelineManager;
   private static File testDir;
   private static XceiverClientManager xceiverClientManager;
-  private static String containerOwner = "OZONE";
   private static Random random;
   private static HddsProtos.ReplicationFactor replicationFactor;
   private static HddsProtos.ReplicationType replicationType;
@@ -124,7 +124,7 @@ public class TestSCMContainerManager {
   @Test
   public void testallocateContainer() throws Exception {
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        replicationType, replicationFactor, containerOwner);
+        replicationType, replicationFactor, OzoneConsts.OZONE);
     Assert.assertNotNull(containerInfo);
   }
 
@@ -139,7 +139,7 @@ public class TestSCMContainerManager {
     Set<UUID> pipelineList = new TreeSet<>();
     for (int x = 0; x < 30; x++) {
       ContainerInfo containerInfo = containerManager.allocateContainer(
-          replicationType, replicationFactor, containerOwner);
+          replicationType, replicationFactor, OzoneConsts.OZONE);
 
       Assert.assertNotNull(containerInfo);
       Assert.assertNotNull(containerInfo.getPipelineID());
@@ -165,7 +165,7 @@ public class TestSCMContainerManager {
         try {
           ContainerInfo containerInfo = containerManager
               .allocateContainer(replicationType, replicationFactor,
-                  containerOwner);
+                  OzoneConsts.OZONE);
 
           Assert.assertNotNull(containerInfo);
           Assert.assertNotNull(containerInfo.getPipelineID());
@@ -190,7 +190,7 @@ public class TestSCMContainerManager {
   @Test
   public void testGetContainer() throws IOException {
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        replicationType, replicationFactor, containerOwner);
+        replicationType, replicationFactor, OzoneConsts.OZONE);
     Assert.assertNotNull(containerInfo);
     Pipeline pipeline  = pipelineManager
         .getPipeline(containerInfo.getPipelineID());
@@ -203,7 +203,7 @@ public class TestSCMContainerManager {
   public void testGetContainerWithPipeline() throws Exception {
     ContainerInfo contInfo = containerManager
         .allocateContainer(replicationType, replicationFactor,
-            containerOwner);
+            OzoneConsts.OZONE);
     // Add dummy replicas for container.
     Iterator<DatanodeDetails> nodes = pipelineManager
         .getPipeline(contInfo.getPipelineID()).getNodes().iterator();
@@ -309,7 +309,8 @@ public class TestSCMContainerManager {
       throws IOException {
     nodeManager.setSafemode(false);
     return containerManager
-        .allocateContainer(replicationType, replicationFactor, containerOwner);
+        .allocateContainer(replicationType, replicationFactor,
+            OzoneConsts.OZONE);
   }
 
 }

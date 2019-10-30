@@ -54,7 +54,6 @@ public class TestContainerStateMachineIdempotency {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
-  private static String containerOwner = "OZONE";
 
   @BeforeClass
   public static void init() throws Exception {
@@ -81,7 +80,7 @@ public class TestContainerStateMachineIdempotency {
   public void testContainerStateMachineIdempotency() throws Exception {
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);

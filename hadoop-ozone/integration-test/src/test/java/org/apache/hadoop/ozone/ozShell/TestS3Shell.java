@@ -154,7 +154,7 @@ public class TestS3Shell {
 
     String s3Bucket = "bucket1";
     String commandOutput;
-    createS3Bucket("ozone", s3Bucket);
+    createS3Bucket(OzoneConsts.OZONE, s3Bucket);
 
     // WHEN
     String[] args =
@@ -200,7 +200,7 @@ public class TestS3Shell {
 
   private void createS3Bucket(String userName, String s3Bucket) {
     try {
-      client.createS3Bucket("ozone", s3Bucket);
+      client.createS3Bucket(OzoneConsts.OZONE, s3Bucket);
     } catch (IOException ex) {
       GenericTestUtils.assertExceptionContains("S3_BUCKET_ALREADY_EXISTS", ex);
     }

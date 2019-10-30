@@ -69,7 +69,7 @@ public class TestContainerOperations {
   public void testCreate() throws Exception {
     ContainerWithPipeline container = storageClient.createContainer(HddsProtos
         .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
-        .ONE, "OZONE");
+        .ONE, OzoneConsts.OZONE);
     assertEquals(container.getContainerInfo().getContainerID(), storageClient
         .getContainer(container.getContainerInfo().getContainerID())
         .getContainerID());

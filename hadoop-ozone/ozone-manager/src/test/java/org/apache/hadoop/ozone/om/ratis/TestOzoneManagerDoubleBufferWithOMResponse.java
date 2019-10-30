@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -441,7 +442,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private OMClientResponse createVolume(String volumeName,
       long transactionId) {
 
-    String admin = "ozone";
+    String admin = OzoneConsts.OZONE;
     String owner = UUID.randomUUID().toString();
     OzoneManagerProtocolProtos.OMRequest omRequest =
         TestOMRequestUtils.createVolumeRequest(volumeName, admin, owner);

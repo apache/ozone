@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -48,6 +49,9 @@ public class TestContainerDataYaml {
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
   private static final Instant SCAN_TIME = Instant.now();
 
+  private static final String VOLUME_OWNER = "hdfs";
+  private static final String CONTAINER_DB_TYPE = "RocksDB";
+
   /**
    * Creates a .container file. cleanup() should be called at the end of the
    * test when container file is created.
@@ -60,7 +64,7 @@ public class TestContainerDataYaml {
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
         containerID, MAXSIZE, UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
-    keyValueContainerData.setContainerDBType("RocksDB");
+    keyValueContainerData.setContainerDBType(CONTAINER_DB_TYPE);
     keyValueContainerData.setMetadataPath(testRoot);
     keyValueContainerData.setChunksPath(testRoot);
     keyValueContainerData.updateDataScanTime(SCAN_TIME);
@@ -93,7 +97,7 @@ public class TestContainerDataYaml {
     assertEquals(containerID, kvData.getContainerID());
     assertEquals(ContainerProtos.ContainerType.KeyValueContainer, kvData
         .getContainerType());
-    assertEquals("RocksDB", kvData.getContainerDBType());
+    assertEquals(CONTAINER_DB_TYPE, kvData.getContainerDBType());
     assertEquals(containerFile.getParent(), kvData.getMetadataPath());
     assertEquals(containerFile.getParent(), kvData.getChunksPath());
     assertEquals(ContainerProtos.ContainerDataProto.State.OPEN, kvData
@@ -108,8 +112,8 @@ public class TestContainerDataYaml {
         kvData.getDataScanTimestamp().longValue());
 
     // Update ContainerData.
-    kvData.addMetadata("VOLUME", "hdfs");
-    kvData.addMetadata("OWNER", "ozone");
+    kvData.addMetadata(OzoneConsts.VOLUME, VOLUME_OWNER);
+    kvData.addMetadata(OzoneConsts.OWNER, OzoneConsts.OZONE);
     kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
 
 
@@ -124,15 +128,16 @@ public class TestContainerDataYaml {
     assertEquals(containerID, kvData.getContainerID());
     assertEquals(ContainerProtos.ContainerType.KeyValueContainer, kvData
         .getContainerType());
-    assertEquals("RocksDB", kvData.getContainerDBType());
+    assertEquals(CONTAINER_DB_TYPE, kvData.getContainerDBType());
     assertEquals(containerFile.getParent(), kvData.getMetadataPath());
     assertEquals(containerFile.getParent(), kvData.getChunksPath());
     assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
         .getState());
     assertEquals(1, kvData.getLayOutVersion());
     assertEquals(2, kvData.getMetadata().size());
-    assertEquals("hdfs", kvData.getMetadata().get("VOLUME"));
-    assertEquals("ozone", kvData.getMetadata().get("OWNER"));
+    assertEquals(VOLUME_OWNER, kvData.getMetadata().get(OzoneConsts.VOLUME));
+    assertEquals(OzoneConsts.OZONE,
+        kvData.getMetadata().get(OzoneConsts.OWNER));
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
     assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
@@ -176,7 +181,7 @@ public class TestContainerDataYaml {
       //Checking the Container file data is consistent or not
       assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
           .getState());
-      assertEquals("RocksDB", kvData.getContainerDBType());
+      assertEquals(CONTAINER_DB_TYPE, kvData.getContainerDBType());
       assertEquals(ContainerProtos.ContainerType.KeyValueContainer, kvData
           .getContainerType());
       assertEquals(9223372036854775807L, kvData.getContainerID());

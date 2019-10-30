@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
@@ -61,7 +62,6 @@ public class TestXceiverClientMetrics {
   private static MiniOzoneCluster cluster;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-  private static String containerOwner = "OZONE";
 
   @BeforeClass
   public static void init() throws Exception {
@@ -87,8 +87,10 @@ public class TestXceiverClientMetrics {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
 
     ContainerWithPipeline container = storageContainerLocationClient
-        .allocateContainer(SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf), containerOwner);
+        .allocateContainer(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf),
+            OzoneConsts.OZONE);
     XceiverClientSpi client = clientManager
         .acquireClient(container.getPipeline());
 
