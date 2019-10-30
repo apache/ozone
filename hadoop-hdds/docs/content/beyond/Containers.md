@@ -113,7 +113,6 @@ The docker-config file contains the list of the required environment variables:
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
 OZONE-SITE.XML_ozone.scm.names=scm
-OZONE-SITE.XML_ozone.enabled=True
 #...
 ```
 

@@ -95,7 +95,6 @@ import java.util.Date;
 import static junit.framework.TestCase.assertNotNull;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
@@ -235,7 +234,6 @@ public final class TestSecureOzoneCluster {
 
   private void setSecureConfig(Configuration configuration) throws IOException {
     configuration.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    configuration.setBoolean(OZONE_ENABLED, true);
     host = InetAddress.getLocalHost().getCanonicalHostName()
         .toLowerCase();
     String realm = miniKdc.getRealm();
@@ -339,7 +337,6 @@ public final class TestSecureOzoneCluster {
       temp.mkdirs();
     }
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    conf.setBoolean(OzoneConfigKeys.OZONE_ENABLED, true);
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     scmStore.setClusterId(clusterId);
     scmStore.setScmId(scmId);

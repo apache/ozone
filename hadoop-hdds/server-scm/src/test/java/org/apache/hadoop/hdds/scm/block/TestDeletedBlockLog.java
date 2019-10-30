@@ -70,7 +70,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.when;
 
@@ -91,7 +90,6 @@ public class TestDeletedBlockLog {
     testDir = GenericTestUtils.getTestDir(
         TestDeletedBlockLog.class.getSimpleName());
     conf = new OzoneConfiguration();
-    conf.set(OZONE_ENABLED, "true");
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     scm = TestUtils.getScm(conf);

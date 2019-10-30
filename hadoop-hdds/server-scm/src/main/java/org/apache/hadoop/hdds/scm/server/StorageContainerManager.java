@@ -118,7 +118,6 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -594,15 +593,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return SCM instance
    * @throws IOException, AuthenticationException
    */
-  public static StorageContainerManager createSCM(
-      OzoneConfiguration conf)
+  public static StorageContainerManager createSCM(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    if (!HddsUtils.isHddsEnabled(conf)) {
-      System.err.println(
-          "SCM cannot be started in secure mode or when " + OZONE_ENABLED + "" +
-              " is set to false");
-      System.exit(1);
-    }
     return new StorageContainerManager(conf);
   }
 
