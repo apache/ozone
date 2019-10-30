@@ -231,7 +231,6 @@ public class XceiverClientManager implements Closeable {
             case RATIS:
               client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
                   caCert);
-              client.connect();
               break;
             case STAND_ALONE:
               client = new XceiverClientGrpc(pipeline, conf, caCert);
@@ -240,6 +239,7 @@ public class XceiverClientManager implements Closeable {
             default:
               throw new IOException("not implemented" + pipeline.getType());
             }
+            client.connect();
             return client;
           }
         });
