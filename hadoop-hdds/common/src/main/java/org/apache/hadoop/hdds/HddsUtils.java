@@ -502,9 +502,9 @@ public final class HddsUtils {
     MetricsSystem metricsSystem = DefaultMetricsSystem.initialize(serverName);
     try {
       JvmMetrics.create(serverName,
-           configuration.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
-           DefaultMetricsSystem.instance());
-    }catch (MetricsException e) {
+          configuration.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
+          DefaultMetricsSystem.instance());
+    } catch (MetricsException e) {
         LOG.info("Metrics source JvmMetrics already added to DataNode.");
     }
     return metricsSystem;
