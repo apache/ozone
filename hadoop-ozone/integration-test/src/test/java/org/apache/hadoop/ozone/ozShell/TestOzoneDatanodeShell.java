@@ -130,7 +130,7 @@ public class TestOzoneDatanodeShell {
   }
 
   private static class TestHddsDatanodeService extends HddsDatanodeService {
-    public TestHddsDatanodeService(boolean printBanner, String[] args) {
+    TestHddsDatanodeService(boolean printBanner, String[] args) {
       super(printBanner, args);
     }
 
