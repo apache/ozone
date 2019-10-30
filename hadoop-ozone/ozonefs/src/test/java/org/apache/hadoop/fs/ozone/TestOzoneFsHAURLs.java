@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -92,7 +91,6 @@ public class TestOzoneFsHAURLs {
     scmId = UUID.randomUUID().toString();
     final String path = GenericTestUtils.getTempPath(omId);
     java.nio.file.Path metaDirPath = java.nio.file.Paths.get(path, "om-meta");
-    conf.setBoolean(OzoneConfigKeys.OZONE_ENABLED, true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);

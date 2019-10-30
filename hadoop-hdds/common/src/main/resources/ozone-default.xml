@@ -477,20 +477,6 @@
       postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
-    <name>ozone.enabled</name>
-    <value>false</value>
-    <tag>OZONE, REQUIRED</tag>
-    <description>
-      Status of the Ozone Object Storage service is enabled.
-      Set to true to enable Ozone.
-      Set to false to disable Ozone.
-      Unless this value is set to true, Ozone services will not be started in
-      the cluster.
-
-      Please note: By default ozone is disabled on a hadoop cluster.
-    </description>
-  </property>
-  <property>
     <name>ozone.key.deleting.limit.per.task</name>
     <value>1000</value>
     <tag>OM, PERFORMANCE</tag>
