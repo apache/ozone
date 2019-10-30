@@ -30,7 +30,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -59,6 +61,8 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -1886,73 +1890,148 @@ public class KeyManagerImpl implements KeyManager {
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
+
+    List<OzoneFileStatus> fileStatusList = new ArrayList<>();
+    if (numEntries <= 0) {
+      return fileStatusList;
+    }
+
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
 
-    List<OzoneFileStatus> fileStatusList = new ArrayList<>();
+    // A map sort by key so as to combine entries from both
+    // cache table and rocksdb into the final result.
+    TreeMap<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
+    // A set to keep track of which keys are already deleted in cache but not
+    // committed to rocksdb yet.
+    Set<String> deletedKeySet = new TreeSet<>();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
+      // If startKey is empty
       if (Strings.isNullOrEmpty(startKey)) {
         OzoneFileStatus fileStatus = getFileStatus(args);
+        // Return directly the single file status if it is a key to a file
         if (fileStatus.isFile()) {
           return Collections.singletonList(fileStatus);
         }
+        // Append '/' to startKey if it doesn't have it
         startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       }
 
+      // Find key in cache table first with iterator.
+      // Limit number of result to numEntries, append result to cacheKeyMap,
+      // and keep track of deleted keys in cache with deletedKeySet
+      int countEntries = 0;
+      Table keyTable = metadataManager.getKeyTable();
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OzoneFileStatus>>>
+          cacheIter = keyTable.cacheIterator();
+      // Similar to the logic in OmMetadataManagerImpl#listKeys
+      // TODO: Double check the boundary, > or >=.
+      while (cacheIter.hasNext() && numEntries - countEntries > 0) {
+        Map.Entry<CacheKey<String>, CacheValue<OzoneFileStatus>> entry =
+            cacheIter.next();
+        String key = entry.getKey().getCacheKey();
+        OzoneFileStatus fileStatus = entry.getValue().getCacheValue();
+        // fileStatus is null if an entry is deleted in cache.
+        // TODO: Double check if the above statement is true.
+        if (fileStatus != null) {
+          if (key.startsWith(startKey) && key.compareTo(startKey) >= 0) {
+            cacheKeyMap.put(key, fileStatus);
+            countEntries++;
+          }
+        } else {
+          deletedKeySet.add(key);
+        }
+      }
+
+      // Find key in db
       String seekKeyInDb =
           metadataManager.getOzoneKey(volumeName, bucketName, startKey);
       String keyInDb = OzoneFSUtils.addTrailingSlashIfNeeded(
           metadataManager.getOzoneKey(volumeName, bucketName, keyName));
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          iterator = metadataManager.getKeyTable().iterator();
+          iterator = keyTable.iterator();
       iterator.seek(seekKeyInDb);
+      // Reset the entry counters
+      countEntries = 0;
 
-      if (!iterator.hasNext()) {
-        return Collections.emptyList();
-      }
+      // Continue only if there are matches
+      if (iterator.hasNext()) {
+        // TODO: This is for skipping the directory itself right?
+        if (iterator.key().equals(keyInDb)) {
+          // skip the key which needs to be listed
+          iterator.next();
+        }
 
-      if (iterator.key().equals(keyInDb)) {
-        // skip the key which needs to be listed
-        iterator.next();
-      }
-
-      while (iterator.hasNext() && numEntries - fileStatusList.size() > 0) {
-        String entryInDb = iterator.key();
-        OmKeyInfo value = iterator.value().getValue();
-        if (entryInDb.startsWith(keyInDb)) {
-          String entryKeyName = value.getKeyName();
-          if (recursive) {
-            // for recursive list all the entries
-            fileStatusList.add(new OzoneFileStatus(value, scmBlockSize,
-                !OzoneFSUtils.isFile(entryKeyName)));
-            iterator.next();
-          } else {
-            // get the child of the directory to list from the entry. For
-            // example if directory to list is /a and entry is /a/b/c where
-            // c is a file. The immediate child is b which is a directory. c
-            // should not be listed as child of a.
-            String immediateChild = OzoneFSUtils
-                .getImmediateChild(entryKeyName, keyName);
-            boolean isFile = OzoneFSUtils.isFile(immediateChild);
-            if (isFile) {
-              fileStatusList
-                  .add(new OzoneFileStatus(value, scmBlockSize, !isFile));
+        while (iterator.hasNext() && numEntries - countEntries > 0) {
+          String entryInDb = iterator.key();
+          OmKeyInfo value = iterator.value().getValue();
+          if (entryInDb.startsWith(keyInDb)) {
+            String entryKeyName = value.getKeyName();
+            if (recursive) {
+              // for recursive list all the entries
+              //TODO: Can a directory key be in deletedKeySet?
+              // If not, change the logic below.
+              if (!deletedKeySet.contains(entryKeyName)) {
+                cacheKeyMap.put(entryKeyName, new OzoneFileStatus(value, scmBlockSize,
+                    !OzoneFSUtils.isFile(entryKeyName)));
+                countEntries++;
+              }
               iterator.next();
             } else {
-              // if entry is a directory
-              fileStatusList.add(new OzoneFileStatus(immediateChild));
-              // skip the other descendants of this child directory.
-              iterator.seek(
-                  getNextGreaterString(volumeName, bucketName, immediateChild));
+              // get the child of the directory to list from the entry. For
+              // example if directory to list is /a and entry is /a/b/c where
+              // c is a file. The immediate child is b which is a directory. c
+              // should not be listed as child of a.
+              String immediateChild = OzoneFSUtils
+                  .getImmediateChild(entryKeyName, keyName);
+              boolean isFile = OzoneFSUtils.isFile(immediateChild);
+              if (isFile) {
+                if (!deletedKeySet.contains(entryKeyName)) {
+                  cacheKeyMap.put(entryKeyName,
+                      new OzoneFileStatus(value, scmBlockSize, !isFile));
+                  countEntries++;
+                }
+                iterator.next();
+              } else {
+                // if entry is a directory
+                //TODO: Can a directory key be in deletedKeySet?
+                // If not, change the logic below.
+                if (!deletedKeySet.contains(entryKeyName)) {
+                  cacheKeyMap.put(entryKeyName,
+                      new OzoneFileStatus(immediateChild));
+                  countEntries++;
+                }
+                // skip the other descendants of this child directory.
+                iterator.seek(getNextGreaterString(
+                    volumeName, bucketName, immediateChild));
+              }
             }
+          } else {
+            break;
           }
-        } else {
+        }
+      }
+
+      // Process results from cache and db.
+      // results are sorted in cacheKeyMap, but still need to check deleted keys
+      countEntries = 0;
+
+      for (Map.Entry<String, OzoneFileStatus> entry : cacheKeyMap.entrySet()) {
+        // No need to check here if a key is deleted or not, this is already
+        // checked above when adding entries to cacheKeyMap.
+        fileStatusList.add(entry.getValue());
+        countEntries++;
+        if (countEntries >= numEntries) {
           break;
         }
       }
+
+      // Clean up temporary map and set.
+      cacheKeyMap.clear();
+      deletedKeySet.clear();
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
