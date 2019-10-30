@@ -53,6 +53,6 @@ public class OmPrefixInfoCodec implements Codec<OmPrefixInfo> {
 
   @Override
   public OmPrefixInfo copyObject(OmPrefixInfo object) {
-    return object;
+    return object.copyObject();
   }
 }

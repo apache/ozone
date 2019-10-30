@@ -903,10 +903,16 @@ message ServicePort {
     required uint32 value = 2;
 }
 
+message OMRoleInfo {
+    required string nodeId = 1;
+    required string serverRole = 2;
+}
+
 message ServiceInfo {
     required hadoop.hdds.NodeType nodeType = 1;
     required string hostname = 2;
     repeated ServicePort servicePorts = 3;
+    optional OMRoleInfo omRole = 4;
 }
 
 message S3CreateBucketRequest {

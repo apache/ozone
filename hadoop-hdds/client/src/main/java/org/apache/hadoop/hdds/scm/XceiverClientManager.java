@@ -71,7 +71,6 @@ public class XceiverClientManager implements Closeable {
   //TODO : change this to SCM configuration class
   private final Configuration conf;
   private final Cache<String, XceiverClientSpi> clientCache;
-  private final boolean useRatis;
   private X509Certificate caCert;
 
   private static XceiverClientMetrics metrics;
@@ -94,9 +93,6 @@ public class XceiverClientManager implements Closeable {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
-    this.useRatis = conf.getBoolean(
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY,
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
     this.conf = conf;
     this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (isSecurityEnabled) {
@@ -235,7 +231,6 @@ public class XceiverClientManager implements Closeable {
             case RATIS:
               client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
                   caCert);
-              client.connect();
               break;
             case STAND_ALONE:
               client = new XceiverClientGrpc(pipeline, conf, caCert);
@@ -244,6 +239,7 @@ public class XceiverClientManager implements Closeable {
             default:
               throw new IOException("not implemented" + pipeline.getType());
             }
+            client.connect();
             return client;
           }
         });
@@ -278,38 +274,6 @@ public class XceiverClientManager implements Closeable {
     if (metrics != null) {
       metrics.unRegister();
     }
-  }
-
-  /**
-   * Tells us if Ratis is enabled for this cluster.
-   * @return True if Ratis is enabled.
-   */
-  public boolean isUseRatis() {
-    return useRatis;
-  }
-
-  /**
-   * Returns hard coded 3 as replication factor.
-   * @return 3
-   */
-  public  HddsProtos.ReplicationFactor getFactor() {
-    if(isUseRatis()) {
-      return HddsProtos.ReplicationFactor.THREE;
-    }
-    return HddsProtos.ReplicationFactor.ONE;
-  }
-
-  /**
-   * Returns the default replication type.
-   * @return Ratis or Standalone
-   */
-  public HddsProtos.ReplicationType getType() {
-    // TODO : Fix me and make Ratis default before release.
-    // TODO: Remove this as replication factor and type are pipeline properties
-    if(isUseRatis()) {
-      return HddsProtos.ReplicationType.RATIS;
-    }
-    return HddsProtos.ReplicationType.STAND_ALONE;
   }
 
   public Function<ByteBuffer, ByteString> byteBufferToByteStringConversion(){

@@ -152,8 +152,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     connectToDatanode(dn, encodedToken);
   }
 
-  private void connectToDatanode(DatanodeDetails dn, String encodedToken)
-      throws IOException {
+  private synchronized void connectToDatanode(DatanodeDetails dn,
+      String encodedToken) throws IOException {
+    if (isConnected(dn)){
+      return;
+    }
     // read port from the data node, on failure use default configured
     // port.
     int port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
@@ -208,7 +211,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   @Override
-  public void close() {
+  public synchronized void close() {
     closed = true;
     for (ManagedChannel channel : channels.values()) {
       channel.shutdownNow();
@@ -397,19 +400,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   private XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, DatanodeDetails dn)
-      throws IOException, ExecutionException, InterruptedException {
-    if (closed) {
-      throw new IOException("This channel is not connected.");
-    }
-
+      throws IOException, InterruptedException {
+    checkOpen(dn, request.getEncodedToken());
     UUID dnId = dn.getUuid();
-    ManagedChannel channel = channels.get(dnId);
-    // If the channel doesn't exist for this specific datanode or the channel
-    // is closed, just reconnect
-    String token = request.getEncodedToken();
-    if (!isConnected(channel)) {
-      reconnect(dn, token);
-    }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
           request.getCmdType().toString(), dn.getNetworkFullPath());
@@ -454,6 +447,21 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     requestObserver.onNext(request);
     requestObserver.onCompleted();
     return new XceiverClientReply(replyFuture);
+  }
+
+  private synchronized void checkOpen(DatanodeDetails dn, String encodedToken)
+      throws IOException{
+    if (closed) {
+      throw new IOException("This channel is not connected.");
+    }
+
+    ManagedChannel channel = channels.get(dn.getUuid());
+    // If the channel doesn't exist for this specific datanode or the channel
+    // is closed, just reconnect
+    if (!isConnected(channel)) {
+      reconnect(dn, encodedToken);
+    }
+
   }
 
   private void reconnect(DatanodeDetails dn, String encodedToken)

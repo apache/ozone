@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -86,7 +87,9 @@ public class TestXceiverClientMetrics {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
 
     ContainerWithPipeline container = storageContainerLocationClient
-        .allocateContainer(clientManager.getType(), clientManager.getFactor(),
+        .allocateContainer(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf),
             OzoneConsts.OZONE);
     XceiverClientSpi client = clientManager
         .acquireClient(container.getPipeline());

@@ -26,6 +26,8 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .OMRoleInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .ServicePort;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 
@@ -58,6 +60,8 @@ public final class ServiceInfo {
    * List of ports the service listens to.
    */
   private Map<ServicePort.Type, Integer> ports;
+  
+  private OMRoleInfo omRoleInfo;
 
   /**
    * Default constructor for JSON deserialization.
@@ -70,8 +74,8 @@ public final class ServiceInfo {
    * @param hostname hostname of the service
    * @param portList list of ports the service listens to
    */
-  private ServiceInfo(
-      NodeType nodeType, String hostname, List<ServicePort> portList) {
+  private ServiceInfo(NodeType nodeType, String hostname,
+      List<ServicePort> portList, OMRoleInfo omRole) {
     Preconditions.checkNotNull(nodeType);
     Preconditions.checkNotNull(hostname);
     this.nodeType = nodeType;
@@ -80,6 +84,7 @@ public final class ServiceInfo {
     for (ServicePort port : portList) {
       ports.put(port.getType(), port.getValue());
     }
+    this.omRoleInfo = omRole;
   }
 
   /**
@@ -129,6 +134,15 @@ public final class ServiceInfo {
   }
 
   /**
+   * Returns the OM role info - node id and ratis server role.
+   * @return OmRoleInfo
+   */
+  @JsonIgnore
+  public OMRoleInfo getOmRoleInfo() {
+    return omRoleInfo;
+  }
+
+  /**
    * Converts {@link ServiceInfo} to OzoneManagerProtocolProtos.ServiceInfo.
    *
    * @return OzoneManagerProtocolProtos.ServiceInfo
@@ -147,6 +161,9 @@ public final class ServiceInfo {
                             .setType(entry.getKey())
                             .setValue(entry.getValue()).build())
                 .collect(Collectors.toList()));
+    if (nodeType == NodeType.OM && omRoleInfo != null) {
+      builder.setOmRole(omRoleInfo);
+    }
     return builder.build();
   }
 
@@ -160,7 +177,8 @@ public final class ServiceInfo {
       OzoneManagerProtocolProtos.ServiceInfo serviceInfo) {
     return new ServiceInfo(serviceInfo.getNodeType(),
         serviceInfo.getHostname(),
-        serviceInfo.getServicePortsList());
+        serviceInfo.getServicePortsList(),
+        serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null);
   }
 
   /**
@@ -179,7 +197,7 @@ public final class ServiceInfo {
     private NodeType node;
     private String host;
     private List<ServicePort> portList = new ArrayList<>();
-
+    private OMRoleInfo omRoleInfo;
 
     /**
      * Sets the node/service type.
@@ -211,13 +229,17 @@ public final class ServiceInfo {
       return this;
     }
 
+    public Builder setOmRoleInfo(OMRoleInfo omRole) {
+      omRoleInfo = omRole;
+      return this;
+    }
 
     /**
      * Builds and returns {@link ServiceInfo} with the set values.
      * @return {@link ServiceInfo}
      */
     public ServiceInfo build() {
-      return new ServiceInfo(node, host, portList);
+      return new ServiceInfo(node, host, portList, omRoleInfo);
     }
   }
 
