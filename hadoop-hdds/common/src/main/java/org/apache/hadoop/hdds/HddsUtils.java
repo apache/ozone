@@ -51,6 +51,7 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
@@ -499,9 +500,13 @@ public final class HddsUtils {
   public static MetricsSystem initializeMetrics(
       OzoneConfiguration configuration, String serverName) {
     MetricsSystem metricsSystem = DefaultMetricsSystem.initialize(serverName);
-    JvmMetrics.create(serverName,
-        configuration.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
-        DefaultMetricsSystem.instance());
+    try {
+      JvmMetrics.create(serverName,
+           configuration.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
+           DefaultMetricsSystem.instance());
+    }catch (MetricsException e) {
+        LOG.info("Metrics source JvmMetrics already added to DataNode.");
+    }
     return metricsSystem;
   }
 
