@@ -505,7 +505,7 @@ public final class HddsUtils {
           configuration.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
           DefaultMetricsSystem.instance());
     } catch (MetricsException e) {
-        LOG.info("Metrics source JvmMetrics already added to DataNode.");
+      LOG.info("Metrics source JvmMetrics already added to DataNode.");
     }
     return metricsSystem;
   }
