@@ -29,6 +29,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.util.Map;
 import java.util.Optional;
@@ -38,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * This class maintains Pipeline related metrics.
  */
 @InterfaceAudience.Private
-@Metrics(about = "SCM PipelineManager Metrics", context = "ozone")
+@Metrics(about = "SCM PipelineManager Metrics", context = OzoneConsts.OZONE)
 public final class SCMPipelineMetrics implements MetricsSource {
 
   private static final String SOURCE_NAME =
