@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.ozShell;
 
+import static org.junit.Assert.fail;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
@@ -24,18 +26,12 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.test.GenericTestUtils;
-
-import com.google.common.base.Strings;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
-import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -43,6 +39,9 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Strings;
+
 import picocli.CommandLine;
 import picocli.CommandLine.ExecutionException;
 import picocli.CommandLine.IExceptionHandler2;
@@ -66,7 +65,6 @@ public class TestOzoneDatanodeShell {
 
   private static File baseDir;
   private static OzoneConfiguration conf = null;
-  private static MiniOzoneCluster cluster = null;
   private static HddsDatanodeService datanode = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -89,14 +87,7 @@ public class TestOzoneDatanodeShell {
     baseDir = new File(path);
     baseDir.mkdirs();
 
-    datanode = HddsDatanodeService.createHddsDatanodeService(null);
-
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    conf.setInt(OZONE_REPLICATION, ReplicationFactor.THREE.getValue());
-    conf.setQuietMode(false);
-    cluster.waitForClusterToBeReady();
+    datanode = new TestHddsDatanodeService(false, new String[] {});
   }
 
   /**
@@ -104,10 +95,6 @@ public class TestOzoneDatanodeShell {
    */
   @AfterClass
   public static void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-
     if (baseDir != null) {
       FileUtil.fullyDelete(baseDir, true);
     }
@@ -184,6 +171,7 @@ public class TestOzoneDatanodeShell {
   }
 
   @Test
+
   public void testDatanodeCommand() {
     LOG.info("Running testDatanodeIncompleteCommand");
     String[] args = new String[]{}; //executing 'ozone datanode'
@@ -200,5 +188,17 @@ public class TestOzoneDatanodeShell {
     String[] args = new String[]{"-invalidParam"};
 
     executeDatanodeWithError(datanode, args, expectedError);
+  }
+
+  private static class TestHddsDatanodeService extends HddsDatanodeService {
+
+    public TestHddsDatanodeService(boolean printBanner, String[] args) {
+      super(printBanner, args);
+    }
+
+    @Override
+    public void start() {
+      // do nothing
+    }
   }
 }
