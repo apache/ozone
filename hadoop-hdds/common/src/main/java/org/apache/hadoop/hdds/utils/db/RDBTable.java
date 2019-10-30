@@ -129,15 +129,14 @@ class RDBTable implements Table<byte[], byte[]> {
       // method returns false, else true.
       rdbMetrics.incNumDBKeyMayExistChecks();
       boolean keyMayExist = db.keyMayExist(handle, key, new StringBuilder());
-      if (!keyMayExist) {
-        return false;
-      } else {
+      if (keyMayExist) {
         boolean keyGet = (db.get(handle, key) != null);
         if (!keyGet) {
           rdbMetrics.incNumDBKeyMayExistMisses();
         }
         return keyGet;
       }
+      return false;
     } catch (RocksDBException e) {
       throw toIOException(
           "Error in accessing DB. ", e);

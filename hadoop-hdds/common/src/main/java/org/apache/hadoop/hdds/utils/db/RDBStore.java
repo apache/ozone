@@ -180,6 +180,7 @@ public class RDBStore implements DBStore {
       statMBeanName = null;
     }
 
+    rdbMetrics.unRegister();
     if (db != null) {
       db.close();
     }

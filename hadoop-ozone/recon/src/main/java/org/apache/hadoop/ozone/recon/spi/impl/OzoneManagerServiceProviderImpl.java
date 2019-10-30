@@ -198,8 +198,9 @@ public class OzoneManagerServiceProviderImpl
   }
 
   @Override
-  public void stop() {
+  public void stop() throws Exception {
     reconTaskController.stop();
+    omMetadataManager.stop();
     scheduler.shutdownNow();
   }
 
