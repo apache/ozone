@@ -20,10 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -39,8 +36,11 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
@@ -59,6 +59,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test OzoneFileSystem Interfaces.
@@ -68,6 +70,9 @@ import org.junit.runners.Parameterized.Parameters;
  */
 @RunWith(Parameterized.class)
 public class TestOzoneFileInterfaces {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOzoneFileInterfaces.class);
 
   private String rootPath;
   private String userName;
@@ -98,6 +103,8 @@ public class TestOzoneFileInterfaces {
 
   private String bucketName;
 
+  OzoneBucket bucket;
+
   private OzoneFSStorageStatistics statistics;
 
   private OMMetrics omMetrics;
@@ -121,7 +128,7 @@ public class TestOzoneFileInterfaces {
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket =
+    bucket =
         TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
 
     rootPath = String
@@ -163,11 +170,39 @@ public class TestOzoneFileInterfaces {
   public void testOzFsReadWrite() throws IOException {
     long currentTime = Time.now();
     int stringLen = 20;
+
+    String lev1dir = "abc";
+    Path lev1path = createPath("/" + lev1dir);
+    String lev2dir = "def";
+    Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
+
     String data = RandomStringUtils.randomAlphanumeric(stringLen);
     String filePath = RandomStringUtils.randomAlphanumeric(5);
-    Path path = createPath("/" + filePath);
+    Path path = createPath("/" + lev1dir + "/" + lev2dir + "/" + filePath);
+
+    // check that directories in path do not exist to start with.
+    assertTrue(!directoryExists(lev1path));
+    assertTrue(!directoryExists(lev2path));
+
     try (FSDataOutputStream stream = fs.create(path)) {
+
+      Iterator<? extends OzoneKey> iter1 = bucket.listKeys("");
+      while (iter1.hasNext()) {
+        OzoneKey next = iter1.next();
+        String relativeKeyName = next.getName();
+        LOG.debug("keys in DB in between create and commit : {}",
+            relativeKeyName);
+      }
+
       stream.writeBytes(data);
+    }
+
+    LOG.info("list of keys in DB :");
+    Iterator<? extends OzoneKey> iter2 = bucket.listKeys("");
+    while (iter2.hasNext()) {
+      OzoneKey next = iter2.next();
+      String relativeKeyName = next.getName();
+      LOG.debug("{}", relativeKeyName);
     }
 
     assertEquals(statistics.getLong(
@@ -206,6 +241,10 @@ public class TestOzoneFileInterfaces {
     assertEquals(statistics.getLong(
         StorageStatistics.CommonStatisticNames.OP_OPEN).longValue(), 1);
     assertEquals(statistics.getLong("objects_read").longValue(), 1);
+
+    // intermediate directories in path should have been created.
+    assertTrue(directoryExists(lev1path));
+    assertTrue(directoryExists(lev2path));
   }
 
   private void verifyOwnerGroup(FileStatus fileStatus) {
@@ -278,7 +317,17 @@ public class TestOzoneFileInterfaces {
   public void testOzoneManagerFileSystemInterface() throws IOException {
     String dirPath = RandomStringUtils.randomAlphanumeric(5);
 
-    Path path = createPath("/" + dirPath);
+    String lev1dir = "abc";
+    Path lev1path = createPath("/" + lev1dir);
+    String lev2dir = "def";
+    Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
+    Path path = createPath("/" + lev1dir + "/" + lev2dir + "/" + dirPath);
+
+    // check that directories do not exist to start with.
+    assertTrue(!directoryExists(lev1path));
+    assertTrue(!directoryExists(lev2path));
+    assertTrue(!directoryExists(path));
+
     assertTrue("Makedirs returned with false for the path " + path,
         fs.mkdirs(path));
 
@@ -292,24 +341,52 @@ public class TestOzoneFileInterfaces {
     assertEquals(FsPermission.getDirDefault(), status.getPermission());
     verifyOwnerGroup(status);
 
+    assertTrue(directoryExists(lev1path));
+    assertTrue(directoryExists(lev2path));
+    assertTrue(directoryExists(path));
+  }
+
+  /**
+   * check if the directory exists
+   * @param path
+   * @return false if the directory is not found in OM
+   * @throws IOException
+   */
+  private boolean directoryExists(Path path) throws IOException {
     long currentTime = System.currentTimeMillis();
+    OzoneFileStatus omStatus;
+    long numFileStatus =
+        cluster.getOzoneManager().getMetrics().getNumGetFileStatus();
+
+    String key = o3fs.pathToKey(path);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setKeyName(o3fs.pathToKey(path))
+        .setKeyName(key)
         .build();
-    OzoneFileStatus omStatus =
-        cluster.getOzoneManager().getFileStatus(keyArgs);
-    //Another get file status here, incremented the counter.
-    Assert.assertEquals(numFileStatus + 2,
-        cluster.getOzoneManager().getMetrics().getNumGetFileStatus());
 
-    assertTrue("The created path is not directory.", omStatus.isDirectory());
+    try {
+      omStatus = cluster.getOzoneManager()
+          .getFileStatus(keyArgs);
+      //test that getFileStatus incremented the counter
+      Assert.assertEquals(numFileStatus + 1,
+          cluster.getOzoneManager().getMetrics().getNumGetFileStatus());
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
+        return false;
+      } else {
+        throw ex;
+      }
+    }
 
-    // For directories, the time returned is the current time.
+    assertTrue(omStatus.isDirectory() == true);
     assertEquals(0, omStatus.getLen());
+    // For directories, the time returned is the current time.
     assertTrue(omStatus.getModificationTime() >= currentTime);
-    assertEquals(omStatus.getPath().getName(), o3fs.pathToKey(path));
+    Path pathFromOM = omStatus.getPath();
+    assertEquals(o3fs.pathToKey(pathFromOM), o3fs.pathToKey(path));
+
+    return true;
   }
 
   @Test

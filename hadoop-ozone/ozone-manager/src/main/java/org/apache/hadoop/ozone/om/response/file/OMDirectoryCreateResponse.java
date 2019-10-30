@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Response for create directory request.
@@ -40,11 +41,14 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   public static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
   private OmKeyInfo dirKeyInfo;
+  private List<OmKeyInfo> parentKeyInfos;
 
   public OMDirectoryCreateResponse(@Nullable OmKeyInfo dirKeyInfo,
+      @Nullable List<OmKeyInfo> parentKeyInfos,
       @Nonnull OMResponse omResponse) {
     super(omResponse);
     this.dirKeyInfo = dirKeyInfo;
+    this.parentKeyInfos = parentKeyInfos;
   }
 
   @Override
@@ -62,6 +66,18 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
         // not an error, in this case dirKeyInfo will be null.
         LOG.debug("Response Status is OK, dirKeyInfo is null in " +
             "OMDirectoryCreateResponse");
+      }
+
+      if (parentKeyInfos != null) {
+        for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
+          String parentKey = omMetadataManager.getOzoneDirKey(
+              parentKeyInfo.getVolumeName(),
+              parentKeyInfo.getBucketName(),
+              parentKeyInfo.getKeyName());
+          LOG.debug("putWithBatch parent : key {} info : {}", parentKey, parentKeyInfo);
+          omMetadataManager.getKeyTable().putWithBatch(batchOperation,
+              parentKey, parentKeyInfo);
+        }
       }
     }
   }

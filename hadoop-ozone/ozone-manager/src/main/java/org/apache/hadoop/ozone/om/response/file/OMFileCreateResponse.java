@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 
-
+import java.util.List;
 
 /**
  * Response for crate file request.
@@ -34,8 +34,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 public class OMFileCreateResponse extends OMKeyCreateResponse {
 
   public OMFileCreateResponse(@Nullable OmKeyInfo omKeyInfo,
+      @Nullable List<OmKeyInfo> parentKeyInfos,
       long openKeySessionID, @Nonnull OMResponse omResponse) {
-    super(omKeyInfo, openKeySessionID, omResponse);
+    super(omKeyInfo, parentKeyInfos, openKeySessionID, omResponse);
   }
 
 }

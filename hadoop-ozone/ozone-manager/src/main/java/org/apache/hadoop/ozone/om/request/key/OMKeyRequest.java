@@ -251,7 +251,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   @SuppressWarnings("parameternumber")
   protected OMClientResponse prepareCreateKeyResponse(@Nonnull KeyArgs keyArgs,
-      OmKeyInfo omKeyInfo, @Nonnull List<OmKeyLocationInfo> locations,
+      OmKeyInfo omKeyInfo, @Nullable List<OmKeyInfo> parentKeyInfos,
+      @Nonnull List<OmKeyLocationInfo> locations,
       FileEncryptionInfo encryptionInfo, @Nullable IOException exception,
       long clientID, long transactionLogIndex, @Nonnull String volumeName,
       @Nonnull String bucketName, @Nonnull String keyName,
@@ -313,15 +314,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
                   .setID(clientID)
                   .setOpenVersion(openVersion).build());
           omResponse.setCmdType(CreateFile);
-          omClientResponse = new OMFileCreateResponse(omKeyInfo, clientID,
-              omResponse.build());
+          omClientResponse = new OMFileCreateResponse(omKeyInfo,
+              parentKeyInfos, clientID, omResponse.build());
         } else {
           omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
               .setKeyInfo(omKeyInfo.getProtobuf())
               .setID(clientID).setOpenVersion(openVersion)
               .build());
           omResponse.setCmdType(CreateKey);
-          omClientResponse = new OMKeyCreateResponse(omKeyInfo, clientID,
+          omClientResponse = new OMKeyCreateResponse(omKeyInfo, null, clientID,
               omResponse.build());
         }
       }
@@ -488,12 +489,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (omAction == OMAction.CREATE_FILE) {
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(CreateFile);
-      return new OMFileCreateResponse(null, -1L,
+      return new OMFileCreateResponse(null, null, -1L,
           createErrorOMResponse(omResponse, exception));
     } else {
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(CreateKey);
-      return new OMKeyCreateResponse(null, -1L,
+      return new OMKeyCreateResponse(null, null,-1L,
           createErrorOMResponse(omResponse, exception));
     }
   }

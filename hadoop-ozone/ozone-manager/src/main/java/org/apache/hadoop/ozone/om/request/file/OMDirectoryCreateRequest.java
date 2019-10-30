@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Optional;
@@ -126,6 +127,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     boolean acquiredLock = false;
     IOException exception = null;
     OMClientResponse omClientResponse = null;
+    List<OmKeyInfo> missingParentInfos = new ArrayList<>();
+
     try {
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
@@ -133,7 +136,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
-        return new OMDirectoryCreateResponse(null,
+        return new OMDirectoryCreateResponse(null, null,
             omResponse.setCreateDirectoryResponse(
                 CreateDirectoryResponse.newBuilder()).build());
       }
@@ -149,6 +152,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
           OMFileRequest.verifyFilesInPath(omMetadataManager,
           volumeName, bucketName, keyName, Paths.get(keyName));
 
+      List<String> missingParents = OMFileRequest.getMissingParents(
+          omMetadataManager, volumeName, bucketName, keyName);
+
       OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
       OmKeyInfo dirKeyInfo = null;
@@ -162,6 +168,20 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         dirKeyInfo = createDirectoryKeyInfo(ozoneManager, omBucketInfo,
             volumeName, bucketName, keyName, keyArgs);
 
+        for (String missingKey : missingParents) {
+          LOG.debug("missing parent {}", missingKey);
+          // what about keyArgs for parent directories? TODO
+          OmKeyInfo parentKeyInfo = createDirectoryKeyInfo(ozoneManager,
+              omBucketInfo, volumeName, bucketName, missingKey, keyArgs);
+
+          missingParentInfos.add(parentKeyInfo);
+          omMetadataManager.getKeyTable().addCacheEntry(
+              new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
+                  bucketName, parentKeyInfo.getKeyName())),
+              new CacheValue<>(Optional.of(parentKeyInfo),
+                  transactionLogIndex));
+        }
+
         omMetadataManager.getKeyTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
                 dirKeyInfo.getKeyName())),
@@ -174,11 +194,11 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       omResponse.setCreateDirectoryResponse(
           CreateDirectoryResponse.newBuilder());
       omClientResponse = new OMDirectoryCreateResponse(dirKeyInfo,
-          omResponse.build());
+          missingParentInfos, omResponse.build());
 
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMDirectoryCreateResponse(null,
+      omClientResponse = new OMDirectoryCreateResponse(null,null,
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {

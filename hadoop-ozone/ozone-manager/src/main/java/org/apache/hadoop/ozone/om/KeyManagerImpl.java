@@ -1693,11 +1693,6 @@ public class KeyManagerImpl implements KeyManager {
         return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
       }
 
-      List<OmKeyInfo> keys = metadataManager.listKeys(volumeName, bucketName,
-          null, dirKey, 1);
-      if (keys.iterator().hasNext()) {
-        return new OzoneFileStatus(keyName);
-      }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Unable to get file status for the key: volume: {}, bucket:" +
                 " {}, key: {}, with error: No such file exists.", volumeName,
@@ -1744,6 +1739,10 @@ public class KeyManagerImpl implements KeyManager {
         // if directory already exists
         return;
       }
+
+      // 'mkdir -p'
+      createParents(args);
+
       OmKeyInfo dirDbKeyInfo =
           createDirectoryKey(volumeName, bucketName, keyName, args.getAcls());
       String dirDbKey = metadataManager
@@ -1776,6 +1775,69 @@ public class KeyManagerImpl implements KeyManager {
         .setFileEncryptionInfo(encInfo)
         .setAcls(acls)
         .build();
+  }
+
+  /**
+   * Create intermediate directories specified in the path -- 'mkdir -p'.
+   * @param args specifies the pathname
+   * @return void
+   */
+  private void createParents(OmKeyArgs args) throws IOException {
+
+    String volumeName = args.getVolumeName();
+    String bucketName = args.getBucketName();
+    String keyName = args.getKeyName();
+
+    Path path = Paths.get(keyName);
+    int parents = path.getNameCount() - 1;
+
+    List<OzoneAcl> acls = new ArrayList<>();
+    int index = 1;
+    while (index < parents) {
+      Path subpath = path.subpath(0, index);
+      String parentKey =
+          OzoneFSUtils.addTrailingSlashIfNeeded(subpath.toString());
+
+      try {
+        OzoneFileStatus status = fileStatusForKey(volumeName, bucketName,
+            parentKey);
+
+        // How do we handle a corruption? TODO
+        Preconditions.checkState(status.isDirectory() == true);
+        acls = status.getKeyInfo().getAcls();
+      } catch (OMException ex) {
+        if (ex.getResult() == FILE_NOT_FOUND) {
+          createParentDir(volumeName, bucketName, parentKey, acls);
+        } else {
+          throw ex;
+        }
+      }
+
+      index++;
+    }
+  }
+
+  private void createParentDir(String volumeName, String bucketName,
+      String dirName, List<OzoneAcl> acls) throws IOException {
+
+    String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(dirName);
+    OmKeyArgs.Builder argsBuilder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(dirKey)
+        .setAcls(acls);
+    createDirectory(argsBuilder.build());
+  }
+
+  private OzoneFileStatus fileStatusForKey(String volumeName,
+      String bucketName,
+      String keyName) throws IOException {
+    OmKeyArgs.Builder argsBuilder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName);
+
+    return getFileStatus(argsBuilder.build());
   }
 
   /**
@@ -1821,6 +1883,8 @@ public class KeyManagerImpl implements KeyManager {
           throw ex;
         }
       }
+
+      createParents(args);
 
       verifyNoFilesInPath(volumeName, bucketName,
           Paths.get(keyName).getParent(), !isRecursive);

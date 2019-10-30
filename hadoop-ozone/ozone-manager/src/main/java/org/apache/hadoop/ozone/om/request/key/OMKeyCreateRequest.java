@@ -183,17 +183,18 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
           keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
           ozoneManager.getPrefixManager(), bucketInfo);
-      omClientResponse = prepareCreateKeyResponse(keyArgs, omKeyInfo,
+      omClientResponse = prepareCreateKeyResponse(keyArgs, omKeyInfo, null,
           locations, encryptionInfo.orNull(), exception,
           createKeyRequest.getClientID(), transactionLogIndex, volumeName,
           bucketName, keyName, ozoneManager, OMAction.ALLOCATE_KEY,
           ozoneManager.getPrefixManager(), bucketInfo);
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = prepareCreateKeyResponse(keyArgs, omKeyInfo, locations,
-          encryptionInfo.orNull(), exception, createKeyRequest.getClientID(),
-          transactionLogIndex, volumeName, bucketName, keyName, ozoneManager,
-          OMAction.ALLOCATE_KEY, ozoneManager.getPrefixManager(), null);
+      omClientResponse = prepareCreateKeyResponse(keyArgs, omKeyInfo, null,
+          locations, encryptionInfo.orNull(), exception,
+          createKeyRequest.getClientID(), transactionLogIndex, volumeName,
+          bucketName, keyName, ozoneManager, OMAction.ALLOCATE_KEY,
+          ozoneManager.getPrefixManager(), null);
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(

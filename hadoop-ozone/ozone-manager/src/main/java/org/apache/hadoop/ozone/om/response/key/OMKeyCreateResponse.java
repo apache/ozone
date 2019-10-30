@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import java.io.IOException;
+import java.util.List;
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
@@ -29,20 +30,27 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Response for CreateKey request.
  */
 public class OMKeyCreateResponse extends OMClientResponse {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMKeyCreateResponse.class);
 
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;
+  private List<OmKeyInfo> parentKeyInfos;
 
   public OMKeyCreateResponse(@Nullable OmKeyInfo omKeyInfo,
+      @Nullable List<OmKeyInfo> parentKeyInfos,
       long openKeySessionID, @Nonnull OMResponse omResponse) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
+    this.parentKeyInfos = parentKeyInfos;
   }
 
   @Override
@@ -57,6 +65,20 @@ public class OMKeyCreateResponse extends OMClientResponse {
           openKeySessionID);
       omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
           openKey, omKeyInfo);
+      LOG.debug("putWithBatch openKey : key {}", openKey);
+
+      if (parentKeyInfos != null) {
+        for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
+          String parentKey = omMetadataManager
+              .getOzoneDirKey(parentKeyInfo.getVolumeName(),
+                  parentKeyInfo.getBucketName(),
+                  parentKeyInfo.getKeyName());
+          LOG.debug("putWithBatch parent : key {} info : {}", parentKey, parentKeyInfo);
+          // create the parent directories without a key commit request.
+          omMetadataManager.getKeyTable()
+              .putWithBatch(batchOperation, parentKey, parentKeyInfo);
+        }
+      }
     }
   }
 }

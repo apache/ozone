@@ -21,15 +21,18 @@ package org.apache.hadoop.ozone.om.request.file;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -44,9 +47,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -174,6 +174,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     IOException exception = null;
     Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
     OmKeyInfo omKeyInfo = null;
+    List<OmKeyInfo> missingParentInfos = new ArrayList<>();
 
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
     OMClientResponse omClientResponse = null;
@@ -213,6 +214,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
             OMException.ResultCodes.NOT_A_FILE);
       }
 
+      List<String> missingParents = OMFileRequest.getMissingParents(
+          omMetadataManager, volumeName, bucketName, keyName);
+
       if (!isRecursive) {
         // We cannot create a file if complete parent directories does not exist
 
@@ -240,8 +244,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
         // unnecessary check which is not required for those cases.
         if (omDirectoryResult == NONE ||
             omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH) {
-          boolean canBeCreated = checkKeysUnderPath(omMetadataManager,
-              volumeName, bucketName, keyName);
+          boolean canBeCreated = missingParents.isEmpty();
           if (!canBeCreated) {
             throw new OMException("Can not create file: " + keyName + "as one" +
                 " of parent directory is not created",
@@ -259,7 +262,24 @@ public class OMFileCreateRequest extends OMKeyRequest {
               keyName), keyArgs.getDataSize(), locations,
           encryptionInfo.orNull(), ozoneManager.getPrefixManager(), bucketInfo);
 
+      for (String missingKey : missingParents) {
+        LOG.debug("missing parent {}", missingKey);
+        // what about keyArgs for parent directories? ACLs? TODO
+        OmKeyInfo parentKeyInfo =
+            createDirectoryKeyInfo(ozoneManager, bucketInfo, volumeName,
+                bucketName, missingKey, keyArgs);
+        LOG.debug("name from Key {}", parentKeyInfo.getKeyName());
+
+        missingParentInfos.add(parentKeyInfo);
+        omMetadataManager.getKeyTable().addCacheEntry(
+            new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
+                bucketName, parentKeyInfo.getKeyName())),
+            new CacheValue<>(Optional.of(parentKeyInfo),
+                transactionLogIndex));
+      }
+
       omClientResponse =  prepareCreateKeyResponse(keyArgs, omKeyInfo,
+          missingParentInfos,
           locations, encryptionInfo.orNull(), exception,
           createFileRequest.getClientID(), transactionLogIndex, volumeName,
           bucketName, keyName, ozoneManager,
@@ -267,7 +287,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     } catch (IOException ex) {
       exception = ex;
       omClientResponse =  prepareCreateKeyResponse(keyArgs, omKeyInfo,
-          locations, encryptionInfo.orNull(), exception,
+          null, locations, encryptionInfo.orNull(), exception,
           createFileRequest.getClientID(), transactionLogIndex,
           volumeName, bucketName, keyName, ozoneManager,
           OMAction.CREATE_FILE, ozoneManager.getPrefixManager(), null);
@@ -286,6 +306,29 @@ public class OMFileCreateRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
+  private OmKeyInfo createDirectoryKeyInfo(OzoneManager ozoneManager,
+      OmBucketInfo omBucketInfo, String volumeName, String bucketName,
+      String keyName, KeyArgs keyArgs)
+      throws IOException {
+    Optional<FileEncryptionInfo> encryptionInfo =
+        getFileEncryptionInfo(ozoneManager, omBucketInfo);
+    String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(dirName)
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+        .setCreationTime(keyArgs.getModificationTime())
+        .setModificationTime(keyArgs.getModificationTime())
+        .setDataSize(0)
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setFileEncryptionInfo(encryptionInfo.orNull())
+        .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+        .build();
+  }
 
 
   /**
