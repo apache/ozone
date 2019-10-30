@@ -91,7 +91,11 @@ public class SetAclVolumeHandler extends Handler {
     boolean result = client.getObjectStore().setAcl(obj,
         OzoneAcl.parseAcls(acls));
 
-    System.out.printf("%s%n", "Acl set successfully: " + result);
+    String message = result
+        ? ("Acl set successfully: ") + result
+        : ("Acl set successfully: ") + result + (" (Acl already set.)");
+
+    System.out.println(message);
 
     client.close();
     return null;
