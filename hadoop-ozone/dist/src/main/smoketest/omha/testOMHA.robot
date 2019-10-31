@@ -19,7 +19,6 @@ Library             OperatingSystem
 Library             SSHLibrary
 Library             Collections
 Resource            ../commonlib.robot
-Test Timeout        5 minutes
 
 *** Variables ***
 ${SECURITY_ENABLED}                 false
@@ -85,13 +84,8 @@ Put Multiple Keys
             Put Key         ${FILE}                 ${tmpKey}
     END
 
-Put Key With Timeout
-    [arguments]             ${KEY}
-    [Timeout]               3 minutes
-    Put Key                 ${TEST_FILE}            ${KEY}
-
 Get OM Leader Node
-    ${result} =             Execute                 ozone omha --getservicestate --serviceId=omservice
+    ${result} =             Execute                 ozone admin om getserviceroles --service-id=omservice
                             LOG                     ${result}
                             Should Contain          ${result}               LEADER              1
                             Should Contain          ${result}               FOLLOWER            2
@@ -177,17 +171,6 @@ Test Multiple Failovers
 
             # Restart OM
             Start OM                    ${leaderOM}
-#    END
-
-Test Two OMs Down
-    # Stop 2 OMs
-                      Set Test Variable             ${keyName}              put_key_with_timeout
-                      STOP OM                       om1
-                      STOP OM                       om2
-    ${leaderOM} =     Get OM Leader Node
-                      Should Be Equal               ${leaderOM}             om3
-                      Put Key With Timeout          ${keyName}
-    ${result} =       Execute                       ozone sh key info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${keyName} | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE'
-                      Should contain                ${result}               KEY_NOT_FOUND
+    END
 
 
