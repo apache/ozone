@@ -134,10 +134,10 @@ public class RDBStore implements DBStore {
 
     } catch (RocksDBException e) {
       String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
-          + ", " + "exception :" + e.getCause() == null ?
+          + ", " + "exception :" + (e.getCause() == null ?
           e.getClass().getCanonicalName() + " " + e.getMessage() :
           e.getCause().getClass().getCanonicalName() + " " +
-              e.getCause().getMessage();
+              e.getCause().getMessage());
 
       throw toIOException(msg, e);
     }

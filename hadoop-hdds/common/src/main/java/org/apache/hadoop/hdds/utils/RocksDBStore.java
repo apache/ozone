@@ -79,10 +79,10 @@ public class RocksDBStore implements MetadataStore {
       }
     } catch (RocksDBException e) {
       String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
-          + ", " + "exception :" + e.getCause() == null ?
+          + ", " + "exception :" + (e.getCause() == null ?
           e.getClass().getCanonicalName() + " " + e.getMessage() :
           e.getCause().getClass().getCanonicalName() + " " +
-              e.getCause().getMessage();
+              e.getCause().getMessage());
       throw new IOException(msg, e);
     }
 
