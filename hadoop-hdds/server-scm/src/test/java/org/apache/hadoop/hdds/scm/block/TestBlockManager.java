@@ -253,7 +253,7 @@ public class TestBlockManager {
     GenericTestUtils.waitFor(() -> {
       return !blockManager.isScmInSafeMode();
     }, 10, 1000 * 5);
-    Assert.assertNotNull(blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
+    Assert.assertNull(blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
         type, factor, OzoneConsts.OZONE, new ExcludeList()));
   }
 
@@ -365,7 +365,7 @@ public class TestBlockManager {
       pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     }
     Assert.assertEquals(0, pipelineManager.getPipelines(type, factor).size());
-    Assert.assertNotNull(blockManager
+    Assert.assertNull(blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
             new ExcludeList()));
   }
