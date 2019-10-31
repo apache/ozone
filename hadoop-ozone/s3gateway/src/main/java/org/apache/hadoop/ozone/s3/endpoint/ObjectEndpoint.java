@@ -43,9 +43,9 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -78,6 +78,7 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
@@ -483,18 +484,19 @@ public class ObjectEndpoint extends EndpointBase {
       CompleteMultipartUploadRequest multipartUploadRequest)
       throws IOException, OS3Exception {
     OzoneBucket ozoneBucket = getBucket(bucket);
-    Map<Integer, String> partsMap = new TreeMap<>();
+    // Using LinkedHashMap to preserve ordering of parts list.
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
     List<CompleteMultipartUploadRequest.Part> partList =
         multipartUploadRequest.getPartList();
 
-    for (CompleteMultipartUploadRequest.Part part : partList) {
-      partsMap.put(part.getPartNumber(), part.geteTag());
-    }
-
-    LOG.debug("Parts map {}", partsMap.toString());
-
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      for (CompleteMultipartUploadRequest.Part part : partList) {
+        partsMap.put(part.getPartNumber(), part.geteTag());
+      }
+
+      LOG.debug("Parts map {}", partsMap.toString());
+
       omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(
           key, uploadID, partsMap);
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
@@ -510,11 +512,11 @@ public class ObjectEndpoint extends EndpointBase {
     } catch (OMException ex) {
       LOG.error("Error in Complete Multipart Upload Request for bucket: " +
           bucket + ", key: " + key, ex);
-      if (ex.getResult() == ResultCodes.MISMATCH_MULTIPART_LIST) {
+      if (ex.getResult() == ResultCodes.INVALID_PART) {
         OS3Exception oex =
             S3ErrorTable.newError(S3ErrorTable.INVALID_PART, key);
         throw oex;
-      } else if (ex.getResult() == ResultCodes.MISSING_UPLOAD_PARTS) {
+      } else if (ex.getResult() == ResultCodes.INVALID_PART_ORDER) {
         OS3Exception oex =
             S3ErrorTable.newError(S3ErrorTable.INVALID_PART_ORDER, key);
         throw oex;
@@ -525,6 +527,13 @@ public class ObjectEndpoint extends EndpointBase {
       } else if (ex.getResult() == ResultCodes.ENTITY_TOO_SMALL) {
         OS3Exception os3Exception = S3ErrorTable.newError(ENTITY_TOO_SMALL,
             key);
+        throw os3Exception;
+      } else if(ex.getResult() == ResultCodes.INVALID_REQUEST) {
+        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST,
+            key);
+        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
+            "when calling the CompleteMultipartUpload operation: You must " +
+            "specify at least one part");
         throw os3Exception;
       }
       throw ex;
