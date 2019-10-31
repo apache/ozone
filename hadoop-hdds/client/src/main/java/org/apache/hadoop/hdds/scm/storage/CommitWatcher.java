@@ -29,12 +29,13 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
@@ -59,8 +60,7 @@ public class CommitWatcher {
   // removing we always end up updating incremented data flushed length.
   // Also, corresponding to the logIndex, the corresponding list of buffers will
   // be released from the buffer pool.
-  private ConcurrentSkipListMap<Long, List<ByteBuffer>>
-      commitIndex2flushedDataMap;
+  private Map<Long, List<ChunkBuffer>> commitIndex2flushedDataMap;
 
   // future Map to hold up all putBlock futures
   private ConcurrentHashMap<Long,
@@ -93,7 +93,8 @@ public class CommitWatcher {
     Preconditions.checkArgument(!commitIndex2flushedDataMap.isEmpty());
     for (long index : indexes) {
       Preconditions.checkState(commitIndex2flushedDataMap.containsKey(index));
-      List<ByteBuffer> buffers = commitIndex2flushedDataMap.remove(index);
+      final List<ChunkBuffer> buffers
+          = commitIndex2flushedDataMap.remove(index);
       long length = buffers.stream().mapToLong(value -> {
         int pos = value.position();
         return pos;
@@ -101,16 +102,15 @@ public class CommitWatcher {
       totalAckDataLength += length;
       // clear the future object from the future Map
       Preconditions.checkNotNull(futureMap.remove(totalAckDataLength));
-      for (ByteBuffer byteBuffer : buffers) {
+      for (ChunkBuffer byteBuffer : buffers) {
         bufferPool.releaseBuffer(byteBuffer);
       }
     }
     return totalAckDataLength;
   }
 
-  public void updateCommitInfoMap(long index, List<ByteBuffer> byteBufferList) {
-    commitIndex2flushedDataMap
-        .put(index, byteBufferList);
+  public void updateCommitInfoMap(long index, List<ChunkBuffer> buffers) {
+    commitIndex2flushedDataMap.put(index, buffers);
   }
 
   int getCommitInfoMapSize() {
@@ -213,8 +213,7 @@ public class CommitWatcher {
   }
 
   @VisibleForTesting
-  public ConcurrentSkipListMap<Long,
-      List<ByteBuffer>> getCommitIndex2flushedDataMap() {
+  public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
     return commitIndex2flushedDataMap;
   }
 
