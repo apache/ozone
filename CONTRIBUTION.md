@@ -79,6 +79,8 @@ make install
 protoc --version
 ```
 
+(Standard development tools such as make, gcc, etc. are required.)
+
 ### Build the project
 
 After installing the requirements (especially maven and protobuf) the build is as simple as:
@@ -181,6 +183,17 @@ To start Ozone from IntelliJ:
 2. Execute the `./hadoop-ozone/dev-support/intellij/install-runconfigs.sh` helper script.
 3. Start the IDE
 4. New runner definitions are available from the Run menu.
+
+### Setting up Checkstyle
+
+Checkstyle plugin may help to detect violations directly from the IDE.
+
+1. Install `Checkstyle+IDEA` plugin from `File` -> `Settings` -> `Plugins`
+2. Open `File` -> `Settings` -> `Other settings` -> `Checkstyle` and Add (`+`) a new `Configuration File`
+  * Description: `Ozone`
+  * Use a local checkstyle `./hadoop-hdds/dev-support/checkstyle/checkstyle.xml`
+3. Check the `pom.xml` for the current version of the used checkstyle and use the same version with the plugin (`File` -> `Settings` -> `Other settings` -> `Checkstyle`)
+4. Open the _Checkstyle Tool Window_, select the `Ozone` rule and execute the check
 
 ### Common problems
 
