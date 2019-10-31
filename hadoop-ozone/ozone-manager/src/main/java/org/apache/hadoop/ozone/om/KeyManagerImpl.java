@@ -1892,6 +1892,7 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(args, "Key args can not be null");
 
     List<OzoneFileStatus> fileStatusList = new ArrayList<>();
+    // Sanity check for numEntries.
     if (numEntries <= 0) {
       return fileStatusList;
     }
@@ -1900,42 +1901,42 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
 
-    // A map sort by key so as to combine entries from both
+    // A map sorted by OmKey so as to combine entries from both
     // cache table and rocksdb into the final result.
     TreeMap<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
-    // A set to keep track of which keys are already deleted in cache but not
-    // committed to rocksdb yet.
+    // A set to keep track of which keys are deleted in cache
+    // but haven't been committed to rocksdb.
     Set<String> deletedKeySet = new TreeSet<>();
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
       // If startKey is empty
       if (Strings.isNullOrEmpty(startKey)) {
         OzoneFileStatus fileStatus = getFileStatus(args);
-        // Return directly the single file status if it is a key to a file
         if (fileStatus.isFile()) {
+          // Return the single file status directly if OmKey points to a file
           return Collections.singletonList(fileStatus);
         }
         // Append '/' to startKey if it doesn't have it
         startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       }
 
-      // Find key in cache table first with iterator.
+      // Find OmKey in cache table first with iterator.
       // Limit number of result to numEntries, append result to cacheKeyMap,
-      // and keep track of deleted keys in cache with deletedKeySet
+      // and keep track of deleted OmKeys with deletedKeySet.
       int countEntries = 0;
       Table keyTable = metadataManager.getKeyTable();
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OzoneFileStatus>>>
           cacheIter = keyTable.cacheIterator();
+
       // Similar to the logic in OmMetadataManagerImpl#listKeys
-      // TODO: Double check the boundary, > or >=.
       while (cacheIter.hasNext() && numEntries - countEntries > 0) {
         Map.Entry<CacheKey<String>, CacheValue<OzoneFileStatus>> entry =
             cacheIter.next();
         String key = entry.getKey().getCacheKey();
         OzoneFileStatus fileStatus = entry.getValue().getCacheValue();
         // fileStatus is null if an entry is deleted in cache.
-        // TODO: Double check if the above statement is true.
         if (fileStatus != null) {
           if (key.startsWith(startKey) && key.compareTo(startKey) >= 0) {
             cacheKeyMap.put(key, fileStatus);
@@ -1959,24 +1960,23 @@ public class KeyManagerImpl implements KeyManager {
 
       // Continue only if there are matches
       if (iterator.hasNext()) {
-        // TODO: This is for skipping the directory itself right?
         if (iterator.key().equals(keyInDb)) {
-          // skip the key which needs to be listed
+          // Skip the key itself (listing a directory)
           iterator.next();
         }
 
+        // Iterate through seek results
         while (iterator.hasNext() && numEntries - countEntries > 0) {
           String entryInDb = iterator.key();
           OmKeyInfo value = iterator.value().getValue();
+          // TODO: In which case will entryInDb NOT start with keyInDb?
           if (entryInDb.startsWith(keyInDb)) {
             String entryKeyName = value.getKeyName();
             if (recursive) {
               // for recursive list all the entries
-              //TODO: Can a directory key be in deletedKeySet?
-              // If not, change the logic below.
               if (!deletedKeySet.contains(entryKeyName)) {
-                cacheKeyMap.put(entryKeyName, new OzoneFileStatus(value, scmBlockSize,
-                    !OzoneFSUtils.isFile(entryKeyName)));
+                cacheKeyMap.put(entryKeyName, new OzoneFileStatus(value,
+                    scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
                 countEntries++;
               }
               iterator.next();
@@ -1997,8 +1997,6 @@ public class KeyManagerImpl implements KeyManager {
                 iterator.next();
               } else {
                 // if entry is a directory
-                //TODO: Can a directory key be in deletedKeySet?
-                // If not, change the logic below.
                 if (!deletedKeySet.contains(entryKeyName)) {
                   cacheKeyMap.put(entryKeyName,
                       new OzoneFileStatus(immediateChild));
