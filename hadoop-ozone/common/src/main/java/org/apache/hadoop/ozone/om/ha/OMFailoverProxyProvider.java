@@ -232,8 +232,9 @@ public class OMFailoverProxyProvider implements
   @Override
   public void performFailover(OzoneManagerProtocolPB currentProxy) {
     if (LOG.isDebugEnabled()) {
+      int currentIndex = getCurrentProxyIndex();
       LOG.debug("Failing over OM proxy to index: {}, nodeId: {}",
-          currentProxyIndex, omNodeIDList.get(currentProxyIndex));
+          currentIndex, omNodeIDList.get(currentIndex));
     }
   }
 
@@ -289,6 +290,10 @@ public class OMFailoverProxyProvider implements
       }
     }
     return false;
+  }
+
+  private synchronized int getCurrentProxyIndex() {
+    return currentProxyIndex;
   }
 
   /**
