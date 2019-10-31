@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -65,7 +64,6 @@ public class TestOzoneManagerConfiguration {
     scmId = UUID.randomUUID().toString();
     final String path = GenericTestUtils.getTempPath(omId);
     Path metaDirPath = Paths.get(path, "om-meta");
-    conf.setBoolean(OzoneConfigKeys.OZONE_ENABLED, true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);

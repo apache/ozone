@@ -75,8 +75,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED;
-
 /**
  * Stateless helper functions to handler scm/datanode connection.
  */
@@ -530,7 +528,6 @@ public final class TestUtils {
   public static StorageContainerManager getScm(OzoneConfiguration conf,
                                                SCMConfigurator configurator)
       throws IOException, AuthenticationException {
-    conf.setBoolean(OZONE_ENABLED, true);
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "127.0.0.1:0");

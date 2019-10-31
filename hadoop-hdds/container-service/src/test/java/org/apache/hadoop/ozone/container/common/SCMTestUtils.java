@@ -24,7 +24,9 @@ import java.net.ServerSocket;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageContainerDatanodeProtocolService;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -123,6 +125,26 @@ public final class SCMTestUtils {
 
   public static OzoneConfiguration getOzoneConf() {
     return new OzoneConfiguration();
+  }
+
+  public static HddsProtos.ReplicationType getReplicationType(
+      Configuration conf) {
+    return isUseRatis(conf) ?
+        HddsProtos.ReplicationType.RATIS :
+        HddsProtos.ReplicationType.STAND_ALONE;
+  }
+
+  public static HddsProtos.ReplicationFactor getReplicationFactor(
+      Configuration conf) {
+    return isUseRatis(conf) ?
+        HddsProtos.ReplicationFactor.THREE :
+        HddsProtos.ReplicationFactor.ONE;
+  }
+
+  private static boolean isUseRatis(Configuration c) {
+    return c.getBoolean(
+        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY,
+        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
   }
 
 }

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -51,7 +52,7 @@ import static org.mockito.Mockito.when;
  */
 public class TestObjectPut {
   public static final String CONTENT = "0123456789";
-  private String userName = "ozone";
+  private String userName = OzoneConsts.OZONE;
   private String bucketName = "b1";
   private String keyName = "key1";
   private String destBucket = "b2";

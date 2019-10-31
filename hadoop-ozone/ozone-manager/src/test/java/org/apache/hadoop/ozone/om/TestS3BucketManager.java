@@ -64,7 +64,7 @@ public class TestS3BucketManager {
   public void testOzoneVolumeNameForUser() throws IOException {
     S3BucketManager s3BucketManager = new S3BucketManagerImpl(conf, metaMgr,
         volumeManager, bucketManager);
-    String userName = "ozone";
+    String userName = OzoneConsts.OZONE;
     String volumeName = s3BucketManager.getOzoneVolumeNameForUser(userName);
     assertEquals(OzoneConsts.OM_S3_VOLUME_PREFIX + userName, volumeName);
   }

@@ -34,6 +34,7 @@ import java.util.Scanner;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -59,7 +60,6 @@ public class TestMultipartUploadWithCopy {
 
   private final static ObjectEndpoint REST = new ObjectEndpoint();
 
-  private final static String BUCKET = "s3bucket";
   private final static String KEY = "key2";
   private final static String EXISTING_KEY = "key1";
   private static final String EXISTING_KEY_CONTENT = "testkey";
@@ -71,9 +71,9 @@ public class TestMultipartUploadWithCopy {
   public static void setUp() throws Exception {
 
     ObjectStore objectStore = CLIENT.getObjectStore();
-    objectStore.createS3Bucket("ozone", BUCKET);
+    objectStore.createS3Bucket(OzoneConsts.OZONE, OzoneConsts.S3_BUCKET);
 
-    OzoneBucket bucket = getOzoneBucket(objectStore, BUCKET);
+    OzoneBucket bucket = getOzoneBucket(objectStore, OzoneConsts.S3_BUCKET);
 
     byte[] keyContent = EXISTING_KEY_CONTENT.getBytes();
     try (OutputStream stream = bucket
@@ -108,13 +108,13 @@ public class TestMultipartUploadWithCopy {
     partNumber = 2;
     Part part2 =
         uploadPartWithCopy(KEY, uploadID, partNumber,
-            BUCKET + "/" + EXISTING_KEY, null);
+            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, null);
     partsList.add(part2);
 
     partNumber = 3;
     Part part3 =
         uploadPartWithCopy(KEY, uploadID, partNumber,
-            BUCKET + "/" + EXISTING_KEY,
+            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY,
             "bytes=" + RANGE_FROM + "-" + RANGE_TO);
     partsList.add(part3);
 
@@ -126,7 +126,8 @@ public class TestMultipartUploadWithCopy {
     completeMultipartUpload(KEY, completeMultipartUploadRequest,
         uploadID);
 
-    OzoneBucket bucket = getOzoneBucket(CLIENT.getObjectStore(), BUCKET);
+    OzoneBucket bucket = getOzoneBucket(CLIENT.getObjectStore(),
+        OzoneConsts.S3_BUCKET);
     try (InputStream is = bucket.readKey(KEY)) {
       String keyContent = new Scanner(is).useDelimiter("\\A").next();
       Assert.assertEquals(content + EXISTING_KEY_CONTENT + EXISTING_KEY_CONTENT
@@ -137,7 +138,8 @@ public class TestMultipartUploadWithCopy {
   private String initiateMultipartUpload(String key) throws IOException,
       OS3Exception {
     setHeaders();
-    Response response = REST.initializeMultipartUpload(BUCKET, key);
+    Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        key);
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
@@ -153,8 +155,8 @@ public class TestMultipartUploadWithCopy {
       content) throws IOException, OS3Exception {
     setHeaders();
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());
-    Response response = REST.put(BUCKET, key, content.length(), partNumber,
-        uploadID, body);
+    Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
+        partNumber, uploadID, body);
     assertEquals(response.getStatus(), 200);
     assertNotNull(response.getHeaderString("ETag"));
     Part part = new Part();
@@ -175,7 +177,7 @@ public class TestMultipartUploadWithCopy {
     setHeaders(additionalHeaders);
 
     ByteArrayInputStream body = new ByteArrayInputStream("".getBytes());
-    Response response = REST.put(BUCKET, key, 0, partNumber,
+    Response response = REST.put(OzoneConsts.S3_BUCKET, key, 0, partNumber,
         uploadID, body);
     assertEquals(response.getStatus(), 200);
 
@@ -193,17 +195,19 @@ public class TestMultipartUploadWithCopy {
       CompleteMultipartUploadRequest completeMultipartUploadRequest,
       String uploadID) throws IOException, OS3Exception {
     setHeaders();
-    Response response = REST.completeMultipartUpload(BUCKET, key, uploadID,
-        completeMultipartUploadRequest);
+    Response response = REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
+        uploadID, completeMultipartUploadRequest);
 
     assertEquals(response.getStatus(), 200);
 
     CompleteMultipartUploadResponse completeMultipartUploadResponse =
         (CompleteMultipartUploadResponse) response.getEntity();
 
-    assertEquals(completeMultipartUploadResponse.getBucket(), BUCKET);
+    assertEquals(completeMultipartUploadResponse.getBucket(),
+        OzoneConsts.S3_BUCKET);
     assertEquals(completeMultipartUploadResponse.getKey(), KEY);
-    assertEquals(completeMultipartUploadResponse.getLocation(), BUCKET);
+    assertEquals(completeMultipartUploadResponse.getLocation(),
+        OzoneConsts.S3_BUCKET);
     assertNotNull(completeMultipartUploadResponse.getETag());
   }
 

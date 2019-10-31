@@ -24,10 +24,6 @@
     <value>localhost</value>
   </property>
   <property>
-    <name>ozone.enabled</name>
-    <value>True</value>
-  </property>
-  <property>
     <name>ozone.scm.datanode.id</name>
     <value>/tmp/datanode.id</value>
   </property>
@@ -46,10 +42,6 @@
   <property>
     <name>ozone.om.address</name>
     <value>localhost</value>
-  </property>
-  <property>
-    <name>ozone.enabled</name>
-    <value>true</value>
   </property>
   <property>
     <name>ozone.scm.container.size</name>

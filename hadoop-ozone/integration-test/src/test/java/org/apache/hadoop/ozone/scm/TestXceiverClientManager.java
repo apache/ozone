@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.protocolPB
     .StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.After;
@@ -49,7 +51,6 @@ public class TestXceiverClientManager {
   private static MiniOzoneCluster cluster;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-  private static String containerOwner = "OZONE";
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -83,15 +84,19 @@ public class TestXceiverClientManager {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
 
     ContainerWithPipeline container1 = storageContainerLocationClient
-        .allocateContainer(clientManager.getType(), clientManager.getFactor(),
-            containerOwner);
+        .allocateContainer(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf),
+            OzoneConsts.OZONE);
     XceiverClientSpi client1 = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, client1.getRefcount());
 
     ContainerWithPipeline container2 = storageContainerLocationClient
-        .allocateContainer(clientManager.getType(), clientManager.getFactor(),
-            containerOwner);
+        .allocateContainer(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf),
+            OzoneConsts.OZONE);
     XceiverClientSpi client2 = clientManager
         .acquireClient(container2.getPipeline());
     Assert.assertEquals(1, client2.getRefcount());
@@ -121,8 +126,9 @@ public class TestXceiverClientManager {
 
     ContainerWithPipeline container1 =
         storageContainerLocationClient.allocateContainer(
-            clientManager.getType(), HddsProtos.ReplicationFactor.ONE,
-            containerOwner);
+            SCMTestUtils.getReplicationType(conf),
+            HddsProtos.ReplicationFactor.ONE,
+            OzoneConsts.OZONE);
     XceiverClientSpi client1 = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, client1.getRefcount());
@@ -131,8 +137,9 @@ public class TestXceiverClientManager {
 
     ContainerWithPipeline container2 =
         storageContainerLocationClient.allocateContainer(
-            clientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            SCMTestUtils.getReplicationType(conf),
+            HddsProtos.ReplicationFactor.ONE,
+            OzoneConsts.OZONE);
     XceiverClientSpi client2 = clientManager
         .acquireClient(container2.getPipeline());
     Assert.assertEquals(1, client2.getRefcount());
@@ -179,8 +186,9 @@ public class TestXceiverClientManager {
 
     ContainerWithPipeline container1 =
         storageContainerLocationClient.allocateContainer(
-            clientManager.getType(),
-            clientManager.getFactor(), containerOwner);
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf),
+            OzoneConsts.OZONE);
     XceiverClientSpi client1 = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, client1.getRefcount());
@@ -188,9 +196,11 @@ public class TestXceiverClientManager {
     clientManager.releaseClient(client1, false);
     Assert.assertEquals(0, client1.getRefcount());
 
-    ContainerWithPipeline container2 = storageContainerLocationClient
-        .allocateContainer(clientManager.getType(), clientManager.getFactor(),
-            containerOwner);
+    ContainerWithPipeline container2 =
+        storageContainerLocationClient.allocateContainer(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf),
+            OzoneConsts.OZONE);
     XceiverClientSpi client2 = clientManager
         .acquireClient(container2.getPipeline());
     Assert.assertEquals(1, client2.getRefcount());
@@ -227,9 +237,11 @@ public class TestXceiverClientManager {
         clientManager.getClientCache();
 
     // client is added in cache
-    ContainerWithPipeline container1 = storageContainerLocationClient
-        .allocateContainer(clientManager.getType(), clientManager.getFactor(),
-            containerOwner);
+    ContainerWithPipeline container1 =
+        storageContainerLocationClient.allocateContainer(
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf),
+            OzoneConsts.OZONE);
     XceiverClientSpi client1 =
         clientManager.acquireClient(container1.getPipeline());
     clientManager.acquireClient(container1.getPipeline());

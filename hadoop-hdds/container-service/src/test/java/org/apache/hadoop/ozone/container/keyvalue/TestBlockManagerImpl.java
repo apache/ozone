@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -91,8 +92,9 @@ public class TestBlockManagerImpl {
     // Creating BlockData
     blockID = new BlockID(1L, 1L);
     blockData = new BlockData(blockID);
-    blockData.addMetadata("VOLUME", "ozone");
-    blockData.addMetadata("OWNER", "hdfs");
+    blockData.addMetadata(OzoneConsts.VOLUME, OzoneConsts.OZONE);
+    blockData.addMetadata(OzoneConsts.OWNER,
+        OzoneConsts.OZONE_SIMPLE_HDFS_USER);
     List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
     ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", blockID
         .getLocalID(), 0), 0, 1024);
@@ -156,8 +158,9 @@ public class TestBlockManagerImpl {
     for (long i = 2; i <= 10; i++) {
       blockID = new BlockID(1L, i);
       blockData = new BlockData(blockID);
-      blockData.addMetadata("VOLUME", "ozone");
-      blockData.addMetadata("OWNER", "hdfs");
+      blockData.addMetadata(OzoneConsts.VOLUME, OzoneConsts.OZONE);
+      blockData.addMetadata(OzoneConsts.OWNER,
+          OzoneConsts.OZONE_SIMPLE_HDFS_USER);
       List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
       ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", blockID
           .getLocalID(), 0), 0, 1024);
