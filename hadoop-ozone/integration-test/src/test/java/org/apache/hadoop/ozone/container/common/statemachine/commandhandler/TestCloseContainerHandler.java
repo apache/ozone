@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.util.HashMap;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,8 +59,9 @@ public class TestCloseContainerHandler {
     //setup a cluster (1G free space is enough for a unit test)
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
+    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3).build();
+        .setNumDatanodes(1).build();
   }
 
   @After
