@@ -200,9 +200,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                   partKeyInfo.getPartNumber() + "size " + currentPartKeyInfo
                   .getDataSize() + " is less than minimum part size " +
                   OzoneConsts.OM_MULTIPART_MIN_SIZE);
-              throw new OMException("Complete Multipart Upload Failed: Entity " +
-                  "too small: volume: " + volumeName + "bucket: " + bucketName
-                  + "key: " + keyName, OMException.ResultCodes.ENTITY_TOO_SMALL);
+              throw new OMException("Complete Multipart Upload Failed: " +
+                  "Entity too small: volume: " + volumeName + "bucket: " +
+                  bucketName + "key: " + keyName,
+                  OMException.ResultCodes.ENTITY_TOO_SMALL);
             }
           }
 
