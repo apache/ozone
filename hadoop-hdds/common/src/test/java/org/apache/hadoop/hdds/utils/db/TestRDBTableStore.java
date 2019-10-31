@@ -255,10 +255,10 @@ public class TestRDBTableStore {
     try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
       testTable.put(key, value);
 
-      //Test if isExist returns true for a key that definitely exists.
+      // Test if isExist returns true for a key that definitely exists.
       Assert.assertTrue(testTable.isExist(key));
 
-      //Test if isExist returns false for a key that has been deleted.
+      // Test if isExist returns false for a key that has been deleted.
       testTable.delete(key);
       Assert.assertFalse(testTable.isExist(key));
 
@@ -281,10 +281,8 @@ public class TestRDBTableStore {
     rocksDBOptions.setCreateMissingColumnFamilies(true);
     dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
     try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
-      // Key may be flushed out of Block cache since we use LRU cache. This
-      // may result in RocksDB reading it from OS page cache or disk.
+      // Verify isExist works with key not in block cache.
       Assert.assertTrue(testTable.isExist(key));
-
     } finally {
       dbStore.close();
     }
