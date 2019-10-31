@@ -29,8 +29,8 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hdds.scm.http")
 public class SCMHTTPServerConfig {
 
-  private String principal;
-  private String keytab;
+  private String principal = "";
+  private String keytab = "";
 
   @Config(key = "kerberos.principal",
       type = ConfigType.STRING,
