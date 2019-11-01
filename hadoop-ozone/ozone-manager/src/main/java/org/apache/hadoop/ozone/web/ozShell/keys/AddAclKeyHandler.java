@@ -95,8 +95,8 @@ public class AddAclKeyHandler extends Handler {
         OzoneAcl.parseAcl(acl));
 
     String message = result
-        ? ("Acl added successfully: ") + result
-        : ("Acl added successfully: ") + result + (" (Acl already exists.)");
+        ? ("Acl added successfully.")
+        : ("Acl already exists.");
 
     System.out.println(message);
 
