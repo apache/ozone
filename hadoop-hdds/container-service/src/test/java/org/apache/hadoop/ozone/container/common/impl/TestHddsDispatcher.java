@@ -187,7 +187,7 @@ public class TestHddsDispatcher {
       // verify the error log
       assertTrue(logCapturer.getOutput()
           .contains("ContainerID " + writeChunkRequest.getContainerID()
-              + " creation failed : Result: DISK_OUT_OF_SPACE"));
+              + " creation failed , Result: DISK_OUT_OF_SPACE"));
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }
