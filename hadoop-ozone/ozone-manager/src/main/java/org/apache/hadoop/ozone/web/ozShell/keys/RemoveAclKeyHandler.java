@@ -95,8 +95,8 @@ public class RemoveAclKeyHandler extends Handler {
         OzoneAcl.parseAcl(acl));
 
     String message = result
-        ? ("Acl removed successfully: ") + result
-        : ("Acl removed successfully: ") + result + (" (Acl doesn't exist.)");
+        ? ("Acl removed successfully.")
+        : ("Acl doesn't exist.");
 
     System.out.println(message);
 
