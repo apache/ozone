@@ -172,7 +172,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           .exists()) {
         FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
       }
-      throw new StorageContainerException("Container creation failed.", ex,
+
+      throw new StorageContainerException(
+          "Container creation failed. " + ex.getMessage(), ex,
           CONTAINER_INTERNAL_ERROR);
     } finally {
       volumeSet.readUnlock();
