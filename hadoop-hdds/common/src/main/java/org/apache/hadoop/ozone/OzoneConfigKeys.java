@@ -408,10 +408,6 @@ public final class OzoneConfigKeys {
       "ozone.fs.isolated-classloader";
 
   // Ozone Client Retry and Failover configurations
-  public static final String OZONE_CLIENT_RETRY_MAX_ATTEMPTS_KEY =
-      "ozone.client.retry.max.attempts";
-  public static final int OZONE_CLIENT_RETRY_MAX_ATTEMPTS_DEFAULT =
-      10;
   public static final String OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY =
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
