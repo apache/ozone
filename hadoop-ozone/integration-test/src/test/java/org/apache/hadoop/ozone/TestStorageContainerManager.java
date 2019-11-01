@@ -337,6 +337,7 @@ public class TestStorageContainerManager {
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setHbInterval(1000)
         .setHbProcessorInterval(3000)
+        .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
 
@@ -575,12 +576,13 @@ public class TestStorageContainerManager {
         100, TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
+    conf.setBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setHbInterval(1000)
         .setHbProcessorInterval(3000)
         .setTrace(false)
-        .setNumDatanodes(3)
+        .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
 
@@ -612,7 +614,7 @@ public class TestStorageContainerManager {
       modifiersField.setAccessible(true);
       modifiersField.setInt(f, f.getModifiers() & ~Modifier.FINAL);
       f.set(replicationManager, publisher);
-      Thread.sleep(12000);
+      Thread.sleep(10000);
 
       UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
           .getDatanodeDetails().getUuid();
