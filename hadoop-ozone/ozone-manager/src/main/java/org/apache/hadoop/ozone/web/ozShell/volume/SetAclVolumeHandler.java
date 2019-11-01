@@ -87,13 +87,13 @@ public class SetAclVolumeHandler extends Handler {
         .setStoreType(storeType == null ? OZONE :
             OzoneObj.StoreType.valueOf(storeType))
         .build();
-    System.out.printf(" acls" +acls.length() + " " + acls);
+
     boolean result = client.getObjectStore().setAcl(obj,
         OzoneAcl.parseAcls(acls));
 
     String message = result
-        ? ("Acl set successfully: ") + result
-        : ("Acl set successfully: ") + result + (" (Acl already set.)");
+        ? ("Acl set successfully.")
+        : ("Acl already set.");
 
     System.out.println(message);
 
