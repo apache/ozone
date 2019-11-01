@@ -93,7 +93,7 @@ public class SetAclKeyHandler extends Handler {
     boolean result = client.getObjectStore().setAcl(obj,
         OzoneAcl.parseAcls(acls));
 
-    System.out.printf("%s%n", "Acl set successfully: " + result);
+    System.out.println("Acl set successfully.");
 
     client.close();
     return null;
