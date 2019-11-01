@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.BaseHttpServer;
 
@@ -29,13 +28,9 @@ import java.io.IOException;
  */
 public class StorageContainerManagerHttpServer extends BaseHttpServer {
 
-  OzoneConfiguration ozoneConfiguration;
-  SCMHTTPServerConfig httpServerConfig;
   public StorageContainerManagerHttpServer(Configuration conf)
       throws IOException {
     super(conf, "scm");
-    ozoneConfiguration = new OzoneConfiguration(conf);
-    httpServerConfig = ozoneConfiguration.getObject(SCMHTTPServerConfig.class);
   }
 
   @Override protected String getHttpAddressKey() {
@@ -67,11 +62,11 @@ public class StorageContainerManagerHttpServer extends BaseHttpServer {
   }
 
   @Override protected String getKeytabFile() {
-    return httpServerConfig.getKerberosKeytab();
+    return ScmConfigKeys.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
   }
 
   @Override protected String getSpnegoPrincipal() {
-    return httpServerConfig.getKerberosPrincipal();
+    return ScmConfigKeys.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
   }
 
   @Override protected String getEnabledKey() {
