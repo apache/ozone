@@ -19,6 +19,9 @@
 package org.apache.hadoop.ozone.om.exceptions;
 
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.ratis.protocol.RaftPeerId;
 
 /**
  * Exception thrown by
@@ -29,20 +32,44 @@ public class NotLeaderException extends IOException {
 
   private final String currentPeerId;
   private final String leaderPeerId;
+  private static final Pattern CURRENT_PEER_ID_PATTERN =
+      Pattern.compile("OM:(.*) is not the leader[.]+.*", Pattern.DOTALL);
+  private static final Pattern SUGGESTED_LEADER_PATTERN =
+      Pattern.compile(".*Suggested leader is OM:([^.]*).*", Pattern.DOTALL);
 
-  public NotLeaderException(String currentPeerIdStr) {
-    super("OM " + currentPeerIdStr + " is not the leader. Could not " +
+  public NotLeaderException(RaftPeerId currentPeerId) {
+    super("OM:" + currentPeerId + " is not the leader. Could not " +
         "determine the leader node.");
-    this.currentPeerId = currentPeerIdStr;
+    this.currentPeerId = currentPeerId.toString();
     this.leaderPeerId = null;
   }
 
-  public NotLeaderException(String currentPeerIdStr,
-      String suggestedLeaderPeerIdStr) {
-    super("OM " + currentPeerIdStr + " is not the leader. Suggested leader is "
-        + suggestedLeaderPeerIdStr);
-    this.currentPeerId = currentPeerIdStr;
-    this.leaderPeerId = suggestedLeaderPeerIdStr;
+  public NotLeaderException(RaftPeerId currentPeerId,
+      RaftPeerId suggestedLeaderPeerId) {
+    super("OM:" + currentPeerId + " is not the leader. Suggested leader is" +
+        " OM:" + suggestedLeaderPeerId + ".");
+    this.currentPeerId = currentPeerId.toString();
+    this.leaderPeerId = suggestedLeaderPeerId.toString();
+  }
+
+  public NotLeaderException(String message) {
+    super(message);
+
+    Matcher currentLeaderMatcher = CURRENT_PEER_ID_PATTERN.matcher(message);
+    if (currentLeaderMatcher.matches()) {
+      this.currentPeerId = currentLeaderMatcher.group(1);
+
+      Matcher suggestedLeaderMatcher =
+          SUGGESTED_LEADER_PATTERN.matcher(message);
+      if (suggestedLeaderMatcher.matches()) {
+        this.leaderPeerId = suggestedLeaderMatcher.group(1);
+      } else {
+        this.leaderPeerId = null;
+      }
+    } else {
+      this.currentPeerId = null;
+      this.leaderPeerId = null;
+    }
   }
 
   public String getSuggestedLeaderNodeId() {
