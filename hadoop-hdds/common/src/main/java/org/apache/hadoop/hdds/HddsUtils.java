@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -421,7 +422,7 @@ public final class HddsUtils {
    * @param msg container command
    * @return block ID.
    */
-  public static BlockID getBlockID(ContainerProtos.ContainerCommandRequestProto msg) {
+  public static BlockID getBlockID(ContainerCommandRequestProto msg) {
     switch (msg.getCmdType()) {
     case ReadChunk:
       return BlockID.getFromProtobuf(msg.getReadChunk().getBlockID());

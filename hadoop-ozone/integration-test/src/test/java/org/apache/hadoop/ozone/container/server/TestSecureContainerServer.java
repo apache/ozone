@@ -260,7 +260,8 @@ public class TestSecureContainerServer {
           new OzoneBlockTokenSecretManager(new SecurityConfig(CONF),
           expiryTime, omCertSerialId);
       secretManager.start(caClient);
-      Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken("1",
+      Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken(
+          testBlockID.getContainerBlockID().toString(),
           EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
 
       final ContainerCommandRequestProto request2 =
