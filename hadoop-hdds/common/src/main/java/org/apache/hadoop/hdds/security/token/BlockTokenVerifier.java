@@ -91,16 +91,16 @@ public class BlockTokenVerifier implements TokenVerifier {
     }
 
     UserGroupInformation tokenUser = tokenId.getUser();
-    X509Certificate singerCert;
-    singerCert = caClient.getCertificate(tokenId.getOmCertSerialId());
+    X509Certificate signerCert;
+    signerCert = caClient.getCertificate(tokenId.getOmCertSerialId());
 
-    if (singerCert == null) {
+    if (signerCert == null) {
       throw new BlockTokenException("Can't find signer certificate " +
           "(OmCertSerialId: " + tokenId.getOmCertSerialId() +
           ") of the block token for user: " + tokenUser);
     }
     boolean validToken = caClient.verifySignature(tokenId.getBytes(),
-        token.getPassword(), singerCert);
+        token.getPassword(), signerCert);
     if (!validToken) {
       throw new BlockTokenException("Invalid block token for user: " +
           tokenId.getUser());

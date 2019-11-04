@@ -425,14 +425,22 @@ public final class HddsUtils {
   public static BlockID getBlockID(ContainerCommandRequestProto msg) {
     switch (msg.getCmdType()) {
     case ReadChunk:
-      return BlockID.getFromProtobuf(msg.getReadChunk().getBlockID());
+      if (msg.hasReadChunk()) {
+        return BlockID.getFromProtobuf(msg.getReadChunk().getBlockID());
+      }
     case GetBlock:
-      return BlockID.getFromProtobuf(msg.getGetBlock().getBlockID());
+      if (msg.hasGetBlock()) {
+        return BlockID.getFromProtobuf(msg.getGetBlock().getBlockID());
+      }
     case WriteChunk:
-      return BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+      if (msg.hasWriteChunk()) {
+        return BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+      }
     case PutBlock:
-      return BlockID.getFromProtobuf(msg.getPutBlock().getBlockData()
-          .getBlockID());
+      if (msg.hasPutBlock()) {
+        return BlockID.getFromProtobuf(msg.getPutBlock().getBlockData()
+            .getBlockID());
+      }
     default:
       return null;
     }
