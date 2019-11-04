@@ -1927,18 +1927,21 @@ public class KeyManagerImpl implements KeyManager {
       // and keep track of deleted OmKeys with deletedKeySet.
       int countEntries = 0;
       Table keyTable = metadataManager.getKeyTable();
-      Iterator<Map.Entry<CacheKey<String>, CacheValue<OzoneFileStatus>>>
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
           cacheIter = keyTable.cacheIterator();
 
       // Similar to the logic in OmMetadataManagerImpl#listKeys
       while (cacheIter.hasNext() && numEntries - countEntries > 0) {
-        Map.Entry<CacheKey<String>, CacheValue<OzoneFileStatus>> entry =
+        Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
             cacheIter.next();
         String key = entry.getKey().getCacheKey();
-        OzoneFileStatus fileStatus = entry.getValue().getCacheValue();
-        // fileStatus is null if an entry is deleted in cache.
-        if (fileStatus != null) {
+        OmKeyInfo keyInfo = entry.getValue().getCacheValue();
+        // keyInfo is null if an entry is deleted in cache.
+        if (keyInfo != null) {
           if (key.startsWith(startKey) && key.compareTo(startKey) >= 0) {
+            // Create OzoneFileStatus from OmKeyInfo
+            OzoneFileStatus fileStatus = new OzoneFileStatus(
+                keyInfo, scmBlockSize, !OzoneFSUtils.isFile(key));
             cacheKeyMap.put(key, fileStatus);
             countEntries++;
           }
