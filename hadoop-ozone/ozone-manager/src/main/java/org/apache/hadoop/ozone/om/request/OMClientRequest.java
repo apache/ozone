@@ -99,7 +99,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * Get User information which needs to be set in the OMRequest object.
    * @return User Info.
    */
-  public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
+  public OzoneManagerProtocolProtos.UserInfo getUserInfo() {
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
     InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
@@ -114,9 +114,6 @@ public abstract class OMClientRequest implements RequestAuditor {
       userInfo.setHostName(remoteAddress.getHostName());
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
     }
-
-    userInfo.setHostName(InetAddress.
-        getByName(omRequest.getUserInfo().getRemoteAddress()).getHostName());
 
     return userInfo.build();
   }
@@ -183,7 +180,8 @@ public abstract class OMClientRequest implements RequestAuditor {
   @VisibleForTesting
   public String getHostName() throws IOException {
     if (omRequest.hasUserInfo()) {
-      return omRequest.getUserInfo().getHostName();
+      return InetAddress.getByName(omRequest.getUserInfo()
+          .getRemoteAddress()).getHostName();
     } else {
       return null;
     }
