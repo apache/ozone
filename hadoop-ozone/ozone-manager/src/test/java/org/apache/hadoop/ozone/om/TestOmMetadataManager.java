@@ -191,10 +191,6 @@ public class TestOmMetadataManager {
   }
 
   @Test
-  public void testListStatus() throws Exception {
-  }
-
-  @Test
   public void testListKeys() throws Exception {
 
     String volumeNameA = "volumeA";

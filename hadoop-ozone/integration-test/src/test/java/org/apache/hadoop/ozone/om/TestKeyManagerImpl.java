@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -782,6 +783,33 @@ public class TestKeyManagerImpl {
         "/d=default-drack/127.0.0.1");
     Assert.assertEquals(leader, key4.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
+  }
+
+  @Test
+  public void testListStatusWithTableCache() throws Exception {
+    // Inspired by TestOmMetadataManager#testListKeys
+    String prefixKeyInDB = "key-d";
+    String prefixKeyInCache = "key-c";
+
+    for (int i = 1; i <= 100; i++) {
+      if (i % 2 == 0) {  // Add to DB
+        TestOMRequestUtils.addKeyToTable(false,
+            VOLUME_NAME, BUCKET_NAME, prefixKeyInDB + i,
+            1000L, HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, metadataManager);
+      } else {  // Add to TableCache
+        TestOMRequestUtils.addKeyToTableCache(
+            VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i,
+            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            metadataManager);
+      }
+    }
+
+    OmKeyArgs rootDirArgs = createKeyArgs("");
+    List<OzoneFileStatus> fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, "", 1000);
+    // Should get entries in both TableCache and DB.
+    Assert.assertEquals(fileStatuses.size(),  100);
   }
 
   @Test
