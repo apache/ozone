@@ -19,13 +19,11 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
-import java.io.OutputStream;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +36,8 @@ public class GrpcReplicationService extends
 
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcReplicationService.class);
+
+  private static final int BUFFER_SIZE = 1024 * 1024;
 
   private final ContainerReplicationSource source;
 
@@ -52,7 +52,7 @@ public class GrpcReplicationService extends
     LOG.info("Streaming container data ({}) to other datanode", containerID);
     try {
       GrpcOutputStream outputStream =
-          new GrpcOutputStream(responseObserver, containerID);
+          new GrpcOutputStream(responseObserver, containerID, BUFFER_SIZE);
       source.copyData(containerID, outputStream);
     } catch (IOException e) {
       LOG.error("Error streaming container {}", containerID, e);
@@ -60,64 +60,4 @@ public class GrpcReplicationService extends
     }
   }
 
-  private static class GrpcOutputStream extends OutputStream {
-
-    private static final int BUFFER_SIZE_IN_BYTES = 1024 * 1024;
-
-    private final StreamObserver<CopyContainerResponseProto> responseObserver;
-
-    private final ByteString.Output buffer =
-        ByteString.newOutput(BUFFER_SIZE_IN_BYTES);
-
-    private final long containerId;
-
-    private int writtenBytes;
-
-    GrpcOutputStream(
-        StreamObserver<CopyContainerResponseProto> responseObserver,
-        long containerId) {
-      this.responseObserver = responseObserver;
-      this.containerId = containerId;
-    }
-
-    @Override
-    public void write(int b) {
-      try {
-        buffer.write(b);
-        if (buffer.size() >= BUFFER_SIZE_IN_BYTES) {
-          flushBuffer(false);
-        }
-      } catch (Exception ex) {
-        responseObserver.onError(ex);
-      }
-    }
-
-    private void flushBuffer(boolean eof) {
-      int length = buffer.size();
-      if (length > 0) {
-        ByteString data = buffer.toByteString();
-        LOG.debug("Sending {} bytes (of type {}) for container {}",
-            length, data.getClass().getSimpleName(), containerId);
-        CopyContainerResponseProto response =
-            CopyContainerResponseProto.newBuilder()
-                .setContainerID(containerId)
-                .setData(data)
-                .setEof(eof)
-                .setReadOffset(writtenBytes)
-                .setLen(length)
-                .build();
-        responseObserver.onNext(response);
-        writtenBytes += length;
-        buffer.reset();
-      }
-    }
-
-    @Override
-    public void close() throws IOException {
-      flushBuffer(true);
-      LOG.info("{} bytes written to the rpc stream from container {}",
-          writtenBytes, containerId);
-      responseObserver.onCompleted();
-    }
-  }
 }
