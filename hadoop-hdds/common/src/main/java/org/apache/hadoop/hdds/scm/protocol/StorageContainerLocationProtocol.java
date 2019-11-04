@@ -35,7 +35,8 @@ import org.apache.hadoop.security.KerberosInfo;
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
  * that currently host a container.
  */
-@KerberosInfo(serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
+@KerberosInfo(serverPrincipal = ScmConfig.ConfigStrings
+      .HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 public interface StorageContainerLocationProtocol extends Closeable {
 
   @SuppressWarnings("checkstyle:ConstantName")

@@ -207,8 +207,10 @@ public final class TestSecureOzoneCluster {
 
   private void createCredentialsInKDC(Configuration configuration,
                                       MiniKdc kdc) throws Exception {
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration(configuration);
-    SCMHTTPServerConfig httpServerConfig = ozoneConfiguration.getObject(SCMHTTPServerConfig.class);
+    OzoneConfiguration ozoneConfiguration =
+          new OzoneConfiguration(configuration);
+    SCMHTTPServerConfig httpServerConfig =
+          ozoneConfiguration.getObject(SCMHTTPServerConfig.class);
     createPrincipal(scmKeytab,
         httpServerConfig.getKerberosPrincipal());
     createPrincipal(spnegoKeytab,
@@ -236,7 +238,8 @@ public final class TestSecureOzoneCluster {
   }
 
   private void setSecureConfig(Configuration configuration) throws IOException {
-    SCMHTTPServerConfig httpServerConfig = conf.getObject(SCMHTTPServerConfig.class);
+    SCMHTTPServerConfig httpServerConfig =
+          conf.getObject(SCMHTTPServerConfig.class);
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     configuration.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     host = InetAddress.getLocalHost().getCanonicalHostName()
@@ -251,7 +254,8 @@ public final class TestSecureOzoneCluster {
 
     configuration.set(ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
         "scm/" + host + "@" + realm);
-    configuration.set(SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY,
+    configuration.set(SCMHTTPServerConfig.ConfigStrings
+        .HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY,
         "HTTP_SCM/" + host + "@" + realm);
 
     configuration.set(OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY,
@@ -268,7 +272,8 @@ public final class TestSecureOzoneCluster {
     configuration.set(ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
         scmKeytab.getAbsolutePath());
     configuration.set(
-      SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY,
+        SCMHTTPServerConfig.ConfigStrings
+          .HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY,
         spnegoKeytab.getAbsolutePath());
     configuration.set(OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
         omKeyTab.getAbsolutePath());

@@ -505,8 +505,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       UserGroupInformation.setConfiguration(conf);
       InetSocketAddress socAddr = HddsServerUtil
           .getScmBlockClientBindAddress(conf);
-      SecurityUtil.login(conf, ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
-        ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY, socAddr.getHostName());
+      SecurityUtil.login(conf,
+            ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
+            ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
+            socAddr.getHostName());
     } else {
       throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
           conf) + " authentication method not support. "

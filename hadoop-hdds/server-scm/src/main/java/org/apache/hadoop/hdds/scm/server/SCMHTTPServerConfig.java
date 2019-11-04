@@ -26,6 +26,9 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 
+/**
+ * SCM HTTP Server configuration in Java style configuration class.
+ */
 @ConfigGroup(prefix = "hdds.scm.http")
 public class SCMHTTPServerConfig {
 
@@ -37,27 +40,43 @@ public class SCMHTTPServerConfig {
       defaultValue = "",
       tags = { ConfigTag.SECURITY },
       description = "This Kerberos principal is used when communicating to " +
-          "the HTTP server of SCM.The protocol used is SPNEGO."
+        "the HTTP server of SCM.The protocol used is SPNEGO."
   )
-  public void setKerberosPrincipal(String kerberosPrincipal) { this.principal = kerberosPrincipal; }
+  public void setKerberosPrincipal(String kerberosPrincipal) {
+    this.principal = kerberosPrincipal;
+  }
 
   @Config(key = "kerberos.keytab",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY },
-      description = "The keytab file used by SCM http server to login as its service principal."
+      description = "The keytab file used by SCM http server to login" +
+        " as its service principal."
   )
-  public void setKerberosKeytab(String kerberosKeytab) { this.keytab = kerberosKeytab; }
+  public void setKerberosKeytab(String kerberosKeytab) {
+    this.keytab = kerberosKeytab;
+  }
 
-  public String getKerberosPrincipal() { return this.principal; }
+  public String getKerberosPrincipal() {
+    return this.principal;
+  }
 
-  public String getKerberosKeytab() { return this.keytab; }
+  public String getKerberosKeytab() {
+    return this.keytab;
+  }
+
+  /**
+   * This static class is required to support other classes
+   * that reference the key names and also require attributes.
+   * Example: SCMSecurityProtocol where the KerberosInfo references
+   * the old configuration with the annotation shown below:-
+   * @KerberosInfo(serverPrincipal =
+   *    ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
+   */
   public static class ConfigStrings {
-    /* required for SCMSecurityProtocol where the KerberosInfo references the old configuration with
-     * the annotation shown below:-
-     * @KerberosInfo(serverPrincipal = ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
-     */
-    public static final String HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY = "hdds.scm.http.kerberos.principal";
-    public static final String HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY = "hdds.scm.http.kerberos.keytab";
+    public static final String HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY =
+          "hdds.scm.http.kerberos.principal";
+    public static final String HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY =
+          "hdds.scm.http.kerberos.keytab";
   }
 }
