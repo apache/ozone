@@ -33,7 +33,7 @@ public class ScmConfig {
   @Config(key = "kerberos.principal",
         type = ConfigType.STRING,
         defaultValue = "",
-        tags = { ConfigTag.SECURITY },
+        tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
         description = "This Kerberos principal is used by the SCM service."
   )
   public void setKerberosPrincipal(String kerberosPrincipal) {
@@ -43,7 +43,7 @@ public class ScmConfig {
   @Config(key = "kerberos.keytab.file",
         type = ConfigType.STRING,
         defaultValue = "",
-        tags = { ConfigTag.SECURITY },
+        tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
         description = "The keytab file used by SCM daemon to login as "+
               "its service principal."
   )
