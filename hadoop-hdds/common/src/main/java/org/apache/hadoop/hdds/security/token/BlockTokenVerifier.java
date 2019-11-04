@@ -59,7 +59,7 @@ public class BlockTokenVerifier implements TokenVerifier {
   @Override
   public void verify(String user, String tokenStr,
       ContainerProtos.Type cmd, String id) throws SCMSecurityException {
-    if (!conf.isBlockTokenEnabled() || !HddsUtils.requireOmBlockToken(cmd)) {
+    if (!conf.isBlockTokenEnabled() || !HddsUtils.requireBlockToken(cmd)) {
       return;
     }
 

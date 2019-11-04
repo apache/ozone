@@ -407,7 +407,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private void validateBlockToken(
       ContainerCommandRequestProto msg) throws IOException {
     if (isBlockTokenEnabled && tokenVerifier != null &&
-        HddsUtils.requireOmBlockToken(msg.getCmdType())) {
+        HddsUtils.requireBlockToken(msg.getCmdType())) {
       tokenVerifier.verify(
           UserGroupInformation.getCurrentUser().getShortUserName(),
           msg.getEncodedToken(), msg.getCmdType(),

@@ -404,13 +404,15 @@ public final class HddsUtils {
    * false if block token does not apply to the command.
    *
    */
-  public static boolean requireOmBlockToken(
+  public static boolean requireBlockToken(
       ContainerProtos.Type cmdType) {
     switch (cmdType) {
     case ReadChunk:
     case GetBlock:
     case WriteChunk:
     case PutBlock:
+    case PutSmallFile:
+    case GetSmallFile:
       return true;
     default:
       return false;
@@ -439,6 +441,16 @@ public final class HddsUtils {
     case PutBlock:
       if (msg.hasPutBlock()) {
         return BlockID.getFromProtobuf(msg.getPutBlock().getBlockData()
+            .getBlockID());
+      }
+    case PutSmallFile:
+      if (msg.hasPutSmallFile()) {
+        return BlockID.getFromProtobuf(msg.getPutSmallFile().getBlock()
+            .getBlockData().getBlockID());
+      }
+    case GetSmallFile:
+      if (msg.hasGetSmallFile()) {
+        return BlockID.getFromProtobuf(msg.getGetSmallFile().getBlock()
             .getBlockID());
       }
     default:
