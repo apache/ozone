@@ -36,4 +36,9 @@ public class BigIntegerCodec implements Codec<BigInteger> {
   public BigInteger fromPersistedFormat(byte[] rawData) throws IOException {
     return new BigInteger(rawData);
   }
+
+  @Override
+  public BigInteger copyObject(BigInteger object) {
+    return object;
+  }
 }

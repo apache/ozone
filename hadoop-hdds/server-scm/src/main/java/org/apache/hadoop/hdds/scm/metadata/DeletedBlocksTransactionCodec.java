@@ -47,4 +47,9 @@ public class DeletedBlocksTransactionCodec
           "Can't convert rawBytes to DeletedBlocksTransaction.", e);
     }
   }
+
+  @Override
+  public DeletedBlocksTransaction copyObject(DeletedBlocksTransaction object) {
+    return object;
+  }
 }

@@ -18,12 +18,19 @@
 package org.apache.hadoop.hdds.scm.client;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
@@ -32,11 +39,26 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerLocationProtocolProtos.ObjectStageChangeRequestProto;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ipc.Client;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.SocketFactory;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.List;
+
+import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
+import static org.apache.hadoop.hdds.HddsUtils.getScmSecurityClient;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 
 /**
  * This class provides the client-facing APIs of container operations.
@@ -45,37 +67,70 @@ public class ContainerOperationClient implements ScmClient {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerOperationClient.class);
-  private static long containerSizeB = -1;
+  private final long containerSizeB;
+  private final HddsProtos.ReplicationFactor replicationFactor;
+  private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
   private final XceiverClientManager xceiverClientManager;
 
-  public ContainerOperationClient(
-      StorageContainerLocationProtocol
-          storageContainerLocationClient,
-      XceiverClientManager xceiverClientManager) {
-    this.storageContainerLocationClient = storageContainerLocationClient;
-    this.xceiverClientManager = xceiverClientManager;
+  public ContainerOperationClient(Configuration conf) throws IOException {
+    storageContainerLocationClient = newContainerRpcClient(conf);
+    xceiverClientManager = newXCeiverClientManager(conf);
+    containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
+        OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    boolean useRatis = conf.getBoolean(
+        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY,
+        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
+    if (useRatis) {
+      replicationFactor = HddsProtos.ReplicationFactor.THREE;
+      replicationType = HddsProtos.ReplicationType.RATIS;
+    } else {
+      replicationFactor = HddsProtos.ReplicationFactor.ONE;
+      replicationType = HddsProtos.ReplicationType.STAND_ALONE;
+    }
   }
 
-  /**
-   * Return the capacity of containers. The current assumption is that all
-   * containers have the same capacity. Therefore one static is sufficient for
-   * any container.
-   * @return The capacity of one container in number of bytes.
-   */
-  public static long getContainerSizeB() {
-    return containerSizeB;
+  private XceiverClientManager newXCeiverClientManager(Configuration conf)
+      throws IOException {
+    XceiverClientManager manager;
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+      SecurityConfig securityConfig = new SecurityConfig(conf);
+      SCMSecurityProtocol scmSecurityProtocolClient = getScmSecurityClient(
+          (OzoneConfiguration) securityConfig.getConfiguration());
+      String caCertificate =
+          scmSecurityProtocolClient.getCACertificate();
+      manager = new XceiverClientManager(conf,
+          OzoneConfiguration.of(conf).getObject(XceiverClientManager
+              .ScmClientConfig.class), caCertificate);
+    } else {
+      manager = new XceiverClientManager(conf);
+    }
+    return manager;
   }
 
-  /**
-   * Set the capacity of container. Should be exactly once on system start.
-   * @param size Capacity of one container in number of bytes.
-   */
-  public static void setContainerSizeB(long size) {
-    containerSizeB = size;
-  }
+  private StorageContainerLocationProtocol newContainerRpcClient(
+      Configuration conf) throws IOException {
 
+    Class<StorageContainerLocationProtocolPB> protocol =
+        StorageContainerLocationProtocolPB.class;
+
+    RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
+    long version = RPC.getProtocolVersion(protocol);
+    InetSocketAddress scmAddress = getScmAddressForClients(conf);
+    UserGroupInformation user = UserGroupInformation.getCurrentUser();
+    SocketFactory socketFactory = NetUtils.getDefaultSocketFactory(conf);
+    int rpcTimeOut = Client.getRpcTimeout(conf);
+
+    StorageContainerLocationProtocolPB rpcProxy =
+        RPC.getProxy(protocol, version, scmAddress, user, conf,
+            socketFactory, rpcTimeOut);
+
+    StorageContainerLocationProtocolClientSideTranslatorPB client =
+        new StorageContainerLocationProtocolClientSideTranslatorPB(rpcProxy);
+    return TracingUtil.createProxy(
+        client, StorageContainerLocationProtocol.class, conf);
+  }
 
   @Override
   public ContainerWithPipeline createContainer(String owner)
@@ -83,9 +138,9 @@ public class ContainerOperationClient implements ScmClient {
     XceiverClientSpi client = null;
     try {
       ContainerWithPipeline containerWithPipeline =
-          storageContainerLocationClient.allocateContainer(
-              xceiverClientManager.getType(),
-              xceiverClientManager.getFactor(), owner);
+          storageContainerLocationClient.
+              allocateContainer(replicationType, replicationFactor, owner);
+
       Pipeline pipeline = containerWithPipeline.getPipeline();
       client = xceiverClientManager.acquireClient(pipeline);
 
@@ -449,11 +504,7 @@ public class ContainerOperationClient implements ScmClient {
   public long getContainerSize(long containerID) throws IOException {
     // TODO : Fix this, it currently returns the capacity
     // but not the current usage.
-    long size = getContainerSizeB();
-    if (size == -1) {
-      throw new IOException("Container size unknown!");
-    }
-    return size;
+    return containerSizeB;
   }
 
   /**

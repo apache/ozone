@@ -133,8 +133,13 @@ public class RDBStore implements DBStore {
       checkPointManager = new RDBCheckpointManager(db, "om");
 
     } catch (RocksDBException e) {
-      throw toIOException(
-          "Failed init RocksDB, db path : " + dbFile.getAbsolutePath(), e);
+      String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
+          + ", " + "exception :" + (e.getCause() == null ?
+          e.getClass().getCanonicalName() + " " + e.getMessage() :
+          e.getCause().getClass().getCanonicalName() + " " +
+              e.getCause().getMessage());
+
+      throw toIOException(msg, e);
     }
 
     if (LOG.isDebugEnabled()) {

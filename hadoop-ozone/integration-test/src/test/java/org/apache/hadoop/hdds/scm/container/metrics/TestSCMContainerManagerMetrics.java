@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
@@ -50,7 +51,6 @@ public class TestSCMContainerManagerMetrics {
 
   private MiniOzoneCluster cluster;
   private StorageContainerManager scm;
-  private String containerOwner = "OZONE";
 
   @Before
   public void setup() throws Exception {
@@ -77,7 +77,7 @@ public class TestSCMContainerManagerMetrics {
 
     ContainerInfo containerInfo = containerManager.allocateContainer(
         HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, containerOwner);
+        HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     Assert.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
@@ -86,7 +86,7 @@ public class TestSCMContainerManagerMetrics {
     try {
       containerManager.allocateContainer(
           HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE, containerOwner);
+          HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
       fail("testContainerOpsMetrics failed");
     } catch (IOException ex) {
       // Here it should fail, so it should have the old metric value.

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -288,7 +289,17 @@ public final class OmKeyInfo extends WithMetadata {
 
     public Builder setOmKeyLocationInfos(
         List<OmKeyLocationInfoGroup> omKeyLocationInfoList) {
-      this.omKeyLocationInfoGroups = omKeyLocationInfoList;
+      if (omKeyLocationInfoList != null) {
+        this.omKeyLocationInfoGroups.addAll(omKeyLocationInfoList);
+      }
+      return this;
+    }
+
+    public Builder addOmKeyLocationInfoGroup(OmKeyLocationInfoGroup
+        omKeyLocationInfoGroup) {
+      if (omKeyLocationInfoGroup != null) {
+        this.omKeyLocationInfoGroups.add(omKeyLocationInfoGroup);
+      }
       return this;
     }
 
@@ -335,6 +346,13 @@ public final class OmKeyInfo extends WithMetadata {
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
         this.acls.addAll(listOfAcls);
+      }
+      return this;
+    }
+
+    public Builder addAcl(OzoneAcl ozoneAcl) {
+      if (ozoneAcl != null) {
+        this.acls.add(ozoneAcl);
       }
       return this;
     }
@@ -417,5 +435,38 @@ public final class OmKeyInfo extends WithMetadata {
   @Override
   public int hashCode() {
     return Objects.hash(volumeName, bucketName, keyName);
+  }
+
+  /**
+   * Return a new copy of the object.
+   */
+  public OmKeyInfo copyObject() {
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setCreationTime(creationTime)
+        .setModificationTime(modificationTime)
+        .setDataSize(dataSize)
+        .setReplicationType(type)
+        .setReplicationFactor(factor)
+        .setFileEncryptionInfo(encInfo);
+
+    keyLocationVersions.forEach(keyLocationVersion -> {
+      List<OmKeyLocationInfo> keyLocationInfos = new ArrayList<>();
+      keyLocationInfos.addAll(keyLocationVersion.getLocationList());
+      builder.addOmKeyLocationInfoGroup(new OmKeyLocationInfoGroup(
+          keyLocationVersion.getVersion(), keyLocationInfos));
+    });
+
+    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
+            acl.getName(), (BitSet) acl.getAclBitSet().clone(),
+        acl.getAclScope())));
+
+    if (metadata != null) {
+      metadata.forEach((k, v) -> builder.addMetadata(k, v));
+    }
+
+    return builder.build();
   }
 }

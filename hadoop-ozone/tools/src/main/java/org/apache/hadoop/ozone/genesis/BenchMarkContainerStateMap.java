@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.container.states.ContainerStateMap;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
@@ -73,7 +74,7 @@ public class BenchMarkContainerStateMap {
             .setUsedBytes(0)
             .setNumberOfKeys(0)
             .setStateEnterTime(Time.monotonicNow())
-            .setOwner("OZONE")
+            .setOwner(OzoneConsts.OZONE)
             .setContainerID(x)
             .setDeleteTransactionId(0)
             .build();
@@ -93,7 +94,7 @@ public class BenchMarkContainerStateMap {
             .setUsedBytes(0)
             .setNumberOfKeys(0)
             .setStateEnterTime(Time.monotonicNow())
-            .setOwner("OZONE")
+            .setOwner(OzoneConsts.OZONE)
             .setContainerID(y)
             .setDeleteTransactionId(0)
             .build();
@@ -112,7 +113,7 @@ public class BenchMarkContainerStateMap {
           .setUsedBytes(0)
           .setNumberOfKeys(0)
           .setStateEnterTime(Time.monotonicNow())
-          .setOwner("OZONE")
+          .setOwner(OzoneConsts.OZONE)
           .setContainerID(currentCount++)
           .setDeleteTransactionId(0)
           .build();
@@ -181,7 +182,7 @@ public class BenchMarkContainerStateMap {
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setStateEnterTime(Time.monotonicNow())
-        .setOwner("OZONE")
+        .setOwner(OzoneConsts.OZONE)
         .setContainerID(cid)
         .setDeleteTransactionId(0)
         .build();
@@ -194,7 +195,7 @@ public class BenchMarkContainerStateMap {
       state.stateMap.addContainer(getContainerInfo(state));
     }
     bh.consume(state.stateMap
-        .getMatchingContainerIDs(OPEN, "OZONE", ReplicationFactor.ONE,
+        .getMatchingContainerIDs(OPEN, OzoneConsts.OZONE, ReplicationFactor.ONE,
             ReplicationType.STAND_ALONE));
   }
 }

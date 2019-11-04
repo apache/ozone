@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -171,7 +172,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           .exists()) {
         FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
       }
-      throw new StorageContainerException("Container creation failed.", ex,
+
+      throw new StorageContainerException(
+          "Container creation failed. " + ex.getMessage(), ex,
           CONTAINER_INTERNAL_ERROR);
     } finally {
       volumeSet.readUnlock();
@@ -335,6 +338,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     LOG.info("Container {} is closed with bcsId {}.",
         containerData.getContainerID(),
         containerData.getBlockCommitSequenceId());
+  }
+
+  @Override
+  public void updateDataScanTimestamp(Instant time)
+      throws StorageContainerException {
+    writeLock();
+    try {
+      updateContainerData(() -> containerData.updateDataScanTime(time));
+    } finally {
+      writeUnlock();
+    }
   }
 
   /**

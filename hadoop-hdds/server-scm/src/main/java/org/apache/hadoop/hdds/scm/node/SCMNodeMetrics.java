@@ -37,12 +37,13 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * This class maintains Node related metrics.
  */
 @InterfaceAudience.Private
-@Metrics(about = "SCM NodeManager Metrics", context = "ozone")
+@Metrics(about = "SCM NodeManager Metrics", context = OzoneConsts.OZONE)
 public final class SCMNodeMetrics implements MetricsSource {
 
   private static final String SOURCE_NAME =

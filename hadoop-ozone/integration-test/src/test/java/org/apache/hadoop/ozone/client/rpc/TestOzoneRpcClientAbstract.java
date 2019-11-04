@@ -406,7 +406,7 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testCreateS3BucketMapping()
       throws IOException, OzoneClientException {
     long currentTime = Time.now();
-    String userName = "ozone";
+    String userName = OzoneConsts.OZONE;
     String bucketName = UUID.randomUUID().toString();
     store.createS3Bucket(userName, bucketName);
     String volumeName = store.getOzoneVolumeName(bucketName);

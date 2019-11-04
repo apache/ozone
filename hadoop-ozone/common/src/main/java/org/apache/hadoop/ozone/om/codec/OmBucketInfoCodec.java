@@ -50,4 +50,8 @@ public class OmBucketInfoCodec implements Codec<OmBucketInfo> {
     }
   }
 
+  @Override
+  public OmBucketInfo copyObject(OmBucketInfo object) {
+    return object.copyObject();
+  }
 }

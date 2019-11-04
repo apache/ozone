@@ -244,19 +244,21 @@ public final class OmVolumeArgs extends WithMetadata implements Auditable {
      * Sets the Object ID for this Object.
      * Object ID are unique and immutable identifier for each object in the
      * System.
-     * @param objectID - long
+     * @param id - long
      */
-    public void setObjectID(long objectID) {
-      this.objectID = objectID;
+    public Builder setObjectID(long id) {
+      this.objectID = id;
+      return this;
     }
 
     /**
      * Sets the update ID for this Object. Update IDs are monotonically
      * increasing values which are updated each time there is an update.
-     * @param updateID - long
+     * @param id - long
      */
-    public void setUpdateID(long updateID) {
-      this.updateID = updateID;
+    public Builder setUpdateID(long id) {
+      this.updateID = id;
+      return this;
     }
 
 
@@ -355,5 +357,20 @@ public final class OmVolumeArgs extends WithMetadata implements Auditable {
         volInfo.getCreationTime(),
         volInfo.getObjectID(),
         volInfo.getUpdateID());
+  }
+
+  /**
+   * Return a new copy of the object.
+   */
+  public OmVolumeArgs copyObject() {
+    Map<String, String> cloneMetadata = new HashMap<>();
+    if (metadata != null) {
+      metadata.forEach((k, v) -> cloneMetadata.put(k, v));
+    }
+
+    OmOzoneAclMap cloneAclMap = aclMap.copyObject();
+
+    return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
+        cloneMetadata, cloneAclMap, creationTime, objectID, updateID);
   }
 }

@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.ws.rs.core.Response;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
@@ -35,8 +36,8 @@ import org.junit.Test;
  */
 public class TestBucketHead {
 
-  private String bucketName = "myBucket";
-  private String userName = "ozone";
+  private String bucketName = OzoneConsts.BUCKET;
+  private String userName = OzoneConsts.OZONE;
   private OzoneClientStub clientStub;
   private ObjectStore objectStoreStub;
   private BucketEndpoint bucketEndpoint;

@@ -18,9 +18,10 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 
+import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,8 +40,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithMetadata implements Auditable,
-    Cloneable {
+public final class OmBucketInfo extends WithMetadata implements Auditable{
   /**
    * Name of the volume in which the bucket belongs to.
    */
@@ -215,20 +215,23 @@ public final class OmBucketInfo extends WithMetadata implements Auditable,
     return auditMap;
   }
 
-  @Override
-  public Object clone() {
+  /**
+   * Return a new copy of the object.
+   */
+  public OmBucketInfo copyObject() {
     OmBucketInfo.Builder builder = new OmBucketInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setAcls(acls.stream().map(acl -> new OzoneAcl(acl.getType(),
-            acl.getName(), acl.getAclBitSet(), acl.getAclScope()))
-            .collect(Collectors.toList()))
         .setStorageType(storageType)
         .setIsVersionEnabled(isVersionEnabled)
         .setCreationTime(creationTime)
         .setBucketEncryptionKey(bekInfo != null ?
             new BucketEncryptionKeyInfo(bekInfo.getVersion(),
                 bekInfo.getSuite(), bekInfo.getKeyName()) : null);
+
+    acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
+        acl.getName(), (BitSet) acl.getAclBitSet().clone(),
+        acl.getAclScope())));
 
     if (metadata != null) {
       metadata.forEach((k, v) -> builder.addMetadata(k, v));
@@ -252,7 +255,7 @@ public final class OmBucketInfo extends WithMetadata implements Auditable,
 
     public Builder() {
       //Default values
-      this.acls = new LinkedList<>();
+      this.acls = new ArrayList<>();
       this.isVersionEnabled = false;
       this.storageType = StorageType.DISK;
       this.metadata = new HashMap<>();
@@ -271,6 +274,13 @@ public final class OmBucketInfo extends WithMetadata implements Auditable,
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
         this.acls.addAll(listOfAcls);
+      }
+      return this;
+    }
+
+    public Builder addAcl(OzoneAcl ozoneAcl) {
+      if (ozoneAcl != null) {
+        this.acls.add(ozoneAcl);
       }
       return this;
     }

@@ -50,4 +50,9 @@ public class OmPrefixInfoCodec implements Codec<OmPrefixInfo> {
           "Can't encode the the raw data from the byte array", e);
     }
   }
+
+  @Override
+  public OmPrefixInfo copyObject(OmPrefixInfo object) {
+    return object.copyObject();
+  }
 }

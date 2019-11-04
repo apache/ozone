@@ -50,4 +50,9 @@ public class OmKeyInfoCodec implements Codec<OmKeyInfo> {
     }
   }
 
+  @Override
+  public OmKeyInfo copyObject(OmKeyInfo omKeyInfo) {
+    return omKeyInfo.copyObject();
+  }
+
 }

@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.ws.rs.core.Response;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -39,7 +40,7 @@ import org.junit.Test;
  */
 public class TestBucketDelete {
 
-  private String bucketName = "myBucket";
+  private String bucketName = OzoneConsts.BUCKET;
   private OzoneClientStub clientStub;
   private ObjectStore objectStoreStub;
   private BucketEndpoint bucketEndpoint;
@@ -51,7 +52,7 @@ public class TestBucketDelete {
     clientStub = new OzoneClientStub();
     objectStoreStub = clientStub.getObjectStore();
 
-    objectStoreStub.createS3Bucket("ozone", bucketName);
+    objectStoreStub.createS3Bucket(OzoneConsts.OZONE, bucketName);
 
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = new BucketEndpoint();
@@ -84,11 +85,9 @@ public class TestBucketDelete {
   @Test
   public void testDeleteWithBucketNotEmpty() throws Exception {
     try {
-      String bucket = "nonemptybucket";
-      objectStoreStub.createS3Bucket("ozone1", bucket);
       ObjectStoreStub stub = (ObjectStoreStub) objectStoreStub;
-      stub.setBucketEmptyStatus(bucket, false);
-      bucketEndpoint.delete(bucket);
+      stub.setBucketEmptyStatus(bucketName, false);
+      bucketEndpoint.delete(bucketName);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getErrorMessage(),

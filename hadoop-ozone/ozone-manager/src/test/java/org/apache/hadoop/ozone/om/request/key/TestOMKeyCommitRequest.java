@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -154,7 +155,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         new OMKeyCommitRequest(modifiedOmRequest);
 
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, "ozone", omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
+        omMetadataManager);
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
 

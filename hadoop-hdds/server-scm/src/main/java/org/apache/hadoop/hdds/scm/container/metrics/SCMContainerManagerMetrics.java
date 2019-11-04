@@ -22,11 +22,12 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Class contains metrics related to ContainerManager.
  */
-@Metrics(about = "SCM ContainerManager metrics", context = "ozone")
+@Metrics(about = "SCM ContainerManager metrics", context = OzoneConsts.OZONE)
 public final class SCMContainerManagerMetrics {
 
   private static final String SOURCE_NAME =

@@ -169,8 +169,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       omResponse.setSetBucketPropertyResponse(
           SetBucketPropertyResponse.newBuilder().build());
       omClientResponse =
-          new OMBucketSetPropertyResponse((OmBucketInfo) omBucketInfo.clone(),
-              omResponse.build());
+          new OMBucketSetPropertyResponse(omBucketInfo, omResponse.build());
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMBucketSetPropertyResponse(omBucketInfo,

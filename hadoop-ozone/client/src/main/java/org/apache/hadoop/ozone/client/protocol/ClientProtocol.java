@@ -42,6 +42,7 @@ import java.util.Map;
 
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.KerberosInfo;
@@ -57,6 +58,13 @@ import org.apache.hadoop.security.token.Token;
  */
 @KerberosInfo(serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
 public interface ClientProtocol {
+
+  /**
+   * List of OM node Ids and their Ratis server roles.
+   * @return List of OM server roles
+   * @throws IOException
+   */
+  List<OMRoleInfo> getOmRoleInfos() throws IOException;
 
   /**
    * Creates a new Volume.

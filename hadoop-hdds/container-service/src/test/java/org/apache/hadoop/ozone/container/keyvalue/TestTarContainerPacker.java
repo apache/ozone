@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
@@ -30,7 +31,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
@@ -41,11 +46,14 @@ import org.apache.commons.compress.compressors.CompressorInputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
 
 /**
  * Test the tar/untar for a given container.
@@ -62,7 +70,8 @@ public class TestTarContainerPacker {
 
   private static final String TEST_DESCRIPTOR_FILE_CONTENT = "descriptor";
 
-  private ContainerPacker packer = new TarContainerPacker();
+  private final ContainerPacker<KeyValueContainerData> packer
+      = new TarContainerPacker();
 
   private static final Path SOURCE_CONTAINER_ROOT =
       Paths.get("target/test/data/packer-source-dir");
@@ -70,21 +79,34 @@ public class TestTarContainerPacker {
   private static final Path DEST_CONTAINER_ROOT =
       Paths.get("target/test/data/packer-dest-dir");
 
+  private static final Path TEMP_DIR =
+      Paths.get("target/test/data/packer-tmp-dir");
+
+  private static final AtomicInteger CONTAINER_ID = new AtomicInteger(1);
+
   @BeforeClass
   public static void init() throws IOException {
     initDir(SOURCE_CONTAINER_ROOT);
     initDir(DEST_CONTAINER_ROOT);
+    initDir(TEMP_DIR);
+  }
+
+  @AfterClass
+  public static void cleanup() throws IOException {
+    FileUtils.deleteDirectory(SOURCE_CONTAINER_ROOT.toFile());
+    FileUtils.deleteDirectory(DEST_CONTAINER_ROOT.toFile());
+    FileUtils.deleteDirectory(TEMP_DIR.toFile());
   }
 
   private static void initDir(Path path) throws IOException {
     if (path.toFile().exists()) {
       FileUtils.deleteDirectory(path.toFile());
     }
-    path.toFile().mkdirs();
+    Files.createDirectories(path);
   }
 
-  private KeyValueContainerData createContainer(long id, Path dir,
-      OzoneConfiguration conf) throws IOException {
+  private KeyValueContainerData createContainer(Path dir) throws IOException {
+    long id = CONTAINER_ID.getAndIncrement();
 
     Path containerDir = dir.resolve("container" + id);
     Path dbDir = containerDir.resolve("db");
@@ -98,7 +120,6 @@ public class TestTarContainerPacker {
     containerData.setMetadataPath(dbDir.getParent().toString());
     containerData.setDbFile(dbDir.toFile());
 
-
     return containerData;
   }
 
@@ -109,35 +130,21 @@ public class TestTarContainerPacker {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     KeyValueContainerData sourceContainerData =
-        createContainer(1L, SOURCE_CONTAINER_ROOT, conf);
+        createContainer(SOURCE_CONTAINER_ROOT);
 
     KeyValueContainer sourceContainer =
         new KeyValueContainer(sourceContainerData, conf);
 
     //sample db file in the metadata directory
-    try (FileWriter writer = new FileWriter(
-        sourceContainerData.getDbFile().toPath()
-            .resolve(TEST_DB_FILE_NAME)
-            .toFile())) {
-      IOUtils.write(TEST_DB_FILE_CONTENT, writer);
-    }
+    writeDbFile(sourceContainerData, TEST_DB_FILE_NAME);
 
     //sample chunk file in the chunk directory
-    try (FileWriter writer = new FileWriter(
-        Paths.get(sourceContainerData.getChunksPath())
-            .resolve(TEST_CHUNK_FILE_NAME)
-            .toFile())) {
-      IOUtils.write(TEST_CHUNK_FILE_CONTENT, writer);
-    }
+    writeChunkFile(sourceContainerData, TEST_CHUNK_FILE_NAME);
 
     //sample container descriptor file
-    try (FileWriter writer = new FileWriter(
-        sourceContainer.getContainerFile())) {
-      IOUtils.write(TEST_DESCRIPTOR_FILE_CONTENT, writer);
-    }
+    writeDescriptor(sourceContainer);
 
-    Path targetFile =
-        SOURCE_CONTAINER_ROOT.getParent().resolve("container.tar.gz");
+    Path targetFile = TEMP_DIR.resolve("container.tar.gz");
 
     //WHEN: pack it
     try (FileOutputStream output = new FileOutputStream(targetFile.toFile())) {
@@ -147,7 +154,7 @@ public class TestTarContainerPacker {
     //THEN: check the result
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
       CompressorInputStream uncompressed = new CompressorStreamFactory()
-          .createCompressorInputStream(CompressorStreamFactory.GZIP, input);
+          .createCompressorInputStream(GZIP, input);
       TarArchiveInputStream tarStream = new TarArchiveInputStream(uncompressed);
 
       TarArchiveEntry entry;
@@ -169,12 +176,12 @@ public class TestTarContainerPacker {
     }
 
     KeyValueContainerData destinationContainerData =
-        createContainer(2L, DEST_CONTAINER_ROOT, conf);
+        createContainer(DEST_CONTAINER_ROOT);
 
     KeyValueContainer destinationContainer =
         new KeyValueContainer(destinationContainerData, conf);
 
-    String descriptor = "";
+    String descriptor;
 
     //unpackContainerData
     try (FileInputStream input = new FileInputStream(targetFile.toFile())) {
@@ -184,22 +191,151 @@ public class TestTarContainerPacker {
     }
 
     assertExampleMetadataDbIsGood(
-        destinationContainerData.getDbFile().toPath());
+        destinationContainerData.getDbFile().toPath(),
+        TEST_DB_FILE_NAME);
     assertExampleChunkFileIsGood(
-        Paths.get(destinationContainerData.getChunksPath()));
+        Paths.get(destinationContainerData.getChunksPath()),
+        TEST_CHUNK_FILE_NAME);
     Assert.assertFalse(
-        "Descriptor file should not been exctarcted by the "
+        "Descriptor file should not have been extracted by the "
             + "unpackContainerData Call",
         destinationContainer.getContainerFile().exists());
     Assert.assertEquals(TEST_DESCRIPTOR_FILE_CONTENT, descriptor);
-
   }
 
+  @Test
+  public void unpackContainerDataWithValidRelativeDbFilePath()
+      throws Exception {
+    //GIVEN
+    KeyValueContainerData sourceContainerData =
+        createContainer(SOURCE_CONTAINER_ROOT);
 
-  private void assertExampleMetadataDbIsGood(Path dbPath)
+    String fileName = "sub/dir/" + TEST_DB_FILE_NAME;
+    File file = writeDbFile(sourceContainerData, fileName);
+    String entryName = TarContainerPacker.DB_DIR_NAME + "/" + fileName;
+
+    File containerFile = packContainerWithSingleFile(file, entryName);
+
+    // WHEN
+    KeyValueContainerData dest = unpackContainerData(containerFile);
+
+    // THEN
+    assertExampleMetadataDbIsGood(dest.getDbFile().toPath(), fileName);
+  }
+
+  @Test
+  public void unpackContainerDataWithValidRelativeChunkFilePath()
+      throws Exception {
+    //GIVEN
+    KeyValueContainerData sourceContainerData =
+        createContainer(SOURCE_CONTAINER_ROOT);
+
+    String fileName = "sub/dir/" + TEST_CHUNK_FILE_NAME;
+    File file = writeChunkFile(sourceContainerData, fileName);
+    String entryName = TarContainerPacker.CHUNKS_DIR_NAME + "/" + fileName;
+
+    File containerFile = packContainerWithSingleFile(file, entryName);
+
+    // WHEN
+    KeyValueContainerData dest = unpackContainerData(containerFile);
+
+    // THEN
+    assertExampleChunkFileIsGood(Paths.get(dest.getChunksPath()), fileName);
+  }
+
+  @Test
+  public void unpackContainerDataWithInvalidRelativeDbFilePath()
+      throws Exception {
+    //GIVEN
+    KeyValueContainerData sourceContainerData =
+        createContainer(SOURCE_CONTAINER_ROOT);
+
+    String fileName = "../db_file";
+    File file = writeDbFile(sourceContainerData, fileName);
+    String entryName = TarContainerPacker.DB_DIR_NAME + "/" + fileName;
+
+    File containerFile = packContainerWithSingleFile(file, entryName);
+
+    LambdaTestUtils.intercept(IllegalArgumentException.class,
+        () -> unpackContainerData(containerFile));
+  }
+
+  @Test
+  public void unpackContainerDataWithInvalidRelativeChunkFilePath()
+      throws Exception {
+    //GIVEN
+    KeyValueContainerData sourceContainerData =
+        createContainer(SOURCE_CONTAINER_ROOT);
+
+    String fileName = "../chunk_file";
+    File file = writeChunkFile(sourceContainerData, fileName);
+    String entryName = TarContainerPacker.CHUNKS_DIR_NAME + "/" + fileName;
+
+    File containerFile = packContainerWithSingleFile(file, entryName);
+
+    LambdaTestUtils.intercept(IllegalArgumentException.class,
+        () -> unpackContainerData(containerFile));
+  }
+
+  private KeyValueContainerData unpackContainerData(File containerFile)
+      throws IOException {
+    try (FileInputStream input = new FileInputStream(containerFile)) {
+      OzoneConfiguration conf = new OzoneConfiguration();
+      KeyValueContainerData data = createContainer(DEST_CONTAINER_ROOT);
+      KeyValueContainer container = new KeyValueContainer(data, conf);
+      packer.unpackContainerData(container, input);
+      return data;
+    }
+  }
+
+  private void writeDescriptor(KeyValueContainer container) throws IOException {
+    try (FileWriter writer = new FileWriter(container.getContainerFile())) {
+      IOUtils.write(TEST_DESCRIPTOR_FILE_CONTENT, writer);
+    }
+  }
+
+  private File writeChunkFile(
+      KeyValueContainerData containerData, String chunkFileName)
+      throws IOException {
+    Path path = Paths.get(containerData.getChunksPath())
+        .resolve(chunkFileName);
+    Files.createDirectories(path.getParent());
+    File file = path.toFile();
+    try (FileWriter writer = new FileWriter(file)) {
+      IOUtils.write(TEST_CHUNK_FILE_CONTENT, writer);
+    }
+    return file;
+  }
+
+  private File writeDbFile(
+      KeyValueContainerData containerData, String dbFileName)
+      throws IOException {
+    Path path = containerData.getDbFile().toPath()
+        .resolve(dbFileName);
+    Files.createDirectories(path.getParent());
+    File file = path.toFile();
+    try (FileWriter writer = new FileWriter(file)) {
+      IOUtils.write(TEST_DB_FILE_CONTENT, writer);
+    }
+    return file;
+  }
+
+  private File packContainerWithSingleFile(File file, String entryName)
+      throws Exception {
+    File targetFile = TEMP_DIR.resolve("container.tar.gz").toFile();
+    try (FileOutputStream output = new FileOutputStream(targetFile);
+         CompressorOutputStream gzipped = new CompressorStreamFactory()
+             .createCompressorOutputStream(GZIP, output);
+         ArchiveOutputStream archive = new TarArchiveOutputStream(gzipped)) {
+      TarContainerPacker.includeFile(file, entryName, archive);
+    }
+    return targetFile;
+  }
+
+  private void assertExampleMetadataDbIsGood(Path dbPath, String filename)
       throws IOException {
 
-    Path dbFile = dbPath.resolve(TEST_DB_FILE_NAME);
+    Path dbFile = dbPath.resolve(filename);
 
     Assert.assertTrue(
         "example DB file is missing after pack/unpackContainerData: " + dbFile,
@@ -213,10 +349,10 @@ public class TestTarContainerPacker {
     }
   }
 
-  private void assertExampleChunkFileIsGood(Path chunkDirPath)
+  private void assertExampleChunkFileIsGood(Path chunkPath, String filename)
       throws IOException {
 
-    Path chunkFile = chunkDirPath.resolve(TEST_CHUNK_FILE_NAME);
+    Path chunkFile = chunkPath.resolve(filename);
 
     Assert.assertTrue(
         "example chunk file is missing after pack/unpackContainerData: "

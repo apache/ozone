@@ -50,4 +50,8 @@ public class UserVolumeInfoCodec implements Codec<UserVolumeInfo> {
     }
   }
 
+  @Override
+  public UserVolumeInfo copyObject(UserVolumeInfo object) {
+    return object;
+  }
 }

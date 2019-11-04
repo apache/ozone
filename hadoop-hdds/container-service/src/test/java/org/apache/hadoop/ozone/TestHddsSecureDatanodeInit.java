@@ -72,7 +72,6 @@ public class TestHddsSecureDatanodeInit {
   public static void setUp() throws Exception {
     testDir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.OZONE_ENABLED, true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     //conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
     String volumeDir = testDir + "/disk1";
