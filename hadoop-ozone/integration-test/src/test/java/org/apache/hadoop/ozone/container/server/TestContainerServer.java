@@ -228,7 +228,7 @@ public class TestContainerServer {
                 containerSet, volumeSet, metrics));
       }
       HddsDispatcher dispatcher = new HddsDispatcher(
-          conf, containerSet, volumeSet, handlers, context, metrics);
+          conf, containerSet, volumeSet, handlers, context, metrics, null);
       dispatcher.setScmId(scmId.toString());
       dispatcher.init();
 

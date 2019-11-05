@@ -38,12 +38,14 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -387,6 +389,72 @@ public final class HddsUtils {
     case PutSmallFile:
     default:
       return false;
+    }
+  }
+
+  /**
+   * Not all datanode container cmd protocol has embedded ozone block token.
+   * Block token are issued by Ozone Manager and return to Ozone client to
+   * read/write data on datanode via input/output stream.
+   * Ozone datanode uses this helper to decide which command requires block
+   * token.
+   * @param cmdType
+   * @return true if it is a cmd that block token should be checked when
+   * security is enabled
+   * false if block token does not apply to the command.
+   *
+   */
+  public static boolean requireBlockToken(
+      ContainerProtos.Type cmdType) {
+    switch (cmdType) {
+    case ReadChunk:
+    case GetBlock:
+    case WriteChunk:
+    case PutBlock:
+    case PutSmallFile:
+    case GetSmallFile:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  /**
+   * Return the block ID of container commands that are related to blocks.
+   * @param msg container command
+   * @return block ID.
+   */
+  public static BlockID getBlockID(ContainerCommandRequestProto msg) {
+    switch (msg.getCmdType()) {
+    case ReadChunk:
+      if (msg.hasReadChunk()) {
+        return BlockID.getFromProtobuf(msg.getReadChunk().getBlockID());
+      }
+    case GetBlock:
+      if (msg.hasGetBlock()) {
+        return BlockID.getFromProtobuf(msg.getGetBlock().getBlockID());
+      }
+    case WriteChunk:
+      if (msg.hasWriteChunk()) {
+        return BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+      }
+    case PutBlock:
+      if (msg.hasPutBlock()) {
+        return BlockID.getFromProtobuf(msg.getPutBlock().getBlockData()
+            .getBlockID());
+      }
+    case PutSmallFile:
+      if (msg.hasPutSmallFile()) {
+        return BlockID.getFromProtobuf(msg.getPutSmallFile().getBlock()
+            .getBlockData().getBlockID());
+      }
+    case GetSmallFile:
+      if (msg.hasGetSmallFile()) {
+        return BlockID.getFromProtobuf(msg.getGetSmallFile().getBlock()
+            .getBlockID());
+      }
+    default:
+      return null;
     }
   }
 

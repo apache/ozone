@@ -108,7 +108,7 @@ public class TestContainerMetrics {
                 containerSet, volumeSet, metrics));
       }
       HddsDispatcher dispatcher = new HddsDispatcher(conf, containerSet,
-          volumeSet, handlers, context, metrics);
+          volumeSet, handlers, context, metrics, null);
       dispatcher.setScmId(UUID.randomUUID().toString());
 
       server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher, null,
@@ -129,10 +129,10 @@ public class TestContainerMetrics {
       // Write Chunk
       BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
       ContainerTestHelper.getWriteChunkRequest(
-          pipeline, blockID, 1024);
+          pipeline, blockID, 1024, null);
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper.getWriteChunkRequest(
-              pipeline, blockID, 1024);
+              pipeline, blockID, 1024, null);
       response = client.sendCommand(writeChunkRequest);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());

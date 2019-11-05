@@ -34,6 +34,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import joptsimple.internal.Strings;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -218,14 +219,16 @@ public final class ContainerTestHelper {
    * @param pipeline - A set of machines where this container lives.
    * @param blockID - Block ID of the chunk.
    * @param datalen - Length of data.
+   * @param token - block token.
    * @return ContainerCommandRequestProto
    * @throws IOException
    */
   public static ContainerCommandRequestProto getWriteChunkRequest(
-      Pipeline pipeline, BlockID blockID, int datalen) throws IOException {
+      Pipeline pipeline, BlockID blockID, int datalen, String token)
+      throws IOException {
     LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
         datalen, blockID, pipeline);
-    return getWriteChunkRequest(pipeline, blockID, datalen, 0);
+    return getWriteChunkRequest(pipeline, blockID, datalen, 0, token);
   }
 
   /**
@@ -234,11 +237,12 @@ public final class ContainerTestHelper {
    * @param pipeline - A set of machines where this container lives.
    * @param blockID - Block ID of the chunk.
    * @param datalen - Length of data.
+   * @param token - block token.
    * @return ContainerCommandRequestProto
    * @throws IOException
    */
   public static ContainerCommandRequestProto getWriteChunkRequest(
-      Pipeline pipeline, BlockID blockID, int datalen, int seq)
+      Pipeline pipeline, BlockID blockID, int datalen, int seq, String token)
       throws IOException {
     LOG.trace("writeChunk {} (blockID={}) to pipeline={}",
         datalen, blockID, pipeline);
@@ -261,6 +265,9 @@ public final class ContainerTestHelper {
     request.setContainerID(blockID.getContainerID());
     request.setWriteChunk(writeRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
+    if (!Strings.isNullOrEmpty(token)) {
+      request.setEncodedToken(token);
+    }
 
     return request.build();
   }
@@ -501,8 +508,22 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getPutBlockRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
-    LOG.trace("putBlock: {} to pipeline={}",
-        writeRequest.getBlockID(), pipeline);
+    return getPutBlockRequest(pipeline, null, writeRequest);
+  }
+
+  /**
+   * Returns the PutBlockRequest for test purpose.
+   * @param pipeline - pipeline.
+   * @param token - token.
+   * @param writeRequest - Write Chunk Request.
+   * @return - Request
+   */
+  public static ContainerCommandRequestProto getPutBlockRequest(
+      Pipeline pipeline, String token,
+      ContainerProtos.WriteChunkRequestProto writeRequest)
+      throws IOException {
+    LOG.trace("putBlock: {} to pipeline={} with token {}",
+        writeRequest.getBlockID(), pipeline, token);
 
     ContainerProtos.PutBlockRequestProto.Builder putRequest =
         ContainerProtos.PutBlockRequestProto.newBuilder();
@@ -521,6 +542,9 @@ public final class ContainerTestHelper {
     request.setContainerID(blockData.getContainerID());
     request.setPutBlock(putRequest);
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
+    if (!Strings.isNullOrEmpty(token)) {
+      request.setEncodedToken(token);
+    }
     return request.build();
   }
 

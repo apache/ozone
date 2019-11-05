@@ -20,11 +20,15 @@ package org.apache.hadoop.ozone.security;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
+import org.apache.hadoop.hdds.security.token.BlockTokenException;
+import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -57,12 +61,14 @@ public class TestOzoneBlockTokenSecretManager {
   private CertificateClient client;
   private static final String BASEDIR = GenericTestUtils
       .getTempPath(TestOzoneBlockTokenSecretManager.class.getSimpleName());
+  private BlockTokenVerifier tokenVerifier;
 
 
   @Before
   public void setUp() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, BASEDIR);
+    conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
     // Create Ozone Master key pair.
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     expiryTime = Time.monotonicNow() + 60 * 60 * 24;
@@ -76,6 +82,8 @@ public class TestOzoneBlockTokenSecretManager {
     client = getCertificateClient(securityConfig);
     client.init();
     secretManager.start(client);
+    tokenVerifier = new BlockTokenVerifier(securityConfig, client);
+
   }
 
   private CertificateClient getCertificateClient(SecurityConfig secConf)
@@ -83,6 +91,12 @@ public class TestOzoneBlockTokenSecretManager {
     return new OMCertificateClient(secConf){
       @Override
       public X509Certificate getCertificate() {
+        return x509Certificate;
+      }
+
+      @Override
+      public X509Certificate getCertificate(String certSerialId)
+          throws CertificateException {
         return x509Certificate;
       }
 
@@ -182,5 +196,39 @@ public class TestOzoneBlockTokenSecretManager {
             " is not supported for block tokens",
         () -> secretManager.verifySignature(id,
             client.signData(id.getBytes())));
+  }
+
+  @Test
+  public void testBlockTokenVerifier() throws Exception {
+    String tokenBlockID = "101";
+    Token<OzoneBlockTokenIdentifier> token =
+        secretManager.generateToken("testUser", tokenBlockID,
+            EnumSet.allOf(AccessModeProto.class), 100);
+    OzoneBlockTokenIdentifier btIdentifier =
+        OzoneBlockTokenIdentifier.readFieldsProtobuf(new DataInputStream(
+            new ByteArrayInputStream(token.getIdentifier())));
+
+    // Check basic details.
+    Assert.assertTrue(btIdentifier.getOwnerId().equals("testUser"));
+    Assert.assertTrue(btIdentifier.getBlockId().equals("101"));
+    Assert.assertTrue(btIdentifier.getAccessModes().equals(EnumSet
+        .allOf(AccessModeProto.class)));
+    Assert.assertTrue(btIdentifier.getOmCertSerialId().equals(omCertSerialId));
+
+    validateHash(token.getPassword(), btIdentifier.getBytes());
+
+    tokenVerifier.verify("testUser", token.encodeToUrlString(),
+        ContainerProtos.Type.PutBlock, "101");
+
+    String notAllledBlockID = "NotAllowedBlockID";
+    LambdaTestUtils.intercept(BlockTokenException.class,
+        "Token for block ID: " + tokenBlockID +
+        " can't be used to access block: " + notAllledBlockID,
+        () -> tokenVerifier.verify("testUser", token.encodeToUrlString(),
+            ContainerProtos.Type.PutBlock, notAllledBlockID));
+
+    // Non block operations are not checked by block token verifier
+    tokenVerifier.verify(null, null,
+        ContainerProtos.Type.CloseContainer, null);
   }
 }

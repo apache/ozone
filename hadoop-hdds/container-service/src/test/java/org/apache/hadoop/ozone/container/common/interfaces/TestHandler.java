@@ -72,7 +72,7 @@ public class TestHandler {
               containerType, conf, context, containerSet, volumeSet, metrics));
     }
     this.dispatcher = new HddsDispatcher(
-        conf, containerSet, volumeSet, handlers, null, metrics);
+        conf, containerSet, volumeSet, handlers, null, metrics, null);
   }
 
   @Test
