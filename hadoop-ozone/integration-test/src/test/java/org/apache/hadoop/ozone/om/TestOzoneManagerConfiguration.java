@@ -294,8 +294,7 @@ public class TestOzoneManagerConfiguration {
     try {
       startCluster();
       Assert.fail("Should have failed to start the cluster!");
-    }
-    catch (OzoneIllegalArgumentException e) {
+    } catch (OzoneIllegalArgumentException e) {
       // Expect error message
       Assert.assertTrue(e.getMessage().contains(
           "List of OM Node ID's should be specified"));
@@ -325,8 +324,7 @@ public class TestOzoneManagerConfiguration {
     try {
       startCluster();
       Assert.fail("Should have failed to start the cluster!");
-    }
-    catch (OzoneIllegalArgumentException e) {
+    } catch (OzoneIllegalArgumentException e) {
       // Expect error message
       Assert.assertTrue(e.getMessage().contains(
           "OM Rpc Address should be set for all node"));
