@@ -36,6 +36,7 @@ import java.util.Random;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -119,6 +120,19 @@ public class TestGrpcOutputStream {
     subject.close();
 
     verifyResponses(bytes);
+  }
+
+  @Test
+  public void bufferFlushedWhenFull() throws IOException {
+    byte[] bytes = getRandomBytes(bufferSize);
+
+    subject.write(bytes, 0, bufferSize-1);
+    subject.write(bytes[bufferSize-1]);
+    verify(observer).onNext(any());
+
+    subject.write(bytes[0]);
+    subject.write(bytes, 1, bufferSize-1);
+    verify(observer, times(2)).onNext(any());
   }
 
   @Test

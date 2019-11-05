@@ -58,10 +58,10 @@ class GrpcOutputStream extends OutputStream {
   @Override
   public void write(int b) {
     try {
+      buffer.write(b);
       if (buffer.size() >= bufferSize) {
         flushBuffer(false);
       }
-      buffer.write(b);
     } catch (Exception ex) {
       responseObserver.onError(ex);
     }
