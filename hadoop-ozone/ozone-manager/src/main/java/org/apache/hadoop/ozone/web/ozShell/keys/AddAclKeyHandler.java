@@ -94,7 +94,11 @@ public class AddAclKeyHandler extends Handler {
     boolean result = client.getObjectStore().addAcl(obj,
         OzoneAcl.parseAcl(acl));
 
-    System.out.printf("%s%n", "Acl added successfully: " + result);
+    String message = result
+        ? ("Acl added successfully.")
+        : ("Acl already exists.");
+
+    System.out.println(message);
 
     client.close();
     return null;

@@ -88,10 +88,8 @@ public class SetAclBucketHandler extends Handler {
             OzoneObj.StoreType.valueOf(storeType))
         .build();
 
-    boolean result = client.getObjectStore().setAcl(obj,
-        OzoneAcl.parseAcls(acls));
-
-    System.out.printf("%s%n", "Acl set successfully: " + result);
+    client.getObjectStore().setAcl(obj, OzoneAcl.parseAcls(acls));
+    System.out.println("Acl set successfully.");
 
     client.close();
     return null;
