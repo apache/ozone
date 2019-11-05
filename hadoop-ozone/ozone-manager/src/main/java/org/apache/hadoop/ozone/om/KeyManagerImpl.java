@@ -1918,8 +1918,6 @@ public class KeyManagerImpl implements KeyManager {
           // Return the single file status directly if OmKey points to a file
           return Collections.singletonList(fileStatus);
         }
-        // Append '/' to startKey if it doesn't have it
-        startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       }
 
       // Find OmKey in cache table first with iterator.
@@ -1929,6 +1927,11 @@ public class KeyManagerImpl implements KeyManager {
       Table keyTable = metadataManager.getKeyTable();
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
           cacheIter = keyTable.cacheIterator();
+      String startCacheKey =
+          OZONE_URI_DELIMITER + volumeName +
+          OZONE_URI_DELIMITER + bucketName +
+          OZONE_URI_DELIMITER + startKey;
+      // Note: startKey shouldn't begin with "/".
 
       // Similar to the logic in OmMetadataManagerImpl#listKeys
       while (cacheIter.hasNext() && numEntries - countEntries > 0) {
@@ -1938,7 +1941,8 @@ public class KeyManagerImpl implements KeyManager {
         OmKeyInfo keyInfo = entry.getValue().getCacheValue();
         // keyInfo is null if an entry is deleted in cache.
         if (keyInfo != null) {
-          if (key.startsWith(startKey) && key.compareTo(startKey) >= 0) {
+          if (key.startsWith(startCacheKey) &&
+              key.compareTo(startCacheKey) >= 0) {
             // Create OzoneFileStatus from OmKeyInfo
             OzoneFileStatus fileStatus = new OzoneFileStatus(
                 keyInfo, scmBlockSize, !OzoneFSUtils.isFile(key));
@@ -1950,6 +1954,8 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
 
+      // Append '/' to startKey if it doesn't have it
+      startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       // Find key in db
       String seekKeyInDb =
           metadataManager.getOzoneKey(volumeName, bucketName, startKey);
@@ -1971,14 +1977,14 @@ public class KeyManagerImpl implements KeyManager {
         // Iterate through seek results
         while (iterator.hasNext() && numEntries - countEntries > 0) {
           String entryInDb = iterator.key();
+
           OmKeyInfo value = iterator.value().getValue();
-          // TODO: In which case will entryInDb NOT start with keyInDb?
           if (entryInDb.startsWith(keyInDb)) {
             String entryKeyName = value.getKeyName();
             if (recursive) {
               // for recursive list all the entries
-              if (!deletedKeySet.contains(entryKeyName)) {
-                cacheKeyMap.put(entryKeyName, new OzoneFileStatus(value,
+              if (!deletedKeySet.contains(entryInDb)) {
+                cacheKeyMap.put(entryInDb, new OzoneFileStatus(value,
                     scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
                 countEntries++;
               }
@@ -1992,16 +1998,16 @@ public class KeyManagerImpl implements KeyManager {
                   .getImmediateChild(entryKeyName, keyName);
               boolean isFile = OzoneFSUtils.isFile(immediateChild);
               if (isFile) {
-                if (!deletedKeySet.contains(entryKeyName)) {
-                  cacheKeyMap.put(entryKeyName,
+                if (!deletedKeySet.contains(entryInDb)) {
+                  cacheKeyMap.put(entryInDb,
                       new OzoneFileStatus(value, scmBlockSize, !isFile));
                   countEntries++;
                 }
                 iterator.next();
               } else {
                 // if entry is a directory
-                if (!deletedKeySet.contains(entryKeyName)) {
-                  cacheKeyMap.put(entryKeyName,
+                if (!deletedKeySet.contains(entryInDb)) {
+                  cacheKeyMap.put(entryInDb,
                       new OzoneFileStatus(immediateChild));
                   countEntries++;
                 }
