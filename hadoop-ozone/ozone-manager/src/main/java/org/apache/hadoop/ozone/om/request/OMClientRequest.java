@@ -178,10 +178,9 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @throws IOException
    */
   @VisibleForTesting
-  public String getHostName() throws IOException {
+  public String getHostName() {
     if (omRequest.hasUserInfo()) {
-      return InetAddress.getByName(omRequest.getUserInfo()
-          .getRemoteAddress()).getHostName();
+      return omRequest.getUserInfo().getHostName();
     } else {
       return null;
     }
