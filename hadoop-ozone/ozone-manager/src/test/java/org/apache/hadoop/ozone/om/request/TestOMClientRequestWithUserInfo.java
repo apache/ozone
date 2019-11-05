@@ -77,6 +77,11 @@ public class TestOMClientRequestWithUserInfo {
         return userGroupInformation;
       }
 
+      @Mock
+      public InetAddress getRemoteIp() {
+        return inetAddress;
+      }
+
       public InetAddress getRemoteAddress() {
         return inetAddress;
       }
