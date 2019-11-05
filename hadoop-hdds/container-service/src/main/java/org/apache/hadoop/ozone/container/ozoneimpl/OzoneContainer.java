@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -103,8 +105,11 @@ public class OzoneContainer {
           Handler.getHandlerForContainerType(
               containerType, conf, context, containerSet, volumeSet, metrics));
     }
+
+    SecurityConfig secConf = new SecurityConfig(conf);
     this.hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
-        handlers, context, metrics);
+        handlers, context, metrics, secConf.isBlockTokenEnabled()?
+        new BlockTokenVerifier(secConf, certClient) : null);
 
     /*
      * ContainerController is the control plane
