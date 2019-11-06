@@ -55,13 +55,12 @@ import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.ServerSocketUtil;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
-import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.init.OzoneManagerInitializer;
+import org.apache.hadoop.ozone.om.init.OzoneManagerStorageInitializer;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -775,7 +774,7 @@ public final class TestSecureOzoneCluster {
           "SCM signed certificate"));
 
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-      OzoneManagerInitializer.run(conf);
+      OzoneManagerStorageInitializer.run(conf);
       om.stop();
       om = OzoneManager.createOm(conf);
 
@@ -880,6 +879,6 @@ public final class TestSecureOzoneCluster {
 
   private void initializeOmStorage(OMStorage omStorage)
       throws IOException, AuthenticationException {
-    OzoneManagerInitializer.run(conf);
+    OzoneManagerStorageInitializer.run(conf);
   }
 }

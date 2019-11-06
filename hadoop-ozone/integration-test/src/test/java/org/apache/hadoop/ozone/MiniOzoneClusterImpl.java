@@ -42,13 +42,12 @@ import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocolPB
     .StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.om.init.OzoneManagerInitializer;
+import org.apache.hadoop.ozone.om.init.OzoneManagerStorageInitializer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -531,7 +530,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     void initializeOmStorage()
         throws IOException, AuthenticationException {
-      OzoneManagerInitializer.run(conf);
+      OzoneManagerStorageInitializer.run(conf);
     }
 
     /**
