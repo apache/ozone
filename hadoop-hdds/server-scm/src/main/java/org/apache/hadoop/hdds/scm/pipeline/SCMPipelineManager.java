@@ -407,28 +407,29 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
-    Pipeline pipeline;
-    try {
-      pipeline = stateManager.getPipeline(pipelineID);
-    } catch (PipelineNotFoundException e) {
-      throw new PipelineNotFoundException(String.format(
-          "Pipeline %s cannot be found", pipelineID));
-    }
-
-    boolean ready;
     long st = Time.monotonicNow();
     if (timeout == 0) {
       timeout = pipelineWaitDefaultTimeout;
     }
-    for(ready = pipeline.isOpen();
-        !ready && Time.monotonicNow() - st < timeout;
-        ready = pipeline.isOpen()) {
-      try {
-        Thread.sleep((long)100);
-      } catch (InterruptedException e) {
 
+    boolean ready;
+    Pipeline pipeline;
+    do {
+      try {
+        pipeline = stateManager.getPipeline(pipelineID);
+      } catch (PipelineNotFoundException e) {
+        throw new PipelineNotFoundException(String.format(
+            "Pipeline %s cannot be found", pipelineID));
       }
-    }
+      ready = pipeline.isOpen();
+      if (!ready) {
+        try {
+          Thread.sleep((long)100);
+        } catch (InterruptedException e) {
+        }
+      }
+    } while (!ready && Time.monotonicNow() - st < timeout);
+
     if (!ready) {
       throw new IOException(String.format("Pipeline %s is not ready in %d ms",
           pipelineID, timeout));
