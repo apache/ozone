@@ -52,7 +52,6 @@ public class ChunkInputStream extends InputStream implements Seekable {
   private XceiverClientSpi xceiverClient;
   private boolean verifyChecksum;
   private boolean allocated = false;
-
   // Buffer to store the chunk data read from the DN container
   private List<ByteBuffer> buffers;
 
@@ -75,7 +74,7 @@ public class ChunkInputStream extends InputStream implements Seekable {
 
   private static final int EOF = -1;
 
-  ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId, 
+  ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId,
           XceiverClientSpi xceiverClient, boolean verifyChecksum) {
     this.chunkInfo = chunkInfo;
     this.length = chunkInfo.getLen();
@@ -520,6 +519,9 @@ public class ChunkInputStream extends InputStream implements Seekable {
   private void releaseBuffers() {
     buffers = null;
     bufferIndex = 0;
+    // We should not reset bufferOffset and bufferLength here because when
+    // getPos() is called in chunkStreamsEOF() we use these values and
+    // determine whether chunk is read completely or not.
   }
 
   /**

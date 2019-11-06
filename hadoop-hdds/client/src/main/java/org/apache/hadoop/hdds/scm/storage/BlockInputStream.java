@@ -239,13 +239,15 @@ public class BlockInputStream extends InputStream implements Seekable {
       ChunkInputStream current = chunkStreams.get(chunkIndex);
       int numBytesToRead = Math.min(len, (int)current.getRemaining());
       int numBytesRead = current.read(b, off, numBytesToRead);
+
       if (numBytesRead != numBytesToRead) {
         // This implies that there is either data loss or corruption in the
         // chunk entries. Even EOF in the current stream would be covered in
         // this case.
         throw new IOException(String.format(
-            "Inconsistent read for chunkName=%s length=%d numBytesRead=%d",
-            current.getChunkName(), current.getLength(), numBytesRead));
+            "Inconsistent read for chunkName=%s length=%d numBytesToRead= %d " +
+                "numBytesRead=%d", current.getChunkName(), current.getLength(),
+            numBytesToRead, numBytesRead));
       }
       totalReadLen += numBytesRead;
       off += numBytesRead;
@@ -315,6 +317,11 @@ public class BlockInputStream extends InputStream implements Seekable {
     // Reset the previous chunkStream's position
     chunkStreams.get(chunkIndexOfPrevPosition).resetPosition();
 
+    // Reset all the chunkStreams above the chunkIndex. We do this to reset
+    // any previous reads which might have updated the chunkPosition.
+    for (int index =  chunkIndex + 1; index < chunkStreams.size(); index++) {
+      chunkStreams.get(index).seek(0);
+    }
     // seek to the proper offset in the ChunkInputStream
     chunkStreams.get(chunkIndex).seek(pos - chunkOffsets[chunkIndex]);
     chunkIndexOfPrevPosition = chunkIndex;
