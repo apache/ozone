@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -85,7 +84,7 @@ public class SCMPipelineManager implements PipelineManager {
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
   private GrpcTlsConfig grpcTlsConfig;
-  
+
   public SCMPipelineManager(Configuration conf, NodeManager nodeManager,
       EventPublisher eventPublisher, GrpcTlsConfig grpcTlsConfig)
       throws IOException {

@@ -100,9 +100,17 @@ public class PipelineReportHandler implements
       return;
     }
 
+    pipeline.reportDatanode(dn);
+    if (report.getIsLeader()) {
+      pipeline.setLeaderId(dn.getUuid());
+    }
+    if ((pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED)
+        && pipeline.isHealthy()) {
+      pipelineManager.openPipeline(pipelineID);
+    }
+
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
-      LOGGER.info("Pipeline {} reported by {} isLeader?: {}",
-          pipeline.getId(), dn, report.getIsLeader());
+
 
       if (report.getIsLeader()) {
         // Pipeline reported as the leader
