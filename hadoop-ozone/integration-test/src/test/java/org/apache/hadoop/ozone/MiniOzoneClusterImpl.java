@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.scm.protocolPB
     .StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.om.init.OzoneManagerInitializer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -528,18 +529,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.initialize();
     }
 
-    void initializeOmStorage(OMStorage omStorage) throws IOException{
-      if (omStorage.getState() == StorageState.INITIALIZED) {
-        return;
-      }
-      omStorage.setClusterId(clusterId);
-      omStorage.setScmId(scmId.get());
-      omStorage.setOmId(omId.orElse(UUID.randomUUID().toString()));
-      // Initialize ozone certificate client if security is enabled.
-      if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        OzoneManager.initializeSecurity(conf, omStorage);
-      }
-      omStorage.initialize();
+    void initializeOmStorage()
+        throws IOException, AuthenticationException {
+      OzoneManagerInitializer.run(conf);
     }
 
     /**
@@ -552,8 +544,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
-      OMStorage omStore = new OMStorage(conf);
-      initializeOmStorage(omStore);
+      initializeOmStorage();
       return OzoneManager.createOm(conf);
     }
 

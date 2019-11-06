@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.om.init.OzoneManagerInitializer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
@@ -123,7 +124,7 @@ public class OzoneManagerStarter extends GenericCli {
 
     public boolean init(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
-      return OzoneManager.omInit(conf);
+      return OzoneManagerInitializer.run(conf);
     }
   }
 

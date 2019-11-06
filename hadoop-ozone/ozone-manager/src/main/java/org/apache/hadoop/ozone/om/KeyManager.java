@@ -47,7 +47,7 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    * @param configuration
    * @throws IOException
    */
-  void start(OzoneConfiguration configuration);
+  void start(OzoneConfiguration configuration) throws IOException;
 
   /**
    * Stop key manager.

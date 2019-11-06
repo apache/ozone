@@ -14,7 +14,7 @@
  * License for the specific language governing permissions and limitations under
  * the License.
  */
-package org.apache.hadoop.ozone.om;
+package org.apache.hadoop.ozone.om.init;
 
 
 import org.apache.commons.io.FileUtils;
@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClie
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -211,7 +213,7 @@ public class TestSecureOzoneManager {
     config.set(OZONE_OM_ADDRESS_KEY, "om-unknown");
     LambdaTestUtils.intercept(RuntimeException.class, "Can't get SCM signed" +
             " certificate",
-        () -> OzoneManager.initializeSecurity(config, omStorage));
+        () -> new SecurityInitializer(omStorage).initialize(config));
   }
 
 }

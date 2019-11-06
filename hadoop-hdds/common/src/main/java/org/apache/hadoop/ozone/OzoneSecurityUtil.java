@@ -25,6 +25,9 @@ import org.apache.commons.validator.routines.InetAddressValidator;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +58,39 @@ public final class OzoneSecurityUtil {
       "0.0.0.0", "127.0.0.1"));
 
   private OzoneSecurityUtil() {
+  }
+
+  public static void login(Configuration conf, String keytabConfigKey,
+      String principalConfigKey, String hostName)
+      throws AuthenticationException {
+    if (!isSecurityEnabled(conf)) {
+      return;
+    }
+    UserGroupInformation.setConfiguration(conf);
+    if (!UserGroupInformation.isSecurityEnabled()){
+      return;
+    }
+
+    if (!SecurityUtil.getAuthenticationMethod(conf).equals(
+        UserGroupInformation.AuthenticationMethod.KERBEROS)) {
+      throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
+          conf) + " authentication method not supported. OM user login "
+          + "failed.");
+    }
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Ozone security is enabled. Attempting login. "
+              + "Principal: {}, keytab: {}", conf.get(principalConfigKey),
+          conf.get(keytabConfigKey));
+    }
+    try {
+      SecurityUtil.login(conf, keytabConfigKey, principalConfigKey, hostName);
+    } catch (IOException e){
+      throw new AuthenticationException("Login failed for " +
+          conf.get(principalConfigKey) + " with keytab: "+
+          conf.get(keytabConfigKey), e);
+    }
+    LOG.info("{} logged in successfully.", conf.get(principalConfigKey));
   }
 
   public static boolean isSecurityEnabled(Configuration conf) {

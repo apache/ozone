@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.init.OzoneManagerInitializer;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -774,7 +775,7 @@ public final class TestSecureOzoneCluster {
           "SCM signed certificate"));
 
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-      OzoneManager.omInit(conf);
+      OzoneManagerInitializer.run(conf);
       om.stop();
       om = OzoneManager.createOm(conf);
 
@@ -877,17 +878,8 @@ public final class TestSecureOzoneCluster {
     Assert.assertEquals(encodedKey1, encodedKey2);
   }
 
-  private void initializeOmStorage(OMStorage omStorage) throws IOException {
-    if (omStorage.getState() == Storage.StorageState.INITIALIZED) {
-      return;
-    }
-    omStorage.setClusterId(clusterId);
-    omStorage.setScmId(scmId);
-    omStorage.setOmId(omId);
-    // Initialize ozone certificate client if security is enabled.
-    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      OzoneManager.initializeSecurity(conf, omStorage);
-    }
-    omStorage.initialize();
+  private void initializeOmStorage(OMStorage omStorage)
+      throws IOException, AuthenticationException {
+    OzoneManagerInitializer.run(conf);
   }
 }

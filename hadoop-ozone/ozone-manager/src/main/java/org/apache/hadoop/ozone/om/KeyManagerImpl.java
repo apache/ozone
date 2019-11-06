@@ -159,7 +159,7 @@ public class KeyManagerImpl implements KeyManager {
   public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
       OzoneBlockTokenSecretManager secretManager) {
-    this(null, new ScmClient(scmBlockClient, null), metadataManager,
+    this(null, new ScmClient(conf), metadataManager,
         conf, omId, secretManager, null, null);
   }
 
@@ -197,7 +197,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public void start(OzoneConfiguration configuration) {
+  public void start(OzoneConfiguration configuration) throws IOException {
     if (keyDeletingService == null) {
       long blockDeleteInterval = configuration.getTimeDuration(
           OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
@@ -659,17 +659,17 @@ public class KeyManagerImpl implements KeyManager {
           key.getLocationList().forEach(k -> {
             // TODO: fix Some tests that may not initialize container client
             // The production should always have containerClient initialized.
-            if (scmClient.getContainerClient() != null) {
-              try {
+            try {
+              if (scmClient.getContainerClient() != null) {
                 ContainerWithPipeline cp = scmClient.getContainerClient()
                     .getContainerWithPipeline(k.getContainerID());
                 if (!cp.getPipeline().equals(k.getPipeline())) {
                   k.setPipeline(cp.getPipeline());
                 }
-              } catch (IOException e) {
-                LOG.error("Unable to update pipeline for container:{}",
-                    k.getContainerID());
               }
+            } catch (IOException e) {
+              LOG.error("Unable to update pipeline for container:{}",
+                  k.getContainerID());
             }
           });
         }

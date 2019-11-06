@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.om.init.OzoneManagerInitializer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
@@ -89,7 +90,7 @@ public class TestOmInit {
     // Stop the Ozone Manager
     cluster.getOzoneManager().stop();
     // Now try to init the OM again. It should succeed
-    Assert.assertTrue(OzoneManager.omInit(conf));
+    Assert.assertTrue(OzoneManagerInitializer.run(conf));
   }
 
 }
