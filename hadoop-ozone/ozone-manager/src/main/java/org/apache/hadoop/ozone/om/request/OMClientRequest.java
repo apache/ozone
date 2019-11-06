@@ -112,6 +112,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
 
     if (remoteAddress != null) {
+      userInfo.setHostName(remoteAddress.getHostName());
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
     }
 
@@ -134,7 +135,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
       String vol, String bucket, String key) throws IOException {
     ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
-        createUGI(), getRemoteAddress());
+        createUGI(), getRemoteAddress(), getHostName());
   }
 
   /**
@@ -166,6 +167,21 @@ public abstract class OMClientRequest implements RequestAuditor {
     if (omRequest.hasUserInfo()) {
       return InetAddress.getByName(omRequest.getUserInfo()
           .getRemoteAddress());
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Return String created from OMRequest userInfo. If userInfo is not
+   * set, returns null.
+   * @return String
+   * @throws IOException
+   */
+  @VisibleForTesting
+  public String getHostName() {
+    if (omRequest.hasUserInfo()) {
+      return omRequest.getUserInfo().getHostName();
     } else {
       return null;
     }

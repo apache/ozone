@@ -77,6 +77,11 @@ public class TestOMClientRequestWithUserInfo {
         return userGroupInformation;
       }
 
+      @Mock
+      public InetAddress getRemoteIp() {
+        return inetAddress;
+      }
+
       public InetAddress getRemoteAddress() {
         return inetAddress;
       }
@@ -108,12 +113,14 @@ public class TestOMClientRequestWithUserInfo {
 
     InetAddress remoteAddress = omBucketCreateRequest.getRemoteAddress();
     UserGroupInformation ugi = omBucketCreateRequest.createUGI();
+    String hostName = omBucketCreateRequest.getHostName();
 
 
-    // Now check we have original user info and remote address or not.
-    // Here from OMRequest user info, converted to UGI and InetAddress.
+    // Now check we have original user info, remote address and hostname or not.
+    // Here from OMRequest user info, converted to UGI, InetAddress and String.
     Assert.assertEquals(inetAddress.getHostAddress(),
         remoteAddress.getHostAddress());
     Assert.assertEquals(userGroupInformation.getUserName(), ugi.getUserName());
+    Assert.assertEquals(inetAddress.getHostName(), hostName);
   }
 }
