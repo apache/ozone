@@ -1592,7 +1592,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws OMException {
     checkAcls(resType, store, acl, vol, bucket, key,
         ProtobufRpcEngine.Server.getRemoteUser(),
-        ProtobufRpcEngine.Server.getRemoteIp());
+        ProtobufRpcEngine.Server.getRemoteIp(),
+        ProtobufRpcEngine.Server.getRemoteIp().getHostName());
   }
 
   /**
@@ -1605,12 +1606,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param key
    * @param ugi
    * @param remoteAddress
+   * @param hostName
    * @throws OMException
    */
   @SuppressWarnings("parameternumber")
   public void checkAcls(ResourceType resType, StoreType storeType,
       ACLType aclType, String vol, String bucket, String key,
-      UserGroupInformation ugi, InetAddress remoteAddress)
+      UserGroupInformation ugi, InetAddress remoteAddress, String hostName)
       throws OMException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(resType)
@@ -1621,6 +1623,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     RequestContext context = RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)
+        .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
         .build();
