@@ -329,8 +329,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         }
         break;
       } catch (ExecutionException | InterruptedException | IOException e) {
-        LOG.error("Failed to execute command " + request + " on datanode " + dn
-            .getUuidString(), e);
+        LOG.debug("Failed to execute command {} on datanode {}",
+            request, dn.getUuid(), e);
         if (!(e instanceof IOException)) {
           if (Status.fromThrowable(e.getCause()).getCode()
               == Status.UNAUTHENTICATED.getCode()) {
