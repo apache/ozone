@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -234,10 +233,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     // initialize the dispatcher with snapshot so that it build the missing
     // container list
     try (FileInputStream fin = new FileInputStream(snapshotFile)) {
-      byte[] container2BCSIDData = IOUtils.toByteArray(fin);
       ContainerProtos.Container2BCSIDMapProto proto =
           ContainerProtos.Container2BCSIDMapProto
-              .parseFrom(container2BCSIDData);
+              .parseFrom(fin);
       // read the created containers list from the snapshot file and add it to
       // the container2BCSIDMap here.
       // container2BCSIDMap will further grow as and when containers get created
@@ -260,7 +258,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // TODO : while snapshot is being taken, deleteContainer call should not
     // should not happen. Lock protection will be required if delete
     // container happens outside of Ratis.
-    IOUtils.write(builder.build().toByteArray(), out);
+    builder.build().writeTo(out);
   }
 
   public boolean isStateMachineHealthy() {
