@@ -27,6 +27,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -47,6 +51,7 @@ import io.opentracing.Scope;
 import io.opentracing.util.GlobalTracer;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -252,6 +257,29 @@ public class BaseFreonGenerator {
         RPC.getProxy(OzoneManagerProtocolPB.class, omVersion, omAddress,
             ugi, conf, NetUtils.getDefaultSocketFactory(conf),
             Client.getRpcTimeout(conf)), clientId);
+  }
+
+  public StorageContainerLocationProtocol createStorageContainerLocationClient(
+      OzoneConfiguration ozoneConf)
+      throws IOException {
+
+    long version = RPC.getProtocolVersion(
+        StorageContainerLocationProtocolPB.class);
+    InetSocketAddress scmAddress =
+        getScmAddressForClients(ozoneConf);
+
+    RPC.setProtocolEngine(ozoneConf, StorageContainerLocationProtocolPB.class,
+        ProtobufRpcEngine.class);
+    StorageContainerLocationProtocol client =
+        TracingUtil.createProxy(
+            new StorageContainerLocationProtocolClientSideTranslatorPB(
+                RPC.getProxy(StorageContainerLocationProtocolPB.class, version,
+                    scmAddress, UserGroupInformation.getCurrentUser(),
+                    ozoneConf,
+                    NetUtils.getDefaultSocketFactory(ozoneConf),
+                    Client.getRpcTimeout(ozoneConf))),
+            StorageContainerLocationProtocol.class, ozoneConf);
+    return client;
   }
 
   /**
