@@ -1918,6 +1918,8 @@ public class KeyManagerImpl implements KeyManager {
           // Return the single file status directly if OmKey points to a file
           return Collections.singletonList(fileStatus);
         }
+        // Append '/' to startKey if it doesn't have it
+        startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       }
 
       int countEntries = 0;
@@ -1925,8 +1927,9 @@ public class KeyManagerImpl implements KeyManager {
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
           cacheIter = keyTable.cacheIterator();
       String startCacheKey = OZONE_URI_DELIMITER + volumeName +
-          OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER + startKey;
-      // Note: startKey shouldn't begin with '/'
+          OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
+          ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
+      // Note: eliminate the case where startCacheKey could end with '//'
 
       // First, iterate TableCache
       // Limit number of result to numEntries, append result to cacheKeyMap,
@@ -1951,8 +1954,6 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
 
-      // Append '/' to startKey if it doesn't have it
-      startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       // Find key in db
       String seekKeyInDb =
           metadataManager.getOzoneKey(volumeName, bucketName, startKey);
