@@ -213,8 +213,10 @@ public class OMException extends IOException {
     USER_MISMATCH, // Error code when requested user name passed is different
     // from remote user.
 
-    INVALID_PART,
+    INVALID_PART, // When part name is not found or not matching with partname 
+    // in OM MPU partInfo.
 
-    INVALID_PART_ORDER
+    INVALID_PART_ORDER // When list of parts mentioned to complete MPU are not 
+    // given in ascending order.  
   }
 }
