@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -42,7 +42,7 @@ public class StringCodec implements Codec<StringBuilder> {
       throw new EmptyTracerStateStringException();
     }
     String value = s.toString();
-    if (value != null && !value.equals("")) {
+    if (!"".equals(value)) {
       String[] parts = value.split(":");
       if (parts.length != 4) {
         if (LOG.isDebugEnabled()) {
@@ -59,7 +59,7 @@ public class StringCodec implements Codec<StringBuilder> {
               (new BigInteger(parts[3], 16)).byteValue());
         } else {
           throw new TraceIdOutOfBoundException(
-              "Trace id [" + traceId + "] length is not withing 1 and 32");
+              "Trace id [" + traceId + "] length is not within 1 and 32");
         }
       }
     } else {
@@ -68,13 +68,12 @@ public class StringCodec implements Codec<StringBuilder> {
   }
 
   @Override
-  public void inject(JaegerSpanContext context,
-      StringBuilder string) {
+  public void inject(JaegerSpanContext context, StringBuilder string) {
     int intFlag = context.getFlags() & 255;
-    string.append(
-        context.getTraceId() + ":" + Long.toHexString(context.getSpanId())
-            + ":" + Long.toHexString(context.getParentId()) + ":" + Integer
-            .toHexString(intFlag));
+    string.append(context.getTraceId())
+        .append(":").append(Long.toHexString(context.getSpanId()))
+        .append(":").append(Long.toHexString(context.getParentId()))
+        .append(":").append(Integer.toHexString(intFlag));
   }
 
   private static long high(String hexString) {
