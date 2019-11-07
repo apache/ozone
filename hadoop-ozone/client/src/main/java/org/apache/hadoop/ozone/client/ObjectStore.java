@@ -450,7 +450,7 @@ public class ObjectStore {
    * Add acl for Ozone object. Return true if acl is added successfully else
    * false.
    * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl top be added.
+   * @param acl ozone acl to be added.
    * @return true if acl is added successfully, else false.
    * @throws IOException if there is error.
    * */

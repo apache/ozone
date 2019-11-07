@@ -478,7 +478,7 @@ public class VolumeManagerImpl implements VolumeManager {
    * false.
    *
    * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl top be added.
+   * @param acl ozone acl to be added.
    * @throws IOException if there is error.
    */
   @Override
