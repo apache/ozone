@@ -210,9 +210,6 @@ public class TestKeyManagerImpl {
                 fileStatus.getPath().toString().substring(1))));
       }
     }
-
-    // Clean up TableCache in between tests
-    metadataManager.getKeyTable().cleanupCache(2L);
   }
 
   private static void createBucket(String volumeName, String bucketName)
@@ -819,12 +816,12 @@ public class TestKeyManagerImpl {
         keyManager.listStatus(rootDirArgs, true, "", 1000);
     Assert.assertEquals(fileStatuses.size(),  100);
 
-    // Get entries with startKey = prefixKeyInDB
+    // Get entries with startKey=prefixKeyInDB
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, prefixKeyInDB, 1000);
     Assert.assertEquals(fileStatuses.size(),  50);
 
-    // Get entries with startKey = prefixKeyInCache
+    // Get entries with startKey=prefixKeyInCache
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, prefixKeyInCache, 1000);
     Assert.assertEquals(fileStatuses.size(),  100);
@@ -917,6 +914,18 @@ public class TestKeyManagerImpl {
       Assert.assertTrue(keyName.startsWith(prefixKey));
     }
     Assert.assertEquals(expectedKeys, existKeySet);
+
+    // Clean up by marking remaining entries as deleted
+    for (String key : existKeySet) {
+      String ozoneKey = metadataManager.getOzoneKey(
+          VOLUME_NAME, BUCKET_NAME, key);
+      metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+          new CacheValue<>(Optional.absent(), 2L));
+      deletedKeySet.add(key);
+    }
+    // Update existKeySet
+    existKeySet.removeAll(deletedKeySet);
+    Assert.assertTrue(existKeySet.isEmpty());
   }
 
   @Test
