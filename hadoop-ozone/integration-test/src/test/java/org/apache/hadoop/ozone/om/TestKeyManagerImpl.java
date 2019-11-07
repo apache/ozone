@@ -210,6 +210,9 @@ public class TestKeyManagerImpl {
                 fileStatus.getPath().toString().substring(1))));
       }
     }
+
+    // Clean up TableCache in between tests
+    metadataManager.getKeyTable().cleanupCache(2L);
   }
 
   private static void createBucket(String volumeName, String bucketName)
@@ -825,6 +828,14 @@ public class TestKeyManagerImpl {
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, prefixKeyInCache, 1000);
     Assert.assertEquals(fileStatuses.size(),  100);
+
+    // Clean up cache by marking those keys in cache as deleted
+    for (int i = 1; i <= 100; i += 2) {
+      String key = metadataManager.getOzoneKey(
+          VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i);
+      metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
+          new CacheValue<>(Optional.absent(), 2L));
+    }
   }
 
   @Test
@@ -845,11 +856,12 @@ public class TestKeyManagerImpl {
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
             HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
             metadataManager);
+
         String key = metadataManager.getOzoneKey(
             VOLUME_NAME, BUCKET_NAME, prefixKey + i);
         // Mark as deleted in cache.
         metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.absent(), 100L));
+            new CacheValue<>(Optional.absent(), 2L));
         deletedKeySet.add(key);
       }
     }
@@ -877,14 +889,14 @@ public class TestKeyManagerImpl {
     Assert.assertEquals(0,
         Sets.intersection(existKeySet, deletedKeySet).size());
 
-    // Further, mark half of the entries left as deleted
+    // Next, mark half of the entries left as deleted
     boolean doDelete = false;
     for (String key : existKeySet) {
       if (doDelete) {
         String ozoneKey = metadataManager.getOzoneKey(
             VOLUME_NAME, BUCKET_NAME, key);
         metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
-            new CacheValue<>(Optional.absent(), 100L));
+            new CacheValue<>(Optional.absent(), 2L));
         deletedKeySet.add(key);
       }
       doDelete = !doDelete;
