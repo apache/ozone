@@ -33,7 +33,7 @@ services:
          - ../..:/opt/ozone
       command: ["hdfs","datanode"]
       environment:
-         HADOOP_CLASSPATH: /opt/ozone/share/hadoop/ozoneplugin/*.jar
+         HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/*.jar
       env_file:
         - ./docker-config
    om:

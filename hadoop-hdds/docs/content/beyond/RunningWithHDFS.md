@@ -42,10 +42,10 @@ be activated as part of the normal HDFS Datanode bootstrap.
 </property>
 {{< /highlight >}}
 
-You also need to add the ozone-datanode-plugin jar file to the classpath:
+You also need to add the jar file under path /opt/ozone/share/ozone/lib/ to the classpath:
 
 {{< highlight bash >}}
-export HADOOP_CLASSPATH=/opt/ozone/share/hadoop/ozoneplugin/hadoop-ozone-datanode-plugin.jar
+export HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/*.jar
 {{< /highlight >}}
 
 

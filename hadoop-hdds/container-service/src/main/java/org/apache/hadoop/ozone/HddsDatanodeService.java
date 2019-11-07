@@ -87,6 +87,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private String[] args;
   private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
 
+  //Constructor for DataNode PluginService
+  public HddsDatanodeService(){}
+
   public HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
     this.args = args != null ? Arrays.copyOf(args, args.length) : null;
