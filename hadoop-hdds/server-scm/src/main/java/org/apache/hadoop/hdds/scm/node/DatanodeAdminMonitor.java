@@ -77,10 +77,14 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
     AWAIT_MAINTENANCE_END(4),
     COMPLETE(5);
 
-    public int sequenceNumber;
+    private int sequenceNumber;
 
     States(int sequenceNumber) {
       this.sequenceNumber = sequenceNumber;
+    }
+
+    public int getSequenceNumber() {
+      return sequenceNumber;
     }
   }
 
