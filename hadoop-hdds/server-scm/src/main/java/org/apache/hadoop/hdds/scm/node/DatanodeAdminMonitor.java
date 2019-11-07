@@ -46,7 +46,7 @@ import java.util.Set;
  * the following happens:
  *
  * 1. First an event is fired to close any pipelines on the node, which will
- *    also close any contaners.
+ *    also close any containers.
  * 2. Next the containers on the node are obtained and checked to see if new
  *    replicas are needed. If so, the new replicas are scheduled.
  * 3. After scheduling replication, the node remains pending until replication
@@ -71,8 +71,17 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
    * into maintenance.
    */
   public enum States {
-    CLOSE_PIPELINES, GET_CONTAINERS, REPLICATE_CONTAINERS,
-    AWAIT_MAINTENANCE_END, COMPLETE
+    CLOSE_PIPELINES(1),
+    GET_CONTAINERS(2),
+    REPLICATE_CONTAINERS(3),
+    AWAIT_MAINTENANCE_END(4),
+    COMPLETE(5);
+
+    public int sequenceNumber;
+
+    States(int sequenceNumber) {
+      this.sequenceNumber = sequenceNumber;
+    }
   }
 
   /**
