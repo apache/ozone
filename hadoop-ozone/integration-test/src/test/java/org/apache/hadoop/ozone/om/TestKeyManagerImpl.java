@@ -33,6 +33,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
+import com.google.common.base.Optional;
+import com.google.common.collect.Sets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -60,6 +62,8 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -791,6 +795,7 @@ public class TestKeyManagerImpl {
     String prefixKeyInDB = "key-d";
     String prefixKeyInCache = "key-c";
 
+    // Add a total of 100 key entries to DB and TableCache (50 entries each)
     for (int i = 1; i <= 100; i++) {
       if (i % 2 == 0) {  // Add to DB
         TestOMRequestUtils.addKeyToTable(false,
@@ -806,10 +811,100 @@ public class TestKeyManagerImpl {
     }
 
     OmKeyArgs rootDirArgs = createKeyArgs("");
+    // Get entries in both TableCache and DB
     List<OzoneFileStatus> fileStatuses =
         keyManager.listStatus(rootDirArgs, true, "", 1000);
-    // Should get entries in both TableCache and DB.
     Assert.assertEquals(fileStatuses.size(),  100);
+
+    // Get entries with startKey = prefixKeyInDB
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, prefixKeyInDB, 1000);
+    Assert.assertEquals(fileStatuses.size(),  50);
+
+    // Get entries with startKey = prefixKeyInCache
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, prefixKeyInCache, 1000);
+    Assert.assertEquals(fileStatuses.size(),  100);
+  }
+
+  @Test
+  public void testListStatusWithDeletedEntriesInCache() throws Exception {
+    String prefixKey = "key-";
+    TreeSet<String> existKeySet = new TreeSet<>();
+    TreeSet<String> deletedKeySet = new TreeSet<>();
+
+    for (int i = 1; i <= 100; i++) {
+      if (i % 2 == 0) {
+        TestOMRequestUtils.addKeyToTable(false,
+            VOLUME_NAME, BUCKET_NAME, prefixKey + i,
+            1000L, HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, metadataManager);
+        existKeySet.add(prefixKey + i);
+      } else {
+        TestOMRequestUtils.addKeyToTableCache(
+            VOLUME_NAME, BUCKET_NAME, prefixKey + i,
+            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            metadataManager);
+        String key = metadataManager.getOzoneKey(
+            VOLUME_NAME, BUCKET_NAME, prefixKey + i);
+        // Mark as deleted in cache.
+        metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
+            new CacheValue<>(Optional.absent(), 100L));
+        deletedKeySet.add(key);
+      }
+    }
+
+    OmKeyArgs rootDirArgs = createKeyArgs("");
+    List<OzoneFileStatus> fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, "", 1000);
+    // Should only get entries that are not marked as deleted.
+    Assert.assertEquals(fileStatuses.size(),  50);
+    // Test startKey
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, prefixKey, 1000);
+    // Should only get entries that are not marked as deleted.
+    Assert.assertEquals(fileStatuses.size(),  50);
+    // Verify result
+    TreeSet<String> expectedKeys = new TreeSet<>();
+    for (OzoneFileStatus fileStatus : fileStatuses) {
+      String keyName = fileStatus.getKeyInfo().getKeyName();
+      expectedKeys.add(keyName);
+      Assert.assertTrue(keyName.startsWith(prefixKey));
+    }
+    Assert.assertEquals(expectedKeys, existKeySet);
+
+    // Sanity check, existKeySet should not intersect with deletedKeySet.
+    Assert.assertEquals(0,
+        Sets.intersection(existKeySet, deletedKeySet).size());
+
+    // Further, mark half of the entries left as deleted
+    boolean doDelete = false;
+    for (String key : existKeySet) {
+      if (doDelete) {
+        String ozoneKey = metadataManager.getOzoneKey(
+            VOLUME_NAME, BUCKET_NAME, key);
+        metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+            new CacheValue<>(Optional.absent(), 100L));
+        deletedKeySet.add(key);
+      }
+      doDelete = !doDelete;
+    }
+    // Update existKeySet
+    existKeySet.removeAll(deletedKeySet);
+
+    fileStatuses = keyManager.listStatus(
+        rootDirArgs, true, "", 1000);
+    // Should only get entries that are not marked as deleted.
+    Assert.assertEquals(fileStatuses.size(),  50 / 2);
+
+    // Verify result
+    expectedKeys.clear();
+    for (OzoneFileStatus fileStatus : fileStatuses) {
+      String keyName = fileStatus.getKeyInfo().getKeyName();
+      expectedKeys.add(keyName);
+      Assert.assertTrue(keyName.startsWith(prefixKey));
+    }
+    Assert.assertEquals(expectedKeys, existKeySet);
   }
 
   @Test
