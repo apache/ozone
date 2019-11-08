@@ -19,7 +19,7 @@ We welcome contributions of:
  * **Documentation Improvements**: You can submit improvements to either:
      * Ozone website. Instructions are here: [Modifying the Ozone Website](https://cwiki.apache.org/confluence/display/HADOOP/Modifying+the+Ozone+Website)
      * Developer docs. These are markdown files [checked into the Apache Hadoop Source tree](https://github.com/apache/hadoop-ozone/tree/master/hadoop-hdds/docs/content).
- * The [wiki pages](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Contributor+Guide): Please contact us at hdfs-dev@hadoop.apache.org and we can provide you write access to the wiki.
+ * The [wiki pages](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Contributor+Guide): Please contact us at ozone-dev@hadoop.apache.org and we can provide you write access to the wiki.
  * **Testing**: We always need help to improve our testing
       * Unit Tests (JUnit / Java)
       * Acceptance Tests (docker + robot framework)
@@ -31,7 +31,7 @@ We welcome contributions of:
 
 If you have any questions, please don't hesitate to contact
 
- * **email**: use hdfs-dev@hadoop.apache.org.
+ * **email**: use ozone-dev@hadoop.apache.org.
  * **chat**: You can find the #ozone channel at the ASF slack. Invite link is [here](http://s.apache.org/slack-invite)
  * **meeting**: [We have weekly meetings](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Community+Calls) which is open to anybody. Feel free to join and ask any questions
     
