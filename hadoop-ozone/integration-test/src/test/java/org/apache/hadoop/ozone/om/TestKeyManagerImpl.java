@@ -111,6 +111,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.mockito.Matchers.anyLong;
@@ -833,6 +834,64 @@ public class TestKeyManagerImpl {
       metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
           new CacheValue<>(Optional.absent(), 2L));
     }
+  }
+
+  @Test
+  public void testListStatusWithTableCacheRecursive() throws Exception {
+    String keyNameDir1 = "dir1";
+    OmKeyArgs keyArgsDir1 =
+        createBuilder().setKeyName(keyNameDir1).build();
+    keyManager.createDirectory(keyArgsDir1);
+
+    String keyNameDir1Subdir1 = "dir1" + OZONE_URI_DELIMITER + "subdir1";
+    OmKeyArgs keyArgsDir1Subdir1 =
+        createBuilder().setKeyName(keyNameDir1Subdir1).build();
+    keyManager.createDirectory(keyArgsDir1Subdir1);
+
+    String keyNameDir2 = "dir2";
+    OmKeyArgs keyArgsDir2 =
+        createBuilder().setKeyName(keyNameDir2).build();
+    keyManager.createDirectory(keyArgsDir2);
+
+    OmKeyArgs rootDirArgs = createKeyArgs("");
+    // Test listStatus with recursive=false, should only have dirs under root
+    List<OzoneFileStatus> fileStatuses =
+        keyManager.listStatus(rootDirArgs, false, "", 1000);
+    Assert.assertEquals(2, fileStatuses.size());
+
+    // Test listStatus with recursive=true, should have dirs under root and
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, "", 1000);
+    Assert.assertEquals(3, fileStatuses.size());
+
+    // Add a total of 10 key entries to DB and TableCache under dir1
+    String prefixKeyInDB = "key-d";
+    String prefixKeyInCache = "key-c";
+    for (int i = 1; i <= 10; i++) {
+      if (i % 2 == 0) {  // Add to DB
+        TestOMRequestUtils.addKeyToTable(false,
+            VOLUME_NAME, BUCKET_NAME,
+            keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInDB + i,
+            1000L, HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, metadataManager);
+      } else {  // Add to TableCache
+        TestOMRequestUtils.addKeyToTableCache(
+            VOLUME_NAME, BUCKET_NAME,
+            keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i,
+            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            metadataManager);
+      }
+    }
+
+    // Test non-recursive, should return the dir under root
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, false, "", 1000);
+    Assert.assertEquals(2, fileStatuses.size());
+
+    // Test recursive, should return the dir and the keys in it
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, "", 1000);
+    Assert.assertEquals(10 + 3, fileStatuses.size());
   }
 
   @Test
