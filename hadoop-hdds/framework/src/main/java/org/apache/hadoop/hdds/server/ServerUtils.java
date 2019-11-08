@@ -224,4 +224,12 @@ public final class ServerUtils {
         HddsConfigKeys.OZONE_METADATA_DIRS);
     return ServerUtils.getOzoneMetaDirPath(conf);
   }
+
+  public static String getDefaultRatisDirectory(Configuration conf) {
+    LOG.warn("Storage directory for Ratis is not configured. It is a good " +
+            "idea to map this to an SSD disk. Falling back to {}",
+        HddsConfigKeys.OZONE_METADATA_DIRS);
+    File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+    return (new File(metaDirPath, "ratis")).getPath();
+  }
 }
