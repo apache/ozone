@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .CloseContainerCommandHandler;
@@ -98,6 +97,10 @@ public class DatanodeStateMachine implements Closeable {
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
       Configuration conf, CertificateClient certClient,
       HddsDatanodeStopService hddsDatanodeStopService) throws IOException {
+    OzoneConfiguration ozoneConf = new OzoneConfiguration(conf);
+    DatanodeConfiguration dnConf =
+        ozoneConf.getObject(DatanodeConfiguration.class);
+
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
@@ -107,7 +110,7 @@ public class DatanodeStateMachine implements Closeable {
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
     container = new OzoneContainer(this.datanodeDetails,
-        new OzoneConfiguration(conf), context, certClient);
+        ozoneConf, context, certClient);
     dnCertClient = certClient;
     nextHB = new AtomicLong(Time.monotonicNow());
 
@@ -116,21 +119,9 @@ public class DatanodeStateMachine implements Closeable {
             container.getController(),
             new SimpleContainerDownloader(conf), new TarContainerPacker());
 
-    int replicationThreads = conf.getInt(
-        OzoneConfigKeys.HDDS_DATANODE_REPLICATION_STREAMS_LIMIT,
-        OzoneConfigKeys.HDDS_DATANODE_REPLICATION_STREAMS_LIMIT_DEFAULT);
-    if (replicationThreads < 1) {
-      LOG.warn("{} is set to {} and must be greater than 0. Defaulting to {}",
-          OzoneConfigKeys.HDDS_DATANODE_REPLICATION_STREAMS_LIMIT,
-          replicationThreads,
-          OzoneConfigKeys.HDDS_DATANODE_REPLICATION_STREAMS_LIMIT_DEFAULT);
-      replicationThreads =
-          OzoneConfigKeys.HDDS_DATANODE_REPLICATION_STREAMS_LIMIT_DEFAULT;
-    }
-
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), replicator,
-            replicationThreads);
+            dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
      // trick.

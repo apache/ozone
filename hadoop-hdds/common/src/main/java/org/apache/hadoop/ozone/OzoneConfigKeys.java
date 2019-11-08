@@ -374,10 +374,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CONTAINER_COPY_WORKDIR =
       "hdds.datanode.replication.work.dir";
 
-  public static final String HDDS_DATANODE_REPLICATION_STREAMS_LIMIT =
-      "hdds.datanode.replication.streams.limit";
-  public static final int HDDS_DATANODE_REPLICATION_STREAMS_LIMIT_DEFAULT = 10;
-
   /**
    * Config properties to set client side checksum properties.
    */

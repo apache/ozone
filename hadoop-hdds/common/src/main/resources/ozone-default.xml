@@ -1386,14 +1386,6 @@
   </property>
 
   <property>
-      <name>hdds.datanode.replication.streams.limit</name>
-      <tag>DATANODE</tag>
-      <description>Maximum number of container replication commands which
-        can be executed simultaneously on a single datanode.
-      </description>
-  </property>
-
-  <property>
     <name>hdds.lock.max.concurrency</name>
     <value>100</value>
     <tag>HDDS</tag>
