@@ -31,6 +31,8 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .ContainerPlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -54,10 +56,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.apache.hadoop.hdds.scm.TestUtils.createDatanodeDetails;
-import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
-import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
-import static org.apache.hadoop.hdds.scm.TestUtils.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.TestUtils.*;
 
 /**
  * Test cases to verify the functionality of ReplicationManager.
@@ -162,11 +161,11 @@ public class TestReplicationManager {
 
     // Two replicas in CLOSING state
     final Set<ContainerReplica> replicas = getReplicas(id, State.CLOSING,
-        randomDatanodeDetails(),
-        randomDatanodeDetails());
+        randomDatanodeInfo(),
+        randomDatanodeInfo());
 
     // One replica in OPEN state
-    final DatanodeDetails datanode = randomDatanodeDetails();
+    final DatanodeInfo datanode = randomDatanodeInfo();
     replicas.addAll(getReplicas(id, State.OPEN, datanode));
 
     for (ContainerReplica replica : replicas) {
@@ -207,12 +206,12 @@ public class TestReplicationManager {
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.OPEN, 1000L, originNodeId, randomDatanodeDetails());
-    final DatanodeDetails datanodeDetails = randomDatanodeDetails();
+        id, State.OPEN, 1000L, originNodeId, randomDatanodeInfo());
+    final DatanodeInfo datanodeInfo = randomDatanodeInfo();
     final ContainerReplica replicaThree = getReplicas(
-        id, State.OPEN, 1000L, datanodeDetails.getUuid(), datanodeDetails);
+        id, State.OPEN, 1000L, datanodeInfo.getUuid(), datanodeInfo);
 
     containerStateManager.loadContainer(container);
     containerStateManager.updateContainerReplica(id, replicaOne);
@@ -247,11 +246,11 @@ public class TestReplicationManager {
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaThree = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
 
     containerStateManager.loadContainer(container);
     containerStateManager.updateContainerReplica(id, replicaOne);
@@ -283,11 +282,11 @@ public class TestReplicationManager {
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaThree = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
 
     containerStateManager.loadContainer(container);
     containerStateManager.updateContainerReplica(id, replicaOne);
@@ -309,7 +308,7 @@ public class TestReplicationManager {
     // Make the first replica unhealthy
     final ContainerReplica unhealthyReplica = getReplicas(
         id, State.UNHEALTHY, 1000L, originNodeId,
-        replicaOne.getDatanodeDetails());
+        replicaOne.getDatanodeInfo());
     containerStateManager.updateContainerReplica(id, unhealthyReplica);
 
     replicationManager.processContainersNow();
@@ -346,13 +345,13 @@ public class TestReplicationManager {
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaThree = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaFour = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
 
     containerStateManager.loadContainer(container);
     containerStateManager.updateContainerReplica(id, replicaOne);
@@ -383,13 +382,13 @@ public class TestReplicationManager {
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
     final ContainerReplica replicaOne = getReplicas(
-        id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaThree = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaFour = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
 
     containerStateManager.loadContainer(container);
     containerStateManager.updateContainerReplica(id, replicaOne);
@@ -421,9 +420,9 @@ public class TestReplicationManager {
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
 
     containerStateManager.loadContainer(container);
     containerStateManager.updateContainerReplica(id, replicaOne);
@@ -467,9 +466,9 @@ public class TestReplicationManager {
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
     final ContainerReplica replicaOne = getReplicas(
-        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeInfo());
     final ContainerReplica replicaTwo = getReplicas(
-        id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeInfo());
 
     containerStateManager.loadContainer(container);
     containerStateManager.updateContainerReplica(id, replicaOne);
@@ -495,8 +494,8 @@ public class TestReplicationManager {
 
     Assert.assertTrue(replicateCommand.isPresent());
 
-    DatanodeDetails newNode = createDatanodeDetails(
-        replicateCommand.get().getDatanodeId());
+    DatanodeInfo newNode = new DatanodeInfo(createDatanodeDetails(
+        replicateCommand.get().getDatanodeId()), NodeStatus.inServiceHealthy());
     ContainerReplica newReplica = getReplicas(
         id, State.QUASI_CLOSED, 1000L, originNodeId, newNode);
     containerStateManager.updateContainerReplica(id, newReplica);
@@ -545,9 +544,9 @@ public class TestReplicationManager {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.QUASI_CLOSED,
-        randomDatanodeDetails(),
-        randomDatanodeDetails(),
-        randomDatanodeDetails());
+        randomDatanodeInfo(),
+        randomDatanodeInfo(),
+        randomDatanodeInfo());
     containerStateManager.loadContainer(container);
     for (ContainerReplica replica : replicas) {
       containerStateManager.updateContainerReplica(id, replica);
@@ -577,9 +576,9 @@ public class TestReplicationManager {
     final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
     final ContainerID id = container.containerID();
     final Set<ContainerReplica> replicas = getReplicas(id, State.CLOSED,
-        randomDatanodeDetails(),
-        randomDatanodeDetails(),
-        randomDatanodeDetails());
+        randomDatanodeInfo(),
+        randomDatanodeInfo(),
+        randomDatanodeInfo());
 
     containerStateManager.loadContainer(container);
     for (ContainerReplica replica : replicas) {

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -551,6 +552,18 @@ public class MockNodeManager implements NodeManager {
       }
     }
     return results;
+  }
+
+  /**
+   * Get the DatanodeInfo object which is associated with the given
+   * DatanodeDetails object.
+   *
+   * @param datanodeDetails The datanode to lookup
+   * @return The DatanodeInfo associated with the given DatanodeDetails
+   */
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy());
   }
 
   public void setNetworkTopology(NetworkTopology topology) {

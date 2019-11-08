@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -115,9 +116,12 @@ public class TestContainerReportHandler {
         nodeManager, containerManager);
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
-    final DatanodeDetails datanodeOne = nodeIterator.next();
-    final DatanodeDetails datanodeTwo = nodeIterator.next();
-    final DatanodeDetails datanodeThree = nodeIterator.next();
+    final DatanodeInfo datanodeOne =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeTwo =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeThree =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
 
     final ContainerInfo containerOne = getContainer(LifeCycleState.CLOSED);
     final ContainerInfo containerTwo = getContainer(LifeCycleState.CLOSED);
@@ -184,10 +188,14 @@ public class TestContainerReportHandler {
 
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
-    final DatanodeDetails datanodeOne = nodeIterator.next();
-    final DatanodeDetails datanodeTwo = nodeIterator.next();
-    final DatanodeDetails datanodeThree = nodeIterator.next();
-    final DatanodeDetails datanodeFour = nodeIterator.next();
+    final DatanodeInfo datanodeOne =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeTwo =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeThree =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeDetails datanodeFour =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
 
     final ContainerInfo containerOne = getContainer(LifeCycleState.CLOSED);
     final ContainerInfo containerTwo = getContainer(LifeCycleState.CLOSED);
@@ -263,9 +271,12 @@ public class TestContainerReportHandler {
 
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
-    final DatanodeDetails datanodeOne = nodeIterator.next();
-    final DatanodeDetails datanodeTwo = nodeIterator.next();
-    final DatanodeDetails datanodeThree = nodeIterator.next();
+    final DatanodeInfo datanodeOne =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeTwo =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeThree =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
 
     final ContainerInfo containerOne = getContainer(LifeCycleState.CLOSING);
     final ContainerInfo containerTwo = getContainer(LifeCycleState.CLOSED);
@@ -342,9 +353,12 @@ public class TestContainerReportHandler {
 
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
-    final DatanodeDetails datanodeOne = nodeIterator.next();
-    final DatanodeDetails datanodeTwo = nodeIterator.next();
-    final DatanodeDetails datanodeThree = nodeIterator.next();
+    final DatanodeInfo datanodeOne =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeTwo =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeThree =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
 
     final ContainerInfo containerOne = getContainer(LifeCycleState.CLOSING);
     final ContainerInfo containerTwo = getContainer(LifeCycleState.CLOSED);
@@ -420,9 +434,12 @@ public class TestContainerReportHandler {
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
         NodeStatus.inServiceHealthy()).iterator();
 
-    final DatanodeDetails datanodeOne = nodeIterator.next();
-    final DatanodeDetails datanodeTwo = nodeIterator.next();
-    final DatanodeDetails datanodeThree = nodeIterator.next();
+    final DatanodeInfo datanodeOne =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeTwo =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
+    final DatanodeInfo datanodeThree =
+        nodeManager.getDatanodeInfo(nodeIterator.next());
 
     final ContainerInfo containerOne =
         getContainer(LifeCycleState.QUASI_CLOSED);

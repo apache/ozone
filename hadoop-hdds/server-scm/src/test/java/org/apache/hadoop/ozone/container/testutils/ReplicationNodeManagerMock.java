@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -316,6 +317,19 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public Boolean isNodeRegistered(
       DatanodeDetails datanodeDetails) {
     return null;
+  }
+
+  /**
+   * Get the DatanodeInfo object which is associated with the given
+   * DatanodeDetails object.
+   *
+   * @param datanodeDetails The datanode to lookup
+   * @return The DatanodeInfo associated with the given DatanodeDetails
+   */
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy());
   }
 
   /**

@@ -30,6 +30,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -405,12 +407,16 @@ public class TestContainerStateManagerIntegration {
 
   @Test
   public void testReplicaMap() throws Exception {
-    DatanodeDetails dn1 = DatanodeDetails.newBuilder().setHostName("host1")
+    DatanodeInfo dn1 = new DatanodeInfo(
+        DatanodeDetails.newBuilder().setHostName("host1")
         .setIpAddress("1.1.1.1")
-        .setUuid(UUID.randomUUID().toString()).build();
-    DatanodeDetails dn2 = DatanodeDetails.newBuilder().setHostName("host2")
+        .setUuid(UUID.randomUUID().toString()).build(),
+        NodeStatus.inServiceHealthy());
+    DatanodeInfo dn2 = new DatanodeInfo(
+        DatanodeDetails.newBuilder().setHostName("host2")
         .setIpAddress("2.2.2.2")
-        .setUuid(UUID.randomUUID().toString()).build();
+        .setUuid(UUID.randomUUID().toString()).build(),
+        NodeStatus.inServiceHealthy());
 
     // Test 1: no replica's exist
     ContainerID containerID = ContainerID.valueof(RandomUtils.nextLong());
@@ -433,12 +439,12 @@ public class TestContainerStateManagerIntegration {
     ContainerReplica replicaOne = ContainerReplica.newBuilder()
         .setContainerID(id)
         .setContainerState(ContainerReplicaProto.State.OPEN)
-        .setDatanodeDetails(dn1)
+        .setDatanodeInfo(dn1)
         .build();
     ContainerReplica replicaTwo = ContainerReplica.newBuilder()
         .setContainerID(id)
         .setContainerState(ContainerReplicaProto.State.OPEN)
-        .setDatanodeDetails(dn2)
+        .setDatanodeInfo(dn2)
         .build();
     containerStateManager.updateContainerReplica(id, replicaOne);
     containerStateManager.updateContainerReplica(id, replicaTwo);

@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server
@@ -92,6 +94,16 @@ public final class TestUtils {
    */
   public static DatanodeDetails randomDatanodeDetails() {
     return createDatanodeDetails(UUID.randomUUID());
+  }
+
+  /**
+   * Creates DatanodeInfo with random UUID.
+   *
+   * @return DatanodeInfo
+   */
+  public static DatanodeInfo randomDatanodeInfo() {
+    return new DatanodeInfo(createDatanodeDetails(UUID.randomUUID()),
+        NodeStatus.inServiceHealthy());
   }
 
   /**
@@ -559,17 +571,17 @@ public final class TestUtils {
   public static Set<ContainerReplica> getReplicas(
       final ContainerID containerId,
       final ContainerReplicaProto.State state,
-      final DatanodeDetails... datanodeDetails) {
-    return getReplicas(containerId, state, 10000L, datanodeDetails);
+      final DatanodeInfo... datanodeInfo) {
+    return getReplicas(containerId, state, 10000L, datanodeInfo);
   }
 
   public static Set<ContainerReplica> getReplicas(
       final ContainerID containerId,
       final ContainerReplicaProto.State state,
       final long sequenceId,
-      final DatanodeDetails... datanodeDetails) {
+      final DatanodeInfo... datanodeInfo) {
     Set<ContainerReplica> replicas = new HashSet<>();
-    for (DatanodeDetails datanode : datanodeDetails) {
+    for (DatanodeInfo datanode : datanodeInfo) {
       replicas.add(getReplicas(containerId, state,
           sequenceId, datanode.getUuid(), datanode));
     }
@@ -581,11 +593,11 @@ public final class TestUtils {
       final ContainerReplicaProto.State state,
       final long sequenceId,
       final UUID originNodeId,
-      final DatanodeDetails datanodeDetails) {
+      final DatanodeInfo datanodeInfo) {
     return ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(state)
-        .setDatanodeDetails(datanodeDetails)
+        .setDatanodeInfo(datanodeInfo)
         .setOriginNodeId(originNodeId)
         .setSequenceId(sequenceId)
         .build();

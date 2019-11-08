@@ -228,4 +228,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return the given datanode, or empty list if none found
    */
   List<DatanodeDetails> getNodesByAddress(String address);
+
+  /**
+   * Get the DatanodeInfo object which is associated with the given
+   * DatanodeDetails object.
+   *
+   * @param datanodeDetails The datanode to lookup
+   * @return The DatanodeInfo associated with the given DatanodeDetails
+   */
+  DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException;
 }

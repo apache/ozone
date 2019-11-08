@@ -112,9 +112,9 @@ public class TestDeadNodeHandler {
   @Test
   public void testOnMessage() throws IOException, NodeNotFoundException {
     //GIVEN
-    DatanodeDetails datanode1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails datanode2 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails datanode3 = TestUtils.randomDatanodeDetails();
+    DatanodeInfo datanode1 = TestUtils.randomDatanodeInfo();
+    DatanodeInfo datanode2 = TestUtils.randomDatanodeInfo();
+    DatanodeInfo datanode3 = TestUtils.randomDatanodeInfo();
 
     String storagePath = GenericTestUtils.getRandomizedTempPath()
         .concat("/" + datanode1.getUuidString());
@@ -191,15 +191,15 @@ public class TestDeadNodeHandler {
   }
 
   private void registerReplicas(ContainerManager contManager,
-      ContainerInfo container, DatanodeDetails... datanodes)
+      ContainerInfo container, DatanodeInfo... datanodes)
       throws ContainerNotFoundException {
-    for (DatanodeDetails datanode : datanodes) {
+    for (DatanodeInfo datanode : datanodes) {
       contManager.updateContainerReplica(
           new ContainerID(container.getContainerID()),
           ContainerReplica.newBuilder()
               .setContainerState(ContainerReplicaProto.State.OPEN)
               .setContainerID(container.containerID())
-              .setDatanodeDetails(datanode).build());
+              .setDatanodeInfo(datanode).build());
     }
   }
 

@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -57,13 +58,13 @@ public class AbstractContainerReportHandler {
   /**
    * Process the given ContainerReplica received from specified datanode.
    *
-   * @param datanodeDetails DatanodeDetails of the node which reported
+   * @param datanodeInfo DatanodeInfo of the node which reported
    *                        this replica
    * @param replicaProto ContainerReplica
    *
    * @throws IOException In case of any Exception while processing the report
    */
-  void processContainerReplica(final DatanodeDetails datanodeDetails,
+  void processContainerReplica(final DatanodeInfo datanodeInfo,
                                final ContainerReplicaProto replicaProto)
       throws IOException {
     final ContainerID containerId = ContainerID
@@ -71,20 +72,20 @@ public class AbstractContainerReportHandler {
     final ContainerReplica replica = ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(replicaProto.getState())
-        .setDatanodeDetails(datanodeDetails)
+        .setDatanodeInfo(datanodeInfo)
         .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
         .setSequenceId(replicaProto.getBlockCommitSequenceId())
         .build();
 
     if (logger.isDebugEnabled()) {
       logger.debug("Processing replica of container {} from datanode {}",
-          containerId, datanodeDetails);
+          containerId, datanodeInfo);
     }
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
     synchronized (containerManager.getContainer(containerId)) {
       updateContainerStats(containerId, replicaProto);
-      updateContainerState(datanodeDetails, containerId, replica);
+      updateContainerState(datanodeInfo, containerId, replica);
       containerManager.updateContainerReplica(containerId, replica);
     }
   }

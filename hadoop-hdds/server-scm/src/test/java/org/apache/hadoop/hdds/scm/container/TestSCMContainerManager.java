@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -207,7 +208,7 @@ public class TestSCMContainerManager {
     // Add dummy replicas for container.
     Iterator<DatanodeDetails> nodes = pipelineManager
         .getPipeline(contInfo.getPipelineID()).getNodes().iterator();
-    DatanodeDetails dn1 = nodes.next();
+    DatanodeInfo dn1 = nodeManager.getDatanodeInfo(nodes.next());
     containerManager.updateContainerState(contInfo.containerID(),
         LifeCycleEvent.FINALIZE);
     containerManager
@@ -220,7 +221,7 @@ public class TestSCMContainerManager {
     containerManager.updateContainerReplica(contInfo.containerID(),
         ContainerReplica.newBuilder().setContainerID(contInfo.containerID())
             .setContainerState(ContainerReplicaProto.State.CLOSED)
-            .setDatanodeDetails(dn1).build());
+            .setDatanodeInfo(dn1).build());
 
     Assert.assertEquals(1,
         containerManager.getContainerReplicas(

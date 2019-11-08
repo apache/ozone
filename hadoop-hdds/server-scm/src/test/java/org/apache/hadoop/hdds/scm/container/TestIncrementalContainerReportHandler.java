@@ -27,7 +27,10 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -54,7 +57,7 @@ public class TestIncrementalContainerReportHandler {
   private EventPublisher publisher;
 
   @Before
-  public void setup() throws IOException {
+  public void setup() throws IOException, NodeNotFoundException {
     final Configuration conf = new OzoneConfiguration();
     this.containerManager = Mockito.mock(ContainerManager.class);
     this.nodeManager = Mockito.mock(NodeManager.class);
@@ -80,6 +83,11 @@ public class TestIncrementalContainerReportHandler {
         Mockito.any(ContainerID.class),
         Mockito.any(HddsProtos.LifeCycleEvent.class));
 
+    Mockito.when(
+        nodeManager.getDatanodeInfo(Mockito.any(DatanodeDetails.class)))
+        .thenAnswer(invocation ->
+            new DatanodeInfo((DatanodeDetails)invocation.getArguments()[0],
+                NodeStatus.inServiceHealthy()));
   }
 
   @After
@@ -93,9 +101,9 @@ public class TestIncrementalContainerReportHandler {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(nodeManager, containerManager);
     final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
-    final DatanodeDetails datanodeOne = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeTwo = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeThree = TestUtils.randomDatanodeDetails();
+    final DatanodeInfo datanodeOne = TestUtils.randomDatanodeInfo();
+    final DatanodeInfo datanodeTwo = TestUtils.randomDatanodeInfo();
+    final DatanodeInfo datanodeThree = TestUtils.randomDatanodeInfo();
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -127,9 +135,9 @@ public class TestIncrementalContainerReportHandler {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(nodeManager, containerManager);
     final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
-    final DatanodeDetails datanodeOne = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeTwo = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeThree = TestUtils.randomDatanodeDetails();
+    final DatanodeInfo datanodeOne = TestUtils.randomDatanodeInfo();
+    final DatanodeInfo datanodeTwo = TestUtils.randomDatanodeInfo();
+    final DatanodeInfo datanodeThree = TestUtils.randomDatanodeInfo();
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -162,9 +170,9 @@ public class TestIncrementalContainerReportHandler {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(nodeManager, containerManager);
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
-    final DatanodeDetails datanodeOne = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeTwo = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeThree = TestUtils.randomDatanodeDetails();
+    final DatanodeInfo datanodeOne = TestUtils.randomDatanodeInfo();
+    final DatanodeInfo datanodeTwo = TestUtils.randomDatanodeInfo();
+    final DatanodeInfo datanodeThree = TestUtils.randomDatanodeInfo();
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,

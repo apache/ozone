@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos
     .ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
@@ -64,10 +65,11 @@ public class IncrementalContainerReportHandler extends
         report.getReport().getReportList()) {
       try {
         final DatanodeDetails dd = report.getDatanodeDetails();
+        final DatanodeInfo dnInfo = nodeManager.getDatanodeInfo(dd);
         final ContainerID id = ContainerID.valueof(
             replicaProto.getContainerID());
         nodeManager.addContainer(dd, id);
-        processContainerReplica(dd, replicaProto);
+        processContainerReplica(dnInfo, replicaProto);
       } catch (ContainerNotFoundException e) {
         success = false;
         LOG.warn("Container {} not found!", replicaProto.getContainerID());

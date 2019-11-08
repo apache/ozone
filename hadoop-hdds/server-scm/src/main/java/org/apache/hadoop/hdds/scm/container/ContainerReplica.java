@@ -24,6 +24,7 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -35,18 +36,18 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
   final private ContainerID containerID;
   final private ContainerReplicaProto.State state;
-  final private DatanodeDetails datanodeDetails;
+  final private DatanodeInfo datanodeInfo;
   final private UUID placeOfBirth;
 
   private Long sequenceId;
 
 
   private ContainerReplica(final ContainerID containerID,
-      final ContainerReplicaProto.State state, final DatanodeDetails datanode,
+      final ContainerReplicaProto.State state, final DatanodeInfo datanode,
       final UUID originNodeId) {
     this.containerID = containerID;
     this.state = state;
-    this.datanodeDetails = datanode;
+    this.datanodeInfo = datanode;
     this.placeOfBirth = originNodeId;
   }
 
@@ -60,7 +61,15 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
    * @return DatanodeDetails
    */
   public DatanodeDetails getDatanodeDetails() {
-    return datanodeDetails;
+    return datanodeInfo;
+  }
+
+  /**
+   * Returns the DatanodeInfo to which this replica belongs.
+   * @return
+   */
+  public DatanodeInfo getDatanodeInfo() {
+    return datanodeInfo;
   }
 
   /**
@@ -94,7 +103,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   public int hashCode() {
     return new HashCodeBuilder(61, 71)
         .append(containerID)
-        .append(datanodeDetails)
+        .append(datanodeInfo)
         .toHashCode();
   }
 
@@ -112,7 +121,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
     return new EqualsBuilder()
         .append(containerID, that.containerID)
-        .append(datanodeDetails, that.datanodeDetails)
+        .append(datanodeInfo, that.datanodeInfo)
         .isEquals();
   }
 
@@ -121,7 +130,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     Preconditions.checkNotNull(that);
     return new CompareToBuilder()
         .append(this.containerID, that.containerID)
-        .append(this.datanodeDetails, that.datanodeDetails)
+        .append(this.datanodeInfo, that.datanodeInfo)
         .build();
   }
 
@@ -138,7 +147,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   public String toString() {
     return "ContainerReplica{" +
         "containerID=" + containerID +
-        ", datanodeDetails=" + datanodeDetails +
+        ", datanodeDetails=" + datanodeInfo +
         ", placeOfBirth=" + placeOfBirth +
         ", sequenceId=" + sequenceId +
         '}';
@@ -151,7 +160,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
     private ContainerID containerID;
     private ContainerReplicaProto.State state;
-    private DatanodeDetails datanode;
+    private DatanodeInfo datanode;
     private UUID placeOfBirth;
     private Long sequenceId;
 
@@ -176,12 +185,12 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     /**
      * Set DatanodeDetails.
      *
-     * @param datanodeDetails DatanodeDetails
+     * @param datanodeInfo DatanodeDetails
      * @return ContainerReplicaBuilder
      */
-    public ContainerReplicaBuilder setDatanodeDetails(
-        DatanodeDetails datanodeDetails) {
-      datanode = datanodeDetails;
+    public ContainerReplicaBuilder setDatanodeInfo(
+        DatanodeInfo datanodeInfo) {
+      datanode = datanodeInfo;
       return this;
     }
 
@@ -218,7 +227,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       Preconditions.checkNotNull(state,
           "Container state can't be null");
       Preconditions.checkNotNull(datanode,
-          "DatanodeDetails can't be null");
+          "DatanodeInfo can't be null");
       ContainerReplica replica = new ContainerReplica(
           containerID, state, datanode,
           Optional.ofNullable(placeOfBirth).orElse(datanode.getUuid()));

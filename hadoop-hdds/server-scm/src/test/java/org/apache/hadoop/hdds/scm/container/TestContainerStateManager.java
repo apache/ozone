@@ -22,12 +22,12 @@ import java.util.ArrayList;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
 
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -58,9 +58,9 @@ public class TestContainerStateManager {
     //GIVEN
     ContainerInfo c1 = allocateContainer();
 
-    DatanodeDetails d1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails d2 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails d3 = TestUtils.randomDatanodeDetails();
+    DatanodeInfo d1 = TestUtils.randomDatanodeInfo();
+    DatanodeInfo d2 = TestUtils.randomDatanodeInfo();
+    DatanodeInfo d3 = TestUtils.randomDatanodeInfo();
 
     addReplica(c1, d1);
     addReplica(c1, d2);
@@ -80,8 +80,8 @@ public class TestContainerStateManager {
 
     ContainerInfo c1 = allocateContainer();
 
-    DatanodeDetails d1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails d2 = TestUtils.randomDatanodeDetails();
+    DatanodeInfo d1 = TestUtils.randomDatanodeInfo();
+    DatanodeInfo d2 = TestUtils.randomDatanodeInfo();
 
     addReplica(c1, d1);
     addReplica(c1, d2);
@@ -94,12 +94,12 @@ public class TestContainerStateManager {
     Assert.assertEquals(3, c1.getReplicationFactor().getNumber());
   }
 
-  private void addReplica(ContainerInfo cont, DatanodeDetails node)
+  private void addReplica(ContainerInfo cont, DatanodeInfo node)
       throws ContainerNotFoundException {
     ContainerReplica replica = ContainerReplica.newBuilder()
         .setContainerID(cont.containerID())
         .setContainerState(ContainerReplicaProto.State.CLOSED)
-        .setDatanodeDetails(node)
+        .setDatanodeInfo(node)
         .build();
     containerStateManager
         .updateContainerReplica(cont.containerID(), replica);

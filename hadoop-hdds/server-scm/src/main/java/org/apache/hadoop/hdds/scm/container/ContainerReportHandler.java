@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
@@ -82,6 +83,8 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         reportFromDatanode.getReport();
 
     try {
+      final DatanodeInfo datanodeInfo
+          = nodeManager.getDatanodeInfo(datanodeDetails);
       final List<ContainerReplicaProto> replicas =
           containerReport.getReportsList();
       final Set<ContainerID> containersInSCM =
@@ -94,7 +97,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
       missingReplicas.removeAll(containersInDn);
 
-      processContainerReplicas(datanodeDetails, replicas);
+      processContainerReplicas(datanodeInfo, replicas);
       processMissingReplicas(datanodeDetails, missingReplicas);
       updateDeleteTransaction(datanodeDetails, replicas, publisher);
 
@@ -116,22 +119,22 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   /**
    * Processes the ContainerReport.
    *
-   * @param datanodeDetails Datanode from which this report was received
+   * @param datanodeInfo Datanode from which this report was received
    * @param replicas list of ContainerReplicaProto
    */
-  private void processContainerReplicas(final DatanodeDetails datanodeDetails,
+  private void processContainerReplicas(final DatanodeInfo datanodeInfo,
       final List<ContainerReplicaProto> replicas) {
     for (ContainerReplicaProto replicaProto : replicas) {
       try {
-        processContainerReplica(datanodeDetails, replicaProto);
+        processContainerReplica(datanodeInfo, replicaProto);
       } catch (ContainerNotFoundException e) {
         LOG.error("Received container report for an unknown container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
-            datanodeDetails, e);
+            datanodeInfo, e);
       } catch (IOException e) {
         LOG.error("Exception while processing container report for container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
-            datanodeDetails, e);
+            datanodeInfo, e);
       }
     }
   }

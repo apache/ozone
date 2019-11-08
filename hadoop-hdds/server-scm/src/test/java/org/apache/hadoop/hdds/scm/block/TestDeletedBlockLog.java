@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -83,7 +84,7 @@ public class TestDeletedBlockLog {
   private File testDir;
   private ContainerManager containerManager;
   private StorageContainerManager scm;
-  private List<DatanodeDetails> dnList;
+  private List<DatanodeInfo> dnList;
 
   @Before
   public void setup() throws Exception {
@@ -101,15 +102,10 @@ public class TestDeletedBlockLog {
   }
 
   private void setupContainerManager() throws IOException {
-    dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
-            .build());
-    dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
-            .build());
-    dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
-            .build());
+    dnList.add(TestUtils.randomDatanodeInfo());
+    dnList.add(TestUtils.randomDatanodeInfo());
+    dnList.add(TestUtils.randomDatanodeInfo());
+
 
     final ContainerInfo container =
         new ContainerInfo.Builder().setContainerID(1)
@@ -117,10 +113,10 @@ public class TestDeletedBlockLog {
             .setState(HddsProtos.LifeCycleState.CLOSED)
             .build();
     final Set<ContainerReplica> replicaSet = dnList.stream()
-        .map(datanodeDetails -> ContainerReplica.newBuilder()
+        .map(datanodeInfo -> ContainerReplica.newBuilder()
             .setContainerID(container.containerID())
             .setContainerState(ContainerReplicaProto.State.OPEN)
-            .setDatanodeDetails(datanodeDetails)
+            .setDatanodeInfo(datanodeInfo)
             .build())
         .collect(Collectors.toSet());
 
@@ -331,7 +327,7 @@ public class TestDeletedBlockLog {
     int maximumAllowedTXNum = 5;
     List<DeletedBlocksTransaction> blocks = null;
     List<Long> containerIDs = new LinkedList<>();
-    DatanodeDetails dnId1 = dnList.get(0), dnId2 = dnList.get(1);
+    DatanodeInfo dnId1 = dnList.get(0), dnId2 = dnList.get(1);
 
     int count = 0;
     long containerID = 0L;
@@ -401,9 +397,10 @@ public class TestDeletedBlockLog {
     Assert.assertTrue(transactions.isFull());
   }
 
-  private void mockContainerInfo(long containerID, DatanodeDetails dd)
+  private void mockContainerInfo(long containerID, DatanodeInfo dnInfo)
       throws IOException {
-    List<DatanodeDetails> dns = Collections.singletonList(dd);
+    List<DatanodeInfo> dnInfos = Collections.singletonList(dnInfo);
+    List<DatanodeDetails> dns = Collections.singletonList(dnInfo);
     Pipeline pipeline = Pipeline.newBuilder()
             .setType(ReplicationType.STAND_ALONE)
             .setFactor(ReplicationFactor.ONE)
@@ -421,11 +418,11 @@ public class TestDeletedBlockLog {
     Mockito.doReturn(containerInfo).when(containerManager)
         .getContainer(ContainerID.valueof(containerID));
 
-    final Set<ContainerReplica> replicaSet = dns.stream()
+    final Set<ContainerReplica> replicaSet = dnInfos.stream()
         .map(datanodeDetails -> ContainerReplica.newBuilder()
             .setContainerID(containerInfo.containerID())
             .setContainerState(ContainerReplicaProto.State.OPEN)
-            .setDatanodeDetails(datanodeDetails)
+            .setDatanodeInfo(datanodeDetails)
             .build())
         .collect(Collectors.toSet());
     when(containerManager.getContainerReplicas(

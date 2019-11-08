@@ -689,6 +689,19 @@ public class SCMNodeManager implements NodeManager {
     return results;
   }
 
+  /**
+   * Get the DatanodeInfo object which is associated with the given
+   * DatanodeDetails object.
+   *
+   * @param datanodeDetails The datanode to lookup
+   * @return The DatanodeInfo associated with the given DatanodeDetails
+   */
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return nodeStateManager.getNode(datanodeDetails);
+  }
+
   private String nodeResolve(String hostname) {
     List<String> hosts = new ArrayList<>(1);
     hosts.add(hostname);
