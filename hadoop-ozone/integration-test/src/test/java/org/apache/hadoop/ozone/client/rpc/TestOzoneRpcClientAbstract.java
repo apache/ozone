@@ -1909,7 +1909,7 @@ public abstract class TestOzoneRpcClientAbstract {
     TreeMap<Integer, String> partsMap = new TreeMap<>();
     partsMap.put(1, UUID.randomUUID().toString());
 
-    OzoneTestUtils.expectOmException(ResultCodes.MISMATCH_MULTIPART_LIST,
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART,
         () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
 
   }
@@ -1935,7 +1935,7 @@ public abstract class TestOzoneRpcClientAbstract {
     TreeMap<Integer, String> partsMap = new TreeMap<>();
     partsMap.put(1, UUID.randomUUID().toString());
 
-    OzoneTestUtils.expectOmException(ResultCodes.MISMATCH_MULTIPART_LIST,
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART,
         () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
 
   }
@@ -1960,7 +1960,7 @@ public abstract class TestOzoneRpcClientAbstract {
     TreeMap<Integer, String> partsMap = new TreeMap<>();
     partsMap.put(3, "random");
 
-    OzoneTestUtils.expectOmException(ResultCodes.MISSING_UPLOAD_PARTS,
+    OzoneTestUtils.expectOmException(ResultCodes.INVALID_PART,
         () -> completeMultipartUpload(bucket, keyName, uploadID, partsMap));
   }
 
