@@ -56,7 +56,7 @@ public final class RatisPipelineUtils {
    * @param grpcTlsConfig
    * @throws IOException
    */
-  static void destroyPipeline(Pipeline pipeline, Configuration ozoneConf,
+  public static void destroyPipeline(Pipeline pipeline, Configuration ozoneConf,
       GrpcTlsConfig grpcTlsConfig) {
     final RaftGroup group = RatisHelper.newRaftGroup(pipeline);
     if (LOG.isDebugEnabled()) {

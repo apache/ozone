@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -172,6 +173,12 @@ public class ContainerController {
    */
   public Iterator<Container<?>> getContainers(HddsVolume volume) {
     return containerSet.getContainerIterator(volume);
+  }
+
+  void updateDataScanTimestamp(long containerId, Instant timestamp)
+      throws IOException {
+    Container container = containerSet.getContainer(containerId);
+    container.updateDataScanTimestamp(timestamp);
   }
 
 }

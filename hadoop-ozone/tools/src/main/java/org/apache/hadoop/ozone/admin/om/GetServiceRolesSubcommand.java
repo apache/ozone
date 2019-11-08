@@ -39,7 +39,7 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private OMAdmin parent;
 
-  @CommandLine.Option(names = {"-id", "--om-service-id"},
+  @CommandLine.Option(names = {"-id", "--service-id"},
       description = "OM Service ID",
       required = true)
   private String omServiceId;

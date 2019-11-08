@@ -38,9 +38,9 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.transport.server.XceiverServer;
 
 import io.opentracing.Scope;
+import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -82,7 +82,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Creates a ratis server endpoint that acts as the communication layer for
  * Ozone containers.
  */
-public final class XceiverServerRatis extends XceiverServer {
+public final class XceiverServerRatis implements XceiverServerSpi {
   private static final Logger LOG = LoggerFactory
       .getLogger(XceiverServerRatis.class);
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
@@ -108,13 +108,10 @@ public final class XceiverServerRatis extends XceiverServer {
   // pipelines
   private final Set<RaftGroupId> raftGids = new HashSet<>();
 
-  @SuppressWarnings("parameternumber")
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
-      StateContext context, GrpcTlsConfig tlsConfig, CertificateClient caClient,
-      OzoneConfiguration conf)
+      StateContext context, GrpcTlsConfig tlsConfig, OzoneConfiguration conf)
       throws IOException {
-    super(conf, caClient);
     this.conf = conf;
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
@@ -153,7 +150,6 @@ public final class XceiverServerRatis extends XceiverServer {
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
     return new ContainerStateMachine(gid, dispatcher, containerController,
         chunkExecutor, this, cacheEntryExpiryInteval,
-        getSecurityConfig().isBlockTokenEnabled(), getBlockTokenVerifier(),
         conf);
   }
 
@@ -409,7 +405,7 @@ public final class XceiverServerRatis extends XceiverServer {
           new SecurityConfig(ozoneConf), caClient);
 
     return new XceiverServerRatis(datanodeDetails, localPort, dispatcher,
-        containerController, context, tlsConfig, caClient, ozoneConf);
+        containerController, context, tlsConfig, ozoneConf);
   }
 
   @Override
@@ -493,7 +489,6 @@ public final class XceiverServerRatis extends XceiverServer {
   @Override
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
-    super.submitRequest(request, pipelineID);
     RaftClientReply reply;
     try (Scope scope = TracingUtil
         .importAndCreateScope(

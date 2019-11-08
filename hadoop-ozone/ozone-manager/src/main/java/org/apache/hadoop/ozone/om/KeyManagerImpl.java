@@ -893,17 +893,18 @@ public class KeyManagerImpl implements KeyManager {
       // Not checking if there is an already key for this in the keyTable, as
       // during final complete multipart upload we take care of this.
 
-
+      long currentTime = Time.now();
       Map<Integer, PartKeyInfo> partKeyInfoMap = new HashMap<>();
       OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
-          multipartUploadID, partKeyInfoMap);
+          multipartUploadID, currentTime, keyArgs.getType(),
+          keyArgs.getFactor(), partKeyInfoMap);
       List<OmKeyLocationInfo> locations = new ArrayList<>();
       OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
           .setBucketName(keyArgs.getBucketName())
           .setKeyName(keyArgs.getKeyName())
-          .setCreationTime(Time.now())
-          .setModificationTime(Time.now())
+          .setCreationTime(currentTime)
+          .setModificationTime(currentTime)
           .setReplicationType(keyArgs.getType())
           .setReplicationFactor(keyArgs.getFactor())
           .setOmKeyLocationInfos(Collections.singletonList(
@@ -1323,29 +1324,29 @@ public class KeyManagerImpl implements KeyManager {
 
       List<OmMultipartUpload> collect = multipartUploadKeys.stream()
           .map(OmMultipartUpload::from)
-          .map(upload -> {
+          .peek(upload -> {
             String dbKey = metadataManager
                 .getOzoneKey(upload.getVolumeName(),
                     upload.getBucketName(),
                     upload.getKeyName());
             try {
-              Table<String, OmKeyInfo> openKeyTable =
-                  metadataManager.getOpenKeyTable();
+              Table<String, OmMultipartKeyInfo> keyInfoTable =
+                  metadataManager.getMultipartInfoTable();
 
-              OmKeyInfo omKeyInfo =
-                  openKeyTable.get(upload.getDbKey());
+              OmMultipartKeyInfo multipartKeyInfo =
+                  keyInfoTable.get(upload.getDbKey());
 
               upload.setCreationTime(
-                  Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
-
-              upload.setReplicationType(omKeyInfo.getType());
-              upload.setReplicationFactor(omKeyInfo.getFactor());
+                  Instant.ofEpochMilli(multipartKeyInfo.getCreationTime()));
+              upload.setReplicationType(
+                  multipartKeyInfo.getReplicationType());
+              upload.setReplicationFactor(
+                  multipartKeyInfo.getReplicationFactor());
             } catch (IOException e) {
               LOG.warn(
                   "Open key entry for multipart upload record can be read  {}",
                   dbKey);
             }
-            return upload;
           })
           .collect(Collectors.toList());
 
@@ -1471,7 +1472,7 @@ public class KeyManagerImpl implements KeyManager {
    * false.
    *
    * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl top be added.
+   * @param acl ozone acl to be added.
    * @throws IOException if there is error.
    */
   @Override

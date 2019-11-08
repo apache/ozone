@@ -129,21 +129,22 @@ public class OzoneManagerDoubleBuffer {
       try {
         if (canFlush()) {
           setReadyBuffer();
-          final BatchOperation batchOperation = omMetadataManager.getStore()
-              .initBatchOperation();
+          try(BatchOperation batchOperation = omMetadataManager.getStore()
+              .initBatchOperation()) {
 
-          readyBuffer.iterator().forEachRemaining((entry) -> {
-            try {
-              entry.getResponse().addToDBBatch(omMetadataManager,
-                  batchOperation);
-            } catch (IOException ex) {
-              // During Adding to RocksDB batch entry got an exception.
-              // We should terminate the OM.
-              terminate(ex);
-            }
-          });
+            readyBuffer.iterator().forEachRemaining((entry) -> {
+              try {
+                entry.getResponse().addToDBBatch(omMetadataManager,
+                    batchOperation);
+              } catch (IOException ex) {
+                // During Adding to RocksDB batch entry got an exception.
+                // We should terminate the OM.
+                terminate(ex);
+              }
+            });
 
-          omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            omMetadataManager.getStore().commitBatchOperation(batchOperation);
+          }
 
           // Complete futures first and then do other things. So, that
           // handler threads will be released.
@@ -227,6 +228,11 @@ public class OzoneManagerDoubleBuffer {
     omMetadataManager.getS3Table().cleanupCache(lastRatisTransactionIndex);
     omMetadataManager.getMultipartInfoTable().cleanupCache(
         lastRatisTransactionIndex);
+    omMetadataManager.getS3SecretTable().cleanupCache(
+        lastRatisTransactionIndex);
+    omMetadataManager.getDelegationTokenTable().cleanupCache(
+        lastRatisTransactionIndex);
+    omMetadataManager.getPrefixTable().cleanupCache(lastRatisTransactionIndex);
 
   }
 

@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.security.token;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -70,7 +71,7 @@ public class OzoneBlockTokenIdentifier extends TokenIdentifier {
 
   @Override
   public UserGroupInformation getUser() {
-    if (this.getOwnerId() == null || "".equals(this.getOwnerId())) {
+    if (Strings.isNullOrEmpty(this.getOwnerId())) {
       return UserGroupInformation.createRemoteUser(blockId);
     }
     return UserGroupInformation.createRemoteUser(ownerId);

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
     .InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
+import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -64,6 +65,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 
 import io.opentracing.Scope;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,6 +91,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final float containerCloseThreshold;
   private String scmID;
   private ContainerMetrics metrics;
+  private final TokenVerifier tokenVerifier;
+  private final boolean isBlockTokenEnabled;
 
   /**
    * Constructs an OzoneContainer that receives calls from
@@ -96,7 +100,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
    */
   public HddsDispatcher(Configuration config, ContainerSet contSet,
       VolumeSet volumes, Map<ContainerType, Handler> handlers,
-      StateContext context, ContainerMetrics metrics) {
+      StateContext context, ContainerMetrics metrics,
+      TokenVerifier tokenVerifier) {
     this.conf = config;
     this.containerSet = contSet;
     this.volumeSet = volumes;
@@ -106,6 +111,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.containerCloseThreshold = conf.getFloat(
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD,
         HddsConfigKeys.HDDS_CONTAINER_CLOSE_THRESHOLD_DEFAULT);
+    this.isBlockTokenEnabled = conf.getBoolean(
+        HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED,
+        HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+    this.tokenVerifier = tokenVerifier;
   }
 
   @Override
@@ -183,7 +192,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             && dispatcherContext.getStage()
             == DispatcherContext.WriteChunkStage.COMMIT_DATA);
 
-    // if the command gets executed other than Ratis, the default wroite stage
+    try {
+      validateBlockToken(msg);
+    } catch (IOException ioe) {
+      StorageContainerException sce = new StorageContainerException(
+          "Block token verification failed. " + ioe.getMessage(), ioe,
+          ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
+      return ContainerUtils.logAndReturnError(LOG, sce, msg);
+    }
+    // if the command gets executed other than Ratis, the default write stage
     // is WriteChunkStage.COMBINED
     boolean isCombinedStage =
         cmdType == ContainerProtos.Type.WriteChunk && (dispatcherContext == null
@@ -387,6 +404,17 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     return handler.handle(requestBuilder.build(), null, null);
   }
 
+  private void validateBlockToken(
+      ContainerCommandRequestProto msg) throws IOException {
+    if (isBlockTokenEnabled && tokenVerifier != null &&
+        HddsUtils.requireBlockToken(msg.getCmdType())) {
+      tokenVerifier.verify(
+          UserGroupInformation.getCurrentUser().getShortUserName(),
+          msg.getEncodedToken(), msg.getCmdType(),
+          HddsUtils.getBlockID(msg).getContainerBlockID().toString());
+    }
+  }
+
   /**
    * This will be called as a part of creating the log entry during
    * startTransaction in Ratis on the leader node. In such cases, if the
@@ -443,6 +471,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           "Container " + containerID + " in " + containerState + " state");
       audit(action, eventType, params, AuditEventStatus.FAILURE, iex);
       throw iex;
+    }
+
+    try {
+      validateBlockToken(msg);
+    } catch (IOException ioe) {
+      StorageContainerException sce = new StorageContainerException(
+          "Block token verification failed. " + ioe.getMessage(), ioe,
+          ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
+      throw sce;
     }
   }
 

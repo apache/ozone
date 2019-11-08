@@ -56,4 +56,9 @@ public class OmMultipartKeyInfoCodec implements Codec<OmMultipartKeyInfo> {
           "Can't encode the the raw data from the byte array", e);
     }
   }
+
+  @Override
+  public OmMultipartKeyInfo copyObject(OmMultipartKeyInfo object) {
+    return object.copyObject();
+  }
 }

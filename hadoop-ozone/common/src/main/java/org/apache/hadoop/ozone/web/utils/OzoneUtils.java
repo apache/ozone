@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -132,12 +131,7 @@ public final class OzoneUtils {
     Preconditions.checkNotNull(date, "Date string should not be null.");
     return DATE_FORMAT.get().parse(date).getTime();
   }
-
-  public static boolean isOzoneEnabled(Configuration conf) {
-    return HddsUtils.isHddsEnabled(conf);
-  }
-
-
+  
   /**
    * verifies that bucket name / volume name is a valid DNS name.
    *

@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
+import org.apache.hadoop.io.retry.RetryInvocationHandler;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -30,6 +31,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -205,17 +207,61 @@ public class OMFailoverProxyProvider implements
     return new Text(rpcAddress.toString());
   }
 
-
+  @Override
+  public Class<OzoneManagerProtocolPB> getInterface() {
+    return OzoneManagerProtocolPB.class;
+  }
 
   /**
    * Called whenever an error warrants failing over. It is determined by the
    * retry policy.
+   *
+   * This is a dummy call from {@link RetryInvocationHandler}. The actual
+   * failover should be performed using either
+   * {@link OMFailoverProxyProvider#performFailoverIfRequired(String)} or
+   * {@link OMFailoverProxyProvider#performFailoverToNextProxy()}.
+   *
+   * In {@link OzoneManagerProtocolClientSideTranslatorPB}, we first
+   * manually failover and then call the RetryAction FAILOVER_AND_RETRY. This
+   * is done because we do not want to always failover to the next proxy. If we
+   * get a NotLeaderException with a suggested leader, then we want to
+   * failover to that OM proxy instead. Hence, we failover manually and the
+   * {@link FailoverProxyProvider#performFailover(Object)} call should not do
+   * failover again.
    */
   @Override
   public void performFailover(OzoneManagerProtocolPB currentProxy) {
+    if (LOG.isDebugEnabled()) {
+      int currentIndex = getCurrentProxyIndex();
+      LOG.debug("Failing over OM proxy to index: {}, nodeId: {}",
+          currentIndex, omNodeIDList.get(currentIndex));
+    }
+  }
+
+  /**
+   * Performs failover if the leaderOMNodeId returned through OMReponse does
+   * not match the current leaderOMNodeId cached by the proxy provider.
+   */
+  public void performFailoverIfRequired(String newLeaderOMNodeId) {
+    if (newLeaderOMNodeId == null) {
+      LOG.debug("No suggested leader nodeId. Performing failover to next peer" +
+          " node");
+      performFailoverToNextProxy();
+    } else {
+      if (updateLeaderOMNodeId(newLeaderOMNodeId)) {
+        LOG.debug("Failing over OM proxy to nodeId: {}", newLeaderOMNodeId);
+      }
+    }
+  }
+
+  /**
+   * Performs failover if the leaderOMNodeId returned through OMReponse does
+   * not match the current leaderOMNodeId cached by the proxy provider.
+   */
+  public void performFailoverToNextProxy() {
     int newProxyIndex = incrementProxyIndex();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Failing over OM proxy to index: {}, nodeId: {}",
+      LOG.debug("Incrementing OM proxy index to {}, nodeId: {}",
           newProxyIndex, omNodeIDList.get(newProxyIndex));
     }
   }
@@ -228,27 +274,6 @@ public class OMFailoverProxyProvider implements
     currentProxyIndex = (currentProxyIndex + 1) % omProxies.size();
     currentProxyOMNodeId = omNodeIDList.get(currentProxyIndex);
     return currentProxyIndex;
-  }
-
-  @Override
-  public Class<OzoneManagerProtocolPB> getInterface() {
-    return OzoneManagerProtocolPB.class;
-  }
-
-  /**
-   * Performs failover if the leaderOMNodeId returned through OMReponse does
-   * not match the current leaderOMNodeId cached by the proxy provider.
-   */
-  public void performFailoverIfRequired(String newLeaderOMNodeId) {
-    if (newLeaderOMNodeId == null) {
-      LOG.debug("No suggested leader nodeId. Performing failover to next peer" +
-          " node");
-      performFailover(null);
-    } else {
-      if (updateLeaderOMNodeId(newLeaderOMNodeId)) {
-        LOG.debug("Failing over OM proxy to nodeId: {}", newLeaderOMNodeId);
-      }
-    }
   }
 
   /**
@@ -265,6 +290,10 @@ public class OMFailoverProxyProvider implements
       }
     }
     return false;
+  }
+
+  private synchronized int getCurrentProxyIndex() {
+    return currentProxyIndex;
   }
 
   /**

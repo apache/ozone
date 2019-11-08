@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.BufferedOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -44,7 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Client to read container data from Grpc.
+ * Client to read container data from gRPC.
  */
 public class GrpcReplicationClient {
 
@@ -65,8 +65,7 @@ public class GrpcReplicationClient {
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .build();
     client = IntraDatanodeProtocolServiceGrpc.newStub(channel);
-    this.workingDirectory = workingDir;
-
+    workingDirectory = workingDir;
   }
 
   public CompletableFuture<Path> download(long containerId) {
@@ -84,6 +83,7 @@ public class GrpcReplicationClient {
 
     client.download(request,
         new StreamDownloader(containerId, response, destinationPath));
+
     return response;
   }
 
@@ -101,18 +101,15 @@ public class GrpcReplicationClient {
   }
 
   /**
-   * Grpc stream observer to ComletableFuture adapter.
+   * gRPC stream observer to CompletableFuture adapter.
    */
   public static class StreamDownloader
       implements StreamObserver<CopyContainerResponseProto> {
 
     private final CompletableFuture<Path> response;
-
     private final long containerId;
-
-    private BufferedOutputStream stream;
-
-    private Path outputPath;
+    private final OutputStream stream;
+    private final Path outputPath;
 
     public StreamDownloader(long containerId, CompletableFuture<Path> response,
         Path outputPath) {
@@ -123,8 +120,7 @@ public class GrpcReplicationClient {
         Preconditions.checkNotNull(outputPath, "Output path cannot be null");
         Path parentPath = Preconditions.checkNotNull(outputPath.getParent());
         Files.createDirectories(parentPath);
-        stream =
-            new BufferedOutputStream(new FileOutputStream(outputPath.toFile()));
+        stream = new FileOutputStream(outputPath.toFile());
       } catch (IOException e) {
         throw new RuntimeException("OutputPath can't be used: " + outputPath,
             e);
@@ -135,7 +131,7 @@ public class GrpcReplicationClient {
     @Override
     public void onNext(CopyContainerResponseProto chunk) {
       try {
-        stream.write(chunk.getData().toByteArray());
+        chunk.getData().writeTo(stream);
       } catch (IOException e) {
         response.completeExceptionally(e);
       }
@@ -144,17 +140,20 @@ public class GrpcReplicationClient {
     @Override
     public void onError(Throwable throwable) {
       try {
+        LOG.error("Download of container {} was unsuccessful",
+            containerId, throwable);
         stream.close();
-        LOG.error("Container download was unsuccessfull", throwable);
         try {
           Files.delete(outputPath);
         } catch (IOException ex) {
-          LOG.error(
-              "Error happened during the download but can't delete the "
-                  + "temporary destination.", ex);
+          LOG.error("Failed to delete temporary destination {} for " +
+              "unsuccessful download of container {}",
+              outputPath, containerId, ex);
         }
         response.completeExceptionally(throwable);
       } catch (IOException e) {
+        LOG.error("Failed to close {} for container {}",
+            outputPath, containerId, e);
         response.completeExceptionally(e);
       }
     }
@@ -163,9 +162,11 @@ public class GrpcReplicationClient {
     public void onCompleted() {
       try {
         stream.close();
-        LOG.info("Container is downloaded to {}", outputPath);
+        LOG.info("Container {} is downloaded to {}", containerId, outputPath);
         response.complete(outputPath);
       } catch (IOException e) {
+        LOG.error("Downloaded container {} OK, but failed to close {}",
+            containerId, outputPath, e);
         response.completeExceptionally(e);
       }
 

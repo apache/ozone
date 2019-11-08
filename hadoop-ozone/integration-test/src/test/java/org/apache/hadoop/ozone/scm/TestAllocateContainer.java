@@ -23,6 +23,8 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -40,7 +42,6 @@ public class TestAllocateContainer {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
-  private static String containerOwner = "OZONE";
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
@@ -66,9 +67,9 @@ public class TestAllocateContainer {
   public void testAllocate() throws Exception {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
-            xceiverClientManager.getType(),
-            xceiverClientManager.getFactor(),
-            containerOwner);
+            SCMTestUtils.getReplicationType(conf),
+            SCMTestUtils.getReplicationFactor(conf),
+            OzoneConsts.OZONE);
     Assert.assertNotNull(container);
     Assert.assertNotNull(container.getPipeline().getFirstNode());
 
@@ -78,7 +79,7 @@ public class TestAllocateContainer {
   public void testAllocateNull() throws Exception {
     thrown.expect(NullPointerException.class);
     storageContainerLocationClient.allocateContainer(
-        xceiverClientManager.getType(),
-        xceiverClientManager.getFactor(), null);
+        SCMTestUtils.getReplicationType(conf),
+        SCMTestUtils.getReplicationFactor(conf), null);
   }
 }

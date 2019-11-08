@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.bucket;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -63,7 +64,7 @@ public class TestS3BucketDeleteResponse {
   @Test
   public void testAddToDBBatch() throws Exception {
     String s3BucketName = UUID.randomUUID().toString();
-    String userName = "ozone";
+    String userName = OzoneConsts.OZONE;
     String volumeName = S3BucketCreateRequest.formatOzoneVolumeName(userName);
     S3BucketCreateResponse s3BucketCreateResponse =
         TestOMResponseUtils.createS3BucketResponse(userName, volumeName,

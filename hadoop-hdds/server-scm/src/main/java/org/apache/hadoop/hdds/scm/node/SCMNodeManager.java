@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -143,7 +143,6 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-
   /**
    * Returns all datanode that are in the given state. This function works by
    * taking a snapshot of the current collection and then returning the list
@@ -186,7 +185,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public List<DatanodeDetails> getAllNodes() {
     return nodeStateManager.getAllNodes().stream()
-        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
+        .map(node -> (DatanodeDetails) node).collect(Collectors.toList());
   }
 
   /**
@@ -274,11 +273,11 @@ public class SCMNodeManager implements NodeManager {
    * SCM.
    *
    * @param datanodeDetails - Send datanodeDetails with Node info.
-   *                   This function generates and assigns new datanode ID
-   *                   for the datanode. This allows SCM to be run independent
-   *                   of Namenode if required.
-   * @param nodeReport NodeReport.
-   *
+   *                        This function generates and assigns new datanode ID
+   *                        for the datanode. This allows SCM to be run
+   *                        independent
+   *                        of Namenode if required.
+   * @param nodeReport      NodeReport.
    * @return SCMHeartbeatResponseProto
    */
   @Override
@@ -383,7 +382,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public void processNodeReport(DatanodeDetails datanodeDetails,
-                                NodeReportProto nodeReport) {
+      NodeReportProto nodeReport) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing node report from [datanode={}]",
           datanodeDetails.getHostName());
@@ -408,6 +407,7 @@ public class SCMNodeManager implements NodeManager {
 
   /**
    * Returns the aggregated node stats.
+   *
    * @return the aggregated node stats.
    */
   @Override
@@ -426,6 +426,7 @@ public class SCMNodeManager implements NodeManager {
 
   /**
    * Return a map of node stats.
+   *
    * @return a map of individual node stats (live/stale but not dead).
    */
   @Override
@@ -451,6 +452,7 @@ public class SCMNodeManager implements NodeManager {
 
   /**
    * Return the node stat of the specified datanode.
+   *
    * @param datanodeDetails - datanode ID.
    * @return node stat if it is live/stale, null if it is decommissioned or
    * doesn't exist.
@@ -542,9 +544,9 @@ public class SCMNodeManager implements NodeManager {
     return nodeInfo;
   }
 
-
   /**
    * Get set of pipelines a datanode is part of.
+   *
    * @param datanodeDetails - datanodeID
    * @return Set of PipelineID
    */
@@ -553,9 +555,9 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getPipelineByDnID(datanodeDetails.getUuid());
   }
 
-
   /**
    * Add pipeline information in the NodeManager.
+   *
    * @param pipeline - Pipeline to be added
    */
   @Override
@@ -565,6 +567,7 @@ public class SCMNodeManager implements NodeManager {
 
   /**
    * Remove a pipeline information from the NodeManager.
+   *
    * @param pipeline - Pipeline to be removed
    */
   @Override
@@ -574,17 +577,18 @@ public class SCMNodeManager implements NodeManager {
 
   @Override
   public void addContainer(final DatanodeDetails datanodeDetails,
-                           final ContainerID containerId)
+      final ContainerID containerId)
       throws NodeNotFoundException {
     nodeStateManager.addContainer(datanodeDetails.getUuid(), containerId);
   }
 
   /**
    * Update set of containers available on a datanode.
+   *
    * @param datanodeDetails - DatanodeID
-   * @param containerIds - Set of containerIDs
+   * @param containerIds    - Set of containerIDs
    * @throws NodeNotFoundException - if datanode is not known. For new datanode
-   *                        use addDatanodeInContainerMap call.
+   *                               use addDatanodeInContainerMap call.
    */
   @Override
   public void setContainers(DatanodeDetails datanodeDetails,
@@ -595,6 +599,7 @@ public class SCMNodeManager implements NodeManager {
 
   /**
    * Return set of containerIDs available on a datanode.
+   *
    * @param datanodeDetails - DatanodeID
    * @return - set of containerIDs
    */
@@ -618,7 +623,7 @@ public class SCMNodeManager implements NodeManager {
    * DATANODE_COMMAND to the Queue.
    *
    * @param commandForDatanode DatanodeCommand
-   * @param ignored publisher
+   * @param ignored            publisher
    */
   @Override
   public void onMessage(CommandForDatanode commandForDatanode,
@@ -703,6 +708,7 @@ public class SCMNodeManager implements NodeManager {
 
   /**
    * Test utility to stop heartbeat check process.
+   *
    * @return ScheduledFuture of next scheduled check that got cancelled.
    */
   @VisibleForTesting
@@ -712,6 +718,7 @@ public class SCMNodeManager implements NodeManager {
 
   /**
    * Test utility to resume the paused heartbeat check process.
+   *
    * @return ScheduledFuture of the next scheduled check
    */
   @VisibleForTesting
@@ -721,6 +728,7 @@ public class SCMNodeManager implements NodeManager {
 
   /**
    * Test utility to get the count of skipped heartbeat check iterations.
+   *
    * @return count of skipped heartbeat check iterations
    */
   @VisibleForTesting

@@ -43,4 +43,9 @@ public class LongCodec implements Codec<Long> {
       return null;
     }
   }
+
+  @Override
+  public Long copyObject(Long object) {
+    return object;
+  }
 }

@@ -33,7 +33,9 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -53,7 +55,6 @@ public class TestContainerSmallFile {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
-  private static String containerOwner = "OZONE";
 
   @BeforeClass
   public static void init() throws Exception {
@@ -80,8 +81,8 @@ public class TestContainerSmallFile {
   public void testAllocateWrite() throws Exception {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
-            xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            SCMTestUtils.getReplicationType(ozoneConfig),
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
@@ -102,8 +103,8 @@ public class TestContainerSmallFile {
   public void testInvalidBlockRead() throws Exception {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
-            xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            SCMTestUtils.getReplicationType(ozoneConfig),
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
@@ -125,8 +126,8 @@ public class TestContainerSmallFile {
     long nonExistContainerID = 8888L;
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
-            xceiverClientManager.getType(),
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            SCMTestUtils.getReplicationType(ozoneConfig),
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
@@ -152,7 +153,7 @@ public class TestContainerSmallFile {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
             HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, containerOwner);
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,

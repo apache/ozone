@@ -19,9 +19,12 @@
 package org.apache.hadoop.ozone.container.server;
 
 import com.google.common.collect.Maps;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -31,9 +34,9 @@ import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -41,18 +44,21 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.GrpcReplicationService;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
@@ -61,27 +67,29 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.Ac
 
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.util.function.CheckedBiConsumer;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerRequest;
-import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.*;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
-import static org.apache.ratis.rpc.SupportedRpcType.NETTY;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  * Test Container servers when security is enabled.
@@ -107,21 +115,54 @@ public class TestSecureContainerServer {
     caClient = new CertificateClientTestImpl(CONF);
   }
 
+  @After
+  public void cleanUp() {
+    FileUtils.deleteQuietly(new File(CONF.get(HDDS_DATANODE_DIR_KEY)));
+  }
+
   @Test
   public void testClientServer() throws Exception {
-    DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+    DatanodeDetails dd = TestUtils.randomDatanodeDetails();
     ContainerSet containerSet = new ContainerSet();
     ContainerController controller = new ContainerController(
         containerSet, null);
+    HddsDispatcher hddsDispatcher = createDispatcher(dd,
+        UUID.randomUUID(), CONF);
     runTestClientServer(1, (pipeline, conf) -> conf
             .setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
                     .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
         XceiverClientGrpc::new,
-        (dn, conf) -> new XceiverServerGrpc(datanodeDetails, conf,
-            new TestContainerDispatcher(), caClient,
-            createReplicationService(controller)), (dn, p) -> {
-        });
+        (dn, conf) -> new XceiverServerGrpc(dd, conf,
+            hddsDispatcher, caClient,
+            createReplicationService(controller)), (dn, p) -> {}, (p) -> {});
+  }
+
+  private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+      OzoneConfiguration conf) throws IOException {
+    ContainerSet containerSet = new ContainerSet();
+    conf.set(HDDS_DATANODE_DIR_KEY,
+        Paths.get(TEST_DIR, "dfs", "data", "hdds",
+            RandomStringUtils.randomAlphabetic(4)).toString());
+    VolumeSet volumeSet = new VolumeSet(dd.getUuidString(), conf);
+    DatanodeStateMachine stateMachine = Mockito.mock(
+        DatanodeStateMachine.class);
+    StateContext context = Mockito.mock(StateContext.class);
+    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
+    Mockito.when(context.getParent()).thenReturn(stateMachine);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
+    for (ContainerProtos.ContainerType containerType :
+        ContainerProtos.ContainerType.values()) {
+      handlers.put(containerType,
+          Handler.getHandlerForContainerType(containerType, conf, context,
+              containerSet, volumeSet, metrics));
+    }
+    HddsDispatcher hddsDispatcher = new HddsDispatcher(
+        conf, containerSet, volumeSet, handlers, context, metrics,
+        new BlockTokenVerifier(new SecurityConfig((conf)), caClient));
+    hddsDispatcher.setScmId(scmId.toString());
+    return hddsDispatcher;
   }
 
   @FunctionalInterface
@@ -135,21 +176,14 @@ public class TestSecureContainerServer {
     runTestClientServerRatis(GRPC, 3);
   }
 
-  @Test
-  @Ignore
-  public void testClientServerRatisNetty() throws Exception {
-    runTestClientServerRatis(NETTY, 1);
-    runTestClientServerRatis(NETTY, 3);
-  }
-
   static XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
     conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
         dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
     final String dir = TEST_DIR + dn.getUuid();
     conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
-
-    final ContainerDispatcher dispatcher = new TestContainerDispatcher();
+    final ContainerDispatcher dispatcher = createDispatcher(dn,
+        UUID.randomUUID(), conf);
     return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
         new ContainerController(new ContainerSet(), Maps.newHashMap()),
         caClient, null);
@@ -161,7 +195,8 @@ public class TestSecureContainerServer {
         (pipeline, conf) -> RatisTestHelper.initRatisConf(rpc, conf),
         XceiverClientRatis::newXceiverClientRatis,
         TestSecureContainerServer::newXceiverServerRatis,
-        (dn, p) -> RatisTestHelper.initXceiverServerRatis(rpc, dn, p));
+        (dn, p) -> RatisTestHelper.initXceiverServerRatis(rpc, dn, p),
+        (p) -> {});
   }
 
   static void runTestClientServer(
@@ -171,15 +206,14 @@ public class TestSecureContainerServer {
           IOException> createClient,
       CheckedBiFunction<DatanodeDetails, OzoneConfiguration, XceiverServerSpi,
           IOException> createServer,
-      CheckedBiConsumer<DatanodeDetails, Pipeline, IOException> initServer)
+      CheckedBiConsumer<DatanodeDetails, Pipeline, IOException> initServer,
+      Consumer<Pipeline> stopServer)
       throws Exception {
     final List<XceiverServerSpi> servers = new ArrayList<>();
     XceiverClientSpi client = null;
-    String containerName = OzoneUtils.getRequestID();
+    final Pipeline pipeline =
+        ContainerTestHelper.createPipeline(numDatanodes);
     try {
-      final Pipeline pipeline =
-          ContainerTestHelper.createPipeline(numDatanodes);
-
       initConf.accept(pipeline, CONF);
 
       for (DatanodeDetails dn : pipeline.getNodes()) {
@@ -188,22 +222,28 @@ public class TestSecureContainerServer {
         s.start();
         initServer.accept(dn, pipeline);
       }
-
       client = createClient.apply(pipeline, CONF);
       client.connect();
 
-      // Test 1: Test failure in request without block token.
+      long testContainerID = getTestContainerID();
+      BlockID testBlockID = getTestBlockID(testContainerID);
+
+      //create the container
+      ContainerProtocolCalls.createContainer(client, testContainerID, null);
+
+      // Test 1: Test putBlock failure without block token.
       final ContainerCommandRequestProto request =
-          getCreateContainerRequest(
-                  getTestContainerID(), pipeline);
+          getPutBlockRequest(pipeline, null, getWriteChunkRequest(pipeline,
+              testBlockID, 1024, null).getWriteChunk());
       Assert.assertNotNull(request.getTraceID());
 
       XceiverClientSpi finalClient = client;
-      // Validation is different for grpc and ratis client.
-      if(client instanceof XceiverClientGrpc) {
-        LambdaTestUtils.intercept(SCMSecurityException.class, "Failed to" +
-                " authenticate with GRPC XceiverServer with Ozone block token",
-            () -> finalClient.sendCommand(request));
+      if (finalClient instanceof XceiverClientGrpc) {
+        ContainerCommandResponseProto resp =
+            finalClient.sendCommand(request);
+        assertNotEquals(resp.getResult(), ContainerProtos.Result.SUCCESS);
+        String msg = resp.getMessage();
+        assertTrue(msg, msg.contains("Block token verification failed"));
       } else {
         IOException e = LambdaTestUtils.intercept(IOException.class,
             () -> finalClient.sendCommand(request));
@@ -212,80 +252,33 @@ public class TestSecureContainerServer {
         assertTrue(msg, msg.contains("Block token verification failed"));
       }
 
-      // Test 2: Test success in request with valid block token.
+      // Test 2: Test putBlock succeeded with valid block token.
       long expiryTime = Time.monotonicNow() + 60 * 60 * 24;
-
       String omCertSerialId =
           caClient.getCertificate().getSerialNumber().toString();
       OzoneBlockTokenSecretManager secretManager =
           new OzoneBlockTokenSecretManager(new SecurityConfig(CONF),
           expiryTime, omCertSerialId);
       secretManager.start(caClient);
-      Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken("1",
+      Token<OzoneBlockTokenIdentifier> token = secretManager.generateToken(
+          testBlockID.getContainerBlockID().toString(),
           EnumSet.allOf(AccessModeProto.class), RandomUtils.nextLong());
-      final ContainerCommandRequestProto request2 =
-          ContainerTestHelper
-              .getCreateContainerSecureRequest(
-                  getTestContainerID(), pipeline,
-                  token);
-      Assert.assertNotNull(request2.getTraceID());
-      XceiverClientSpi finalClient2 = createClient.apply(pipeline, CONF);
-      if(finalClient2 instanceof XceiverClientGrpc) {
-        finalClient2.connect(token.encodeToUrlString());
-      } else {
-        finalClient2.connect();
-      }
 
-      ContainerCommandRequestProto request3 = getCreateContainerRequest(
-          getTestContainerID(), pipeline, token);
-      ContainerCommandResponseProto resp = finalClient2.sendCommand(request3);
-      assertEquals(SUCCESS, resp.getResult());
+      final ContainerCommandRequestProto request2 =
+          getPutBlockRequest(pipeline, token.encodeToUrlString(),
+              getWriteChunkRequest(pipeline, testBlockID, 1024,
+                  token.encodeToUrlString()).getWriteChunk());
+      Assert.assertNotNull(request2.getTraceID());
+      ContainerCommandResponseProto resp2 = finalClient.sendCommand(request2);
+      assertEquals(SUCCESS, resp2.getResult());
     } finally {
       if (client != null) {
         client.close();
       }
+      if (pipeline != null) {
+        stopServer.accept(pipeline);
+      }
       servers.stream().forEach(XceiverServerSpi::stop);
-    }
-  }
-
-  private static class TestContainerDispatcher implements ContainerDispatcher {
-    /**
-     * Dispatches commands to container layer.
-     *
-     * @param msg - Command Request
-     * @return Command Response
-     */
-    @Override
-    public ContainerCommandResponseProto dispatch(
-        ContainerCommandRequestProto msg,
-        DispatcherContext context) {
-      return ContainerTestHelper.getCreateContainerResponse(msg);
-    }
-
-    @Override
-    public void init() {
-    }
-
-    @Override
-    public void validateContainerCommand(
-        ContainerCommandRequestProto msg) throws StorageContainerException {
-    }
-
-    @Override
-    public void shutdown() {
-    }
-    @Override
-    public Handler getHandler(ContainerProtos.ContainerType containerType) {
-      return null;
-    }
-
-    @Override
-    public void setScmId(String scmId) {
-    }
-
-    @Override
-    public void buildMissingContainerSetAndValidate(
-        Map<Long, Long> container2BCSIDMap) {
     }
   }
 }

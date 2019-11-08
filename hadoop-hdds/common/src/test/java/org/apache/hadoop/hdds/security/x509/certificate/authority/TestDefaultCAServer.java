@@ -147,6 +147,7 @@ public class TestDefaultCAServer {
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("8.8.8.8")
+        .addServiceName("OzoneMarketingCluster002")
         .setCA(false)
         .setClusterID(clusterId)
         .setScmID(scmId)

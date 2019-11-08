@@ -27,6 +27,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -43,8 +47,11 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
+import io.opentracing.Scope;
+import io.opentracing.util.GlobalTracer;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,7 +130,13 @@ public class BaseFreonGenerator {
 
       final long counter = i;
 
+      //provider is usually a lambda, print out only the owner class name:
+      String spanName = provider.getClass().getSimpleName().split("\\$")[0];
+
       executor.execute(() -> {
+        Scope scope =
+            GlobalTracer.get().buildSpan(spanName)
+                .startActive(true);
         try {
 
           //in case of an other failed test, we shouldn't execute more tasks.
@@ -134,8 +147,11 @@ public class BaseFreonGenerator {
           provider.executeNextTask(counter);
           successCounter.incrementAndGet();
         } catch (Exception e) {
+          scope.span().setTag("failure", true);
           failureCounter.incrementAndGet();
           LOG.error("Error on executing task", e);
+        } finally {
+          scope.close();
         }
       });
     }
@@ -243,6 +259,29 @@ public class BaseFreonGenerator {
             Client.getRpcTimeout(conf)), clientId);
   }
 
+  public StorageContainerLocationProtocol createStorageContainerLocationClient(
+      OzoneConfiguration ozoneConf)
+      throws IOException {
+
+    long version = RPC.getProtocolVersion(
+        StorageContainerLocationProtocolPB.class);
+    InetSocketAddress scmAddress =
+        getScmAddressForClients(ozoneConf);
+
+    RPC.setProtocolEngine(ozoneConf, StorageContainerLocationProtocolPB.class,
+        ProtobufRpcEngine.class);
+    StorageContainerLocationProtocol client =
+        TracingUtil.createProxy(
+            new StorageContainerLocationProtocolClientSideTranslatorPB(
+                RPC.getProxy(StorageContainerLocationProtocolPB.class, version,
+                    scmAddress, UserGroupInformation.getCurrentUser(),
+                    ozoneConf,
+                    NetUtils.getDefaultSocketFactory(ozoneConf),
+                    Client.getRpcTimeout(ozoneConf))),
+            StorageContainerLocationProtocol.class, ozoneConf);
+    return client;
+  }
+
   /**
    * Generate a key/file name based on the prefix and counter.
    */
@@ -332,6 +371,7 @@ public class BaseFreonGenerator {
   public OzoneConfiguration createOzoneConfiguration() {
     return freonCommand.createOzoneConfiguration();
   }
+
   /**
    * Simple contract to execute a new step during a freon test.
    */

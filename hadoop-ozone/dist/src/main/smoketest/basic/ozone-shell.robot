@@ -52,6 +52,8 @@ RpcClient without scheme
 *** Keywords ***
 Test ozone shell
     [arguments]     ${protocol}         ${server}       ${volume}
+    ${result} =     Execute And Ignore Error    ozone sh volume info ${protocol}${server}/${volume}
+                    Should contain      ${result}       VOLUME_NOT_FOUND
     ${result} =     Execute             ozone sh volume create ${protocol}${server}/${volume} --quota 100TB
                     Should not contain  ${result}       Failed
     ${result} =     Execute             ozone sh volume list ${protocol}${server}/ | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="${volume}")'

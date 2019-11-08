@@ -116,7 +116,7 @@ public class BenchMarkDatanodeDispatcher {
               containerType, conf, context, containerSet, volumeSet, metrics));
     }
     dispatcher = new HddsDispatcher(conf, containerSet, volumeSet, handlers,
-        context, metrics);
+        context, metrics, null);
     dispatcher.init();
 
     containerCount = new AtomicInteger();

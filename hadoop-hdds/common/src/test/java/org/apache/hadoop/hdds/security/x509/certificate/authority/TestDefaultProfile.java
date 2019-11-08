@@ -91,11 +91,11 @@ public class TestDefaultProfile {
 // Positive tests
     assertTrue(defaultProfile.isSupportedGeneralName(GeneralName.iPAddress));
     assertTrue(defaultProfile.isSupportedGeneralName(GeneralName.dNSName));
+    assertTrue(defaultProfile.isSupportedGeneralName(GeneralName.otherName));
 // Negative Tests
     assertFalse(defaultProfile.isSupportedGeneralName(
         GeneralName.directoryName));
     assertFalse(defaultProfile.isSupportedGeneralName(GeneralName.rfc822Name));
-    assertFalse(defaultProfile.isSupportedGeneralName(GeneralName.otherName));
   }
 
   /**
@@ -111,6 +111,7 @@ public class TestDefaultProfile {
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
         .addIpAddress("8.8.8.8")
+        .addServiceName("OzoneMarketingCluster001")
         .setCA(false)
         .setClusterID("ClusterID")
         .setScmID("SCMID")

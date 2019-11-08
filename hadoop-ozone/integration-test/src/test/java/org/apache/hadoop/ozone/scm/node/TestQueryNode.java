@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.ContainerOperationClient;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
@@ -91,9 +90,7 @@ public class TestQueryNode {
         .setNumDatanodes(numOfDatanodes)
         .build();
     cluster.waitForClusterToBeReady();
-    scmClient = new ContainerOperationClient(cluster
-        .getStorageContainerLocationClient(),
-        new XceiverClientManager(conf));
+    scmClient = new ContainerOperationClient(conf);
   }
 
   @After

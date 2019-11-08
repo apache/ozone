@@ -62,6 +62,12 @@ public class OmOzoneAclMap {
     }
   }
 
+  OmOzoneAclMap(List<OzoneAclInfo> defaultAclList,
+      ArrayList<Map<String, BitSet>> accessAclMap) {
+    this.defaultAclList = defaultAclList;
+    this.accessAclMap = accessAclMap;
+  }
+
   private Map<String, BitSet> getAccessAclMap(OzoneAclType type) {
     return accessAclMap.get(type.ordinal());
   }
@@ -297,5 +303,30 @@ public class OmOzoneAclMap {
 
   public List<OzoneAclInfo> getDefaultAclList() {
     return defaultAclList;
+  }
+
+  /**
+   * Return a new copy of the object.
+   */
+  public OmOzoneAclMap copyObject() {
+    ArrayList<Map<String, BitSet>> accessMap = new ArrayList<>();
+
+    // Initialize.
+    for (OzoneAclType aclType : OzoneAclType.values()) {
+      accessMap.add(aclType.ordinal(), new HashMap<>());
+    }
+
+    // Add from original accessAclMap to accessMap.
+    for (OzoneAclType aclType : OzoneAclType.values()) {
+      final int ordinal = aclType.ordinal();
+      accessAclMap.get(ordinal).forEach((k, v) ->
+          accessMap.get(ordinal).put(k, (BitSet) v.clone()));
+    }
+
+    // We can do shallow copy here, as OzoneAclInfo is immutable structure.
+    ArrayList<OzoneAclInfo> defaultList = new ArrayList<>();
+    defaultList.addAll(defaultAclList);
+
+    return new OmOzoneAclMap(defaultList, accessMap);
   }
 }
