@@ -297,6 +297,9 @@ enum Status {
 
     USER_MISMATCH = 54; // Error code when requested user name passed is
     // different from remote user.
+
+    INVALID_PART = 55;
+    INVALID_PART_ORDER = 56;
 }
 
 
