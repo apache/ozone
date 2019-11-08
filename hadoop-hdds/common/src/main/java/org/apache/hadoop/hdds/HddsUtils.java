@@ -589,6 +589,6 @@ public final class HddsUtils {
         "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
-        "Path should be a descendant of " + ancestor);
+        "Path should be a descendant of %s", ancestor);
   }
 }
