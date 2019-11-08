@@ -88,15 +88,6 @@ SECURITY_AUTHORIZATION_ENABLED=$("${HADOOP_HDFS_HOME}/bin/ozone" getconf -confKe
 #  exit 1
 #fi
 
-#---------------------------------------------------------
-# Check if ozone is enabled
-OZONE_ENABLED=$("${HADOOP_HDFS_HOME}/bin/ozone" getconf -confKey ozone.enabled | tr '[:upper:]' '[:lower:]' 2>&-)
-if [[ "${OZONE_ENABLED}" != "true" ]]; then
-  echo "Operation is not supported because ozone is not enabled."
-  exit -1
-fi
-
-#---------------------------------------------------------
 # datanodes (using default workers file)
 
 echo "Starting datanodes"

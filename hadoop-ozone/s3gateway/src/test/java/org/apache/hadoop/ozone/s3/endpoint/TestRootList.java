@@ -20,6 +20,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.header.AuthenticationHeaderParser;
@@ -37,7 +38,7 @@ public class TestRootList {
   private OzoneClientStub clientStub;
   private ObjectStore objectStoreStub;
   private RootEndpoint rootEndpoint;
-  private String userName = "ozone";
+  private String userName = OzoneConsts.OZONE;
 
   @Before
   public void setup() throws Exception {

@@ -17,46 +17,26 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
+    OZONE_SCM_CLIENT_ADDRESS_KEY;
 
-import org.apache.hadoop.conf.StorageUnit;
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.cli.container.ContainerCommands;
 import org.apache.hadoop.hdds.scm.cli.pipeline.PipelineCommands;
 import org.apache.hadoop.hdds.scm.cli.node.DatanodeAdminCommands;
 import org.apache.hadoop.hdds.scm.client.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB
-    .StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.NativeCodeLoader;
 
 import org.apache.commons.lang3.StringUtils;
-import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.hdds.HddsUtils.getScmSecurityClient;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_CLIENT_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -109,55 +89,12 @@ public class SCMCLI extends GenericCli {
 
   public ScmClient createScmClient()
       throws IOException {
-
     OzoneConfiguration ozoneConf = createOzoneConfiguration();
-    if (StringUtils.isNotEmpty(scm)) {
-      ozoneConf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scm);
-    }
-    if (!HddsUtils.getHostNameFromConfigKeys(ozoneConf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY).isPresent()) {
-
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY
-              + " should be set in ozone-site.xml or with the --scm option");
-    }
-
-    long version = RPC.getProtocolVersion(
-        StorageContainerLocationProtocolPB.class);
-    InetSocketAddress scmAddress =
-        getScmAddressForClients(ozoneConf);
-    int containerSizeGB = (int) ozoneConf.getStorageSize(
-        OZONE_SCM_CONTAINER_SIZE, OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-        StorageUnit.GB);
-    ContainerOperationClient
-        .setContainerSizeB(containerSizeGB * OzoneConsts.GB);
-
-    RPC.setProtocolEngine(ozoneConf, StorageContainerLocationProtocolPB.class,
-        ProtobufRpcEngine.class);
-    StorageContainerLocationProtocol client =
-        TracingUtil.createProxy(
-        new StorageContainerLocationProtocolClientSideTranslatorPB(
-            RPC.getProxy(StorageContainerLocationProtocolPB.class, version,
-                scmAddress, UserGroupInformation.getCurrentUser(), ozoneConf,
-                NetUtils.getDefaultSocketFactory(ozoneConf),
-                Client.getRpcTimeout(ozoneConf))),
-            StorageContainerLocationProtocol.class, ozoneConf);
-
-    XceiverClientManager xceiverClientManager = null;
-    if (OzoneSecurityUtil.isSecurityEnabled(ozoneConf)) {
-      SecurityConfig securityConfig = new SecurityConfig(ozoneConf);
-      SCMSecurityProtocol scmSecurityProtocolClient = getScmSecurityClient(
-          (OzoneConfiguration) securityConfig.getConfiguration());
-      String caCertificate =
-          scmSecurityProtocolClient.getCACertificate();
-      xceiverClientManager = new XceiverClientManager(ozoneConf,
-          OzoneConfiguration.of(ozoneConf).getObject(XceiverClientManager
-              .ScmClientConfig.class), caCertificate);
-    } else {
-      xceiverClientManager = new XceiverClientManager(ozoneConf);
-    }
-    return new ContainerOperationClient(client, xceiverClientManager);
+    checkAndSetSCMAddressArg(ozoneConf);
+    return new ContainerOperationClient(ozoneConf);
   }
+
+
 
   public void checkContainerExists(ScmClient scmClient, long containerId)
       throws IOException {
@@ -167,4 +104,16 @@ public class SCMCLI extends GenericCli {
     }
   }
 
+  private void checkAndSetSCMAddressArg(Configuration conf) {
+    if (StringUtils.isNotEmpty(scm)) {
+      conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scm);
+    }
+    if (!HddsUtils.getHostNameFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY).isPresent()) {
+
+      throw new IllegalArgumentException(
+          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY
+              + " should be set in ozone-site.xml or with the --scm option");
+    }
+  }
 }

@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.
     StorageContainerException;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -59,7 +60,7 @@ import java.util.concurrent.TimeUnit;
  * Creates a Grpc server endpoint that acts as the communication layer for
  * Ozone containers.
  */
-public final class XceiverServerGrpc extends XceiverServer {
+public final class XceiverServerGrpc implements XceiverServerSpi {
   private static final Logger
       LOG = LoggerFactory.getLogger(XceiverServerGrpc.class);
   private static final String COMPONENT = "dn";
@@ -79,7 +80,6 @@ public final class XceiverServerGrpc extends XceiverServer {
   public XceiverServerGrpc(DatanodeDetails datanodeDetails, Configuration conf,
       ContainerDispatcher dispatcher, CertificateClient caClient,
       BindableService... additionalServices) {
-    super(conf, caClient);
     Preconditions.checkNotNull(conf);
 
     this.id = datanodeDetails.getUuid();
@@ -96,25 +96,21 @@ public final class XceiverServerGrpc extends XceiverServer {
         ((NettyServerBuilder) ServerBuilder.forPort(port))
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
-    ServerCredentialInterceptor credInterceptor =
-        new ServerCredentialInterceptor(getBlockTokenVerifier());
     GrpcServerInterceptor tracingInterceptor = new GrpcServerInterceptor();
     nettyServerBuilder.addService(ServerInterceptors.intercept(
-        new GrpcXceiverService(dispatcher,
-            getSecurityConfig().isBlockTokenEnabled(),
-            getBlockTokenVerifier()), credInterceptor,
-        tracingInterceptor));
+        new GrpcXceiverService(dispatcher), tracingInterceptor));
 
     for (BindableService service : additionalServices) {
       nettyServerBuilder.addService(service);
     }
 
-    if (getSecConfig().isGrpcTlsEnabled()) {
+    SecurityConfig secConf = new SecurityConfig(conf);
+    if (secConf.isGrpcTlsEnabled()) {
       try {
         SslContextBuilder sslClientContextBuilder = SslContextBuilder.forServer(
             caClient.getPrivateKey(), caClient.getCertificate());
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
-            sslClientContextBuilder, getSecurityConfig().getGrpcSslProvider());
+            sslClientContextBuilder, secConf.getGrpcSslProvider());
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
         LOG.error("Unable to setup TLS for secure datanode GRPC endpoint.", ex);
@@ -180,8 +176,6 @@ public final class XceiverServerGrpc extends XceiverServer {
         .importAndCreateScope(
             "XceiverServerGrpc." + request.getCmdType().name(),
             request.getTraceID())) {
-
-      super.submitRequest(request, pipelineID);
       ContainerProtos.ContainerCommandResponseProto response =
           storageContainer.dispatch(request, null);
       if (response.getResult() != ContainerProtos.Result.SUCCESS) {

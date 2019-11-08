@@ -35,4 +35,9 @@ public class IntegerCodec implements Codec<Integer> {
   public Integer fromPersistedFormat(byte[] rawData) throws IOException {
     return Ints.fromByteArray(rawData);
   }
+
+  @Override
+  public Integer copyObject(Integer object) {
+    return object;
+  }
 }

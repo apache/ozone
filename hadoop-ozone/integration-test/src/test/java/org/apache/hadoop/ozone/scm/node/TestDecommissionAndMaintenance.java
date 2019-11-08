@@ -72,9 +72,7 @@ public class TestDecommissionAndMaintenance {
         .setNumDatanodes(numOfDatanodes)
         .build();
     cluster.waitForClusterToBeReady();
-    scmClient = new ContainerOperationClient(cluster
-        .getStorageContainerLocationClient(),
-        new XceiverClientManager(conf));
+    scmClient = new ContainerOperationClient(conf);
   }
 
   @After

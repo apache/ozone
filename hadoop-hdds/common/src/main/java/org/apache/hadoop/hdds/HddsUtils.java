@@ -24,6 +24,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.file.Path;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.HashSet;
@@ -32,16 +33,19 @@ import java.util.Optional;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -49,6 +53,7 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
@@ -60,8 +65,6 @@ import com.google.common.net.HostAndPort;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED_DEFAULT;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -320,12 +323,7 @@ public final class HddsUtils {
     }
     return addresses;
   }
-
-  public static boolean isHddsEnabled(Configuration conf) {
-    return conf.getBoolean(OZONE_ENABLED, OZONE_ENABLED_DEFAULT);
-  }
-
-
+  
   /**
    * Returns the hostname for this datanode. If the hostname is not
    * explicitly configured in the given config, then it is determined
@@ -392,6 +390,72 @@ public final class HddsUtils {
     case PutSmallFile:
     default:
       return false;
+    }
+  }
+
+  /**
+   * Not all datanode container cmd protocol has embedded ozone block token.
+   * Block token are issued by Ozone Manager and return to Ozone client to
+   * read/write data on datanode via input/output stream.
+   * Ozone datanode uses this helper to decide which command requires block
+   * token.
+   * @param cmdType
+   * @return true if it is a cmd that block token should be checked when
+   * security is enabled
+   * false if block token does not apply to the command.
+   *
+   */
+  public static boolean requireBlockToken(
+      ContainerProtos.Type cmdType) {
+    switch (cmdType) {
+    case ReadChunk:
+    case GetBlock:
+    case WriteChunk:
+    case PutBlock:
+    case PutSmallFile:
+    case GetSmallFile:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  /**
+   * Return the block ID of container commands that are related to blocks.
+   * @param msg container command
+   * @return block ID.
+   */
+  public static BlockID getBlockID(ContainerCommandRequestProto msg) {
+    switch (msg.getCmdType()) {
+    case ReadChunk:
+      if (msg.hasReadChunk()) {
+        return BlockID.getFromProtobuf(msg.getReadChunk().getBlockID());
+      }
+    case GetBlock:
+      if (msg.hasGetBlock()) {
+        return BlockID.getFromProtobuf(msg.getGetBlock().getBlockID());
+      }
+    case WriteChunk:
+      if (msg.hasWriteChunk()) {
+        return BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+      }
+    case PutBlock:
+      if (msg.hasPutBlock()) {
+        return BlockID.getFromProtobuf(msg.getPutBlock().getBlockData()
+            .getBlockID());
+      }
+    case PutSmallFile:
+      if (msg.hasPutSmallFile()) {
+        return BlockID.getFromProtobuf(msg.getPutSmallFile().getBlock()
+            .getBlockData().getBlockID());
+      }
+    case GetSmallFile:
+      if (msg.hasGetSmallFile()) {
+        return BlockID.getFromProtobuf(msg.getGetSmallFile().getBlock()
+            .getBlockID());
+      }
+    default:
+      return null;
     }
   }
 
@@ -497,9 +561,34 @@ public final class HddsUtils {
   public static MetricsSystem initializeMetrics(
       OzoneConfiguration configuration, String serverName) {
     MetricsSystem metricsSystem = DefaultMetricsSystem.initialize(serverName);
-    JvmMetrics.create(serverName,
-        configuration.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
-        DefaultMetricsSystem.instance());
+    try {
+      JvmMetrics.create(serverName,
+          configuration.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
+          DefaultMetricsSystem.instance());
+    } catch (MetricsException e) {
+      LOG.info("Metrics source JvmMetrics already added to DataNode.");
+    }
     return metricsSystem;
+  }
+
+  /**
+   * Basic validation for {@code path}: checks that it is a descendant of
+   * (or the same as) the given {@code ancestor}.
+   * @param path the path to be validated
+   * @param ancestor a trusted path that is supposed to be the ancestor of
+   *     {@code path}
+   * @throws NullPointerException if either {@code path} or {@code ancestor} is
+   *     null
+   * @throws IllegalArgumentException if {@code ancestor} is not really the
+   *     ancestor of {@code path}
+   */
+  public static void validatePath(Path path, Path ancestor) {
+    Preconditions.checkNotNull(path,
+        "Path should not be null");
+    Preconditions.checkNotNull(ancestor,
+        "Ancestor should not be null");
+    Preconditions.checkArgument(
+        path.normalize().startsWith(ancestor.normalize()),
+        "Path should be a descendant of " + ancestor);
   }
 }

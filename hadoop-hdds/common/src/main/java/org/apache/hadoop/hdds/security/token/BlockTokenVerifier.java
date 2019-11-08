@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.security.token;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -55,68 +57,68 @@ public class BlockTokenVerifier implements TokenVerifier {
   }
 
   @Override
-  public UserGroupInformation verify(String user, String tokenStr)
-      throws SCMSecurityException {
-    if (conf.isBlockTokenEnabled()) {
-      // TODO: add audit logs.
-
-      if (Strings.isNullOrEmpty(tokenStr)) {
-        throw new BlockTokenException("Fail to find any token (empty or " +
-            "null.)");
-      }
-      final Token<OzoneBlockTokenIdentifier> token = new Token();
-      OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
-      try {
-        token.decodeFromUrlString(tokenStr);
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Verifying token:{} for user:{} ", token, user);
-        }
-        ByteArrayInputStream buf = new ByteArrayInputStream(
-            token.getIdentifier());
-        DataInputStream in = new DataInputStream(buf);
-        tokenId.readFields(in);
-
-      } catch (IOException ex) {
-        throw new BlockTokenException("Failed to decode token : " + tokenStr);
-      }
-
-      if (caClient == null) {
-        throw new SCMSecurityException("Certificate client not available " +
-            "to validate token");
-      }
-
-      X509Certificate singerCert;
-      singerCert = caClient.getCertificate(tokenId.getOmCertSerialId());
-
-      if (singerCert == null) {
-        throw new BlockTokenException("Can't find signer certificate " +
-            "(OmCertSerialId: " + tokenId.getOmCertSerialId() +
-            ") of the block token for user: " + tokenId.getUser());
-      }
-      boolean validToken = caClient.verifySignature(tokenId.getBytes(),
-          token.getPassword(), singerCert);
-      if (!validToken) {
-        throw new BlockTokenException("Invalid block token for user: " +
-            tokenId.getUser());
-      }
-
-      // check expiration
-      if (isExpired(tokenId.getExpiryDate())) {
-        UserGroupInformation tokenUser = tokenId.getUser();
-        tokenUser.setAuthenticationMethod(
-            UserGroupInformation.AuthenticationMethod.TOKEN);
-        throw new BlockTokenException("Expired block token for user: " +
-            tokenUser);
-      }
-      // defer access mode, bcsid and maxLength check to container dispatcher
-      UserGroupInformation ugi = tokenId.getUser();
-      ugi.addToken(token);
-      ugi.setAuthenticationMethod(UserGroupInformation
-          .AuthenticationMethod.TOKEN);
-      return ugi;
-    } else {
-      return UserGroupInformation.createRemoteUser(user);
+  public void verify(String user, String tokenStr,
+      ContainerProtos.Type cmd, String id) throws SCMSecurityException {
+    if (!conf.isBlockTokenEnabled() || !HddsUtils.requireBlockToken(cmd)) {
+      return;
     }
+
+    // TODO: add audit logs.
+    if (Strings.isNullOrEmpty(tokenStr)) {
+      throw new BlockTokenException("Fail to find any token (empty or " +
+          "null.)");
+    }
+
+    final Token<OzoneBlockTokenIdentifier> token = new Token();
+    OzoneBlockTokenIdentifier tokenId = new OzoneBlockTokenIdentifier();
+    try {
+      token.decodeFromUrlString(tokenStr);
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Verifying token:{} for user:{} ", token, user);
+      }
+      ByteArrayInputStream buf = new ByteArrayInputStream(
+          token.getIdentifier());
+      DataInputStream in = new DataInputStream(buf);
+      tokenId.readFields(in);
+
+    } catch (IOException ex) {
+      throw new BlockTokenException("Failed to decode token : " + tokenStr);
+    }
+
+    if (caClient == null) {
+      throw new SCMSecurityException("Certificate client not available " +
+          "to validate token");
+    }
+
+    UserGroupInformation tokenUser = tokenId.getUser();
+    X509Certificate signerCert;
+    signerCert = caClient.getCertificate(tokenId.getOmCertSerialId());
+
+    if (signerCert == null) {
+      throw new BlockTokenException("Can't find signer certificate " +
+          "(OmCertSerialId: " + tokenId.getOmCertSerialId() +
+          ") of the block token for user: " + tokenUser);
+    }
+    boolean validToken = caClient.verifySignature(tokenId.getBytes(),
+        token.getPassword(), signerCert);
+    if (!validToken) {
+      throw new BlockTokenException("Invalid block token for user: " +
+          tokenId.getUser());
+    }
+    // check expiration
+    if (isExpired(tokenId.getExpiryDate())) {
+      throw new BlockTokenException("Expired block token for user: " +
+          tokenUser);
+    }
+
+    // Token block id mismatch
+    if (!tokenId.getBlockId().equals(id)) {
+      throw new BlockTokenException("Block id mismatch. Token for block ID: " +
+          tokenId.getBlockId() + " can't be used to access block: " + id +
+          " by user: " + tokenUser);
+    }
+
+    // TODO: check cmd type and the permissions(AccessMode) in the token
   }
 
   public static boolean isTestStub() {

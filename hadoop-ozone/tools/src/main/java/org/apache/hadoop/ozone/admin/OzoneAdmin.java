@@ -58,7 +58,7 @@ public class OzoneAdmin extends GenericCli {
    */
   public static void main(String[] argv) throws Exception {
     LogManager.resetConfiguration();
-    Logger.getRootLogger().setLevel(Level.INFO);
+    Logger.getRootLogger().setLevel(Level.WARN);
     Logger.getRootLogger()
         .addAppender(new ConsoleAppender(new PatternLayout("%m%n")));
     Logger.getLogger(NativeCodeLoader.class).setLevel(Level.ERROR);

@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -111,6 +112,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
 
     if (remoteAddress != null) {
+      userInfo.setHostName(remoteAddress.getHostName());
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
     }
 
@@ -133,7 +135,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
       String vol, String bucket, String key) throws IOException {
     ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
-        createUGI(), getRemoteAddress());
+        createUGI(), getRemoteAddress(), getHostName());
   }
 
   /**
@@ -171,6 +173,21 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   /**
+   * Return String created from OMRequest userInfo. If userInfo is not
+   * set, returns null.
+   * @return String
+   * @throws IOException
+   */
+  @VisibleForTesting
+  public String getHostName() {
+    if (omRequest.hasUserInfo()) {
+      return omRequest.getUserInfo().getHostName();
+    } else {
+      return null;
+    }
+  }
+
+  /**
    * Set parameters needed for return error response to client.
    * @param omResponse
    * @param ex - IOException
@@ -180,11 +197,20 @@ public abstract class OMClientRequest implements RequestAuditor {
       @Nonnull OMResponse.Builder omResponse, @Nonnull IOException ex) {
 
     omResponse.setSuccess(false);
-    if (ex.getMessage() != null) {
-      omResponse.setMessage(ex.getMessage());
+    String errorMsg = exceptionErrorMessage(ex);
+    if (errorMsg != null) {
+      omResponse.setMessage(errorMsg);
     }
     omResponse.setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(ex));
     return omResponse.build();
+  }
+
+  private String exceptionErrorMessage(IOException ex) {
+    if (ex instanceof OMException) {
+      return ex.getMessage();
+    } else {
+      return org.apache.hadoop.util.StringUtils.stringifyException(ex);
+    }
   }
 
   /**

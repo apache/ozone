@@ -17,32 +17,20 @@
  */
 package org.apache.hadoop.ozone.ozShell;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.PrintStream;
+import static org.junit.Assert.fail;
+
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.test.GenericTestUtils;
-
-import com.google.common.base.Strings;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
-import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Assert;
-import static org.junit.Assert.fail;
-import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Strings;
+
 import picocli.CommandLine;
 import picocli.CommandLine.ExecutionException;
 import picocli.CommandLine.IExceptionHandler2;
@@ -58,79 +46,18 @@ public class TestOzoneDatanodeShell {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneDatanodeShell.class);
 
-  /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public Timeout testTimeout = new Timeout(300000);
-
-  private static File baseDir;
-  private static OzoneConfiguration conf = null;
-  private static MiniOzoneCluster cluster = null;
   private static HddsDatanodeService datanode = null;
 
-  private final ByteArrayOutputStream out = new ByteArrayOutputStream();
-  private final ByteArrayOutputStream err = new ByteArrayOutputStream();
-  private static final PrintStream OLD_OUT = System.out;
-  private static final PrintStream OLD_ERR = System.err;
-
   /**
-   * Create a MiniDFSCluster for testing with using distributed Ozone
-   * handler type.
+   * Create a HddsDatanodeService stub that can be used to test Cli behavior.
    *
    * @throws Exception
    */
   @BeforeClass
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-
-    String path = GenericTestUtils.getTempPath(
-        TestOzoneDatanodeShell.class.getSimpleName());
-    baseDir = new File(path);
-    baseDir.mkdirs();
-
-    datanode = HddsDatanodeService.createHddsDatanodeService(null);
-
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    conf.setInt(OZONE_REPLICATION, ReplicationFactor.THREE.getValue());
-    conf.setQuietMode(false);
-    cluster.waitForClusterToBeReady();
+  public static void init() {
+    datanode = new TestHddsDatanodeService(false, new String[] {});
   }
-
-  /**
-   * shutdown MiniDFSCluster.
-   */
-  @AfterClass
-  public static void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-
-    if (baseDir != null) {
-      FileUtil.fullyDelete(baseDir, true);
-    }
-  }
-
-  @Before
-  public void setup() {
-    System.setOut(new PrintStream(out));
-    System.setErr(new PrintStream(err));
-  }
-
-  @After
-  public void reset() {
-    // reset stream after each unit test
-    out.reset();
-    err.reset();
-
-    // restore system streams
-    System.setOut(OLD_OUT);
-    System.setErr(OLD_ERR);
-  }
-
-
+  
   private void executeDatanode(HddsDatanodeService hdds, String[] args) {
     LOG.info("Executing datanode command with args {}", Arrays.asList(args));
     CommandLine cmd = hdds.getCmd();
@@ -200,5 +127,16 @@ public class TestOzoneDatanodeShell {
     String[] args = new String[]{"-invalidParam"};
 
     executeDatanodeWithError(datanode, args, expectedError);
+  }
+
+  private static class TestHddsDatanodeService extends HddsDatanodeService {
+    TestHddsDatanodeService(boolean printBanner, String[] args) {
+      super(printBanner, args);
+    }
+
+    @Override
+    public void start() {
+      // do nothing
+    }
   }
 }

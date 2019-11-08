@@ -26,7 +26,6 @@ data:
   OZONE-SITE.XML_ozone.om.address: "om-0.om"
   OZONE-SITE.XML_ozone.scm.client.address: "scm-0.scm"
   OZONE-SITE.XML_ozone.scm.names: "scm-0.scm"
-  OZONE-SITE.XML_ozone.enabled: "true"
   LOG4J.PROPERTIES_log4j.rootLogger: "INFO, stdout"
   LOG4J.PROPERTIES_log4j.appender.stdout: "org.apache.log4j.ConsoleAppender"
   LOG4J.PROPERTIES_log4j.appender.stdout.layout: "org.apache.log4j.PatternLayout"

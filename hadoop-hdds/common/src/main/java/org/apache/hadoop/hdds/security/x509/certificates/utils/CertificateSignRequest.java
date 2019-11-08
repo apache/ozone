@@ -25,7 +25,13 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.logging.log4j.util.Strings;
+import org.bouncycastle.asn1.ASN1EncodableVector;
+import org.bouncycastle.asn1.ASN1Object;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.asn1.DERTaggedObject;
+import org.bouncycastle.asn1.DERUTF8String;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
@@ -198,12 +204,45 @@ public final class CertificateSignRequest {
       return this;
     }
 
+    public CertificateSignRequest.Builder addServiceName(
+        String serviceName) {
+      Preconditions.checkNotNull(
+          serviceName, "Service Name cannot be null");
+
+      this.addAltName(GeneralName.otherName, serviceName);
+      return this;
+    }
+
     private CertificateSignRequest.Builder addAltName(int tag, String name) {
       if (altNames == null) {
         altNames = new ArrayList<>();
       }
-      altNames.add(new GeneralName(tag, name));
+      if (tag == GeneralName.otherName) {
+        ASN1Object ono = addOtherNameAsn1Object(name);
+
+        altNames.add(new GeneralName(tag, ono));
+      } else {
+        altNames.add(new GeneralName(tag, name));
+      }
       return this;
+    }
+
+    /**
+     * addOtherNameAsn1Object requires special handling since
+     * Bouncy Castle does not support othername as string.
+     * @param name
+     * @return
+     */
+    private ASN1Object addOtherNameAsn1Object(String name) {
+      // Below oid is copied from this URL:
+      // https://docs.microsoft.com/en-us/windows/win32/adschema/a-middlename
+      final String otherNameOID = "2.16.840.1.113730.3.1.34";
+      ASN1EncodableVector otherName = new ASN1EncodableVector();
+      otherName.add(new ASN1ObjectIdentifier(otherNameOID));
+      otherName.add(new DERTaggedObject(
+          true, GeneralName.otherName, new DERUTF8String(name)));
+      return new DERTaggedObject(
+          false, 0, new DERSequence(otherName));
     }
 
     public CertificateSignRequest.Builder setCA(Boolean isCA) {

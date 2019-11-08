@@ -86,7 +86,7 @@ public class GetKeyHandler extends Handler {
 
     if (dataFile.exists()) {
       throw new OzoneClientException(
-          fileName + "exists. Download will overwrite an "
+          fileName + " exists. Download will overwrite an "
               + "existing file. Aborting.");
     }
 

@@ -37,4 +37,9 @@ public class LongCodec implements Codec<Long> {
   public Long fromPersistedFormat(byte[] rawData) throws IOException {
     return Longs.fromByteArray(rawData);
   }
+
+  @Override
+  public Long copyObject(Long object) {
+    return object;
+  }
 }

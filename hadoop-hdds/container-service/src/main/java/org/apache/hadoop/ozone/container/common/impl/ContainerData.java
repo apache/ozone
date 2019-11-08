@@ -21,6 +21,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
@@ -32,13 +34,17 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.yaml.snakeyaml.Yaml;
 
+import javax.annotation.Nullable;
+
 import static org.apache.hadoop.ozone.OzoneConsts.CHECKSUM;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_TYPE;
+import static org.apache.hadoop.ozone.OzoneConsts.DATA_SCAN_TIMESTAMP;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUTVERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.MAX_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA;
@@ -89,7 +95,14 @@ public abstract class ContainerData {
   private HddsVolume volume;
 
   private String checksum;
-  public static final Charset CHARSET_ENCODING = Charset.forName("UTF-8");
+
+  /** Timestamp of last data scan (milliseconds since Unix Epoch).
+   * {@code null} if not yet scanned (or timestamp not recorded,
+   * eg. in prior versions). */
+  private Long dataScanTimestamp; // for serialization
+  private transient Optional<Instant> lastDataScanTime = Optional.empty();
+
+  public static final Charset CHARSET_ENCODING = StandardCharsets.UTF_8;
   private static final String DUMMY_CHECKSUM = new String(new byte[64],
       CHARSET_ENCODING);
 
@@ -103,6 +116,7 @@ public abstract class ContainerData {
       METADATA,
       MAX_SIZE,
       CHECKSUM,
+      DATA_SCAN_TIMESTAMP,
       ORIGIN_PIPELINE_ID,
       ORIGIN_NODE_ID));
 
@@ -506,6 +520,30 @@ public abstract class ContainerData {
     return this.checksum;
   }
 
+  /**
+   * @return {@code Optional} with the timestamp of last data scan.
+   * {@code absent} if not yet scanned or timestamp was not recorded.
+   */
+  public Optional<Instant> lastDataScanTime() {
+    return lastDataScanTime;
+  }
+
+  public void updateDataScanTime(@Nullable Instant time) {
+    lastDataScanTime = Optional.ofNullable(time);
+    dataScanTimestamp = time != null ? time.toEpochMilli() : null;
+  }
+
+  // for deserialization
+  public void setDataScanTimestamp(Long timestamp) {
+    dataScanTimestamp = timestamp;
+    lastDataScanTime = timestamp != null
+        ? Optional.of(Instant.ofEpochMilli(timestamp))
+        : Optional.empty();
+  }
+
+  public Long getDataScanTimestamp() {
+    return dataScanTimestamp;
+  }
 
   /**
    * Returns the origin pipeline Id of this container.
@@ -557,4 +595,5 @@ public abstract class ContainerData {
    * Returns the blockCommitSequenceId.
    */
   public abstract long getBlockCommitSequenceId();
+
 }

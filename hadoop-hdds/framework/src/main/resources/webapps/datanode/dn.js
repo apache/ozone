@@ -34,7 +34,6 @@
         $.get('/jmx?qry=Hadoop:service=OzoneDataNode,name=SCMConnectionManager', function (resp) {
             if (resp.beans.length > 0) {
                 data.ozone.SCMServers = resp.beans[0].SCMServers;
-                data.ozone.enabled = true;
                 render();
             }
         }).fail(show_err_msg);
@@ -44,7 +43,6 @@
         $.get('/jmx?qry=Hadoop:service=OzoneDataNode,name=ContainerLocationManager', function (resp) {
             if (resp.beans.length > 0) {
                 data.ozone.LocationReport = resp.beans[0].LocationReport;
-                data.ozone.enabled = true;
                 render();
             }
         }).fail(show_err_msg);

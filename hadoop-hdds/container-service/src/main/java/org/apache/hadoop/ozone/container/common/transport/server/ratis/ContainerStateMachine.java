@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -32,7 +31,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -59,8 +57,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ReadChunkResponseProto;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-import org.apache.hadoop.hdds.security.token.TokenVerifier;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -107,7 +103,7 @@ import java.io.OutputStream;
  * The write requests can be divided into requests with user data
  * (WriteChunkRequest) and other request without user data.
  *
- * Inorder to optimize the write throughput, the writeChunk request is
+ * In order to optimize the write throughput, the writeChunk request is
  * processed in 2 phases. The 2 phases are divided in
  * {@link #startTransaction(RaftClientRequest)}, in the first phase the user
  * data is written directly into the state machine via
@@ -127,7 +123,7 @@ import java.io.OutputStream;
  *
  * 2) Write chunk commit operation is executed after write chunk state machine
  * operation. This will ensure that commit operation is sync'd with the state
- * machine operation.For example, synchronization between writeChunk and
+ * machine operation. For example, synchronization between writeChunk and
  * createContainer in {@link ContainerStateMachine}.
  **/
 
@@ -149,8 +145,6 @@ public class ContainerStateMachine extends BaseStateMachine {
   private ExecutorService[] executors;
   private final Map<Long, Long> applyTransactionCompletionMap;
   private final Cache<Long, ByteString> stateMachineDataCache;
-  private final boolean isBlockTokenEnabled;
-  private final TokenVerifier tokenVerifier;
   private final AtomicBoolean stateMachineHealthy;
 
   private final Semaphore applyTransactionSemaphore;
@@ -162,9 +156,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
       ContainerController containerController, ThreadPoolExecutor chunkExecutor,
-      XceiverServerRatis ratisServer, long expiryInterval,
-      boolean isBlockTokenEnabled, TokenVerifier tokenVerifier,
-      Configuration conf) {
+      XceiverServerRatis ratisServer, long expiryInterval, Configuration conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -178,8 +170,6 @@ public class ContainerStateMachine extends BaseStateMachine {
         // set the limit on no of cached entries equal to no of max threads
         // executing writeStateMachineData
         .maximumSize(chunkExecutor.getCorePoolSize()).build();
-    this.isBlockTokenEnabled = isBlockTokenEnabled;
-    this.tokenVerifier = tokenVerifier;
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
     final int numContainerOpExecutors = conf.getInt(
@@ -243,10 +233,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     // initialize the dispatcher with snapshot so that it build the missing
     // container list
     try (FileInputStream fin = new FileInputStream(snapshotFile)) {
-      byte[] container2BCSIDData = IOUtils.toByteArray(fin);
       ContainerProtos.Container2BCSIDMapProto proto =
           ContainerProtos.Container2BCSIDMapProto
-              .parseFrom(container2BCSIDData);
+              .parseFrom(fin);
       // read the created containers list from the snapshot file and add it to
       // the container2BCSIDMap here.
       // container2BCSIDMap will further grow as and when containers get created
@@ -269,7 +258,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // TODO : while snapshot is being taken, deleteContainer call should not
     // should not happen. Lock protection will be required if delete
     // container happens outside of Ratis.
-    IOUtils.write(builder.build().toByteArray(), out);
+    builder.build().writeTo(out);
   }
 
   public boolean isStateMachineHealthy() {
@@ -395,19 +384,6 @@ public class ContainerStateMachine extends BaseStateMachine {
       LOG.trace("{}: dispatch {} containerID={} pipelineID={} traceID={}", gid,
           requestProto.getCmdType(), requestProto.getContainerID(),
           requestProto.getPipelineID(), requestProto.getTraceID());
-    }
-    if (isBlockTokenEnabled) {
-      try {
-        // ServerInterceptors intercepts incoming request and creates ugi.
-        tokenVerifier
-            .verify(UserGroupInformation.getCurrentUser().getShortUserName(),
-                requestProto.getEncodedToken());
-      } catch (IOException ioe) {
-        StorageContainerException sce = new StorageContainerException(
-            "Block token verification failed. " + ioe.getMessage(), ioe,
-            ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
-        return ContainerUtils.logAndReturnError(LOG, sce, requestProto);
-      }
     }
     ContainerCommandResponseProto response =
         dispatcher.dispatch(requestProto, context);

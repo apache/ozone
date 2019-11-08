@@ -91,7 +91,11 @@ public class RemoveAclBucketHandler extends Handler {
     boolean result = client.getObjectStore().removeAcl(obj,
         OzoneAcl.parseAcl(acl));
 
-    System.out.printf("%s%n", "Acl removed successfully: " + result);
+    String message = result
+        ? ("Acl removed successfully.")
+        : ("Acl doesn't exist.");
+
+    System.out.println(message);
 
     client.close();
     return null;

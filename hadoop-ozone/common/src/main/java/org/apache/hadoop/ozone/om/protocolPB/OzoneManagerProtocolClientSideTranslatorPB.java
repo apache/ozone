@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.protocolPB;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,6 +34,7 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtocolTranslator;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.NotLeaderException;
@@ -202,9 +202,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
         omServiceId);
 
-    int maxRetries = conf.getInt(
-        OzoneConfigKeys.OZONE_CLIENT_RETRY_MAX_ATTEMPTS_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_RETRY_MAX_ATTEMPTS_DEFAULT);
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
@@ -215,9 +212,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_DEFAULT);
 
-    this.rpcProxy =
-        createRetryProxy(omFailoverProxyProvider, maxRetries, maxFailovers,
-            sleepBase, sleepMax);
+    this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers,
+        sleepBase, sleepMax);
     this.clientID = clientId;
   }
 
@@ -228,32 +224,39 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   private OzoneManagerProtocolPB createRetryProxy(
       OMFailoverProxyProvider failoverProxyProvider,
-      int maxRetries, int maxFailovers, int delayMillis, int maxDelayBase) {
+      int maxFailovers, int delayMillis, int maxDelayBase) {
 
     RetryPolicy retryPolicyOnNetworkException = RetryPolicies
         .failoverOnNetworkException(RetryPolicies.TRY_ONCE_THEN_FAIL,
-            maxFailovers, maxRetries, delayMillis, maxDelayBase);
+            maxFailovers, maxFailovers, delayMillis, maxDelayBase);
 
+    // Client attempts contacting each OM ipc.client.connect.max.retries
+    // (default = 10) times before failing over to the next OM, if
+    // available.
+    // Client will attempt upto maxFailovers number of failovers between
+    // available OMs before throwing exception.
     RetryPolicy retryPolicy = new RetryPolicy() {
       @Override
       public RetryAction shouldRetry(Exception exception, int retries,
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
-
         if (exception instanceof ServiceException) {
-          Throwable cause = exception.getCause();
-          if (cause instanceof NotLeaderException) {
-            NotLeaderException notLeaderException = (NotLeaderException) cause;
+          NotLeaderException notLeaderException =
+              getNotLeaderException(exception);
+          if (notLeaderException != null &&
+              notLeaderException.getSuggestedLeaderNodeId() != null) {
+            // We need to failover manually to the suggested Leader OM Node.
+            // OMFailoverProxyProvider#performFailover() is a dummy call and
+            // does not perform any failover.
             omFailoverProxyProvider.performFailoverIfRequired(
                 notLeaderException.getSuggestedLeaderNodeId());
-            return getRetryAction(RetryAction.RETRY, retries, failovers);
-          } else {
-            return getRetryAction(RetryAction.FAILOVER_AND_RETRY, retries,
-                failovers);
+            return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
           }
-        } else if (exception instanceof EOFException) {
-          return getRetryAction(RetryAction.FAILOVER_AND_RETRY, retries,
-              failovers);
+          // We need to failover manually to the next OM Node proxy.
+          // OMFailoverProxyProvider#performFailover() is a dummy call and
+          // does not perform any failover.
+          omFailoverProxyProvider.performFailoverToNextProxy();
+          return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
         } else {
           return retryPolicyOnNetworkException.shouldRetry(
               exception, retries, failovers, isIdempotentOrAtMostOnce);
@@ -261,12 +264,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       }
 
       private RetryAction getRetryAction(RetryAction fallbackAction,
-          int retries, int failovers) {
-        if (retries < maxRetries && failovers < maxFailovers) {
+          int failovers) {
+        if (failovers <= maxFailovers) {
           return fallbackAction;
         } else {
-          FAILOVER_PROXY_PROVIDER_LOG.error("Failed to connect to OM. " +
-              "Attempted {} retries and {} failovers", retries, failovers);
+          FAILOVER_PROXY_PROVIDER_LOG.error("Failed to connect to OMs: {}. " +
+              "Attempted {} failovers.",
+              omFailoverProxyProvider.getOMProxyInfos(), maxFailovers);
           return RetryAction.FAIL;
         }
       }
@@ -275,6 +279,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OzoneManagerProtocolPB proxy = (OzoneManagerProtocolPB) RetryProxy.create(
         OzoneManagerProtocolPB.class, failoverProxyProvider, retryPolicy);
     return proxy;
+  }
+
+  /**
+   * Check if exception is a NotLeaderException.
+   * @return NotLeaderException.
+   */
+  private NotLeaderException getNotLeaderException(Exception exception) {
+    Throwable cause = exception.getCause();
+    if (cause != null && cause instanceof RemoteException) {
+      IOException ioException =
+          ((RemoteException) cause).unwrapRemoteException();
+      if (ioException instanceof NotLeaderException) {
+        return (NotLeaderException) ioException;
+      }
+    }
+    return null;
   }
 
   @VisibleForTesting
@@ -347,7 +367,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
       return omResponse;
     } catch (ServiceException e) {
-      throw ProtobufHelper.getRemoteException(e);
+//      throw ProtobufHelper.getRemoteException(e);
+      NotLeaderException notLeaderException = getNotLeaderException(e);
+      if (notLeaderException == null) {
+        throw ProtobufHelper.getRemoteException(e);
+      } else {
+        throw new IOException("Could not determine or connect to OM Leader.");
+      }
     }
   }
 
@@ -1402,7 +1428,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * false.
    *
    * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl top be added.
+   * @param acl ozone acl to be added.
    * @throws IOException if there is error.
    */
   @Override

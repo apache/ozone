@@ -477,20 +477,6 @@
       postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
-    <name>ozone.enabled</name>
-    <value>false</value>
-    <tag>OZONE, REQUIRED</tag>
-    <description>
-      Status of the Ozone Object Storage service is enabled.
-      Set to true to enable Ozone.
-      Set to false to disable Ozone.
-      Unless this value is set to true, Ozone services will not be started in
-      the cluster.
-
-      Please note: By default ozone is disabled on a hadoop cluster.
-    </description>
-  </property>
-  <property>
     <name>ozone.key.deleting.limit.per.task</name>
     <value>1000</value>
     <tag>OM, PERFORMANCE</tag>
@@ -2162,18 +2148,13 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.retry.max.attempts</name>
-    <value>10</value>
-    <description>
-      Max retry attempts for Ozone RpcClient talking to OzoneManagers.
-    </description>
-  </property>
-  <property>
     <name>ozone.client.failover.max.attempts</name>
     <value>15</value>
     <description>
-      Expert only. The number of client failover attempts that should be
-      made before the failover is considered failed.
+      Expert only. Ozone RpcClient attempts talking to each OzoneManager
+      ipc.client.connect.max.retries (default = 10) number of times before
+      failing over to another OzoneManager, if available. This parameter
+      represents the number of times the client will failover before giving up.
     </description>
   </property>
   <property>

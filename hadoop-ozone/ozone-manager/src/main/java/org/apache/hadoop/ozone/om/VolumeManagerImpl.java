@@ -478,7 +478,7 @@ public class VolumeManagerImpl implements VolumeManager {
    * false.
    *
    * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl top be added.
+   * @param acl ozone acl to be added.
    * @throws IOException if there is error.
    */
   @Override
@@ -695,6 +695,9 @@ public class VolumeManagerImpl implements VolumeManager {
       }
       return hasAccess;
     } catch (IOException ex) {
+      if (ex instanceof OMException) {
+        throw (OMException) ex;
+      }
       LOG.error("Check access operation failed for volume:{}", volume, ex);
       throw new OMException("Check access operation failed for " +
           "volume:" + volume, ex, ResultCodes.INTERNAL_ERROR);

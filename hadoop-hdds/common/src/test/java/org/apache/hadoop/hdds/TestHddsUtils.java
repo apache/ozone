@@ -17,8 +17,10 @@
  */
 package org.apache.hadoop.hdds;
 
+import java.nio.file.Paths;
 import java.util.Optional;
 
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -37,6 +39,25 @@ public class TestHddsUtils {
 
     Assert.assertEquals(Optional.empty(),
         HddsUtils.getHostName(":1234"));
+  }
+
+  @Test
+  public void validatePath() throws Exception {
+    HddsUtils.validatePath(Paths.get("/"), Paths.get("/"));
+    HddsUtils.validatePath(Paths.get("/a"), Paths.get("/"));
+    HddsUtils.validatePath(Paths.get("/a"), Paths.get("/a"));
+    HddsUtils.validatePath(Paths.get("/a/b"), Paths.get("/a"));
+    HddsUtils.validatePath(Paths.get("/a/b/c"), Paths.get("/a"));
+    HddsUtils.validatePath(Paths.get("/a/../a/b"), Paths.get("/a"));
+
+    LambdaTestUtils.intercept(IllegalArgumentException.class,
+        () -> HddsUtils.validatePath(Paths.get("/b/c"), Paths.get("/a")));
+    LambdaTestUtils.intercept(IllegalArgumentException.class,
+        () -> HddsUtils.validatePath(Paths.get("/"), Paths.get("/a")));
+    LambdaTestUtils.intercept(IllegalArgumentException.class,
+        () -> HddsUtils.validatePath(Paths.get("/a/.."), Paths.get("/a")));
+    LambdaTestUtils.intercept(IllegalArgumentException.class,
+        () -> HddsUtils.validatePath(Paths.get("/a/../b"), Paths.get("/a")));
   }
 
 }

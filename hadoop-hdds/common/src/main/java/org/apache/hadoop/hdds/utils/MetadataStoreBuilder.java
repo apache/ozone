@@ -127,7 +127,6 @@ public class MetadataStoreBuilder {
         opts = CACHED_OPTS.get(conf);
       } else {
         opts = new org.rocksdb.Options();
-        opts.setCreateIfMissing(createIfMissing);
         if (cacheSize > 0) {
           BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
           tableConfig.setBlockCacheSize(cacheSize);
@@ -143,8 +142,9 @@ public class MetadataStoreBuilder {
           statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
           opts = opts.setStatistics(statistics);
         }
-        CACHED_OPTS.put(conf, opts);
       }
+      opts.setCreateIfMissing(createIfMissing);
+      CACHED_OPTS.put(conf, opts);
       return new RocksDBStore(dbFile, opts);
     }
     

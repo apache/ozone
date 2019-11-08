@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 
@@ -47,7 +46,6 @@ public class TestHddsDatanodeService {
   public void setUp() {
     testDir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
-    conf.setBoolean(OZONE_ENABLED, true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     conf.setClass(OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY, MockService.class,
         ServicePlugin.class);

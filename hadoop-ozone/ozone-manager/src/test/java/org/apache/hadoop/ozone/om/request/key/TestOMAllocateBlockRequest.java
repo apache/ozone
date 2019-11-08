@@ -23,6 +23,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -146,7 +147,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
 
 
     // Added only volume to DB.
-    TestOMRequestUtils.addVolumeToDB(volumeName, "ozone", omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
+        omMetadataManager);
 
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L,

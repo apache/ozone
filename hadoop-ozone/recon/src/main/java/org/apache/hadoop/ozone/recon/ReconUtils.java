@@ -40,6 +40,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -172,13 +173,14 @@ public class ReconUtils {
 
       try (TarArchiveInputStream tarInStream =
                new TarArchiveInputStream(gzIn)) {
-        TarArchiveEntry entry = null;
+        TarArchiveEntry entry;
 
         while ((entry = (TarArchiveEntry) tarInStream.getNextEntry()) != null) {
+          Path path = Paths.get(destPath.toString(), entry.getName());
+          HddsUtils.validatePath(path, destPath);
+          File f = path.toFile();
           //If directory, create a directory.
           if (entry.isDirectory()) {
-            File f = new File(Paths.get(destPath.toString(),
-                entry.getName()).toString());
             boolean success = f.mkdirs();
             if (!success) {
               LOG.error("Unable to create directory found in tar.");
@@ -188,8 +190,7 @@ public class ReconUtils {
             int count;
             byte[] data = new byte[WRITE_BUFFER];
 
-            FileOutputStream fos = new FileOutputStream(
-                Paths.get(destPath.toString(), entry.getName()).toString());
+            FileOutputStream fos = new FileOutputStream(f);
             try (BufferedOutputStream dest =
                      new BufferedOutputStream(fos, WRITE_BUFFER)) {
               while ((count =

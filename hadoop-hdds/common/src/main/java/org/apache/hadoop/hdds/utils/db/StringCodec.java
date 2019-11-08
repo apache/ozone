@@ -43,4 +43,9 @@ public class StringCodec implements Codec<String> {
       return null;
     }
   }
+
+  @Override
+  public String copyObject(String object) {
+    return object;
+  }
 }
