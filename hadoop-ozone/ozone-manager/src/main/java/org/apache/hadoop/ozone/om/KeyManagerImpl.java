@@ -37,6 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -1943,6 +1944,16 @@ public class KeyManagerImpl implements KeyManager {
         if (cacheOmKeyInfo != null) {
           if (cacheKey.startsWith(startCacheKey) &&
               cacheKey.compareTo(startCacheKey) >= 0) {
+            // Respect recursive
+            if (!recursive) {
+              // Remove trailing '/', if any
+              String remainingKeyPart = StringUtils.stripEnd(
+                  cacheKey.substring(startCacheKey.length()),
+                  OZONE_URI_DELIMITER);
+              if (remainingKeyPart.contains(OZONE_URI_DELIMITER)) {
+                continue;
+              }
+            }
             // Create OzoneFileStatus from OmKeyInfo
             OzoneFileStatus fileStatus = new OzoneFileStatus(
                 cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
