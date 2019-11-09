@@ -119,6 +119,19 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   }
 
   /**
+   * Get OzoneManager leader object.
+   * @return OzoneManager object, could return null if there isn't a leader.
+   */
+  public OzoneManager getOMLeader() {
+    for (OzoneManager ozoneManager : this.ozoneManagers) {
+      if (ozoneManager.isLeader()) {
+        return ozoneManager;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Start a previously inactive OM.
    */
   public void startInactiveOM(String omNodeID) throws IOException {
