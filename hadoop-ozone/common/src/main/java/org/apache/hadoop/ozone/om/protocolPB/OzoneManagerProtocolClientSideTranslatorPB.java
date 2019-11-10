@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -105,6 +106,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyRequest;
@@ -1591,5 +1594,44 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       statusList.add(OzoneFileStatus.getFromProtobuf(fileStatus));
     }
     return statusList;
+  }
+
+  @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName,
+      String bucketName, String startKeyName, String keyPrefix, int maxKeys)
+      throws IOException {
+
+    Preconditions.checkArgument(Strings.isNullOrEmpty(volumeName),
+        "The volume name cannot be null or " +
+        "empty.  Please enter a valid volume name or use '*' as a wild card");
+
+    Preconditions.checkArgument(Strings.isNullOrEmpty(bucketName),
+        "The bucket name cannot be null or " +
+        "empty.  Please enter a valid bucket name or use '*' as a wild card");
+
+    ListTrashRequest trashRequest = ListTrashRequest.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setStartKeyName(startKeyName)
+        .setKeyPrefix(keyPrefix)
+        .setMaxKeys(maxKeys)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.ListTrash)
+        .setListTrashRequest(trashRequest)
+        .build();
+
+    ListTrashResponse trashResponse =
+        handleError(submitRequest(omRequest)).getListTrashResponse();
+
+    List<RepeatedOmKeyInfo> deletedKeyList =
+        new ArrayList<>(trashResponse.getDeletedKeysCount());
+
+    deletedKeyList.addAll(
+        trashResponse.getDeletedKeysList().stream()
+            .map(RepeatedOmKeyInfo::getFromProto)
+            .collect(Collectors.toList()));
+
+    return deletedKeyList;
   }
 }
