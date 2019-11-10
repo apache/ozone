@@ -47,19 +47,19 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 /**
- * Data generator to use pure datanode XCeiver interface.
+ * Data validator to use pure datanode XCeiver interface.
  */
-@Command(name = "dcg",
-    aliases = "datanode-chunk-generator",
-    description = "Create as many chunks as possible with pure XCeiverClient.",
+@Command(name = "dcv",
+    aliases = "datanode-chunk-validator",
+    description = "Validate chunks with pure XCeiverClient.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class DatanodeChunkGenerator extends BaseFreonGenerator implements
+public class DatanodeChunkValidator extends BaseFreonGenerator implements
     Callable<Void> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeChunkGenerator.class);
+      LoggerFactory.getLogger(DatanodeChunkValidator.class);
 
   @Option(names = {"-a", "--async"},
       description = "Use async operation.",
@@ -67,7 +67,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
   private boolean async;
 
   @Option(names = {"-s", "--size"},
-      description = "Size of the generated chunks (in bytes)",
+      description = "Size of the chunks (in bytes)",
       defaultValue = "1024")
   private int chunkSize;
 
@@ -92,7 +92,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     OzoneConfiguration ozoneConf = createOzoneConfiguration();
     if (OzoneSecurityUtil.isSecurityEnabled(ozoneConf)) {
       throw new IllegalArgumentException(
-          "Datanode chunk generator is not supported in secure environment");
+          "Datanode chunk validator is not supported in secure environment");
     }
 
     StorageContainerLocationProtocol scmLocationClient =
@@ -122,7 +122,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     xceiverClientSpi =
         new XceiverClientManager(ozoneConf).acquireClient(pipeline);
 
-    timer = getMetrics().timer("chunk-write");
+    timer = getMetrics().timer("chunk-validate");
 
     byte[] data = RandomStringUtils.randomAscii(chunkSize)
         .getBytes(StandardCharsets.UTF_8);
@@ -132,12 +132,12 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
     Checksum checksum = new Checksum(ChecksumType.CRC32, chunkSize);
     checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();
 
-    runTests(this::writeChunk);
+    runTests(this::validateChunk);
 
     return null;
   }
 
-  private void writeChunk(long stepNo)
+  private void validateChunk(long stepNo)
       throws Exception {
 
     //Always use this fake blockid.
