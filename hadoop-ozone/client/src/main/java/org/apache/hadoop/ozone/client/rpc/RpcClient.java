@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -706,6 +707,17 @@ public class RpcClient implements ClientProtocol {
         ReplicationType.valueOf(key.getType().toString()),
         key.getFactor().getNumber()))
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
+      String startKeyName, String keyPrefix, int maxKeys) throws IOException {
+
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+
+    return ozoneManagerClient.listTrash(volumeName, bucketName, startKeyName,
+        keyPrefix, maxKeys);
   }
 
   @Override
