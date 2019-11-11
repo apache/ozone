@@ -321,6 +321,11 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         // Once container is marked unhealthy, all the subsequent write
         // transactions will fail with UNHEALTHY_CONTAINER exception.
 
+        if (container == null) {
+          throw new NullPointerException(
+              "Error on creating containers " + result + " " + responseProto
+                  .getMessage());
+        }
         // For container to be moved to unhealthy state here, the container can
         // only be in open or closing state.
         State containerState = container.getContainerData().getState();

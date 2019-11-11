@@ -41,7 +41,8 @@ public final class Genesis {
 
   // After adding benchmark in genesis package add the benchmark name in the
   // description for this option.
-  @Option(names = "-benchmark", split = ",", description =
+  @Option(names = {"-b", "-benchmark", "--benchmark"},
+      split = ",", description =
       "Option used for specifying benchmarks to run.\n"
           + "Ex. ozone genesis -benchmark BenchMarkContainerStateMap,"
           + "BenchMarkOMKeyAllocation.\n"
