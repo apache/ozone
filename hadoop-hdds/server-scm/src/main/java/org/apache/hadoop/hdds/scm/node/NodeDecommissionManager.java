@@ -20,12 +20,15 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.ozone.protocol.commands.SetNodeState;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -239,6 +242,13 @@ public class NodeDecommissionManager {
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.DECOMMISSIONING);
       monitor.startMonitoring(dn, 0);
+
+      // Create a DECOMMISSIONING Command and send it to the datanode.
+      nodeManager.addDatanodeCommand(dn.getUuid(),
+          new SetNodeState(Time.monotonicNow(),
+              StorageContainerDatanodeProtocolProtos.
+                  SetNodeStateCommandProto.NodeState.DECOMMISSIONING));
+
     } else if (opState == NodeOperationalState.DECOMMISSIONING
         || opState == NodeOperationalState.DECOMMISSIONED) {
       LOG.info("Start Decommission called on node {} in state {}. Nothing to "+
