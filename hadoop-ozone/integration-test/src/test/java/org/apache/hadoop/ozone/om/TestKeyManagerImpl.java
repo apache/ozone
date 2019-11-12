@@ -114,7 +114,7 @@ public class TestKeyManagerImpl {
   private static NodeManager nodeManager;
   private static StorageContainerManager scm;
   private static ScmClient scmClient;
-  private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
+  private static ScmClient mockingScmClient;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
   private static File dir;
@@ -132,7 +132,6 @@ public class TestKeyManagerImpl {
     dir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     conf.set(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, "true");
-    mockScmBlockLocationProtocol = Mockito.mock(ScmBlockLocationProtocol.class);
     metadataManager = new OmMetadataManagerImpl(conf);
     nodeManager = new MockNodeManager(true, 10);
     NodeSchema[] schemas = new NodeSchema[]
@@ -155,10 +154,18 @@ public class TestKeyManagerImpl {
         .getStorageSize(OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT,
             StorageUnit.BYTES);
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
+
     scmClient = Mockito.mock(ScmClient.class);
     Mockito.when(scmClient.getBlockClient()).
         thenReturn(scm.getBlockProtocolServer());
     Mockito.when(scmClient.getContainerClient()).thenReturn(null);
+
+    ScmBlockLocationProtocol mockScmBlockLocationProtocol =
+        Mockito.mock(ScmBlockLocationProtocol.class);
+    mockingScmClient = Mockito.mock(ScmClient.class);
+    Mockito.when(mockingScmClient.getBlockClient()).
+        thenReturn(mockScmBlockLocationProtocol);
+    Mockito.when(mockingScmClient.getContainerClient()).thenReturn(null);
 
     keyManager =
         new KeyManagerImpl(metadataManager, scmClient, conf, "om1");
@@ -222,7 +229,7 @@ public class TestKeyManagerImpl {
   @Test
   public void allocateBlockFailureInSafeMode() throws Exception {
     KeyManager keyManager1 =
-        new KeyManagerImpl(metadataManager, scmClient, conf, "om1");
+        new KeyManagerImpl(metadataManager, mockingScmClient, conf, "om1");
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .build();
@@ -256,7 +263,7 @@ public class TestKeyManagerImpl {
   public void openKeyFailureInSafeMode() throws Exception {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     KeyManager keyManager1 =
-        new KeyManagerImpl(metadataManager, scmClient, conf, "om1");
+        new KeyManagerImpl(metadataManager, mockingScmClient, conf, "om1");
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .setDataSize(1000)
