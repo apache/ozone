@@ -46,13 +46,11 @@ public class OzoneManagerStarter extends GenericCli {
       LoggerFactory.getLogger(OzoneManagerStarter.class);
 
   public static void main(String[] args) throws Exception {
-    TracingUtil.initTracing("OzoneManager");
     new OzoneManagerStarter(
         new OzoneManagerStarter.OMStarterHelper()).run(args);
   }
 
   public OzoneManagerStarter(OMStarterInterface receiverObj) {
-    super();
     receiver = receiverObj;
   }
 
@@ -100,6 +98,7 @@ public class OzoneManagerStarter extends GenericCli {
    */
   private void commonInit() {
     conf = createOzoneConfiguration();
+    TracingUtil.initTracing("OzoneManager", conf);
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
