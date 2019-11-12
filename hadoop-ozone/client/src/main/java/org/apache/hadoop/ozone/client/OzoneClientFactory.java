@@ -81,41 +81,6 @@ public final class OzoneClientFactory {
    * @param omHost
    *        hostname of OzoneManager to connect.
    *
-   * @return OzoneClient
-   *
-   * @throws IOException
-   */
-  public static OzoneClient getRpcClient(String omHost)
-      throws IOException {
-    Configuration config = new OzoneConfiguration();
-    int port = OmUtils.getOmRpcPort(config);
-    return getRpcClient(omHost, port, config);
-  }
-
-  /**
-   * Returns an OzoneClient which will use RPC protocol.
-   *
-   * @param omHost
-   *        hostname of OzoneManager to connect.
-   *
-   * @param omRpcPort
-   *        RPC port of OzoneManager.
-   *
-   * @return OzoneClient
-   *
-   * @throws IOException
-   */
-  public static OzoneClient getRpcClient(String omHost, Integer omRpcPort)
-      throws IOException {
-    return getRpcClient(omHost, omRpcPort, new OzoneConfiguration());
-  }
-
-  /**
-   * Returns an OzoneClient which will use RPC protocol.
-   *
-   * @param omHost
-   *        hostname of OzoneManager to connect.
-   *
    * @param omRpcPort
    *        RPC port of OzoneManager.
    *
@@ -200,8 +165,7 @@ public final class OzoneClientFactory {
   public static OzoneClient getRpcClient(Configuration config)
       throws IOException {
     Preconditions.checkNotNull(config);
-    return getClient(getClientProtocol(config),
-        config);
+    return getClient(getClientProtocol(config), config);
   }
 
   /**
