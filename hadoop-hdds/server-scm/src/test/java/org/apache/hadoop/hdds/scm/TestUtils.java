@@ -353,7 +353,9 @@ public final class TestUtils {
         PipelineReportsProto.newBuilder();
     for (PipelineID pipelineID : pipelineIDs) {
       reportBuilder.addPipelineReport(
-          PipelineReport.newBuilder().setPipelineID(pipelineID.getProtobuf()));
+          PipelineReport.newBuilder()
+              .setPipelineID(pipelineID.getProtobuf())
+              .setIsLeader(false));
     }
     return new PipelineReportFromDatanode(dn, reportBuilder.build());
   }
