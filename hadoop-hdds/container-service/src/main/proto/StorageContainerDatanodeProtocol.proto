@@ -282,6 +282,7 @@ message SCMCommandProto {
     closeContainerCommand = 3;
     deleteContainerCommand = 4;
     replicateContainerCommand = 5;
+    setNodeStateCommand = 6;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;
@@ -290,6 +291,7 @@ message SCMCommandProto {
   optional CloseContainerCommandProto closeContainerCommandProto = 4;
   optional DeleteContainerCommandProto deleteContainerCommandProto = 5;
   optional ReplicateContainerCommandProto replicateContainerCommandProto = 6;
+  optional SetNodeStateCommandProto setNodeStateCommandProto = 7;
 }
 
 /**
@@ -356,6 +358,18 @@ message ReplicateContainerCommandProto {
   required int64 containerID = 1;
   repeated DatanodeDetailsProto sources = 2;
   required int64 cmdId = 3;
+}
+
+
+
+message SetNodeStateCommandProto {
+  enum NodeState {
+    IN_SERVICE = 1;
+    DECOMMISSIONING = 2;
+    DECOMMISSIONED = 3;
+    MAINTENANCE = 4;
+  }
+  required  NodeState nodeState = 1;
 }
 
 /**
