@@ -61,15 +61,20 @@ public class TestKeyManagerUnit {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         GenericTestUtils.getRandomizedTestDir().toString());
-    metadataManager = new OmMetadataManagerImpl(configuration);
-    keyManager = new KeyManagerImpl(
-        Mockito.mock(ScmBlockLocationProtocol.class),
-        metadataManager,
-        configuration,
-        "omtest",
-        Mockito.mock(OzoneBlockTokenSecretManager.class)
-    );
 
+    metadataManager = new OmMetadataManagerImpl(configuration);
+    OzoneBlockTokenSecretManager blockTokenSecretMgr =
+        Mockito.mock(OzoneBlockTokenSecretManager.class);
+    OzoneManager om = Mockito.mock(OzoneManager.class);
+    Mockito.when(om.getMetadataManager()).thenReturn(metadataManager);
+    Mockito.when(om.getBlockTokenMgr()).thenReturn(blockTokenSecretMgr);
+
+    ScmBlockLocationProtocol blockClient =
+        Mockito.mock(ScmBlockLocationProtocol.class);
+    ScmClient scmClient = Mockito.mock(ScmClient.class);
+    Mockito.when(scmClient.getBlockClient()).thenReturn(blockClient);
+
+    keyManager = new KeyManagerImpl(om, scmClient, configuration, "omtest");
     startDate = Instant.now();
   }
 

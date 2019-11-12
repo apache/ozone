@@ -103,7 +103,8 @@ public class ScmClient {
     return this.blockClient;
   }
 
-  StorageContainerLocationProtocol getContainerClient() throws IOException {
+  public StorageContainerLocationProtocol getContainerClient()
+      throws IOException {
     initContainerClient();
     return this.containerClient;
   }

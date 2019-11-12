@@ -113,6 +113,7 @@ public class TestKeyManagerImpl {
   private static KeyManagerImpl keyManager;
   private static NodeManager nodeManager;
   private static StorageContainerManager scm;
+  private static ScmClient scmClient;
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
@@ -154,10 +155,13 @@ public class TestKeyManagerImpl {
         .getStorageSize(OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT,
             StorageUnit.BYTES);
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
+    scmClient = Mockito.mock(ScmClient.class);
+    Mockito.when(scmClient.getBlockClient()).
+        thenReturn(scm.getBlockProtocolServer());
+    Mockito.when(scmClient.getContainerClient()).thenReturn(null);
 
     keyManager =
-        new KeyManagerImpl(scm.getBlockProtocolServer(), metadataManager, conf,
-            "om1", null);
+        new KeyManagerImpl(metadataManager, scmClient, conf, "om1");
     prefixManager = new PrefixManagerImpl(metadataManager, false);
 
     Mockito.when(mockScmBlockLocationProtocol
@@ -217,8 +221,8 @@ public class TestKeyManagerImpl {
 
   @Test
   public void allocateBlockFailureInSafeMode() throws Exception {
-    KeyManager keyManager1 = new KeyManagerImpl(mockScmBlockLocationProtocol,
-        metadataManager, conf, "om1", null);
+    KeyManager keyManager1 =
+        new KeyManagerImpl(metadataManager, scmClient, conf, "om1");
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .build();
@@ -251,8 +255,8 @@ public class TestKeyManagerImpl {
   @Test
   public void openKeyFailureInSafeMode() throws Exception {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    KeyManager keyManager1 = new KeyManagerImpl(mockScmBlockLocationProtocol,
-        metadataManager, conf, "om1", null);
+    KeyManager keyManager1 =
+        new KeyManagerImpl(metadataManager, scmClient, conf, "om1");
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .setDataSize(1000)

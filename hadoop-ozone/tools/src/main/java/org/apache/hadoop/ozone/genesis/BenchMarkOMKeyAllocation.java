@@ -24,12 +24,15 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.BucketManagerImpl;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.VolumeManager;
 import org.apache.hadoop.ozone.om.VolumeManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -87,8 +90,20 @@ public class BenchMarkOMKeyAllocation {
         .setBucketName(bucketName)
         .setVolumeName(volumeName).build());
 
-    keyManager = new KeyManagerImpl(null, omMetadataManager, configuration,
-        UUID.randomUUID().toString(), null);
+    ScmClient scmClient = new ScmClient(configuration){
+      @Override
+      public ScmBlockLocationProtocol getBlockClient() {
+        return null;
+      }
+
+      @Override
+      public StorageContainerLocationProtocol getContainerClient() {
+        return null;
+      }
+    };
+
+    keyManager = new KeyManagerImpl(omMetadataManager, scmClient, configuration,
+        UUID.randomUUID().toString());
   }
 
   @TearDown(Level.Trial)

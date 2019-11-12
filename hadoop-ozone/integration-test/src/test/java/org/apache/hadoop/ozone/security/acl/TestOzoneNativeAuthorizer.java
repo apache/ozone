@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
+import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.VolumeManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -51,6 +52,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -166,10 +168,13 @@ public class TestOzoneNativeAuthorizer {
     scm = TestUtils.getScm(ozConfig, configurator);
     scm.start();
     scm.exitSafeMode();
+
+    ScmClient scmClient = Mockito.mock(ScmClient.class);
+    Mockito.when(scmClient.getBlockClient()).
+        thenReturn(scm.getBlockProtocolServer());
+    Mockito.when(scmClient.getContainerClient()).thenReturn(null);
     keyManager =
-        new KeyManagerImpl(scm.getBlockProtocolServer(), metadataManager,
-            ozConfig,
-            "om1", null);
+        new KeyManagerImpl(metadataManager, scmClient, ozConfig, "om1");
 
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager);
