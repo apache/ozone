@@ -57,6 +57,7 @@ Additional requirements to execute different type of tests:
 * [Robot framework](https://robotframework.org/) (for executing acceptance tests)
 * docker-compose (to start pseudo cluster, also used for blockade and acceptance tests)
 * [blockade](https://pypi.org/project/blockade/) To execute network fault-injection testing.
+* [jq](https://stedolan.github.io/jq/) To parse JMX results from different processes running in containers in docker based tests.
 
 Optional dependencies:
 
