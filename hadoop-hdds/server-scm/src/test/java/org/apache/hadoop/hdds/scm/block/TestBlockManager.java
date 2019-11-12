@@ -30,6 +30,8 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
@@ -46,9 +48,13 @@ import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -96,16 +102,17 @@ public class TestBlockManager {
 
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.newFolder().toString());
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-    conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 1,
+    conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 5,
         TimeUnit.SECONDS);
 
     // Override the default Node Manager in SCM with this Mock Node Manager.
     nodeManager = new MockNodeManager(true, 10);
+    eventQueue = new EventQueue();
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue());
+        new SCMPipelineManager(conf, nodeManager, eventQueue);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
-            pipelineManager.getStateManager(), conf);
+            pipelineManager.getStateManager(), conf, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     SCMConfigurator configurator = new SCMConfigurator();
@@ -116,12 +123,10 @@ public class TestBlockManager {
     // Initialize these fields so that the tests can pass.
     mapping = (SCMContainerManager) scm.getContainerManager();
     blockManager = (BlockManagerImpl) scm.getScmBlockManager();
-
-    eventQueue = new EventQueue();
     eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS,
         scm.getSafeModeHandler());
-    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS,
-        scm.getSafeModeHandler());
+    DatanodeCommandHandler handler = new DatanodeCommandHandler();
+    eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, mapping);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
@@ -253,7 +258,7 @@ public class TestBlockManager {
     GenericTestUtils.waitFor(() -> {
       return !blockManager.isScmInSafeMode();
     }, 10, 1000 * 5);
-    Assert.assertNull(blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
+    Assert.assertNotNull(blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
         type, factor, OzoneConsts.OZONE, new ExcludeList()));
   }
 
@@ -365,9 +370,26 @@ public class TestBlockManager {
       pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     }
     Assert.assertEquals(0, pipelineManager.getPipelines(type, factor).size());
-    Assert.assertNull(blockManager
+    Assert.assertNotNull(blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
             new ExcludeList()));
   }
 
+  private class DatanodeCommandHandler implements
+      EventHandler<CommandForDatanode> {
+
+    @Override
+    public void onMessage(final CommandForDatanode command,
+                          final EventPublisher publisher) {
+      final SCMCommandProto.Type type = command.getCommand().getType();
+      if (type == SCMCommandProto.Type.createPipelineCommand) {
+        CreatePipelineCommand createCommand =
+            (CreatePipelineCommand) command.getCommand();
+        try {
+          pipelineManager.openPipeline(createCommand.getPipelineID());
+        } catch (IOException e) {
+        }
+      }
+    }
+  }
 }
