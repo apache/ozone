@@ -13,7 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM apache/ozone-runner
+
+ARG OZONE_RUNNER_VERSION
+
+FROM apache/ozone-runner:${OZONE_RUNNER_VERSION}
+
 RUN sudo yum install -y openssh-clients openssh-server
 
 RUN sudo ssh-keygen -A

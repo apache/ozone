@@ -14,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM apache/ozone-runner
+ARG OZONE_RUNNER_VERSION
+
+FROM apache/ozone-runner:${OZONE_RUNNER_VERSION}
 
 # Install ssh
 RUN sudo yum install -y openssh-clients openssh-server

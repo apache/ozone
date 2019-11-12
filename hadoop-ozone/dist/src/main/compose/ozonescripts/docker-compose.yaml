@@ -17,7 +17,11 @@
 version: "3"
 services:
    datanode:
-      build: .
+      build:
+         context: .
+         args:
+            - OZONE_RUNNER_VERSION
+      image: ozone-runner-scripts:${OZONE_RUNNER_VERSION}
       volumes:
         - ../..:/opt/hadoop
       ports:
@@ -25,7 +29,11 @@ services:
       env_file:
         - ./docker-config
    om:
-      build: .
+      build:
+         context: .
+         args:
+            - OZONE_RUNNER_VERSION
+      image: ozone-runner-scripts:${OZONE_RUNNER_VERSION}
       volumes:
          - ../..:/opt/hadoop
       ports:
@@ -33,7 +41,11 @@ services:
       env_file:
           - ./docker-config
    scm:
-      build: .
+      build:
+         context: .
+         args:
+            - OZONE_RUNNER_VERSION
+      image: ozone-runner-scripts:${OZONE_RUNNER_VERSION}
       volumes:
          - ../..:/opt/hadoop
       ports:
