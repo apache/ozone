@@ -50,11 +50,18 @@ public class ScmClient {
   private ScmBlockLocationProtocol blockClient;
   private StorageContainerLocationProtocol containerClient;
 
-  public ScmClient(OzoneConfiguration config) {
+  public ScmClient(OzoneConfiguration config) throws IOException {
     this.config = config;
+    // As ugi is cached in the proxy implementation, we need to initialize
+    // protocol clients at the beginning otherwise the initalization's call for
+    // getCurrentUser might come from a client call where the ugi is different.
+    synchronized (this) {
+      initContainerClient();
+      initBlockClient();
+    }
   }
 
-  private synchronized void initContainerClient() throws IOException {
+  private void initContainerClient() throws IOException {
     if (containerClient == null){
       Class<StorageContainerLocationProtocolPB> protocol =
           StorageContainerLocationProtocolPB.class;
@@ -75,7 +82,7 @@ public class ScmClient {
     }
   }
 
-  private synchronized void initBlockClient() throws IOException {
+  private void initBlockClient() throws IOException {
     if (blockClient == null) {
       Class<ScmBlockLocationProtocolPB> protocol =
           ScmBlockLocationProtocolPB.class;
@@ -98,14 +105,11 @@ public class ScmClient {
     }
   }
 
-  public ScmBlockLocationProtocol getBlockClient() throws IOException {
-    initBlockClient();
+  public ScmBlockLocationProtocol getBlockClient() {
     return this.blockClient;
   }
 
-  public StorageContainerLocationProtocol getContainerClient()
-      throws IOException {
-    initContainerClient();
+  public StorageContainerLocationProtocol getContainerClient() {
     return this.containerClient;
   }
 
