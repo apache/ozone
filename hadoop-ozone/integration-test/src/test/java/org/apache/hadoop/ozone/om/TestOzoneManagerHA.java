@@ -90,6 +90,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
@@ -779,10 +780,12 @@ public class TestOzoneManagerHA {
       OzoneManager ozoneManager = cluster.getOzoneManager(i);
       String omHostName = ozoneManager.getOmRpcServerAddr().getHostName();
       int rpcPort = ozoneManager.getOmRpcServerAddr().getPort();
+      // Test can pass without this line below
+      conf.set(OZONE_OM_ADDRESS_KEY, omHostName + ":" + rpcPort);
 
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
       final ObjectStore store = OzoneClientFactory.getRpcClient(
-          omHostName, rpcPort, omServiceId, conf).getObjectStore();
+          omServiceId, conf).getObjectStore();
       final OMFailoverProxyProvider proxyProvider =
           store.getClientProxy().getOMProxyProvider();
 
