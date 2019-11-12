@@ -64,7 +64,7 @@ public final class ChunkUtils {
   private static final Set<Path> LOCKS = ConcurrentHashMap.newKeySet();
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ChunkManagerImpl.class);
+      LoggerFactory.getLogger(ChunkUtils.class);
 
   // skip SYNC and DSYNC to reduce contention on file.lock
   private static final Set<? extends OpenOption> WRITE_OPTIONS =
