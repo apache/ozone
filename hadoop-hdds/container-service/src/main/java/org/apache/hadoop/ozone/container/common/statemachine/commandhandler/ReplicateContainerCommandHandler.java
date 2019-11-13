@@ -68,8 +68,8 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
     final long containerID = replicateCommand.getContainerID();
 
     Preconditions.checkArgument(sourceDatanodes.size() > 0,
-        String.format("Replication command is received for container %d "
-            + "but the size of source datanodes was 0.", containerID));
+        "Replication command is received for container %s "
+            + "without source datanodes.", containerID);
 
     supervisor.addTask(new ReplicationTask(containerID, sourceDatanodes));
   }

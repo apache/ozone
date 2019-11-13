@@ -578,10 +578,10 @@ public class ContainerStateMachine extends BaseStateMachine {
     ByteString data = responseProto.getData();
     // assert that the response has data in it.
     Preconditions
-        .checkNotNull(data, "read chunk data is null for chunk:" + chunkInfo);
-    Preconditions.checkState(data.size() == chunkInfo.getLen(), String.format(
-        "read chunk len=%d does not match chunk expected len=%d for chunk:%s",
-        data.size(), chunkInfo.getLen(), chunkInfo));
+        .checkNotNull(data, "read chunk data is null for chunk: %s", chunkInfo);
+    Preconditions.checkState(data.size() == chunkInfo.getLen(),
+        "read chunk len=%s does not match chunk expected len=%s for chunk:%s",
+        data.size(), chunkInfo.getLen(), chunkInfo);
     return data;
   }
 
