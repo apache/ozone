@@ -23,6 +23,7 @@ import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto
@@ -102,30 +103,21 @@ public class PipelineReportHandler implements
     }
 
     pipeline.reportDatanode(dn);
-    if (report.getIsLeader()) {
+    // ONE replica pipeline doesn't have leader flag
+    if (report.getIsLeader() ||
+        pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
       pipeline.setLeaderId(dn.getUuid());
-    }
-    if ((pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED)
-        && pipeline.isHealthy()) {
-      pipelineManager.openPipeline(pipelineID);
     }
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
       LOGGER.info("Pipeline {} {} reported by {}", pipeline.getFactor(),
           pipeline.getId(), dn);
-      pipeline.reportDatanode(dn);
-      if (report.getIsLeader()) {
-        // Pipeline reported as the leader
-        pipeline.setLeaderId(dn.getUuid());
+      if (pipeline.isHealthy()) {
         pipelineManager.openPipeline(pipelineID);
+        if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
+          publisher.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);
+        }
       }
-      if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
-        publisher.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);
-      }
-    } else {
-      // In OPEN state case just report the datanode
-      pipeline.reportDatanode(dn);
     }
-    pipeline.reportDatanode(dn);
   }
 }

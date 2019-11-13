@@ -95,7 +95,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private final List<HddsDatanodeService> hddsDatanodes;
 
   // Timeout for the cluster to be ready
-  private int waitForClusterToBeReadyTimeout = 60000; // 1 min
+  private int waitForClusterToBeReadyTimeout = 120000; // 2 min
   private CertificateClient caClient;
 
   /**
@@ -154,25 +154,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
               "Waiting for cluster to exit safe mode",
           healthy, hddsDatanodes.size());
 
-      boolean ready = isNodeReady && exitSafeMode;
-      if (ready) {
-        // Wait a while for as many as new pipelines to be ready
-        boolean createPipelineInSafeMode = conf.getBoolean(
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
-            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
-        if (createPipelineInSafeMode) {
-          long sleepTime = conf.getTimeDuration(
-              HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
-              HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
-              TimeUnit.MILLISECONDS);
-          try {
-            Thread.sleep(sleepTime);
-          } catch (InterruptedException e) {
-          }
-        }
-      }
-
-      return ready;
+      return isNodeReady && exitSafeMode;
     }, 1000, waitForClusterToBeReadyTimeout);
   }
 

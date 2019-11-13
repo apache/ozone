@@ -381,8 +381,8 @@ public class TestBlockManager {
     @Override
     public void onMessage(final CommandForDatanode command,
                           final EventPublisher publisher) {
-      final SCMCommandProto.Type type = command.getCommand().getType();
-      if (type == SCMCommandProto.Type.createPipelineCommand) {
+      final SCMCommandProto.Type commandType = command.getCommand().getType();
+      if (commandType == SCMCommandProto.Type.createPipelineCommand) {
         CreatePipelineCommand createCommand =
             (CreatePipelineCommand) command.getCommand();
         try {
