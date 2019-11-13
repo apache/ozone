@@ -605,12 +605,22 @@ public class RpcClient implements ClientProtocol {
     HddsClientUtils.checkNotNull(keyName, type, factor);
     String requestId = UUID.randomUUID().toString();
 
-    if(Boolean.valueOf(metadata.get(OzoneConsts.GDPR_FLAG))){
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
+        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+        .addAllMetadata(metadata)
+        .setAcls(getAclList());
+
+    if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
       try{
         GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
-        metadata.putAll(gKey.getKeyDetails());
-      }catch (Exception e) {
-        if(e instanceof InvalidKeyException &&
+        builder.addAllMetadata(gKey.getKeyDetails());
+      } catch (Exception e) {
+        if (e instanceof InvalidKeyException &&
             e.getMessage().contains("Illegal key size or default parameters")) {
           LOG.error("Missing Unlimited Strength Policy jars. Please install " +
               "Java Cryptography Extension (JCE) Unlimited Strength " +
@@ -620,18 +630,7 @@ public class RpcClient implements ClientProtocol {
       }
     }
 
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setDataSize(size)
-        .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
-        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
-        .addAllMetadata(metadata)
-        .setAcls(getAclList())
-        .build();
-
-    OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
+    OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     return createOutputStream(openKey, requestId, type, factor);
   }
 

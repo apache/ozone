@@ -97,6 +97,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
 
+import com.google.common.collect.ImmutableMap;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -693,10 +694,13 @@ public abstract class TestOzoneRpcClientAbstract {
 
     for (int i = 0; i < 10; i++) {
       String keyName = UUID.randomUUID().toString();
+      Map<String, String> metadata = new HashMap<>(1);
+      metadata.put(OzoneConsts.GDPR_FLAG, Boolean.toString(i % 2 == 0));
+      Map<String, String> originalMetadata = ImmutableMap.copyOf(metadata);
 
       OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes().length, STAND_ALONE,
-          ONE, new HashMap<>());
+          ONE, metadata);
       out.write(value.getBytes());
       out.close();
       OzoneKey key = bucket.getKey(keyName);
@@ -710,6 +714,7 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertEquals(value, new String(fileContent));
       Assert.assertTrue(key.getCreationTime() >= currentTime);
       Assert.assertTrue(key.getModificationTime() >= currentTime);
+      Assert.assertEquals(originalMetadata, metadata);
     }
   }
 
@@ -2693,6 +2698,7 @@ public abstract class TestOzoneRpcClientAbstract {
         text.getBytes().length, STAND_ALONE, ONE, keyMetadata);
     out.write(text.getBytes());
     out.close();
+    Assert.assertNull(keyMetadata.get(OzoneConsts.GDPR_SECRET));
 
     //Step 3
     OzoneKeyDetails key = bucket.getKey(keyName);
@@ -2701,7 +2707,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
     Assert.assertEquals("AES",
         key.getMetadata().get(OzoneConsts.GDPR_ALGORITHM));
-    Assert.assertTrue(key.getMetadata().get(OzoneConsts.GDPR_SECRET) != null);
+    Assert.assertNotNull(key.getMetadata().get(OzoneConsts.GDPR_SECRET));
 
     OzoneInputStream is = bucket.readKey(keyName);
     byte[] fileContent = new byte[text.getBytes().length];
@@ -2725,7 +2731,7 @@ public abstract class TestOzoneRpcClientAbstract {
     //Step 5
     key = bucket.getKey(keyName);
     Assert.assertEquals(keyName, key.getName());
-    Assert.assertEquals(null, key.getMetadata().get(OzoneConsts.GDPR_FLAG));
+    Assert.assertNull(key.getMetadata().get(OzoneConsts.GDPR_FLAG));
     is = bucket.readKey(keyName);
     fileContent = new byte[text.getBytes().length];
     is.read(fileContent);
