@@ -162,11 +162,9 @@ public class Checksum {
       data = data.asReadOnlyBuffer();
     }
 
-    final ChecksumData checksumData = new ChecksumData(
-        checksumType, bytesPerChecksum);
     if (checksumType == ChecksumType.NONE) {
       // Since type is set to NONE, we do not need to compute the checksums
-      return checksumData;
+      return new ChecksumData(checksumType, bytesPerChecksum);
     }
 
     final Function<ByteBuffer, ByteString> function;
@@ -188,9 +186,7 @@ public class Checksum {
     for (int index = 0; index < numChecksums; index++) {
       checksumList.add(computeChecksum(data, function, bytesPerChecksum));
     }
-    checksumData.setChecksums(checksumList);
-
-    return checksumData;
+    return new ChecksumData(checksumType, bytesPerChecksum, checksumList);
   }
 
   /**
