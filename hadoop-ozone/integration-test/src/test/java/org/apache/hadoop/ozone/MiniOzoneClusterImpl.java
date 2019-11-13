@@ -529,13 +529,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.initialize();
     }
 
-    void initializeOmStorage()
+    void initializeOmStorage(OzoneConfiguration config)
         throws IOException, AuthenticationException {
-      OzoneManagerStorageInitializer.run(conf);
+      OzoneManagerStorageInitializer.run(config);
       if (omId.isPresent()){
-        OMStorage storage = new OMStorage(conf);
+        OMStorage storage = new OMStorage(config);
         FileUtils.deleteDirectory(storage.getCurrentDir());
-        OMStorage finalStorage = new OMStorage(conf);
+        OMStorage finalStorage = new OMStorage(config);
         finalStorage.setOmId(omId.get());
         if (storage.getOmCertSerialId() != null) {
           finalStorage.setOmCertSerialId(storage.getOmCertSerialId());
@@ -556,7 +556,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
-      initializeOmStorage();
+      initializeOmStorage(conf);
       return OzoneManager.createOm(conf);
     }
 
