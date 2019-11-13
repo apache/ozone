@@ -286,8 +286,8 @@ public class RDBStore implements DBStore {
 
   @Override
   public void flush() throws IOException {
-    final FlushOptions flushOptions = new FlushOptions().setWaitForFlush(true);
-    try {
+    try (FlushOptions flushOptions = new FlushOptions()) {
+      flushOptions.setWaitForFlush(true);
       db.flush(flushOptions);
     } catch (RocksDBException e) {
       LOG.error("Unable to Flush RocksDB data", e);
@@ -296,13 +296,8 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public DBCheckpoint getCheckpoint(boolean flush) {
-    final FlushOptions flushOptions = new FlushOptions().setWaitForFlush(flush);
-    try {
-      db.flush(flushOptions);
-    } catch (RocksDBException e) {
-      LOG.error("Unable to Flush RocksDB data before creating snapshot", e);
-    }
+  public DBCheckpoint getCheckpoint(boolean flush) throws IOException {
+    this.flush();
     return checkPointManager.createCheckpoint(checkpointsParentDir);
   }
 
