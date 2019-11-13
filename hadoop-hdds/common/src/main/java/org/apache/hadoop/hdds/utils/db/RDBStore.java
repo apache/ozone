@@ -297,7 +297,9 @@ public class RDBStore implements DBStore {
 
   @Override
   public DBCheckpoint getCheckpoint(boolean flush) throws IOException {
-    this.flush();
+    if (flush) {
+      this.flush();
+    }
     return checkPointManager.createCheckpoint(checkpointsParentDir);
   }
 
