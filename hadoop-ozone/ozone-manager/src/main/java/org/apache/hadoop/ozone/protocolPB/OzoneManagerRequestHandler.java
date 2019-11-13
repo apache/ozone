@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
@@ -763,11 +764,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throws IOException {
     ServiceListResponse.Builder resp = ServiceListResponse.newBuilder();
 
-    resp.addAllServiceInfo(impl.getServiceInfo().getServiceInfoList().stream()
+    ServiceInfoEx serviceInfoEx = impl.getServiceInfo();
+    resp.addAllServiceInfo(serviceInfoEx.getServiceInfoList().stream()
         .map(ServiceInfo::getProtobuf)
         .collect(Collectors.toList()));
-    if (impl.getServiceInfo().getCaCertificate() != null) {
-      resp.setCaCertificate(impl.getServiceInfo().getCaCertificate());
+    if (serviceInfoEx.getCaCertificate() != null) {
+      resp.setCaCertificate(serviceInfoEx.getCaCertificate());
     }
     return resp.build();
   }
