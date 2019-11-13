@@ -1492,7 +1492,7 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] determines
       which algorithm would be used to compute checksum for chunk data.
-      Default checksum type is SHA256.
+      Default checksum type is CRC32.
     </description>
   </property>
 
