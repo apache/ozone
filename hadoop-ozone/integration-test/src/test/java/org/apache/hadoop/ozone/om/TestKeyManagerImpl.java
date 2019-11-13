@@ -815,17 +815,17 @@ public class TestKeyManagerImpl {
     // Get entries in both TableCache and DB
     List<OzoneFileStatus> fileStatuses =
         keyManager.listStatus(rootDirArgs, true, "", 1000);
-    Assert.assertEquals(fileStatuses.size(),  100);
+    Assert.assertEquals(100, fileStatuses.size());
 
     // Get entries with startKey=prefixKeyInDB
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, prefixKeyInDB, 1000);
-    Assert.assertEquals(fileStatuses.size(),  50);
+    Assert.assertEquals(50, fileStatuses.size());
 
     // Get entries with startKey=prefixKeyInCache
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, prefixKeyInCache, 1000);
-    Assert.assertEquals(fileStatuses.size(),  100);
+    Assert.assertEquals(100, fileStatuses.size());
 
     // Clean up cache by marking those keys in cache as deleted
     for (int i = 1; i <= 100; i += 2) {
@@ -892,6 +892,17 @@ public class TestKeyManagerImpl {
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, "", 1000);
     Assert.assertEquals(10 + 3, fileStatuses.size());
+
+    // Clean up
+    for (int i = 1; i <= 10; i += 2) {
+      // Mark TableCache entries as deleted
+      // Note that DB entry clean up is handled by cleanupTest()
+      String key = metadataManager.getOzoneKey(
+          VOLUME_NAME, BUCKET_NAME,
+          keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i);
+      metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
+          new CacheValue<>(Optional.absent(), 2L));
+    }
   }
 
   @Test
