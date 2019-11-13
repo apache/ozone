@@ -44,6 +44,8 @@ class FullUnsecureInitializer extends OzoneManagerStorageInitializer {
     }
     getStorage().setClusterId(clusterId);
     getStorage().setScmId(scmId);
+    // NOTE: omId is set automagically from OMStorage and Storage classes,
+    // see getNodeProperties, and setNodeProperties for the logic.
     getStorage().initialize();
     System.out.println(
         "OM initialization succeeded. Current cluster id for Storage Directory="
