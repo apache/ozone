@@ -96,6 +96,8 @@ import static junit.framework.TestCase.assertNotNull;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
@@ -368,11 +370,15 @@ public final class TestSecureOzoneCluster {
   }
 
   private void testCommonKerberosFailures(Callable callable) throws Exception {
-    LambdaTestUtils.intercept(KerberosAuthException.class, "failure "
-        + "to login: for principal:", callable);
+    String principal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+    String keytab = conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY);
+    LambdaTestUtils.intercept(AuthenticationException.class,
+        "Login failed for " + principal + " with keytab: " + keytab,
+        callable
+    );
+
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
         "OAuth2");
-
     LambdaTestUtils.intercept(IllegalArgumentException.class, "Invalid"
             + " attribute value for hadoop.security.authentication of OAuth2",
         callable);
@@ -410,8 +416,9 @@ public final class TestSecureOzoneCluster {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
     scm = StorageContainerManager.createSCM(conf);
-    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.LOG);
-    GenericTestUtils.setLogLevel(OzoneManager.LOG, INFO);
+    Logger interest = LoggerFactory.getLogger(OzoneSecurityUtil.class);
+    LogCapturer logs = LogCapturer.captureLogs(interest);
+    GenericTestUtils.setLogLevel(interest, INFO);
 
     setupOm(conf);
     try {
@@ -419,8 +426,9 @@ public final class TestSecureOzoneCluster {
     } catch (Exception ex) {
       // Expects timeout failure from scmClient in om but om user login via
       // kerberos should succeed.
-      assertTrue(logs.getOutput().contains("Ozone Manager login"
-          + " successful"));
+      String principal = conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY);
+      assertTrue(logs.getOutput().contains(principal + " logged in "
+          + "successfully."));
     }
   }
 
