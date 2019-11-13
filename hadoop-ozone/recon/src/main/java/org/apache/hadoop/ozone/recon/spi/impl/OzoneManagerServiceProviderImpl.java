@@ -95,7 +95,6 @@ public class OzoneManagerServiceProviderImpl
   private String omDBSnapshotUrl;
 
   private OzoneManagerProtocol ozoneManagerClient;
-  private final ClientId clientId = ClientId.randomId();
   private final OzoneConfiguration configuration;
   private final ScheduledExecutorService scheduler =
       Executors.newScheduledThreadPool(1);
@@ -283,10 +282,12 @@ public class OzoneManagerServiceProviderImpl
       LOG.debug("Number of updates received from OM : " +
           dbUpdates.getData().size());
       for (byte[] data : dbUpdates.getData()) {
-        WriteBatch writeBatch = new WriteBatch(data);
-        writeBatch.iterate(omdbUpdatesHandler);
-        RDBBatchOperation rdbBatchOperation = new RDBBatchOperation(writeBatch);
-        rdbBatchOperation.commit(rocksDB, new WriteOptions());
+        try (WriteBatch writeBatch = new WriteBatch(data)) {
+          writeBatch.iterate(omdbUpdatesHandler);
+          RDBBatchOperation rdbBatchOperation =
+              new RDBBatchOperation(writeBatch);
+          rdbBatchOperation.commit(rocksDB, new WriteOptions());
+        }
       }
     }
   }
@@ -304,9 +305,8 @@ public class OzoneManagerServiceProviderImpl
     if (currentSequenceNumber <= 0) {
       fullSnapshot = true;
     } else {
-      OMDBUpdatesHandler omdbUpdatesHandler =
-          new OMDBUpdatesHandler(omMetadataManager);
-      try {
+      try (OMDBUpdatesHandler omdbUpdatesHandler =
+               new OMDBUpdatesHandler(omMetadataManager)) {
         LOG.info("Obtaining delta updates from Ozone Manager");
         // Get updates from OM and apply to local Recon OM DB.
         getAndApplyDeltaUpdatesFromOM(currentSequenceNumber,
@@ -320,6 +320,7 @@ public class OzoneManagerServiceProviderImpl
         reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
             omdbUpdatesHandler.getEvents()), omMetadataManager);
       } catch (IOException | InterruptedException | RocksDBException e) {
+        Thread.currentThread().interrupt();
         LOG.warn("Unable to get and apply delta updates from OM.", e);
         fullSnapshot = true;
       }
@@ -342,6 +343,7 @@ public class OzoneManagerServiceProviderImpl
           reconTaskController.reInitializeTasks(omMetadataManager);
         }
       } catch (IOException | InterruptedException e) {
+        Thread.currentThread().interrupt();
         LOG.error("Unable to update Recon's OM DB with new snapshot ", e);
       }
     }
