@@ -753,22 +753,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return new OzoneManager(conf);
   }
 
-  private ScmInfo getScmInfo(OzoneConfiguration conf)
-      throws IOException {
-    try {
-      RetryPolicy retryPolicy = retryUpToMaximumCountWithFixedSleep(
-          10, 5, TimeUnit.SECONDS);
-      RetriableTask<ScmInfo> retriable = new RetriableTask<>(
-          retryPolicy, "OM#getScmInfo",
-          () -> scmClient.getBlockClient().getScmInfo());
-      return retriable.call();
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new IOException("Failed to get SCM info", e);
-    }
-  }
-
   /**
    * Builds a message for logging startup information about an RPC server.
    *
