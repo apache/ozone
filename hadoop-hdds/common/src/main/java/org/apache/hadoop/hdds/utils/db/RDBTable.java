@@ -48,6 +48,7 @@ class RDBTable implements Table<byte[], byte[]> {
   private final RocksDB db;
   private final ColumnFamilyHandle handle;
   private final WriteOptions writeOptions;
+  private final RDBMetrics rdbMetrics;
 
   /**
    * Constructs a TableStore.
@@ -57,10 +58,11 @@ class RDBTable implements Table<byte[], byte[]> {
    * @param writeOptions - RocksDB write Options.
    */
   RDBTable(RocksDB db, ColumnFamilyHandle handle,
-      WriteOptions writeOptions) {
+      WriteOptions writeOptions, RDBMetrics rdbMetrics) {
     this.db = db;
     this.handle = handle;
     this.writeOptions = writeOptions;
+    this.rdbMetrics = rdbMetrics;
   }
 
   /**
@@ -125,8 +127,18 @@ class RDBTable implements Table<byte[], byte[]> {
       // RocksDB#keyMayExist
       // If the key definitely does not exist in the database, then this
       // method returns false, else true.
-      return db.keyMayExist(handle, key, new StringBuilder())
-          && db.get(handle, key) != null;
+      rdbMetrics.incNumDBKeyMayExistChecks();
+      StringBuilder outValue = new StringBuilder();
+      boolean keyMayExist = db.keyMayExist(handle, key, outValue);
+      if (keyMayExist) {
+        boolean keyExists = (outValue.length() > 0) ||
+            (db.get(handle, key) != null);
+        if (!keyExists) {
+          rdbMetrics.incNumDBKeyMayExistMisses();
+        }
+        return keyExists;
+      }
+      return false;
     } catch (RocksDBException e) {
       throw toIOException(
           "Error in accessing DB. ", e);
