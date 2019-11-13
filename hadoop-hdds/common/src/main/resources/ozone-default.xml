@@ -1742,22 +1742,6 @@
     <description>Key to enable/disable ozone acls.</description>
   </property>
   <property>
-    <name>hdds.scm.kerberos.keytab.file</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
-    <description> The keytab file used by each SCM daemon to login as its
-      service principal. The principal name is configured with
-      hdds.scm.kerberos.principal.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.kerberos.principal</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
-    <description>The SCM service principal. Ex scm/_HOST@REALM.COM</description>
-  </property>
-
-  <property>
     <name>ozone.om.kerberos.keytab.file</name>
     <value></value>
     <tag> OZONE, SECURITY</tag>
@@ -1772,16 +1756,6 @@
     <tag> OZONE, SECURITY</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
-
-  <property>
-    <name>hdds.scm.http.kerberos.principal</name>
-    <value>HTTP/_HOST@EXAMPLE.COM</value>
-  </property>
-  <property>
-    <name>hdds.scm.http.kerberos.keytab</name>
-    <value>/etc/security/keytabs/HTTP.keytab</value>
-  </property>
-
   <property>
     <name>ozone.om.http.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
