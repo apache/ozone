@@ -68,7 +68,6 @@ import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.ratis.protocol.ClientId;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.rocksdb.RocksDB;
