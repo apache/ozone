@@ -71,7 +71,7 @@ public abstract class ReportPublisher<T extends GeneratedMessage>
   @Override
   public void run() {
     publishReport();
-    if (!executor.isShutdown() ||
+    if (!executor.isShutdown() &&
         !(context.getState() == DatanodeStates.SHUTDOWN)) {
       executor.schedule(this,
           getReportFrequency(), TimeUnit.MILLISECONDS);
