@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.helpers;
 
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.junit.Assert;
@@ -30,6 +31,8 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * Tests to test block deleting service.
@@ -128,5 +131,14 @@ public class TestBlockData {
       computed.setChunks(expected);
       assertChunks(expected, computed);
     }
+  }
+
+  @Test
+  public void testToString() {
+    final BlockID blockID = new BlockID(5, 123);
+    blockID.setBlockCommitSequenceId(42);
+    final BlockData subject = new BlockData(blockID);
+    assertEquals("[blockId=conID: 5 locID: 123 bcsId: 42,size=0]",
+        subject.toString());
   }
 }

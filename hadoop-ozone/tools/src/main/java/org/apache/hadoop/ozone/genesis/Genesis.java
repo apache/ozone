@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.genesis;
 
+import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.profile.StackProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
@@ -84,6 +85,7 @@ public final class Genesis {
     optionsBuilder.warmupIterations(2)
         .measurementIterations(20)
         .addProfiler(StackProfiler.class)
+        .addProfiler(GCProfiler.class)
         .shouldDoGC(true)
         .forks(1)
         .threads(numThreads);
