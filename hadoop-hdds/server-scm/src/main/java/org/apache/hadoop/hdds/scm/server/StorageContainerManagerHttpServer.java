@@ -62,11 +62,13 @@ public class StorageContainerManagerHttpServer extends BaseHttpServer {
   }
 
   @Override protected String getKeytabFile() {
-    return ScmConfigKeys.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
+    return SCMHTTPServerConfig.ConfigStrings
+      .HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
   }
 
   @Override protected String getSpnegoPrincipal() {
-    return ScmConfigKeys.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
+    return SCMHTTPServerConfig.ConfigStrings
+      .HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
   }
 
   @Override protected String getEnabledKey() {
