@@ -23,8 +23,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerLocationProtocolProtos.ObjectStageChangeRequestProto;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -114,18 +112,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
       HddsProtos.QueryScope queryScope, String poolName) throws IOException;
 
   /**
-   * Notify from client when begin or finish creating objects like pipeline
-   * or containers on datanodes.
-   * Container will be in Operational state after that.
-   * @param type object type
-   * @param id object id
-   * @param op operation type (e.g., create, close, delete)
-   * @param stage creation stage
+   * Close a container.
+   *
+   * @param containerID ID of the container to close
+   * @throws IOException in case of any Exception
    */
-  void notifyObjectStageChange(
-      ObjectStageChangeRequestProto.Type type, long id,
-      ObjectStageChangeRequestProto.Op op,
-      ObjectStageChangeRequestProto.Stage stage) throws IOException;
+  void closeContainer(long containerID) throws IOException;
 
   /**
    * Creates a replication pipeline of a specified type.

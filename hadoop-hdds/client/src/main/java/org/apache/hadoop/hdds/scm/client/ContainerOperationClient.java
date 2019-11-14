@@ -37,8 +37,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerLocationProtocolProtos.ObjectStageChangeRequestProto;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.Client;
@@ -428,70 +426,15 @@ public class ContainerOperationClient implements ScmClient {
   /**
    * Close a container.
    *
-   * @param pipeline the container to be closed.
-   * @throws IOException
-   */
-  @Override
-  public void closeContainer(long containerId, Pipeline pipeline)
-      throws IOException {
-    XceiverClientSpi client = null;
-    try {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Close container {}", pipeline);
-      }
-      /*
-      TODO: two orders here, revisit this later:
-      1. close on SCM first, then on data node
-      2. close on data node first, then on SCM
-
-      with 1: if client failed after closing on SCM, then there is a
-      container SCM thinks as closed, but is actually open. Then SCM will no
-      longer allocate block to it, which is fine. But SCM may later try to
-      replicate this "closed" container, which I'm not sure is safe.
-
-      with 2: if client failed after close on datanode, then there is a
-      container SCM thinks as open, but is actually closed. Then SCM will still
-      try to allocate block to it. Which will fail when actually doing the
-      write. No more data can be written, but at least the correctness and
-      consistency of existing data will maintain.
-
-      For now, take the #2 way.
-       */
-      // Actually close the container on Datanode
-      client = xceiverClientManager.acquireClient(pipeline);
-
-      storageContainerLocationClient.notifyObjectStageChange(
-          ObjectStageChangeRequestProto.Type.container,
-          containerId,
-          ObjectStageChangeRequestProto.Op.close,
-          ObjectStageChangeRequestProto.Stage.begin);
-
-      ContainerProtocolCalls.closeContainer(client, containerId,
-          null);
-      // Notify SCM to close the container
-      storageContainerLocationClient.notifyObjectStageChange(
-          ObjectStageChangeRequestProto.Type.container,
-          containerId,
-          ObjectStageChangeRequestProto.Op.close,
-          ObjectStageChangeRequestProto.Stage.complete);
-    } finally {
-      if (client != null) {
-        xceiverClientManager.releaseClient(client, false);
-      }
-    }
-  }
-
-  /**
-   * Close a container.
-   *
    * @throws IOException
    */
   @Override
   public void closeContainer(long containerId)
       throws IOException {
-    ContainerWithPipeline info = getContainerWithPipeline(containerId);
-    Pipeline pipeline = info.getPipeline();
-    closeContainer(containerId, pipeline);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Close container {}", containerId);
+    }
+    storageContainerLocationClient.closeContainer(containerId);
   }
 
   /**
