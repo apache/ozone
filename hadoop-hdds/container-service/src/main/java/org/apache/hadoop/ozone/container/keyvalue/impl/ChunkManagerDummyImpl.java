@@ -34,12 +34,17 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of ChunkManager built for running performance tests.
  * Chunks are not written to disk, Reads are returned with zero-filled buffers
  */
 public class ChunkManagerDummyImpl extends ChunkManagerImpl {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ChunkManagerDummyImpl.class);
 
   public ChunkManagerDummyImpl(boolean sync) {
     super(sync);
