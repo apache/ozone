@@ -28,7 +28,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -43,6 +43,8 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
+
+import static java.util.stream.Collectors.toList;
 
 /**
  * Compress/uncompress KeyValueContainer data to a tar.gz archive.
@@ -68,13 +70,12 @@ public class TarContainerPacker
       InputStream input)
       throws IOException {
     byte[] descriptorFileContent = null;
-    try {
-      KeyValueContainerData containerData = container.getContainerData();
-      Path dbRoot = containerData.getDbFile().toPath();
-      Path chunksRoot = Paths.get(containerData.getChunksPath());
+    KeyValueContainerData containerData = container.getContainerData();
+    Path dbRoot = containerData.getDbFile().toPath();
+    Path chunksRoot = Paths.get(containerData.getChunksPath());
 
-      InputStream decompressed = decompress(input);
-      ArchiveInputStream archiveInput = untar(decompressed);
+    try (InputStream decompressed = decompress(input);
+         ArchiveInputStream archiveInput = untar(decompressed)) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -116,8 +117,8 @@ public class TarContainerPacker
       Files.createDirectories(parent);
     }
 
-    try (OutputStream output = new BufferedOutputStream(
-        new FileOutputStream(path.toFile()))) {
+    try (OutputStream fileOutput = new FileOutputStream(path.toFile());
+         OutputStream output = new BufferedOutputStream(fileOutput)) {
       int bufferSize = 1024;
       byte[] buffer = new byte[bufferSize + 1];
       long remaining = size;
@@ -169,9 +170,8 @@ public class TarContainerPacker
   @Override
   public byte[] unpackContainerDescriptor(InputStream input)
       throws IOException {
-    try {
-      InputStream decompressed = decompress(input);
-      ArchiveInputStream archiveInput = untar(decompressed);
+    try (InputStream decompressed = decompress(input);
+         ArchiveInputStream archiveInput = untar(decompressed)) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -209,10 +209,11 @@ public class TarContainerPacker
   private void includePath(Path dir, String subdir,
       ArchiveOutputStream archiveOutput) throws IOException {
 
-    for (Path path : Files.list(dir).collect(Collectors.toList())) {
-
-      String entryName = subdir + "/" + path.getFileName();
-      includeFile(path.toFile(), entryName, archiveOutput);
+    try (Stream<Path> dirEntries = Files.list(dir)) {
+      for (Path path : dirEntries.collect(toList())) {
+        String entryName = subdir + "/" + path.getFileName();
+        includeFile(path.toFile(), entryName, archiveOutput);
+      }
     }
   }
 
