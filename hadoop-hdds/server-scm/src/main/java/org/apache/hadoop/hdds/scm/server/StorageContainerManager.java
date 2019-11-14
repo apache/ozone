@@ -251,9 +251,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
      * passed before any artifacts like SCM DB is created. So please don't
      * add any other initialization above the Security checks please.
      */
-    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      loginAsSCMUser(conf);
-    }
+    OzoneSecurityUtil.login(conf,
+        HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
+        HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
+        HddsServerUtil.getScmBlockClientBindAddress(conf).getHostName());
 
     // Creates the SCM DBs or opens them if it exists.
     // A valid pointer to the store is required by all the other services below.
@@ -485,36 +486,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
     }
   }
-
-  /**
-   * Login as the configured user for SCM.
-   *
-   * @param conf
-   */
-  private void loginAsSCMUser(Configuration conf)
-      throws IOException, AuthenticationException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Ozone security is enabled. Attempting login for SCM user. "
-              + "Principal: {}, keytab: {}",
-          conf.get(HDDS_SCM_KERBEROS_PRINCIPAL_KEY),
-          conf.get(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY));
-    }
-
-    if (SecurityUtil.getAuthenticationMethod(conf).equals(
-        AuthenticationMethod.KERBEROS)) {
-      UserGroupInformation.setConfiguration(conf);
-      InetSocketAddress socAddr = HddsServerUtil
-          .getScmBlockClientBindAddress(conf);
-      SecurityUtil.login(conf, HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
-          HDDS_SCM_KERBEROS_PRINCIPAL_KEY, socAddr.getHostName());
-    } else {
-      throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
-          conf) + " authentication method not support. "
-          + "SCM user login failed.");
-    }
-    LOG.info("SCM login successful.");
-  }
-
 
   /**
    * This function creates/initializes a certificate server as needed.
