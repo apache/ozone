@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -32,15 +33,20 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
@@ -213,19 +219,39 @@ public class ChunkManagerImpl implements ChunkManager {
     // of the chunk file.
     if (containerData.getLayOutVersion() == ChunkLayOutVersion
         .getLatestVersion().getVersion()) {
-      File chunkFile = ChunkUtils.getChunkFile(containerData, info);
 
-      // In case the chunk file does not exist but tmp chunk file exist,
-      // read from tmp chunk file if readFromTmpFile is set to true
-      if (!chunkFile.exists() && dispatcherContext != null
-          && dispatcherContext.isReadFromTmpFile()) {
-        chunkFile = getTmpChunkFile(chunkFile, dispatcherContext);
+      File finalChunkFile = ChunkUtils.getChunkFile(containerData, info);
+      File tmpChunkFile = getTmpChunkFile(finalChunkFile, dispatcherContext);
+
+      List<File> possibleFiles = new ArrayList<>();
+      possibleFiles.add(finalChunkFile);
+      if (dispatcherContext.isReadFromTmpFile()) {
+        possibleFiles.add(tmpChunkFile);
+        possibleFiles.add(finalChunkFile);
       }
-      data = ChunkUtils.readData(chunkFile, info, volumeIOStats);
-      containerData.incrReadCount();
-      long length = chunkFile.length();
-      containerData.incrReadBytes(length);
-      return data;
+
+      boolean found = false;
+
+      for (File chunkFile : possibleFiles) {
+        try {
+          data = ChunkUtils.readData(chunkFile, info, volumeIOStats);
+          containerData.incrReadCount();
+          long length = chunkFile.length();
+          containerData.incrReadBytes(length);
+          found = true;
+          return data;
+        } catch (StorageContainerException ex) {
+          //UNABLE TO FIND chunk is not a problem as we will try with the
+          //next possible location
+          if (ex.getResult() != UNABLE_TO_FIND_CHUNK) {
+            throw ex;
+          }
+        }
+      }
+      throw new StorageContainerException(
+          "Chunk file can't be found " + possibleFiles.toString(),
+          UNABLE_TO_FIND_CHUNK);
+
     }
     return null;
   }
