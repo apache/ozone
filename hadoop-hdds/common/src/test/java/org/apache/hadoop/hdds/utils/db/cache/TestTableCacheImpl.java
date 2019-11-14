@@ -93,20 +93,20 @@ public class TestTableCacheImpl {
   public void testPartialTableCacheWithNotContinousEntries() throws Exception {
     int totalCount = 0;
     int insertedCount = 3000;
+
+    int cleanupCount = 1000;
+
+    ArrayList<Long> epochs = new ArrayList();
     for (long i=0; i<insertedCount; i+=2) {
+      if (cleanupCount++ < 1000) {
+        epochs.add(i);
+      }
       tableCache.put(new CacheKey<>(Long.toString(i)),
           new CacheValue<>(Optional.of(Long.toString(i)), i));
       totalCount++;
     }
 
     Assert.assertEquals(totalCount, tableCache.size());
-
-    ArrayList<Long> epochs = new ArrayList();
-    epochs.add(0L);
-    epochs.add(10L);
-    epochs.add(300L);
-    epochs.add(500L);
-    epochs.add(1000L);
 
     tableCache.cleanup(epochs);
 
