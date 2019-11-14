@@ -94,7 +94,7 @@ public class TestTableCacheImpl {
     int totalCount = 0;
     int insertedCount = 3000;
 
-    int cleanupCount = 1000;
+    int cleanupCount = 0;
 
     ArrayList<Long> epochs = new ArrayList();
     for (long i=0; i<insertedCount; i+=2) {
