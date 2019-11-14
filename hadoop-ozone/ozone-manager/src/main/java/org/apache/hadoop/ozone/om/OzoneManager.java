@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerServerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
@@ -1902,6 +1903,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  // TODO: HDDS-2418 - Complete stub below for server logic
+  @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName,
+      String bucketName, String startKeyName, String keyPrefix, int maxKeys)
+      throws IOException {
+
+    List<RepeatedOmKeyInfo> deletedKeys = new ArrayList<>();
+    return deletedKeys;
+  }
+
   /**
    * Sets bucket property from args.
    *
@@ -2570,7 +2581,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * false.
    *
    * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl top be added.
+   * @param acl ozone acl to be added.
    * @throws IOException if there is error.
    */
   @Override

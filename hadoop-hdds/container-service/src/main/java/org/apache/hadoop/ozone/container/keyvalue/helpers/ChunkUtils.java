@@ -43,14 +43,18 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileAttribute;
 import java.security.NoSuchAlgorithmException;
+import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.*;
+import static java.util.Collections.unmodifiableSet;
 
 /**
  * Utility methods for chunk operations for KeyValue container.
@@ -58,6 +62,19 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 public final class ChunkUtils {
 
   private static final Set<Path> LOCKS = ConcurrentHashMap.newKeySet();
+
+  // skip SYNC and DSYNC to reduce contention on file.lock
+  private static final Set<? extends OpenOption> WRITE_OPTIONS =
+      unmodifiableSet(EnumSet.of(
+          StandardOpenOption.CREATE,
+          StandardOpenOption.WRITE,
+          StandardOpenOption.SPARSE
+      ));
+  private static final Set<? extends OpenOption> READ_OPTIONS =
+      unmodifiableSet(EnumSet.of(
+          StandardOpenOption.READ
+      ));
+  private static final FileAttribute<?>[] NO_ATTRIBUTES = {};
 
   /** Never constructed. **/
   private ChunkUtils() {
@@ -85,11 +102,7 @@ public final class ChunkUtils {
     processFileExclusively(path, () -> {
       FileChannel file = null;
       try {
-        // skip SYNC and DSYNC to reduce contention on file.lock
-        file = FileChannel.open(path,
-            StandardOpenOption.CREATE,
-            StandardOpenOption.WRITE,
-            StandardOpenOption.SPARSE);
+        file = FileChannel.open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
 
         int size;
         try (FileLock ignored = file.lock()) {
@@ -167,7 +180,7 @@ public final class ChunkUtils {
       FileChannel file = null;
 
       try {
-        file = FileChannel.open(path, StandardOpenOption.READ);
+        file = FileChannel.open(path, READ_OPTIONS, NO_ATTRIBUTES);
 
         try (FileLock ignored = file.lock(offset, len, true)) {
           file.read(buf, offset);

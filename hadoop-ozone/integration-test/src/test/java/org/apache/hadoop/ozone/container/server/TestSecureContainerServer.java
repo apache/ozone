@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
+import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -155,8 +156,10 @@ public class TestSecureContainerServer {
     for (ContainerProtos.ContainerType containerType :
         ContainerProtos.ContainerType.values()) {
       handlers.put(containerType,
-          Handler.getHandlerForContainerType(containerType, conf, context,
-              containerSet, volumeSet, metrics));
+          Handler.getHandlerForContainerType(containerType, conf,
+              dd.getUuid().toString(),
+              containerSet, volumeSet, metrics,
+              TestHddsDispatcher.NO_OP_ICR_SENDER));
     }
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,

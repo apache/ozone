@@ -239,6 +239,7 @@ message ContainerAction {
 
 message PipelineReport {
   required PipelineID pipelineID = 1;
+  required bool isLeader = 2;
 }
 
 message PipelineReportsProto {

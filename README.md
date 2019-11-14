@@ -23,7 +23,7 @@ Ozone is part of the [Apache Hadoop](https://hadoop.apache.org) project.
 
  * Ozone [web page](https://hadoop.apache.org/ozone/) is available from the Hadoop site
  * Mailing lists
-     * For dev questions use: [hdfs-dev@hadoop.apache.org](https://lists.apache.org/list.html?hdfs-dev@hadoop.apache.org)
+     * For dev questions use: [ozone-dev@hadoop.apache.org](https://lists.apache.org/list.html?ozone-dev@hadoop.apache.org)
      * For user questions use: [user@hadoop.apache.org](https://lists.apache.org/list.html?user@hadoop.apache.org)
  * Chat: You can find the #ozone channel on the official ASF slack. Invite link is [here](http://s.apache.org/slack-invite).
  * There are Open [Weekly calls](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Community+Calls) where you can ask anything about Ozone.

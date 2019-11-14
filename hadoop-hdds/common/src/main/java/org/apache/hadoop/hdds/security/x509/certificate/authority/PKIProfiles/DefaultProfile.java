@@ -74,6 +74,7 @@ public class DefaultProfile implements PKIProfile {
   private static final int[] GENERAL_NAMES = {
       GeneralName.dNSName,
       GeneralName.iPAddress,
+      GeneralName.otherName,
   };
   // Map that handles all the Extensions lookup and validations.
   private static final Map<ASN1ObjectIdentifier, BiFunction<Extension,
@@ -245,6 +246,9 @@ public class DefaultProfile implements PKIProfile {
       }
     case GeneralName.dNSName:
       return DomainValidator.getInstance().isValid(value);
+    case GeneralName.otherName:
+      // for other name its a general string, nothing to validate
+      return true;
     default:
       // This should not happen, since it guarded via isSupportedGeneralName.
       LOG.error("Unexpected type in General Name (int value) : " + type);

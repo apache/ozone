@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -41,11 +41,10 @@ public final class TracingUtil {
 
   /**
    * Initialize the tracing with the given service name.
-   *
-   * @param serviceName
    */
-  public static void initTracing(String serviceName) {
-    if (!GlobalTracer.isRegistered()) {
+  public static void initTracing(
+      String serviceName, org.apache.hadoop.conf.Configuration conf) {
+    if (!GlobalTracer.isRegistered() && isTracingEnabled(conf)) {
       Configuration config = Configuration.fromEnv(serviceName);
       JaegerTracer tracer = config.getTracerBuilder()
           .registerExtractor(StringCodec.FORMAT, new StringCodec())
@@ -61,13 +60,7 @@ public final class TracingUtil {
    * @return encoded tracing context.
    */
   public static String exportCurrentSpan() {
-    if (GlobalTracer.get().activeSpan() != null) {
-      StringBuilder builder = new StringBuilder();
-      GlobalTracer.get().inject(GlobalTracer.get().activeSpan().context(),
-          StringCodec.FORMAT, builder);
-      return builder.toString();
-    }
-    return NULL_SPAN_AS_STRING;
+    return exportSpan(GlobalTracer.get().activeSpan());
   }
 
   /**
@@ -93,48 +86,51 @@ public final class TracingUtil {
    * @return OpenTracing scope.
    */
   public static Scope importAndCreateScope(String name, String encodedParent) {
-    Tracer.SpanBuilder spanBuilder;
     Tracer tracer = GlobalTracer.get();
-    SpanContext parentSpan = null;
-    if (encodedParent != null && encodedParent.length() > 0) {
-      StringBuilder builder = new StringBuilder();
-      builder.append(encodedParent);
-      parentSpan = tracer.extract(StringCodec.FORMAT, builder);
+    return tracer.buildSpan(name)
+        .asChildOf(extractParent(encodedParent, tracer))
+        .startActive(true);
+  }
 
+  private static SpanContext extractParent(String parent, Tracer tracer) {
+    if (!GlobalTracer.isRegistered()) {
+      return null;
     }
 
-    if (parentSpan == null) {
-      spanBuilder = tracer.buildSpan(name);
-    } else {
-      spanBuilder =
-          tracer.buildSpan(name).asChildOf(parentSpan);
+    if (parent == null || parent.isEmpty()) {
+      return null;
     }
-    return spanBuilder.startActive(true);
+
+    return tracer.extract(StringCodec.FORMAT, new StringBuilder(parent));
   }
 
   /**
    * Creates a proxy of the implementation and trace all the method calls.
    *
    * @param delegate the original class instance
-   * @param interfce the interface which should be implemented by the proxy
+   * @param itf the interface which should be implemented by the proxy
    * @param <T> the type of the interface
    * @param conf configuration
    *
    * @return A new interface which implements interfce but delegate all the
    * calls to the delegate and also enables tracing.
    */
-  public static <T> T createProxy(T delegate, Class<T> interfce,
-                                  org.apache.hadoop.conf.Configuration conf) {
-    boolean isTracingEnabled = conf.getBoolean(
-        ScmConfigKeys.HDDS_TRACING_ENABLED,
-        ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
-    if (!isTracingEnabled) {
+  public static <T> T createProxy(
+      T delegate, Class<T> itf, org.apache.hadoop.conf.Configuration conf) {
+    if (!isTracingEnabled(conf)) {
       return delegate;
     }
     Class<?> aClass = delegate.getClass();
-    return  (T) Proxy.newProxyInstance(aClass.getClassLoader(),
-        new Class<?>[] {interfce},
-        new TraceAllMethod<T>(delegate, interfce.getSimpleName()));
+    return itf.cast(Proxy.newProxyInstance(aClass.getClassLoader(),
+        new Class<?>[] {itf},
+        new TraceAllMethod<>(delegate, itf.getSimpleName())));
+  }
+
+  private static boolean isTracingEnabled(
+      org.apache.hadoop.conf.Configuration conf) {
+    return conf.getBoolean(
+          ScmConfigKeys.HDDS_TRACING_ENABLED,
+          ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
   }
 
 }

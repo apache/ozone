@@ -87,6 +87,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private String[] args;
   private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
 
+  //Constructor for DataNode PluginService
+  public HddsDatanodeService(){}
+
   public HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
     this.args = args != null ? Arrays.copyOf(args, args.length) : null;
@@ -179,7 +182,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails.setIpAddress(ip);
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
-              .substring(0, 8));
+              .substring(0, 8), conf);
       LOG.info("HddsDatanodeService host:{} ip:{}", hostname, ip);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {

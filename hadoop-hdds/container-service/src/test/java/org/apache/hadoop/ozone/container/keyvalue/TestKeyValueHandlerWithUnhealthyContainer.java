@@ -24,9 +24,11 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -40,7 +42,6 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
 
 /**
  * Test that KeyValueHandler fails certain operations when the
@@ -147,10 +148,10 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
 
     return new KeyValueHandler(
         new OzoneConfiguration(),
-        context,
+        stateMachine.getDatanodeDetails().getUuidString(),
         mock(ContainerSet.class),
         mock(VolumeSet.class),
-        mock(ContainerMetrics.class));
+        mock(ContainerMetrics.class), TestHddsDispatcher.NO_OP_ICR_SENDER);
   }
 
   private KeyValueContainer getMockUnhealthyContainer() {

@@ -67,6 +67,7 @@ public class RDBStore implements DBStore {
   private RDBCheckpointManager checkPointManager;
   private String checkpointsParentDir;
   private List<ColumnFamilyHandle> columnFamilyHandles;
+  private RDBMetrics rdbMetrics;
 
   @VisibleForTesting
   public RDBStore(File dbFile, DBOptions options,
@@ -131,6 +132,7 @@ public class RDBStore implements DBStore {
 
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, "om");
+      rdbMetrics = RDBMetrics.create();
 
     } catch (RocksDBException e) {
       String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
@@ -183,6 +185,7 @@ public class RDBStore implements DBStore {
       statMBeanName = null;
     }
 
+    rdbMetrics.unRegister();
     if (db != null) {
       db.close();
     }
@@ -257,7 +260,7 @@ public class RDBStore implements DBStore {
     if (handle == null) {
       throw new IOException("No such table in this DB. TableName : " + name);
     }
-    return new RDBTable(this.db, handle, this.writeOptions);
+    return new RDBTable(this.db, handle, this.writeOptions, rdbMetrics);
   }
 
   @Override
@@ -279,7 +282,7 @@ public class RDBStore implements DBStore {
   public ArrayList<Table> listTables() throws IOException {
     ArrayList<Table> returnList = new ArrayList<>();
     for (ColumnFamilyHandle handle : handleTable.values()) {
-      returnList.add(new RDBTable(db, handle, writeOptions));
+      returnList.add(new RDBTable(db, handle, writeOptions, rdbMetrics));
     }
     return returnList;
   }
@@ -383,4 +386,7 @@ public class RDBStore implements DBStore {
     return db;
   }
 
+  public RDBMetrics getMetrics() {
+    return rdbMetrics;
+  }
 }
