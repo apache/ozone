@@ -36,6 +36,7 @@ import java.util.Objects;
 
 import org.apache.commons.codec.digest.DigestUtils;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -1358,6 +1359,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setClusterID(omStore.getClusterID())
         .setSubject(subject)
         .addIpAddress(ip);
+
+
+    OMHANodeDetails haOMHANodeDetails = OMHANodeDetails.loadOMHAConfig(config);
+    String serviceName =
+        haOMHANodeDetails.getLocalNodeDetails().getOMServiceId();
+    if (!StringUtils.isEmpty(serviceName)) {
+      builder.addServiceName(serviceName);
+    }
 
     LOG.info("Creating csr for OM->dns:{},ip:{},scmId:{},clusterId:{}," +
             "subject:{}", hostname, ip,
