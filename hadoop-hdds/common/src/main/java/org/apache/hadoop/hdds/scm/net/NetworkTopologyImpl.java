@@ -694,7 +694,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
     if (scopeNode == null) {
       return 0;
     }
-    NetUtils.removeOutscope(mutableExcludedNodes, scope);
+    NetUtils.removeOutOfScope(mutableExcludedNodes, scope);
     List<Node> excludedAncestorList =
         NetUtils.getAncestorList(this, mutableExcludedNodes, ancestorGen);
     for (Node ancestor : excludedAncestorList) {
