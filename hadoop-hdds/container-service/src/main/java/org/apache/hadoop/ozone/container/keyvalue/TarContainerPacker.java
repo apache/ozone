@@ -63,42 +63,42 @@ public class TarContainerPacker
    * directories.
    *
    * @param container container which defines the destination structure.
-   * @param inputStream the input stream.
+   * @param input the input stream.
    */
   @Override
   public byte[] unpackContainerData(Container<KeyValueContainerData> container,
-      InputStream inputStream)
+      InputStream input)
       throws IOException {
     byte[] descriptorFileContent = null;
     try {
       KeyValueContainerData containerData = container.getContainerData();
-      InputStream compressorInputStream = decompress(inputStream);
+      InputStream decompressed = decompress(input);
 
-      ArchiveInputStream tarInput =
-          new TarArchiveInputStream(compressorInputStream);
+      ArchiveInputStream archiveInput =
+          new TarArchiveInputStream(decompressed);
 
-      ArchiveEntry entry = tarInput.getNextEntry();
+      ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
         String name = entry.getName();
         if (name.startsWith(DB_DIR_NAME + "/")) {
           Path dbRoot = containerData.getDbFile().toPath();
           Path destinationPath = dbRoot
               .resolve(name.substring(DB_DIR_NAME.length() + 1));
-          extractEntry(tarInput, entry.getSize(), dbRoot, destinationPath);
+          extractEntry(archiveInput, entry.getSize(), dbRoot, destinationPath);
         } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
           Path chunksRoot = Paths.get(containerData.getChunksPath());
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
-          extractEntry(tarInput, entry.getSize(), chunksRoot, destinationPath);
+          extractEntry(archiveInput, entry.getSize(), chunksRoot, destinationPath);
         } else if (name.equals(CONTAINER_FILE_NAME)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
-          descriptorFileContent = readEntry(tarInput, entry);
+          descriptorFileContent = readEntry(archiveInput, entry);
         } else {
           throw new IllegalArgumentException(
               "Unknown entry in the tar file: " + "" + name);
         }
-        entry = tarInput.getNextEntry();
+        entry = archiveInput.getNextEntry();
       }
       return descriptorFileContent;
 
@@ -110,24 +110,24 @@ public class TarContainerPacker
     }
   }
 
-  private void extractEntry(InputStream tarInput, long size,
+  private void extractEntry(InputStream input, long size,
                             Path ancestor, Path path) throws IOException {
     HddsUtils.validatePath(path, ancestor);
     Path parent = path.getParent();
     if (parent != null) {
       Files.createDirectories(parent);
     }
-    try (OutputStream bos = new BufferedOutputStream(
+    try (OutputStream output = new BufferedOutputStream(
         new FileOutputStream(path.toAbsolutePath().toString()))) {
       int bufferSize = 1024;
       byte[] buffer = new byte[bufferSize + 1];
       long remaining = size;
       while (remaining > 0) {
         int read =
-            tarInput.read(buffer, 0, (int) Math.min(remaining, bufferSize));
+            input.read(buffer, 0, (int) Math.min(remaining, bufferSize));
         if (read >= 0) {
           remaining -= read;
-          bos.write(buffer, 0, read);
+          output.write(buffer, 0, read);
         } else {
           remaining = 0;
         }
@@ -141,29 +141,29 @@ public class TarContainerPacker
    * in a tar file.
    *
    * @param container Container to archive (data + metadata).
-   * @param destination   Destination tar file/stream.
+   * @param output   Destination tar file/stream.
    */
   @Override
   public void pack(Container<KeyValueContainerData> container,
-      OutputStream destination)
+      OutputStream output)
       throws IOException {
 
     KeyValueContainerData containerData = container.getContainerData();
 
-    try (OutputStream gzippedOut = compress(destination)) {
+    try (OutputStream compressed = compress(output)) {
 
-      try (ArchiveOutputStream archiveOutputStream = new TarArchiveOutputStream(
-          gzippedOut)) {
+      try (ArchiveOutputStream archiveOutput = new TarArchiveOutputStream(
+          compressed)) {
 
         includePath(containerData.getDbFile().toString(), DB_DIR_NAME,
-            archiveOutputStream);
+            archiveOutput);
 
         includePath(containerData.getChunksPath(), CHUNKS_DIR_NAME,
-            archiveOutputStream);
+            archiveOutput);
 
         includeFile(container.getContainerFile(),
             CONTAINER_FILE_NAME,
-            archiveOutputStream);
+            archiveOutput);
       }
     } catch (CompressorException e) {
       throw new IOException(
@@ -174,21 +174,21 @@ public class TarContainerPacker
   }
 
   @Override
-  public byte[] unpackContainerDescriptor(InputStream inputStream)
+  public byte[] unpackContainerDescriptor(InputStream input)
       throws IOException {
     try {
-      InputStream compressorInputStream = decompress(inputStream);
+      InputStream decompressed = decompress(input);
 
-      ArchiveInputStream tarInput =
-          new TarArchiveInputStream(compressorInputStream);
+      ArchiveInputStream archiveInput =
+          new TarArchiveInputStream(decompressed);
 
-      ArchiveEntry entry = tarInput.getNextEntry();
+      ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
         String name = entry.getName();
         if (name.equals(CONTAINER_FILE_NAME)) {
-          return readEntry(tarInput, entry);
+          return readEntry(archiveInput, entry);
         }
-        entry = tarInput.getNextEntry();
+        entry = archiveInput.getNextEntry();
       }
 
     } catch (CompressorException e) {
@@ -200,53 +200,53 @@ public class TarContainerPacker
         "Container descriptor is missing from the container archive.");
   }
 
-  private byte[] readEntry(InputStream tarInput, ArchiveEntry entry)
+  private byte[] readEntry(InputStream input, ArchiveEntry entry)
       throws IOException {
-    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
     int bufferSize = 1024;
     byte[] buffer = new byte[bufferSize + 1];
     long remaining = entry.getSize();
     while (remaining > 0) {
       int read =
-          tarInput.read(buffer, 0, (int) Math.min(remaining, bufferSize));
+          input.read(buffer, 0, (int) Math.min(remaining, bufferSize));
       remaining -= read;
-      bos.write(buffer, 0, read);
+      output.write(buffer, 0, read);
     }
-    return bos.toByteArray();
+    return output.toByteArray();
   }
 
   private void includePath(String containerPath, String subdir,
-      ArchiveOutputStream archiveOutputStream) throws IOException {
+      ArchiveOutputStream archiveOutput) throws IOException {
 
     for (Path path : Files.list(Paths.get(containerPath))
         .collect(Collectors.toList())) {
 
       includeFile(path.toFile(), subdir + "/" + path.getFileName(),
-          archiveOutputStream);
+          archiveOutput);
     }
   }
 
   static void includeFile(File file, String entryName,
-      ArchiveOutputStream archiveOutputStream) throws IOException {
+      ArchiveOutputStream archiveOutput) throws IOException {
     ArchiveEntry archiveEntry =
-        archiveOutputStream.createArchiveEntry(file, entryName);
-    archiveOutputStream.putArchiveEntry(archiveEntry);
+        archiveOutput.createArchiveEntry(file, entryName);
+    archiveOutput.putArchiveEntry(archiveEntry);
     try (InputStream fis = new FileInputStream(file)) {
-      IOUtils.copy(fis, archiveOutputStream);
+      IOUtils.copy(fis, archiveOutput);
     }
-    archiveOutputStream.closeArchiveEntry();
+    archiveOutput.closeArchiveEntry();
   }
 
-  private static InputStream decompress(InputStream in)
+  private static InputStream decompress(InputStream input)
       throws CompressorException {
     return new CompressorStreamFactory()
-        .createCompressorInputStream(CompressorStreamFactory.GZIP, in);
+        .createCompressorInputStream(CompressorStreamFactory.GZIP, input);
   }
 
-  private static OutputStream compress(OutputStream out)
+  private static OutputStream compress(OutputStream output)
       throws CompressorException {
     return new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP, out);
+        .createCompressorOutputStream(CompressorStreamFactory.GZIP, output);
   }
 
 }
