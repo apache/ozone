@@ -75,7 +75,7 @@ public class TarContainerPacker
       InputStream decompressed = decompress(input);
 
       ArchiveInputStream archiveInput =
-          new TarArchiveInputStream(decompressed);
+          untar(decompressed);
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -152,8 +152,7 @@ public class TarContainerPacker
 
     try (OutputStream compressed = compress(output)) {
 
-      try (ArchiveOutputStream archiveOutput = new TarArchiveOutputStream(
-          compressed)) {
+      try (ArchiveOutputStream archiveOutput = tar(compressed)) {
 
         includePath(containerData.getDbFile().toString(), DB_DIR_NAME,
             archiveOutput);
@@ -178,9 +177,7 @@ public class TarContainerPacker
       throws IOException {
     try {
       InputStream decompressed = decompress(input);
-
-      ArchiveInputStream archiveInput =
-          new TarArchiveInputStream(decompressed);
+      ArchiveInputStream archiveInput = untar(decompressed);
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -235,6 +232,14 @@ public class TarContainerPacker
       IOUtils.copy(fis, archiveOutput);
     }
     archiveOutput.closeArchiveEntry();
+  }
+
+  private static ArchiveInputStream untar(InputStream input) {
+    return new TarArchiveInputStream(input);
+  }
+
+  private static ArchiveOutputStream tar(OutputStream output) {
+    return new TarArchiveOutputStream(output);
   }
 
   private static InputStream decompress(InputStream input)
