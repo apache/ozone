@@ -67,7 +67,7 @@ class SecurityInitializer extends OzoneManagerStorageInitializer {
   }
 
 
-  private void initializeSecurity(OzoneConfiguration conf,
+  static void initializeSecurity(OzoneConfiguration conf,
       OMStorage omStore)
       throws IOException {
     LOG.info("Initializing secure OzoneManager.");
@@ -102,7 +102,7 @@ class SecurityInitializer extends OzoneManagerStorageInitializer {
   /**
    * Get SCM signed certificate and store it using certificate client.
    * */
-  private void getSCMSignedCert(CertificateClient client,
+  private static void getSCMSignedCert(CertificateClient client,
       OzoneConfiguration config, OMStorage omStore) throws IOException {
     CertificateSignRequest.Builder builder = client.getCSRBuilder();
     KeyPair keyPair = new KeyPair(client.getPublicKey(),

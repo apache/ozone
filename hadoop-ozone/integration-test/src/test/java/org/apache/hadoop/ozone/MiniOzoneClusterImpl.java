@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.protocolPB
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.om.init.OzoneManagerStorageInitializer;
+import org.apache.hadoop.ozone.om.init.OzoneManagerStorageInitializerForTests;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -530,20 +531,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     void initializeOmStorage(OzoneConfiguration config)
-        throws IOException, AuthenticationException {
-      OzoneManagerStorageInitializer.run(config);
-      if (omId.isPresent()){
-        OMStorage storage = new OMStorage(config);
-        FileUtils.deleteDirectory(storage.getCurrentDir());
-        OMStorage finalStorage = new OMStorage(config);
-        finalStorage.setOmId(omId.get());
-        if (storage.getOmCertSerialId() != null) {
-          finalStorage.setOmCertSerialId(storage.getOmCertSerialId());
-        }
-        finalStorage.setScmId(storage.getScmId());
-        finalStorage.setClusterId(storage.getClusterID());
-        finalStorage.initialize();
-      }
+        throws IOException {
+      OzoneManagerStorageInitializerForTests.run(config, clusterId,
+          scmId.isPresent() ? scmId.get() : null,
+          omId.isPresent() ? omId.get() : null);
     }
 
     /**

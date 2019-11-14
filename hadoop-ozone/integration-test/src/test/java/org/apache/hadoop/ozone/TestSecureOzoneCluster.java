@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.init.OzoneManagerStorageInitializer;
+import org.apache.hadoop.ozone.om.init.OzoneManagerStorageInitializerForTests;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -770,8 +771,7 @@ public final class TestSecureOzoneCluster {
       scm = HddsTestUtils.getScm(conf);
       scm.start();
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, false);
-      OMStorage omStore = new OMStorage(conf);
-      initializeOmStorage(omStore);
+      OzoneManagerStorageInitializerForTests.run(conf);
       OzoneManager.setTestSecureOmFlag(true);
       om = OzoneManager.createOm(conf);
 
@@ -781,7 +781,7 @@ public final class TestSecureOzoneCluster {
           "SCM signed certificate"));
 
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-      OzoneManagerStorageInitializer.run(conf);
+      OzoneManagerStorageInitializerForTests.run(conf);
       om.stop();
       om = OzoneManager.createOm(conf);
 
@@ -808,6 +808,7 @@ public final class TestSecureOzoneCluster {
    */
   @Test
   public void testSecureOmInitSuccess() throws Exception {
+    UserGroupInformation.setShouldRenewImmediatelyForTests(true);
     LogCapturer omLogs =
         LogCapturer.captureLogs(OzoneManager.getLogger());
     omLogs.clearOutput();
@@ -816,8 +817,7 @@ public final class TestSecureOzoneCluster {
       scm = HddsTestUtils.getScm(conf);
       scm.start();
 
-      OMStorage omStore = new OMStorage(conf);
-      initializeOmStorage(omStore);
+      OzoneManagerStorageInitializerForTests.run(conf, clusterId, scmId, omId);
       OzoneManager.setTestSecureOmFlag(true);
       om = OzoneManager.createOm(conf);
 
@@ -845,7 +845,6 @@ public final class TestSecureOzoneCluster {
       }
 
     }
-
   }
 
   public void validateCertificate(X509Certificate cert) throws Exception {
@@ -882,10 +881,5 @@ public final class TestSecureOzoneCluster {
     String encodedKey1 = cert.getPublicKey().toString();
     String encodedKey2 = om.getCertificateClient().getPublicKey().toString();
     Assert.assertEquals(encodedKey1, encodedKey2);
-  }
-
-  private void initializeOmStorage(OMStorage omStorage)
-      throws IOException, AuthenticationException {
-    OzoneManagerStorageInitializer.run(conf);
   }
 }
