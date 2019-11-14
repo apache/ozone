@@ -36,13 +36,11 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
 import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorInputStream;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
 
@@ -74,15 +72,15 @@ public class TarContainerPacker
     byte[] descriptorFileContent = null;
     try {
       KeyValueContainerData containerData = container.getContainerData();
-      CompressorInputStream compressorInputStream =
+      InputStream compressorInputStream =
           new CompressorStreamFactory()
               .createCompressorInputStream(CompressorStreamFactory.GZIP,
                   inputStream);
 
-      TarArchiveInputStream tarInput =
+      ArchiveInputStream tarInput =
           new TarArchiveInputStream(compressorInputStream);
 
-      TarArchiveEntry entry = tarInput.getNextTarEntry();
+      ArchiveEntry entry = tarInput.getNextEntry();
       while (entry != null) {
         String name = entry.getName();
         if (name.startsWith(DB_DIR_NAME + "/")) {
@@ -103,7 +101,7 @@ public class TarContainerPacker
           throw new IllegalArgumentException(
               "Unknown entry in the tar file: " + "" + name);
         }
-        entry = tarInput.getNextTarEntry();
+        entry = tarInput.getNextEntry();
       }
       return descriptorFileContent;
 
@@ -115,14 +113,14 @@ public class TarContainerPacker
     }
   }
 
-  private void extractEntry(TarArchiveInputStream tarInput, long size,
+  private void extractEntry(InputStream tarInput, long size,
                             Path ancestor, Path path) throws IOException {
     HddsUtils.validatePath(path, ancestor);
     Path parent = path.getParent();
     if (parent != null) {
       Files.createDirectories(parent);
     }
-    try (BufferedOutputStream bos = new BufferedOutputStream(
+    try (OutputStream bos = new BufferedOutputStream(
         new FileOutputStream(path.toAbsolutePath().toString()))) {
       int bufferSize = 1024;
       byte[] buffer = new byte[bufferSize + 1];
@@ -155,7 +153,7 @@ public class TarContainerPacker
 
     KeyValueContainerData containerData = container.getContainerData();
 
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
+    try (OutputStream gzippedOut = new CompressorStreamFactory()
           .createCompressorOutputStream(CompressorStreamFactory.GZIP,
               destination)) {
 
@@ -184,21 +182,21 @@ public class TarContainerPacker
   public byte[] unpackContainerDescriptor(InputStream inputStream)
       throws IOException {
     try {
-      CompressorInputStream compressorInputStream =
+      InputStream compressorInputStream =
           new CompressorStreamFactory()
               .createCompressorInputStream(CompressorStreamFactory.GZIP,
                   inputStream);
 
-      TarArchiveInputStream tarInput =
+      ArchiveInputStream tarInput =
           new TarArchiveInputStream(compressorInputStream);
 
-      TarArchiveEntry entry = tarInput.getNextTarEntry();
+      ArchiveEntry entry = tarInput.getNextEntry();
       while (entry != null) {
         String name = entry.getName();
         if (name.equals(CONTAINER_FILE_NAME)) {
           return readEntry(tarInput, entry);
         }
-        entry = tarInput.getNextTarEntry();
+        entry = tarInput.getNextEntry();
       }
 
     } catch (CompressorException e) {
@@ -210,8 +208,8 @@ public class TarContainerPacker
         "Container descriptor is missing from the container archive.");
   }
 
-  private byte[] readEntry(TarArchiveInputStream tarInput,
-      TarArchiveEntry entry) throws IOException {
+  private byte[] readEntry(InputStream tarInput, ArchiveEntry entry)
+      throws IOException {
     ByteArrayOutputStream bos = new ByteArrayOutputStream();
     int bufferSize = 1024;
     byte[] buffer = new byte[bufferSize + 1];
@@ -241,7 +239,7 @@ public class TarContainerPacker
     ArchiveEntry archiveEntry =
         archiveOutputStream.createArchiveEntry(file, entryName);
     archiveOutputStream.putArchiveEntry(archiveEntry);
-    try (FileInputStream fis = new FileInputStream(file)) {
+    try (InputStream fis = new FileInputStream(file)) {
       IOUtils.copy(fis, archiveOutputStream);
     }
     archiveOutputStream.closeArchiveEntry();
