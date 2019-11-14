@@ -21,7 +21,6 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.om.init.OzoneManagerStorageInitializer;
 import org.apache.hadoop.ozone.om.init.OzoneManagerStorageInitializerForTests;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 

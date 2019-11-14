@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.util.Random;
 import java.util.UUID;
 
-public class OzoneManagerStorageInitializerForTests {
+public final class OzoneManagerStorageInitializerForTests {
   private OzoneManagerStorageInitializerForTests(){
     // disable instantiation
   }
@@ -61,11 +61,11 @@ public class OzoneManagerStorageInitializerForTests {
    */
   public static void run(OzoneConfiguration configuration, String clusterId,
       String scmId, String omId) throws IOException {
-    OMStorage storage = createBaseOMStorage(configuration, clusterId, scmId, omId);
+    OMStorage st = createBaseOMStorage(configuration, clusterId, scmId, omId);
     if (OzoneSecurityUtil.isSecurityEnabled(configuration)){
-      SecurityInitializer.initializeSecurity(configuration, storage);
+      SecurityInitializer.initializeSecurity(configuration, st);
     }
-    storage.initialize();
+    st.initialize();
   }
 
   /**
@@ -83,9 +83,9 @@ public class OzoneManagerStorageInitializerForTests {
    */
   public static void run(OzoneConfiguration configuration, String clusterId,
       String scmId, String omId, String certSerialId) throws IOException {
-    OMStorage storage = createBaseOMStorage(configuration, clusterId, scmId, omId);
-    storage.setOmCertSerialId(checkCertId(certSerialId));
-    storage.initialize();
+    OMStorage st = createBaseOMStorage(configuration, clusterId, scmId, omId);
+    st.setOmCertSerialId(checkCertId(certSerialId));
+    st.initialize();
   }
 
   private static OMStorage createBaseOMStorage(OzoneConfiguration configuration,
