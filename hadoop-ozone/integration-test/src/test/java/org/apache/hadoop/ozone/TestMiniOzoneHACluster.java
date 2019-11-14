@@ -3,7 +3,6 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.After;
 import org.junit.Assert;
@@ -20,6 +19,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 
+/**
+ * This class tests MiniOzoneHAClusterImpl.
+ */
 public class TestMiniOzoneHACluster {
 
   private MiniOzoneHAClusterImpl cluster = null;
