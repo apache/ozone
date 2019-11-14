@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.utils.db.cache;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,7 +94,11 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
 
   @Override
   public void cleanup(long epoch) {
-    executorService.submit(() -> evictCache(epoch, cleanupPolicy));
+    executorService.submit(() -> evictCache(epoch));
+  }
+
+  public void cleanup(List<Long> epochs) {
+    executorService.submit(() -> evictCache(epochs));
   }
 
   @Override
@@ -106,7 +111,38 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
     return cache.entrySet().iterator();
   }
 
-  private void evictCache(long epoch, CacheCleanupPolicy cacheCleanupPolicy) {
+  private void evictCache(List<Long> epochs) {
+    EpochEntry<CACHEKEY> currentEntry;
+    long lastEpoch = epochs.get(epochs.size() - 1);
+    for (Iterator<EpochEntry<CACHEKEY>> iterator = epochEntries.iterator();
+         iterator.hasNext();) {
+      currentEntry = iterator.next();
+      CACHEKEY cachekey = currentEntry.getCachekey();
+      CacheValue cacheValue = cache.computeIfPresent(cachekey, ((k, v) -> {
+        if (cleanupPolicy == CacheCleanupPolicy.MANUAL) {
+          if (epochs.contains(v.getEpoch())) {
+            iterator.remove();
+            return null;
+          }
+        } else if (cleanupPolicy == CacheCleanupPolicy.NEVER) {
+          // Remove only entries which are marked for delete.
+          if (epochs.contains(v.getEpoch()) && v.getCacheValue() == null) {
+            iterator.remove();
+            return null;
+          }
+        }
+        return v;
+      }));
+
+      // If currentEntry epoch is greater than last epoch, we have deleted all
+      // entries less than specified epoch. So, we can break.
+      if (cacheValue != null && cacheValue.getEpoch() >= lastEpoch) {
+        break;
+      }
+    }
+  }
+
+  private void evictCache(long epoch) {
     EpochEntry<CACHEKEY> currentEntry = null;
     for (Iterator<EpochEntry<CACHEKEY>> iterator = epochEntries.iterator();
          iterator.hasNext();) {

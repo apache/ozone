@@ -23,6 +23,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -69,6 +70,17 @@ public interface TableCache<CACHEKEY extends CacheKey,
    * @param epoch
    */
   void cleanup(long epoch);
+
+  /**
+   * Removes all the entries from the cache which are matching with epoch
+   * provided in the epoch list.
+   *
+   * If clean up policy is NEVER, this is a do nothing operation.
+   * If clean up policy is MANUAL, it is caller responsibility to cleanup the
+   * cache before calling cleanup.
+   * @param epochs
+   */
+  void cleanup(List<Long> epochs);
 
   /**
    * Return the size of the cache.

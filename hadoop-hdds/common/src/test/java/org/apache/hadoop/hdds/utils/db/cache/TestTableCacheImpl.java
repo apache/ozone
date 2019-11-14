@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -87,6 +88,55 @@ public class TestTableCacheImpl {
     }
   }
 
+
+  @Test
+  public void testPartialTableCacheWithNotContinousEntries() throws Exception {
+    int totalCount = 0;
+    int insertedCount = 3000;
+    for (long i=0; i<insertedCount; i+=2) {
+      tableCache.put(new CacheKey<>(Long.toString(i)),
+          new CacheValue<>(Optional.of(Long.toString(i)), i));
+      totalCount++;
+    }
+
+    Assert.assertEquals(totalCount, tableCache.size());
+
+    ArrayList<Long> epochs = new ArrayList();
+    epochs.add(0L);
+    epochs.add(10L);
+    epochs.add(300L);
+    epochs.add(500L);
+    epochs.add(1000L);
+
+    tableCache.cleanup(epochs);
+
+    final int count = totalCount;
+
+    // If cleanup policy is manual entries should have been removed.
+    if (cacheCleanupPolicy == TableCacheImpl.CacheCleanupPolicy.MANUAL) {
+      GenericTestUtils.waitFor(() -> {
+        return count - epochs.size() == tableCache.size();
+      }, 100, 10000);
+
+      // Check remaining entries exist or not and deleted entries does not
+      // exist.
+      for (long i = 0; i < insertedCount; i += 2) {
+        if (!epochs.contains(i)) {
+          Assert.assertEquals(Long.toString(i),
+              tableCache.get(new CacheKey<>(Long.toString(i))).getCacheValue());
+        } else {
+          Assert.assertEquals(null,
+              tableCache.get(new CacheKey<>(Long.toString(i))));
+        }
+      }
+    } else {
+      for (long i = 0; i < insertedCount; i += 2) {
+        Assert.assertEquals(Long.toString(i),
+            tableCache.get(new CacheKey<>(Long.toString(i))).getCacheValue());
+      }
+    }
+
+  }
 
   @Test
   public void testPartialTableCacheParallel() throws Exception {
