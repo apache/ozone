@@ -70,6 +70,9 @@ public class TarContainerPacker
     byte[] descriptorFileContent = null;
     try {
       KeyValueContainerData containerData = container.getContainerData();
+      Path dbRoot = containerData.getDbFile().toPath();
+      Path chunksRoot = Paths.get(containerData.getChunksPath());
+
       InputStream decompressed = decompress(input);
       ArchiveInputStream archiveInput = untar(decompressed);
 
@@ -78,12 +81,10 @@ public class TarContainerPacker
         String name = entry.getName();
         long size = entry.getSize();
         if (name.startsWith(DB_DIR_NAME + "/")) {
-          Path dbRoot = containerData.getDbFile().toPath();
           Path destinationPath = dbRoot
               .resolve(name.substring(DB_DIR_NAME.length() + 1));
           extractEntry(archiveInput, size, dbRoot, destinationPath);
         } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
-          Path chunksRoot = Paths.get(containerData.getChunksPath());
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
           extractEntry(archiveInput, size, chunksRoot, destinationPath);
@@ -116,7 +117,7 @@ public class TarContainerPacker
     }
 
     try (OutputStream output = new BufferedOutputStream(
-        new FileOutputStream(path.toAbsolutePath().toString()))) {
+        new FileOutputStream(path.toFile()))) {
       int bufferSize = 1024;
       byte[] buffer = new byte[bufferSize + 1];
       long remaining = size;
@@ -150,10 +151,10 @@ public class TarContainerPacker
     try (OutputStream compressed = compress(output);
          ArchiveOutputStream archiveOutput = tar(compressed)) {
 
-      includePath(containerData.getDbFile().toString(), DB_DIR_NAME,
+      includePath(containerData.getDbFile().toPath(), DB_DIR_NAME,
           archiveOutput);
 
-      includePath(containerData.getChunksPath(), CHUNKS_DIR_NAME,
+      includePath(Paths.get(containerData.getChunksPath()), CHUNKS_DIR_NAME,
           archiveOutput);
 
       includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
@@ -205,11 +206,10 @@ public class TarContainerPacker
     return output.toByteArray();
   }
 
-  private void includePath(String containerPath, String subdir,
+  private void includePath(Path dir, String subdir,
       ArchiveOutputStream archiveOutput) throws IOException {
 
-    for (Path path : Files.list(Paths.get(containerPath))
-        .collect(Collectors.toList())) {
+    for (Path path : Files.list(dir).collect(Collectors.toList())) {
 
       String entryName = subdir + "/" + path.getFileName();
       includeFile(path.toFile(), entryName, archiveOutput);
