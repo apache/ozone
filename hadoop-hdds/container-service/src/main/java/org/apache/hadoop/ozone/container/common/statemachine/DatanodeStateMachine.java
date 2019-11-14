@@ -97,6 +97,10 @@ public class DatanodeStateMachine implements Closeable {
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
       Configuration conf, CertificateClient certClient,
       HddsDatanodeStopService hddsDatanodeStopService) throws IOException {
+    OzoneConfiguration ozoneConf = new OzoneConfiguration(conf);
+    DatanodeConfiguration dnConf =
+        ozoneConf.getObject(DatanodeConfiguration.class);
+
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
@@ -106,7 +110,7 @@ public class DatanodeStateMachine implements Closeable {
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
     container = new OzoneContainer(this.datanodeDetails,
-        new OzoneConfiguration(conf), context, certClient);
+        ozoneConf, context, certClient);
     dnCertClient = certClient;
     nextHB = new AtomicLong(Time.monotonicNow());
 
@@ -116,7 +120,8 @@ public class DatanodeStateMachine implements Closeable {
             new SimpleContainerDownloader(conf), new TarContainerPacker());
 
     supervisor =
-        new ReplicationSupervisor(container.getContainerSet(), replicator, 10);
+        new ReplicationSupervisor(container.getContainerSet(), replicator,
+            dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
      // trick.
