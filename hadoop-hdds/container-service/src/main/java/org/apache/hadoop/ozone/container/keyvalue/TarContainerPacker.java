@@ -88,7 +88,7 @@ public class TarContainerPacker
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
           extractEntry(archiveInput, size, chunksRoot, destinationPath);
-        } else if (name.equals(CONTAINER_FILE_NAME)) {
+        } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
           descriptorFileContent = readEntry(archiveInput, entry);
@@ -176,7 +176,7 @@ public class TarContainerPacker
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
         String name = entry.getName();
-        if (name.equals(CONTAINER_FILE_NAME)) {
+        if (CONTAINER_FILE_NAME.equals(name)) {
           return readEntry(archiveInput, entry);
         }
         entry = archiveInput.getNextEntry();
