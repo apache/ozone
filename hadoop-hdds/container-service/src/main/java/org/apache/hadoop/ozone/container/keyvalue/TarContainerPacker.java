@@ -220,8 +220,8 @@ public class TarContainerPacker
       ArchiveOutputStream archiveOutput) throws IOException {
     ArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
     archiveOutput.putArchiveEntry(entry);
-    try (InputStream fis = new FileInputStream(file)) {
-      IOUtils.copy(fis, archiveOutput);
+    try (InputStream input = new FileInputStream(file)) {
+      IOUtils.copy(input, archiveOutput);
     }
     archiveOutput.closeArchiveEntry();
   }
