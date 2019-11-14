@@ -72,10 +72,7 @@ public class TarContainerPacker
     byte[] descriptorFileContent = null;
     try {
       KeyValueContainerData containerData = container.getContainerData();
-      InputStream compressorInputStream =
-          new CompressorStreamFactory()
-              .createCompressorInputStream(CompressorStreamFactory.GZIP,
-                  inputStream);
+      InputStream compressorInputStream = decompress(inputStream);
 
       ArchiveInputStream tarInput =
           new TarArchiveInputStream(compressorInputStream);
@@ -153,9 +150,7 @@ public class TarContainerPacker
 
     KeyValueContainerData containerData = container.getContainerData();
 
-    try (OutputStream gzippedOut = new CompressorStreamFactory()
-          .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-              destination)) {
+    try (OutputStream gzippedOut = compress(destination)) {
 
       try (ArchiveOutputStream archiveOutputStream = new TarArchiveOutputStream(
           gzippedOut)) {
@@ -182,10 +177,7 @@ public class TarContainerPacker
   public byte[] unpackContainerDescriptor(InputStream inputStream)
       throws IOException {
     try {
-      InputStream compressorInputStream =
-          new CompressorStreamFactory()
-              .createCompressorInputStream(CompressorStreamFactory.GZIP,
-                  inputStream);
+      InputStream compressorInputStream = decompress(inputStream);
 
       ArchiveInputStream tarInput =
           new TarArchiveInputStream(compressorInputStream);
@@ -243,6 +235,18 @@ public class TarContainerPacker
       IOUtils.copy(fis, archiveOutputStream);
     }
     archiveOutputStream.closeArchiveEntry();
+  }
+
+  private static InputStream decompress(InputStream in)
+      throws CompressorException {
+    return new CompressorStreamFactory()
+        .createCompressorInputStream(CompressorStreamFactory.GZIP, in);
+  }
+
+  private static OutputStream compress(OutputStream out)
+      throws CompressorException {
+    return new CompressorStreamFactory()
+        .createCompressorOutputStream(CompressorStreamFactory.GZIP, out);
   }
 
 }
