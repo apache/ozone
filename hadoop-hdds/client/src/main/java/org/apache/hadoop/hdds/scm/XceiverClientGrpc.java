@@ -466,8 +466,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       connectToDatanode(dn, encodedToken);
       channel = channels.get(dn.getUuid());
     } catch (Exception e) {
-      LOG.error("Error while connecting: ", e);
-      throw new IOException(e);
+      throw new IOException("Error while connecting", e);
     }
 
     if (channel == null || !isConnected(channel)) {
