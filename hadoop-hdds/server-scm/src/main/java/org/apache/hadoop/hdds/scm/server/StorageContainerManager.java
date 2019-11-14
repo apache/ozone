@@ -29,7 +29,6 @@ import com.google.common.cache.RemovalNotification;
 import com.google.protobuf.BlockingService;
 import java.util.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -96,9 +95,7 @@ import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.ozone.protocol.commands.RetriableDatanodeEventWatcher;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
@@ -251,8 +248,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
      * add any other initialization above the Security checks please.
      */
     OzoneSecurityUtil.login(conf,
-        HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
-        HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
+        ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
+        ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
         HddsServerUtil.getScmBlockClientBindAddress(conf).getHostName());
 
     // Creates the SCM DBs or opens them if it exists.
