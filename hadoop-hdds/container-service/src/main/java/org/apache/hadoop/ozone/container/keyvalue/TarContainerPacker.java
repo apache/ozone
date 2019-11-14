@@ -91,7 +91,7 @@ public class TarContainerPacker
         } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
-          descriptorFileContent = readEntry(archiveInput, entry);
+          descriptorFileContent = readEntry(archiveInput, size);
         } else {
           throw new IllegalArgumentException(
               "Unknown entry in the tar file: " + "" + name);
@@ -177,7 +177,7 @@ public class TarContainerPacker
       while (entry != null) {
         String name = entry.getName();
         if (CONTAINER_FILE_NAME.equals(name)) {
-          return readEntry(archiveInput, entry);
+          return readEntry(archiveInput, entry.getSize());
         }
         entry = archiveInput.getNextEntry();
       }
@@ -191,12 +191,12 @@ public class TarContainerPacker
         "Container descriptor is missing from the container archive.");
   }
 
-  private byte[] readEntry(InputStream input, ArchiveEntry entry)
+  private byte[] readEntry(InputStream input, final long size)
       throws IOException {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     int bufferSize = 1024;
     byte[] buffer = new byte[bufferSize + 1];
-    long remaining = entry.getSize();
+    long remaining = size;
     while (remaining > 0) {
       int len = (int) Math.min(remaining, bufferSize);
       int read = input.read(buffer, 0, len);
