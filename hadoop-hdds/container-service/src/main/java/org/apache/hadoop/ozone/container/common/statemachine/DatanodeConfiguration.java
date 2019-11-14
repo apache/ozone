@@ -36,6 +36,11 @@ public class DatanodeConfiguration {
    * simultaneously.
    */
   private int replicationMaxStreams = 10;
+  /**
+   * The maximum number of threads used to delete containers on a datanode
+   * simultaneously.
+   */
+  private int deleteContainerThreads = 2;
 
   @Config(key = "replication.streams.limit",
       type = ConfigType.INT,
@@ -56,6 +61,27 @@ public class DatanodeConfiguration {
 
   public int getReplicationMaxStreams() {
     return replicationMaxStreams;
+  }
+
+  @Config(key = "delete.container.threads",
+      type = ConfigType.INT,
+      defaultValue = "2",
+      tags = {DATANODE},
+      description = "The maximum number of threads used to delete containers " +
+          "on a datanode"
+  )
+  public void setDeleteContainerThreads(int val) {
+    if (val < 1) {
+      LOG.warn("hdds.datanode.delete.container.threads must be greater than" +
+              "zero and was set to {}. Defaulting to {}",
+          val, deleteContainerThreads);
+    } else {
+      this.deleteContainerThreads = val;
+    }
+  }
+
+  public int getDeleteContainerThreads() {
+    return deleteContainerThreads;
   }
 
 }

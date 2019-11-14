@@ -130,9 +130,10 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
             conf))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
-        .addHandler(new DeleteContainerCommandHandler(2))
         .addHandler(new ClosePipelineCommandHandler())
         .addHandler(new CreatePipelineCommandHandler())
+        .addHandler(new DeleteContainerCommandHandler(
+            dnConf.getDeleteContainerThreads()))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
