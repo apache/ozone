@@ -177,6 +177,7 @@ message IncrementalContainerReportProto {
   repeated ContainerReplicaProto report = 1;
 }
 
+
 message ContainerReplicaProto {
   enum State {
     OPEN = 1;
@@ -185,6 +186,14 @@ message ContainerReplicaProto {
     CLOSED = 4;
     UNHEALTHY = 5;
     INVALID = 6;
+    // This container is marked as Decomm and should be
+    // ignored by the SCM and Replica manager, in other words, this is a
+    // UNHEALTHY container
+    DECOM_PLEASE_IGNORE = 7;
+    
+    // This container should be treated as Available unless the total count
+    // of HEALTHY replicas goes below 1.
+    MAINT_CONSIDER_AVAILABLE = 8;
   }
   required int64 containerID = 1;
   required State state = 2;
@@ -363,13 +372,7 @@ message ReplicateContainerCommandProto {
 
 
 message SetNodeStateCommandProto {
-  enum NodeState {
-    IN_SERVICE = 1;
-    DECOMMISSIONING = 2;
-    DECOMMISSIONED = 3;
-    MAINTENANCE = 4;
-  }
-  required  NodeState nodeState = 1;
+  required  NodeOperationalState nodeState = 1;
 }
 
 /**

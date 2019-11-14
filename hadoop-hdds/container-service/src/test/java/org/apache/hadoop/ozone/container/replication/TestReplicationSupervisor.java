@@ -45,7 +45,7 @@ public class TestReplicationSupervisor {
   @Test
   public void normal() throws Exception {
     //GIVEN
-    ContainerSet set = new ContainerSet();
+    ContainerSet set = new ContainerSet(null);
 
     FakeReplicator replicator = new FakeReplicator(set);
     ReplicationSupervisor supervisor =

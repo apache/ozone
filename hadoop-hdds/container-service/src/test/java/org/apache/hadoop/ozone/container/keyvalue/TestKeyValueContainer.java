@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
@@ -338,14 +340,17 @@ public class TestKeyValueContainer {
   @Test
   public void testReportOfUnhealthyContainer() throws Exception {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-    Assert.assertNotNull(keyValueContainer.getContainerReport());
+    Assert.assertNotNull(
+        keyValueContainer.getContainerReport(
+            HddsProtos.NodeOperationalState.IN_SERVICE));
     keyValueContainer.markContainerUnhealthy();
     File containerFile = keyValueContainer.getContainerFile();
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
     assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         keyValueContainerData.getState());
-    Assert.assertNotNull(keyValueContainer.getContainerReport());
+    Assert.assertNotNull(keyValueContainer.getContainerReport(
+        HddsProtos.NodeOperationalState.IN_SERVICE.IN_SERVICE));
   }
 
   @Test

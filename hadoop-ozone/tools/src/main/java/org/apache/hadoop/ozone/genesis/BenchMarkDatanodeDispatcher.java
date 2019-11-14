@@ -103,7 +103,7 @@ public class BenchMarkDatanodeDispatcher {
     // data directory
     conf.set("dfs.datanode.data.dir", baseDir + File.separator + "data");
 
-    ContainerSet containerSet = new ContainerSet();
+    ContainerSet containerSet = new ContainerSet(null);
     volumeSet = new VolumeSet(datanodeUuid, conf);
     StateContext context = new StateContext(
         conf, DatanodeStates.RUNNING, null);

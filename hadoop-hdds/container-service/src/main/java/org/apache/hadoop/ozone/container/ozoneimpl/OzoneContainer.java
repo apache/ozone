@@ -24,10 +24,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto
     .ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -77,12 +78,19 @@ public class OzoneContainer {
   private final XceiverServerSpi writeChannel;
   private final XceiverServerSpi readChannel;
   private final ContainerController controller;
+  private final BlockDeletingService blockDeletingService;
   private ContainerMetadataScanner metadataScanner;
   private List<ContainerDataScanner> dataScanners;
-  private final BlockDeletingService blockDeletingService;
+  // TODO: This datanode's current state. We will read this from datanode.yaml
+  // on reboot, and this variable is set up via SetNodeStateCommand from
+  // SCM. If there is no value in datanode.yaml, we will assume that
+  // this is an in-service node.  Right now hard coded to in_service.
+  private HddsProtos.NodeOperationalState globalNodeState =
+      HddsProtos.NodeOperationalState.IN_SERVICE;
 
   /**
    * Construct OzoneContainer object.
+   *
    * @param datanodeDetails
    * @param conf
    * @param certClient
@@ -92,9 +100,11 @@ public class OzoneContainer {
   public OzoneContainer(DatanodeDetails datanodeDetails, OzoneConfiguration
       conf, StateContext context, CertificateClient certClient)
       throws IOException {
+
+
     this.config = conf;
     this.volumeSet = new VolumeSet(datanodeDetails.getUuidString(), conf);
-    this.containerSet = new ContainerSet();
+    this.containerSet = new ContainerSet(this);
     this.metadataScanner = null;
 
     buildContainerSet();
@@ -108,7 +118,7 @@ public class OzoneContainer {
 
     SecurityConfig secConf = new SecurityConfig(conf);
     this.hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
-        handlers, context, metrics, secConf.isBlockTokenEnabled()?
+        handlers, context, metrics, secConf.isBlockTokenEnabled() ?
         new BlockTokenVerifier(secConf, certClient) : null);
 
     /*
@@ -134,6 +144,24 @@ public class OzoneContainer {
     this.blockDeletingService =
         new BlockDeletingService(this, svcInterval, serviceTimeout,
             TimeUnit.MILLISECONDS, config);
+  }
+
+  /**
+   * Get this datanode's current operational Status.
+   *
+   * @return - IN_SERVICE, DECOMM, Maint etc.
+   */
+  public HddsProtos.NodeOperationalState getGlobalNodeState() {
+    return globalNodeState;
+  }
+
+  /**
+   * Set this nodes Operational Status.
+   *
+   * @param globalNodeState - by default IN_SERVICE.
+   */
+  public void setGlobalNodeState(HddsProtos.NodeOperationalState globalNodeState) {
+    this.globalNodeState = globalNodeState;
   }
 
   private GrpcReplicationService createReplicationService() {
@@ -168,7 +196,6 @@ public class OzoneContainer {
     }
 
   }
-
 
   /**
    * Start background daemon thread for performing container integrity checks.
@@ -240,13 +267,14 @@ public class OzoneContainer {
     ContainerMetrics.remove();
   }
 
-
   @VisibleForTesting
   public ContainerSet getContainerSet() {
     return containerSet;
   }
+
   /**
    * Returns container report.
+   *
    * @return - container report.
    */
 

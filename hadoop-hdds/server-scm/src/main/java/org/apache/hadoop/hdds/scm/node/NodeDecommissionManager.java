@@ -246,8 +246,7 @@ public class NodeDecommissionManager {
       // Create a DECOMMISSIONING Command and send it to the datanode.
       nodeManager.addDatanodeCommand(dn.getUuid(),
           new SetNodeState(Time.monotonicNow(),
-              StorageContainerDatanodeProtocolProtos.
-                  SetNodeStateCommandProto.NodeState.DECOMMISSIONING));
+              NodeOperationalState.DECOMMISSIONING));
 
     } else if (opState == NodeOperationalState.DECOMMISSIONING
         || opState == NodeOperationalState.DECOMMISSIONED) {

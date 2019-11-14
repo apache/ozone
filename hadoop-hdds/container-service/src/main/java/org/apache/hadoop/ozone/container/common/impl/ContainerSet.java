@@ -22,12 +22,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,18 +44,23 @@ import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-
 /**
  * Class that manages Containers created on the datanode.
  */
 public class ContainerSet {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerSet.class);
+  private final OzoneContainer ozoneContainer;
 
   private final ConcurrentSkipListMap<Long, Container<?>> containerMap = new
       ConcurrentSkipListMap<>();
   private final ConcurrentSkipListSet<Long> missingContainerSet =
       new ConcurrentSkipListSet<>();
+
+  public ContainerSet(OzoneContainer container) {
+    this.ozoneContainer = container;
+  }
+
   /**
    * Add Container to container map.
    * @param container container to be added
@@ -226,8 +233,17 @@ public class ContainerSet {
     ContainerReportsProto.Builder crBuilder =
         ContainerReportsProto.newBuilder();
 
-    for (Container<?> container: containers) {
-      crBuilder.addReports(container.getContainerReport());
+    for (Container<?> container : containers) {
+      // To handle tests where we set this to null
+      // in real world there is not reason for this to be
+      // null at all.
+      if (ozoneContainer != null) {
+        crBuilder.addReports(container.getContainerReport(
+            ozoneContainer.getGlobalNodeState()));
+      } else {
+        crBuilder.addReports(container.getContainerReport(
+            HddsProtos.NodeOperationalState.IN_SERVICE));
+      }
     }
 
     return crBuilder.build();

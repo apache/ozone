@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -99,8 +100,8 @@ public abstract class Handler {
       throws StorageContainerException {
     IncrementalContainerReportProto icr = IncrementalContainerReportProto
         .newBuilder()
-        .addReport(container.getContainerReport())
-        .build();
+        .addReport(container.getContainerReport(
+            HddsProtos.NodeOperationalState.IN_SERVICE)).build();
     context.addReport(icr);
     context.getParent().triggerHeartbeat();
   }

@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers
@@ -149,8 +150,10 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
 
   /**
    * Returns containerReport for the container.
+   * @param nodeState
    */
-  ContainerReplicaProto getContainerReport()
+  ContainerReplicaProto getContainerReport(
+      HddsProtos.NodeOperationalState nodeState)
       throws StorageContainerException;
 
   /**

@@ -77,7 +77,7 @@ public class TestContainerDeletionChoosingPolicy {
         RandomContainerDeletionChoosingPolicy.class.getName());
     List<StorageLocation> pathLists = new LinkedList<>();
     pathLists.add(StorageLocation.parse(containerDir.getAbsolutePath()));
-    containerSet = new ContainerSet();
+    containerSet = new ContainerSet(null);
 
     int numContainers = 10;
     for (int i = 0; i < numContainers; i++) {

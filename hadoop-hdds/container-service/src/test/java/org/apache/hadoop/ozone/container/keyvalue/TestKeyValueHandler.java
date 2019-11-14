@@ -233,7 +233,7 @@ public class TestKeyValueHandler {
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
     VolumeSet volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
     try {
-      ContainerSet cset = new ContainerSet();
+      ContainerSet cset = new ContainerSet(null);
       int[] interval = new int[1];
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);

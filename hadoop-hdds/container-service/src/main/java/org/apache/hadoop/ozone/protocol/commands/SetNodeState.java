@@ -1,5 +1,6 @@
 package org.apache.hadoop.ozone.protocol.commands;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SetNodeStateCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -18,7 +19,7 @@ import org.apache.hadoop.hdds.protocol.proto
  * containers.
  */
 public class SetNodeState extends SCMCommand<SetNodeStateCommandProto> {
-  private final SetNodeStateCommandProto.NodeState state;
+  private final HddsProtos.NodeOperationalState state;
 
   /**
    * Ctor that creates a set node state command.
@@ -26,7 +27,7 @@ public class SetNodeState extends SCMCommand<SetNodeStateCommandProto> {
    * @param id - Command ID. Something a time stamp would suffice.
    * @param state - NodeState that want the node to be set into.
    */
-  public SetNodeState(long id, SetNodeStateCommandProto.NodeState state) {
+  public SetNodeState(long id, HddsProtos.NodeOperationalState state) {
     super(id);
     this.state = state;
   }

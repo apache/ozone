@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers
@@ -60,6 +61,7 @@ import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
+
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .Result.CONTAINER_ALREADY_EXISTS;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
@@ -106,6 +108,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         "be null");
     this.config = ozoneConfig;
     this.containerData = containerData;
+  }
+
+  static File getContainerFile(String metadataPath, long containerId) {
+    return new File(metadataPath,
+        containerId + OzoneConsts.CONTAINER_EXTENSION);
   }
 
   @Override
@@ -213,8 +220,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    * Writes to .container file.
    *
    * @param containerFile container file name
-   * @param isCreate True if creating a new file. False is updating an
-   *                 existing container file.
+   * @param isCreate True if creating a new file. False is updating an existing
+   * container file.
    * @throws StorageContainerException
    */
   private void writeToContainerFile(File containerFile, boolean isCreate)
@@ -259,7 +266,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throws StorageContainerException {
     writeToContainerFile(containerFile, false);
   }
-
 
   @Override
   public void delete() throws StorageContainerException {
@@ -352,7 +358,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   /**
-   *
    * Must be invoked with the writeLock held.
    *
    * @param update
@@ -382,7 +387,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   private void compactDB() throws StorageContainerException {
     try {
-      try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+      try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
         db.getStore().compactDB();
       }
     } catch (StorageContainerException ex) {
@@ -410,7 +415,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public KeyValueContainerData getContainerData()  {
+  public KeyValueContainerData getContainerData() {
     return containerData;
   }
 
@@ -433,7 +438,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     // holding lock and writing data to disk. We can have async implementation
     // to flush the update container data to disk.
     long containerId = containerData.getContainerID();
-    if(!containerData.isValid()) {
+    if (!containerData.isValid()) {
       LOG.debug("Invalid container data. ContainerID: {}", containerId);
       throw new StorageContainerException("Invalid container data. " +
           "ContainerID: " + containerId, INVALID_CONTAINER_STATE);
@@ -454,7 +459,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       File containerFile = getContainerFile();
       // update the new container data to .container File
       updateContainerFile(containerFile);
-    } catch (StorageContainerException  ex) {
+    } catch (StorageContainerException ex) {
       containerData.setMetadata(oldMetadata);
       throw ex;
     } finally {
@@ -468,7 +473,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public KeyValueBlockIterator blockIterator() throws IOException{
+  public KeyValueBlockIterator blockIterator() throws IOException {
     return new KeyValueBlockIterator(containerData.getContainerID(), new File(
         containerData.getContainerPath()));
   }
@@ -597,6 +602,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   /**
    * Acquire read lock, unless interrupted while waiting.
+   *
    * @throws InterruptedException
    */
   @Override
@@ -606,6 +612,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   /**
    * Acquire write lock, unless interrupted while waiting.
+   *
    * @throws InterruptedException
    */
   @Override
@@ -616,17 +623,13 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   /**
    * Returns containerFile.
+   *
    * @return .container File name
    */
   @Override
   public File getContainerFile() {
     return getContainerFile(containerData.getMetadataPath(),
-            containerData.getContainerID());
-  }
-
-  static File getContainerFile(String metadataPath, long containerId) {
-    return new File(metadataPath,
-        containerId + OzoneConsts.CONTAINER_EXTENSION);
+        containerData.getContainerID());
   }
 
   @Override
@@ -639,12 +642,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     return containerData.getBlockCommitSequenceId();
   }
 
-
   /**
    * Returns KeyValueContainerReport for the KeyValueContainer.
+   *
+   * @param nodeState
    */
   @Override
-  public ContainerReplicaProto getContainerReport()
+  public ContainerReplicaProto getContainerReport(
+      HddsProtos.NodeOperationalState nodeState)
       throws StorageContainerException {
     ContainerReplicaProto.Builder ciBuilder =
         ContainerReplicaProto.newBuilder();
@@ -655,7 +660,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .setWriteBytes(containerData.getWriteBytes())
         .setKeyCount(containerData.getKeyCount())
         .setUsed(containerData.getBytesUsed())
-        .setState(getHddsState())
+        .setState(getHddsState(nodeState))
         .setDeleteTransactionId(containerData.getDeleteTransactionId())
         .setBlockCommitSequenceId(containerData.getBlockCommitSequenceId())
         .setOriginNodeId(containerData.getOriginNodeId());
@@ -664,37 +669,60 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   /**
    * Returns LifeCycle State of the container.
+   *
    * @return LifeCycle State of the container in HddsProtos format
    * @throws StorageContainerException
    */
-  private ContainerReplicaProto.State getHddsState()
+  private ContainerReplicaProto.State getHddsState(
+      HddsProtos.NodeOperationalState nodeState)
       throws StorageContainerException {
-    ContainerReplicaProto.State state;
-    switch (containerData.getState()) {
-    case OPEN:
-      state = ContainerReplicaProto.State.OPEN;
-      break;
-    case CLOSING:
-      state = ContainerReplicaProto.State.CLOSING;
-      break;
-    case QUASI_CLOSED:
-      state = ContainerReplicaProto.State.QUASI_CLOSED;
-      break;
-    case CLOSED:
-      state = ContainerReplicaProto.State.CLOSED;
-      break;
-    case UNHEALTHY:
-      state = ContainerReplicaProto.State.UNHEALTHY;
-      break;
-    default:
-      throw new StorageContainerException("Invalid Container state found: " +
-          containerData.getContainerID(), INVALID_CONTAINER_STATE);
+    ContainerReplicaProto.State state = ContainerReplicaProto.State.INVALID;
+    if (nodeState == HddsProtos.NodeOperationalState.IN_SERVICE) {
+      switch (containerData.getState()) {
+      case OPEN:
+        state = ContainerReplicaProto.State.OPEN;
+        break;
+      case CLOSING:
+        state = ContainerReplicaProto.State.CLOSING;
+        break;
+      case QUASI_CLOSED:
+        state = ContainerReplicaProto.State.QUASI_CLOSED;
+        break;
+      case CLOSED:
+        state = ContainerReplicaProto.State.CLOSED;
+        break;
+      case UNHEALTHY:
+        state = ContainerReplicaProto.State.UNHEALTHY;
+        break;
+      default:
+        throw new StorageContainerException("Invalid Container state found: " +
+            containerData.getContainerID(), INVALID_CONTAINER_STATE);
+      }
+    }
+
+    // If this node has been marked as Decommissioned or is under going
+    // Decommission, we report all containers as DECOM_PLEASE_IGNORE state.
+    // This allows SCM to know that these containers need to be managed in
+    // a different way.
+    if (nodeState == HddsProtos.NodeOperationalState.DECOMMISSIONED ||
+        nodeState == HddsProtos.NodeOperationalState.DECOMMISSIONING) {
+      state = ContainerReplicaProto.State.DECOM_PLEASE_IGNORE;
+    }
+
+    // If we are in maintenance mode, this is a request to SCM/Replica
+    // manager to not start replication immediately; since we are making a
+    // promise to the SCM that these containers will soon be operational.
+
+    if (nodeState == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE ||
+        nodeState == HddsProtos.NodeOperationalState.IN_MAINTENANCE) {
+      state = ContainerReplicaProto.State.MAINT_CONSIDER_AVAILABLE;
     }
     return state;
   }
 
   /**
    * Returns container DB file.
+   *
    * @return
    */
   public File getContainerDBFile() {
@@ -731,19 +759,20 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     return checker.fullCheck(throttler, canceler);
   }
 
-  private enum ContainerCheckLevel {
-    NO_CHECK, FAST_CHECK, FULL_CHECK
-  }
-
   /**
    * Creates a temporary file.
+   *
    * @param file
    * @return
    * @throws IOException
    */
-  private File createTempFile(File file) throws IOException{
+  private File createTempFile(File file) throws IOException {
     return File.createTempFile("tmp_" + System.currentTimeMillis() + "_",
         file.getName(), file.getParentFile());
+  }
+
+  private enum ContainerCheckLevel {
+    NO_CHECK, FAST_CHECK, FULL_CHECK
   }
 
 }

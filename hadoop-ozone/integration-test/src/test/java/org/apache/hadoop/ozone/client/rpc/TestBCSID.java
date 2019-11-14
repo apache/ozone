@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -129,7 +130,8 @@ public class TestBCSID {
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
-            .getContainerReport().getBlockCommitSequenceId();
+            .getContainerReport(HddsProtos.NodeOperationalState.IN_SERVICE)
+            .getBlockCommitSequenceId();
     Assert.assertTrue(blockCommitSequenceId > 0);
 
     // make sure the persisted block Id in OM is same as that seen in the
@@ -143,6 +145,7 @@ public class TestBCSID {
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
-            .getContainerReport().getBlockCommitSequenceId());
+            .getContainerReport(HddsProtos.NodeOperationalState.IN_SERVICE)
+            .getBlockCommitSequenceId());
   }
 }
