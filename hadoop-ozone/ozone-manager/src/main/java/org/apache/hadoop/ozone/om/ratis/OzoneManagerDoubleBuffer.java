@@ -169,8 +169,6 @@ public class OzoneManagerDoubleBuffer {
                 flushedTransactionsSize);
           }
 
-          readyBuffer.clear();
-
           long lastRatisTransactionIndex =
               readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
                   .max(Long::compareTo).get();
@@ -185,6 +183,8 @@ public class OzoneManagerDoubleBuffer {
             // cleanup cache.
             cleanupCache(lastRatisTransactionIndex);
           }
+
+          readyBuffer.clear();
 
           // TODO: Need to revisit this logic, once we have multiple
           //  executors for volume/bucket request handling. As for now
