@@ -56,8 +56,6 @@ public class TarContainerPacker
 
   private static final String CONTAINER_FILE_NAME = "container.yaml";
 
-
-
   /**
    * Given an input stream (tar file) extract the data to the specified
    * directories.
@@ -73,23 +71,22 @@ public class TarContainerPacker
     try {
       KeyValueContainerData containerData = container.getContainerData();
       InputStream decompressed = decompress(input);
-
-      ArchiveInputStream archiveInput =
-          untar(decompressed);
+      ArchiveInputStream archiveInput = untar(decompressed);
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
         String name = entry.getName();
+        long size = entry.getSize();
         if (name.startsWith(DB_DIR_NAME + "/")) {
           Path dbRoot = containerData.getDbFile().toPath();
           Path destinationPath = dbRoot
               .resolve(name.substring(DB_DIR_NAME.length() + 1));
-          extractEntry(archiveInput, entry.getSize(), dbRoot, destinationPath);
+          extractEntry(archiveInput, size, dbRoot, destinationPath);
         } else if (name.startsWith(CHUNKS_DIR_NAME + "/")) {
           Path chunksRoot = Paths.get(containerData.getChunksPath());
           Path destinationPath = chunksRoot
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
-          extractEntry(archiveInput, entry.getSize(), chunksRoot, destinationPath);
+          extractEntry(archiveInput, size, chunksRoot, destinationPath);
         } else if (name.equals(CONTAINER_FILE_NAME)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
@@ -117,14 +114,15 @@ public class TarContainerPacker
     if (parent != null) {
       Files.createDirectories(parent);
     }
+
     try (OutputStream output = new BufferedOutputStream(
         new FileOutputStream(path.toAbsolutePath().toString()))) {
       int bufferSize = 1024;
       byte[] buffer = new byte[bufferSize + 1];
       long remaining = size;
       while (remaining > 0) {
-        int read =
-            input.read(buffer, 0, (int) Math.min(remaining, bufferSize));
+        int len = (int) Math.min(remaining, bufferSize);
+        int read = input.read(buffer, 0, len);
         if (read >= 0) {
           remaining -= read;
           output.write(buffer, 0, read);
@@ -133,7 +131,6 @@ public class TarContainerPacker
         }
       }
     }
-
   }
 
   /**
@@ -150,26 +147,22 @@ public class TarContainerPacker
 
     KeyValueContainerData containerData = container.getContainerData();
 
-    try (OutputStream compressed = compress(output)) {
+    try (OutputStream compressed = compress(output);
+         ArchiveOutputStream archiveOutput = tar(compressed)) {
 
-      try (ArchiveOutputStream archiveOutput = tar(compressed)) {
+      includePath(containerData.getDbFile().toString(), DB_DIR_NAME,
+          archiveOutput);
 
-        includePath(containerData.getDbFile().toString(), DB_DIR_NAME,
-            archiveOutput);
+      includePath(containerData.getChunksPath(), CHUNKS_DIR_NAME,
+          archiveOutput);
 
-        includePath(containerData.getChunksPath(), CHUNKS_DIR_NAME,
-            archiveOutput);
-
-        includeFile(container.getContainerFile(),
-            CONTAINER_FILE_NAME,
-            archiveOutput);
-      }
+      includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
+          archiveOutput);
     } catch (CompressorException e) {
       throw new IOException(
           "Can't compress the container: " + containerData.getContainerID(),
           e);
     }
-
   }
 
   @Override
@@ -187,12 +180,12 @@ public class TarContainerPacker
         }
         entry = archiveInput.getNextEntry();
       }
-
     } catch (CompressorException e) {
       throw new IOException(
           "Can't read the container descriptor from the container archive",
           e);
     }
+
     throw new IOException(
         "Container descriptor is missing from the container archive.");
   }
@@ -204,8 +197,8 @@ public class TarContainerPacker
     byte[] buffer = new byte[bufferSize + 1];
     long remaining = entry.getSize();
     while (remaining > 0) {
-      int read =
-          input.read(buffer, 0, (int) Math.min(remaining, bufferSize));
+      int len = (int) Math.min(remaining, bufferSize);
+      int read = input.read(buffer, 0, len);
       remaining -= read;
       output.write(buffer, 0, read);
     }
@@ -218,16 +211,15 @@ public class TarContainerPacker
     for (Path path : Files.list(Paths.get(containerPath))
         .collect(Collectors.toList())) {
 
-      includeFile(path.toFile(), subdir + "/" + path.getFileName(),
-          archiveOutput);
+      String entryName = subdir + "/" + path.getFileName();
+      includeFile(path.toFile(), entryName, archiveOutput);
     }
   }
 
   static void includeFile(File file, String entryName,
       ArchiveOutputStream archiveOutput) throws IOException {
-    ArchiveEntry archiveEntry =
-        archiveOutput.createArchiveEntry(file, entryName);
-    archiveOutput.putArchiveEntry(archiveEntry);
+    ArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
+    archiveOutput.putArchiveEntry(entry);
     try (InputStream fis = new FileInputStream(file)) {
       IOUtils.copy(fis, archiveOutput);
     }
