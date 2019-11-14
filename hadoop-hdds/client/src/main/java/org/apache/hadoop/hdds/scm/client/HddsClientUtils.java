@@ -78,22 +78,22 @@ public final class HddsClientUtils {
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsClientUtils.class);
 
-  private static final int NO_PORT = -1;
-
   private HddsClientUtils() {
   }
 
   private static final List<Class<? extends Exception>> EXCEPTION_LIST =
-      new ArrayList<Class<? extends Exception>>() {{
-        add(TimeoutException.class);
-        add(StorageContainerException.class);
-        add(RaftRetryFailureException.class);
-        add(AlreadyClosedException.class);
-        add(GroupMismatchException.class);
-        // Not Replicated Exception will be thrown if watch For commit
-        // does not succeed
-        add(NotReplicatedException.class);
-      }};
+      new ArrayList<>();
+
+  static {
+    EXCEPTION_LIST.add(TimeoutException.class);
+    EXCEPTION_LIST.add(StorageContainerException.class);
+    EXCEPTION_LIST.add(RaftRetryFailureException.class);
+    EXCEPTION_LIST.add(AlreadyClosedException.class);
+    EXCEPTION_LIST.add(GroupMismatchException.class);
+    // Not Replicated Exception will be thrown if watch For commit
+    // does not succeed
+    EXCEPTION_LIST.add(NotReplicatedException.class);
+  }
 
   /**
    * Date format that used in ozone. Here the format is thread safe to use.
