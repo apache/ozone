@@ -20,11 +20,9 @@ package org.apache.hadoop.ozone.recon.api;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import javax.ws.rs.DefaultValue;
@@ -50,8 +48,6 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadat
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.FETCH_ALL;
 import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_CONTAINER_ID_DEFAULT_VALUE;
@@ -65,9 +61,6 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 @Path("/containers")
 @Produces(MediaType.APPLICATION_JSON)
 public class ContainerKeyService {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerKeyService.class);
 
   @Inject
   private ContainerDBServiceProvider containerDBServiceProvider;
@@ -169,9 +162,8 @@ public class ContainerKeyService {
           keyMetadataMap.get(ozoneKey).getVersions()
               .add(containerKeyPrefix.getKeyVersion());
 
-          keyMetadataMap.get(ozoneKey).getBlockIds().putAll(
-              Collections.singletonMap(containerKeyPrefix.getKeyVersion(),
-                  blockIds));
+          keyMetadataMap.get(ozoneKey).getBlockIds()
+              .put(containerKeyPrefix.getKeyVersion(), blockIds);
         } else {
           // break the for loop if limit has been reached
           if (keyMetadataMap.size() == limit) {
@@ -186,14 +178,10 @@ public class ContainerKeyService {
           keyMetadata.setModificationTime(
               Instant.ofEpochMilli(omKeyInfo.getModificationTime()));
           keyMetadata.setDataSize(omKeyInfo.getDataSize());
-          keyMetadata.setVersions(new ArrayList<Long>() {{
-              add(containerKeyPrefix.getKeyVersion());
-            }});
+          keyMetadata.getVersions().add(containerKeyPrefix.getKeyVersion());
           keyMetadataMap.put(ozoneKey, keyMetadata);
-          keyMetadata.setBlockIds(new TreeMap<Long,
-              List<ContainerBlockMetadata>>() {{
-              put(containerKeyPrefix.getKeyVersion(), blockIds);
-            }});
+          keyMetadata.getBlockIds().put(containerKeyPrefix.getKeyVersion(),
+              blockIds);
         }
       }
 
