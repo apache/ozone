@@ -326,19 +326,19 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           getBlockDNcache.put(getBlockID, dn);
         }
         break;
-      } catch (ExecutionException | InterruptedException | IOException e) {
+      } catch (IOException e) {
+        ioException = e;
+        responseProto = null;
+      } catch (ExecutionException | InterruptedException e) {
         LOG.debug("Failed to execute command {} on datanode {}",
             request, dn.getUuid(), e);
-        if (!(e instanceof IOException)) {
-          if (Status.fromThrowable(e.getCause()).getCode()
-              == Status.UNAUTHENTICATED.getCode()) {
-            throw new SCMSecurityException("Failed to authenticate with "
-                + "GRPC XceiverServer with Ozone block token.");
-          }
-          ioException = new IOException(e);
-        } else {
-          ioException = (IOException) e;
+        if (Status.fromThrowable(e.getCause()).getCode()
+            == Status.UNAUTHENTICATED.getCode()) {
+          throw new SCMSecurityException("Failed to authenticate with "
+              + "GRPC XceiverServer with Ozone block token.");
         }
+
+        ioException = new IOException(e);
         responseProto = null;
       }
     }
