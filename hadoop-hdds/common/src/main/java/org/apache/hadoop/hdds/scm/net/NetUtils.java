@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
  */
 public final class NetUtils {
   public static final Logger LOG = LoggerFactory.getLogger(NetUtils.class);
-  private static final Object excludeNodesLock = new Object();
+  private static final Object EXCLUDE_NODES_LOCK = new Object();
 
   private NetUtils() {
     // Prevent instantiation
@@ -119,7 +119,7 @@ public final class NetUtils {
     if (CollectionUtils.isEmpty(mutableExcludedNodes) || scope == null) {
       return;
     }
-    synchronized (excludeNodesLock) {
+    synchronized (EXCLUDE_NODES_LOCK) {
       mutableExcludedNodes.removeIf(
           next -> !next.getNetworkFullPath().startsWith(scope));
     }
