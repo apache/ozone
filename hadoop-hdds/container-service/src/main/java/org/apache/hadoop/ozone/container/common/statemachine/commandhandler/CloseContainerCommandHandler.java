@@ -109,8 +109,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
       case QUASI_CLOSED:
         if (closeCommand.getForce()) {
           controller.closeContainer(containerId);
-          break;
         }
+        break;
       case CLOSED:
         break;
       case UNHEALTHY:
@@ -119,6 +119,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
           LOG.debug("Cannot close the container #{}, the container is"
               + " in {} state.", containerId, container.getContainerState());
         }
+        break;
       default:
         break;
       }
