@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,7 +61,7 @@ public class RDBStore implements DBStore {
   private final WriteOptions writeOptions;
   private final DBOptions dbOptions;
   private final CodecRegistry codecRegistry;
-  private final Hashtable<String, ColumnFamilyHandle> handleTable;
+  private final Map<String, ColumnFamilyHandle> handleTable;
   private ObjectName statMBeanName;
   private RDBCheckpointManager checkPointManager;
   private String checkpointsParentDir;
@@ -81,8 +80,8 @@ public class RDBStore implements DBStore {
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
-    Preconditions.checkArgument(families.size() > 0);
-    handleTable = new Hashtable<>();
+    Preconditions.checkArgument(!families.isEmpty());
+    handleTable = new HashMap<>();
     codecRegistry = registry;
     final List<ColumnFamilyDescriptor> columnFamilyDescriptors =
         new ArrayList<>();
@@ -266,7 +265,7 @@ public class RDBStore implements DBStore {
   @Override
   public <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
       Class<KEY> keyType, Class<VALUE> valueType) throws IOException {
-    return new TypedTable<KEY, VALUE>(getTable(name), codecRegistry, keyType,
+    return new TypedTable<>(getTable(name), codecRegistry, keyType,
         valueType);
   }
 
@@ -274,12 +273,12 @@ public class RDBStore implements DBStore {
   public <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
       Class<KEY> keyType, Class<VALUE> valueType,
       TableCacheImpl.CacheCleanupPolicy cleanupPolicy) throws IOException {
-    return new TypedTable<KEY, VALUE>(getTable(name), codecRegistry, keyType,
+    return new TypedTable<>(getTable(name), codecRegistry, keyType,
         valueType, cleanupPolicy);
   }
 
   @Override
-  public ArrayList<Table> listTables() throws IOException {
+  public ArrayList<Table> listTables() {
     ArrayList<Table> returnList = new ArrayList<>();
     for (ColumnFamilyHandle handle : handleTable.values()) {
       returnList.add(new RDBTable(db, handle, writeOptions, rdbMetrics));
