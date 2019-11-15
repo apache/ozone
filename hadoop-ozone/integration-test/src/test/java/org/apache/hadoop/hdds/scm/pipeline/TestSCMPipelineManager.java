@@ -174,18 +174,17 @@ public class TestSCMPipelineManager {
     Assert
         .assertFalse(pipelineManager.getPipeline(pipeline.getId()).isOpen());
 
-    // get pipeline report from each dn in the pipeline
+    // pipeline is not healthy until all dns report
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
-    for (DatanodeDetails dn: pipeline.getNodes()) {
-      PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
-      // pipeline is not healthy until all dns report
-      Assert.assertFalse(
-          pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-      pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
-    }
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+    Assert.assertFalse(
+        pipelineManager.getPipeline(pipeline.getId()).isHealthy());
+    // get pipeline report from each dn in the pipeline
+    nodes.subList(0, 2).forEach(dn ->
+        sendPipelineReport(dn, pipeline, pipelineReportHandler, false));
+    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
+        pipelineReportHandler, true);
 
     // pipeline is healthy when all dns report
     Assert
@@ -271,7 +270,7 @@ public class TestSCMPipelineManager {
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
     Assert.assertTrue(numPipelineCreateFailed == 0);
-
+    
     // clean up
     pipelineManager.close();
   }
