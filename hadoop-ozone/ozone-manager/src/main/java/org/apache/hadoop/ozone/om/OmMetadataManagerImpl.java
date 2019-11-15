@@ -796,6 +796,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return result;
   }
 
+  // TODO: HDDS-2419 - Complete stub below for core logic
+  @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
+      String startKeyName, String keyPrefix, int maxKeys) throws IOException {
+
+    List<RepeatedOmKeyInfo> deletedKeys = new ArrayList<>();
+    return deletedKeys;
+  }
+
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {

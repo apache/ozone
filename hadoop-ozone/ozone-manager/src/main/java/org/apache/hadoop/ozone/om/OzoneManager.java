@@ -2240,14 +2240,39 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  // TODO: HDDS-2418 - Complete stub below for server logic
   @Override
   public List<RepeatedOmKeyInfo> listTrash(String volumeName,
       String bucketName, String startKeyName, String keyPrefix, int maxKeys)
       throws IOException {
 
-    List<RepeatedOmKeyInfo> deletedKeys = new ArrayList<>();
-    return deletedKeys;
+    if (isAclEnabled) {
+      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+          volumeName, bucketName, keyPrefix);
+    }
+
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    auditMap.put(OzoneConsts.START_KEY, startKeyName);
+    auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
+    auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
+
+    try {
+      metrics.incNumKeyLists();
+      return keyManager.listTrash(volumeName, bucketName,
+          startKeyName, keyPrefix, maxKeys);
+    } catch (IOException ex) {
+      metrics.incNumKeyListFails();
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_KEYS,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_KEYS,
+            auditMap));
+      }
+    }
   }
 
   /**

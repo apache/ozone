@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 import java.io.IOException;
 import java.util.List;
@@ -149,6 +150,24 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<OmKeyInfo> listKeys(String volumeName,
       String bucketName, String startKey, String keyPrefix, int maxKeys)
       throws IOException;
+
+  /**
+   * List trash allows the user to list the keys that were marked as deleted,
+   * but not actually deleted by Ozone Manager. This allows a user to recover
+   * keys within a configurable window.
+   * @param volumeName - The volume name, which can also be a wild card
+   *                   using '*'.
+   * @param bucketName - The bucket name, which can also be a wild card
+   *                   using '*'.
+   * @param startKeyName - List keys from a specific key name.
+   * @param keyPrefix - List keys using a specific prefix.
+   * @param maxKeys - The number of keys to be returned. This must be below
+   *                the cluster level set by admins.
+   * @return The list of keys that are deleted from the deleted table.
+   * @throws IOException
+   */
+  List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
+      String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
    * Returns a list of pending deletion key info that ups to the given count.
