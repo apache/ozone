@@ -199,11 +199,11 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public <KEY, VALUE> void move(KEY key, Table<KEY, VALUE> source,
-                                Table<KEY, VALUE> dest) throws IOException {
+  public <K, V> void move(K key, Table<K, V> source,
+                                Table<K, V> dest) throws IOException {
     try (BatchOperation batchOperation = initBatchOperation()) {
 
-      VALUE value = source.get(key);
+      V value = source.get(key);
       dest.putWithBatch(batchOperation, key, value);
       source.deleteWithBatch(batchOperation, key);
       commitBatchOperation(batchOperation);
@@ -211,15 +211,15 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public <KEY, VALUE> void move(KEY key, VALUE value, Table<KEY, VALUE> source,
-                                Table<KEY, VALUE> dest) throws IOException {
+  public <K, V> void move(K key, V value, Table<K, V> source,
+                                Table<K, V> dest) throws IOException {
     move(key, key, value, source, dest);
   }
 
   @Override
-  public <KEY, VALUE> void move(KEY sourceKey, KEY destKey, VALUE value,
-                                Table<KEY, VALUE> source,
-                                Table<KEY, VALUE> dest) throws IOException {
+  public <K, V> void move(K sourceKey, K destKey, V value,
+                                Table<K, V> source,
+                                Table<K, V> dest) throws IOException {
     try (BatchOperation batchOperation = initBatchOperation()) {
       dest.putWithBatch(batchOperation, destKey, value);
       source.deleteWithBatch(batchOperation, sourceKey);
@@ -263,15 +263,15 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType) throws IOException {
+  public <K, V> Table<K, V> getTable(String name,
+      Class<K> keyType, Class<V> valueType) throws IOException {
     return new TypedTable<>(getTable(name), codecRegistry, keyType,
         valueType);
   }
 
   @Override
-  public <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType,
+  public <K, V> Table<K, V> getTable(String name,
+      Class<K> keyType, Class<V> valueType,
       TableCacheImpl.CacheCleanupPolicy cleanupPolicy) throws IOException {
     return new TypedTable<>(getTable(name), codecRegistry, keyType,
         valueType, cleanupPolicy);
