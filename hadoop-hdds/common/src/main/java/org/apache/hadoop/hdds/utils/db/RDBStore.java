@@ -292,7 +292,6 @@ public class RDBStore implements DBStore {
       flushOptions.setWaitForFlush(true);
       db.flush(flushOptions);
     } catch (RocksDBException e) {
-      LOG.error("Unable to Flush RocksDB data", e);
       throw toIOException("Unable to Flush RocksDB data", e);
     }
   }
