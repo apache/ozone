@@ -65,7 +65,7 @@ public class TestContainerMapper {
     conf.set(OZONE_OM_DB_DIRS, dbPath);
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE, "100MB");
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1)
+        .setNumDatanodes(3)
         .setScmId(SCM_ID)
         .build();
     cluster.waitForClusterToBeReady();
