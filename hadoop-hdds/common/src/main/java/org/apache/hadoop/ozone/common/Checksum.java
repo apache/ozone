@@ -61,7 +61,7 @@ public class Checksum {
     };
   }
 
-  private static ByteString int2ByteString(int n) {
+  public static ByteString int2ByteString(int n) {
     final ByteString.Output out = ByteString.newOutput();
     try(DataOutputStream dataOut = new DataOutputStream(out)) {
       dataOut.writeInt(n);
@@ -161,7 +161,11 @@ public class Checksum {
     if (!data.isReadOnly()) {
       data = data.asReadOnlyBuffer();
     }
+    return computeChecksum(ChunkBuffer.wrap(data));
+  }
 
+  public ChecksumData computeChecksum(ChunkBuffer data)
+      throws OzoneChecksumException {
     if (checksumType == ChecksumType.NONE) {
       // Since type is set to NONE, we do not need to compute the checksums
       return new ChecksumData(checksumType, bytesPerChecksum);
@@ -174,17 +178,12 @@ public class Checksum {
       throw new OzoneChecksumException(checksumType);
     }
 
-    // Compute number of checksums needs for given data length based on bytes
-    // per checksum.
-    final int dataSize = data.remaining();
-    int numChecksums = (dataSize + bytesPerChecksum - 1) / bytesPerChecksum;
-
     // Checksum is computed for each bytesPerChecksum number of bytes of data
     // starting at offset 0. The last checksum might be computed for the
     // remaining data with length less than bytesPerChecksum.
-    List<ByteString> checksumList = new ArrayList<>(numChecksums);
-    for (int index = 0; index < numChecksums; index++) {
-      checksumList.add(computeChecksum(data, function, bytesPerChecksum));
+    final List<ByteString> checksumList = new ArrayList<>();
+    for (ByteBuffer b : data.iterate(bytesPerChecksum)) {
+      checksumList.add(computeChecksum(b, function, bytesPerChecksum));
     }
     return new ChecksumData(checksumType, bytesPerChecksum, checksumList);
   }
