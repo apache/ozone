@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 name: Build
-on: push
+on:
+  - push
+  - pull_request
 jobs:
   build:
     name: compile
