@@ -33,6 +33,7 @@ import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -171,10 +172,8 @@ public final class OmUtils {
   }
 
   public static int getOmRpcPort(Configuration conf) {
-    // If no port number is specified then we'll just try the defaultBindPort.
-    final Optional<Integer> port = getPortNumberFromConfigKeys(conf,
-        OZONE_OM_ADDRESS_KEY);
-    return port.orElse(OZONE_OM_PORT_DEFAULT);
+    return getPortNumberFromConfigKeys(conf, OZONE_OM_ADDRESS_KEY)
+        .orElse(OZONE_OM_PORT_DEFAULT);
   }
 
   /**
@@ -185,17 +184,13 @@ public final class OmUtils {
    * @return Port on which OM RPC server will listen on
    */
   public static int getOmRpcPort(Configuration conf, String confKey) {
-    // If no port number is specified then we'll just try the defaultBindPort.
-    final Optional<Integer> port = getPortNumberFromConfigKeys(conf, confKey);
-    return port.orElse(OZONE_OM_PORT_DEFAULT);
+    return getPortNumberFromConfigKeys(conf, confKey)
+        .orElse(OZONE_OM_PORT_DEFAULT);
   }
 
   public static int getOmRestPort(Configuration conf) {
-    // If no port number is specified then we'll just try the default
-    // HTTP BindPort.
-    final Optional<Integer> port =
-        getPortNumberFromConfigKeys(conf, OZONE_OM_HTTP_ADDRESS_KEY);
-    return port.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
+    return getPortNumberFromConfigKeys(conf, OZONE_OM_HTTP_ADDRESS_KEY)
+        .orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
   }
 
   /**
@@ -430,7 +425,7 @@ public final class OmUtils {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTP_BIND_HOST_KEY, omServiceId, omNodeId));
 
-    final Optional<Integer> addressPort = getPortNumberFromConfigKeys(conf,
+    final OptionalInt addressPort = getPortNumberFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
 
     final Optional<String> addressHost = getHostNameFromConfigKeys(conf,
@@ -453,7 +448,7 @@ public final class OmUtils {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTPS_BIND_HOST_KEY, omServiceId, omNodeId));
 
-    final Optional<Integer> addressPort = getPortNumberFromConfigKeys(conf,
+    final OptionalInt addressPort = getPortNumberFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
 
     final Optional<String> addressHost = getHostNameFromConfigKeys(conf,
