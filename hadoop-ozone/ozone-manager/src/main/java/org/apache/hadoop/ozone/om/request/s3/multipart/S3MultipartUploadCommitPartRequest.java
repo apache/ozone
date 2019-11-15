@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -32,6 +33,8 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart
     .S3MultipartUploadCommitPartResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartCommitUploadPartRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -47,6 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -84,8 +88,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     MultipartCommitUploadPartRequest multipartCommitUploadPartRequest =
         getOmRequest().getCommitMultiPartUploadRequest();
 
-    OzoneManagerProtocolProtos.KeyArgs keyArgs =
-        multipartCommitUploadPartRequest.getKeyArgs();
+    KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -210,8 +213,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY, buildKeyArgsAuditMap(keyArgs),
-        exception, getOmRequest().getUserInfo()));
+        OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY,
+        buildAuditMap(keyArgs, partName), exception,
+        getOmRequest().getUserInfo()));
 
     if (exception == null) {
       LOG.debug("MultipartUpload Commit is successfully for Key:{} in " +
@@ -223,6 +227,17 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       ozoneManager.getMetrics().incNumCommitMultipartUploadPartFails();
     }
     return omClientResponse;
+  }
+
+  private Map<String, String> buildAuditMap(KeyArgs keyArgs, String partName) {
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+
+    // Add MPU related information.
+    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
+        String.valueOf(keyArgs.getMultipartNumber()));
+    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NAME, partName);
+
+    return auditMap;
   }
 }
 

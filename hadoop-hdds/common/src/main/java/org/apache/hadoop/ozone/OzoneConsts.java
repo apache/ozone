@@ -272,6 +272,8 @@ public final class OzoneConsts {
   public static final String MAX_PARTS = "maxParts";
   public static final String S3_BUCKET = "s3Bucket";
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
+  public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
+  public static final String MULTIPART_UPLOAD_PART_NAME = "partName";
 
 
 
