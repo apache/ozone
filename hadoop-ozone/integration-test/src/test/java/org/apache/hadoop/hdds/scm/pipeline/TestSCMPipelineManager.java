@@ -271,6 +271,9 @@ public class TestSCMPipelineManager {
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
     Assert.assertTrue(numPipelineCreateFailed == 0);
+
+    // clean up
+    pipelineManager.close();
   }
 
   @Test
@@ -368,6 +371,8 @@ public class TestSCMPipelineManager {
 
     Assert.assertEquals(Pipeline.PipelineState.OPEN,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
+
+    pipelineManager.close();
   }
 
   private void sendPipelineReport(DatanodeDetails dn,
