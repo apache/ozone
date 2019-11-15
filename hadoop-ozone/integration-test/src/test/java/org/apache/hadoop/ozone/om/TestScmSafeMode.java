@@ -341,7 +341,7 @@ public class TestScmSafeMode {
     builder = MiniOzoneCluster.newBuilder(conf)
         .setHbInterval(1000)
         .setHbProcessorInterval(500)
-        .setNumDatanodes(1);
+        .setNumDatanodes(3);
     cluster = builder.build();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     assertFalse(scm.isInSafeMode());
