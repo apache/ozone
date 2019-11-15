@@ -177,14 +177,19 @@ public class TestSCMPipelineManager {
     // get pipeline report from each dn in the pipeline
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
+    Boolean isLeader = true;
     for (DatanodeDetails dn: pipeline.getNodes()) {
       PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
+          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId(),
+              isLeader);
+      if (isLeader) {
+        isLeader = false;
+      }
       // pipeline is not healthy until all dns report
       Assert.assertFalse(
           pipelineManager.getPipeline(pipeline.getId()).isHealthy());
       pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
+          .onMessage(pipelineReportFromDatanode, eventQueue);
     }
 
     // pipeline is healthy when all dns report
@@ -197,12 +202,17 @@ public class TestSCMPipelineManager {
     // close the pipeline
     pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
 
+    isLeader = true;
     for (DatanodeDetails dn: pipeline.getNodes()) {
       PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
+          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId(),
+              isLeader);
+      if (isLeader) {
+        isLeader = false;
+      }
       // pipeline report for destroyed pipeline should be ignored
       pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
+          .onMessage(pipelineReportFromDatanode, eventQueue);
     }
 
     try {
