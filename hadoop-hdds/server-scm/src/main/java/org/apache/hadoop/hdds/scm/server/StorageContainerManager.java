@@ -232,7 +232,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     configuration = conf;
     initMetrics();
-    initContainerReportCache(conf);
+    initContainerReportCache();
     /**
      * It is assumed the scm --init command creates the SCM Storage Config.
      */
@@ -478,10 +478,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmMetadataStore = configurator.getMetadataStore();
     } else {
       scmMetadataStore = new SCMMetadataStoreRDBImpl(conf);
-      if (scmMetadataStore == null) {
-        throw new SCMException("Unable to initialize metadata store",
-            ResultCodes.SCM_NOT_INITIALIZED);
-      }
     }
   }
 
@@ -617,7 +613,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
         scmStorageConfig.initialize();
-        System.out.println(
+        LOG.info(
             "SCM initialization succeeded."
                 + "Current cluster id for sd="
                 + scmStorageConfig.getStorageDir()
@@ -629,7 +625,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         return false;
       }
     } else {
-      System.out.println(
+      LOG.info(
           "SCM already initialized. Reusing existing"
               + " cluster id for sd="
               + scmStorageConfig.getStorageDir()
@@ -678,25 +674,21 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @param conf
    */
-  private void initContainerReportCache(OzoneConfiguration conf) {
+  @SuppressWarnings("UnstableApiUsage")
+  private void initContainerReportCache() {
     containerReportCache =
         CacheBuilder.newBuilder()
             .expireAfterAccess(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
             .maximumSize(Integer.MAX_VALUE)
-            .removalListener(
-                new RemovalListener<String, ContainerStat>() {
-                  @Override
-                  public void onRemoval(
-                      RemovalNotification<String, ContainerStat>
-                          removalNotification) {
-                    synchronized (containerReportCache) {
-                      ContainerStat stat = removalNotification.getValue();
-                      // remove invalid container report
-                      metrics.decrContainerStat(stat);
-                      if (LOG.isDebugEnabled()) {
-                        LOG.debug("Remove expired container stat entry for " +
-                            "datanode: {}.", removalNotification.getKey());
-                      }
+            .removalListener((
+                RemovalListener<String, ContainerStat>) removalNotification -> {
+                  synchronized (containerReportCache) {
+                    ContainerStat stat = removalNotification.getValue();
+                    // remove invalid container report
+                    metrics.decrContainerStat(stat);
+                    if (LOG.isDebugEnabled()) {
+                      LOG.debug("Remove expired container stat entry for " +
+                          "datanode: {}.", removalNotification.getKey());
                     }
                   }
                 })
@@ -763,22 +755,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Start service.
    */
   public void start() throws IOException {
-    LOG.info(
-        buildRpcServerStartMessage(
-            "StorageContainerLocationProtocol RPC server",
-            getClientRpcAddress()));
+    if (LOG.isInfoEnabled()) {
+      LOG.info(buildRpcServerStartMessage(
+          "StorageContainerLocationProtocol RPC server",
+          getClientRpcAddress()));
+    }
 
     ms = HddsUtils.initializeMetrics(configuration, "StorageContainerManager");
 
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();
 
-    LOG.info(buildRpcServerStartMessage("ScmBlockLocationProtocol RPC " +
-        "server", getBlockProtocolServer().getBlockRpcAddress()));
+    if (LOG.isInfoEnabled()) {
+      LOG.info(buildRpcServerStartMessage("ScmBlockLocationProtocol RPC " +
+          "server", getBlockProtocolServer().getBlockRpcAddress()));
+    }
     getBlockProtocolServer().start();
 
-    LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
-        "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
+    if (LOG.isInfoEnabled()) {
+      LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
+          "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
+    }
     getDatanodeProtocolServer().start();
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
@@ -971,12 +968,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   public void checkAdminAccess(String remoteUser) throws IOException {
-    if (remoteUser != null) {
-      if (!scmAdminUsernames.contains(remoteUser)) {
-        throw new IOException(
-            "Access denied for user " + remoteUser + ". Superuser privilege " +
-                "is required.");
-      }
+    if (remoteUser != null && !scmAdminUsernames.contains(remoteUser)) {
+      throw new IOException(
+          "Access denied for user " + remoteUser + ". Superuser privilege " +
+              "is required.");
     }
   }
 
