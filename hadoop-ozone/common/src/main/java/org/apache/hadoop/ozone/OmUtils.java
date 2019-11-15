@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.base.Strings;
 
@@ -369,13 +370,14 @@ public final class OmUtils {
                new TarArchiveOutputStream(gzippedOut)) {
 
         Path checkpointPath = checkpoint.getCheckpointLocation();
-        for (Path path : Files.list(checkpointPath)
-            .collect(Collectors.toList())) {
-          if (path != null) {
-            Path fileName = path.getFileName();
-            if (fileName != null) {
-              includeFile(path.toFile(), fileName.toString(),
-                  archiveOutputStream);
+        try (Stream<Path> files = Files.list(checkpointPath)) {
+          for (Path path : files.collect(Collectors.toList())) {
+            if (path != null) {
+              Path fileName = path.getFileName();
+              if (fileName != null) {
+                includeFile(path.toFile(), fileName.toString(),
+                    archiveOutputStream);
+              }
             }
           }
         }

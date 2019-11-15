@@ -27,11 +27,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerType;
@@ -91,7 +93,7 @@ public final class ContainerDataYaml {
       // Write the ContainerData with checksum to Yaml file.
       out = new FileOutputStream(
           containerFile);
-      writer = new OutputStreamWriter(out, "UTF-8");
+      writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
       yaml.dump(containerData, writer);
     } finally {
       try {
@@ -105,6 +107,7 @@ public final class ContainerDataYaml {
         LOG.warn("Error occurred during closing the writer. ContainerID: " +
             containerData.getContainerID());
       }
+      IOUtils.closeQuietly(out);
     }
   }
 
