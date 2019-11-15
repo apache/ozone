@@ -2466,4 +2466,12 @@
       The number of Recon Tasks that are waiting on updates from OM.
     </description>
   </property>
+  <property>
+    <name>ozone.client.list.trash.keys.max</name>
+    <value>1000</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The maximum number of keys to return for a list trash request.
+    </description>
+  </property>
 </configuration>
