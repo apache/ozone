@@ -172,6 +172,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setActivatePipelineResponse(activatePipeline(
                 request.getActivatePipelineRequest()))
             .build();
+      case DeactivatePipeline:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setDeactivatePipelineResponse(deactivatePipeline(
+                request.getDeactivatePipelineRequest()))
+            .build();
+      case ClosePipeline:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setClosePipelineResponse(closePipeline(
+                request.getClosePipelineRequest()))
+            .build();
       case GetScmInfo:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -332,7 +346,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public ClosePipelineResponseProto closePipeline(
-      RpcController controller, ClosePipelineRequestProto request)
+      ClosePipelineRequestProto request)
       throws IOException {
 
     impl.closePipeline(request.getPipelineID());
