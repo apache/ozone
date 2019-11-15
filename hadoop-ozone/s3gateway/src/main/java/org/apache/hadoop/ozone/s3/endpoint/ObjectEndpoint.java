@@ -470,7 +470,7 @@ public class ObjectEndpoint extends EndpointBase {
           multipartUploadInitiateResponse).build();
     } catch (IOException ex) {
       LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
-          "key: ", bucket, key, ex);
+          "key: {}", bucket, key, ex);
       throw ex;
     }
   }
