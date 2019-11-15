@@ -63,7 +63,8 @@ public class TraceAllMethod<T> implements InvocationHandler {
         name + "." + method.getName())
         .startActive(true)) {
       try {
-        return delegateMethod.invoke(delegate, args);
+        return delegateMethod == null ? null :
+          delegateMethod.invoke(delegate, args);
       } catch (Exception ex) {
         if (ex.getCause() != null) {
           throw ex.getCause();
