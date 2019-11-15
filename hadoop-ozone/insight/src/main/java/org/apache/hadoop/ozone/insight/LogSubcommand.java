@@ -83,7 +83,7 @@ public class LogSubcommand extends BaseInsightSubCommand
         .collect(Collectors.toSet());
     try {
       streamLog(conf, sources, loggers,
-          (logLine) -> insight.filterLog(filters, logLine));
+          logLine -> insight.filterLog(filters, logLine));
     } finally {
       for (LoggerSource logger : loggers) {
         setLogLevel(conf, logger.getLoggerName(), logger.getComponent(),
