@@ -71,7 +71,6 @@ import java.util.concurrent.TimeoutException;
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
   static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
-  private static final String COMPONENT = "dn";
   private final Pipeline pipeline;
   private final Configuration config;
   private Map<UUID, XceiverClientProtocolServiceStub> asyncStubs;
