@@ -52,7 +52,7 @@ public class TestOzoneFsRenameDir {
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
 
