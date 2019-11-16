@@ -113,7 +113,7 @@ public class OzoneManagerServiceProviderImpl
       ReconOMMetadataManager omMetadataManager,
       ReconTaskController reconTaskController,
       ReconUtils reconUtils,
-      OzoneManagerProtocol ozoneManagerClient) throws IOException {
+      OzoneManagerProtocol ozoneManagerClient) {
 
     String ozoneManagerHttpAddress = configuration.get(OMConfigKeys
         .OZONE_OM_HTTP_ADDRESS_KEY);
@@ -224,7 +224,6 @@ public class OzoneManagerServiceProviderImpl
       reconUtils.untarCheckpointFile(targetFile, untarredDbDir);
       FileUtils.deleteQuietly(targetFile);
 
-      // TODO Create Checkpoint based on OM DB type.
       // Currently, OM DB type is not configurable. Hence, defaulting to
       // RocksDB.
       return new RocksDBCheckpoint(untarredDbDir);
@@ -278,14 +277,17 @@ public class OzoneManagerServiceProviderImpl
     if (null != dbUpdates) {
       RDBStore rocksDBStore = (RDBStore)omMetadataManager.getStore();
       RocksDB rocksDB = rocksDBStore.getDb();
-      LOG.debug("Number of updates received from OM : " +
+      LOG.debug("Number of updates received from OM : {}",
           dbUpdates.getData().size());
       for (byte[] data : dbUpdates.getData()) {
         try (WriteBatch writeBatch = new WriteBatch(data)) {
           writeBatch.iterate(omdbUpdatesHandler);
-          RDBBatchOperation rdbBatchOperation =
-              new RDBBatchOperation(writeBatch);
-          rdbBatchOperation.commit(rocksDB, new WriteOptions());
+          try (RDBBatchOperation rdbBatchOperation =
+                   new RDBBatchOperation(writeBatch)) {
+            try (WriteOptions wOpts = new WriteOptions()) {
+              rdbBatchOperation.commit(rocksDB, wOpts);
+            }
+          }
         }
       }
     }
