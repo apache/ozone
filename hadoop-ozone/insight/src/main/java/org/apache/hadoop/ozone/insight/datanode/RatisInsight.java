@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.insight.datanode;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +66,7 @@ public class RatisInsight extends BaseInsightPoint implements InsightPoint {
         }
       }
     } catch (IOException e) {
-      throw new ExceptionInInitializerError(e);
+      throw new UncheckedIOException("Can't enumerate required logs", e);
     }
 
     return result;
