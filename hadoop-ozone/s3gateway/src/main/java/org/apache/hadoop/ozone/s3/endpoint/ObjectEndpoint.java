@@ -233,16 +233,19 @@ public class ObjectEndpoint extends EndpointBase {
       String rangeHeaderVal = headers.getHeaderString(RANGE_HEADER);
       RangeHeader rangeHeader = null;
 
-      LOG.debug("range Header provided value is {}", rangeHeaderVal);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("range Header provided value is {}", rangeHeaderVal);
+      }
 
       if (rangeHeaderVal != null) {
         rangeHeader = RangeHeaderParserUtil.parseRangeHeader(rangeHeaderVal,
             length);
-        LOG.debug("range Header provided value is {}", rangeHeader);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("range Header provided value is {}", rangeHeader);
+        }
         if (rangeHeader.isInValidRange()) {
-          OS3Exception exception = S3ErrorTable.newError(S3ErrorTable
-              .INVALID_RANGE, rangeHeaderVal);
-          throw exception;
+          throw S3ErrorTable.newError(
+              S3ErrorTable.INVALID_RANGE, rangeHeaderVal);
         }
       }
       ResponseBuilder responseBuilder;
@@ -351,8 +354,7 @@ public class ObjectEndpoint extends EndpointBase {
         .header("Content-Length", key.getDataSize())
         .header("Content-Type", "binary/octet-stream");
     addLastModifiedDate(response, key);
-    return response
-        .build();
+    return response.build();
   }
 
   /**
@@ -467,8 +469,8 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (IOException ex) {
-      LOG.error("Error in Initiate Multipart Upload Request for bucket: " +
-          bucket + ", key: " + key, ex);
+      LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
+          "key: {}", bucket, key, ex);
       throw ex;
     }
   }
@@ -494,8 +496,9 @@ public class ObjectEndpoint extends EndpointBase {
       for (CompleteMultipartUploadRequest.Part part : partList) {
         partsMap.put(part.getPartNumber(), part.geteTag());
       }
-
-      LOG.debug("Parts map {}", partsMap.toString());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Parts map {}", partsMap);
+      }
 
       omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(
           key, uploadID, partsMap);
@@ -510,27 +513,18 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
-      LOG.error("Error in Complete Multipart Upload Request for bucket: " +
-          bucket + ", key: " + key, ex);
+      LOG.error("Error in Complete Multipart Upload Request for bucket: {}, " +
+          ", key: {}", bucket, key, ex);
       if (ex.getResult() == ResultCodes.INVALID_PART) {
-        OS3Exception oex =
-            S3ErrorTable.newError(S3ErrorTable.INVALID_PART, key);
-        throw oex;
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_PART, key);
       } else if (ex.getResult() == ResultCodes.INVALID_PART_ORDER) {
-        OS3Exception oex =
-            S3ErrorTable.newError(S3ErrorTable.INVALID_PART_ORDER, key);
-        throw oex;
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_PART_ORDER, key);
       } else if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
-        OS3Exception os3Exception = S3ErrorTable.newError(NO_SUCH_UPLOAD,
-            uploadID);
-        throw os3Exception;
+        throw S3ErrorTable.newError(NO_SUCH_UPLOAD, uploadID);
       } else if (ex.getResult() == ResultCodes.ENTITY_TOO_SMALL) {
-        OS3Exception os3Exception = S3ErrorTable.newError(ENTITY_TOO_SMALL,
-            key);
-        throw os3Exception;
+        throw S3ErrorTable.newError(ENTITY_TOO_SMALL, key);
       } else if(ex.getResult() == ResultCodes.INVALID_REQUEST) {
-        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST,
-            key);
+        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST, key);
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: You must " +
             "specify at least one part");
@@ -546,39 +540,39 @@ public class ObjectEndpoint extends EndpointBase {
       throws IOException, OS3Exception {
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
-      OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
-          key, length, partNumber, uploadID);
+      String copyHeader;
+      OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo;
+      try (OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
+          key, length, partNumber, uploadID)) {
+        copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
+        if (copyHeader != null) {
+          Pair<String, String> result = parseSourceHeader(copyHeader);
 
-      String copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
-      if (copyHeader != null) {
-        Pair<String, String> result = parseSourceHeader(copyHeader);
+          String sourceBucket = result.getLeft();
+          String sourceKey = result.getRight();
 
-        String sourceBucket = result.getLeft();
-        String sourceKey = result.getRight();
+          try (OzoneInputStream sourceObject =
+                   getBucket(sourceBucket).readKey(sourceKey)) {
 
-        try (OzoneInputStream sourceObject =
-            getBucket(sourceBucket).readKey(sourceKey)) {
+            String range =
+                headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
+            if (range != null) {
+              RangeHeader rangeHeader =
+                  RangeHeaderParserUtil.parseRangeHeader(range, 0);
+              IOUtils.copyLarge(sourceObject, ozoneOutputStream,
+                  rangeHeader.getStartOffset(),
+                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset());
 
-          String range =
-              headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
-          if (range != null) {
-            RangeHeader rangeHeader =
-                RangeHeaderParserUtil.parseRangeHeader(range, 0);
-            IOUtils.copyLarge(sourceObject, ozoneOutputStream,
-                rangeHeader.getStartOffset(),
-                rangeHeader.getEndOffset() - rangeHeader.getStartOffset());
-
-          } else {
-            IOUtils.copy(sourceObject, ozoneOutputStream);
+            } else {
+              IOUtils.copy(sourceObject, ozoneOutputStream);
+            }
           }
+        } else {
+          IOUtils.copy(body, ozoneOutputStream);
         }
-
-      } else {
-        IOUtils.copy(body, ozoneOutputStream);
+        omMultipartCommitUploadPartInfo = ozoneOutputStream
+            .getCommitUploadPartInfo();
       }
-      ozoneOutputStream.close();
-      OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
-          ozoneOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
       if (copyHeader != null) {
@@ -761,7 +755,7 @@ public class ObjectEndpoint extends EndpointBase {
     if (header.startsWith("/")) {
       header = copyHeader.substring(1);
     }
-    int pos = header.indexOf("/");
+    int pos = header.indexOf('/');
     if (pos == -1) {
       OS3Exception ex = S3ErrorTable.newError(S3ErrorTable
           .INVALID_ARGUMENT, header);
