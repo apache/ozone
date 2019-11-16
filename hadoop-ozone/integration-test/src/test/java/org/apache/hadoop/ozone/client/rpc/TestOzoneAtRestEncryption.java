@@ -277,7 +277,8 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
     Assert.assertFalse(
         deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
-    Assert.assertNull(deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
+    Assert.assertNull(
+        deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
   }
 
   private boolean verifyRatisReplication(String volumeName, String bucketName,
