@@ -166,7 +166,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     // Add credential context to the client call
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Nodes in pipeline : {}", pipeline.getNodes().toString());
+      LOG.debug("Nodes in pipeline : {}", pipeline.getNodes());
       LOG.debug("Connecting to server : {}", dn.getIpAddress());
     }
     NettyChannelBuilder channelBuilder =
