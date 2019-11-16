@@ -57,12 +57,13 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Utility methods for Ozone and Container Clients.
@@ -84,16 +85,14 @@ public final class HddsClientUtils {
   }
 
   private static final List<Class<? extends Exception>> EXCEPTION_LIST =
-      new ArrayList<Class<? extends Exception>>() {{
-        add(TimeoutException.class);
-        add(StorageContainerException.class);
-        add(RaftRetryFailureException.class);
-        add(AlreadyClosedException.class);
-        add(GroupMismatchException.class);
-        // Not Replicated Exception will be thrown if watch For commit
-        // does not succeed
-        add(NotReplicatedException.class);
-      }};
+      Stream.of(TimeoutException.class,
+          StorageContainerException.class,
+          RaftRetryFailureException.class,
+          AlreadyClosedException.class,
+          GroupMismatchException.class,
+          // Not Replicated Exception will be thrown if watch For commit
+          // does not succeed
+          NotReplicatedException.class).collect(Collectors.toList());
 
   /**
    * Date format that used in ozone. Here the format is thread safe to use.
