@@ -80,40 +80,6 @@ wait_for_datanodes(){
    return 1
 }
 
-## @description wait until safemode exit (or 30 seconds)
-## @param the docker-compose file
-wait_for_safemode_exit(){
-  local compose_file=$1
-
-  #Reset the timer
-  SECONDS=0
-
-  #Don't give it up until 30 seconds
-  while [[ $SECONDS -lt 90 ]]; do
-
-     #This line checks the safemode status in scm
-     local command="ozone scmcli safemode status"
-     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=`docker-compose -f "${compose_file}" exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command'"`
-     else
-         status=`docker-compose -f "${compose_file}" exec -T scm bash -c "$command"`
-     fi
-
-     echo $status
-     if [[ "$status" ]]; then
-       if [[ ${status} == "SCM is out of safe mode." ]]; then
-         #Safemode exits. Let's return from the function.
-         echo "Safe mode is off"
-         return
-       fi
-     fi
-
-     sleep 2
-   done
-   echo "WARNING! Safemode is still on. Please check the docker-compose files"
-   return 1
-}
-
 ## @description  Starts a docker-compose based test environment
 ## @param number of datanodes to start and wait for (default: 3)
 start_docker_env(){
@@ -124,7 +90,6 @@ start_docker_env(){
   docker-compose -f "$COMPOSE_FILE" --no-ansi down
   docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
     && wait_for_datanodes "$COMPOSE_FILE" "${datanode_count}" \
-    && wait_for_safemode_exit "$COMPOSE_FILE" \
     && sleep 10
 
   if [[ $? -gt 0 ]]; then
