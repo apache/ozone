@@ -71,7 +71,7 @@ public class BufferPool {
    * chunk size.
    *
    */
-  public ChunkBuffer allocateBufferIfNeeded() {
+  public ChunkBuffer allocateBufferIfNeeded(int increment) {
     ChunkBuffer buffer = getCurrentBuffer();
     if (buffer != null && buffer.hasRemaining()) {
       return buffer;
@@ -79,7 +79,7 @@ public class BufferPool {
     if (currentBufferIndex < bufferList.size() - 1) {
       buffer = getBuffer(currentBufferIndex + 1);
     } else {
-      buffer = ChunkBuffer.allocate(bufferSize);
+      buffer = ChunkBuffer.allocate(bufferSize, increment);
       bufferList.add(buffer);
     }
     Preconditions.checkArgument(bufferList.size() <= capacity);
