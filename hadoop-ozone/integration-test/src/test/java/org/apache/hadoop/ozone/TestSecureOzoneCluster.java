@@ -213,7 +213,7 @@ public final class TestSecureOzoneCluster {
     SCMHTTPServerConfig httpServerConfig =
           conf.getObject(SCMHTTPServerConfig.class);
     createPrincipal(scmKeytab, scmConfig.getKerberosPrincipal());
-    createPrincipal(spnegoKeytab, httpServerConfig.getKerberosKeytab());
+    createPrincipal(spnegoKeytab, httpServerConfig.getKerberosPrincipal());
     createPrincipal(testUserKeytab, testUserPrincipal);
     createPrincipal(omKeyTab,
         conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY));
