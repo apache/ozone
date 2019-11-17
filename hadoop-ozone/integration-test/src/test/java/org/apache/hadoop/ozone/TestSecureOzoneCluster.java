@@ -209,10 +209,11 @@ public final class TestSecureOzoneCluster {
                                       MiniKdc kdc) throws Exception {
     OzoneConfiguration ozoneConfiguration =
           new OzoneConfiguration(configuration);
+    ScmConfig scmConfig = ozoneConfiguration.getObject(ScmConfig.class);
     SCMHTTPServerConfig httpServerConfig =
           ozoneConfiguration.getObject(SCMHTTPServerConfig.class);
     createPrincipal(scmKeytab,
-        httpServerConfig.getKerberosPrincipal());
+        scmConfig.getKerberosPrincipal());
     createPrincipal(spnegoKeytab,
         httpServerConfig.getKerberosKeytab());
     createPrincipal(testUserKeytab, testUserPrincipal);
