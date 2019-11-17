@@ -541,9 +541,10 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String copyHeader;
-      OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo;
-      try (OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
-          key, length, partNumber, uploadID)) {
+      OzoneOutputStream ozoneOutputStream = null;
+      try {
+        ozoneOutputStream = ozoneBucket.createMultipartKey(
+            key, length, partNumber, uploadID);
         copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
         if (copyHeader != null) {
           Pair<String, String> result = parseSourceHeader(copyHeader);
@@ -570,9 +571,12 @@ public class ObjectEndpoint extends EndpointBase {
         } else {
           IOUtils.copy(body, ozoneOutputStream);
         }
-        omMultipartCommitUploadPartInfo = ozoneOutputStream
-            .getCommitUploadPartInfo();
+      } finally {
+        IOUtils.closeQuietly(ozoneOutputStream);
       }
+
+      OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
+          ozoneOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
       if (copyHeader != null) {
