@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm.client;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -57,7 +59,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -78,22 +79,20 @@ public final class HddsClientUtils {
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsClientUtils.class);
 
-  private static final int NO_PORT = -1;
-
   private HddsClientUtils() {
   }
 
   private static final List<Class<? extends Exception>> EXCEPTION_LIST =
-      new ArrayList<Class<? extends Exception>>() {{
-        add(TimeoutException.class);
-        add(StorageContainerException.class);
-        add(RaftRetryFailureException.class);
-        add(AlreadyClosedException.class);
-        add(GroupMismatchException.class);
-        // Not Replicated Exception will be thrown if watch For commit
-        // does not succeed
-        add(NotReplicatedException.class);
-      }};
+      ImmutableList.<Class<? extends Exception>>builder()
+          .add(TimeoutException.class)
+          .add(StorageContainerException.class)
+          .add(RaftRetryFailureException.class)
+          .add(AlreadyClosedException.class)
+          .add(GroupMismatchException.class)
+          // Not Replicated Exception will be thrown if watch For commit
+          // does not succeed
+          .add(NotReplicatedException.class)
+          .build();
 
   /**
    * Date format that used in ozone. Here the format is thread safe to use.
