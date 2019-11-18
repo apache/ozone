@@ -645,6 +645,8 @@ public class KeyManagerImpl implements KeyManager {
           });
         }
       }
+      // Refresh container pipeline info from SCM
+      // based on OmKeyArgs.refreshPipeline flag
       if (args.getRefreshPipeline()) {
         refreshPipeline(value);
       }
@@ -668,40 +670,27 @@ public class KeyManagerImpl implements KeyManager {
    * @param value OmKeyInfo
    */
   @VisibleForTesting
-  protected void refreshPipeline(OmKeyInfo value) {
-    // Refresh container pipeline info from SCM
-    // based on OmKeyArgs.refreshPipeline flag
-    // 1. Client send initial read request OmKeyArgs.refreshPipeline = false
-    // and uses the pipeline cached in OM to access datanode
-    // 2. If succeeded, done.
-    // 3. If failed due to pipeline does not exist or invalid pipeline state
-    //    exception, client should retry lookupKey with
-    //    OmKeyArgs.refreshPipeline = true
+  protected void refreshPipeline(OmKeyInfo value) throws  IOException {
     Map<Long, ContainerWithPipeline> containerWithPipelineMap = new HashMap<>();
     for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-      key.getLocationList().forEach(k -> {
+      for (OmKeyLocationInfo k : key.getLocationList()) {
         // TODO: fix Some tests that may not initialize container client
         // The production should always have containerClient initialized.
         if (scmClient.getContainerClient() != null) {
-          ContainerWithPipeline cp = containerWithPipelineMap
-              .computeIfAbsent(k.getContainerID(), cId -> {
-                try {
-                  return scmClient.getContainerClient()
-                      .getContainerWithPipeline(cId);
-                } catch (IOException e) {
-                  LOG.error("Unable to update pipeline for container:{}",
-                      k.getContainerID());
-                  return null;
-                }
-              });
-          if (cp == null) {
-            return;
+          if (containerWithPipelineMap.containsKey(k.getContainerID())) {
+            ContainerWithPipeline containerWithPipeline = scmClient
+                .getContainerClient()
+                .getContainerWithPipeline(k.getContainerID());
+            containerWithPipelineMap.put(k.getContainerID(),
+                containerWithPipeline);
           }
+          ContainerWithPipeline cp =
+              containerWithPipelineMap.get(k.getContainerID());
           if (!cp.getPipeline().equals(k.getPipeline())) {
             k.setPipeline(cp.getPipeline());
           }
         }
-      });
+      }
     }
   }
 
