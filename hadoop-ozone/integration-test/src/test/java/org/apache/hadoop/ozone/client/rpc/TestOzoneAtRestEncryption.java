@@ -231,10 +231,11 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
 
     //Step 2
     String keyName = UUID.randomUUID().toString();
-
+    Map<String, String> keyMetadata = new HashMap<>();
+    keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes("UTF-8").length, ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, new HashMap<>())) {
+        ReplicationFactor.ONE, keyMetadata)) {
       out.write(value.getBytes("UTF-8"));
     }
 
@@ -256,11 +257,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     Assert.assertTrue(key.getCreationTime() >= currentTime);
     Assert.assertTrue(key.getModificationTime() >= currentTime);
     Assert.assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
-    //As TDE is enabled, the GDPR encryption will be skipped and only TDE
-    // will take place. So the GDPR encryption details should be null in the
-    // metadata and the TDE encryption details should not be null.
-    Assert.assertNull(key.getMetadata().get(OzoneConsts.GDPR_ALGORITHM));
-    Assert.assertNull(key.getMetadata().get(OzoneConsts.GDPR_SECRET));
+    //As TDE is enabled, the TDE encryption details should not be null.
     Assert.assertNotNull(key.getFileEncryptionInfo());
 
     //Step 3
