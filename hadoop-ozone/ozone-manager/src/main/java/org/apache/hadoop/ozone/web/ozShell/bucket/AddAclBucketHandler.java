@@ -70,7 +70,8 @@ public class AddAclBucketHandler extends Handler {
     Objects.requireNonNull(acl, "New acl to be added not specified.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
-    try (OzoneClient client = address.createClient(createOzoneConfiguration())) {
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();

@@ -58,7 +58,8 @@ public class CreateBucketHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
-    try (OzoneClient client = address.createClient(createOzoneConfiguration())) {
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
@@ -79,8 +80,8 @@ public class CreateBucketHandler extends Handler {
         if (!bekName.isEmpty()) {
           bb.setBucketEncryptionKey(bekName);
         } else {
-          throw new IllegalArgumentException("Bucket encryption key name must " +
-                  "be specified to enable bucket encryption!");
+          throw new IllegalArgumentException("Bucket encryption key name must" +
+              " " + "be specified to enable bucket encryption!");
         }
       }
 
