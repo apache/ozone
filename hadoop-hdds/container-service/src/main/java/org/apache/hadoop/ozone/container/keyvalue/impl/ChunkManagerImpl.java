@@ -229,15 +229,12 @@ public class ChunkManagerImpl implements ChunkManager {
         possibleFiles.add(finalChunkFile);
       }
 
-      boolean found = false;
-
       for (File chunkFile : possibleFiles) {
         try {
           data = ChunkUtils.readData(chunkFile, info, volumeIOStats);
           containerData.incrReadCount();
-          long length = chunkFile.length();
+          long length = info.getLen();
           containerData.incrReadBytes(length);
-          found = true;
           return data;
         } catch (StorageContainerException ex) {
           //UNABLE TO FIND chunk is not a problem as we will try with the
