@@ -34,12 +34,11 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
+    .PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -181,10 +180,10 @@ public class TestSCMPipelineManager {
     Assert.assertFalse(
         pipelineManager.getPipeline(pipeline.getId()).isHealthy());
     // get pipeline report from each dn in the pipeline
-    nodes.subList(0, 2).forEach(dn ->
-        sendPipelineReport(dn, pipeline, pipelineReportHandler, false));
+    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
+        pipelineReportHandler, false, eventQueue));
     sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
-        pipelineReportHandler, true);
+        pipelineReportHandler, true, eventQueue);
 
     // pipeline is healthy when all dns report
     Assert
@@ -196,13 +195,11 @@ public class TestSCMPipelineManager {
     // close the pipeline
     pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
 
-    for (DatanodeDetails dn: pipeline.getNodes()) {
-      PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
-      // pipeline report for destroyed pipeline should be ignored
-      pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
-    }
+    // pipeline report for destroyed pipeline should be ignored
+    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
+        pipelineReportHandler, false, eventQueue));
+    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
+        pipelineReportHandler, true, eventQueue);
 
     try {
       pipelineManager.getPipeline(pipeline.getId());
@@ -357,16 +354,16 @@ public class TestSCMPipelineManager {
     List<DatanodeDetails> nodes = pipeline.getNodes();
     Assert.assertEquals(3, nodes.size());
     // Send report for all but no leader
-    nodes.forEach(dn ->
-        sendPipelineReport(dn, pipeline, pipelineReportHandler, false));
+    nodes.forEach(dn -> sendPipelineReport(dn, pipeline, pipelineReportHandler,
+        false, eventQueue));
 
     Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
-    nodes.subList(0, 2).forEach(dn ->
-        sendPipelineReport(dn, pipeline, pipelineReportHandler, false));
+    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
+        pipelineReportHandler, false, eventQueue));
     sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
-        pipelineReportHandler, true);
+        pipelineReportHandler, true, eventQueue);
 
     Assert.assertEquals(Pipeline.PipelineState.OPEN,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
@@ -376,16 +373,9 @@ public class TestSCMPipelineManager {
 
   private void sendPipelineReport(DatanodeDetails dn,
       Pipeline pipeline, PipelineReportHandler pipelineReportHandler,
-      boolean isLeader) {
-
-    PipelineReportsProto.Builder reportProtoBuilder =
-        PipelineReportsProto.newBuilder();
-    PipelineReport.Builder reportBuilder = PipelineReport.newBuilder();
-    reportBuilder.setPipelineID(pipeline.getId().getProtobuf());
-    reportBuilder.setIsLeader(isLeader);
-
-    pipelineReportHandler.onMessage(new PipelineReportFromDatanode(dn,
-        reportProtoBuilder.addPipelineReport(
-            reportBuilder.build()).build()), new EventQueue());
+      boolean isLeader, EventQueue eventQueue) {
+    PipelineReportFromDatanode report =
+        TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId(), isLeader);
+    pipelineReportHandler.onMessage(report, eventQueue);
   }
 }

@@ -362,6 +362,15 @@ public final class TestUtils {
     return new PipelineReportFromDatanode(dn, reportBuilder.build());
   }
 
+  public static PipelineReportFromDatanode getPipelineReportFromDatanode(
+      DatanodeDetails dn, PipelineID pipelineID, boolean isLeader) {
+    PipelineReportsProto.Builder reportBuilder =
+        PipelineReportsProto.newBuilder();
+    reportBuilder.addPipelineReport(PipelineReport.newBuilder()
+        .setPipelineID(pipelineID.getProtobuf()).setIsLeader(isLeader));
+    return new PipelineReportFromDatanode(dn, reportBuilder.build());
+  }
+
   public static void openAllRatisPipelines(PipelineManager pipelineManager)
       throws IOException {
     // Pipeline is created by background thread
