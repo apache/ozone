@@ -523,7 +523,6 @@ public class BlockOutputStream extends OutputStream {
       }
       ContainerProtocolCalls.validateContainerResponse(responseProto);
     } catch (StorageContainerException sce) {
-      LOG.error("Unexpected Storage Container Exception: ", sce);
       setIoException(sce);
       throw sce;
     }
@@ -531,10 +530,15 @@ public class BlockOutputStream extends OutputStream {
 
 
   private void setIoException(Exception e) {
-    if (getIoException() == null) {
+    IOException ioe = getIoException();
+    if (ioe == null) {
       IOException exception =  new IOException(
           "Unexpected Storage Container Exception: " + e.toString(), e);
       ioException.compareAndSet(null, exception);
+    } else {
+      LOG.debug("Previous request had already failed with " + ioe.toString()
+          + " so subsequent request also encounters"
+          + " Storage Container Exception ", e);
     }
   }
 
