@@ -220,12 +220,11 @@ public class ChunkManagerImpl implements ChunkManager {
         .getLatestVersion().getVersion()) {
 
       File finalChunkFile = ChunkUtils.getChunkFile(containerData, info);
-      File tmpChunkFile = getTmpChunkFile(finalChunkFile, dispatcherContext);
 
       List<File> possibleFiles = new ArrayList<>();
       possibleFiles.add(finalChunkFile);
-      if (dispatcherContext.isReadFromTmpFile()) {
-        possibleFiles.add(tmpChunkFile);
+      if (dispatcherContext != null && dispatcherContext.isReadFromTmpFile()) {
+        possibleFiles.add(getTmpChunkFile(finalChunkFile, dispatcherContext));
         possibleFiles.add(finalChunkFile);
       }
 
