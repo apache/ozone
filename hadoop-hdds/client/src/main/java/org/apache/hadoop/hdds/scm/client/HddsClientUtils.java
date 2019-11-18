@@ -294,13 +294,11 @@ public final class HddsClientUtils {
         RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
     InetSocketAddress scmSecurityProtoAdd =
         HddsUtils.getScmAddressForSecurityProtocol(conf);
-    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
-        new SCMSecurityProtocolClientSideTranslatorPB(
-            RPC.getProxy(SCMSecurityProtocolPB.class, scmVersion,
-                scmSecurityProtoAdd, ugi, conf,
-                NetUtils.getDefaultSocketFactory(conf),
-                Client.getRpcTimeout(conf)));
-    return scmSecurityClient;
+    return new SCMSecurityProtocolClientSideTranslatorPB(
+        RPC.getProxy(SCMSecurityProtocolPB.class, scmVersion,
+            scmSecurityProtoAdd, ugi, conf,
+            NetUtils.getDefaultSocketFactory(conf),
+            Client.getRpcTimeout(conf)));
   }
 
   // This will return the underlying exception after unwrapping
