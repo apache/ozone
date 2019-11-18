@@ -158,6 +158,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setScmCloseContainerResponse(closeContainer(
                 request.getScmCloseContainerRequest()))
             .build();
+      case DeleteContainer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setScmDeleteContainerResponse(deleteContainer(
+                request.getScmDeleteContainerRequest()))
+            .build();
       case ListPipelines:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
