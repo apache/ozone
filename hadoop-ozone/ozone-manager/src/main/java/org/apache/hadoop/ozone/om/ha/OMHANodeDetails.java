@@ -96,9 +96,9 @@ public class OMHANodeDetails {
 
     Collection<String> omServiceIds;
 
-    String omServiceId = conf.getTrimmed(OZONE_OM_INTERNAL_SERVICE_ID);
+    localOMServiceId = conf.getTrimmed(OZONE_OM_INTERNAL_SERVICE_ID);
 
-    if (omServiceId == null) {
+    if (localOMServiceId == null) {
       // There is no internal om service id is being set, fall back to ozone
       // .om.service.ids.
       LOG.info(OZONE_OM_INTERNAL_SERVICE_ID + " is not defined, falling back " +
@@ -107,8 +107,8 @@ public class OMHANodeDetails {
       omServiceIds = conf.getTrimmedStringCollection(
           OZONE_OM_SERVICE_IDS_KEY);
     } else {
-      LOG.info("ServiceID for OzoneManager is {}", omServiceId);
-      omServiceIds = Collections.singletonList(omServiceId);
+      LOG.info("ServiceID for OzoneManager is {}", localOMServiceId);
+      omServiceIds = Collections.singletonList(localOMServiceId);
     }
 
     String knownOMNodeId = conf.get(OZONE_OM_NODE_ID_KEY);
