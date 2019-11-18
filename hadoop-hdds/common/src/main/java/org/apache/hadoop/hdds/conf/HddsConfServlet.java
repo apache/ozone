@@ -172,7 +172,7 @@ public class HddsConfServlet extends HttpServlet {
           propMap.put(tag, properties);
         } else {
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Not a valid tag" + tag);
+            LOG.debug("Not a valid tag {}", tag);
           }
         }
       }
