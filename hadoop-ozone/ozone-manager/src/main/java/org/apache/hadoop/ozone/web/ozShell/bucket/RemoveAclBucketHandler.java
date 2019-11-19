@@ -70,34 +70,35 @@ public class RemoveAclBucketHandler extends Handler {
     Objects.requireNonNull(acl, "ACL to be removed not specified.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+      }
+
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setBucketName(bucketName)
+          .setVolumeName(volumeName)
+          .setResType(OzoneObj.ResourceType.BUCKET)
+          .setStoreType(storeType == null ? OZONE :
+              OzoneObj.StoreType.valueOf(storeType))
+          .build();
+
+      boolean result = client.getObjectStore().removeAcl(obj,
+          OzoneAcl.parseAcl(acl));
+
+      String message = result
+          ? ("Acl removed successfully.")
+          : ("Acl doesn't exist.");
+
+      System.out.println(message);
     }
 
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(storeType == null ? OZONE :
-            OzoneObj.StoreType.valueOf(storeType))
-        .build();
-
-    boolean result = client.getObjectStore().removeAcl(obj,
-        OzoneAcl.parseAcl(acl));
-
-    String message = result
-        ? ("Acl removed successfully.")
-        : ("Acl doesn't exist.");
-
-    System.out.println(message);
-
-    client.close();
     return null;
   }
 

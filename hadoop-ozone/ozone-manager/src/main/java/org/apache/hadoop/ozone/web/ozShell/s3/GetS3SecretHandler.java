@@ -41,19 +41,20 @@ public class GetS3SecretHandler extends Handler {
   @Override
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    OzoneClient client =
-        new OzoneAddress().createClient(ozoneConfiguration);
+    try (OzoneClient client =
+        new OzoneAddress().createClient(ozoneConfiguration)) {
 
-    // getS3Secret works only with secured clusters
-    if (ozoneConfiguration.getBoolean(OZONE_SECURITY_ENABLED_KEY, false)) {
-      System.out.println(
-          client.getObjectStore().getS3Secret(
-              UserGroupInformation.getCurrentUser().getUserName()
-          ).toString()
-      );
-    } else {
-      // log a warning message for unsecured cluster
-      System.out.println(OZONE_GETS3SECRET_ERROR);
+      // getS3Secret works only with secured clusters
+      if (ozoneConfiguration.getBoolean(OZONE_SECURITY_ENABLED_KEY, false)) {
+        System.out.println(
+            client.getObjectStore().getS3Secret(
+                UserGroupInformation.getCurrentUser().getUserName()
+            ).toString()
+        );
+      } else {
+        // log a warning message for unsecured cluster
+        System.out.println(OZONE_GETS3SECRET_ERROR);
+      }
     }
 
     return null;
