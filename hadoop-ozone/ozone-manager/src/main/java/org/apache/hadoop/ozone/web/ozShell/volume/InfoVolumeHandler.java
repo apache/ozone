@@ -46,12 +46,15 @@ public class InfoVolumeHandler extends Handler{
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
+      String volumeName = address.getVolumeName();
 
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    ObjectPrinter.printObjectAsJson(vol);
+      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+      ObjectPrinter.printObjectAsJson(vol);
+    }
+
     return null;
   }
 

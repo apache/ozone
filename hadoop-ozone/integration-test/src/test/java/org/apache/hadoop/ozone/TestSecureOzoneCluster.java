@@ -167,6 +167,16 @@ public final class TestSecureOzoneCluster {
               ServerSocketUtil.getPort(ScmConfigKeys
                       .OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, 100));
 
+      conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, "OMMarketingCluster001");
+      conf.set(OMConfigKeys.OZONE_OM_NODES_KEY+".OMMarketingCluster001",
+               "node1,node2,node3");
+      conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY+".OMMarketingCluster001.node1",
+          "localhost:9862");
+      conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY+".OMMarketingCluster001.node2",
+          "google.com:9863");
+      conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY+".OMMarketingCluster001.node3",
+               "yahoo.com:9864");
+
       DefaultMetricsSystem.setMiniClusterMode(true);
       final String path = folder.newFolder().toString();
       metaDirPath = Paths.get(path, "om-meta");

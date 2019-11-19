@@ -28,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -212,7 +213,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
 
   @VisibleForTesting
-  public ConcurrentHashMap<UUID, Long> getCommitInfoMap() {
+  public ConcurrentMap<UUID, Long> getCommitInfoMap() {
     return commitInfoMap;
   }
 

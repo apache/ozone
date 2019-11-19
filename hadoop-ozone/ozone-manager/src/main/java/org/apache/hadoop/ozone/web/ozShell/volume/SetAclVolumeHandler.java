@@ -70,34 +70,35 @@ public class SetAclVolumeHandler extends Handler {
     Objects.requireNonNull(acls, "New acls to be added not specified.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+      }
+
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setBucketName(bucketName)
+          .setVolumeName(volumeName)
+          .setResType(OzoneObj.ResourceType.VOLUME)
+          .setStoreType(storeType == null ? OZONE :
+              OzoneObj.StoreType.valueOf(storeType))
+          .build();
+
+      boolean result = client.getObjectStore().setAcl(obj,
+          OzoneAcl.parseAcls(acls));
+
+      String message = result
+          ? ("Acl set successfully.")
+          : ("Acl already set.");
+
+      System.out.println(message);
     }
 
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setResType(OzoneObj.ResourceType.VOLUME)
-        .setStoreType(storeType == null ? OZONE :
-            OzoneObj.StoreType.valueOf(storeType))
-        .build();
-
-    boolean result = client.getObjectStore().setAcl(obj,
-        OzoneAcl.parseAcls(acls));
-
-    String message = result
-        ? ("Acl set successfully.")
-        : ("Acl already set.");
-
-    System.out.println(message);
-
-    client.close();
     return null;
   }
 

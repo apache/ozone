@@ -46,22 +46,25 @@ public class DeleteKeyHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureKeyAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
-    String keyName = address.getKeyName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
+      String keyName = address.getKeyName();
 
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
-      System.out.printf("Key Name : %s%n", keyName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+        System.out.printf("Key Name : %s%n", keyName);
+      }
+
+      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+      OzoneBucket bucket = vol.getBucket(bucketName);
+      bucket.deleteKey(keyName);
     }
 
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket = vol.getBucket(bucketName);
-    bucket.deleteKey(keyName);
     return null;
   }
 }

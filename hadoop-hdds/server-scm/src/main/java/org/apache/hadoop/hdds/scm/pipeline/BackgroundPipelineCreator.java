@@ -26,7 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -42,7 +41,6 @@ class BackgroundPipelineCreator {
   private final AtomicBoolean isPipelineCreatorRunning;
   private final PipelineManager pipelineManager;
   private final Configuration conf;
-  private ScheduledFuture<?> periodicTask;
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
       Scheduler scheduler, Configuration conf) {
@@ -59,16 +57,13 @@ class BackgroundPipelineCreator {
   /**
    * Schedules a fixed interval job to create pipelines.
    */
-  synchronized void startFixedIntervalPipelineCreator() {
-    if (periodicTask != null) {
-      return;
-    }
+  void startFixedIntervalPipelineCreator() {
     long intervalInMillis = conf
         .getTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
             ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
     // TODO: #CLUTIL We can start the job asap
-    periodicTask = scheduler.scheduleWithFixedDelay(() -> {
+    scheduler.scheduleWithFixedDelay(() -> {
       if (!shouldSchedulePipelineCreator()) {
         return;
       }

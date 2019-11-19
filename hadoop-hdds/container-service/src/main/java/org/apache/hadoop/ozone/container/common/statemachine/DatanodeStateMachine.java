@@ -39,11 +39,7 @@ import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .CloseContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
-    .ClosePipelineCommandHandler;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .CommandDispatcher;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
-    .CreatePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
@@ -134,9 +130,8 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
             conf))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
-        .addHandler(new DeleteContainerCommandHandler())
-        .addHandler(new ClosePipelineCommandHandler())
-        .addHandler(new CreatePipelineCommandHandler())
+        .addHandler(new DeleteContainerCommandHandler(
+            dnConf.getContainerDeleteThreads()))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -283,6 +278,10 @@ public class DatanodeStateMachine implements Closeable {
 
     if (jvmPauseMonitor != null) {
       jvmPauseMonitor.stop();
+    }
+
+    if (commandDispatcher != null) {
+      commandDispatcher.stop();
     }
   }
 

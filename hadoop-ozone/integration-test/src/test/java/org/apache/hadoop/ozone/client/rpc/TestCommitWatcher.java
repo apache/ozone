@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -44,7 +45,6 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -140,7 +140,7 @@ public class TestCommitWatcher {
     XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
     CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient, 10000);
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
-    List<ByteBuffer> bufferList = new ArrayList<>();
+    final List<ChunkBuffer> bufferList = new ArrayList<>();
     List<XceiverClientReply> replies = new ArrayList<>();
     long length = 0;
     List<CompletableFuture<ContainerProtos.ContainerCommandResponseProto>>
@@ -151,8 +151,8 @@ public class TestCommitWatcher {
           ContainerTestHelper
               .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
       // add the data to the buffer pool
-      ByteBuffer byteBuffer = bufferPool.allocateBufferIfNeeded().put(
-          writeChunkRequest.getWriteChunk().getData().asReadOnlyByteBuffer());
+      final ChunkBuffer byteBuffer = bufferPool.allocateBufferIfNeeded();
+      byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
       ratisClient.sendCommandAsync(writeChunkRequest);
       ContainerProtos.ContainerCommandRequestProto putBlockRequest =
           ContainerTestHelper
@@ -216,7 +216,7 @@ public class TestCommitWatcher {
     XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
     CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient, 10000);
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
-    List<ByteBuffer> bufferList = new ArrayList<>();
+    final List<ChunkBuffer> bufferList = new ArrayList<>();
     List<XceiverClientReply> replies = new ArrayList<>();
     long length = 0;
     List<CompletableFuture<ContainerProtos.ContainerCommandResponseProto>>
@@ -227,8 +227,8 @@ public class TestCommitWatcher {
           ContainerTestHelper
               .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
       // add the data to the buffer pool
-      ByteBuffer byteBuffer = bufferPool.allocateBufferIfNeeded().put(
-          writeChunkRequest.getWriteChunk().getData().asReadOnlyByteBuffer());
+      final ChunkBuffer byteBuffer = bufferPool.allocateBufferIfNeeded();
+      byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
       ratisClient.sendCommandAsync(writeChunkRequest);
       ContainerProtos.ContainerCommandRequestProto putBlockRequest =
           ContainerTestHelper

@@ -109,6 +109,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KEYS_MAX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -144,6 +146,7 @@ public class KeyManagerImpl implements KeyManager {
   private final boolean useRatis;
 
   private final int preallocateBlocksMax;
+  private final int listTrashKeysMax;
   private final String omId;
   private final OzoneBlockTokenSecretManager secretManager;
   private final boolean grpcBlockTokenEnabled;
@@ -184,6 +187,9 @@ public class KeyManagerImpl implements KeyManager {
     this.grpcBlockTokenEnabled = conf.getBoolean(
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+    this.listTrashKeysMax = conf.getInt(
+      OZONE_CLIENT_LIST_TRASH_KEYS_MAX,
+      OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT);
 
     this.ozoneManager = om;
     this.omId = omId;
@@ -825,6 +831,21 @@ public class KeyManagerImpl implements KeyManager {
     // when we iterate.
     return metadataManager.listKeys(volumeName, bucketName,
         startKey, keyPrefix, maxKeys);
+  }
+
+  @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName,
+      String bucketName, String startKeyName, String keyPrefix,
+      int maxKeys) throws IOException {
+
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+    Preconditions.checkArgument(maxKeys < listTrashKeysMax,
+        "The max keys limit specified is not less than the cluster " +
+          "allowed limit.");
+
+    return metadataManager.listTrash(volumeName, bucketName,
+     startKeyName, keyPrefix, maxKeys);
   }
 
   @Override

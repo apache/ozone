@@ -71,7 +71,6 @@ import java.util.concurrent.TimeoutException;
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
   static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
-  private static final String COMPONENT = "dn";
   private final Pipeline pipeline;
   private final Configuration config;
   private Map<UUID, XceiverClientProtocolServiceStub> asyncStubs;
@@ -135,7 +134,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     DatanodeDetails dn = topologyAwareRead ? this.pipeline.getClosestNode() :
         this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning
-    connectToDatanode(dn, null);
+    connectToDatanode(dn);
   }
 
   /**
@@ -148,11 +147,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     DatanodeDetails dn = topologyAwareRead ? this.pipeline.getClosestNode() :
         this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning
-    connectToDatanode(dn, encodedToken);
+    connectToDatanode(dn);
   }
 
-  private synchronized void connectToDatanode(DatanodeDetails dn,
-      String encodedToken) throws IOException {
+  private synchronized void connectToDatanode(DatanodeDetails dn)
+      throws IOException {
     if (isConnected(dn)){
       return;
     }
@@ -166,7 +165,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     // Add credential context to the client call
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Nodes in pipeline : {}", pipeline.getNodes().toString());
+      LOG.debug("Nodes in pipeline : {}", pipeline.getNodes());
       LOG.debug("Connecting to server : {}", dn.getIpAddress());
     }
     NettyChannelBuilder channelBuilder =
@@ -230,9 +229,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request) throws IOException {
     try {
-      XceiverClientReply reply;
-      reply = sendCommandWithTraceIDAndRetry(request, null);
-      return reply.getResponse().get();
+      return sendCommandWithTraceIDAndRetry(request, null).
+          getResponse().get();
     } catch (ExecutionException | InterruptedException e) {
       throw new IOException("Failed to execute command " + request, e);
     }
@@ -309,7 +307,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     for (DatanodeDetails dn : datanodeList) {
       try {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Executing command " + request + " on datanode " + dn);
+          LOG.debug("Executing command {} on datanode {}", request, dn);
         }
         // In case the command gets retried on a 2nd datanode,
         // sendCommandAsyncCall will create a new channel and async stub
@@ -400,7 +398,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
-          request.getCmdType().toString(), dn.getNetworkFullPath());
+          request.getCmdType(), dn.getNetworkFullPath());
     }
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
@@ -463,7 +461,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throws IOException {
     ManagedChannel channel;
     try {
-      connectToDatanode(dn, encodedToken);
+      connectToDatanode(dn);
       channel = channels.get(dn.getUuid());
     } catch (Exception e) {
       throw new IOException("Error while connecting", e);

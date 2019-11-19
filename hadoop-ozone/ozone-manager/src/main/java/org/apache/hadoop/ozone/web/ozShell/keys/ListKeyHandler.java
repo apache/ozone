@@ -65,43 +65,45 @@ public class ListKeyHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
 
-    if (maxKeys < 1) {
-      throw new IllegalArgumentException(
-          "the length should be a positive number");
-    }
+      if (maxKeys < 1) {
+        throw new IllegalArgumentException(
+            "the length should be a positive number");
+      }
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("bucket Name : %s%n", bucketName);
-    }
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("bucket Name : %s%n", bucketName);
+      }
 
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket = vol.getBucket(bucketName);
-    Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(prefix,
-        startKey);
+      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+      OzoneBucket bucket = vol.getBucket(bucketName);
+      Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(prefix,
+          startKey);
 
-    int maxKeyLimit = maxKeys;
+      int maxKeyLimit = maxKeys;
 
-    int counter = 0;
-    while (maxKeys > 0 && keyIterator.hasNext()) {
-      OzoneKey ozoneKey = keyIterator.next();
-      ObjectPrinter.printObjectAsJson(ozoneKey);
-      maxKeys -= 1;
-      counter++;
-    }
+      int counter = 0;
+      while (maxKeys > 0 && keyIterator.hasNext()) {
+        OzoneKey ozoneKey = keyIterator.next();
+        ObjectPrinter.printObjectAsJson(ozoneKey);
+        maxKeys -= 1;
+        counter++;
+      }
 
-    // More keys were returned notify about max length
-    if (keyIterator.hasNext()) {
-      System.out.println("Listing first " + maxKeyLimit + " entries of the " +
-          "result. Use --length (-l) to override max returned keys.");
-    } else if (isVerbose()) {
-      System.out.printf("Found : %d keys for bucket %s in volume : %s ",
-          counter, bucketName, volumeName);
+      // More keys were returned notify about max length
+      if (keyIterator.hasNext()) {
+        System.out.println("Listing first " + maxKeyLimit + " entries of the " +
+            "result. Use --length (-l) to override max returned keys.");
+      } else if (isVerbose()) {
+        System.out.printf("Found : %d keys for bucket %s in volume : %s ",
+            counter, bucketName, volumeName);
+      }
     }
 
     return null;
