@@ -95,10 +95,6 @@ public class TestRDBTableStore {
   }
 
   @Test
-  public void toIOException() {
-  }
-
-  @Test
   public void getHandle() throws Exception {
     try (Table testTable = rdbStore.getTable("First")) {
       Assert.assertNotNull(testTable);
