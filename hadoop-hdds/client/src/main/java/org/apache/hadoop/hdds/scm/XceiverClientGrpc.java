@@ -229,9 +229,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request) throws IOException {
     try {
-      XceiverClientReply reply;
-      reply = sendCommandWithTraceIDAndRetry(request, null);
-      return reply.getResponse().get();
+      return sendCommandWithTraceIDAndRetry(request, null).
+          getResponse().get();
     } catch (ExecutionException | InterruptedException e) {
       throw new IOException("Failed to execute command " + request, e);
     }
