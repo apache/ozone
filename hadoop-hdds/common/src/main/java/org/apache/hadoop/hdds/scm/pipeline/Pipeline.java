@@ -155,11 +155,6 @@ public final class Pipeline {
     return state == PipelineState.OPEN;
   }
 
-  public boolean isAllocationTimeout() {
-    //TODO: define a system property to control the timeout value
-    return false;
-  }
-
   public void setNodesInOrder(List<DatanodeDetails> nodes) {
     nodesInOrder.set(nodes);
   }
@@ -313,6 +308,7 @@ public final class Pipeline {
       this.state = pipeline.state;
       this.nodeStatus = pipeline.nodeStatus;
       this.nodesInOrder = pipeline.nodesInOrder.get();
+      this.leaderId = pipeline.getLeaderId();
     }
 
     public Builder setId(PipelineID id1) {

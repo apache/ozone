@@ -111,7 +111,7 @@ public class BufferPool {
   }
 
   public long computeBufferData() {
-    return bufferList.stream().mapToInt(value -> value.position())
+    return bufferList.stream().mapToInt(ChunkBuffer::position)
         .sum();
   }
 

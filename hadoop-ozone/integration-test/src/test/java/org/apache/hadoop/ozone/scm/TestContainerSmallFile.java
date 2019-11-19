@@ -61,7 +61,7 @@ public class TestContainerSmallFile {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, ContainerPlacementPolicy.class);
-    cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(3)
+    cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
     storageContainerLocationClient = cluster

@@ -66,32 +66,35 @@ public class CreateVolumeHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
+      String volumeName = address.getVolumeName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume name : %s%n", volumeName);
-    }
+      if (isVerbose()) {
+        System.out.printf("Volume name : %s%n", volumeName);
+      }
 
-    String rootName;
-    if (root) {
-      rootName = "hdfs";
-    } else {
-      rootName = UserGroupInformation.getCurrentUser().getShortUserName();
-    }
+      String rootName;
+      if (root) {
+        rootName = "hdfs";
+      } else {
+        rootName = UserGroupInformation.getCurrentUser().getShortUserName();
+      }
 
-    VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
-        .setAdmin(rootName)
-        .setOwner(userName);
-    if (quota != null) {
-      volumeArgsBuilder.setQuota(quota);
-    }
-    client.getObjectStore().createVolume(volumeName, volumeArgsBuilder.build());
+      VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
+          .setAdmin(rootName)
+          .setOwner(userName);
+      if (quota != null) {
+        volumeArgsBuilder.setQuota(quota);
+      }
+      client.getObjectStore().createVolume(volumeName,
+          volumeArgsBuilder.build());
 
-    if (isVerbose()) {
-      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-      ObjectPrinter.printObjectAsJson(vol);
+      if (isVerbose()) {
+        OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+        ObjectPrinter.printObjectAsJson(vol);
+      }
     }
     return null;
   }
