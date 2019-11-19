@@ -136,7 +136,7 @@ public class BlockOutputStream extends OutputStream {
       long watchTimeout, BufferPool bufferPool, ChecksumType checksumType,
       int bytesPerChecksum)
       throws IOException {
-    this.blockID.set(blockID);
+    this.blockID = new AtomicReference<>(blockID);
     this.chunkSize = chunkSize;
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
