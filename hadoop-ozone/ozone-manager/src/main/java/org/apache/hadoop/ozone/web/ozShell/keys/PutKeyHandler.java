@@ -116,7 +116,8 @@ public class PutKeyHandler extends Handler {
               replicationFactor, keyMetadata);
       FileInputStream fileInputStream = new FileInputStream(dataFile);
       IOUtils.copyBytes(fileInputStream, outputStream, (int) conf
-          .getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, OZONE_SCM_CHUNK_SIZE_DEFAULT,
+          .getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
+              OZONE_SCM_CHUNK_SIZE_DEFAULT,
               StorageUnit.BYTES));
       outputStream.close();
       fileInputStream.close();
