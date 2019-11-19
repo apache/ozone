@@ -145,7 +145,7 @@ public class TestContainerReplication {
     //wait for the replication
     GenericTestUtils.waitFor(()
         -> destinationDatanodeDatanodeStateMachine.getSupervisor()
-        .getReplicationCounter() > 0, 1000, 20_000);
+        .getReplicationRequestCount() > 0, 1000, 20_000);
 
     OzoneContainer ozoneContainer =
         destinationDatanodeDatanodeStateMachine.getContainer();

@@ -360,6 +360,16 @@ public final class TestUtils {
     return new PipelineReportFromDatanode(dn, reportBuilder.build());
   }
 
+  public static PipelineReportFromDatanode getPipelineReportFromDatanode(
+      DatanodeDetails dn, PipelineID pipelineID, boolean isLeader) {
+    PipelineReportsProto.Builder reportBuilder =
+        PipelineReportsProto.newBuilder();
+    reportBuilder.addPipelineReport(PipelineReport.newBuilder()
+        .setPipelineID(pipelineID.getProtobuf()).setIsLeader(isLeader));
+    return new PipelineReportFromDatanode(dn, reportBuilder.build());
+  }
+
+
   public static PipelineActionsFromDatanode getPipelineActionFromDatanode(
       DatanodeDetails dn, PipelineID... pipelineIDs) {
     PipelineActionsProto.Builder actionsProtoBuilder =

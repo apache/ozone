@@ -41,17 +41,17 @@ import java.util.function.BiFunction;
 public class TestContainerCommandRequestMessage {
   static final Random RANDOM = new Random();
 
-  static ByteString newData(int length, Random random) {
+  static ByteString newData(int length) {
     final ByteString.Output out = ByteString.newOutput();
     for(int i = 0; i < length; i++) {
-      out.write(random.nextInt());
+      out.write(RANDOM.nextInt());
     }
     return out.toByteString();
   }
 
   static ChecksumData checksum(ByteString data) {
     try {
-      return new Checksum().computeChecksum(data.toByteArray());
+      return new Checksum().computeChecksum(data.asReadOnlyByteBuffer());
     } catch (OzoneChecksumException e) {
       throw new IllegalStateException(e);
     }
@@ -140,7 +140,7 @@ public class TestContainerCommandRequestMessage {
       throws Exception {
     System.out.println("length=" + length);
     final BlockID blockID = new BlockID(RANDOM.nextLong(), RANDOM.nextLong());
-    final ByteString data = newData(length, RANDOM);
+    final ByteString data = newData(length);
 
     final ContainerCommandRequestProto original = method.apply(blockID, data);
     final ContainerCommandRequestMessage message

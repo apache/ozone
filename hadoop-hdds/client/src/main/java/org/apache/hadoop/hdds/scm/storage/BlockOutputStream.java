@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -40,7 +41,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
@@ -76,7 +76,7 @@ public class BlockOutputStream extends OutputStream {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStream.class);
 
-  private volatile BlockID blockID;
+  private AtomicReference<BlockID> blockID;
 
   private final BlockData.Builder containerBlockData;
   private XceiverClientManager xceiverClientManager;
@@ -87,7 +87,7 @@ public class BlockOutputStream extends OutputStream {
   private int chunkSize;
   private final long streamBufferFlushSize;
   private final long streamBufferMaxSize;
-  private BufferPool bufferPool;
+  private final BufferPool bufferPool;
   // The IOException will be set by response handling thread in case there is an
   // exception received in the response. If the exception is set, the next
   // request will fail upfront.
@@ -106,7 +106,7 @@ public class BlockOutputStream extends OutputStream {
   // when the watchForCommit acknowledges a putBlock logIndex has been
   // committed on all datanodes. This list will be a  place holder for buffers
   // which got written between successive putBlock calls.
-  private List<ByteBuffer> bufferList;
+  private List<ChunkBuffer> bufferList;
 
   // This object will maintain the commitIndexes and byteBufferList in order
   // Also, corresponding to the logIndex, the corresponding list of buffers will
@@ -136,7 +136,7 @@ public class BlockOutputStream extends OutputStream {
       long watchTimeout, BufferPool bufferPool, ChecksumType checksumType,
       int bytesPerChecksum)
       throws IOException {
-    this.blockID = blockID;
+    this.blockID = new AtomicReference<>(blockID);
     this.chunkSize = chunkSize;
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
@@ -164,7 +164,7 @@ public class BlockOutputStream extends OutputStream {
 
 
   public BlockID getBlockID() {
-    return blockID;
+    return blockID.get();
   }
 
   public long getTotalAckDataLength() {
@@ -199,7 +199,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   @VisibleForTesting
-  public Map<Long, List<ByteBuffer>> getCommitIndex2flushedDataMap() {
+  public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
     return commitWatcher.getCommitIndex2flushedDataMap();
   }
 
@@ -230,7 +230,7 @@ public class BlockOutputStream extends OutputStream {
       // Allocate a buffer if needed. The buffer will be allocated only
       // once as needed and will be reused again for multiple blockOutputStream
       // entries.
-      ByteBuffer  currentBuffer = bufferPool.allocateBufferIfNeeded();
+      final ChunkBuffer currentBuffer = bufferPool.allocateBufferIfNeeded();
       int pos = currentBuffer.position();
       writeLen =
           Math.min(chunkSize - pos % chunkSize, len);
@@ -366,7 +366,7 @@ public class BlockOutputStream extends OutputStream {
     checkOpen();
     long flushPos = totalDataFlushedLength;
     Preconditions.checkNotNull(bufferList);
-    List<ByteBuffer> byteBufferList = bufferList;
+    final List<ChunkBuffer> byteBufferList = bufferList;
     bufferList = null;
     Preconditions.checkNotNull(byteBufferList);
 
@@ -387,10 +387,10 @@ public class BlockOutputStream extends OutputStream {
         if (getIoException() == null) {
           BlockID responseBlockID = BlockID.getFromProtobuf(
               e.getPutBlock().getCommittedBlockLength().getBlockID());
-          Preconditions.checkState(blockID.getContainerBlockID()
+          Preconditions.checkState(blockID.get().getContainerBlockID()
               .equals(responseBlockID.getContainerBlockID()));
           // updates the bcsId of the block
-          blockID = responseBlockID;
+          blockID.set(responseBlockID);
           if (LOG.isDebugEnabled()) {
             LOG.debug(
                 "Adding index " + asyncReply.getLogIndex() + " commitMap size "
@@ -440,7 +440,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
 
-  private void writeChunk(ByteBuffer buffer)
+  private void writeChunk(ChunkBuffer buffer)
       throws IOException {
     // This data in the buffer will be pushed to datanode and a reference will
     // be added to the bufferList. Once putBlock gets executed, this list will
@@ -451,15 +451,7 @@ public class BlockOutputStream extends OutputStream {
       bufferList = new ArrayList<>();
     }
     bufferList.add(buffer);
-    // Please note : We are not flipping the slice when we write since
-    // the slices are pointing the currentBuffer start and end as needed for
-    // the chunk write. Also please note, Duplicate does not create a
-    // copy of data, it only creates metadata that points to the data
-    // stream.
-    ByteBuffer chunk = buffer.duplicate();
-    chunk.position(0);
-    chunk.limit(buffer.position());
-    writeChunkToContainer(chunk);
+    writeChunkToContainer(buffer.duplicate(0, buffer.position()));
   }
 
   private void handleFlush()
@@ -467,7 +459,7 @@ public class BlockOutputStream extends OutputStream {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
     if (totalDataFlushedLength < writtenDataLength) {
-      ByteBuffer currentBuffer = bufferPool.getCurrentBuffer();
+      final ChunkBuffer currentBuffer = bufferPool.getCurrentBuffer();
       Preconditions.checkArgument(currentBuffer.position() > 0);
       if (currentBuffer.position() != chunkSize) {
         writeChunk(currentBuffer);
@@ -531,7 +523,6 @@ public class BlockOutputStream extends OutputStream {
       }
       ContainerProtocolCalls.validateContainerResponse(responseProto);
     } catch (StorageContainerException sce) {
-      LOG.error("Unexpected Storage Container Exception: ", sce);
       setIoException(sce);
       throw sce;
     }
@@ -539,10 +530,15 @@ public class BlockOutputStream extends OutputStream {
 
 
   private void setIoException(Exception e) {
-    if (getIoException() == null) {
+    IOException ioe = getIoException();
+    if (ioe == null) {
       IOException exception =  new IOException(
           "Unexpected Storage Container Exception: " + e.toString(), e);
       ioException.compareAndSet(null, exception);
+    } else {
+      LOG.debug("Previous request had already failed with " + ioe.toString()
+          + " so subsequent request also encounters"
+          + " Storage Container Exception ", e);
     }
   }
 
@@ -587,13 +583,14 @@ public class BlockOutputStream extends OutputStream {
    * @throws OzoneChecksumException if there is an error while computing
    * checksum
    */
-  private void writeChunkToContainer(ByteBuffer chunk) throws IOException {
+  private void writeChunkToContainer(ChunkBuffer chunk) throws IOException {
     int effectiveChunkSize = chunk.remaining();
-    ByteString data = bufferPool.byteStringConversion().apply(chunk);
+    final ByteString data = chunk.toByteString(
+        bufferPool.byteStringConversion());
     Checksum checksum = new Checksum(checksumType, bytesPerChecksum);
     ChecksumData checksumData = checksum.computeChecksum(chunk);
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
-        .setChunkName(blockID.getLocalID() + "_chunk_" + ++chunkIndex)
+        .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(0)
         .setLen(effectiveChunkSize)
         .setChecksumData(checksumData.getProtoBufMessage())
@@ -601,7 +598,7 @@ public class BlockOutputStream extends OutputStream {
 
     try {
       XceiverClientReply asyncReply =
-          writeChunkAsync(xceiverClient, chunkInfo, blockID, data);
+          writeChunkAsync(xceiverClient, chunkInfo, blockID.get(), data);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       future.thenApplyAsync(e -> {

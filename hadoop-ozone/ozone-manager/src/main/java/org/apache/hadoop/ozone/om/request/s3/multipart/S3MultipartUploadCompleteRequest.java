@@ -184,8 +184,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
           if (partKeyInfo == null ||
               !partName.equals(partKeyInfo.getPartName())) {
+            String omPartName = partKeyInfo == null ? null :
+                partKeyInfo.getPartName();
             throw new OMException("Complete Multipart Upload Failed: volume: " +
-                volumeName + "bucket: " + bucketName + "key: " + keyName,
+                volumeName + "bucket: " + bucketName + "key: " + keyName +
+                ". Provided Part info is { " + partName + ", " + partNumber +
+                "}, where as OM has partName " + omPartName,
                 OMException.ResultCodes.INVALID_PART);
           }
 

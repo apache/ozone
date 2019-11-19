@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
@@ -47,10 +49,10 @@ public class KeyMetadata {
   private long dataSize;
 
   @XmlElement(name = "Versions")
-  private List<Long> versions;
+  private List<Long> versions = new ArrayList<>();
 
   @XmlElement(name = "Blocks")
-  private Map<Long, List<ContainerBlockMetadata>> blockIds;
+  private Map<Long, List<ContainerBlockMetadata>> blockIds = new TreeMap<>();
 
   @XmlJavaTypeAdapter(IsoDateAdapter.class)
   @XmlElement(name = "CreationTime")
