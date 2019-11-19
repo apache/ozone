@@ -44,16 +44,19 @@ public class DeleteVolumeHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
+      String volumeName = address.getVolumeName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume name : %s%n", volumeName);
+      if (isVerbose()) {
+        System.out.printf("Volume name : %s%n", volumeName);
+      }
+
+      client.getObjectStore().deleteVolume(volumeName);
+      System.out.printf("Volume %s is deleted%n", volumeName);
     }
 
-    client.getObjectStore().deleteVolume(volumeName);
-    System.out.printf("Volume %s is deleted%n", volumeName);
     return null;
   }
 }

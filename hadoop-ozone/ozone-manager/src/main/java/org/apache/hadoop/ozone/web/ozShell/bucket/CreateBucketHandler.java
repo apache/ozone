@@ -58,47 +58,49 @@ public class CreateBucketHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
 
-    BucketArgs.Builder bb = new BucketArgs.Builder()
-        .setStorageType(StorageType.DEFAULT)
-        .setVersioning(false);
+      BucketArgs.Builder bb = new BucketArgs.Builder()
+              .setStorageType(StorageType.DEFAULT)
+              .setVersioning(false);
 
-    if(isGdprEnforced != null) {
-      if(isGdprEnforced) {
-        bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(Boolean.TRUE));
-      } else {
-        bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(Boolean.FALSE));
+      if (isGdprEnforced != null) {
+        if (isGdprEnforced) {
+          bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(Boolean.TRUE));
+        } else {
+          bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(Boolean.FALSE));
+        }
       }
-    }
 
-    if (bekName != null) {
-      if (!bekName.isEmpty()) {
-        bb.setBucketEncryptionKey(bekName);
-      } else {
-        throw new IllegalArgumentException("Bucket encryption key name must " +
-            "be specified to enable bucket encryption!");
-      }
-    }
-
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
       if (bekName != null) {
-        System.out.printf("Bucket Encryption enabled with Key Name: %s%n",
-            bekName);
+        if (!bekName.isEmpty()) {
+          bb.setBucketEncryptionKey(bekName);
+        } else {
+          throw new IllegalArgumentException("Bucket encryption key name must" +
+              " " + "be specified to enable bucket encryption!");
+        }
       }
-    }
 
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    vol.createBucket(bucketName, bb.build());
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+        if (bekName != null) {
+          System.out.printf("Bucket Encryption enabled with Key Name: %s%n",
+                  bekName);
+        }
+      }
 
-    if (isVerbose()) {
-      OzoneBucket bucket = vol.getBucket(bucketName);
-      ObjectPrinter.printObjectAsJson(bucket);
+      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+      vol.createBucket(bucketName, bb.build());
+
+      if (isVerbose()) {
+        OzoneBucket bucket = vol.getBucket(bucketName);
+        ObjectPrinter.printObjectAsJson(bucket);
+      }
     }
     return null;
   }
