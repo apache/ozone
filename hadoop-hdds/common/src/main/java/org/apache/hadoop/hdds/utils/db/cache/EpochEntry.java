@@ -53,7 +53,7 @@ public class EpochEntry<CACHEKEY> implements Comparable<CACHEKEY> {
       return false;
     }
     EpochEntry<?> that = (EpochEntry<?>) o;
-    return epoch == that.epoch && cachekey == that.cachekey;
+    return epoch == that.epoch && Objects.equals(cachekey, that.cachekey);
   }
 
   @Override

@@ -235,11 +235,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void cleanupCache(long epoch) {
-    cache.cleanup(epoch);
-  }
-
-  @Override
   public void cleanupCache(List<Long> epochs) {
     cache.cleanup(epochs);
   }

@@ -19,12 +19,14 @@
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Cache used for RocksDB tables.
@@ -59,17 +61,6 @@ public interface TableCache<CACHEKEY extends CacheKey,
    * @param value
    */
   void put(CACHEKEY cacheKey, CACHEVALUE value);
-
-  /**
-   * Removes all the entries from the cache which are having epoch value less
-   * than or equal to specified epoch value.
-   *
-   * If clean up policy is NEVER, this is a do nothing operation.
-   * If clean up policy is MANUAL, it is caller responsibility to cleanup the
-   * cache before calling cleanup.
-   * @param epoch
-   */
-  void cleanup(long epoch);
 
   /**
    * Removes all the entries from the cache which are matching with epoch
@@ -115,4 +106,7 @@ public interface TableCache<CACHEKEY extends CacheKey,
    */
   CacheResult<CACHEVALUE> lookup(CACHEKEY cachekey);
 
+
+  @VisibleForTesting
+  Set<EpochEntry<CACHEKEY>> getEpochEntrySet();
 }

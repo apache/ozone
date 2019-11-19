@@ -140,15 +140,6 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   }
 
   /**
-   * Removes all the entries from the table cache which are having epoch value
-   * less than or equal to specified epoch value.
-   * @param epoch
-   */
-  default void cleanupCache(long epoch) {
-    throw new NotImplementedException("cleanupCache is not implemented");
-  }
-
-  /**
    * Removes all the entries from the table cache which are matching with
    * epoch provided in the epoch list.
    * @param epochs

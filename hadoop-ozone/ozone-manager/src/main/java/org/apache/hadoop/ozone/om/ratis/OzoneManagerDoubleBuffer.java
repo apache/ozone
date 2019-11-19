@@ -173,16 +173,12 @@ public class OzoneManagerDoubleBuffer {
               readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
                   .max(Long::compareTo).get();
 
-          if (!isRatisEnabled) {
-            List<Long> flushedEpochs =
-                readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
-                    .sorted().collect(Collectors.toList());
+          List<Long> flushedEpochs =
+              readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
+                  .sorted().collect(Collectors.toList());
 
-            cleanupCache(flushedEpochs);
-          } else {
-            // cleanup cache.
-            cleanupCache(lastRatisTransactionIndex);
-          }
+          cleanupCache(flushedEpochs);
+
 
           readyBuffer.clear();
 
@@ -218,32 +214,6 @@ public class OzoneManagerDoubleBuffer {
         ExitUtils.terminate(2, s, t, LOG);
       }
     }
-  }
-
-  private void cleanupCache(long lastRatisTransactionIndex) {
-    // As now only volume and bucket transactions are handled only called
-    // cleanupCache on bucketTable.
-    // TODO: After supporting all write operations we need to call
-    //  cleanupCache on the tables only when buffer has entries for that table.
-    omMetadataManager.getBucketTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getVolumeTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getUserTable().cleanupCache(lastRatisTransactionIndex);
-
-    //TODO: Optimization we can do here is for key transactions we can only
-    // cleanup cache when it is key commit transaction. In this way all
-    // intermediate transactions for a key will be read from in-memory cache.
-    omMetadataManager.getOpenKeyTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getKeyTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getDeletedTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getS3Table().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getMultipartInfoTable().cleanupCache(
-        lastRatisTransactionIndex);
-    omMetadataManager.getS3SecretTable().cleanupCache(
-        lastRatisTransactionIndex);
-    omMetadataManager.getDelegationTokenTable().cleanupCache(
-        lastRatisTransactionIndex);
-    omMetadataManager.getPrefixTable().cleanupCache(lastRatisTransactionIndex);
-
   }
 
   private void cleanupCache(List<Long> lastRatisTransactionIndex) {
