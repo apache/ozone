@@ -92,10 +92,6 @@ public class TestTypedRDBTableStore {
   }
 
   @Test
-  public void toIOException() {
-  }
-
-  @Test
   public void putGetAndEmpty() throws Exception {
     try (Table<String, String> testTable = createTypedTable(
         "First")) {

@@ -70,28 +70,29 @@ public class SetAclBucketHandler extends Handler {
     Objects.requireNonNull(acls, "Acls to be set not specified.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+      }
+
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setBucketName(bucketName)
+          .setVolumeName(volumeName)
+          .setResType(OzoneObj.ResourceType.BUCKET)
+          .setStoreType(storeType == null ? OZONE :
+              OzoneObj.StoreType.valueOf(storeType))
+          .build();
+
+      client.getObjectStore().setAcl(obj, OzoneAcl.parseAcls(acls));
+      System.out.println("Acl set successfully.");
     }
 
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(storeType == null ? OZONE :
-            OzoneObj.StoreType.valueOf(storeType))
-        .build();
-
-    client.getObjectStore().setAcl(obj, OzoneAcl.parseAcls(acls));
-    System.out.println("Acl set successfully.");
-
-    client.close();
     return null;
   }
 

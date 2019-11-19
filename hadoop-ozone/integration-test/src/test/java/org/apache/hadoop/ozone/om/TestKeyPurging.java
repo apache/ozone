@@ -67,7 +67,7 @@ public class TestKeyPurging {
     conf.setQuietMode(false);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(1)
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
