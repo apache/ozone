@@ -131,7 +131,7 @@ public class DatanodeStateMachine implements Closeable {
             conf))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
         .addHandler(new DeleteContainerCommandHandler(
-            dnConf.getDeleteContainerThreads()))
+            dnConf.getContainerDeleteThreads()))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)

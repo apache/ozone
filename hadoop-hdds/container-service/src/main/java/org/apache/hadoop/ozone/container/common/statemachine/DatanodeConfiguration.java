@@ -35,12 +35,14 @@ public class DatanodeConfiguration {
    * The maximum number of replication commands a single datanode can execute
    * simultaneously.
    */
-  private int replicationMaxStreams = 10;
+  private final int replicationMaxStreamsDefault = 10;
+  private int replicationMaxStreams = replicationMaxStreamsDefault;
   /**
    * The maximum number of threads used to delete containers on a datanode
    * simultaneously.
    */
-  private int deleteContainerThreads = 2;
+  private final int containerDeleteThreadsDefault = 2;
+  private int containerDeleteThreads = containerDeleteThreadsDefault;
 
   @Config(key = "replication.streams.limit",
       type = ConfigType.INT,
@@ -53,7 +55,8 @@ public class DatanodeConfiguration {
     if (val < 1) {
       LOG.warn("hdds.datanode.replication.streams.limit must be greater than" +
           "zero and was set to {}. Defaulting to {}",
-          val, replicationMaxStreams);
+          val, replicationMaxStreamsDefault);
+      replicationMaxStreams = replicationMaxStreamsDefault;
     } else {
       this.replicationMaxStreams = val;
     }
@@ -63,25 +66,26 @@ public class DatanodeConfiguration {
     return replicationMaxStreams;
   }
 
-  @Config(key = "delete.container.threads",
+  @Config(key = "container.delete.threads.max",
       type = ConfigType.INT,
       defaultValue = "2",
       tags = {DATANODE},
       description = "The maximum number of threads used to delete containers " +
           "on a datanode"
   )
-  public void setDeleteContainerThreads(int val) {
+  public void setContainerDeleteThreads(int val) {
     if (val < 1) {
-      LOG.warn("hdds.datanode.delete.container.threads must be greater than" +
-              "zero and was set to {}. Defaulting to {}",
-          val, deleteContainerThreads);
+      LOG.warn("hdds.datanode.container.delete.threads.max must be greater " +
+          "than zero and was set to {}. Defaulting to {}",
+          val, containerDeleteThreadsDefault);
+      containerDeleteThreads = containerDeleteThreadsDefault;
     } else {
-      this.deleteContainerThreads = val;
+      this.containerDeleteThreads = val;
     }
   }
 
-  public int getDeleteContainerThreads() {
-    return deleteContainerThreads;
+  public int getContainerDeleteThreads() {
+    return containerDeleteThreads;
   }
 
 }

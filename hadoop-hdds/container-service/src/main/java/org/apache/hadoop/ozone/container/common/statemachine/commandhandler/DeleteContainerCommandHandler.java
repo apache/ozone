@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -48,7 +49,7 @@ public class DeleteContainerCommandHandler implements CommandHandler {
 
   private final AtomicInteger invocationCount = new AtomicInteger(0);
   private final AtomicLong totalTime = new AtomicLong(0);
-  private final ThreadPoolExecutor executor;
+  private final ExecutorService executor;
 
   public DeleteContainerCommandHandler(int threadPoolSize) {
     this.executor = new ThreadPoolExecutor(
@@ -93,8 +94,9 @@ public class DeleteContainerCommandHandler implements CommandHandler {
 
   @Override
   public long getAverageRunTime() {
-    return invocationCount.get() == 0 ?
-        0 : totalTime.get() / invocationCount.get();
+    final int invocations = invocationCount.get();
+    return invocations == 0 ?
+        0 : totalTime.get() / invocations;
   }
 
   @Override
