@@ -307,7 +307,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     for (DatanodeDetails dn : datanodeList) {
       try {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Executing command " + request + " on datanode " + dn);
+          LOG.debug("Executing command {} on datanode {}", request, dn);
         }
         // In case the command gets retried on a 2nd datanode,
         // sendCommandAsyncCall will create a new channel and async stub
