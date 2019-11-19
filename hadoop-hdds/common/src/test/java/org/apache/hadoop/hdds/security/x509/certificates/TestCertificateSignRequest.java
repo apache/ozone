@@ -24,9 +24,15 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
+import org.bouncycastle.asn1.ASN1Encodable;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.ASN1Sequence;
+import org.bouncycastle.asn1.DERTaggedObject;
+import org.bouncycastle.asn1.DLSequence;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.operator.ContentVerifierProvider;
 import org.bouncycastle.operator.OperatorCreationException;
@@ -43,6 +49,7 @@ import java.io.IOException;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.util.Iterator;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -137,6 +144,7 @@ public class TestCertificateSignRequest {
     // Multi-home
     builder.addIpAddress("192.168.1.1");
     builder.addIpAddress("192.168.2.1");
+    builder.addServiceName("OzoneMarketingCluster003");
 
     builder.addDnsName("dn1.abc.com");
 
@@ -162,6 +170,7 @@ public class TestCertificateSignRequest {
     Extension sanExt = extensions.getExtension(Extension.keyUsage);
     Assert.assertEquals(true, sanExt.isCritical());
 
+    verifyServiceId(extensions);
 
     // Verify signature in CSR
     ContentVerifierProvider verifierProvider =
@@ -263,5 +272,29 @@ public class TestCertificateSignRequest {
     // Verify de-serialized CSR matches with the original CSR
     PKCS10CertificationRequest dsCsr = new PKCS10CertificationRequest(csrBytes);
     Assert.assertEquals(csr, dsCsr);
+  }
+
+  private void verifyServiceId(Extensions extensions) {
+    GeneralNames gns =
+        GeneralNames.fromExtensions(
+            extensions, Extension.subjectAlternativeName);
+    GeneralName[] names = gns.getNames();
+    for(int i=0; i < names.length; i++) {
+      if(names[i].getTagNo() == GeneralName.otherName) {
+        ASN1Encodable asn1Encodable = names[i].getName();
+        Iterator iterator = ((DLSequence) asn1Encodable).iterator();
+        while (iterator.hasNext()) {
+          Object o = iterator.next();
+          if (o instanceof ASN1ObjectIdentifier) {
+            String oid = o.toString();
+            Assert.assertEquals(oid, "2.16.840.1.113730.3.1.34");
+          }
+          if (o instanceof DERTaggedObject) {
+            String serviceName = ((DERTaggedObject)o).getObject().toString();
+            Assert.assertEquals(serviceName, "OzoneMarketingCluster003");
+          }
+        }
+      }
+    }
   }
 }
