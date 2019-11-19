@@ -70,30 +70,31 @@ public class SetAclKeyHandler extends Handler {
     Objects.requireNonNull(acls, "New acls to be added not specified.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureKeyAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
-    String keyName = address.getKeyName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
+      String keyName = address.getKeyName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+      }
+
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setBucketName(bucketName)
+          .setVolumeName(volumeName)
+          .setKeyName(keyName)
+          .setResType(OzoneObj.ResourceType.KEY)
+          .setStoreType(storeType == null ? OZONE :
+              OzoneObj.StoreType.valueOf(storeType))
+          .build();
+
+      client.getObjectStore().setAcl(obj, OzoneAcl.parseAcls(acls));
+      System.out.println("Acl set successfully.");
     }
 
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setKeyName(keyName)
-        .setResType(OzoneObj.ResourceType.KEY)
-        .setStoreType(storeType == null ? OZONE :
-            OzoneObj.StoreType.valueOf(storeType))
-        .build();
-
-    client.getObjectStore().setAcl(obj, OzoneAcl.parseAcls(acls));
-    System.out.println("Acl set successfully.");
-
-    client.close();
     return null;
   }
 
