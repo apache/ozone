@@ -134,7 +134,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     DatanodeDetails dn = topologyAwareRead ? this.pipeline.getClosestNode() :
         this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning
-    connectToDatanode(dn, null);
+    connectToDatanode(dn);
   }
 
   /**
@@ -147,11 +147,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     DatanodeDetails dn = topologyAwareRead ? this.pipeline.getClosestNode() :
         this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning
-    connectToDatanode(dn, encodedToken);
+    connectToDatanode(dn);
   }
 
-  private synchronized void connectToDatanode(DatanodeDetails dn,
-      String encodedToken) throws IOException {
+  private synchronized void connectToDatanode(DatanodeDetails dn)
+      throws IOException {
     if (isConnected(dn)){
       return;
     }
@@ -461,7 +461,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throws IOException {
     ManagedChannel channel;
     try {
-      connectToDatanode(dn, encodedToken);
+      connectToDatanode(dn);
       channel = channels.get(dn.getUuid());
     } catch (Exception e) {
       throw new IOException("Error while connecting", e);
