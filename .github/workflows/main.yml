@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
         - uses: actions/checkout@master
+        - run: .github/workflows/rebase.sh
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/build.sh
@@ -30,6 +31,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
         - uses: actions/checkout@master
+        - run: .github/workflows/rebase.sh
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/rat.sh
@@ -43,6 +45,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
         - uses: actions/checkout@master
+        - run: .github/workflows/rebase.sh
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/author.sh
@@ -56,6 +59,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
         - uses: actions/checkout@master
+        - run: .github/workflows/rebase.sh
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/unit.sh
@@ -69,6 +73,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
         - uses: actions/checkout@master
+        - run: .github/workflows/rebase.sh
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
@@ -82,6 +87,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
         - uses: actions/checkout@master
+        - run: .github/workflows/rebase.sh
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/findbugs.sh
@@ -101,6 +107,7 @@ jobs:
        - findbugs
     steps:
         - uses: actions/checkout@master
+        - run: .github/workflows/rebase.sh
         - uses: ./.github/buildenv
           with:
             args: ./hadoop-ozone/dev-support/checks/build.sh
