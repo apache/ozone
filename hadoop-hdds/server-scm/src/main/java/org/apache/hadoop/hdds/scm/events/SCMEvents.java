@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.events;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -98,14 +97,15 @@ public final class SCMEvents {
           new TypedEvent<>(PipelineReportFromDatanode.class, "Pipeline_Report");
 
   /**
-   * Open pipeline event sent by PipelineReportHandler. This event is
+   * PipelineReport processed by pipeline report handler. This event is
    * received by HealthyPipelineSafeModeRule.
    */
-  public static final TypedEvent<Pipeline>
-      OPEN_PIPELINE = new TypedEvent<>(Pipeline.class, "Open_Pipeline");
+  public static final TypedEvent<PipelineReportFromDatanode>
+      PROCESSED_PIPELINE_REPORT = new TypedEvent<>(
+          PipelineReportFromDatanode.class, "Processed_Pipeline_Report");
 
   /**
-   * PipelineActions are sent by Datanode to close a pipeline. It's received by
+   * PipelineActions are sent by Datanode. This event is received by
    * SCMDatanodeHeartbeatDispatcher and PIPELINE_ACTIONS event is generated.
    */
   public static final TypedEvent<PipelineActionsFromDatanode>
@@ -113,7 +113,7 @@ public final class SCMEvents {
       "Pipeline_Actions");
 
   /**
-   * A Command status report will be sent by datanodes. This report is received
+   * A Command status report will be sent by datanodes. This repoort is received
    * by SCMDatanodeHeartbeatDispatcher and CommandReport event is generated.
    */
   public static final TypedEvent<CommandStatusReportFromDatanode>
