@@ -18,119 +18,229 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
+
+import javax.annotation.Nonnull;
+
+import static com.google.common.util.concurrent.MoreExecutors.sameThreadExecutor;
+import static java.util.Collections.emptyList;
 
 /**
  * Test the replication supervisor.
  */
 public class TestReplicationSupervisor {
 
-  private OzoneConfiguration conf = new OzoneConfiguration();
+  private final ContainerReplicator noopReplicator = task -> {};
+  private final ContainerReplicator throwingReplicator = task -> {
+    throw new RuntimeException("testing replication failure");
+  };
+  private final AtomicReference<ContainerReplicator> replicatorRef =
+      new AtomicReference<>();
+  private final ContainerReplicator mutableReplicator =
+      task -> replicatorRef.get().replicate(task);
+
+  private ContainerSet set;
+
+  @Before
+  public void setUp() throws Exception {
+    set = new ContainerSet();
+  }
+
+  @After
+  public void cleanup() {
+    replicatorRef.set(null);
+  }
 
   @Test
-  public void normal() throws Exception {
-    //GIVEN
-    ContainerSet set = new ContainerSet();
-
-    FakeReplicator replicator = new FakeReplicator(set);
-    ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, replicator, 5);
-
-    List<DatanodeDetails> datanodes = IntStream.range(1, 3)
-        .mapToObj(v -> Mockito.mock(DatanodeDetails.class))
-        .collect(Collectors.toList());
+  public void normal() {
+    // GIVEN
+    ReplicationSupervisor supervisor = supervisorWithSuccessfulReplicator();
 
     try {
       //WHEN
-      supervisor.addTask(new ReplicationTask(1L, datanodes));
-      supervisor.addTask(new ReplicationTask(1L, datanodes));
-      supervisor.addTask(new ReplicationTask(1L, datanodes));
-      supervisor.addTask(new ReplicationTask(2L, datanodes));
-      supervisor.addTask(new ReplicationTask(2L, datanodes));
-      supervisor.addTask(new ReplicationTask(3L, datanodes));
-      //THEN
-      LambdaTestUtils.await(200_000, 1000,
-          () -> supervisor.getInFlightReplications() == 0);
+      supervisor.addTask(new ReplicationTask(1L, emptyList()));
+      supervisor.addTask(new ReplicationTask(2L, emptyList()));
+      supervisor.addTask(new ReplicationTask(5L, emptyList()));
 
-      Assert.assertEquals(3, replicator.replicated.size());
-
+      Assert.assertEquals(3, supervisor.getReplicationRequestCount());
+      Assert.assertEquals(3, supervisor.getReplicationSuccessCount());
+      Assert.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(3, set.containerCount());
     } finally {
       supervisor.stop();
     }
   }
 
   @Test
-  public void duplicateMessageAfterAWhile() throws Exception {
-    //GIVEN
-    ContainerSet set = new ContainerSet();
-
-    FakeReplicator replicator = new FakeReplicator(set);
-    ReplicationSupervisor supervisor =
-        new ReplicationSupervisor(set, replicator, 2);
-
-    List<DatanodeDetails> datanodes = IntStream.range(1, 3)
-        .mapToObj(v -> Mockito.mock(DatanodeDetails.class))
-        .collect(Collectors.toList());
+  public void duplicateMessage() {
+    // GIVEN
+    ReplicationSupervisor supervisor = supervisorWithSuccessfulReplicator();
 
     try {
       //WHEN
-      supervisor.addTask(new ReplicationTask(1L, datanodes));
-      LambdaTestUtils.await(200_000, 1000,
-          () -> supervisor.getInFlightReplications() == 0);
-      supervisor.addTask(new ReplicationTask(1L, datanodes));
-      LambdaTestUtils.await(200_000, 1000,
-          () -> supervisor.getInFlightReplications() == 0);
+      supervisor.addTask(new ReplicationTask(6L, emptyList()));
+      supervisor.addTask(new ReplicationTask(6L, emptyList()));
+      supervisor.addTask(new ReplicationTask(6L, emptyList()));
+      supervisor.addTask(new ReplicationTask(6L, emptyList()));
 
       //THEN
-      System.out.println(replicator.replicated.get(0));
-
-      Assert.assertEquals(1, replicator.replicated.size());
-
+      Assert.assertEquals(4, supervisor.getReplicationRequestCount());
+      Assert.assertEquals(1, supervisor.getReplicationSuccessCount());
+      Assert.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(1, set.containerCount());
     } finally {
       supervisor.stop();
     }
   }
 
-  private class FakeReplicator implements ContainerReplicator {
+  @Test
+  public void failureHandling() {
+    // GIVEN
+    ReplicationSupervisor supervisor = supervisorWith(
+        __ -> throwingReplicator, sameThreadExecutor());
 
-    private List<ReplicationTask> replicated = new ArrayList<>();
+    try {
+      //WHEN
+      ReplicationTask task = new ReplicationTask(1L, emptyList());
+      supervisor.addTask(task);
 
-    private ContainerSet containerSet;
+      //THEN
+      Assert.assertEquals(1, supervisor.getReplicationRequestCount());
+      Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
+      Assert.assertEquals(1, supervisor.getReplicationFailureCount());
+      Assert.assertEquals(0, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, set.containerCount());
+      Assert.assertEquals(ReplicationTask.Status.FAILED, task.getStatus());
+    } finally {
+      supervisor.stop();
+    }
+  }
 
-    FakeReplicator(ContainerSet set) {
+  @Test
+  public void stalledDownload() {
+    // GIVEN
+    ReplicationSupervisor supervisor = supervisorWith(__ -> noopReplicator,
+        new DiscardingExecutorService());
+
+    try {
+      //WHEN
+      supervisor.addTask(new ReplicationTask(1L, emptyList()));
+      supervisor.addTask(new ReplicationTask(2L, emptyList()));
+      supervisor.addTask(new ReplicationTask(3L, emptyList()));
+
+      //THEN
+      Assert.assertEquals(0, supervisor.getReplicationRequestCount());
+      Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
+      Assert.assertEquals(0, supervisor.getReplicationFailureCount());
+      Assert.assertEquals(3, supervisor.getInFlightReplications());
+      Assert.assertEquals(0, set.containerCount());
+    } finally {
+      supervisor.stop();
+    }
+  }
+
+  private ReplicationSupervisor supervisorWithSuccessfulReplicator() {
+    return supervisorWith(supervisor -> new FakeReplicator(supervisor, set),
+        sameThreadExecutor());
+  }
+
+  private ReplicationSupervisor supervisorWith(
+      Function<ReplicationSupervisor, ContainerReplicator> replicatorFactory,
+      ExecutorService executor) {
+    ReplicationSupervisor supervisor =
+        new ReplicationSupervisor(set, mutableReplicator, executor);
+    replicatorRef.set(replicatorFactory.apply(supervisor));
+    return supervisor;
+  }
+
+  /**
+   * A fake replicator that simulates successful download of containers.
+   */
+  private static class FakeReplicator implements ContainerReplicator {
+
+    private final OzoneConfiguration conf = new OzoneConfiguration();
+    private final ReplicationSupervisor supervisor;
+    private final ContainerSet containerSet;
+
+    FakeReplicator(ReplicationSupervisor supervisor, ContainerSet set) {
+      this.supervisor = supervisor;
       this.containerSet = set;
     }
 
     @Override
     public void replicate(ReplicationTask task) {
+      Assert.assertNull(containerSet.getContainer(task.getContainerId()));
+
+      // assumes same-thread execution
+      Assert.assertEquals(1, supervisor.getInFlightReplications());
+
       KeyValueContainerData kvcd =
           new KeyValueContainerData(task.getContainerId(), 100L,
               UUID.randomUUID().toString(), UUID.randomUUID().toString());
       KeyValueContainer kvc =
           new KeyValueContainer(kvcd, conf);
+
       try {
-        //download is slow
-        Thread.sleep(100);
-        replicated.add(task);
         containerSet.addContainer(kvc);
+        task.setStatus(ReplicationTask.Status.DONE);
       } catch (Exception e) {
-        throw new RuntimeException(e);
+        Assert.fail("Unexpected error: " + e.getMessage());
       }
+    }
+  }
+
+  /**
+   * Discards all tasks.
+   */
+  private static class DiscardingExecutorService
+      extends AbstractExecutorService {
+
+    @Override
+    public void shutdown() {
+      // no-op
+    }
+
+    @Override
+    public @Nonnull List<Runnable> shutdownNow() {
+      return emptyList();
+    }
+
+    @Override
+    public boolean isShutdown() {
+      return false;
+    }
+
+    @Override
+    public boolean isTerminated() {
+      return false;
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, @Nonnull TimeUnit unit) {
+      return false;
+    }
+
+    @Override
+    public void execute(@Nonnull Runnable command) {
+      // ignore all tasks
     }
   }
 }

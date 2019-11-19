@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentHashMap.KeySetView;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -42,8 +43,10 @@ public class ReplicationSupervisor {
 
   private final ContainerSet containerSet;
   private final ContainerReplicator replicator;
-  private final ThreadPoolExecutor executor;
-  private final AtomicLong replicationCounter;
+  private final ExecutorService executor;
+  private final AtomicLong requestCounter = new AtomicLong();
+  private final AtomicLong successCounter = new AtomicLong();
+  private final AtomicLong failureCounter = new AtomicLong();
 
   /**
    * A set of container IDs that are currently being downloaded
@@ -52,19 +55,25 @@ public class ReplicationSupervisor {
    */
   private final KeySetView<Object, Boolean> containersInFlight;
 
-  public ReplicationSupervisor(
-      ContainerSet containerSet,
-      ContainerReplicator replicator, int poolSize) {
+  @VisibleForTesting
+  ReplicationSupervisor(
+      ContainerSet containerSet, ContainerReplicator replicator,
+      ExecutorService executor) {
     this.containerSet = containerSet;
     this.replicator = replicator;
     this.containersInFlight = ConcurrentHashMap.newKeySet();
-    replicationCounter = new AtomicLong();
-    this.executor = new ThreadPoolExecutor(
+    this.executor = executor;
+  }
+
+  public ReplicationSupervisor(
+      ContainerSet containerSet,
+      ContainerReplicator replicator, int poolSize) {
+    this(containerSet, replicator, new ThreadPoolExecutor(
         0, poolSize, 60, TimeUnit.SECONDS,
         new LinkedBlockingQueue<>(),
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("ContainerReplicationThread-%d")
-            .build());
+            .build()));
   }
 
   /**
@@ -94,7 +103,7 @@ public class ReplicationSupervisor {
    * @return Count of in-flight replications.
    */
   @VisibleForTesting
-  public int getInFlightReplications() {
+  int getInFlightReplications() {
     return containersInFlight.size();
   }
 
@@ -107,10 +116,12 @@ public class ReplicationSupervisor {
 
     @Override
     public void run() {
+      final Long containerId = task.getContainerId();
       try {
+        requestCounter.incrementAndGet();
+
         if (containerSet.getContainer(task.getContainerId()) != null) {
-          LOG.debug("Container {} has already been downloaded.",
-              task.getContainerId());
+          LOG.debug("Container {} has already been downloaded.", containerId);
           return;
         }
 
@@ -120,18 +131,32 @@ public class ReplicationSupervisor {
         if (task.getStatus() == Status.FAILED) {
           LOG.error(
               "Container {} can't be downloaded from any of the datanodes.",
-              task.getContainerId());
+              containerId);
+          failureCounter.incrementAndGet();
         } else if (task.getStatus() == Status.DONE) {
-          LOG.info("Container {} is replicated.", task.getContainerId());
+          LOG.info("Container {} is replicated.", containerId);
+          successCounter.incrementAndGet();
         }
+      } catch (Exception e) {
+        task.setStatus(Status.FAILED);
+        LOG.error("Encountered error while replicating container {}.",
+            containerId, e);
+        failureCounter.incrementAndGet();
       } finally {
-        containersInFlight.remove(task.getContainerId());
-        replicationCounter.incrementAndGet();
+        containersInFlight.remove(containerId);
       }
     }
   }
 
-  public long getReplicationCounter() {
-    return replicationCounter.get();
+  public long getReplicationRequestCount() {
+    return requestCounter.get();
+  }
+
+  public long getReplicationSuccessCount() {
+    return successCounter.get();
+  }
+
+  public long getReplicationFailureCount() {
+    return failureCounter.get();
   }
 }
