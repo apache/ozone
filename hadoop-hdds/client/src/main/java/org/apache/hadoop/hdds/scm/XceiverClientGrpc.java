@@ -398,7 +398,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
-          request.getCmdType().toString(), dn.getNetworkFullPath());
+          request.getCmdType(), dn.getNetworkFullPath());
     }
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
