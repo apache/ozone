@@ -262,7 +262,7 @@ public interface MiniOzoneCluster {
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
     protected int numOfScmHandlers = 20;
-    protected int numOfDatanodes = 3;
+    protected int numOfDatanodes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
 

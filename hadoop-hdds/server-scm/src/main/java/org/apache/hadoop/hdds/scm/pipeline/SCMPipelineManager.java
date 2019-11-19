@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -38,7 +37,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.hdds.utils.Scheduler;
-import org.apache.hadoop.util.Time;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,18 +81,18 @@ public class SCMPipelineManager implements PipelineManager {
   private final NodeManager nodeManager;
   private final SCMPipelineMetrics metrics;
   private final Configuration conf;
-  private long pipelineWaitDefaultTimeout;
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
+  private GrpcTlsConfig grpcTlsConfig;
 
   public SCMPipelineManager(Configuration conf, NodeManager nodeManager,
-      EventPublisher eventPublisher)
+      EventPublisher eventPublisher, GrpcTlsConfig grpcTlsConfig)
       throws IOException {
     this.lock = new ReentrantReadWriteLock();
     this.conf = conf;
     this.stateManager = new PipelineStateManager(conf);
     this.pipelineFactory = new PipelineFactory(nodeManager, stateManager,
-        conf, eventPublisher);
+        conf, grpcTlsConfig);
     // TODO: See if thread priority needs to be set for these threads
     scheduler = new Scheduler("RatisPipelineUtilsThread", false, 1);
     this.backgroundPipelineCreator =
@@ -114,11 +113,8 @@ public class SCMPipelineManager implements PipelineManager {
     this.metrics = SCMPipelineMetrics.create();
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
-    this.pipelineWaitDefaultTimeout = conf.getTimeDuration(
-        HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
-        HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
     initializePipelineState();
+    this.grpcTlsConfig = grpcTlsConfig;
   }
 
   public PipelineStateManager getStateManager() {
@@ -152,8 +148,8 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   @Override
-  public synchronized Pipeline createPipeline(ReplicationType type,
-      ReplicationFactor factor) throws IOException {
+  public synchronized Pipeline createPipeline(
+      ReplicationType type, ReplicationFactor factor) throws IOException {
     lock.writeLock().lock();
     try {
       Pipeline pipeline = pipelineFactory.create(type, factor);
@@ -161,11 +157,8 @@ public class SCMPipelineManager implements PipelineManager {
           pipeline.getProtobufMessage().toByteArray());
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
-      metrics.incNumPipelineAllocated();
-      if (pipeline.isOpen()) {
-        metrics.incNumPipelineCreated();
-        metrics.createPerPipelineMetrics(pipeline);
-      }
+      metrics.incNumPipelineCreated();
+      metrics.createPerPipelineMetrics(pipeline);
       return pipeline;
     } catch (InsufficientDatanodesException idEx) {
       throw idEx;
@@ -227,16 +220,6 @@ public class SCMPipelineManager implements PipelineManager {
     lock.readLock().lock();
     try {
       return stateManager.getPipelines(type, factor);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  public List<Pipeline> getPipelines(ReplicationType type,
-      Pipeline.PipelineState state) {
-    lock.readLock().lock();
-    try {
-      return stateManager.getPipelines(type, state);
     } finally {
       lock.readLock().unlock();
     }
@@ -310,7 +293,6 @@ public class SCMPipelineManager implements PipelineManager {
     lock.writeLock().lock();
     try {
       Pipeline pipeline = stateManager.openPipeline(pipelineId);
-      metrics.incNumPipelineCreated();
       metrics.createPerPipelineMetrics(pipeline);
     } finally {
       lock.writeLock().unlock();
@@ -398,45 +380,6 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   /**
-   * Wait a pipeline to be OPEN.
-   *
-   * @param pipelineID ID of the pipeline to wait for.
-   * @param timeout    wait timeout, millisecond, 0 to use default value
-   * @throws IOException in case of any Exception, such as timeout
-   */
-  @Override
-  public void waitPipelineReady(PipelineID pipelineID, long timeout)
-      throws IOException {
-    long st = Time.monotonicNow();
-    if (timeout == 0) {
-      timeout = pipelineWaitDefaultTimeout;
-    }
-
-    boolean ready;
-    Pipeline pipeline;
-    do {
-      try {
-        pipeline = stateManager.getPipeline(pipelineID);
-      } catch (PipelineNotFoundException e) {
-        throw new PipelineNotFoundException(String.format(
-            "Pipeline %s cannot be found", pipelineID));
-      }
-      ready = pipeline.isOpen();
-      if (!ready) {
-        try {
-          Thread.sleep((long)100);
-        } catch (InterruptedException e) {
-        }
-      }
-    } while (!ready && Time.monotonicNow() - st < timeout);
-
-    if (!ready) {
-      throw new IOException(String.format("Pipeline %s is not ready in %d ms",
-          pipelineID, timeout));
-    }
-  }
-
-  /**
    * Moves the pipeline to CLOSED state and sends close container command for
    * all the containers in the pipeline.
    *
@@ -465,7 +408,7 @@ public class SCMPipelineManager implements PipelineManager {
    * @throws IOException
    */
   private void destroyPipeline(Pipeline pipeline) throws IOException {
-    pipelineFactory.close(pipeline.getType(), pipeline);
+    RatisPipelineUtils.destroyPipeline(pipeline, conf, grpcTlsConfig);
     // remove the pipeline from the pipeline manager
     removePipeline(pipeline.getId());
     triggerPipelineCreation();
@@ -495,6 +438,11 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void incNumBlocksAllocatedMetric(PipelineID id) {
     metrics.incNumBlocksAllocated(id);
+  }
+
+  @Override
+  public GrpcTlsConfig getGrpcTlsConfig() {
+    return grpcTlsConfig;
   }
 
   @Override

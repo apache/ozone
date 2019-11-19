@@ -62,7 +62,6 @@ public class TestSCMPipelineManager {
     testDir = GenericTestUtils
         .getTestDir(TestSCMPipelineManager.class.getSimpleName());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     boolean folderExisted = testDir.exists() || testDir.mkdirs();
     if (!folderExisted) {
       throw new IOException("Unable to create test directory path");
@@ -78,7 +77,7 @@ public class TestSCMPipelineManager {
   @Test
   public void testPipelineReload() throws IOException {
     SCMPipelineManager pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue());
+        new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -95,7 +94,7 @@ public class TestSCMPipelineManager {
 
     // new pipeline manager should be able to load the pipelines from the db
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue());
+        new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
     mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -118,7 +117,7 @@ public class TestSCMPipelineManager {
   @Test
   public void testRemovePipeline() throws IOException {
     SCMPipelineManager pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue());
+        new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -136,71 +135,7 @@ public class TestSCMPipelineManager {
 
     // new pipeline manager should not be able to load removed pipelines
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue());
-    try {
-      pipelineManager.getPipeline(pipeline.getId());
-      Assert.fail("Pipeline should not have been retrieved");
-    } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().contains("not found"));
-    }
-
-    // clean up
-    pipelineManager.close();
-  }
-
-  @Test
-  public void testPipelineReport() throws IOException {
-    EventQueue eventQueue = new EventQueue();
-    SCMPipelineManager pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, eventQueue);
-    PipelineProvider mockRatisProvider =
-        new MockRatisPipelineProvider(nodeManager,
-            pipelineManager.getStateManager(), conf);
-    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
-        mockRatisProvider);
-
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(conf, new ArrayList<>(), pipelineManager,
-            eventQueue);
-
-    // create a pipeline in allocated state with no dns yet reported
-    Pipeline pipeline = pipelineManager
-        .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
-
-    Assert
-        .assertFalse(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-    Assert
-        .assertFalse(pipelineManager.getPipeline(pipeline.getId()).isOpen());
-
-    // pipeline is not healthy until all dns report
-    PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
-    List<DatanodeDetails> nodes = pipeline.getNodes();
-    Assert.assertFalse(
-        pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-    // get pipeline report from each dn in the pipeline
-    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
-        pipelineReportHandler, false, eventQueue));
-    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
-        pipelineReportHandler, true, eventQueue);
-
-    // pipeline is healthy when all dns report
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-    // pipeline should now move to open state
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isOpen());
-
-    // close the pipeline
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
-
-    // pipeline report for destroyed pipeline should be ignored
-    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
-        pipelineReportHandler, false, eventQueue));
-    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
-        pipelineReportHandler, true, eventQueue);
-
+        new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
     try {
       pipelineManager.getPipeline(pipeline.getId());
       Assert.fail("Pipeline should not have been retrieved");
@@ -217,7 +152,7 @@ public class TestSCMPipelineManager {
     MockNodeManager nodeManagerMock = new MockNodeManager(true,
         20);
     SCMPipelineManager pipelineManager =
-        new SCMPipelineManager(conf, nodeManagerMock, new EventQueue());
+        new SCMPipelineManager(conf, nodeManagerMock, new EventQueue(), null);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManagerMock,
             pipelineManager.getStateManager(), conf);
@@ -226,9 +161,9 @@ public class TestSCMPipelineManager {
 
     MetricsRecordBuilder metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
-    long numPipelineAllocated = getLongCounter("NumPipelineAllocated",
+    long numPipelineCreated = getLongCounter("NumPipelineCreated",
         metrics);
-    Assert.assertTrue(numPipelineAllocated == 0);
+    Assert.assertTrue(numPipelineCreated == 0);
 
     // 3 DNs are unhealthy.
     // Create 5 pipelines (Use up 15 Datanodes)
@@ -241,8 +176,8 @@ public class TestSCMPipelineManager {
 
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
-    numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertTrue(numPipelineAllocated == 5);
+    numPipelineCreated = getLongCounter("NumPipelineCreated", metrics);
+    Assert.assertTrue(numPipelineCreated == 5);
 
     long numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
@@ -261,8 +196,8 @@ public class TestSCMPipelineManager {
 
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
-    numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertTrue(numPipelineAllocated == 5);
+    numPipelineCreated = getLongCounter("NumPipelineCreated", metrics);
+    Assert.assertTrue(numPipelineCreated == 5);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
@@ -275,7 +210,7 @@ public class TestSCMPipelineManager {
   @Test
   public void testActivateDeactivatePipeline() throws IOException {
     final SCMPipelineManager pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue());
+        new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
     final PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -322,7 +257,7 @@ public class TestSCMPipelineManager {
   public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
     EventQueue eventQueue = new EventQueue();
     SCMPipelineManager pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, eventQueue);
+        new SCMPipelineManager(conf, nodeManager, eventQueue, null);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -335,7 +270,7 @@ public class TestSCMPipelineManager {
     pipelineManager.close();
     // new pipeline manager loads the pipelines from the db in ALLOCATED state
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, eventQueue);
+        new SCMPipelineManager(conf, nodeManager, eventQueue, null);
     mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
