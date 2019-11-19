@@ -130,7 +130,8 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
             conf))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
-        .addHandler(new DeleteContainerCommandHandler())
+        .addHandler(new DeleteContainerCommandHandler(
+            dnConf.getContainerDeleteThreads()))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -277,6 +278,10 @@ public class DatanodeStateMachine implements Closeable {
 
     if (jvmPauseMonitor != null) {
       jvmPauseMonitor.stop();
+    }
+
+    if (commandDispatcher != null) {
+      commandDispatcher.stop();
     }
   }
 
