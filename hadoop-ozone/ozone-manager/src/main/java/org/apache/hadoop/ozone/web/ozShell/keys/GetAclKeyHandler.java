@@ -55,32 +55,34 @@ public class GetAclKeyHandler extends Handler {
   public Void call() throws Exception {
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureKeyAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
-    String keyName = address.getKeyName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
+      String keyName = address.getKeyName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
-      System.out.printf("Key Name : %s%n", keyName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+        System.out.printf("Key Name : %s%n", keyName);
+      }
+
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setBucketName(bucketName)
+          .setVolumeName(volumeName)
+          .setKeyName(keyName)
+          .setResType(OzoneObj.ResourceType.KEY)
+          .setStoreType(storeType == null ? OZONE :
+              OzoneObj.StoreType.valueOf(storeType))
+          .build();
+
+      List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
+
+      System.out.printf("%s%n",
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
     }
 
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setKeyName(keyName)
-        .setResType(OzoneObj.ResourceType.KEY)
-        .setStoreType(storeType == null ? OZONE :
-            OzoneObj.StoreType.valueOf(storeType))
-        .build();
-
-    List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
-
-    System.out.printf("%s%n",
-        JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
-    client.close();
     return null;
   }
 
