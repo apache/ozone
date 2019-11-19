@@ -490,7 +490,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.internal.service.ids</name>
+    <name>ozone.om.internal.service.id</name>
     <value></value>
     <tag>OM, HA</tag>
     <description>
