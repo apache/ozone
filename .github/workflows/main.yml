@@ -17,40 +17,40 @@ on:
   - push
   - pull_request
 jobs:
-  build:
-    name: compile
-    runs-on: ubuntu-18.04
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/build.sh
-  rat:
-    name: rat
-    runs-on: ubuntu-18.04
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/rat.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: rat
-            path: target/rat
-  author:
-    name: author
-    runs-on: ubuntu-18.04
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/author.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: author
-            path: target/author
+#  build:
+#    name: compile
+#    runs-on: ubuntu-18.04
+#    steps:
+#        - uses: actions/checkout@master
+#        - uses: ./.github/buildenv
+#          with:
+#             args: ./hadoop-ozone/dev-support/checks/build.sh
+#  rat:
+#    name: rat
+#    runs-on: ubuntu-18.04
+#    steps:
+#        - uses: actions/checkout@master
+#        - uses: ./.github/buildenv
+#          with:
+#             args: ./hadoop-ozone/dev-support/checks/rat.sh
+#        - uses: actions/upload-artifact@master
+#          if: always()
+#          with:
+#            name: rat
+#            path: target/rat
+#  author:
+#    name: author
+#    runs-on: ubuntu-18.04
+#    steps:
+#        - uses: actions/checkout@master
+#        - uses: ./.github/buildenv
+#          with:
+#             args: ./hadoop-ozone/dev-support/checks/author.sh
+#        - uses: actions/upload-artifact@master
+#          if: always()
+#          with:
+#            name: author
+#            path: target/author
   unit:
     name: unit
     runs-on: ubuntu-18.04
@@ -59,57 +59,62 @@ jobs:
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/unit.sh
+        - uses: ./.github/buildenv
+          with:
+            args: ./hadoop-ozone/dev-support/checks/sonar.sh
+          env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: unit
             path: target/unit
-  checkstyle:
-    name: checkstyle
-    runs-on: ubuntu-18.04
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: checkstyle
-            path: target/checkstyle
-  findbugs:
-    name: findbugs
-    runs-on: ubuntu-18.04
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/findbugs.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: findbugs
-            path: target/findbugs
-  acceptance:
-    name: acceptance
-    runs-on: ubuntu-18.04
-    needs:
-       - build
-       - rat
-       - checkstyle
-       - unit
-       - findbugs
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-            args: ./hadoop-ozone/dev-support/checks/build.sh
-        - run: sudo pip install robotframework
-        - run: sudo chown runner -R .
-        - run: cd ./hadoop-ozone/dist/target/ozone-*-SNAPSHOT/ && mkdir .aws && sudo chown 1000 .aws 
-        - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: acceptance
-            path: target/acceptance
+#  checkstyle:
+#    name: checkstyle
+#    runs-on: ubuntu-18.04
+#    steps:
+#        - uses: actions/checkout@master
+#        - uses: ./.github/buildenv
+#          with:
+#             args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
+#        - uses: actions/upload-artifact@master
+#          if: always()
+#          with:
+#            name: checkstyle
+#            path: target/checkstyle
+#  findbugs:
+#    name: findbugs
+#    runs-on: ubuntu-18.04
+#    steps:
+#        - uses: actions/checkout@master
+#        - uses: ./.github/buildenv
+#          with:
+#             args: ./hadoop-ozone/dev-support/checks/findbugs.sh
+#        - uses: actions/upload-artifact@master
+#          if: always()
+#          with:
+#            name: findbugs
+#            path: target/findbugs
+#  acceptance:
+#    name: acceptance
+#    runs-on: ubuntu-18.04
+#    needs:
+#       - build
+#       - rat
+#       - checkstyle
+#       - unit
+#       - findbugs
+#    steps:
+#        - uses: actions/checkout@master
+#        - uses: ./.github/buildenv
+#          with:
+#            args: ./hadoop-ozone/dev-support/checks/build.sh
+#        - run: sudo pip install robotframework
+#        - run: sudo chown runner -R .
+#        - run: cd ./hadoop-ozone/dist/target/ozone-*-SNAPSHOT/ && mkdir .aws && sudo chown 1000 .aws
+#        - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
+#        - uses: actions/upload-artifact@master
+#          if: always()
+#          with:
+#            name: acceptance
+#            path: target/acceptance

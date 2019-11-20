@@ -229,6 +229,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <snakeyaml.version>1.16</snakeyaml.version>
     <hbase.one.version>1.2.6</hbase.one.version>
     <hbase.two.version>2.0.0-beta-1</hbase.two.version>
+
+    <!-- sonar cloud integration. Token can be set with using SONAR_TOKEN
+     environment variable.-->
+    <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+    <sonar.organization>apache</sonar.organization>
   </properties>
 
 
