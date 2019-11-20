@@ -36,6 +36,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Cache implementation for the table. Depending on the cache clean up policy
@@ -51,6 +53,10 @@ import org.apache.hadoop.classification.InterfaceStability.Evolving;
 @Evolving
 public class TableCacheImpl<CACHEKEY extends CacheKey,
     CACHEVALUE extends CacheValue> implements TableCache<CACHEKEY, CACHEVALUE> {
+
+  public static final Logger LOG =
+      LoggerFactory.getLogger(TableCacheImpl.class);
+
   private final Map<CACHEKEY, CACHEVALUE> cache;
   private final NavigableSet<EpochEntry<CACHEKEY>> epochEntries;
   private ExecutorService executorService;
@@ -121,6 +127,8 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
       CacheValue cacheValue = cache.computeIfPresent(cachekey, ((k, v) -> {
         if (cleanupPolicy == CacheCleanupPolicy.MANUAL) {
           if (v.getEpoch() == currentEpoch && epochs.contains(v.getEpoch())) {
+            LOG.debug("CacheKey {} with epoch {} is removed from cache",
+                k.getCacheKey(), currentEpoch);
             iterator.remove();
             removed.set(true);
             return null;
@@ -129,6 +137,8 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
           // Remove only entries which are marked for delete.
           if (v.getEpoch() == currentEpoch && epochs.contains(v.getEpoch())
               && v.getCacheValue() == null) {
+            LOG.debug("CacheKey {} with epoch {} is removed from cache",
+                k.getCacheKey(), currentEpoch);
             removed.set(true);
             iterator.remove();
             return null;
@@ -142,6 +152,9 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
       // override cache entry, but in epoch entry it is still lying around.
       // This is done to cleanup epoch entries.
       if (!removed.get() && cacheValue == null) {
+        LOG.debug("CacheKey {} with epoch {} is removed from epochEntry for " +
+                "a key not existing in cache", cachekey.getCacheKey(),
+            currentEpoch);
         iterator.remove();
       } else if (currentEpoch >= lastEpoch) {
         // If currentEntry epoch is greater than last epoch provided, we have
