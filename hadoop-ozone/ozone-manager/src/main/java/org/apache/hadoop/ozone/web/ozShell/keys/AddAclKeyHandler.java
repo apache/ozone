@@ -70,37 +70,38 @@ public class AddAclKeyHandler extends Handler {
     Objects.requireNonNull(acl, "New acl to be added not specified.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureKeyAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
-    String keyName = address.getKeyName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
+      String keyName = address.getKeyName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
-      System.out.printf("Key Name : %s%n", keyName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+        System.out.printf("Key Name : %s%n", keyName);
+      }
+
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setBucketName(bucketName)
+          .setVolumeName(volumeName)
+          .setKeyName(address.getKeyName())
+          .setResType(OzoneObj.ResourceType.KEY)
+          .setStoreType(storeType == null ? OZONE :
+              OzoneObj.StoreType.valueOf(storeType))
+          .build();
+
+      boolean result = client.getObjectStore().addAcl(obj,
+          OzoneAcl.parseAcl(acl));
+
+      String message = result
+          ? ("Acl added successfully.")
+          : ("Acl already exists.");
+
+      System.out.println(message);
     }
 
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setKeyName(address.getKeyName())
-        .setResType(OzoneObj.ResourceType.KEY)
-        .setStoreType(storeType == null ? OZONE :
-            OzoneObj.StoreType.valueOf(storeType))
-        .build();
-
-    boolean result = client.getObjectStore().addAcl(obj,
-        OzoneAcl.parseAcl(acl));
-
-    String message = result
-        ? ("Acl added successfully.")
-        : ("Acl already exists.");
-
-    System.out.println(message);
-
-    client.close();
     return null;
   }
 

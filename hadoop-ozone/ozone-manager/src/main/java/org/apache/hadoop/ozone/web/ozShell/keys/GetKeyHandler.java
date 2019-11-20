@@ -65,50 +65,52 @@ public class GetKeyHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureKeyAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
-    String keyName = address.getKeyName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
+      String keyName = address.getKeyName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
-      System.out.printf("Key Name : %s%n", keyName);
-    }
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+        System.out.printf("Key Name : %s%n", keyName);
+      }
 
-    Path dataFilePath = Paths.get(fileName);
-    File dataFile = new File(fileName);
+      Path dataFilePath = Paths.get(fileName);
+      File dataFile = new File(fileName);
 
-    if (dataFile.exists() && dataFile.isDirectory()) {
-      dataFile = new File(fileName, keyName);
-    }
+      if (dataFile.exists() && dataFile.isDirectory()) {
+        dataFile = new File(fileName, keyName);
+      }
 
-    if (dataFile.exists()) {
-      throw new OzoneClientException(
-          fileName + " exists. Download will overwrite an "
-              + "existing file. Aborting.");
-    }
+      if (dataFile.exists()) {
+        throw new OzoneClientException(
+            fileName + " exists. Download will overwrite an "
+                + "existing file. Aborting.");
+      }
 
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket = vol.getBucket(bucketName);
-    OzoneInputStream keyInputStream = bucket.readKey(keyName);
-    if (dataFilePath != null) {
-      FileOutputStream outputStream = new FileOutputStream(dataFile);
-      IOUtils.copyBytes(keyInputStream, outputStream,
-          (int) new OzoneConfiguration()
-              .getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
-                  OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES));
-      outputStream.close();
-    } else {
-      throw new OzoneClientException(
-          "Can not access the file \"" + fileName + "\"");
-    }
-    if (isVerbose()) {
-      FileInputStream stream = new FileInputStream(dataFile);
-      String hash = DigestUtils.md5Hex(stream);
-      System.out.printf("Downloaded file hash : %s%n", hash);
-      stream.close();
+      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+      OzoneBucket bucket = vol.getBucket(bucketName);
+      OzoneInputStream keyInputStream = bucket.readKey(keyName);
+      if (dataFilePath != null) {
+        FileOutputStream outputStream = new FileOutputStream(dataFile);
+        IOUtils.copyBytes(keyInputStream, outputStream,
+            (int) new OzoneConfiguration()
+                .getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
+                    OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES));
+        outputStream.close();
+      } else {
+        throw new OzoneClientException(
+            "Can not access the file \"" + fileName + "\"");
+      }
+      if (isVerbose()) {
+        FileInputStream stream = new FileInputStream(dataFile);
+        String hash = DigestUtils.md5Hex(stream);
+        System.out.printf("Downloaded file hash : %s%n", hash);
+        stream.close();
+      }
     }
     return null;
   }

@@ -57,8 +57,8 @@ public class GrpcXceiverService extends
               dispatcher.dispatch(request, null);
           responseObserver.onNext(resp);
         } catch (Throwable e) {
-          LOG.error("{} got exception when processing"
-                    + " ContainerCommandRequestProto {}: {}", request, e);
+          LOG.error("Got exception when processing"
+                    + " ContainerCommandRequestProto {}", request, e);
           responseObserver.onError(e);
         }
       }
@@ -66,13 +66,13 @@ public class GrpcXceiverService extends
       @Override
       public void onError(Throwable t) {
         // for now we just log a msg
-        LOG.error("{}: ContainerCommand send on error. Exception: {}", t);
+        LOG.error("ContainerCommand send on error. Exception: ", t);
       }
 
       @Override
       public void onCompleted() {
         if (isClosed.compareAndSet(false, true)) {
-          LOG.debug("{}: ContainerCommand send completed");
+          LOG.debug("ContainerCommand send completed");
           responseObserver.onCompleted();
         }
       }

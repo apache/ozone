@@ -510,12 +510,13 @@ public final class OmUtils {
   public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
       RepeatedOmKeyInfo repeatedOmKeyInfo) throws IOException{
     // If this key is in a GDPR enforced bucket, then before moving
-    // KeyInfo to deletedTable, remove the GDPR related metadata from
-    // KeyInfo.
+    // KeyInfo to deletedTable, remove the GDPR related metadata and
+    // FileEncryptionInfo from KeyInfo.
     if(Boolean.valueOf(keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))) {
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
+      keyInfo.clearFileEncryptionInfo();
     }
 
     if(repeatedOmKeyInfo == null) {

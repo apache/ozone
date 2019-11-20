@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -73,9 +72,9 @@ public class Scheduler {
     }, delay, timeUnit);
   }
 
-  public ScheduledFuture<?> scheduleWithFixedDelay(Runnable runnable,
-      long initialDelay, long fixedDelay, TimeUnit timeUnit) {
-    return scheduler
+  public void scheduleWithFixedDelay(Runnable runnable, long initialDelay,
+      long fixedDelay, TimeUnit timeUnit) {
+    scheduler
         .scheduleWithFixedDelay(runnable, initialDelay, fixedDelay, timeUnit);
   }
 

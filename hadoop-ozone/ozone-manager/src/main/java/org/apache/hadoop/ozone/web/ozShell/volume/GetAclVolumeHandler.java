@@ -55,23 +55,25 @@ public class GetAclVolumeHandler extends Handler {
   public Void call() throws Exception {
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
-    String volumeName = address.getVolumeName();
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
+      String volumeName = address.getVolumeName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+      }
+
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName)
+          .setResType(OzoneObj.ResourceType.VOLUME)
+          .setStoreType(storeType == null ? OZONE :
+              OzoneObj.StoreType.valueOf(storeType))
+          .build();
+      List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
+      System.out.printf("%s%n",
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
     }
 
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setVolumeName(volumeName)
-        .setResType(OzoneObj.ResourceType.VOLUME)
-        .setStoreType(storeType == null ? OZONE :
-            OzoneObj.StoreType.valueOf(storeType))
-        .build();
-    List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
-    System.out.printf("%s%n",
-        JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
-    client.close();
     return null;
   }
 
