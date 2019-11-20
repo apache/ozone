@@ -307,7 +307,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     for (DatanodeDetails dn : datanodeList) {
       try {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Executing command " + request + " on datanode " + dn);
+          LOG.debug("Executing command {} on datanode {}", request, dn);
         }
         // In case the command gets retried on a 2nd datanode,
         // sendCommandAsyncCall will create a new channel and async stub
@@ -398,7 +398,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
-          request.getCmdType().toString(), dn.getNetworkFullPath());
+          request.getCmdType(), dn.getNetworkFullPath());
     }
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
@@ -478,7 +478,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       IOException {
     // there is no notion of watch for commit index in standalone pipeline
     return null;
-  };
+  }
 
   public long getReplicatedMinCommitIndex() {
     return 0;

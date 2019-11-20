@@ -104,6 +104,12 @@ public final class CommandDispatcher {
     }
   }
 
+  public void stop() {
+    for (CommandHandler c : handlerMap.values()) {
+      c.stop();
+    }
+  }
+
   public static Builder newBuilder() {
     return new Builder();
   }
