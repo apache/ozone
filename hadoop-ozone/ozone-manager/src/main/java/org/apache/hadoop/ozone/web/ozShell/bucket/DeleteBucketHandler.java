@@ -45,18 +45,20 @@ public class DeleteBucketHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+      }
+
+      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+      vol.deleteBucket(bucketName);
     }
-
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    vol.deleteBucket(bucketName);
     return null;
   }
 }

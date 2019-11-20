@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,7 +23,7 @@ package org.apache.hadoop.hdds.server.events;
  * EventExecutors should guarantee that the implementations are called only
  * from one thread.
  *
- * @param <PAYLOAD>
+ * @param <PAYLOAD> the payload type of the event
  */
 @FunctionalInterface
 public interface EventHandler<PAYLOAD> {

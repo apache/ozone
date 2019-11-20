@@ -449,6 +449,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_MANAGER_FAIR_LOCK = "ozone.om.lock.fair";
   public static final boolean OZONE_MANAGER_FAIR_LOCK_DEFAULT = false;
 
+  public static final String OZONE_CLIENT_LIST_TRASH_KEYS_MAX =
+      "ozone.client.list.trash.keys.max";
+  public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
+
   /**
    * There is no need to instantiate this class.
    */

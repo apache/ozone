@@ -53,7 +53,10 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
  * This class is for performing chunk related operations.
  */
 public class ChunkManagerImpl implements ChunkManager {
-  static final Logger LOG = LoggerFactory.getLogger(ChunkManagerImpl.class);
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ChunkManagerImpl.class);
+
   private final boolean doSyncWrite;
 
   public ChunkManagerImpl(boolean sync) {

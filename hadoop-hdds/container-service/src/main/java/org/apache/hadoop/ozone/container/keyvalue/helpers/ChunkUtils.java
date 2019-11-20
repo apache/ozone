@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerImpl;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -62,6 +61,9 @@ import static java.util.Collections.unmodifiableSet;
 public final class ChunkUtils {
 
   private static final Set<Path> LOCKS = ConcurrentHashMap.newKeySet();
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ChunkUtils.class);
 
   // skip SYNC and DSYNC to reduce contention on file.lock
   private static final Set<? extends OpenOption> WRITE_OPTIONS =
@@ -94,8 +96,8 @@ public final class ChunkUtils {
       ByteBuffer data, VolumeIOStats volumeIOStats, boolean sync)
       throws StorageContainerException, ExecutionException,
       InterruptedException, NoSuchAlgorithmException {
-    Logger log = LoggerFactory.getLogger(ChunkManagerImpl.class);
-    final int bufferSize = validateBufferSize(chunkInfo, data, log);
+
+    final int bufferSize = validateBufferSize(chunkInfo, data);
 
     Path path = chunkFile.toPath();
     long startTime = Time.monotonicNow();
@@ -114,7 +116,7 @@ public final class ChunkUtils {
         volumeIOStats.incWriteOpCount();
         volumeIOStats.incWriteBytes(size);
         if (size != bufferSize) {
-          log.error("Invalid write size found. Size:{}  Expected: {} ", size,
+          LOG.error("Invalid write size found. Size:{}  Expected: {} ", size,
               bufferSize);
           throw new StorageContainerException("Invalid write size found. " +
               "Size: " + size + " Expected: " + bufferSize, INVALID_WRITE_SIZE);
@@ -130,21 +132,21 @@ public final class ChunkUtils {
       return null;
     });
 
-    if (log.isDebugEnabled()) {
-      log.debug("Write Chunk completed for chunkFile: {}, size {}", chunkFile,
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Write Chunk completed for chunkFile: {}, size {}", chunkFile,
           bufferSize);
     }
   }
 
   public static int validateBufferSize(
-      ChunkInfo chunkInfo, ByteBuffer data, Logger log)
+      ChunkInfo chunkInfo, ByteBuffer data)
       throws StorageContainerException {
     final int bufferSize = data.remaining();
     if (bufferSize != chunkInfo.getLen()) {
       String err = String.format("data array does not match the length " +
               "specified. DataLen: %d Byte Array: %d",
           chunkInfo.getLen(), bufferSize);
-      log.error(err);
+      LOG.error(err);
       throw new StorageContainerException(err, INVALID_WRITE_SIZE);
     }
     return bufferSize;
@@ -160,10 +162,9 @@ public final class ChunkUtils {
    */
   public static ByteBuffer readData(File chunkFile, ChunkInfo data,
       VolumeIOStats volumeIOStats) throws StorageContainerException {
-    Logger log = LoggerFactory.getLogger(ChunkManagerImpl.class);
 
     if (!chunkFile.exists()) {
-      log.error("Unable to find the chunk file. chunk info : {}",
+      LOG.error("Unable to find the chunk file. chunk info : {}",
           data.toString());
       throw new StorageContainerException("Unable to find the chunk file. " +
           "chunk info " +
@@ -215,11 +216,9 @@ public final class ChunkUtils {
   public static boolean validateChunkForOverwrite(File chunkFile,
       ChunkInfo info) {
 
-    Logger log = LoggerFactory.getLogger(ChunkManagerImpl.class);
-
     if (isOverWriteRequested(chunkFile, info)) {
       if (!isOverWritePermitted(info)) {
-        log.warn("Duplicate write chunk request. Chunk overwrite " +
+        LOG.warn("Duplicate write chunk request. Chunk overwrite " +
             "without explicit request. {}", info.toString());
       }
       return true;
@@ -240,17 +239,16 @@ public final class ChunkUtils {
       StorageContainerException {
 
     Preconditions.checkNotNull(containerData, "Container data can't be null");
-    Logger log = LoggerFactory.getLogger(ChunkManagerImpl.class);
 
     String chunksPath = containerData.getChunksPath();
     if (chunksPath == null) {
-      log.error("Chunks path is null in the container data");
+      LOG.error("Chunks path is null in the container data");
       throw new StorageContainerException("Unable to get Chunks directory.",
           UNABLE_TO_FIND_DATA_DIR);
     }
     File chunksLoc = new File(chunksPath);
     if (!chunksLoc.exists()) {
-      log.error("Chunks path does not exist");
+      LOG.error("Chunks path does not exist");
       throw new StorageContainerException("Unable to get Chunks directory.",
           UNABLE_TO_FIND_DATA_DIR);
     }

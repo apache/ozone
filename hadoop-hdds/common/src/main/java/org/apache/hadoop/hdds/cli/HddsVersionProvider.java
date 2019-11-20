@@ -27,9 +27,8 @@ import picocli.CommandLine.IVersionProvider;
 public class HddsVersionProvider implements IVersionProvider {
   @Override
   public String[] getVersion() throws Exception {
-    String[] result = new String[] {
+    return new String[] {
         HddsVersionInfo.HDDS_VERSION_INFO.getBuildVersion()
     };
-    return result;
   }
 }

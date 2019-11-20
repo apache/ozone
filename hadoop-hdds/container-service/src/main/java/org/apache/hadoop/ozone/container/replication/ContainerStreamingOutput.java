@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.StreamingOutput;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -39,7 +38,7 @@ public class ContainerStreamingOutput implements StreamingOutput {
 
   @Override
   public void write(OutputStream outputStream)
-      throws IOException, WebApplicationException {
+      throws IOException {
     containerReplicationSource.copyData(containerId, outputStream);
   }
 }

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.replication;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -122,10 +123,9 @@ public class GrpcReplicationClient {
         Files.createDirectories(parentPath);
         stream = new FileOutputStream(outputPath.toFile());
       } catch (IOException e) {
-        throw new RuntimeException("OutputPath can't be used: " + outputPath,
-            e);
+        throw new UncheckedIOException(
+            "Output path can't be used: " + outputPath, e);
       }
-
     }
 
     @Override
@@ -143,13 +143,7 @@ public class GrpcReplicationClient {
         LOG.error("Download of container {} was unsuccessful",
             containerId, throwable);
         stream.close();
-        try {
-          Files.delete(outputPath);
-        } catch (IOException ex) {
-          LOG.error("Failed to delete temporary destination {} for " +
-              "unsuccessful download of container {}",
-              outputPath, containerId, ex);
-        }
+        deleteOutputOnFailure();
         response.completeExceptionally(throwable);
       } catch (IOException e) {
         LOG.error("Failed to close {} for container {}",
@@ -170,6 +164,16 @@ public class GrpcReplicationClient {
         response.completeExceptionally(e);
       }
 
+    }
+
+    private void deleteOutputOnFailure() {
+      try {
+        Files.delete(outputPath);
+      } catch (IOException ex) {
+        LOG.error("Failed to delete temporary destination {} for " +
+                "unsuccessful download of container {}",
+            outputPath, containerId, ex);
+      }
     }
   }
 

@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
+import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -90,7 +91,7 @@ public final class ContainerCommandRequestMessage implements Message {
 
   private ByteString buildContent() {
     final ByteString headerBytes = header.toByteString();
-    return RatisHelper.int2ByteString(headerBytes.size())
+    return Checksum.int2ByteString(headerBytes.size())
         .concat(headerBytes)
         .concat(data);
   }
