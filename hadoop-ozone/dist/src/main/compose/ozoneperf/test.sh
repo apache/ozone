@@ -18,12 +18,24 @@
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
+export SECURITY_ENABLED=false
+
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-execute_robot_test scm basic/basic.robot
+#Due to the limitation of the current auditparser test, it should be the
+#first test in a clean cluster.
+
+#Disabling for now, audit parser tool during parse getting exception.
+#execute_robot_test om auditparser
+
+execute_robot_test scm basic
+
+execute_robot_test scm gdpr
+
+execute_robot_test scm s3
 
 stop_docker_env
 
