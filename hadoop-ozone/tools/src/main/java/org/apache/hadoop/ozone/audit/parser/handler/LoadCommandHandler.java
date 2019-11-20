@@ -16,14 +16,15 @@
  */
 package org.apache.hadoop.ozone.audit.parser.handler;
 
+import java.util.concurrent.Callable;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.audit.parser.AuditParser;
 import org.apache.hadoop.ozone.audit.parser.common.DatabaseHelper;
-import picocli.CommandLine.*;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
-
-import java.util.concurrent.Callable;
+import picocli.CommandLine.ParentCommand;
 
 /**
  * Load command handler for ozone audit parser.
@@ -41,8 +42,8 @@ public class LoadCommandHandler implements Callable<Void> {
   @ParentCommand
   private AuditParser auditParser;
 
-  public Void call() {
-    if(DatabaseHelper.setup(auditParser.getDatabase(), logs)) {
+  public Void call() throws Exception {
+    if (DatabaseHelper.setup(auditParser.getDatabase(), logs)) {
       System.out.println(logs + " has been loaded successfully");
     } else {
       System.out.println("Failed to load " + logs);
