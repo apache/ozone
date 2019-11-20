@@ -680,19 +680,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .maximumSize(Integer.MAX_VALUE)
             .removalListener((
                 RemovalListener<String, ContainerStat>) removalNotification -> {
-              synchronized (containerReportCache) {
-                ContainerStat stat = removalNotification.getValue();
-                if (stat != null) {
-                  // TODO: Are we doing the right thing here?
-                  // remove invalid container report
-                  metrics.decrContainerStat(stat);
-                }
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Remove expired container stat entry for " +
-                      "datanode: {}.", removalNotification.getKey());
-                }
-              }
-            })
+                  synchronized (containerReportCache) {
+                    ContainerStat stat = removalNotification.getValue();
+                    if (stat != null) {
+                      // TODO: Are we doing the right thing here?
+                      // remove invalid container report
+                      metrics.decrContainerStat(stat);
+                    }
+                    if (LOG.isDebugEnabled()) {
+                      LOG.debug("Remove expired container stat entry for " +
+                          "datanode: {}.", removalNotification.getKey());
+                    }
+                  }
+                })
             .build();
   }
 
