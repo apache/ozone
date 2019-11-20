@@ -41,7 +41,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
+import java.util.stream.LongStream;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -52,6 +54,8 @@ import static org.junit.Assert.fail;
  * Class used to test ContainerSet operations.
  */
 public class TestContainerSet {
+
+  private static final int FIRST_ID = 2;
 
   @Test
   public void testAddGetRemoveContainer() throws StorageContainerException {
@@ -247,21 +251,40 @@ public class TestContainerSet {
   @Test
   public void testListContainer() throws StorageContainerException {
     ContainerSet containerSet = createContainerSet();
+    int count = 5;
+    int startId = FIRST_ID + 3;
+    List<ContainerData> result = new ArrayList<>(count);
 
-    List<ContainerData> result = new ArrayList<>();
-    containerSet.listContainer(2, 5, result);
+    containerSet.listContainer(startId, count, result);
 
-    assertEquals(5, result.size());
+    assertContainerIds(startId, count, result);
+  }
 
-    for(ContainerData containerData : result) {
-      assertTrue(containerData.getContainerID() >=2 && containerData
-          .getContainerID()<=6);
-    }
+  @Test
+  public void testListContainerFromFirstKey() throws StorageContainerException {
+    ContainerSet containerSet = createContainerSet();
+    int count = 6;
+    List<ContainerData> result = new ArrayList<>(count);
+
+    containerSet.listContainer(0, count, result);
+
+    assertContainerIds(FIRST_ID, count, result);
+  }
+
+  /**
+   * Verify that {@code result} contains {@code count} containers
+   * with IDs in increasing order starting at {@code startId}.
+   */
+  private static void assertContainerIds(int startId, int count,
+                                         List<ContainerData> result) {
+    assertEquals(count, result.size());
+    assertArrayEquals(LongStream.range(startId, startId + count).toArray(),
+        result.stream().mapToLong(ContainerData::getContainerID).toArray());
   }
 
   private ContainerSet createContainerSet() throws StorageContainerException {
     ContainerSet containerSet = new ContainerSet();
-    for (int i=0; i<10; i++) {
+    for (int i = FIRST_ID; i < FIRST_ID + 10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
