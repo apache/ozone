@@ -383,13 +383,14 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
       }
 
       // We are doing +1 for volume transaction.
+      // Here not checking lastAppliedIndex because transactionIndex is
+      // shared across threads, and lastAppliedIndex cannot be always
+      // expectedTransactions. So, skipping that check here.
       long expectedTransactions = (bucketCount + 1) * iterations;
-      GenericTestUtils.waitFor(() -> lastAppliedIndex == expectedTransactions,
-          100, 500000);
 
-      Assert.assertEquals(expectedTransactions,
-          doubleBuffer.getFlushedTransactionCount()
-      );
+      GenericTestUtils.waitFor(() -> expectedTransactions ==
+              doubleBuffer.getFlushedTransactionCount(),
+          100, 500000);
 
       GenericTestUtils.waitFor(() -> {
         long count = 0L;
