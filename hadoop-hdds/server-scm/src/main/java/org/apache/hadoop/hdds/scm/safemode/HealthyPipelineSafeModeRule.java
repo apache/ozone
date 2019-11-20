@@ -57,17 +57,17 @@ public class HealthyPipelineSafeModeRule
             HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT);
 
-    int minHealthyPipelines = 0;
-
     boolean createPipelineInSafemode = configuration.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
 
-    if (createPipelineInSafemode) {
-      minHealthyPipelines =
-          configuration.getInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_PIPELINE,
-              HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_PIPELINE_DEFAULT);
-    }
+    int minDatanodes = configuration.getInt(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
+
+    // We only care about THREE replica pipeline
+    int minHealthyPipelines = minDatanodes /
+        HddsProtos.ReplicationFactor.THREE_VALUE;
 
     Preconditions.checkArgument(
         (healthyPipelinesPercent >= 0.0 && healthyPipelinesPercent <= 1.0),

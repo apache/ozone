@@ -173,18 +173,17 @@ public class TestSCMPipelineManager {
     Assert
         .assertFalse(pipelineManager.getPipeline(pipeline.getId()).isOpen());
 
+    // pipeline is not healthy until all dns report
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+    Assert.assertFalse(
+        pipelineManager.getPipeline(pipeline.getId()).isHealthy());
     // get pipeline report from each dn in the pipeline
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
-    for (DatanodeDetails dn: pipeline.getNodes()) {
-      PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
-      // pipeline is not healthy until all dns report
-      Assert.assertFalse(
-          pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-      pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
-    }
+    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
+        pipelineReportHandler, false, eventQueue));
+    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
+        pipelineReportHandler, true, eventQueue);
 
     // pipeline is healthy when all dns report
     Assert
@@ -196,13 +195,11 @@ public class TestSCMPipelineManager {
     // close the pipeline
     pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
 
-    for (DatanodeDetails dn: pipeline.getNodes()) {
-      PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
-      // pipeline report for destroyed pipeline should be ignored
-      pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
-    }
+    // pipeline report for destroyed pipeline should be ignored
+    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
+        pipelineReportHandler, false, eventQueue));
+    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
+        pipelineReportHandler, true, eventQueue);
 
     try {
       pipelineManager.getPipeline(pipeline.getId());
