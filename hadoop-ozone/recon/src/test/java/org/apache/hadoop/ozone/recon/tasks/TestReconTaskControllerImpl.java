@@ -34,6 +34,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.hadoop.ozone.recon.schema.ReconInternalSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
@@ -99,6 +100,7 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
   @Test
   public void testFailedTaskRetryLogic() throws Exception {
     String taskName = "Dummy_" + System.currentTimeMillis();
+
     DummyReconDBTask dummyReconDBTask =
         new DummyReconDBTask(taskName, DummyReconDBTask.TaskType.FAIL_ONCE);
     reconTaskController.registerTask(dummyReconDBTask);
@@ -120,6 +122,7 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
     Assert.assertEquals(taskName, dbRecord.getTaskName());
     Assert.assertTrue(
         dbRecord.getLastUpdatedTimestamp() > currentTime);
+
     Assert.assertEquals(Long.valueOf(100L), dbRecord.getLastUpdatedSeqNumber());
   }
 
@@ -161,17 +164,35 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
   @Test
   public void testReInitializeTasks() throws Exception {
 
-    OMMetadataManager omMetadataManagerMock = mock(OMMetadataManager.class);
+    ReconOMMetadataManager omMetadataManagerMock = mock(
+        ReconOMMetadataManager.class);
     ReconDBUpdateTask reconDBUpdateTaskMock =
         getMockTask("MockTask2");
     when(reconDBUpdateTaskMock.reprocess(omMetadataManagerMock))
         .thenReturn(new ImmutablePair<>("MockTask2", true));
+    when(omMetadataManagerMock.getLastSequenceNumberFromOMMetadataDB()
+    ).thenReturn(100L);
 
+    long startTime = System.currentTimeMillis();
     reconTaskController.registerTask(reconDBUpdateTaskMock);
     reconTaskController.reInitializeTasks(omMetadataManagerMock);
+    long endTime = System.currentTimeMillis();
 
     verify(reconDBUpdateTaskMock, times(1))
         .reprocess(omMetadataManagerMock);
+
+    verify(omMetadataManagerMock, times(1)
+    ).getLastSequenceNumberFromOMMetadataDB();
+
+    ReconTaskStatusDao dao = new ReconTaskStatusDao(sqlConfiguration);
+    ReconTaskStatus reconTaskStatus = dao.findById("MockTask2");
+    long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
+    long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
+
+    Assert.assertTrue(startTime <= taskTimeStamp
+        && taskTimeStamp <= endTime);
+    Assert.assertEquals(seqNumber,
+        omMetadataManagerMock.getLastSequenceNumberFromOMMetadataDB());
   }
 
   /**

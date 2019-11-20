@@ -167,6 +167,30 @@ public class OzoneManagerServiceProviderImpl
     this.reconTaskStatusDao = reconTaskController.getReconTaskStatusDao();
     this.ozoneManagerClient = ozoneManagerClient;
     this.configuration = configuration;
+
+    registerOMDBTasks();
+  }
+
+  public void registerOMDBTasks () {
+    ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
+        OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name(),
+        System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
+    if (!reconTaskStatusDao.existsById(
+        OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name())){
+      reconTaskStatusDao.insert(reconTaskStatusRecord);
+      LOG.info("Registered {} task ",
+          OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name());
+    }
+
+    reconTaskStatusRecord = new ReconTaskStatus(
+        OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name(),
+        System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
+    if (!reconTaskStatusDao.existsById(
+        OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name())){
+      reconTaskStatusDao.insert(reconTaskStatusRecord);
+      LOG.info("Registered {} task ",
+          OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name());
+    }
   }
 
   @Override
@@ -317,6 +341,7 @@ public class OzoneManagerServiceProviderImpl
             OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name(),
                 System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
         reconTaskStatusDao.update(reconTaskStatusRecord);
+
         // Pass on DB update events to tasks that are listening.
         reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
             omdbUpdatesHandler.getEvents()), omMetadataManager);
@@ -339,6 +364,7 @@ public class OzoneManagerServiceProviderImpl
                   OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name(),
                   System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
           reconTaskStatusDao.update(reconTaskStatusRecord);
+
           // Reinitialize tasks that are listening.
           LOG.info("Calling reprocess on Recon tasks.");
           reconTaskController.reInitializeTasks(omMetadataManager);
@@ -355,12 +381,7 @@ public class OzoneManagerServiceProviderImpl
    * @return latest sequence number.
    */
   private long getCurrentOMDBSequenceNumber() {
-    RDBStore rocksDBStore = (RDBStore)omMetadataManager.getStore();
-    if (null == rocksDBStore) {
-      return 0;
-    } else {
-      return rocksDBStore.getDb().getLatestSequenceNumber();
-    }
+    return omMetadataManager.getLastSequenceNumberFromOMMetadataDB();
   }
 }
 
