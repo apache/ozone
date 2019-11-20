@@ -1893,7 +1893,6 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(args, "Key args can not be null");
 
     List<OzoneFileStatus> fileStatusList = new ArrayList<>();
-    // Sanity check for numEntries.
     if (numEntries <= 0) {
       return fileStatusList;
     }
@@ -1902,24 +1901,19 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
 
-    // A map sorted by OmKey so as to combine entries from both
-    // cache table and rocksdb into the final result.
+    // A map sorted by OmKey to combine results from TableCache and DB.
     TreeMap<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
-    // A set to keep track of which keys are deleted in cache
-    // but haven't been committed to rocksdb.
+    // A set to keep track of keys deleted in cache but not flushed to DB.
     Set<String> deletedKeySet = new TreeSet<>();
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      // If startKey is empty
       if (Strings.isNullOrEmpty(startKey)) {
         OzoneFileStatus fileStatus = getFileStatus(args);
         if (fileStatus.isFile()) {
-          // Return the single file status directly if OmKey points to a file
           return Collections.singletonList(fileStatus);
         }
-        // Append '/' to startKey if it doesn't have it
         startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       }
 
@@ -1930,11 +1924,9 @@ public class KeyManagerImpl implements KeyManager {
       String startCacheKey = OZONE_URI_DELIMITER + volumeName +
           OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
           ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
-      // Note: eliminate the case where startCacheKey could end with '//'
+      // Note: eliminating the case where startCacheKey could end with '//'
 
-      // First, iterate TableCache
-      // Limit number of result to numEntries, append result to cacheKeyMap,
-      // and keep track of deleted OmKeys with deletedKeySet.
+      // First, find key in TableCache
       while (cacheIter.hasNext() && numEntries - countEntries > 0) {
         Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
             cacheIter.next();
@@ -1944,17 +1936,14 @@ public class KeyManagerImpl implements KeyManager {
         if (cacheOmKeyInfo != null) {
           if (cacheKey.startsWith(startCacheKey) &&
               cacheKey.compareTo(startCacheKey) >= 0) {
-            // Respect recursive
             if (!recursive) {
-              // Remove trailing '/', if any
-              String remainingKeyPart = StringUtils.stripEnd(
-                  cacheKey.substring(startCacheKey.length()),
-                  OZONE_URI_DELIMITER);
-              if (remainingKeyPart.contains(OZONE_URI_DELIMITER)) {
+              String remainingKey = StringUtils.stripEnd(cacheKey.substring(
+                  startCacheKey.length()), OZONE_URI_DELIMITER);
+              // For non-recursive, the remaining part of key can't have '/'
+              if (remainingKey.contains(OZONE_URI_DELIMITER)) {
                 continue;
               }
             }
-            // Create OzoneFileStatus from OmKeyInfo
             OzoneFileStatus fileStatus = new OzoneFileStatus(
                 cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
             cacheKeyMap.put(cacheKey, fileStatus);
@@ -1965,7 +1954,7 @@ public class KeyManagerImpl implements KeyManager {
         }
       }
 
-      // Find key in db
+      // Then, find key in DB
       String seekKeyInDb =
           metadataManager.getOzoneKey(volumeName, bucketName, startKey);
       String keyInDb = OzoneFSUtils.addTrailingSlashIfNeeded(
@@ -1973,20 +1962,16 @@ public class KeyManagerImpl implements KeyManager {
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
           iterator = keyTable.iterator();
       iterator.seek(seekKeyInDb);
-      // Reset the entry counters
-      countEntries = 0;
 
-      // Continue only if there are matches
       if (iterator.hasNext()) {
         if (iterator.key().equals(keyInDb)) {
           // Skip the key itself (when listing a directory)
           iterator.next();
         }
-
         // Iterate through seek results
+        countEntries = 0;
         while (iterator.hasNext() && numEntries - countEntries > 0) {
           String entryInDb = iterator.key();
-
           OmKeyInfo value = iterator.value().getValue();
           if (entryInDb.startsWith(keyInDb)) {
             String entryKeyName = value.getKeyName();
