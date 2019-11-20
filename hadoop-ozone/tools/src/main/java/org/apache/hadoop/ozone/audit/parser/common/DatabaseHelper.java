@@ -56,8 +56,7 @@ public final class DatabaseHelper {
       LoggerFactory.getLogger(DatabaseHelper.class);
   private static Map<String, String> properties;
 
-  public static boolean setup(String dbName, String logs)
-      throws SQLException, IOException {
+  public static boolean setup(String dbName, String logs) throws Exception {
     if (createAuditTable(dbName)) {
       return insertAudits(dbName, logs);
     } else {
@@ -65,16 +64,9 @@ public final class DatabaseHelper {
     }
   }
 
-  private static Connection getConnection(String dbName) {
-    Connection connection = null;
-    try{
-      Class.forName(ParserConsts.DRIVER);
-      connection = DriverManager.getConnection(
-          ParserConsts.CONNECTION_PREFIX + dbName);
-    } catch (ClassNotFoundException | SQLException e) {
-      LOG.error(e.getMessage());
-    }
-    return connection;
+  private static Connection getConnection(String dbName) throws Exception {
+    Class.forName(ParserConsts.DRIVER);
+    return DriverManager.getConnection(ParserConsts.CONNECTION_PREFIX + dbName);
   }
 
   private static void loadProperties() {
@@ -100,12 +92,10 @@ public final class DatabaseHelper {
 
   }
 
-  private static boolean createAuditTable(String dbName) throws SQLException {
+  private static boolean createAuditTable(String dbName) throws Exception {
     try (Connection connection = getConnection(dbName)) {
-      if (connection != null) {
-        try (Statement st = connection.createStatement()) {
-          st.executeUpdate(properties.get(ParserConsts.CREATE_AUDIT_TABLE));
-        }
+      try (Statement st = connection.createStatement()) {
+        st.executeUpdate(properties.get(ParserConsts.CREATE_AUDIT_TABLE));
       }
     }
     return true;
@@ -113,43 +103,37 @@ public final class DatabaseHelper {
 
   @SuppressFBWarnings("REC_CATCH_EXCEPTION")
   private static boolean insertAudits(String dbName, String logs)
-      throws SQLException, IOException {
-    try (Connection connection = getConnection(dbName)) {
-      if (connection != null) {
-        try (PreparedStatement preparedStatement = connection.prepareStatement(
-            properties.get(ParserConsts.INSERT_AUDITS))) {
-
-          ArrayList<AuditEntry> auditEntries = parseAuditLogs(logs);
-          final int batchSize = 1000;
-          int count = 0;
-          //Insert list to db
-          for (AuditEntry audit : auditEntries) {
-            preparedStatement.setString(1, audit.getTimestamp());
-            preparedStatement.setString(2, audit.getLevel());
-            preparedStatement.setString(3, audit.getLogger());
-            preparedStatement.setString(4, audit.getUser());
-            preparedStatement.setString(5, audit.getIp());
-            preparedStatement.setString(6, audit.getOp());
-            preparedStatement.setString(7, audit.getParams());
-            preparedStatement.setString(8, audit.getResult());
-            preparedStatement.setString(9, audit.getException());
-            preparedStatement.addBatch();
-            if (++count % batchSize == 0) {
-              preparedStatement.executeBatch();
-            }
-          }
-          if (!auditEntries.isEmpty()) {
-            preparedStatement.executeBatch(); // insert remaining records
-          }
-        } catch (SQLException e) {
-          LOG.error(e.getMessage());
-          return false;
+      throws Exception {
+    try (Connection connection = getConnection(dbName);
+         PreparedStatement preparedStatement = connection.prepareStatement(
+             properties.get(ParserConsts.INSERT_AUDITS))) {
+      ArrayList<AuditEntry> auditEntries = parseAuditLogs(logs);
+      final int batchSize = 1000;
+      int count = 0;
+      //Insert list to db
+      for (AuditEntry audit : auditEntries) {
+        preparedStatement.setString(1, audit.getTimestamp());
+        preparedStatement.setString(2, audit.getLevel());
+        preparedStatement.setString(3, audit.getLogger());
+        preparedStatement.setString(4, audit.getUser());
+        preparedStatement.setString(5, audit.getIp());
+        preparedStatement.setString(6, audit.getOp());
+        preparedStatement.setString(7, audit.getParams());
+        preparedStatement.setString(8, audit.getResult());
+        preparedStatement.setString(9, audit.getException());
+        preparedStatement.addBatch();
+        if (++count % batchSize == 0) {
+          preparedStatement.executeBatch();
         }
+      }
+      if (!auditEntries.isEmpty()) {
+        preparedStatement.executeBatch(); // insert remaining records
       }
     }
     return true;
   }
 
+  @SuppressWarnings("squid:S3776")
   private static ArrayList<AuditEntry> parseAuditLogs(String filePath)
       throws IOException {
     ArrayList<AuditEntry> listResult = new ArrayList<>();
@@ -203,36 +187,31 @@ public final class DatabaseHelper {
   }
 
   public static String executeCustomQuery(String dbName, String query)
-      throws SQLException {
+      throws Exception {
     return executeStatement(dbName, query);
   }
 
   public static String executeTemplate(String dbName, String template)
-      throws SQLException {
-    return executeStatement(dbName,
-        properties.get(template));
+      throws Exception {
+    return executeStatement(dbName, properties.get(template));
   }
 
   private static String executeStatement(String dbName, String sql)
-      throws SQLException {
+      throws Exception {
     StringBuilder result = new StringBuilder();
     ResultSetMetaData rsm;
-    try (Connection connection = getConnection(dbName)) {
-      if (connection != null){
-        try (Statement st = connection.createStatement()) {
-          try (ResultSet rs = st.executeQuery(sql)) {
-            if (rs != null) {
-              rsm = rs.getMetaData();
-              int cols = rsm.getColumnCount();
-              while (rs.next()){
-                for (int index = 1; index <= cols; index++){
-                  result.append(rs.getObject(index));
-                  result.append("\t");
-                }
-                result.append("\n");
-              }
-            }
+    try (Connection connection = getConnection(dbName);
+         Statement st = connection.createStatement();
+         ResultSet rs = st.executeQuery(sql)) {
+      if (rs != null) {
+        rsm = rs.getMetaData();
+        int cols = rsm.getColumnCount();
+        while (rs.next()){
+          for (int index = 1; index <= cols; index++){
+            result.append(rs.getObject(index));
+            result.append("\t");
           }
+          result.append("\n");
         }
       }
     }
