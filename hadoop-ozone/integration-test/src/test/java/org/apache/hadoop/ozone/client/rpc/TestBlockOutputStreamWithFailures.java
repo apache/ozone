@@ -106,6 +106,11 @@ public class TestBlockOutputStreamWithFailures {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
+  private XceiverClientMetrics getXceiverClientMetrics() {
+    RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
+    return rpc.getXceiverClientManager().getMetrics();
+  }
+
   private String getKeyName() {
     return UUID.randomUUID().toString();
   }
@@ -123,8 +128,7 @@ public class TestBlockOutputStreamWithFailures {
   @Test
   public void testWatchForCommitWithCloseContainerException()
       throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -263,8 +267,7 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testWatchForCommitDatanodeFailure() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -396,8 +399,7 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void test2DatanodesFailure() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -544,8 +546,7 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testFailureWithPrimeSizedData() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -665,8 +666,7 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testExceptionDuringClose() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -780,8 +780,7 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testWatchForCommitWithSingleNodeRatis() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -921,8 +920,7 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testDatanodeFailureWithSingleNodeRatis() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -1061,8 +1059,7 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testDatanodeFailureWithPreAllocation() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =

@@ -80,12 +80,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
       Configuration ozoneConf) {
-    return newXceiverClientRatis(pipeline, ozoneConf, null);
+    return newXceiverClientRatis(pipeline, ozoneConf, null, null);
   }
 
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      Configuration ozoneConf, X509Certificate caCert) {
+      Configuration ozoneConf, X509Certificate caCert, XceiverClientMetrics metrics) {
     final String rpcType = ozoneConf
         .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
@@ -98,7 +98,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         SecurityConfig(ozoneConf), caCert);
     return new XceiverClientRatis(pipeline,
         SupportedRpcType.valueOfIgnoreCase(rpcType), maxOutstandingRequests,
-        retryPolicy, tlsConfig, clientRequestTimeout);
+        retryPolicy, tlsConfig, clientRequestTimeout, metrics);
   }
 
   private final Pipeline pipeline;
@@ -119,7 +119,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
    */
   private XceiverClientRatis(Pipeline pipeline, RpcType rpcType,
       int maxOutStandingChunks, RetryPolicy retryPolicy,
-      GrpcTlsConfig tlsConfig, TimeDuration timeout) {
+      GrpcTlsConfig tlsConfig, TimeDuration timeout, XceiverClientMetrics metrics) {
     super();
     this.pipeline = pipeline;
     this.rpcType = rpcType;
@@ -128,7 +128,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     commitInfoMap = new ConcurrentHashMap<>();
     this.tlsConfig = tlsConfig;
     this.clientRequestTimeout = timeout;
-    metrics = XceiverClientManager.getXceiverClientMetrics();
+    this.metrics = metrics;
   }
 
   private void updateCommitInfosMap(

@@ -102,6 +102,11 @@ public class TestBlockOutputStream {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
+  private XceiverClientMetrics getXceiverClientMetrics() {
+    RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
+    return rpc.getXceiverClientManager().getMetrics();
+  }
+
   private String getKeyName() {
     return UUID.randomUUID().toString();
   }
@@ -118,8 +123,7 @@ public class TestBlockOutputStream {
 
   @Test
   public void testBufferCaching() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -156,11 +160,9 @@ public class TestBlockOutputStream {
     Assert.assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
     Assert.assertEquals(0, blockOutputStream.getTotalAckDataLength());
     Assert.assertEquals(pendingWriteChunkCount,
-        XceiverClientManager.getXceiverClientMetrics()
-            .getContainerOpsMetrics(ContainerProtos.Type.WriteChunk));
+            metrics.getContainerOpsMetrics(ContainerProtos.Type.WriteChunk));
     Assert.assertEquals(pendingPutBlockCount,
-        XceiverClientManager.getXceiverClientMetrics()
-            .getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
+            metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
 
     // commitIndex2FlushedData Map will be empty here
     Assert.assertTrue(
@@ -216,8 +218,7 @@ public class TestBlockOutputStream {
 
   @Test
   public void testFlushChunk() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -311,8 +312,7 @@ public class TestBlockOutputStream {
 
   @Test
   public void testMultiChunkWrite() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -406,8 +406,7 @@ public class TestBlockOutputStream {
 
   @Test
   public void testMultiChunkWrite2() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -482,8 +481,7 @@ public class TestBlockOutputStream {
 
   @Test
   public void testFullBufferCondition() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -582,8 +580,7 @@ public class TestBlockOutputStream {
 
   @Test
   public void testWriteWithExceedingMaxBufferLimit() throws Exception {
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(

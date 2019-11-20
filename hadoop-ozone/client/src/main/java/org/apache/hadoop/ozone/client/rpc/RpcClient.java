@@ -829,6 +829,11 @@ public class RpcClient implements ClientProtocol {
     IOUtils.cleanupWithLogger(LOG, xceiverClientManager);
   }
 
+  @VisibleForTesting
+  public XceiverClientManager getXceiverClientManager() {
+    return xceiverClientManager;
+  }
+
   @Override
   public OmMultipartInfo initiateMultipartUpload(String volumeName,
                                                 String bucketName,

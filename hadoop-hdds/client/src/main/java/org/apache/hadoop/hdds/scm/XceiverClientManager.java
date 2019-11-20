@@ -73,7 +73,7 @@ public class XceiverClientManager implements Closeable {
   private final Cache<String, XceiverClientSpi> clientCache;
   private X509Certificate caCert;
 
-  private static XceiverClientMetrics metrics;
+  private XceiverClientMetrics metrics;
   private boolean isSecurityEnabled;
   private final boolean topologyAwareRead;
   /**
@@ -86,6 +86,12 @@ public class XceiverClientManager implements Closeable {
   public XceiverClientManager(Configuration conf) throws IOException {
     this(conf, OzoneConfiguration.of(conf).getObject(ScmClientConfig.class),
         null);
+    metrics = XceiverClientMetrics.create();
+  }
+
+  @VisibleForTesting
+  public XceiverClientMetrics getMetrics() {
+    return metrics;
   }
 
   public XceiverClientManager(Configuration conf, ScmClientConfig clientConf,
@@ -230,10 +236,10 @@ public class XceiverClientManager implements Closeable {
             switch (type) {
             case RATIS:
               client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf,
-                  caCert);
+                  caCert, metrics);
               break;
             case STAND_ALONE:
-              client = new XceiverClientGrpc(pipeline, conf, caCert);
+              client = new XceiverClientGrpc(pipeline, conf, caCert, metrics);
               break;
             case CHAINED:
             default:
@@ -271,24 +277,11 @@ public class XceiverClientManager implements Closeable {
     clientCache.invalidateAll();
     clientCache.cleanUp();
 
-    if (metrics != null) {
-      metrics.unRegister();
-    }
+    metrics.unRegister();
   }
 
   public Function<ByteBuffer, ByteString> byteBufferToByteStringConversion(){
     return ByteStringConversion.createByteBufferConversion(conf);
-  }
-
-  /**
-   * Get xceiver client metric.
-   */
-  public static synchronized XceiverClientMetrics getXceiverClientMetrics() {
-    if (metrics == null) {
-      metrics = XceiverClientMetrics.create();
-    }
-
-    return metrics;
   }
 
   /**

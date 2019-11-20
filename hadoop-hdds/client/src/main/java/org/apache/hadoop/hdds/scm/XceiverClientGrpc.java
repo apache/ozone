@@ -94,7 +94,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * @param caCert   - SCM ca certificate.
    */
   public XceiverClientGrpc(Pipeline pipeline, Configuration config,
-      X509Certificate caCert) {
+      X509Certificate caCert, XceiverClientMetrics metrics) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
@@ -103,7 +103,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     this.secConfig = new SecurityConfig(config);
     this.semaphore =
         new Semaphore(HddsClientUtils.getMaxOutstandingRequests(config));
-    this.metrics = XceiverClientManager.getXceiverClientMetrics();
+    this.metrics = metrics;
     this.channels = new HashMap<>();
     this.asyncStubs = new HashMap<>();
     this.topologyAwareRead = config.getBoolean(
@@ -121,7 +121,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * @param config   -- Ozone Config
    */
   public XceiverClientGrpc(Pipeline pipeline, Configuration config) {
-    this(pipeline, config, null);
+    this(pipeline, config, null, null);
   }
 
   /**
@@ -212,7 +212,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     for (ManagedChannel channel : channels.values()) {
       channel.shutdownNow();
       try {
-        channel.awaitTermination(60, TimeUnit.MINUTES);
+        channel.awaitTermination(5, TimeUnit.SECONDS);
       } catch (Exception e) {
         LOG.error("Unexpected exception while waiting for channel termination",
             e);

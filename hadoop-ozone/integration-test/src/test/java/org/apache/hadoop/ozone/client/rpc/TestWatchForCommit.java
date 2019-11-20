@@ -130,6 +130,11 @@ public class TestWatchForCommit {
     return UUID.randomUUID().toString();
   }
 
+  private XceiverClientMetrics getXceiverClientMetrics() {
+    RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
+    return rpc.getXceiverClientManager().getMetrics();
+  }
+
   @Test
   public void testWatchForCommitWithKeyWrite() throws Exception {
     // in this case, watch request should fail with RaftRetryFailureException
@@ -143,8 +148,7 @@ public class TestWatchForCommit {
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);
     startCluster(conf);
-    XceiverClientMetrics metrics =
-        XceiverClientManager.getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(

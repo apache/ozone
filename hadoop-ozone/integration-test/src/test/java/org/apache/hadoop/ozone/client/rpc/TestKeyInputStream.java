@@ -120,11 +120,14 @@ public class TestKeyInputStream {
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
+  private XceiverClientMetrics getXceiverClientMetrics() {
+    RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
+    return rpc.getXceiverClientManager().getMetrics();
+  }
 
   @Test
   public void testSeekRandomly() throws Exception {
-    XceiverClientMetrics metrics = XceiverClientManager
-        .getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
 
     String keyName = getKeyName();
     OzoneOutputStream key = TestHelper.createKey(keyName,
@@ -223,8 +226,7 @@ public class TestKeyInputStream {
 
   @Test
   public void testSeek() throws Exception {
-    XceiverClientMetrics metrics = XceiverClientManager
-        .getXceiverClientMetrics();
+    XceiverClientMetrics metrics = getXceiverClientMetrics();
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long readChunkCount = metrics.getContainerOpCountMetrics(
