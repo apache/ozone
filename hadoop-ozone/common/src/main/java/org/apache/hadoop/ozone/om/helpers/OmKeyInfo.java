@@ -469,4 +469,15 @@ public final class OmKeyInfo extends WithMetadata {
 
     return builder.build();
   }
+
+  /**
+   * Method to clear the fileEncryptionInfo.
+   * This method is called when a KeyDelete operation is performed.
+   * This ensures that when TDE is enabled and GDPR is enforced on a bucket,
+   * the encryption info is deleted from Key Metadata before the key is moved
+   * to deletedTable in OM Metadata.
+   */
+  public void clearFileEncryptionInfo() {
+    this.encInfo = null;
+  }
 }
