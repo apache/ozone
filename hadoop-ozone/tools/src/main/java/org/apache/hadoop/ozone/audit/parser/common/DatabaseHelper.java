@@ -56,7 +56,8 @@ public final class DatabaseHelper {
       LoggerFactory.getLogger(DatabaseHelper.class);
   private static Map<String, String> properties;
 
-  public static boolean setup(String dbName, String logs) {
+  public static boolean setup(String dbName, String logs)
+      throws SQLException, IOException {
     if (createAuditTable(dbName)) {
       return insertAudits(dbName, logs);
     } else {
@@ -99,32 +100,28 @@ public final class DatabaseHelper {
 
   }
 
-  private static boolean createAuditTable(String dbName) {
+  private static boolean createAuditTable(String dbName) throws SQLException {
     try (Connection connection = getConnection(dbName)) {
       if (connection != null) {
         try (Statement st = connection.createStatement()) {
           st.executeUpdate(properties.get(ParserConsts.CREATE_AUDIT_TABLE));
         }
       }
-    } catch (SQLException e) {
-      LOG.error(e.getMessage());
-      return false;
     }
     return true;
   }
 
   @SuppressFBWarnings("REC_CATCH_EXCEPTION")
-  private static boolean insertAudits(String dbName, String logs) {
+  private static boolean insertAudits(String dbName, String logs)
+      throws SQLException, IOException {
     try (Connection connection = getConnection(dbName)) {
       if (connection != null) {
         try (PreparedStatement preparedStatement = connection.prepareStatement(
             properties.get(ParserConsts.INSERT_AUDITS))) {
 
           ArrayList<AuditEntry> auditEntries = parseAuditLogs(logs);
-
           final int batchSize = 1000;
           int count = 0;
-
           //Insert list to db
           for (AuditEntry audit : auditEntries) {
             preparedStatement.setString(1, audit.getTimestamp());
@@ -136,9 +133,7 @@ public final class DatabaseHelper {
             preparedStatement.setString(7, audit.getParams());
             preparedStatement.setString(8, audit.getResult());
             preparedStatement.setString(9, audit.getException());
-
             preparedStatement.addBatch();
-
             if (++count % batchSize == 0) {
               preparedStatement.executeBatch();
             }
@@ -146,11 +141,11 @@ public final class DatabaseHelper {
           if (!auditEntries.isEmpty()) {
             preparedStatement.executeBatch(); // insert remaining records
           }
+        } catch (SQLException e) {
+          LOG.error(e.getMessage());
+          return false;
         }
       }
-    } catch (Exception e) {
-      LOG.error(e.getMessage());
-      return false;
     }
     return true;
   }
@@ -161,12 +156,10 @@ public final class DatabaseHelper {
     try (FileInputStream fis = new FileInputStream(filePath);
         InputStreamReader isr = new InputStreamReader(fis, UTF_8);
         BufferedReader bReader = new BufferedReader(isr)) {
-      String currentLine;
+      String currentLine = bReader.readLine();
+      String nextLine = bReader.readLine();
       String[] entry;
       AuditEntry tempEntry = null;
-      String nextLine;
-      currentLine = bReader.readLine();
-      nextLine = bReader.readLine();
 
       while (true) {
         if (tempEntry == null){
