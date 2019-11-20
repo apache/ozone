@@ -63,7 +63,7 @@ jobs:
           with:
             args: ./hadoop-ozone/dev-support/checks/sonar.sh
           env:
-            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+            SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
         - uses: actions/upload-artifact@master
           if: always()
           with:
