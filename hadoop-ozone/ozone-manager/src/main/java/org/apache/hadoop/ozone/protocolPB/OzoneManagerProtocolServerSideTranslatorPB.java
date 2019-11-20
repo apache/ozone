@@ -210,7 +210,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         OMClientRequest omClientRequest =
             OzoneManagerRatisUtils.createClientRequest(request);
         Preconditions.checkState(omClientRequest != null,
-            "Unrecognized write command type request" + request.toString());
+            "Unrecognized write command type request: %s", request);
         request = omClientRequest.preExecute(ozoneManager);
         index = transactionIndex.incrementAndGet();
         omClientRequest = OzoneManagerRatisUtils.createClientRequest(request);

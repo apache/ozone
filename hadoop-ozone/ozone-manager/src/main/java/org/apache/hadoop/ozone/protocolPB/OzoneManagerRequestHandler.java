@@ -45,7 +45,9 @@ import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
@@ -80,6 +82,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyRequest;
@@ -237,6 +241,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListKeysResponse listKeysResponse = listKeys(
             request.getListKeysRequest());
         responseBuilder.setListKeysResponse(listKeysResponse);
+        break;
+      case ListTrash:
+        ListTrashResponse listTrashResponse = listTrash(
+            request.getListTrashRequest());
+        responseBuilder.setListTrashResponse(listTrashResponse);
         break;
       case CommitKey:
         CommitKeyResponse commitKeyResponse = commitKey(
@@ -712,6 +721,26 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
+  private ListTrashResponse listTrash(ListTrashRequest request)
+      throws IOException {
+
+    ListTrashResponse.Builder resp =
+        ListTrashResponse.newBuilder();
+
+    List<RepeatedOmKeyInfo> deletedKeys = impl.listTrash(
+        request.getVolumeName(),
+        request.getBucketName(),
+        request.getStartKeyName(),
+        request.getKeyPrefix(),
+        request.getMaxKeys());
+
+    for (RepeatedOmKeyInfo key: deletedKeys) {
+      resp.addDeletedKeys(key.getProto());
+    }
+
+    return resp.build();
+  }
+
   private CommitKeyResponse commitKey(CommitKeyRequest request)
       throws IOException {
     CommitKeyResponse.Builder resp =
@@ -763,11 +792,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throws IOException {
     ServiceListResponse.Builder resp = ServiceListResponse.newBuilder();
 
-    resp.addAllServiceInfo(impl.getServiceInfo().getServiceInfoList().stream()
+    ServiceInfoEx serviceInfoEx = impl.getServiceInfo();
+    resp.addAllServiceInfo(serviceInfoEx.getServiceInfoList().stream()
         .map(ServiceInfo::getProtobuf)
         .collect(Collectors.toList()));
-    if (impl.getServiceInfo().getCaCertificate() != null) {
-      resp.setCaCertificate(impl.getServiceInfo().getCaCertificate());
+    if (serviceInfoEx.getCaCertificate() != null) {
+      resp.setCaCertificate(serviceInfoEx.getCaCertificate());
     }
     return resp.build();
   }

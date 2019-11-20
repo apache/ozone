@@ -95,11 +95,13 @@ public class ReconUtils {
    */
   public static File createTarFile(Path sourcePath) throws IOException {
     TarArchiveOutputStream tarOs = null;
+    FileOutputStream fileOutputStream = null;
+    GZIPOutputStream gzipOutputStream = null;
     try {
       String sourceDir = sourcePath.toString();
       String fileName = sourceDir.concat(".tar.gz");
-      FileOutputStream fileOutputStream = new FileOutputStream(fileName);
-      GZIPOutputStream gzipOutputStream =
+      fileOutputStream = new FileOutputStream(fileName);
+      gzipOutputStream =
           new GZIPOutputStream(new BufferedOutputStream(fileOutputStream));
       tarOs = new TarArchiveOutputStream(gzipOutputStream);
       File folder = new File(sourceDir);
@@ -113,6 +115,8 @@ public class ReconUtils {
     } finally {
       try {
         org.apache.hadoop.io.IOUtils.closeStream(tarOs);
+        org.apache.hadoop.io.IOUtils.closeStream(fileOutputStream);
+        org.apache.hadoop.io.IOUtils.closeStream(gzipOutputStream);
       } catch (Exception e) {
         LOG.error("Exception encountered when closing " +
             "TAR file output stream: " + e);
@@ -126,13 +130,13 @@ public class ReconUtils {
       throws IOException {
     tarFileOutputStream.putArchiveEntry(new TarArchiveEntry(file, source));
     if (file.isFile()) {
-      FileInputStream fileInputStream = new FileInputStream(file);
-      BufferedInputStream bufferedInputStream =
-          new BufferedInputStream(fileInputStream);
-      org.apache.commons.compress.utils.IOUtils.copy(bufferedInputStream,
-          tarFileOutputStream);
-      tarFileOutputStream.closeArchiveEntry();
-      fileInputStream.close();
+      try (FileInputStream fileInputStream = new FileInputStream(file)) {
+        BufferedInputStream bufferedInputStream =
+            new BufferedInputStream(fileInputStream);
+        org.apache.commons.compress.utils.IOUtils.copy(bufferedInputStream,
+            tarFileOutputStream);
+        tarFileOutputStream.closeArchiveEntry();
+      }
     } else if (file.isDirectory()) {
       tarFileOutputStream.closeArchiveEntry();
       File[] filesInDir = file.listFiles();

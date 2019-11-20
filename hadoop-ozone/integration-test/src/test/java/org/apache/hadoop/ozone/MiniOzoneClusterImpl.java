@@ -28,6 +28,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -64,6 +67,7 @@ import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState
@@ -143,10 +147,31 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       final int healthy = scm.getNodeCount(HEALTHY);
-      final boolean isReady = healthy == hddsDatanodes.size();
-      LOG.info("{}. Got {} of {} DN Heartbeats.",
-          isReady? "Cluster is ready" : "Waiting for cluster to be ready",
-          healthy, hddsDatanodes.size());
+      boolean isReady = healthy == hddsDatanodes.size();
+      boolean printIsReadyMsg = true;
+      List<Pipeline> pipelines = scm.getPipelineManager().getPipelines();
+      if (!pipelines.isEmpty()) {
+        List<Pipeline> raftPipelines = pipelines.stream().filter(p ->
+            p.getType() == HddsProtos.ReplicationType.RATIS).collect(
+                Collectors.toList());
+        if (!raftPipelines.isEmpty()) {
+          List<Pipeline> notOpenPipelines = raftPipelines.stream().filter(p ->
+              p.getPipelineState() != Pipeline.PipelineState.OPEN &&
+                  p.getPipelineState() != Pipeline.PipelineState.CLOSED)
+              .collect(Collectors.toList());
+          if (notOpenPipelines.size() > 0) {
+            LOG.info("Waiting for {} number of pipelines out of {}, to report "
+                + "a leader.", notOpenPipelines.size(), raftPipelines.size());
+            isReady = false;
+            printIsReadyMsg = false;
+          }
+        }
+      }
+      if (printIsReadyMsg) {
+        LOG.info("{}. Got {} of {} DN Heartbeats.",
+            isReady ? "Cluster is ready" : "Waiting for cluster to be ready",
+            healthy, hddsDatanodes.size());
+      }
       return isReady;
     }, 1000, waitForClusterToBeReadyTimeout);
   }
@@ -260,6 +285,19 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     ozoneManager.restart();
   }
 
+  private void waitForHddsDatanodesStop() throws TimeoutException,
+      InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      final int healthy = scm.getNodeCount(HEALTHY);
+      boolean isReady = healthy == hddsDatanodes.size();
+      if (!isReady) {
+        LOG.info("Waiting on {} datanodes out of {} to be marked unhealthy.",
+            healthy, hddsDatanodes.size());
+      }
+      return isReady;
+    }, 1000, waitForClusterToBeReadyTimeout);
+  }
+
   @Override
   public void restartHddsDatanode(int i, boolean waitForDatanode)
       throws InterruptedException, TimeoutException {
@@ -279,7 +317,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     hddsDatanodes.remove(i);
     if (waitForDatanode) {
       // wait for node to be removed from SCM healthy node list.
-      waitForClusterToBeReady();
+      waitForHddsDatanodesStop();
     }
     String[] args = new String[]{};
     HddsDatanodeService service =
@@ -512,7 +550,15 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       configureSCM();
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
-      return StorageContainerManager.createSCM(conf);
+      StorageContainerManager scm = StorageContainerManager.createSCM(conf);
+      HealthyPipelineSafeModeRule rule =
+          scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
+      if (rule != null) {
+        // Set threshold to wait for safe mode exit - this is needed since a
+        // pipeline is marked open only after leader election.
+        rule.setHealthyPipelineThresholdCount(numOfDatanodes / 3);
+      }
+      return scm;
     }
 
     private void initializeScmStorage(SCMStorageConfig scmStore)

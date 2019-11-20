@@ -61,6 +61,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -110,6 +111,7 @@ public class TestDeadNodeHandler {
   }
 
   @Test
+  @Ignore("Tracked by HDDS-2508.")
   public void testOnMessage() throws IOException, NodeNotFoundException {
     //GIVEN
     DatanodeDetails datanode1 = TestUtils.randomDatanodeDetails();

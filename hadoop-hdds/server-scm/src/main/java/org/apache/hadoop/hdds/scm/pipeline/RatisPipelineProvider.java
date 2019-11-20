@@ -153,29 +153,22 @@ public class RatisPipelineProvider implements PipelineProvider {
       throw new InsufficientDatanodesException(e);
     }
 
-    Pipeline pipeline = Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setState(PipelineState.OPEN)
-        .setType(ReplicationType.RATIS)
-        .setFactor(factor)
-        .setNodes(dns)
-        .build();
+    Pipeline pipeline = create(factor, dns);
     initializePipeline(pipeline);
     return pipeline;
   }
 
   @Override
   public Pipeline create(ReplicationFactor factor,
-      List<DatanodeDetails> nodes) {
+                         List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
-        .setState(PipelineState.OPEN)
+        .setState(PipelineState.ALLOCATED)
         .setType(ReplicationType.RATIS)
         .setFactor(factor)
         .setNodes(nodes)
         .build();
   }
-
 
   @Override
   public void shutdown() {

@@ -113,5 +113,8 @@ public class ReconServer extends GenericCli {
   void stop() throws Exception {
     LOG.info("Stopping Recon server");
     httpServer.stop();
+    OzoneManagerServiceProvider ozoneManagerServiceProvider = injector
+        .getInstance(OzoneManagerServiceProvider.class);
+    ozoneManagerServiceProvider.stop();
   }
 }

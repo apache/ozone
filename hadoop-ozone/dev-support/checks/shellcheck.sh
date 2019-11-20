@@ -20,7 +20,6 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/shellcheck"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-echo "" > "$OUTPUT_FILE"
 if [[ "$(uname -s)" = "Darwin" ]]; then
   find hadoop-hdds hadoop-ozone -type f -perm '-500'
 else

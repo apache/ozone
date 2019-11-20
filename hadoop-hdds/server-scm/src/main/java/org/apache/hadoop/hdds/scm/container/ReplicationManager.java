@@ -192,7 +192,7 @@ public class ReplicationManager implements MetricsSource {
   @SuppressFBWarnings(value="NN_NAKED_NOTIFY",
       justification="Used only for testing")
   public synchronized void processContainersNow() {
-    notify();
+    notifyAll();
   }
 
   /**
@@ -204,7 +204,7 @@ public class ReplicationManager implements MetricsSource {
       inflightReplication.clear();
       inflightDeletion.clear();
       running = false;
-      notify();
+      notifyAll();
     } else {
       LOG.info("Replication Monitor Thread is not running.");
     }

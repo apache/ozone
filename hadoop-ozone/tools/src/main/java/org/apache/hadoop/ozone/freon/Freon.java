@@ -21,6 +21,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import org.slf4j.Logger;
@@ -57,11 +58,13 @@ public class Freon extends GenericCli {
   private boolean httpServer = false;
 
   private FreonHttpServer freonHttpServer;
+  private OzoneConfiguration conf;
 
   @Override
   public void execute(String[] argv) {
-    HddsUtils.initializeMetrics(createOzoneConfiguration(), "ozone-freon");
-    TracingUtil.initTracing("freon");
+    conf = createOzoneConfiguration();
+    HddsUtils.initializeMetrics(conf, "ozone-freon");
+    TracingUtil.initTracing("freon", conf);
     super.execute(argv);
   }
 
@@ -78,7 +81,7 @@ public class Freon extends GenericCli {
   public void startHttpServer() {
     if (httpServer) {
       try {
-        freonHttpServer = new FreonHttpServer(createOzoneConfiguration());
+        freonHttpServer = new FreonHttpServer(conf);
         freonHttpServer.start();
       } catch (IOException e) {
         LOG.error("Freon http server can't be started", e);

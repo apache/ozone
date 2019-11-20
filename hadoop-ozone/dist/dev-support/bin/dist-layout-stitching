@@ -98,8 +98,10 @@ run cp -f "${ROOT}/hadoop-ozone/dist/src/shell/conf/log4j.properties" "etc/hadoo
 run cp "${ROOT}/hadoop-hdds/common/src/main/resources/network-topology-default.xml" "etc/hadoop"
 run cp "${ROOT}/hadoop-hdds/common/src/main/resources/network-topology-nodegroup.xml" "etc/hadoop"
 
+run cp -r "${ROOT}/hadoop-ozone/dist/src/main/dockerlibexec/." "libexec/"
+
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/ozone" "bin/"
-run cp -r "${ROOT}/hadoop-ozone/dist/src/main/dockerbin" "bin/docker"
+
 
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-config.sh" "libexec/"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-config.cmd" "libexec/"

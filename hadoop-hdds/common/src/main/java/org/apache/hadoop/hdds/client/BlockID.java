@@ -74,10 +74,14 @@ public class BlockID {
 
   @Override
   public String toString() {
-    return new StringBuilder().append(getContainerBlockID().toString())
-        .append(" bcsId: ")
-        .append(blockCommitSequenceId)
-        .toString();
+    StringBuilder sb = new StringBuilder(64);
+    appendTo(sb);
+    return sb.toString();
+  }
+
+  public void appendTo(StringBuilder sb) {
+    containerBlockID.appendTo(sb);
+    sb.append(" bcsId: ").append(blockCommitSequenceId);
   }
 
   public ContainerProtos.DatanodeBlockID getDatanodeBlockIDProtobuf() {

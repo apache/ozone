@@ -38,7 +38,7 @@ public class S3Shell extends Shell {
 
   @Override
   public void execute(String[] argv) {
-    TracingUtil.initTracing("s3shell");
+    TracingUtil.initTracing("s3shell", createOzoneConfiguration());
     try (Scope scope = GlobalTracer.get().buildSpan("main").startActive(true)) {
       super.execute(argv);
     }
@@ -48,9 +48,8 @@ public class S3Shell extends Shell {
    * Main for the S3Shell Command handling.
    *
    * @param argv - System Args Strings[]
-   * @throws Exception
    */
-  public static void main(String[] argv) throws Exception {
+  public static void main(String[] argv) {
     new S3Shell().run(argv);
   }
 }

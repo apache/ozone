@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -37,13 +38,16 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.AfterClass;
@@ -55,6 +59,7 @@ import java.io.File;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -194,6 +199,83 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
       Assert.assertTrue(key.getCreationTime() >= currentTime);
       Assert.assertTrue(key.getModificationTime() >= currentTime);
     }
+  }
+
+  /**
+   * Test PutKey & DeleteKey with Encryption and GDPR.
+   * 1. Create a GDPR enforced bucket
+   * 2. PutKey with Encryption in above bucket and verify.
+   * 3. DeleteKey and confirm the metadata does not have encryption key.
+   * @throws Exception
+   */
+  @Test
+  public void testKeyWithEncryptionAndGdpr() throws Exception {
+    //Step 1
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    long currentTime = Time.now();
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    //Bucket with Encryption & GDPR enforced
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketEncryptionKey(TEST_KEY)
+        .addMetadata(OzoneConsts.GDPR_FLAG, "true").build();
+    volume.createBucket(bucketName, bucketArgs);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    Assert.assertEquals(bucketName, bucket.getName());
+    Assert.assertNotNull(bucket.getMetadata());
+    Assert.assertEquals("true",
+        bucket.getMetadata().get(OzoneConsts.GDPR_FLAG));
+
+    //Step 2
+    String keyName = UUID.randomUUID().toString();
+    Map<String, String> keyMetadata = new HashMap<>();
+    keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes("UTF-8").length, ReplicationType.STAND_ALONE,
+        ReplicationFactor.ONE, keyMetadata)) {
+      out.write(value.getBytes("UTF-8"));
+    }
+
+    OzoneKeyDetails key = bucket.getKey(keyName);
+    Assert.assertEquals(keyName, key.getName());
+    byte[] fileContent;
+    int len = 0;
+
+    try(OzoneInputStream is = bucket.readKey(keyName)) {
+      fileContent = new byte[value.getBytes("UTF-8").length];
+      len = is.read(fileContent);
+    }
+
+    Assert.assertEquals(len, value.length());
+    Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
+        keyName, ReplicationType.STAND_ALONE,
+        ReplicationFactor.ONE));
+    Assert.assertEquals(value, new String(fileContent, "UTF-8"));
+    Assert.assertTrue(key.getCreationTime() >= currentTime);
+    Assert.assertTrue(key.getModificationTime() >= currentTime);
+    Assert.assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
+    //As TDE is enabled, the TDE encryption details should not be null.
+    Assert.assertNotNull(key.getFileEncryptionInfo());
+
+    //Step 3
+    bucket.deleteKey(key.getName());
+
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
+    RepeatedOmKeyInfo deletedKeys =
+        omMetadataManager.getDeletedTable().get(objectKey);
+    Map<String, String> deletedKeyMetadata =
+        deletedKeys.getOmKeyInfoList().get(0).getMetadata();
+    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
+    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
+    Assert.assertFalse(
+        deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+    Assert.assertNull(
+        deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
   }
 
   private boolean verifyRatisReplication(String volumeName, String bucketName,

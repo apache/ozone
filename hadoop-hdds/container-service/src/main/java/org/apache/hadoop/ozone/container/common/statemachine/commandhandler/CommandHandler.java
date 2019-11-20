@@ -72,4 +72,12 @@ public interface CommandHandler {
           command.getId());
     }
   }
+
+  /**
+   * Override for any command with an internal threadpool, and stop the
+   * executor when this method is invoked.
+   */
+  default void stop() {
+    // Default implementation does nothing
+  }
 }

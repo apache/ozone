@@ -21,9 +21,9 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * This class represents multipart list, which is required for
@@ -31,7 +31,7 @@ import java.util.TreeMap;
  */
 public class OmMultipartUploadCompleteList {
 
-  private final TreeMap<Integer, String> multipartMap;
+  private final LinkedHashMap<Integer, String> multipartMap;
 
   /**
    * Construct OmMultipartUploadCompleteList which holds multipart map which
@@ -39,14 +39,14 @@ public class OmMultipartUploadCompleteList {
    * @param partMap
    */
   public OmMultipartUploadCompleteList(Map<Integer, String> partMap) {
-    this.multipartMap = new TreeMap<>(partMap);
+    this.multipartMap = new LinkedHashMap<>(partMap);
   }
 
   /**
    * Return multipartMap which is a map of part number and part name.
    * @return multipartMap
    */
-  public TreeMap<Integer, String> getMultipartMap() {
+  public Map<Integer, String> getMultipartMap() {
     return multipartMap;
   }
 

@@ -283,7 +283,7 @@ public class XceiverClientManager implements Closeable {
   /**
    * Get xceiver client metric.
    */
-  public synchronized static XceiverClientMetrics getXceiverClientMetrics() {
+  public static synchronized XceiverClientMetrics getXceiverClientMetrics() {
     if (metrics == null) {
       metrics = XceiverClientMetrics.create();
     }
