@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -26,6 +26,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static org.apache.hadoop.ozone.lease.Lease.messageForResource;
 
 /**
  * LeaseManager is someone who can provide you leases based on your
@@ -114,7 +116,7 @@ public class LeaseManager<T> {
       LOG.debug("Acquiring lease on {} for {} milliseconds", resource, timeout);
     }
     if(activeLeases.containsKey(resource)) {
-      throw new LeaseAlreadyExistException("Resource: " + resource);
+      throw new LeaseAlreadyExistException(messageForResource(resource));
     }
     Lease<T> lease = new Lease<>(resource, timeout);
     activeLeases.put(resource, lease);
@@ -136,7 +138,7 @@ public class LeaseManager<T> {
     if(lease != null) {
       return lease;
     }
-    throw new LeaseNotFoundException("Resource: " + resource);
+    throw new LeaseNotFoundException(messageForResource(resource));
   }
 
   /**
@@ -155,7 +157,7 @@ public class LeaseManager<T> {
     }
     Lease<T> lease = activeLeases.remove(resource);
     if(lease == null) {
-      throw new LeaseNotFoundException("Resource: " + resource);
+      throw new LeaseNotFoundException(messageForResource(resource));
     }
     lease.invalidate();
   }
@@ -196,11 +198,10 @@ public class LeaseManager<T> {
    */
   private final class LeaseMonitor implements Runnable {
 
-    private boolean monitor = true;
-    private ExecutorService executorService;
+    private volatile boolean monitor = true;
+    private final ExecutorService executorService;
 
     private LeaseMonitor() {
-      this.monitor = true;
       this.executorService = Executors.newCachedThreadPool();
     }
 
@@ -219,10 +220,9 @@ public class LeaseManager<T> {
               List<Callable<Void>> leaseCallbacks = lease.getCallbacks();
               release(resource);
               executorService.execute(
-                  new LeaseCallbackExecutor(resource, leaseCallbacks));
+                  new LeaseCallbackExecutor<>(resource, leaseCallbacks));
             } else {
-              sleepTime = remainingTime > sleepTime ?
-                  sleepTime : remainingTime;
+              sleepTime = Math.min(remainingTime, sleepTime);
             }
           } catch (LeaseNotFoundException | LeaseExpiredException ex) {
             //Ignore the exception, someone might have released the lease
