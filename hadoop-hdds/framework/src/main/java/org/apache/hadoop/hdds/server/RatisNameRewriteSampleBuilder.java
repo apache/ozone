@@ -74,7 +74,7 @@ public class RatisNameRewriteSampleBuilder extends DefaultSampleBuilder {
       List<String> values) {
 
     List<String> nameParts =
-        new ArrayList<String>(Arrays.asList(dropwizardName.split("\\.")));
+        new ArrayList<>(Arrays.asList(dropwizardName.split("\\.")));
     //second part is id or id@group_id
     if (nameParts.size() > 2) {
       String[] identifiers = nameParts.get(2).split("@");
