@@ -46,7 +46,7 @@ public class PrometheusServlet extends HttpServlet {
     DefaultMetricsSystem.instance().publishMetricsNow();
     PrintWriter writer = resp.getWriter();
     getPrometheusSink().writeMetrics(writer);
-    resp.getWriter().write("\n\n#Dropwizard metrics\n\n");
+    writer.write("\n\n#Dropwizard metrics\n\n");
     //print out dropwizard metrics used by ratis.
     TextFormat.write004(writer,
         CollectorRegistry.defaultRegistry.metricFamilySamples());
