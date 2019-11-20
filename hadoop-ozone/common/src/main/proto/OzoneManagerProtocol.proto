@@ -306,6 +306,7 @@ enum Status {
 
     INVALID_PART = 55;
     INVALID_PART_ORDER = 56;
+    SCM_GET_PIPELINE_EXCEPTION = 57;
 }
 
 /**
