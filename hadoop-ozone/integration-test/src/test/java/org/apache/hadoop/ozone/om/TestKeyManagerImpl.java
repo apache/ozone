@@ -106,8 +106,10 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.mockito.Matchers.anyLong;
+=import static org.mockito.Matchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -919,6 +921,50 @@ public class TestKeyManagerImpl {
     verify(sclProtocolMock, times(2)).getContainerWithPipeline(anyLong());
     verify(sclProtocolMock, times(1)).getContainerWithPipeline(100L);
     verify(sclProtocolMock, times(1)).getContainerWithPipeline(200L);
+  }
+
+
+  @Test
+  public void testRefreshPipelineException() throws Exception {
+
+    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).build();
+    cluster.waitForClusterToBeReady();
+    OzoneManager ozoneManager = cluster.getOzoneManager();
+
+    String errorMessage = "Cannot find container!!";
+    StorageContainerLocationProtocol sclProtocolMock = mock(
+        StorageContainerLocationProtocol.class);
+    doThrow(new IOException(errorMessage)).when(sclProtocolMock)
+        .getContainerWithPipeline(anyLong());
+
+    ScmClient scmClientMock = mock(ScmClient.class);
+    when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
+
+    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo("v1",
+        "b1", "k1", ReplicationType.RATIS,
+        ReplicationFactor.THREE);
+
+    // Add block to key.
+    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
+    Pipeline pipeline = getRandomPipeline();
+
+    OmKeyLocationInfo omKeyLocationInfo =
+        new OmKeyLocationInfo.Builder().setBlockID(
+            new BlockID(100L, 1000L))
+            .setOffset(0).setLength(100L).setPipeline(pipeline).build();
+    omKeyLocationInfoList.add(omKeyLocationInfo);
+    omKeyInfo.appendNewBlocks(omKeyLocationInfoList, false);
+
+    KeyManagerImpl keyManagerImpl =
+        new KeyManagerImpl(ozoneManager, scmClientMock, conf, "om1");
+
+    try {
+      keyManagerImpl.refreshPipeline(omKeyInfo);
+      Assert.fail();
+    } catch (OMException omEx) {
+      Assert.assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
+      Assert.assertTrue(omEx.getMessage().equals(errorMessage));
+    }
   }
 
   /**
