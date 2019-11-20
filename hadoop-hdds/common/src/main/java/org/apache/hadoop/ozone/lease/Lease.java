@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -22,7 +22,9 @@ import org.apache.hadoop.util.Time;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This class represents the lease created on a resource. Callback can be
@@ -42,7 +44,7 @@ public class Lease<T> {
   /**
    * Lease lifetime in milliseconds.
    */
-  private volatile long leaseTimeout;
+  private final AtomicLong leaseTimeout;
 
   private boolean expired;
 
@@ -62,7 +64,7 @@ public class Lease<T> {
    */
   public Lease(T resource, long timeout) {
     this.resource = resource;
-    this.leaseTimeout = timeout;
+    this.leaseTimeout = new AtomicLong(timeout);
     this.callbacks = Collections.synchronizedList(new ArrayList<>());
     this.creationTime = Time.monotonicNow();
     this.expired = false;
@@ -79,7 +81,7 @@ public class Lease<T> {
 
   /**
    * Registers a callback which will be executed in case of timeout. Callbacks
-   * are executed in a separate Thread.
+   * are executed in a separate Thread (by {@link LeaseManager}).
    *
    * @param callback
    *        The Callable which has to be executed
@@ -89,7 +91,7 @@ public class Lease<T> {
   public void registerCallBack(Callable<Void> callback)
       throws LeaseExpiredException {
     if(hasExpired()) {
-      throw new LeaseExpiredException("Resource: " + resource);
+      throw new LeaseExpiredException(messageForResource(resource));
     }
     callbacks.add(callback);
   }
@@ -103,7 +105,7 @@ public class Lease<T> {
    */
   public long getElapsedTime() throws LeaseExpiredException {
     if(hasExpired()) {
-      throw new LeaseExpiredException("Resource: " + resource);
+      throw new LeaseExpiredException(messageForResource(resource));
     }
     return Time.monotonicNow() - creationTime;
   }
@@ -116,10 +118,7 @@ public class Lease<T> {
    *         If the lease has already timed out
    */
   public long getRemainingTime() throws LeaseExpiredException {
-    if(hasExpired()) {
-      throw new LeaseExpiredException("Resource: " + resource);
-    }
-    return leaseTimeout - getElapsedTime();
+    return getLeaseLifeTime() - getElapsedTime();
   }
 
   /**
@@ -131,9 +130,9 @@ public class Lease<T> {
    */
   public long getLeaseLifeTime() throws LeaseExpiredException {
     if(hasExpired()) {
-      throw new LeaseExpiredException("Resource: " + resource);
+      throw new LeaseExpiredException(messageForResource(resource));
     }
-    return leaseTimeout;
+    return leaseTimeout.get();
   }
 
   /**
@@ -146,27 +145,32 @@ public class Lease<T> {
    */
   public void renew(long timeout) throws LeaseExpiredException {
     if(hasExpired()) {
-      throw new LeaseExpiredException("Resource: " + resource);
+      throw new LeaseExpiredException(messageForResource(resource));
     }
-    leaseTimeout += timeout;
+    leaseTimeout.addAndGet(timeout);
   }
 
   @Override
   public int hashCode() {
-    return resource.hashCode();
+    return Objects.hashCode(resource);
   }
 
   @Override
   public boolean equals(Object obj) {
-    if(obj instanceof Lease) {
-      return resource.equals(((Lease) obj).resource);
+    if (this == obj) {
+      return true;
     }
-    return false;
+    if (null == obj || getClass() != obj.getClass()) {
+      return false;
+    }
+
+    Lease<?> other = (Lease<?>) obj;
+    return Objects.equals(resource, other.resource);
   }
 
   @Override
   public String toString() {
-    return "Lease<" + resource.toString() + ">";
+    return "Lease<" + resource + ">";
   }
 
   /**
@@ -184,6 +188,10 @@ public class Lease<T> {
   void invalidate() {
     callbacks = null;
     expired = true;
+  }
+
+  static String messageForResource(Object resource) {
+    return "Resource: " + resource;
   }
 
 }

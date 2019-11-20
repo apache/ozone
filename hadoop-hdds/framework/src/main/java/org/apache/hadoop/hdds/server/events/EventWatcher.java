@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +36,6 @@ import org.apache.hadoop.ozone.lease.LeaseNotFoundException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.commons.collections.map.HashedMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +49,6 @@ import org.slf4j.LoggerFactory;
  * @param <COMPLETION_PAYLOAD> The type of event which could cancel the
  *                             tracking.
  */
-@SuppressWarnings("CheckStyle")
 public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     IdentifiableEventPayload,
     COMPLETION_PAYLOAD extends IdentifiableEventPayload> {
@@ -71,7 +70,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
 
   private final Set<TIMEOUT_PAYLOAD> trackedEvents = new HashSet<>();
 
-  private final Map<Long, Long> startTrackingTimes = new HashedMap();
+  private final Map<Long, Long> startTrackingTimes = new HashMap<>();
 
   public EventWatcher(String name, Event<TIMEOUT_PAYLOAD> startEvent,
       Event<COMPLETION_PAYLOAD> completionEvent,
@@ -117,7 +116,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
   }
 
   private synchronized void handleStartEvent(TIMEOUT_PAYLOAD payload,
-      EventPublisher publisher) {
+                                             EventPublisher publisher) {
     metrics.incrementTrackedEvents();
     long identifier = payload.getId();
     startTrackingTimes.put(identifier, System.currentTimeMillis());
@@ -126,17 +125,21 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     trackedEvents.add(payload);
     try {
       Lease<Long> lease = leaseManager.acquire(identifier);
-      try {
-        lease.registerCallBack(() -> {
-          handleTimeout(publisher, identifier);
-          return null;
-        });
-
-      } catch (LeaseExpiredException e) {
-        handleTimeout(publisher, identifier);
-      }
+      listenForTimeout(lease, publisher, identifier);
     } catch (LeaseAlreadyExistException e) {
       //No problem at all. But timer is not reset.
+    }
+  }
+
+  private void listenForTimeout(Lease<Long> lease, EventPublisher publisher,
+                                long identifier) {
+    try {
+      lease.registerCallBack(() -> {
+        handleTimeout(publisher, identifier);
+        return null;
+      });
+    } catch (LeaseExpiredException e) {
+      handleTimeout(publisher, identifier);
     }
   }
 
@@ -200,19 +203,4 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     return metrics;
   }
 
-  /**
-   * Returns a tracked event to which the specified id is
-   * mapped, or {@code null} if there is no mapping for the id.
-   */
-  public TIMEOUT_PAYLOAD getTrackedEventbyId(long id) {
-    return trackedEventsByID.get(id);
-  }
-
-  public Map<Long, TIMEOUT_PAYLOAD> getTrackedEventsByID() {
-    return trackedEventsByID;
-  }
-
-  public Set<TIMEOUT_PAYLOAD> getTrackedEvents() {
-    return trackedEvents;
-  }
 }
