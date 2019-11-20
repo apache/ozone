@@ -80,7 +80,6 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
 
   @Test
   public void testConsumeOMEvents() throws Exception {
-
     ReconDBUpdateTask reconDBUpdateTaskMock = getMockTask("MockTask");
     when(reconDBUpdateTaskMock.process(any(OMUpdateEventBatch.class)))
         .thenReturn(new ImmutablePair<>("MockTask", true));
@@ -89,12 +88,23 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
     when(omUpdateEventBatchMock.filter(Collections.singleton("MockTable")))
         .thenReturn(omUpdateEventBatchMock);
+
+    long startTime = System.currentTimeMillis();
     reconTaskController.consumeOMEvents(
         omUpdateEventBatchMock,
         mock(OMMetadataManager.class));
 
     verify(reconDBUpdateTaskMock, times(1))
         .process(any());
+    long endTime = System.currentTimeMillis();
+
+    ReconTaskStatusDao dao = new ReconTaskStatusDao(sqlConfiguration);
+    ReconTaskStatus reconTaskStatus = dao.findById("MockTask");
+    long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
+
+    Assert.assertTrue(startTime <= taskTimeStamp
+        && taskTimeStamp <= endTime);
+
   }
 
   @Test
