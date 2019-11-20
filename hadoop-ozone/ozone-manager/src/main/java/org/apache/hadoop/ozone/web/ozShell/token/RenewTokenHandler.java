@@ -49,27 +49,31 @@ public class RenewTokenHandler extends Handler {
   @Override
   public Void call() throws Exception {
     OzoneAddress address = new OzoneAddress("");
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    if(!OzoneSecurityUtil.isSecurityEnabled(createOzoneConfiguration())) {
-      System.err.println("Error:Token operations work only when security is " +
-          "enabled. To enable security set ozone.security.enabled to true.");
-      return null;
+      if (!OzoneSecurityUtil.isSecurityEnabled(createOzoneConfiguration())) {
+        System.err.println("Error:Token operations work only when security is" +
+            " " + "enabled. To enable security set ozone.security.enabled to " +
+            "true.");
+        return null;
+      }
+
+      if (Files.notExists(Paths.get(tokenFile))) {
+        System.err.println("Error:Renew token operation failed as token file: "
+            + tokenFile + " containing encoded token doesn't exist.");
+        return null;
+      }
+      Token token = new Token();
+      token.decodeFromUrlString(
+          new String(Files.readAllBytes(Paths.get(tokenFile)),
+              StandardCharsets.UTF_8));
+      long expiryTime = client.getObjectStore().renewDelegationToken(token);
+
+      System.out.printf("Token renewed successfully, expiry time: %s",
+          expiryTime);
     }
 
-    if (Files.notExists(Paths.get(tokenFile))) {
-      System.err.println("Error:Renew token operation failed as token file: "
-          + tokenFile + " containing encoded token doesn't exist.");
-      return null;
-    }
-    Token token = new Token();
-    token.decodeFromUrlString(
-        new String(Files.readAllBytes(Paths.get(tokenFile)),
-            StandardCharsets.UTF_8));
-    long expiryTime = client.getObjectStore().renewDelegationToken(token);
-
-    System.out.printf("Token renewed successfully, expiry time: %s",
-        expiryTime);
     return null;
   }
 }

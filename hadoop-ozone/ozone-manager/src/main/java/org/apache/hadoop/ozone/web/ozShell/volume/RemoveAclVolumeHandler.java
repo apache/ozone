@@ -70,31 +70,32 @@ public class RemoveAclVolumeHandler extends Handler {
     Objects.requireNonNull(acl, "ACL to be removed not specified.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
+      String volumeName = address.getVolumeName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+      }
+
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setVolumeName(volumeName)
+          .setResType(OzoneObj.ResourceType.VOLUME)
+          .setStoreType(storeType == null ? OZONE :
+              OzoneObj.StoreType.valueOf(storeType))
+          .build();
+
+      boolean result = client.getObjectStore().removeAcl(obj,
+          OzoneAcl.parseAcl(acl));
+
+      String message = result
+          ? ("Acl removed successfully.")
+          : ("Acl doesn't exist.");
+
+      System.out.println(message);
     }
 
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setVolumeName(volumeName)
-        .setResType(OzoneObj.ResourceType.VOLUME)
-        .setStoreType(storeType == null ? OZONE :
-            OzoneObj.StoreType.valueOf(storeType))
-        .build();
-
-    boolean result = client.getObjectStore().removeAcl(obj,
-        OzoneAcl.parseAcl(acl));
-
-    String message = result
-        ? ("Acl removed successfully.")
-        : ("Acl doesn't exist.");
-
-    System.out.println(message);
-
-    client.close();
     return null;
   }
 

@@ -112,7 +112,7 @@ public class TestBlockDeletion {
         3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(1)
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
@@ -143,7 +143,7 @@ public class TestBlockDeletion {
     String keyName = UUID.randomUUID().toString();
 
     OzoneOutputStream out = bucket.createKey(keyName, value.getBytes().length,
-        ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
+        ReplicationType.RATIS, ReplicationFactor.ONE, new HashMap<>());
     for (int i = 0; i < 100; i++) {
       out.write(value.getBytes());
     }
@@ -152,7 +152,7 @@ public class TestBlockDeletion {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
         .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setFactor(HddsProtos.ReplicationFactor.ONE)
         .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =

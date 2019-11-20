@@ -22,8 +22,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.server.events.EventQueue;
 
 import java.io.IOException;
 import java.util.List;
@@ -36,13 +34,7 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   public MockRatisPipelineProvider(NodeManager nodeManager,
                             PipelineStateManager stateManager,
                             Configuration conf) {
-    super(nodeManager, stateManager, conf, new EventQueue());
-  }
-
-  public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, Configuration conf,
-      EventPublisher eventPublisher) {
-    super(nodeManager, stateManager, conf, eventPublisher);
+    super(nodeManager, stateManager, conf, null);
   }
 
   protected void initializePipeline(Pipeline pipeline) throws IOException {

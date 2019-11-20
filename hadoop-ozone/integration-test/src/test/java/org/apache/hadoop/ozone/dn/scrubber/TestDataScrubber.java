@@ -85,8 +85,6 @@ public class TestDataScrubber {
     ozoneConfig.set(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, "1s");
     ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, ContainerPlacementPolicy.class);
-    ozoneConfig.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
-        false);
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();

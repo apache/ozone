@@ -33,9 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
@@ -362,16 +360,15 @@ public final class TestUtils {
     return new PipelineReportFromDatanode(dn, reportBuilder.build());
   }
 
-  public static void openAllRatisPipelines(PipelineManager pipelineManager)
-      throws IOException {
-    // Pipeline is created by background thread
-    List<Pipeline> pipelines =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS);
-    // Trigger the processed pipeline report event
-    for (Pipeline pipeline : pipelines) {
-      pipelineManager.openPipeline(pipeline.getId());
-    }
+  public static PipelineReportFromDatanode getPipelineReportFromDatanode(
+      DatanodeDetails dn, PipelineID pipelineID, boolean isLeader) {
+    PipelineReportsProto.Builder reportBuilder =
+        PipelineReportsProto.newBuilder();
+    reportBuilder.addPipelineReport(PipelineReport.newBuilder()
+        .setPipelineID(pipelineID.getProtobuf()).setIsLeader(isLeader));
+    return new PipelineReportFromDatanode(dn, reportBuilder.build());
   }
+
 
   public static PipelineActionsFromDatanode getPipelineActionFromDatanode(
       DatanodeDetails dn, PipelineID... pipelineIDs) {
