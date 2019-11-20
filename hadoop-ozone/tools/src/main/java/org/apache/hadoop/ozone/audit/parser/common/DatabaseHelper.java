@@ -93,10 +93,9 @@ public final class DatabaseHelper {
   }
 
   private static boolean createAuditTable(String dbName) throws Exception {
-    try (Connection connection = getConnection(dbName)) {
-      try (Statement st = connection.createStatement()) {
-        st.executeUpdate(properties.get(ParserConsts.CREATE_AUDIT_TABLE));
-      }
+    try (Connection connection = getConnection(dbName);
+         Statement st = connection.createStatement()) {
+      st.executeUpdate(properties.get(ParserConsts.CREATE_AUDIT_TABLE));
     }
     return true;
   }
