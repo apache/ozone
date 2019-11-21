@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.nio.ByteBuffer;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -87,18 +86,12 @@ public final class ContainerTestHelper {
    * Create a pipeline with single node replica.
    *
    * @return Pipeline with single node in it.
-   * @throws IOException
    */
   public static Pipeline createSingleNodePipeline() throws
       IOException {
     return createPipeline(1);
   }
 
-  public static String createLocalAddress() throws IOException {
-    try(ServerSocket s = new ServerSocket(0)) {
-      return "127.0.0.1:" + s.getLocalPort();
-    }
-  }
   public static DatanodeDetails createDatanodeDetails() throws IOException {
     ServerSocket socket = new ServerSocket(0);
     int port = socket.getLocalPort();
@@ -125,10 +118,8 @@ public final class ContainerTestHelper {
    * Create a pipeline with single node replica.
    *
    * @return Pipeline with single node in it.
-   * @throws IOException
    */
-  public static Pipeline createPipeline(int numNodes)
-      throws IOException {
+  public static Pipeline createPipeline(int numNodes) throws IOException {
     Preconditions.checkArgument(numNodes >= 1);
     final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
     for(int i = 0; i < numNodes; i++) {
@@ -137,20 +128,18 @@ public final class ContainerTestHelper {
     return createPipeline(ids);
   }
 
-  public static Pipeline createPipeline(
-      Iterable<DatanodeDetails> ids) throws IOException {
+  public static Pipeline createPipeline(Iterable<DatanodeDetails> ids) {
     Objects.requireNonNull(ids, "ids == null");
     Preconditions.checkArgument(ids.iterator().hasNext());
     List<DatanodeDetails> dns = new ArrayList<>();
     ids.forEach(dns::add);
-    Pipeline pipeline = Pipeline.newBuilder()
+    return Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setType(HddsProtos.ReplicationType.STAND_ALONE)
         .setFactor(ReplicationFactor.ONE)
         .setNodes(dns)
         .build();
-    return pipeline;
   }
 
   /**
@@ -159,14 +148,11 @@ public final class ContainerTestHelper {
    * @param keyID - ID of the key
    * @param seqNo - Chunk number.
    * @return ChunkInfo
-   * @throws IOException
    */
   public static ChunkInfo getChunk(long keyID, int seqNo, long offset,
-      long len) throws IOException {
-
-    ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", keyID,
+      long len) {
+    return new ChunkInfo(String.format("%d.data.%d", keyID,
         seqNo), offset, len);
-    return info;
   }
 
   /**
@@ -201,7 +187,6 @@ public final class ContainerTestHelper {
    * @param datalen - Length of data.
    * @param token - block token.
    * @return ContainerCommandRequestProto
-   * @throws IOException
    */
   public static ContainerCommandRequestProto getWriteChunkRequest(
       Pipeline pipeline, BlockID blockID, int datalen, String token)
@@ -219,7 +204,6 @@ public final class ContainerTestHelper {
    * @param datalen - Length of data.
    * @param token - block token.
    * @return ContainerCommandRequestProto
-   * @throws IOException
    */
   public static ContainerCommandRequestProto getWriteChunkRequest(
       Pipeline pipeline, BlockID blockID, int datalen, int seq, String token)
@@ -316,12 +300,10 @@ public final class ContainerTestHelper {
    * @param pipeline pipeline.
    * @param request writeChunkRequest.
    * @return Request.
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
    */
   public static ContainerCommandRequestProto getReadChunkRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto request)
-      throws IOException, NoSuchAlgorithmException {
+      throws IOException {
     LOG.trace("readChunk blockID={} from pipeline={}",
         request.getBlockID(), pipeline);
 
@@ -345,13 +327,10 @@ public final class ContainerTestHelper {
    * @param pipeline pipeline.
    * @param writeRequest - write request
    * @return request
-   * @throws IOException
-   * @throws NoSuchAlgorithmException
    */
   public static ContainerCommandRequestProto getDeleteChunkRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
-      throws
-      IOException, NoSuchAlgorithmException {
+      throws IOException {
     LOG.trace("deleteChunk blockID={} from pipeline={}",
         writeRequest.getBlockID(), pipeline);
 
@@ -432,21 +411,16 @@ public final class ContainerTestHelper {
    * Return an update container command for test purposes.
    * Creates a container data based on the given meta data,
    * and request to update an existing container with it.
-   *
-   * @param containerID
-   * @param metaData
-   * @return
-   * @throws IOException
    */
   public static ContainerCommandRequestProto getUpdateContainerRequest(
       long containerID, Map<String, String> metaData) throws IOException {
     ContainerProtos.UpdateContainerRequestProto.Builder updateRequestBuilder =
         ContainerProtos.UpdateContainerRequestProto.newBuilder();
     String[] keys = metaData.keySet().toArray(new String[]{});
-    for(int i=0; i<keys.length; i++) {
+    for (String key : keys) {
       KeyValue.Builder kvBuilder = KeyValue.newBuilder();
-      kvBuilder.setKey(keys[i]);
-      kvBuilder.setValue(metaData.get(keys[i]));
+      kvBuilder.setKey(key);
+      kvBuilder.setValue(metaData.get(key));
       updateRequestBuilder.addMetadata(kvBuilder.build());
     }
     Pipeline pipeline =
@@ -460,6 +434,7 @@ public final class ContainerTestHelper {
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
     return request.build();
   }
+
   /**
    * Returns a create container response for test purposes. There are a bunch of
    * tests where we need to just send a request and get a reply.
@@ -599,16 +574,13 @@ public final class ContainerTestHelper {
    */
   public static ContainerCommandRequestProto getCloseContainer(
       Pipeline pipeline, long containerID) throws IOException {
-    ContainerProtos.ContainerCommandRequestProto cmd =
-        ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.CloseContainer)
-            .setContainerID(containerID)
-            .setCloseContainer(
-                ContainerProtos.CloseContainerRequestProto.getDefaultInstance())
-            .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
-            .build();
-
-    return cmd;
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.CloseContainer)
+        .setContainerID(containerID)
+        .setCloseContainer(
+            ContainerProtos.CloseContainerRequestProto.getDefaultInstance())
+        .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
+        .build();
   }
 
   /**
@@ -620,15 +592,13 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getRequestWithoutTraceId(
       Pipeline pipeline, long containerID) throws IOException {
     Preconditions.checkNotNull(pipeline);
-    ContainerProtos.ContainerCommandRequestProto cmd =
-        ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.CloseContainer)
-            .setContainerID(containerID)
-            .setCloseContainer(
-                ContainerProtos.CloseContainerRequestProto.getDefaultInstance())
-            .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
-            .build();
-    return cmd;
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.CloseContainer)
+        .setContainerID(containerID)
+        .setCloseContainer(
+            ContainerProtos.CloseContainerRequestProto.getDefaultInstance())
+        .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
+        .build();
   }
 
   /**
