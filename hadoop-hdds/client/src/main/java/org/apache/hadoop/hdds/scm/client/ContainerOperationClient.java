@@ -176,55 +176,6 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  /**
-   * Creates a pipeline over the machines choosen by the SCM.
-   *
-   * @param client - Client
-   * @param pipeline - pipeline to be createdon Datanodes.
-   * @throws IOException
-   */
-  private void createPipeline(XceiverClientSpi client, Pipeline pipeline)
-      throws IOException {
-
-    Preconditions.checkNotNull(pipeline.getId(), "Pipeline " +
-        "name cannot be null when client create flag is set.");
-
-    // Pipeline creation is a three step process.
-    //
-    // 1. Notify SCM that this client is doing a create pipeline on
-    // datanodes.
-    //
-    // 2. Talk to Datanodes to create the pipeline.
-    //
-    // 3. update SCM that pipeline creation was successful.
-
-    // TODO: this has not been fully implemented on server side
-    // SCMClientProtocolServer#notifyObjectStageChange
-    // TODO: when implement the pipeline state machine, change
-    // the pipeline name (string) to pipeline id (long)
-    //storageContainerLocationClient.notifyObjectStageChange(
-    //    ObjectStageChangeRequestProto.Type.pipeline,
-    //    pipeline.getPipelineName(),
-    //    ObjectStageChangeRequestProto.Op.create,
-    //    ObjectStageChangeRequestProto.Stage.begin);
-
-    // client.createPipeline();
-    // TODO: Use PipelineManager to createPipeline
-
-    //storageContainerLocationClient.notifyObjectStageChange(
-    //    ObjectStageChangeRequestProto.Type.pipeline,
-    //    pipeline.getPipelineName(),
-    //    ObjectStageChangeRequestProto.Op.create,
-    //    ObjectStageChangeRequestProto.Stage.complete);
-
-    // TODO : Should we change the state on the client side ??
-    // That makes sense, but it is not needed for the client to work.
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Pipeline creation successful. Pipeline: {}",
-          pipeline);
-    }
-  }
-
   @Override
   public ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor, String owner) throws IOException {
