@@ -40,8 +40,6 @@ public class TestMiniOzoneHACluster {
 
   /**
    * Create a MiniOzoneHAClusterImpl for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
    *
    * @throws IOException
    */
