@@ -121,6 +121,8 @@ public class OMException extends IOException {
 
     BUCKET_NOT_EMPTY,
 
+    INVALID_BUCKET_NAME,
+
     BUCKET_ALREADY_EXISTS,
 
     KEY_ALREADY_EXISTS,

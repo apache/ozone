@@ -32,3 +32,7 @@ Create bucket which already exists
     ${result} =         Execute AWSS3APICli         create-bucket --bucket ${BUCKET}
                         Should contain              ${result}         ${BUCKET}
                         Should contain              ${result}         Location
+
+Create bucket with invalid bucket name
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket_1   255
+                        Should contain              ${result}         InvalidBucketName
