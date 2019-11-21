@@ -307,8 +307,12 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
      * Initialize HA related configurations.
      */
     private void initHAConfig(int basePort) throws IOException {
-      // Set configurations required for starting OM HA service
+      // Set configurations required for starting OM HA service, because that
+      // is the serviceID being passed to start Ozone HA cluster.
+      // Here setting internal service and OZONE_OM_SERVICE_IDS_KEY, in this
+      // way in OM start it uses internal service id to find it's service id.
       conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
+      conf.set(OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID, omServiceId);
       String omNodesKey = OmUtils.addKeySuffixes(
           OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
       StringBuilder omNodesKeyValue = new StringBuilder();
