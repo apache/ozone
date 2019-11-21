@@ -16,6 +16,14 @@ name: build-branch
 on:
   - push
 jobs:
+  build:
+    name: compile
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@master
+      - uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/build.sh
   rat:
     name: rat
     runs-on: ubuntu-18.04
