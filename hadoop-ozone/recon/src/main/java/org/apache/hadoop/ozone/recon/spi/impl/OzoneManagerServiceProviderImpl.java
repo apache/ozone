@@ -167,8 +167,6 @@ public class OzoneManagerServiceProviderImpl
     this.reconTaskStatusDao = reconTaskController.getReconTaskStatusDao();
     this.ozoneManagerClient = ozoneManagerClient;
     this.configuration = configuration;
-
-    registerOMDBTasks();
   }
 
   public void registerOMDBTasks () {
@@ -200,6 +198,7 @@ public class OzoneManagerServiceProviderImpl
 
   @Override
   public void start() {
+    registerOMDBTasks();
     try {
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
@@ -381,7 +380,7 @@ public class OzoneManagerServiceProviderImpl
    * @return latest sequence number.
    */
   private long getCurrentOMDBSequenceNumber() {
-    return omMetadataManager.getLastSequenceNumberFromOMMetadataDB();
+    return omMetadataManager.getLastSequenceNumberFromDB();
   }
 }
 

@@ -186,7 +186,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           //store the timestamp for the task
           ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
               System.currentTimeMillis(),
-              omMetadataManager.getLastSequenceNumberFromOMMetadataDB());
+              omMetadataManager.getLastSequenceNumberFromDB());
           reconTaskStatusDao.update(reconTaskStatusRecord);
         }
       }

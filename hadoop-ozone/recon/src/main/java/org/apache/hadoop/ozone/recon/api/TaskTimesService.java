@@ -57,7 +57,7 @@ public class TaskTimesService {
    * @return {@link Response}
    */
   @GET
-  @Path("taskStatus")
+  @Path("status")
   public Response getTaskTimes() {
     reconTaskStatusDao = getDao();
     List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();

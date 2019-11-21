@@ -80,11 +80,14 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
 
   @Test
   public void testConsumeOMEvents() throws Exception {
+    ReconOMMetadataManager omMetadataManagerMock = mock(
+        ReconOMMetadataManager.class);
     ReconDBUpdateTask reconDBUpdateTaskMock = getMockTask("MockTask");
     when(reconDBUpdateTaskMock.process(any(OMUpdateEventBatch.class)))
         .thenReturn(new ImmutablePair<>("MockTask", true));
     reconTaskController.registerTask(reconDBUpdateTaskMock);
     OMUpdateEventBatch omUpdateEventBatchMock = mock(OMUpdateEventBatch.class);
+    when(omUpdateEventBatchMock.getLastSequenceNumber()).thenReturn(100L);
     when(omUpdateEventBatchMock.isEmpty()).thenReturn(false);
     when(omUpdateEventBatchMock.filter(Collections.singleton("MockTable")))
         .thenReturn(omUpdateEventBatchMock);
@@ -101,10 +104,12 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
     ReconTaskStatusDao dao = new ReconTaskStatusDao(sqlConfiguration);
     ReconTaskStatus reconTaskStatus = dao.findById("MockTask");
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
+    long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
 
     Assert.assertTrue(startTime <= taskTimeStamp
         && taskTimeStamp <= endTime);
-
+    Assert.assertEquals(seqNumber,
+        omUpdateEventBatchMock.getLastSequenceNumber());
   }
 
   @Test
@@ -180,7 +185,7 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
         getMockTask("MockTask2");
     when(reconDBUpdateTaskMock.reprocess(omMetadataManagerMock))
         .thenReturn(new ImmutablePair<>("MockTask2", true));
-    when(omMetadataManagerMock.getLastSequenceNumberFromOMMetadataDB()
+    when(omMetadataManagerMock.getLastSequenceNumberFromDB()
     ).thenReturn(100L);
 
     long startTime = System.currentTimeMillis();
@@ -192,7 +197,7 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
         .reprocess(omMetadataManagerMock);
 
     verify(omMetadataManagerMock, times(1)
-    ).getLastSequenceNumberFromOMMetadataDB();
+    ).getLastSequenceNumberFromDB();
 
     ReconTaskStatusDao dao = new ReconTaskStatusDao(sqlConfiguration);
     ReconTaskStatus reconTaskStatus = dao.findById("MockTask2");
@@ -202,7 +207,7 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
     Assert.assertTrue(startTime <= taskTimeStamp
         && taskTimeStamp <= endTime);
     Assert.assertEquals(seqNumber,
-        omMetadataManagerMock.getLastSequenceNumberFromOMMetadataDB());
+        omMetadataManagerMock.getLastSequenceNumberFromDB());
   }
 
   /**

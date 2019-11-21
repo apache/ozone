@@ -40,5 +40,5 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
    * Get the most recent sequence number from the Ozone Manager Metadata
    * Database.
    */
-  long getLastSequenceNumberFromOMMetadataDB ();
+  long getLastSequenceNumberFromDB();
 }
