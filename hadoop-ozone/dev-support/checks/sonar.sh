@@ -20,4 +20,4 @@ if [ ! "$SONAR_TOKEN" ]; then
   echo "SONAR_TOKEN environment variable should be set"
   exit 1
 fi
-mvn install org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar -Dsonar.host.url=https://sonarcloud.io -Dsonar.organization=apache -Dsonar.projectKey=hadoop-ozone
+mvn install -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:3.6.0.1398:sonar -Dsonar.host.url=https://sonarcloud.io -Dsonar.organization=apache -Dsonar.projectKey=hadoop-ozone
