@@ -86,7 +86,11 @@ public class TestRangeHeaderParserUtil {
     assertEquals(9, rangeHeader.getEndOffset());
     assertEquals(false, rangeHeader.isInValidRange());
 
-
+    rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=3977248768" +
+            "-4977248768", 4977248769L);
+    assertEquals(3977248768L, rangeHeader.getStartOffset());
+    assertEquals(4977248768L, rangeHeader.getEndOffset());
+    assertEquals(false, rangeHeader.isInValidRange());
 
   }
 
