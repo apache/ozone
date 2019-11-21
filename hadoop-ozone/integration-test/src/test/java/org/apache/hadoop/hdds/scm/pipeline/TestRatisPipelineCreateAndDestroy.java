@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
@@ -66,15 +67,43 @@ public class TestRatisPipelineCreateAndDestroy {
   @Test(timeout = 180000)
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
-    init(6);
+    int numOfDatanodes = 6;
+    init(numOfDatanodes);
     // make sure two pipelines are created
     waitForPipelines(2);
+    Assert.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE).size());
+
     List<Pipeline> pipelines = pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
       pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     }
+    // make sure two pipelines are created
+    waitForPipelines(2);
+  }
+
+  @Test(timeout = 180000)
+  public void testAutomaticPipelineCreationDisablingFactorONE()
+      throws Exception {
+    conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
+    init(6);
+    // make sure two pipelines are created
+    waitForPipelines(2);
+    // No Factor ONE pipeline is auto created.
+    Assert.assertEquals(0, pipelineManager.getPipelines(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE).size());
+
+    List<Pipeline> pipelines = pipelineManager
+        .getPipelines(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+    for (Pipeline pipeline : pipelines) {
+      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+    }
+
     // make sure two pipelines are created
     waitForPipelines(2);
   }
