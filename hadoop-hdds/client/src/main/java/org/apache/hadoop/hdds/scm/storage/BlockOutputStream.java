@@ -403,8 +403,8 @@ public class BlockOutputStream extends OutputStream {
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
-        LOG.debug("putBlock failed for blockID {} with exception {}", blockID,  e
-                  .getLocalizedMessage());
+        LOG.debug("putBlock failed for blockID {} with exception {}",
+            blockID,  e.getLocalizedMessage());
         CompletionException ce =  new CompletionException(e);
         setIoException(ce);
         throw ce;
@@ -532,7 +532,7 @@ public class BlockOutputStream extends OutputStream {
     } else {
       LOG.debug("Previous request had already failed with {}"
           + " so subsequent request also encounters"
-          + " Storage Container Exception ", ioe.toString(), e);
+          + " Storage Container Exception ", ioe, e);
     }
   }
 
@@ -603,7 +603,7 @@ public class BlockOutputStream extends OutputStream {
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
-        LOG.debug("writing chunk failed {} blockID {} with exception{}",
+        LOG.debug("writing chunk failed {} blockID {} with exception {}",
               chunkInfo.getChunkName(), blockID, e.getLocalizedMessage());
         CompletionException ce = new CompletionException(e);
         setIoException(ce);
@@ -613,8 +613,7 @@ public class BlockOutputStream extends OutputStream {
       throw new IOException(
           "Unexpected Storage Container Exception: " + e.toString(), e);
     }
-    LOG.debug(
-        "writing chunk {} blockID {} length {}",
+    LOG.debug("writing chunk {} blockID {} length {}",
         chunkInfo.getChunkName(), blockID, effectiveChunkSize);
     containerBlockData.addChunks(chunkInfo);
   }
