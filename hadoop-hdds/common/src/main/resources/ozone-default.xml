@@ -1386,16 +1386,6 @@
   </property>
 
   <property>
-    <name>hdds.scm.safemode.min.pipeline</name>
-    <value>1</value>
-    <tag>HDDS,SCM,OPERATION</tag>
-    <description>
-      Minimum RATIS pipeline number to exit SCM safe mode. Considered only when
-      "hdds.scm.safemode.pipeline.creation" is True.
-    </description>
-  </property>
-
-  <property>
     <name>hdds.lock.max.concurrency</name>
     <value>100</value>
     <tag>HDDS</tag>

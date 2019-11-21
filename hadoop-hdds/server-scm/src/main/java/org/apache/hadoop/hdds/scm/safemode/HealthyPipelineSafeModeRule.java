@@ -57,10 +57,6 @@ public class HealthyPipelineSafeModeRule
             HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT);
 
-    boolean createPipelineInSafemode = configuration.getBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
-
     int minDatanodes = configuration.getInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);

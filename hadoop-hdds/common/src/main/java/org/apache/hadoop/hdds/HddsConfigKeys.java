@@ -100,10 +100,6 @@ public final class HddsConfigKeys {
       "hdds.scm.safemode.healthy.pipelie.pct";
   public static final double
       HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT = 0.10;
-  // number of healthy RATIS pipeline(ONE or THREE factor)
-  public static final String HDDS_SCM_SAFEMODE_MIN_PIPELINE =
-      "hdds.scm.safemode.min.pipeline";
-  public static final int HDDS_SCM_SAFEMODE_MIN_PIPELINE_DEFAULT = 1;
 
   public static final String HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT =
       "hdds.scm.safemode.atleast.one.node.reported.pipeline.pct";
