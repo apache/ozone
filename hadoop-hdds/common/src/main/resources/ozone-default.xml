@@ -494,8 +494,17 @@
     <description>
       Comma-separated list of OM service Ids.
 
-      If not set, the default value of "om-service-value" is assigned as the
+      If not set, the default value of "omServiceIdDefault" is assigned as the
       OM service ID.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.internal.service.id</name>
+    <value></value>
+    <tag>OM, HA</tag>
+    <description>
+      Service ID of the Ozone Manager. If this is not set fall back to
+      ozone.om.service.ids to find the service ID it belongs to.
     </description>
   </property>
   <property>
