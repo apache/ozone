@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.InetSocketAddress;
-import java.util.Collection;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
@@ -91,8 +90,7 @@ public final class HddsServerUtil {
 
     if (!host.isPresent()) {
       // Fallback to Ozone SCM name
-      Collection<InetSocketAddress> scmAddresses = getSingleSCMAddress(conf);
-      host = Optional.of(scmAddresses.iterator().next().getHostName());
+      host = Optional.of(getSingleSCMAddress(conf).getHostName());
     }
 
     final int port = getPortNumberFromConfigKeys(conf,

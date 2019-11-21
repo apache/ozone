@@ -109,9 +109,8 @@ public final class HddsUtils {
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
 
     if (!host.isPresent()) {
-      // Fallback to Ozone SCM names.
-      Collection<InetSocketAddress> scmAddresses = getSingleSCMAddress(conf);
-      host = Optional.of(scmAddresses.iterator().next().getHostName());
+      // Fallback to Ozone SCM name
+      host = Optional.of(getSingleSCMAddress(conf).getHostName());
     }
 
     final int port = getPortNumberFromConfigKeys(conf,
@@ -135,13 +134,11 @@ public final class HddsUtils {
       Configuration conf) {
     Optional<String> host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY
-        );
+        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
 
     if (!host.isPresent()) {
-      // Fallback to Ozone SCM names.
-      Collection<InetSocketAddress> scmAddresses = getSingleSCMAddress(conf);
-      host = Optional.of(scmAddresses.iterator().next().getHostName());
+      // Fallback to Ozone SCM name
+      host = Optional.of(getSingleSCMAddress(conf).getHostName());
     }
 
     final int port = getPortNumberFromConfigKeys(conf,
@@ -290,21 +287,18 @@ public final class HddsUtils {
   }
 
   /**
-   * Same as {@link #getSCMAddresses(Configuration)}, but verifies that
-   * only one SCM address is configured, as currently multiple ones are not
-   * supported.  When multi-SCM support is added, simply replace calls with the
-   * delegate method.
+   * Retrieve the address of the only SCM (as currently multiple ones are not
+   * supported).
    *
-   * @return a collection of SCM addresses with exactly 1 item
+   * @return SCM address
    * @throws IllegalArgumentException if {@code conf} has more than one SCM
    *         address or it has none
    */
-  public static Collection<InetSocketAddress> getSingleSCMAddress(
-      Configuration conf) {
+  public static InetSocketAddress getSingleSCMAddress(Configuration conf) {
     Collection<InetSocketAddress> singleton = getSCMAddresses(conf);
     Preconditions.checkArgument(singleton.size() == 1,
         MULTIPLE_SCM_NOT_YET_SUPPORTED);
-    return singleton;
+    return singleton.iterator().next();
   }
 
   /**
@@ -511,8 +505,7 @@ public final class HddsUtils {
 
     if (!host.isPresent()) {
       // Fallback to Ozone SCM name
-      Collection<InetSocketAddress> scmAddresses = getSingleSCMAddress(conf);
-      host = Optional.of(scmAddresses.iterator().next().getHostName());
+      host = Optional.of(getSingleSCMAddress(conf).getHostName());
     }
 
     final int port = getPortNumberFromConfigKeys(conf,
