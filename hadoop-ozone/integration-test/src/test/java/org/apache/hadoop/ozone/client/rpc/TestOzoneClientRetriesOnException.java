@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.client.io.BlockOutputStreamEntry;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ratis.protocol.GroupMismatchException;
 import org.junit.After;
 import org.junit.Assert;
@@ -148,7 +149,7 @@ public class TestOzoneClientRetriesOnException {
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
-    ContainerTestHelper.waitForPipelineClose(key, cluster, true);
+    TestHelper.waitForPipelineClose(key, cluster, true);
     key.flush();
     Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
         .getIoException()) instanceof GroupMismatchException);
@@ -196,7 +197,7 @@ public class TestOzoneClientRetriesOnException {
     OutputStream stream = entries.get(0).getOutputStream();
     Assert.assertTrue(stream instanceof BlockOutputStream);
     BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
-    ContainerTestHelper.waitForContainerClose(key, cluster);
+    TestHelper.waitForContainerClose(key, cluster);
     try {
       key.write(data1);
       Assert.fail("Expected exception not thrown");
@@ -222,12 +223,12 @@ public class TestOzoneClientRetriesOnException {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return ContainerTestHelper
+    return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    ContainerTestHelper
+    TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }
