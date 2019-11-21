@@ -51,14 +51,14 @@ jobs:
 #          with:
 #            name: author
 #            path: target/author
-  unit:
-    name: unit
+  sonar:
+    name: sonar
     runs-on: ubuntu-18.04
     steps:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv
           with:
-             args: ./hadoop-ozone/dev-support/checks/unit.sh
+             args: ./hadoop-ozone/dev-support/checks/build.sh
         - uses: ./.github/buildenv
           with:
             args: ./hadoop-ozone/dev-support/checks/sonar.sh
@@ -68,8 +68,8 @@ jobs:
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: unit
-            path: target/unit
+            name: sonar
+            path: target/sonar
 #  checkstyle:
 #    name: checkstyle
 #    runs-on: ubuntu-18.04
