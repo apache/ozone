@@ -49,8 +49,6 @@ import org.apache.ratis.protocol.AlreadyClosedException;
 import org.apache.ratis.protocol.GroupMismatchException;
 import org.apache.ratis.protocol.NotReplicatedException;
 import org.apache.ratis.protocol.RaftRetryFailureException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -75,9 +73,6 @@ import java.util.concurrent.TimeoutException;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class HddsClientUtils {
-
-  private static final Logger LOG = LoggerFactory.getLogger(
-      HddsClientUtils.class);
 
   private HddsClientUtils() {
   }
