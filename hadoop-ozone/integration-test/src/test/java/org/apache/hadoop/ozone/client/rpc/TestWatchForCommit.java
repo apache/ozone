@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -130,11 +131,6 @@ public class TestWatchForCommit {
     return UUID.randomUUID().toString();
   }
 
-  private XceiverClientMetrics getXceiverClientMetrics() {
-    RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
-    return rpc.getXceiverClientManager().getMetrics();
-  }
-
   @Test
   public void testWatchForCommitWithKeyWrite() throws Exception {
     // in this case, watch request should fail with RaftRetryFailureException
@@ -148,7 +144,8 @@ public class TestWatchForCommit {
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);
     startCluster(conf);
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(

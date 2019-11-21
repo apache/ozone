@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -150,8 +151,9 @@ public class TestOzoneContainerWithTLS {
       //Set scmId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
+      XceiverClientMetrics metrics = XceiverClientMetrics.create();
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,
-          caClient.getCACertificate());
+          caClient.getCACertificate(), metrics);
 
       if (blockTokenEnabled) {
         secretManager.start(caClient);

@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -30,6 +29,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -106,11 +106,6 @@ public class TestBlockOutputStreamWithFailures {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  private XceiverClientMetrics getXceiverClientMetrics() {
-    RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
-    return rpc.getXceiverClientManager().getMetrics();
-  }
-
   private String getKeyName() {
     return UUID.randomUUID().toString();
   }
@@ -128,7 +123,8 @@ public class TestBlockOutputStreamWithFailures {
   @Test
   public void testWatchForCommitWithCloseContainerException()
       throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -267,7 +263,8 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testWatchForCommitDatanodeFailure() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -399,7 +396,8 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void test2DatanodesFailure() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -546,7 +544,8 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testFailureWithPrimeSizedData() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -666,7 +665,8 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testExceptionDuringClose() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -780,7 +780,8 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testWatchForCommitWithSingleNodeRatis() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -920,7 +921,8 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testDatanodeFailureWithSingleNodeRatis() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =
@@ -1059,7 +1061,8 @@ public class TestBlockOutputStreamWithFailures {
 
   @Test
   public void testDatanodeFailureWithPreAllocation() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount =
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk);
     long putBlockCount =

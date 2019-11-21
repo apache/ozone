@@ -22,8 +22,11 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -108,5 +111,10 @@ public final class OzoneTestUtils {
     } catch (OMException ex) {
       Assert.assertEquals(code, ex.getResult());
     }
+  }
+
+  public static XceiverClientMetrics getXceiverClientMetrics(OzoneClient client) {
+    RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
+    return rpc.getXceiverClientManager().getMetrics();
   }
 }

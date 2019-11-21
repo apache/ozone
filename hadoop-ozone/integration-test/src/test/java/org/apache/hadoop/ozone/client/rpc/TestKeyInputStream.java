@@ -21,10 +21,10 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -120,15 +120,8 @@ public class TestKeyInputStream {
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
-  private XceiverClientMetrics getXceiverClientMetrics() {
-    RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
-    return rpc.getXceiverClientManager().getMetrics();
-  }
-
   @Test
   public void testSeekRandomly() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
-
     String keyName = getKeyName();
     OzoneOutputStream key = TestHelper.createKey(keyName,
         ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
@@ -226,7 +219,8 @@ public class TestKeyInputStream {
 
   @Test
   public void testSeek() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long readChunkCount = metrics.getContainerOpCountMetrics(

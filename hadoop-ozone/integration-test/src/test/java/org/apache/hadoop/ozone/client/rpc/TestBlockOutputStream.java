@@ -21,11 +21,11 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -102,11 +102,6 @@ public class TestBlockOutputStream {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  private XceiverClientMetrics getXceiverClientMetrics() {
-    RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
-    return rpc.getXceiverClientManager().getMetrics();
-  }
-
   private String getKeyName() {
     return UUID.randomUUID().toString();
   }
@@ -123,7 +118,8 @@ public class TestBlockOutputStream {
 
   @Test
   public void testBufferCaching() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -218,7 +214,8 @@ public class TestBlockOutputStream {
 
   @Test
   public void testFlushChunk() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -312,7 +309,8 @@ public class TestBlockOutputStream {
 
   @Test
   public void testMultiChunkWrite() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -406,7 +404,8 @@ public class TestBlockOutputStream {
 
   @Test
   public void testMultiChunkWrite2() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -481,7 +480,8 @@ public class TestBlockOutputStream {
 
   @Test
   public void testFullBufferCondition() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
@@ -580,7 +580,8 @@ public class TestBlockOutputStream {
 
   @Test
   public void testWriteWithExceedingMaxBufferLimit() throws Exception {
-    XceiverClientMetrics metrics = getXceiverClientMetrics();
+    XceiverClientMetrics metrics =
+            OzoneTestUtils.getXceiverClientMetrics(client);
     long writeChunkCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
