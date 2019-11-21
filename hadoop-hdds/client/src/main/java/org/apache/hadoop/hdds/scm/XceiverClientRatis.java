@@ -85,7 +85,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      Configuration ozoneConf, X509Certificate caCert, XceiverClientMetrics metrics) {
+      Configuration ozoneConf, X509Certificate caCert,
+      XceiverClientMetrics metrics) {
     final String rpcType = ozoneConf
         .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
@@ -119,7 +120,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
    */
   private XceiverClientRatis(Pipeline pipeline, RpcType rpcType,
       int maxOutStandingChunks, RetryPolicy retryPolicy,
-      GrpcTlsConfig tlsConfig, TimeDuration timeout, XceiverClientMetrics metrics) {
+      GrpcTlsConfig tlsConfig, TimeDuration timeout,
+      XceiverClientMetrics metrics) {
     super();
     this.pipeline = pipeline;
     this.rpcType = rpcType;

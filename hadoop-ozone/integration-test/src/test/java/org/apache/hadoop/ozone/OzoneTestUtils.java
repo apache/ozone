@@ -113,7 +113,8 @@ public final class OzoneTestUtils {
     }
   }
 
-  public static XceiverClientMetrics getXceiverClientMetrics(OzoneClient client) {
+  public static XceiverClientMetrics getXceiverClientMetrics(
+          OzoneClient client) {
     RpcClient rpc = (RpcClient)client.getObjectStore().getClientProxy();
     return rpc.getXceiverClientManager().getMetrics();
   }
