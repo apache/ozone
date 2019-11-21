@@ -206,12 +206,20 @@ public class BucketEndpoint extends EndpointBase {
     String volumeName = getVolumeName(getAuthenticationHeaderParser().
         getAccessKeyID());
 
-    String location = createS3Bucket(volumeName, bucketName);
-
-    LOG.info("Location is {}", location);
-    return Response.status(HttpStatus.SC_OK).header("Location", location)
-        .build();
-
+    try {
+      String location = createS3Bucket(volumeName, bucketName);
+      LOG.info("Location is {}", location);
+      return Response.status(HttpStatus.SC_OK).header("Location", location)
+          .build();
+    } catch (OMException exception) {
+      LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
+          exception);
+      if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_BUCKET_NAME,
+            bucketName);
+      }
+      throw exception;
+    }
   }
 
   public Response listMultipartUploads(
