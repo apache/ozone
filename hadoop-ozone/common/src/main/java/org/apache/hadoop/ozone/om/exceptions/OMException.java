@@ -219,6 +219,8 @@ public class OMException extends IOException {
     INVALID_PART_ORDER, // When list of parts mentioned to complete MPU are not
     // given in ascending order.
 
-    SCM_GET_PIPELINE_EXCEPTION
+    SCM_GET_PIPELINE_EXCEPTION,
+
+    INVALID_BUCKET_NAME
   }
 }
