@@ -229,6 +229,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <snakeyaml.version>1.16</snakeyaml.version>
     <hbase.one.version>1.2.6</hbase.one.version>
     <hbase.two.version>2.0.0-beta-1</hbase.two.version>
+    <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
   </properties>
 
 

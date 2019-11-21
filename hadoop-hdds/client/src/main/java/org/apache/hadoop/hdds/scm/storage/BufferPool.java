@@ -94,7 +94,7 @@ public class BufferPool {
     // always remove from head of the list and append at last
     final ChunkBuffer buffer = bufferList.remove(0);
     // Ensure the buffer to be removed is always at the head of the list.
-    Preconditions.checkArgument(buffer.equals(chunkBuffer));
+    Preconditions.checkArgument(buffer == chunkBuffer);
     buffer.clear();
     bufferList.add(buffer);
     Preconditions.checkArgument(currentBufferIndex >= 0);

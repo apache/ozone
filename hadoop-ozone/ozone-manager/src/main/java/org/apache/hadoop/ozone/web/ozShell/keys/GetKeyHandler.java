@@ -21,8 +21,8 @@ package org.apache.hadoop.ozone.web.ozShell.keys;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
 import org.apache.hadoop.ozone.web.ozShell.Shell;
@@ -39,6 +38,7 @@ import org.apache.hadoop.ozone.web.ozShell.Shell;
 import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -65,8 +65,10 @@ public class GetKeyHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureKeyAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+
+    OzoneConfiguration conf = createOzoneConfiguration();
+
+    try (OzoneClient client = address.createClient(conf)) {
 
       String volumeName = address.getVolumeName();
       String bucketName = address.getBucketName();
@@ -78,7 +80,6 @@ public class GetKeyHandler extends Handler {
         System.out.printf("Key Name : %s%n", keyName);
       }
 
-      Path dataFilePath = Paths.get(fileName);
       File dataFile = new File(fileName);
 
       if (dataFile.exists() && dataFile.isDirectory()) {
@@ -86,30 +87,25 @@ public class GetKeyHandler extends Handler {
       }
 
       if (dataFile.exists()) {
-        throw new OzoneClientException(
-            fileName + " exists. Download will overwrite an "
-                + "existing file. Aborting.");
+        throw new OzoneClientException(dataFile.getPath() + " exists."
+            + " Download would overwrite an existing file. Aborting.");
       }
+
+      int chunkSize = (int) conf.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
+          OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
 
       OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
       OzoneBucket bucket = vol.getBucket(bucketName);
-      OzoneInputStream keyInputStream = bucket.readKey(keyName);
-      if (dataFilePath != null) {
-        FileOutputStream outputStream = new FileOutputStream(dataFile);
-        IOUtils.copyBytes(keyInputStream, outputStream,
-            (int) new OzoneConfiguration()
-                .getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
-                    OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES));
-        outputStream.close();
-      } else {
-        throw new OzoneClientException(
-            "Can not access the file \"" + fileName + "\"");
+      try (OutputStream output = new FileOutputStream(dataFile);
+           InputStream input = bucket.readKey(keyName)) {
+        IOUtils.copyBytes(input, output, chunkSize);
       }
+
       if (isVerbose()) {
-        FileInputStream stream = new FileInputStream(dataFile);
-        String hash = DigestUtils.md5Hex(stream);
-        System.out.printf("Downloaded file hash : %s%n", hash);
-        stream.close();
+        try (InputStream stream = new FileInputStream(dataFile)) {
+          String hash = DigestUtils.md5Hex(stream);
+          System.out.printf("Downloaded file hash : %s%n", hash);
+        }
       }
     }
     return null;
