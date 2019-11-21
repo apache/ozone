@@ -100,8 +100,8 @@ public class TestMiniOzoneHACluster {
     GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null,
             100, 30000);
     OzoneManager ozoneManager = cluster.getOMLeader();
-    Assert.assertNotNull("Timed out waiting OM leader election to finish: no leader or more than one leader",
+    Assert.assertNotNull("Timed out waiting OM leader election to finish: no leader or more than one leader.",
             ozoneManager);
-    Assert.assertTrue(ozoneManager.isLeader());
+    Assert.assertTrue("Should have gotten the leader!", ozoneManager.isLeader());
   }
 }
