@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -32,6 +33,7 @@ import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
@@ -93,10 +95,13 @@ public class TestMiniOzoneHACluster {
   }
 
   @Test
-  public void testGetOMLeader() {
-    // Start the HA cluster; check the leader OM
+  public void testGetOMLeader() throws InterruptedException, TimeoutException {
+    // Wait for OM leader election to finish
+    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null,
+            100, 30000);
     OzoneManager ozoneManager = cluster.getOMLeader();
-    Assert.assertNotNull(ozoneManager);
+    Assert.assertNotNull("Timed out waiting OM leader election to finish: no leader or more than one leader",
+            ozoneManager);
     Assert.assertTrue(ozoneManager.isLeader());
   }
 }
