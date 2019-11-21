@@ -80,6 +80,7 @@ public class TestMiniOzoneHACluster {
   public void testGetOMLeader() {
     // Start the HA cluster; check the leader OM
     OzoneManager ozoneManager = cluster.getOMLeader();
-    Assert.assertTrue(ozoneManager != null && ozoneManager.isLeader());
+    Assert.assertNotNull(ozoneManager);
+    Assert.assertTrue(ozoneManager.isLeader());
   }
 }
