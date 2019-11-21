@@ -52,7 +52,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
@@ -141,11 +140,13 @@ public class TestCommitWatcher {
     XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
     CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient, 10000);
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
+    final List<ChunkBuffer> bufferList = new ArrayList<>();
     List<XceiverClientReply> replies = new ArrayList<>();
     long length = 0;
     List<CompletableFuture<ContainerProtos.ContainerCommandResponseProto>>
         futures = new ArrayList<>();
     for (int i = 0; i < capacity; i++) {
+      bufferList.clear();
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
               .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
@@ -157,7 +158,7 @@ public class TestCommitWatcher {
           ContainerTestHelper
               .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
       XceiverClientReply reply = ratisClient.sendCommandAsync(putBlockRequest);
-      final List<ChunkBuffer> bufferList = singletonList(byteBuffer);
+      bufferList.add(byteBuffer);
       length += byteBuffer.position();
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           reply.getResponse().thenApply(v -> {
@@ -215,11 +216,13 @@ public class TestCommitWatcher {
     XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
     CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient, 10000);
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
+    final List<ChunkBuffer> bufferList = new ArrayList<>();
     List<XceiverClientReply> replies = new ArrayList<>();
     long length = 0;
     List<CompletableFuture<ContainerProtos.ContainerCommandResponseProto>>
         futures = new ArrayList<>();
     for (int i = 0; i < capacity; i++) {
+      bufferList.clear();
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper
               .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
@@ -231,7 +234,7 @@ public class TestCommitWatcher {
           ContainerTestHelper
               .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
       XceiverClientReply reply = ratisClient.sendCommandAsync(putBlockRequest);
-      final List<ChunkBuffer> bufferList = singletonList(byteBuffer);
+      bufferList.add(byteBuffer);
       length += byteBuffer.position();
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           reply.getResponse().thenApply(v -> {

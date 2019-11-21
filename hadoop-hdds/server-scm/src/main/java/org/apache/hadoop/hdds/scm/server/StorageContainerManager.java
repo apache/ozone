@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import com.google.protobuf.BlockingService;
 import java.util.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -177,7 +178,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Key = DatanodeUuid, value = ContainerStat.
    */
-  private final Cache<String, ContainerStat> containerReportCache;
+  private Cache<String, ContainerStat> containerReportCache;
 
   private ReplicationManager replicationManager;
 
@@ -231,8 +232,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     configuration = conf;
     initMetrics();
-    containerReportCache = buildContainerReportCache();
-
+    initContainerReportCache(conf);
     /**
      * It is assumed the scm --init command creates the SCM Storage Config.
      */
@@ -478,6 +478,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmMetadataStore = configurator.getMetadataStore();
     } else {
       scmMetadataStore = new SCMMetadataStoreRDBImpl(conf);
+      if (scmMetadataStore == null) {
+        throw new SCMException("Unable to initialize metadata store",
+            ResultCodes.SCM_NOT_INITIALIZED);
+      }
     }
   }
 
@@ -613,7 +617,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
         scmStorageConfig.initialize();
-        LOG.info(
+        System.out.println(
             "SCM initialization succeeded."
                 + "Current cluster id for sd="
                 + scmStorageConfig.getStorageDir()
@@ -625,7 +629,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         return false;
       }
     } else {
-      LOG.info(
+      System.out.println(
           "SCM already initialized. Reusing existing"
               + " cluster id for sd="
               + scmStorageConfig.getStorageDir()
@@ -671,25 +675,28 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   /**
    * Initialize container reports cache that sent from datanodes.
+   *
+   * @param conf
    */
-  @SuppressWarnings("UnstableApiUsage")
-  private Cache<String, ContainerStat> buildContainerReportCache() {
-    return
+  private void initContainerReportCache(OzoneConfiguration conf) {
+    containerReportCache =
         CacheBuilder.newBuilder()
             .expireAfterAccess(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
             .maximumSize(Integer.MAX_VALUE)
-            .removalListener((
-                RemovalListener<String, ContainerStat>) removalNotification -> {
-                  synchronized (containerReportCache) {
-                    ContainerStat stat = removalNotification.getValue();
-                    if (stat != null) {
-                      // TODO: Are we doing the right thing here?
+            .removalListener(
+                new RemovalListener<String, ContainerStat>() {
+                  @Override
+                  public void onRemoval(
+                      RemovalNotification<String, ContainerStat>
+                          removalNotification) {
+                    synchronized (containerReportCache) {
+                      ContainerStat stat = removalNotification.getValue();
                       // remove invalid container report
                       metrics.decrContainerStat(stat);
-                    }
-                    if (LOG.isDebugEnabled()) {
-                      LOG.debug("Remove expired container stat entry for " +
-                          "datanode: {}.", removalNotification.getKey());
+                      if (LOG.isDebugEnabled()) {
+                        LOG.debug("Remove expired container stat entry for " +
+                            "datanode: {}.", removalNotification.getKey());
+                      }
                     }
                   }
                 })
@@ -756,27 +763,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Start service.
    */
   public void start() throws IOException {
-    if (LOG.isInfoEnabled()) {
-      LOG.info(buildRpcServerStartMessage(
-          "StorageContainerLocationProtocol RPC server",
-          getClientRpcAddress()));
-    }
+    LOG.info(
+        buildRpcServerStartMessage(
+            "StorageContainerLocationProtocol RPC server",
+            getClientRpcAddress()));
 
     ms = HddsUtils.initializeMetrics(configuration, "StorageContainerManager");
 
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();
 
-    if (LOG.isInfoEnabled()) {
-      LOG.info(buildRpcServerStartMessage("ScmBlockLocationProtocol RPC " +
-          "server", getBlockProtocolServer().getBlockRpcAddress()));
-    }
+    LOG.info(buildRpcServerStartMessage("ScmBlockLocationProtocol RPC " +
+        "server", getBlockProtocolServer().getBlockRpcAddress()));
     getBlockProtocolServer().start();
 
-    if (LOG.isInfoEnabled()) {
-      LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
-          "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
-    }
+    LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
+        "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
     getDatanodeProtocolServer().start();
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
@@ -969,10 +971,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   public void checkAdminAccess(String remoteUser) throws IOException {
-    if (remoteUser != null && !scmAdminUsernames.contains(remoteUser)) {
-      throw new IOException(
-          "Access denied for user " + remoteUser + ". Superuser privilege " +
-              "is required.");
+    if (remoteUser != null) {
+      if (!scmAdminUsernames.contains(remoteUser)) {
+        throw new IOException(
+            "Access denied for user " + remoteUser + ". Superuser privilege " +
+                "is required.");
+      }
     }
   }
 

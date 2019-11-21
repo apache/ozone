@@ -16,16 +16,15 @@
  */
 package org.apache.hadoop.ozone.audit.parser.handler;
 
-import java.sql.SQLException;
-import java.util.concurrent.Callable;
-
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.audit.parser.AuditParser;
 import org.apache.hadoop.ozone.audit.parser.common.DatabaseHelper;
-
+import picocli.CommandLine.*;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParentCommand;
+
+import java.sql.SQLException;
+import java.util.concurrent.Callable;
 
 /**
  * Custom query command handler for ozone audit parser.
@@ -45,7 +44,7 @@ public class QueryCommandHandler implements Callable<Void> {
   @ParentCommand
   private AuditParser auditParser;
 
-  public Void call() throws Exception {
+  public Void call() {
     try {
       System.out.println(
           DatabaseHelper.executeCustomQuery(auditParser.getDatabase(), query)

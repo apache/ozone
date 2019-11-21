@@ -34,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -111,8 +110,7 @@ public class CommitWatcher {
   }
 
   public void updateCommitInfoMap(long index, List<ChunkBuffer> buffers) {
-    commitIndex2flushedDataMap.computeIfAbsent(index, k -> new LinkedList<>())
-      .addAll(buffers);
+    commitIndex2flushedDataMap.put(index, buffers);
   }
 
   int getCommitInfoMapSize() {
