@@ -74,10 +74,7 @@ public class HealthyPipelineSafeModeRule
     // We want to wait for RATIS THREE factor write pipelines
     int pipelineCount = pipelineManager.getPipelines(
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
-        Pipeline.PipelineState.OPEN).size() +
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE,
-            Pipeline.PipelineState.ALLOCATED).size();
+        Pipeline.PipelineState.ALLOCATED).size();
 
     // This value will be zero when pipeline count is 0.
     // On a fresh installed cluster, there will be zero pipelines in the SCM
