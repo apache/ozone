@@ -79,7 +79,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public void registerTask(ReconDBUpdateTask task) {
     String taskName = task.getTaskName();
-    LOG.info("Registered task " + taskName + " with controller.");
+    LOG.info("Registered task {} with controller.", taskName);
 
     // Store task in Task Map.
     reconDBUpdateTasks.put(taskName, task);
@@ -134,7 +134,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         }
 
         // Reprocess the failed tasks.
-        // TODO Move to a separate task queue since reprocess may be a heavy
         // operation for large OM DB instances
         if (!retryFailedTasks.isEmpty()) {
           tasks.clear();
@@ -145,21 +144,29 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           results = executorService.invokeAll(tasks);
           List<String> reprocessFailedTasks =
               processTaskResults(results, events);
-          for (String taskName : reprocessFailedTasks) {
-            LOG.info("Reprocess step failed for task : " + taskName);
-            if (taskFailureCounter.get(taskName).incrementAndGet() >
-                TASK_FAILURE_THRESHOLD) {
-              LOG.info("Blacklisting Task since it failed retry and " +
-                  "reprocess more than " + TASK_FAILURE_THRESHOLD + " times.");
-              reconDBUpdateTasks.remove(taskName);
-            }
-          }
+          blacklistFailedTasks(reprocessFailedTasks);
         }
       }
     } catch (ExecutionException e) {
       LOG.error("Unexpected error : ", e);
     } finally {
       taskSemaphore.release();
+    }
+  }
+
+  /**
+   * Blacklist tasks that failed reprocess step more than threshold times.
+   * @param failedTasks list of failed tasks.
+   */
+  private void blacklistFailedTasks(List<String> failedTasks) {
+    for (String taskName : failedTasks) {
+      LOG.info("Reprocess step failed for task {}.", taskName);
+      if (taskFailureCounter.get(taskName).incrementAndGet() >
+          TASK_FAILURE_THRESHOLD) {
+        LOG.info("Blacklisting Task since it failed retry and " +
+            "reprocess more than " + TASK_FAILURE_THRESHOLD + " times.");
+        reconDBUpdateTasks.remove(taskName);
+      }
     }
   }
 
@@ -179,8 +186,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       List<Future<Pair>> results = executorService.invokeAll(tasks);
       for (Future<Pair> f : results) {
         String taskName = f.get().getLeft().toString();
-        if (!(Boolean)f.get().getRight()) {
-          LOG.info("Init failed for task : " + taskName);
+        if (!(boolean)f.get().getRight()) {
+          LOG.info("Init failed for task {}.", taskName);
         }
       }
     } catch (ExecutionException e) {
@@ -232,8 +239,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     List<String> failedTasks = new ArrayList<>();
     for (Future<Pair> f : results) {
       String taskName = f.get().getLeft().toString();
-      if (!(Boolean)f.get().getRight()) {
-        LOG.info("Failed task : " + taskName);
+      if (!(boolean)f.get().getRight()) {
+        LOG.info("Failed task : {}", taskName);
         failedTasks.add(f.get().getLeft().toString());
       } else {
         taskFailureCounter.get(taskName).set(0);
