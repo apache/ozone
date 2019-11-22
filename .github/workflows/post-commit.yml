@@ -12,19 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-name: Build
+name: build-branch
 on:
   - push
-  - pull_request
 jobs:
   build:
     name: compile
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/build.sh
+      - uses: actions/checkout@master
+      - uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/build.sh
   rat:
     name: rat
     runs-on: ubuntu-18.04
@@ -59,6 +58,12 @@ jobs:
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/unit.sh
+        - uses: ./.github/buildenv
+          with:
+            args: ./hadoop-ozone/dev-support/checks/sonar.sh
+          env:
+            SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         - uses: actions/upload-artifact@master
           if: always()
           with:
