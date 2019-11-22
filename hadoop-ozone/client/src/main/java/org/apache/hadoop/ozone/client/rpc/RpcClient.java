@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ChecksumType;
+import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.IOUtils;
@@ -830,8 +831,8 @@ public class RpcClient implements ClientProtocol {
   }
 
   @VisibleForTesting
-  public XceiverClientManager getXceiverClientManager() {
-    return xceiverClientManager;
+  public XceiverClientMetrics getXceiverClientMetrics() {
+    return xceiverClientManager.getMetrics();
   }
 
   @Override
