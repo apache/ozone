@@ -1268,10 +1268,8 @@ public class KeyManagerImpl implements KeyManager {
             } catch (IOException e) {
               LOG.warn(
                   "Open key entry for multipart upload record can be read  {}",
-                  metadataManager
-                      .getOzoneKey(upload.getVolumeName(),
-                          upload.getBucketName(),
-                          upload.getKeyName()));
+                  metadataManager.getOzoneKey(upload.getVolumeName(),
+                          upload.getBucketName(), upload.getKeyName()));
             }
           })
           .collect(Collectors.toList());
