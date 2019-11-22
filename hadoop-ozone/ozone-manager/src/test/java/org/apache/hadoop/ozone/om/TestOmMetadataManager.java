@@ -90,6 +90,32 @@ public class TestOmMetadataManager {
   }
 
   @Test
+  public void testListVolumes() throws Exception {
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder().setAdminName("admin")
+        .setOwnerName("ownerA").setVolume("volume").build();
+    for (int i = 0; i < 50; i++) {
+      String volName = "vol" + i;
+      String ownerName = "owner" + i;
+      omVolumeArgs = OmVolumeArgs.newBuilder()
+          .setAdminName("admin")
+          .setOwnerName(ownerName)
+          .setVolume(volName)
+          .build();
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+
+    String prefix = "";
+    String startKey = "";
+
+    // Test list all volumes
+    List<OmVolumeArgs> volListA = omMetadataManager.listVolumes(null,
+            prefix, startKey, 1000);
+    Assert.assertEquals(volListA.size(), 50);
+
+  }
+
+  @Test
   public void testListBuckets() throws Exception {
 
     String volumeName1 = "volumeA";
