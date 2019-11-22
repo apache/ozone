@@ -804,24 +804,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return deletedKeys;
   }
 
-  /**
-   * @param userName volume owner, null for listing all volumes.
-   * @throws IOException
-   */
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
     List<OmVolumeArgs> result = Lists.newArrayList();
-    List<UserVolumeInfo> volumes = Lists.newArrayList();
-
+    UserVolumeInfo volumes;
     if (StringUtil.isBlank(userName)) {
-      // null userName represents listing all volumes in cluster.
-      for (String user : getAllUsers()) {
-        volumes.add(getVolumesByUser(user));
-      }
-    } else {
-      volumes.add(getVolumesByUser(userName));
+      throw new OMException("User name is required to list Volumes.",
+          ResultCodes.USER_NOT_FOUND);
     }
+    volumes = getVolumesByUser(userName);
 
     final List<OmVolumeArgs> result = Lists.newArrayList();
     final List<String> volumes = getVolumesByUser(userName)
@@ -852,23 +844,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           throw new OMException("Volume info not found for " + volumeName,
               ResultCodes.VOLUME_NOT_FOUND);
         }
+        result.add(volumeArgs);
       }
       index++;
     }
 
     return result;
-  }
-
-  private List<String> getAllUsers() throws IOException {
-    TableIterator<String, ? extends KeyValue<String, UserVolumeInfo>> iterator
-        = getUserTable().iterator();
-    List<String> allUsers = Lists.newArrayList();
-
-    while (iterator.hasNext()) {
-      allUsers.add(iterator.next().getKey());
-    }
-
-    return  allUsers;
   }
 
   private UserVolumeInfo getVolumesByUser(String userNameKey)
