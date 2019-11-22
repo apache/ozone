@@ -17,10 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.safemode;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -30,16 +31,13 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
-
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashSet;
-import java.util.Set;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 /**
  * Class defining Safe mode exit criteria for Pipelines.
@@ -54,17 +52,17 @@ public class HealthyPipelineSafeModeRule
   public static final Logger LOG =
       LoggerFactory.getLogger(HealthyPipelineSafeModeRule.class);
   private final PipelineManager pipelineManager;
-  private final int healthyPipelineThresholdCount;
+  private int healthyPipelineThresholdCount;
   private int currentHealthyPipelineCount = 0;
-  private final Set<DatanodeDetails> processedDatanodeDetails =
-      new HashSet<>();
+  private final Map<PipelineID, Boolean> processedPipelines = new HashMap<>();
+  private final double healthyPipelinesPercent;
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager,
       SCMSafeModeManager manager, Configuration configuration) {
     super(manager, ruleName, eventQueue);
     this.pipelineManager = pipelineManager;
-    double healthyPipelinesPercent =
+    healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
                 HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT,
             HddsConfigKeys.
@@ -94,6 +92,12 @@ public class HealthyPipelineSafeModeRule
         healthyPipelineThresholdCount);
   }
 
+  @VisibleForTesting
+  public void setHealthyPipelineThresholdCount(int actualPipelineCount) {
+    healthyPipelineThresholdCount =
+        (int) Math.ceil(healthyPipelinesPercent * actualPipelineCount);
+  }
+
   @Override
   protected TypedEvent<PipelineReportFromDatanode> getEventType() {
     return SCMEvents.PROCESSED_PIPELINE_REPORT;
@@ -116,46 +120,41 @@ public class HealthyPipelineSafeModeRule
     // processed report event, we should not consider this pipeline report
     // from datanode again during threshold calculation.
     Preconditions.checkNotNull(pipelineReportFromDatanode);
-    DatanodeDetails dnDetails = pipelineReportFromDatanode.getDatanodeDetails();
-    if (!processedDatanodeDetails.contains(
-        pipelineReportFromDatanode.getDatanodeDetails())) {
 
+    PipelineReportsProto pipelineReport =
+        pipelineReportFromDatanode.getReport();
+
+    for (PipelineReport report : pipelineReport.getPipelineReportList()) {
+      PipelineID pipelineID = PipelineID.getFromProtobuf(
+          report.getPipelineID());
       Pipeline pipeline;
-      PipelineReportsProto pipelineReport =
-          pipelineReportFromDatanode.getReport();
+      try {
+        pipeline = pipelineManager.getPipeline(pipelineID);
+      } catch (PipelineNotFoundException e) {
+        continue;
+      }
 
-      for (PipelineReport report : pipelineReport.getPipelineReportList()) {
-        PipelineID pipelineID = PipelineID
-            .getFromProtobuf(report.getPipelineID());
-        try {
-          pipeline = pipelineManager.getPipeline(pipelineID);
-        } catch (PipelineNotFoundException e) {
-          continue;
-        }
-
+      if (!processedPipelines.containsKey(pipelineID)) {
         if (pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE &&
-            pipeline.getPipelineState() == Pipeline.PipelineState.OPEN) {
-          // If the pipeline is open state mean, all 3 datanodes are reported
-          // for this pipeline.
+            report.getIsLeader()) {
+          // If the pipeline gets reported with a leader we mark it as healthy
           currentHealthyPipelineCount++;
           getSafeModeMetrics().incCurrentHealthyPipelinesCount();
+          processedPipelines.put(pipelineID, Boolean.TRUE);
         }
       }
-      if (scmInSafeMode()) {
-        SCMSafeModeManager.getLogger().info(
-            "SCM in safe mode. Healthy pipelines reported count is {}, " +
-                "required healthy pipeline reported count is {}",
-            currentHealthyPipelineCount, healthyPipelineThresholdCount);
-      }
-
-      processedDatanodeDetails.add(dnDetails);
     }
-
+    if (scmInSafeMode()) {
+      SCMSafeModeManager.getLogger().info(
+          "SCM in safe mode. Healthy pipelines reported count is {}, " +
+              "required healthy pipeline reported count is {}",
+          currentHealthyPipelineCount, healthyPipelineThresholdCount);
+    }
   }
 
   @Override
   protected void cleanup() {
-    processedDatanodeDetails.clear();
+    processedPipelines.clear();
   }
 
   @VisibleForTesting

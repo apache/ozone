@@ -42,11 +42,14 @@ public class ContainerBlockID {
 
   @Override
   public String toString() {
-    return new StringBuffer()
-        .append("conID: ")
-        .append(containerID)
-        .append(" locID: ")
-        .append(localID).toString();
+    StringBuilder sb = new StringBuilder(48);
+    appendTo(sb);
+    return sb.toString();
+  }
+
+  public void appendTo(StringBuilder sb) {
+    sb.append("conID: ").append(containerID)
+        .append(" locID: ").append(localID);
   }
 
   public HddsProtos.ContainerBlockID getProtobuf() {

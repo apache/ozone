@@ -16,15 +16,16 @@
  */
 package org.apache.hadoop.ozone.audit.parser.handler;
 
+import java.sql.SQLException;
+import java.util.concurrent.Callable;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.audit.parser.AuditParser;
 import org.apache.hadoop.ozone.audit.parser.common.DatabaseHelper;
-import picocli.CommandLine.*;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
-
-import java.sql.SQLException;
-import java.util.concurrent.Callable;
+import picocli.CommandLine.ParentCommand;
 
 /**
  * Template command handler for ozone audit parser.
@@ -42,7 +43,7 @@ public class TemplateCommandHandler implements Callable<Void> {
   @ParentCommand
   private AuditParser auditParser;
 
-  public Void call() {
+  public Void call() throws Exception {
     try {
       if(DatabaseHelper.validateTemplate(template)) {
         System.out.println(

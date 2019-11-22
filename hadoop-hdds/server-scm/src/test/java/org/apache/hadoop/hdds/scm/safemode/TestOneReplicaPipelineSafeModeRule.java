@@ -188,7 +188,8 @@ public class TestOneReplicaPipelineSafeModeRule {
         PipelineReportsProto.newBuilder();
 
     reportBuilder.addPipelineReport(PipelineReport.newBuilder()
-        .setPipelineID(pipeline.getId().getProtobuf()));
+        .setPipelineID(pipeline.getId().getProtobuf())
+        .setIsLeader(Boolean.TRUE));
 
     if (pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE) {
       eventQueue.fireEvent(SCMEvents.PROCESSED_PIPELINE_REPORT,

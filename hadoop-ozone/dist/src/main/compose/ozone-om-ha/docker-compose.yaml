@@ -17,7 +17,11 @@
 version: "3"
 services:
    datanode:
-      build: .
+      build:
+         context: .
+         args:
+            - OZONE_RUNNER_VERSION
+      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
@@ -27,7 +31,11 @@ services:
       env_file:
         - ./docker-config
    om1:
-      build: .
+      build:
+         context: .
+         args:
+            - OZONE_RUNNER_VERSION
+      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -40,7 +48,11 @@ services:
           - ./docker-config
       command: sleep 1d
    om2:
-      build: .
+      build:
+         context: .
+         args:
+            - OZONE_RUNNER_VERSION
+      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -53,7 +65,11 @@ services:
          - ./docker-config
       command: sleep 1d
    om3:
-      build: .
+      build:
+         context: .
+         args:
+            - OZONE_RUNNER_VERSION
+      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -66,7 +82,11 @@ services:
          - ./docker-config
       command: sleep 1d
    scm:
-      build: .
+      build:
+         context: .
+         args:
+            - OZONE_RUNNER_VERSION
+      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,10 +23,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.MessageBodyReader;
 import javax.ws.rs.ext.Provider;
+import javax.xml.XMLConstants;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.UnmarshallerHandler;
 import javax.xml.parsers.SAXParserFactory;
-import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
@@ -49,6 +49,7 @@ public class MultiDeleteRequestUnmarshaller
     try {
       context = JAXBContext.newInstance(MultiDeleteRequest.class);
       SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
+      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       xmlReader = saxParserFactory.newSAXParser().getXMLReader();
     } catch (Exception ex) {
       throw new AssertionError("Can't instantiate MultiDeleteRequest parser",
@@ -65,8 +66,7 @@ public class MultiDeleteRequestUnmarshaller
   @Override
   public MultiDeleteRequest readFrom(Class<MultiDeleteRequest> type,
       Type genericType, Annotation[] annotations, MediaType mediaType,
-      MultivaluedMap<String, String> httpHeaders, InputStream entityStream)
-      throws IOException, WebApplicationException {
+      MultivaluedMap<String, String> httpHeaders, InputStream entityStream) {
     try {
       UnmarshallerHandler unmarshallerHandler =
           context.createUnmarshaller().getUnmarshallerHandler();

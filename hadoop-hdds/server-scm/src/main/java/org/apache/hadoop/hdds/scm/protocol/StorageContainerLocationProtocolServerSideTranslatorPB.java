@@ -42,8 +42,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeQueryResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ObjectStageChangeRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ObjectStageChangeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
@@ -163,12 +163,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setNodeQueryResponse(queryNode(request.getNodeQueryRequest()))
             .build();
-      case NotifyObjectStageChange:
+      case CloseContainer:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
-            .setObjectStageChangeResponse(notifyObjectStageChange(
-                request.getObjectStageChangeRequest()))
+            .setScmCloseContainerResponse(closeContainer(
+                request.getScmCloseContainerRequest()))
             .build();
       case ListPipelines:
         return ScmContainerLocationResponse.newBuilder()
@@ -183,6 +183,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setActivatePipelineResponse(activatePipeline(
                 request.getActivatePipelineRequest()))
+            .build();
+      case DeactivatePipeline:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setDeactivatePipelineResponse(deactivatePipeline(
+                request.getDeactivatePipelineRequest()))
+            .build();
+      case ClosePipeline:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setClosePipelineResponse(closePipeline(
+                request.getClosePipelineRequest()))
             .build();
       case GetScmInfo:
         return ScmContainerLocationResponse.newBuilder()
@@ -336,12 +350,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
-  public ObjectStageChangeResponseProto notifyObjectStageChange(
-      ObjectStageChangeRequestProto request)
+  public SCMCloseContainerResponseProto closeContainer(
+      SCMCloseContainerRequestProto request)
       throws IOException {
-    impl.notifyObjectStageChange(request.getType(), request.getId(),
-        request.getOp(), request.getStage());
-    return ObjectStageChangeResponseProto.newBuilder().build();
+    impl.closeContainer(request.getContainerID());
+    return SCMCloseContainerResponseProto.newBuilder().build();
   }
 
   public ListPipelineResponseProto listPipelines(
@@ -372,7 +385,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public ClosePipelineResponseProto closePipeline(
-      RpcController controller, ClosePipelineRequestProto request)
+      ClosePipelineRequestProto request)
       throws IOException {
 
     impl.closePipeline(request.getPipelineID());

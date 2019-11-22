@@ -71,7 +71,6 @@ import java.util.concurrent.TimeoutException;
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
   static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
-  private static final String COMPONENT = "dn";
   private final Pipeline pipeline;
   private final Configuration config;
   private Map<UUID, XceiverClientProtocolServiceStub> asyncStubs;
@@ -135,7 +134,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     DatanodeDetails dn = topologyAwareRead ? this.pipeline.getClosestNode() :
         this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning
-    connectToDatanode(dn, null);
+    connectToDatanode(dn);
   }
 
   /**
@@ -148,11 +147,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     DatanodeDetails dn = topologyAwareRead ? this.pipeline.getClosestNode() :
         this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning
-    connectToDatanode(dn, encodedToken);
+    connectToDatanode(dn);
   }
 
-  private synchronized void connectToDatanode(DatanodeDetails dn,
-      String encodedToken) throws IOException {
+  private synchronized void connectToDatanode(DatanodeDetails dn)
+      throws IOException {
     if (isConnected(dn)){
       return;
     }
@@ -166,7 +165,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     // Add credential context to the client call
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Nodes in pipeline : {}", pipeline.getNodes().toString());
+      LOG.debug("Nodes in pipeline : {}", pipeline.getNodes());
       LOG.debug("Connecting to server : {}", dn.getIpAddress());
     }
     NettyChannelBuilder channelBuilder =
@@ -230,10 +229,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request) throws IOException {
     try {
-      XceiverClientReply reply;
-      reply = sendCommandWithTraceIDAndRetry(request, null);
-      ContainerCommandResponseProto responseProto = reply.getResponse().get();
-      return responseProto;
+      return sendCommandWithTraceIDAndRetry(request, null).
+          getResponse().get();
     } catch (ExecutionException | InterruptedException e) {
       throw new IOException("Failed to execute command " + request, e);
     }
@@ -246,8 +243,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     try {
       XceiverClientReply reply;
       reply = sendCommandWithTraceIDAndRetry(request, validators);
-      ContainerCommandResponseProto responseProto = reply.getResponse().get();
-      return responseProto;
+      return reply.getResponse().get();
     } catch (ExecutionException | InterruptedException e) {
       throw new IOException("Failed to execute command " + request, e);
     }
@@ -311,7 +307,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     for (DatanodeDetails dn : datanodeList) {
       try {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Executing command " + request + " on datanode " + dn);
+          LOG.debug("Executing command {} on datanode {}", request, dn);
         }
         // In case the command gets retried on a 2nd datanode,
         // sendCommandAsyncCall will create a new channel and async stub
@@ -328,19 +324,19 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           getBlockDNcache.put(getBlockID, dn);
         }
         break;
-      } catch (ExecutionException | InterruptedException | IOException e) {
+      } catch (IOException e) {
+        ioException = e;
+        responseProto = null;
+      } catch (ExecutionException | InterruptedException e) {
         LOG.debug("Failed to execute command {} on datanode {}",
             request, dn.getUuid(), e);
-        if (!(e instanceof IOException)) {
-          if (Status.fromThrowable(e.getCause()).getCode()
-              == Status.UNAUTHENTICATED.getCode()) {
-            throw new SCMSecurityException("Failed to authenticate with "
-                + "GRPC XceiverServer with Ozone block token.");
-          }
-          ioException = new IOException(e);
-        } else {
-          ioException = (IOException) e;
+        if (Status.fromThrowable(e.getCause()).getCode()
+            == Status.UNAUTHENTICATED.getCode()) {
+          throw new SCMSecurityException("Failed to authenticate with "
+              + "GRPC XceiverServer with Ozone block token.");
         }
+
+        ioException = new IOException(e);
         responseProto = null;
       }
     }
@@ -402,7 +398,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
-          request.getCmdType().toString(), dn.getNetworkFullPath());
+          request.getCmdType(), dn.getNetworkFullPath());
     }
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
@@ -465,11 +461,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throws IOException {
     ManagedChannel channel;
     try {
-      connectToDatanode(dn, encodedToken);
+      connectToDatanode(dn);
       channel = channels.get(dn.getUuid());
     } catch (Exception e) {
-      LOG.error("Error while connecting: ", e);
-      throw new IOException(e);
+      throw new IOException("Error while connecting", e);
     }
 
     if (channel == null || !isConnected(channel)) {
@@ -483,7 +478,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       IOException {
     // there is no notion of watch for commit index in standalone pipeline
     return null;
-  };
+  }
 
   public long getReplicatedMinCommitIndex() {
     return 0;

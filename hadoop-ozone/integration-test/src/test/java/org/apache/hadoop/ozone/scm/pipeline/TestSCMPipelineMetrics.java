@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.scm.pipeline;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -50,6 +51,8 @@ public class TestSCMPipelineMetrics {
   @Before
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
+        Boolean.TRUE.toString());
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();

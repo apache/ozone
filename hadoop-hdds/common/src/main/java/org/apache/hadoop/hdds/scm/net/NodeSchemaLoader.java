@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,6 +27,7 @@ import org.w3c.dom.NodeList;
 import org.w3c.dom.Text;
 import org.xml.sax.SAXException;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -101,7 +102,7 @@ public final class NodeSchemaLoader {
    * @return all valid node schemas defined in schema file
    */
   public NodeSchemaLoadResult loadSchemaFromFile(String schemaFilePath)
-      throws IllegalArgumentException, FileNotFoundException {
+      throws FileNotFoundException {
     try {
       File schemaFile = new File(schemaFilePath);
 
@@ -122,7 +123,7 @@ public final class NodeSchemaLoader {
           try (InputStream stream = classloader
               .getResourceAsStream(schemaFilePath)) {
             if (stream != null) {
-              LOG.info("Loading file from " + classloader
+              LOG.info("Loading file from {}", classloader
                   .getResources(schemaFilePath));
               return loadSchemaFromStream(schemaFilePath, stream);
             }
@@ -171,6 +172,7 @@ public final class NodeSchemaLoader {
     LOG.info("Loading network topology layer schema file");
     // Read and parse the schema file.
     DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     dbf.setIgnoringComments(true);
     DocumentBuilder builder = dbf.newDocumentBuilder();
     Document doc = builder.parse(inputStream);
@@ -214,9 +216,6 @@ public final class NodeSchemaLoader {
    * Load network topology layer schemas from a YAML configuration file.
    * @param schemaFile as inputStream
    * @return all valid node schemas defined in schema file
-   * @throws ParserConfigurationException ParserConfigurationException happen
-   * @throws IOException no such schema file
-   * @throws SAXException xml file has some invalid elements
    * @throws IllegalArgumentException xml file content is logically invalid
    */
   private NodeSchemaLoadResult loadSchemaFromYaml(InputStream schemaFile) {
@@ -297,7 +296,7 @@ public final class NodeSchemaLoader {
    */
   private Map<String, NodeSchema> loadLayersSection(Element root) {
     NodeList elements = root.getElementsByTagName(LAYER_TAG);
-    Map<String, NodeSchema> schemas = new HashMap<String, NodeSchema>();
+    Map<String, NodeSchema> schemas = new HashMap<>();
     for (int i = 0; i < elements.getLength(); i++) {
       Node node = elements.item(i);
       if (node instanceof Element) {
@@ -361,8 +360,8 @@ public final class NodeSchemaLoader {
       Map<String, NodeSchema> schemas) {
     NodeList elements = root.getElementsByTagName(TOPOLOGY_TAG)
         .item(0).getChildNodes();
-    List<NodeSchema> schemaList = new ArrayList<NodeSchema>();
-    boolean enforecePrefix = false;
+    List<NodeSchema> schemaList = new ArrayList<>();
+    boolean enforcePrefix = false;
     for (int i = 0; i < elements.getLength(); i++) {
       Node node = elements.item(i);
       if (node instanceof Element) {
@@ -383,10 +382,10 @@ public final class NodeSchemaLoader {
         }
         if (TOPOLOGY_PATH.equals(tagName)) {
           if(value.startsWith(NetConstants.PATH_SEPARATOR_STR)) {
-            value = value.substring(1, value.length());
+            value = value.substring(1);
           }
           String[] layerIDs = value.split(NetConstants.PATH_SEPARATOR_STR);
-          if (layerIDs == null || layerIDs.length != schemas.size()) {
+          if (layerIDs.length != schemas.size()) {
             throw new IllegalArgumentException("Topology path depth doesn't "
                 + "match layer element numbers");
           }
@@ -409,7 +408,7 @@ public final class NodeSchemaLoader {
             schemaList.add(schemas.get(layerIDs[j]));
           }
         } else if (TOPOLOGY_ENFORCE_PREFIX.equalsIgnoreCase(tagName)) {
-          enforecePrefix = Boolean.parseBoolean(value);
+          enforcePrefix = Boolean.parseBoolean(value);
         } else {
           throw new IllegalArgumentException("Unsupported Element <" +
               tagName + ">");
@@ -417,7 +416,7 @@ public final class NodeSchemaLoader {
       }
     }
     // Integrity check
-    if (enforecePrefix) {
+    if (enforcePrefix) {
       // Every InnerNode should have prefix defined
       for (NodeSchema schema: schemas.values()) {
         if (schema.getType() == LayerType.INNER_NODE &&
@@ -427,7 +426,7 @@ public final class NodeSchemaLoader {
         }
       }
     }
-    return new NodeSchemaLoadResult(schemaList, enforecePrefix);
+    return new NodeSchemaLoadResult(schemaList, enforcePrefix);
   }
 
   /**

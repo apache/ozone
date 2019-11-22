@@ -21,12 +21,16 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.test.GenericTestUtils;
+
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -159,6 +163,21 @@ public class TestChunkUtils {
     } finally {
       Files.deleteIfExists(tempFile);
     }
+  }
+
+  @Test
+  public void validateChunkForOverwrite() throws IOException {
+
+    Path tempFile = Files.createTempFile(PREFIX, "overwrite");
+    FileUtils.write(tempFile.toFile(), "test", StandardCharsets.UTF_8);
+
+    Assert.assertTrue(
+        ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
+            new ChunkInfo("chunk", 3, 5)));
+
+    Assert.assertFalse(
+        ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
+            new ChunkInfo("chunk", 5, 5)));
   }
 
 }

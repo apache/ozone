@@ -357,7 +357,8 @@ public class TestSCMSafeModeManager {
         PipelineReportsProto.newBuilder();
 
     reportBuilder.addPipelineReport(PipelineReport.newBuilder()
-        .setPipelineID(pipeline.getId().getProtobuf()));
+        .setPipelineID(pipeline.getId().getProtobuf())
+        .setIsLeader(Boolean.TRUE));
     queue.fireEvent(SCMEvents.PROCESSED_PIPELINE_REPORT,
         new PipelineReportFromDatanode(pipeline.getNodes().get(0),
             reportBuilder.build()));
@@ -493,7 +494,8 @@ public class TestSCMSafeModeManager {
       PipelineReportsProto.Builder reportBuilder = PipelineReportsProto
           .newBuilder();
       reportBuilder.addPipelineReport(PipelineReport.newBuilder()
-          .setPipelineID(pipeline.getId().getProtobuf()));
+          .setPipelineID(pipeline.getId().getProtobuf())
+          .setIsLeader(Boolean.TRUE));
 
       scmSafeModeManager = new SCMSafeModeManager(
           config, containers, pipelineManager, queue);

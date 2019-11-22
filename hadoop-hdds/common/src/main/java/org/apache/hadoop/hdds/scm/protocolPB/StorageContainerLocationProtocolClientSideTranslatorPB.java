@@ -40,7 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeQueryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeQueryResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ObjectStageChangeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
@@ -326,31 +326,22 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   /**
-   * Notify from client that creates object on datanodes.
+   * Close a container.
    *
-   * @param type  object type
-   * @param id    object id
-   * @param op    operation type (e.g., create, close, delete)
-   * @param stage object creation stage : begin/complete
+   * @param containerID ID of the container to close
+   * @throws IOException in case of any Exception
    */
   @Override
-  public void notifyObjectStageChange(
-      ObjectStageChangeRequestProto.Type type, long id,
-      ObjectStageChangeRequestProto.Op op,
-      ObjectStageChangeRequestProto.Stage stage) throws IOException {
-    Preconditions.checkState(id >= 0,
-        "Object id cannot be negative.");
-    ObjectStageChangeRequestProto request =
-        ObjectStageChangeRequestProto.newBuilder()
-            .setTraceID(TracingUtil.exportCurrentSpan())
-            .setType(type)
-            .setId(id)
-            .setOp(op)
-            .setStage(stage)
-            .build();
-    submitRequest(Type.NotifyObjectStageChange,
-        builder -> builder.setObjectStageChangeRequest(request));
-
+  public void closeContainer(long containerID) throws IOException {
+    Preconditions.checkState(containerID >= 0,
+        "Container ID cannot be negative");
+    SCMCloseContainerRequestProto request = SCMCloseContainerRequestProto
+        .newBuilder()
+        .setTraceID(TracingUtil.exportCurrentSpan())
+        .setContainerID(containerID)
+        .build();
+    submitRequest(Type.CloseContainer,
+        builder -> builder.setScmCloseContainerRequest(request));
   }
 
   /**

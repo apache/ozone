@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.impl.RaftServerProxy;
@@ -576,10 +578,10 @@ public class ContainerStateMachine extends BaseStateMachine {
     ByteString data = responseProto.getData();
     // assert that the response has data in it.
     Preconditions
-        .checkNotNull(data, "read chunk data is null for chunk:" + chunkInfo);
-    Preconditions.checkState(data.size() == chunkInfo.getLen(), String.format(
-        "read chunk len=%d does not match chunk expected len=%d for chunk:%s",
-        data.size(), chunkInfo.getLen(), chunkInfo));
+        .checkNotNull(data, "read chunk data is null for chunk: %s", chunkInfo);
+    Preconditions.checkState(data.size() == chunkInfo.getLen(),
+        "read chunk len=%s does not match chunk expected len=%s for chunk:%s",
+        data.size(), chunkInfo.getLen(), chunkInfo);
     return data;
   }
 
@@ -853,5 +855,11 @@ public class ContainerStateMachine extends BaseStateMachine {
     for (ExecutorService executor : executors) {
       executor.shutdown();
     }
+  }
+
+  @Override
+  public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
+                                  RaftPeerId raftPeerId) {
+    ratisServer.handleLeaderChangedNotification(groupMemberId, raftPeerId);
   }
 }

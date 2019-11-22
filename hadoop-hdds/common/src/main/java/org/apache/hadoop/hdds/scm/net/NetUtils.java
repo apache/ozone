@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
  */
 public final class NetUtils {
   public static final Logger LOG = LoggerFactory.getLogger(NetUtils.class);
+  
   private NetUtils() {
     // Prevent instantiation
   }
@@ -104,27 +105,6 @@ public final class NetUtils {
           iterator.remove();
         }
       });
-    }
-  }
-
-  /**
-   *  Remove node from mutableExcludedNodes if it's not part of scope
-   *  Please noted that mutableExcludedNodes content might be changed after the
-   *  function call.
-   */
-  public static void removeOutscope(Collection<Node> mutableExcludedNodes,
-      String scope) {
-    if (CollectionUtils.isEmpty(mutableExcludedNodes) || scope == null) {
-      return;
-    }
-    synchronized (mutableExcludedNodes) {
-      Iterator<Node> iterator = mutableExcludedNodes.iterator();
-      while (iterator.hasNext()) {
-        Node next = iterator.next();
-        if (!next.getNetworkFullPath().startsWith(scope)) {
-          iterator.remove();
-        }
-      }
     }
   }
 

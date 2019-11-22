@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -68,12 +69,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -107,6 +110,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
   private final Set<RaftGroupId> raftGids = new HashSet<>();
+  private final RaftPeerId raftPeerId;
+  // pipelines for which I am the leader
+  private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
 
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -136,9 +142,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         TimeUnit.MILLISECONDS);
     this.dispatcher = dispatcher;
     this.containerController = containerController;
+    this.raftPeerId = RatisHelper.toRaftPeerId(dd);
 
     RaftServer.Builder builder =
-        RaftServer.newBuilder().setServerId(RatisHelper.toRaftPeerId(dd))
+        RaftServer.newBuilder().setServerId(raftPeerId)
             .setProperties(serverProperties)
             .setStateMachineRegistry(this::getStateMachine);
     if (tlsConfig != null) {
@@ -593,6 +600,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       for (RaftGroupId groupId : gids) {
         reports.add(PipelineReport.newBuilder()
             .setPipelineID(PipelineID.valueOf(groupId.getUuid()).getProtobuf())
+            .setIsLeader(groupLeaderMap.getOrDefault(groupId, Boolean.FALSE))
             .build());
       }
       return reports;
@@ -676,9 +684,26 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   void notifyGroupRemove(RaftGroupId gid) {
     raftGids.remove(gid);
+    // Remove any entries for group leader map
+    groupLeaderMap.remove(gid);
   }
 
   void notifyGroupAdd(RaftGroupId gid) {
     raftGids.add(gid);
+  }
+
+  void handleLeaderChangedNotification(RaftGroupMemberId groupMemberId,
+                                       RaftPeerId raftPeerId1) {
+    LOG.info("Leader change notification received for group: {} with new " +
+        "leaderId: {}", groupMemberId.getGroupId(), raftPeerId1);
+    // Save the reported leader to be sent with the report to SCM
+    boolean leaderForGroup = this.raftPeerId.equals(raftPeerId1);
+    groupLeaderMap.put(groupMemberId.getGroupId(), leaderForGroup);
+    if (context != null && leaderForGroup) {
+      // Publish new report from leader
+      context.addReport(context.getParent().getContainer().getPipelineReport());
+      // Trigger HB immediately
+      context.getParent().triggerHeartbeat();
+    }
   }
 }

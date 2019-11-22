@@ -110,7 +110,7 @@ public class TestMultipartUploadComplete {
 
     assertEquals(completeMultipartUploadResponse.getBucket(),
         OzoneConsts.S3_BUCKET);
-    assertEquals(completeMultipartUploadResponse.getKey(), OzoneConsts.KEY);
+    assertEquals(completeMultipartUploadResponse.getKey(), key);
     assertEquals(completeMultipartUploadResponse.getLocation(),
         OzoneConsts.S3_BUCKET);
     assertNotNull(completeMultipartUploadResponse.getETag());
@@ -181,7 +181,7 @@ public class TestMultipartUploadComplete {
       completeMultipartUpload(key, completeMultipartUploadRequest, uploadID);
       fail("testMultipartInvalidPartOrderError");
     } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), S3ErrorTable.INVALID_PART_ORDER.getCode());
+      assertEquals(S3ErrorTable.INVALID_PART_ORDER.getCode(), ex.getCode());
     }
 
   }
@@ -200,7 +200,7 @@ public class TestMultipartUploadComplete {
     int partNumber = 1;
 
     Part part1 = uploadPart(key, uploadID, partNumber, content);
-    // Change part number
+    // Change part name.
     part1.seteTag("random");
     partsList.add(part1);
 
@@ -216,7 +216,7 @@ public class TestMultipartUploadComplete {
     completeMultipartUploadRequest.setPartList(partsList);
     try {
       completeMultipartUpload(key, completeMultipartUploadRequest, uploadID);
-      fail("testMultipartInvalidPartOrderError");
+      fail("testMultipartInvalidPartError");
     } catch (OS3Exception ex) {
       assertEquals(ex.getCode(), S3ErrorTable.INVALID_PART.getCode());
     }

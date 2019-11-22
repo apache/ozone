@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.test.GenericTestUtils;
+
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
@@ -57,6 +59,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -68,6 +71,9 @@ import static org.mockito.Mockito.verify;
  * Test-cases to verify the functionality of HddsDispatcher.
  */
 public class TestHddsDispatcher {
+
+  public static final Consumer<ContainerReplicaProto> NO_OP_ICR_SENDER =
+      c -> {};
 
   @Test
   public void testContainerCloseActionWhenFull() throws IOException {
@@ -98,8 +104,9 @@ public class TestHddsDispatcher {
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
       for (ContainerType containerType : ContainerType.values()) {
         handlers.put(containerType,
-            Handler.getHandlerForContainerType(containerType, conf, context,
-                containerSet, volumeSet, metrics));
+            Handler.getHandlerForContainerType(containerType, conf,
+                context.getParent().getDatanodeDetails().getUuidString(),
+                containerSet, volumeSet, metrics, NO_OP_ICR_SENDER));
       }
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
@@ -214,8 +221,9 @@ public class TestHddsDispatcher {
     Map<ContainerType, Handler> handlers = Maps.newHashMap();
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,
-          Handler.getHandlerForContainerType(containerType, conf, context,
-              containerSet, volumeSet, metrics));
+          Handler.getHandlerForContainerType(containerType, conf,
+              context.getParent().getDatanodeDetails().getUuidString(),
+              containerSet, volumeSet, metrics, NO_OP_ICR_SENDER));
     }
 
     HddsDispatcher hddsDispatcher = new HddsDispatcher(

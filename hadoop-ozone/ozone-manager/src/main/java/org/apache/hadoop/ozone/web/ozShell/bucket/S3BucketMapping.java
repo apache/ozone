@@ -43,23 +43,25 @@ public class S3BucketMapping extends Handler {
   public Void call() throws Exception {
 
     OzoneAddress ozoneAddress = new OzoneAddress();
-    OzoneClient client = ozoneAddress.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+        ozoneAddress.createClient(createOzoneConfiguration())) {
 
-    String mapping =
-        client.getObjectStore().getOzoneBucketMapping(s3BucketName);
-    String volumeName =
-        client.getObjectStore().getOzoneVolumeName(s3BucketName);
+      String mapping =
+          client.getObjectStore().getOzoneBucketMapping(s3BucketName);
+      String volumeName =
+          client.getObjectStore().getOzoneVolumeName(s3BucketName);
 
-    if (isVerbose()) {
-      System.out.printf("Mapping created for S3Bucket is : %s%n", mapping);
+      if (isVerbose()) {
+        System.out.printf("Mapping created for S3Bucket is : %s%n", mapping);
+      }
+
+      System.out.printf("Volume name for S3Bucket is : %s%n", volumeName);
+
+      String ozoneFsUri = String.format("%s://%s.%s", OzoneConsts
+          .OZONE_URI_SCHEME, s3BucketName, volumeName);
+
+      System.out.printf("Ozone FileSystem Uri is : %s%n", ozoneFsUri);
     }
-
-    System.out.printf("Volume name for S3Bucket is : %s%n", volumeName);
-
-    String ozoneFsUri = String.format("%s://%s.%s", OzoneConsts
-        .OZONE_URI_SCHEME, s3BucketName, volumeName);
-
-    System.out.printf("Ozone FileSystem Uri is : %s%n", ozoneFsUri);
 
     return null;
   }

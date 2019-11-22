@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.insight.datanode;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -47,22 +49,24 @@ public class RatisInsight extends BaseInsightPoint implements InsightPoint {
   public List<LoggerSource> getRelatedLoggers(boolean verbose) {
     List<LoggerSource> result = new ArrayList<>();
     try {
-      ScmClient scmClient = createScmClient(conf);
-      Pipeline pipeline = scmClient.listPipelines()
-          .stream()
-          .filter(d -> d.getNodes().size() > 1)
-          .findFirst()
-          .get();
-      for (DatanodeDetails datanode : pipeline.getNodes()) {
-        Component dn =
-            new Component(Type.DATANODE, datanode.getUuid().toString(),
-                datanode.getHostName(), 9882);
-        result
-            .add(new LoggerSource(dn, "org.apache.ratis.server.impl",
-                defaultLevel(verbose)));
+      Optional<Pipeline> pipeline;
+      try (ScmClient scmClient = createScmClient(conf)) {
+        pipeline = scmClient.listPipelines()
+            .stream()
+            .filter(d -> d.getNodes().size() > 1)
+            .findFirst();
+      }
+      if (pipeline.isPresent()) {
+        for (DatanodeDetails datanode : pipeline.get().getNodes()) {
+          Component dn = new Component(
+              Type.DATANODE, datanode.getUuid().toString(),
+              datanode.getHostName(), 9882);
+          result.add(new LoggerSource(dn, "org.apache.ratis.server.impl",
+              defaultLevel(verbose)));
+        }
       }
     } catch (IOException e) {
-      throw new RuntimeException("Can't enumerate required logs", e);
+      throw new UncheckedIOException("Can't enumerate required logs", e);
     }
 
     return result;

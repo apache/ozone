@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,11 +61,12 @@ public class RDBStore implements DBStore {
   private final WriteOptions writeOptions;
   private final DBOptions dbOptions;
   private final CodecRegistry codecRegistry;
-  private final Hashtable<String, ColumnFamilyHandle> handleTable;
+  private final Map<String, ColumnFamilyHandle> handleTable;
   private ObjectName statMBeanName;
   private RDBCheckpointManager checkPointManager;
   private String checkpointsParentDir;
   private List<ColumnFamilyHandle> columnFamilyHandles;
+  private RDBMetrics rdbMetrics;
 
   @VisibleForTesting
   public RDBStore(File dbFile, DBOptions options,
@@ -80,8 +80,8 @@ public class RDBStore implements DBStore {
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
-    Preconditions.checkArgument(families.size() > 0);
-    handleTable = new Hashtable<>();
+    Preconditions.checkArgument(!families.isEmpty());
+    handleTable = new HashMap<>();
     codecRegistry = registry;
     final List<ColumnFamilyDescriptor> columnFamilyDescriptors =
         new ArrayList<>();
@@ -131,6 +131,7 @@ public class RDBStore implements DBStore {
 
       //Initialize checkpoint manager
       checkPointManager = new RDBCheckpointManager(db, "om");
+      rdbMetrics = RDBMetrics.create();
 
     } catch (RocksDBException e) {
       String msg = "Failed init RocksDB, db path : " + dbFile.getAbsolutePath()
@@ -183,6 +184,7 @@ public class RDBStore implements DBStore {
       statMBeanName = null;
     }
 
+    rdbMetrics.unRegister();
     if (db != null) {
       db.close();
     }
@@ -197,11 +199,11 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public <KEY, VALUE> void move(KEY key, Table<KEY, VALUE> source,
-                                Table<KEY, VALUE> dest) throws IOException {
+  public <K, V> void move(K key, Table<K, V> source,
+                                Table<K, V> dest) throws IOException {
     try (BatchOperation batchOperation = initBatchOperation()) {
 
-      VALUE value = source.get(key);
+      V value = source.get(key);
       dest.putWithBatch(batchOperation, key, value);
       source.deleteWithBatch(batchOperation, key);
       commitBatchOperation(batchOperation);
@@ -209,15 +211,15 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public <KEY, VALUE> void move(KEY key, VALUE value, Table<KEY, VALUE> source,
-                                Table<KEY, VALUE> dest) throws IOException {
+  public <K, V> void move(K key, V value, Table<K, V> source,
+                                Table<K, V> dest) throws IOException {
     move(key, key, value, source, dest);
   }
 
   @Override
-  public <KEY, VALUE> void move(KEY sourceKey, KEY destKey, VALUE value,
-                                Table<KEY, VALUE> source,
-                                Table<KEY, VALUE> dest) throws IOException {
+  public <K, V> void move(K sourceKey, K destKey, V value,
+                                Table<K, V> source,
+                                Table<K, V> dest) throws IOException {
     try (BatchOperation batchOperation = initBatchOperation()) {
       dest.putWithBatch(batchOperation, destKey, value);
       source.deleteWithBatch(batchOperation, sourceKey);
@@ -257,51 +259,47 @@ public class RDBStore implements DBStore {
     if (handle == null) {
       throw new IOException("No such table in this DB. TableName : " + name);
     }
-    return new RDBTable(this.db, handle, this.writeOptions);
+    return new RDBTable(this.db, handle, this.writeOptions, rdbMetrics);
   }
 
   @Override
-  public <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType) throws IOException {
-    return new TypedTable<KEY, VALUE>(getTable(name), codecRegistry, keyType,
+  public <K, V> Table<K, V> getTable(String name,
+      Class<K> keyType, Class<V> valueType) throws IOException {
+    return new TypedTable<>(getTable(name), codecRegistry, keyType,
         valueType);
   }
 
   @Override
-  public <KEY, VALUE> Table<KEY, VALUE> getTable(String name,
-      Class<KEY> keyType, Class<VALUE> valueType,
+  public <K, V> Table<K, V> getTable(String name,
+      Class<K> keyType, Class<V> valueType,
       TableCacheImpl.CacheCleanupPolicy cleanupPolicy) throws IOException {
-    return new TypedTable<KEY, VALUE>(getTable(name), codecRegistry, keyType,
+    return new TypedTable<>(getTable(name), codecRegistry, keyType,
         valueType, cleanupPolicy);
   }
 
   @Override
-  public ArrayList<Table> listTables() throws IOException {
+  public ArrayList<Table> listTables() {
     ArrayList<Table> returnList = new ArrayList<>();
     for (ColumnFamilyHandle handle : handleTable.values()) {
-      returnList.add(new RDBTable(db, handle, writeOptions));
+      returnList.add(new RDBTable(db, handle, writeOptions, rdbMetrics));
     }
     return returnList;
   }
 
   @Override
   public void flush() throws IOException {
-    final FlushOptions flushOptions = new FlushOptions().setWaitForFlush(true);
-    try {
+    try (FlushOptions flushOptions = new FlushOptions()) {
+      flushOptions.setWaitForFlush(true);
       db.flush(flushOptions);
     } catch (RocksDBException e) {
-      LOG.error("Unable to Flush RocksDB data", e);
       throw toIOException("Unable to Flush RocksDB data", e);
     }
   }
 
   @Override
-  public DBCheckpoint getCheckpoint(boolean flush) {
-    final FlushOptions flushOptions = new FlushOptions().setWaitForFlush(flush);
-    try {
-      db.flush(flushOptions);
-    } catch (RocksDBException e) {
-      LOG.error("Unable to Flush RocksDB data before creating snapshot", e);
+  public DBCheckpoint getCheckpoint(boolean flush) throws IOException {
+    if (flush) {
+      this.flush();
     }
     return checkPointManager.createCheckpoint(checkpointsParentDir);
   }
@@ -383,4 +381,7 @@ public class RDBStore implements DBStore {
     return db;
   }
 
+  public RDBMetrics getMetrics() {
+    return rdbMetrics;
+  }
 }

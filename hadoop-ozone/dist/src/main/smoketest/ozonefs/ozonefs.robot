@@ -80,11 +80,11 @@ Run ozoneFS tests
     ${result} =         Execute               ozone sh key list o3://om/fstest/bucket1 | grep -v WARN | jq -r '.name'
                         Should not contain  ${result}       testdir
 
-                        Execute               rm -Rf localdir1
-                        Execute               mkdir localdir1
-                        Execute               cp NOTICE.txt localdir1/LOCAL.txt
+                        Execute               rm -Rf /tmp/localdir1
+                        Execute               mkdir /tmp/localdir1
+                        Execute               cp NOTICE.txt /tmp/localdir1/LOCAL.txt
                         Execute               ozone fs -mkdir -p o3fs://bucket1.fstest/testdir1
-                        Execute               ozone fs -copyFromLocal localdir1 o3fs://bucket1.fstest/testdir1/
+                        Execute               ozone fs -copyFromLocal /tmp/localdir1 o3fs://bucket1.fstest/testdir1/
                         Execute               ozone fs -put NOTICE.txt o3fs://bucket1.fstest/testdir1/NOTICE.txt
 
     ${result} =         Execute               ozone fs -ls -R o3fs://bucket1.fstest/testdir1/
@@ -104,9 +104,9 @@ Run ozoneFS tests
     ${rc}  ${result} =  Run And Return Rc And Output        ozone fs -copyFromLocal NOTICE.txt o3fs://bucket1.fstest/KEY.txt
                         Should Be Equal As Integers     ${rc}                1
                         Should contain    ${result}         File exists
-                        Execute               rm -Rf GET.txt
-                        Execute               ozone fs -get o3fs://bucket1.fstest/KEY.txt GET.txt
-                        Execute               ls -l GET.txt
+                        Execute               rm -Rf /tmp/GET.txt
+                        Execute               ozone fs -get o3fs://bucket1.fstest/KEY.txt /tmp/GET.txt
+                        Execute               ls -l /tmp/GET.txt
     ${rc}  ${result} =  Run And Return Rc And Output        ozone fs -ls o3fs://abcde.pqrs/
                         Should Be Equal As Integers     ${rc}                1
                         Should Match Regexp    ${result}         (Check access operation failed)|(Volume pqrs is not found)

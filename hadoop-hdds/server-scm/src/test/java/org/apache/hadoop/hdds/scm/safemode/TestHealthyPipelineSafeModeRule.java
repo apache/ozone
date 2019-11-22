@@ -252,7 +252,8 @@ public class TestHealthyPipelineSafeModeRule {
         .newBuilder();
 
     reportBuilder.addPipelineReport(PipelineReport.newBuilder()
-        .setPipelineID(pipeline.getId().getProtobuf()));
+        .setPipelineID(pipeline.getId().getProtobuf())
+        .setIsLeader(Boolean.TRUE));
 
     // Here no need to fire event from 3 nodes, as already pipeline is in
     // open state, but doing it.

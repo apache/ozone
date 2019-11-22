@@ -353,10 +353,22 @@ public final class TestUtils {
         PipelineReportsProto.newBuilder();
     for (PipelineID pipelineID : pipelineIDs) {
       reportBuilder.addPipelineReport(
-          PipelineReport.newBuilder().setPipelineID(pipelineID.getProtobuf()));
+          PipelineReport.newBuilder()
+              .setPipelineID(pipelineID.getProtobuf())
+              .setIsLeader(false));
     }
     return new PipelineReportFromDatanode(dn, reportBuilder.build());
   }
+
+  public static PipelineReportFromDatanode getPipelineReportFromDatanode(
+      DatanodeDetails dn, PipelineID pipelineID, boolean isLeader) {
+    PipelineReportsProto.Builder reportBuilder =
+        PipelineReportsProto.newBuilder();
+    reportBuilder.addPipelineReport(PipelineReport.newBuilder()
+        .setPipelineID(pipelineID.getProtobuf()).setIsLeader(isLeader));
+    return new PipelineReportFromDatanode(dn, reportBuilder.build());
+  }
+
 
   public static PipelineActionsFromDatanode getPipelineActionFromDatanode(
       DatanodeDetails dn, PipelineID... pipelineIDs) {

@@ -50,22 +50,24 @@ public class RenameKeyHandler extends Handler {
   public Void call() throws Exception {
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
-    }
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+      }
 
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket = vol.getBucket(bucketName);
-    bucket.renameKey(fromKey, toKey);
+      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+      OzoneBucket bucket = vol.getBucket(bucketName);
+      bucket.renameKey(fromKey, toKey);
 
-    if (isVerbose()) {
-      System.out.printf("Renamed Key : %s to %s%n", fromKey, toKey);
+      if (isVerbose()) {
+        System.out.printf("Renamed Key : %s to %s%n", fromKey, toKey);
+      }
     }
 
     return null;
