@@ -1866,10 +1866,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (!ozAdmins.contains(ProtobufRpcEngine.Server.
           getRemoteUser().getUserName())
           && !ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-        LOG.error("Only admin users are authorized to list " +
-            "Ozone volumes.");
-        throw new OMException("Only admin users are authorized to list " +
-            "Ozone volumes.", ResultCodes.PERMISSION_DENIED);
+        String errMsg = "Only admin users are authorized to" +
+            " list Ozone volumes.";
+        LOG.error(errMsg);
+        throw new OMException(errMsg, ResultCodes.PERMISSION_DENIED);
       }
     }
     boolean auditSuccess = true;
