@@ -138,7 +138,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       if (keyName.length() == 0) {
         return new OMDirectoryCreateResponse(null, null,
             omResponse.setCreateDirectoryResponse(
-                CreateDirectoryResponse.newBuilder()).build());
+                CreateDirectoryResponse.newBuilder()).build(), false);
       }
       // acquire lock
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
@@ -194,12 +194,13 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       omResponse.setCreateDirectoryResponse(
           CreateDirectoryResponse.newBuilder());
       omClientResponse = new OMDirectoryCreateResponse(dirKeyInfo,
-          missingParentInfos, omResponse.build());
+          missingParentInfos, omResponse.build(),
+          ozoneManager.createPrefixRecursive());
 
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMDirectoryCreateResponse(null,null,
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), false);
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(

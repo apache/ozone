@@ -43,14 +43,17 @@ public class OMKeyCreateResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;
   private List<OmKeyInfo> parentKeyInfos;
+  private boolean createPrefix;
 
   public OMKeyCreateResponse(@Nullable OmKeyInfo omKeyInfo,
       @Nullable List<OmKeyInfo> parentKeyInfos,
-      long openKeySessionID, @Nonnull OMResponse omResponse) {
+      long openKeySessionID, @Nonnull OMResponse omResponse,
+      boolean createPrefix) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
     this.parentKeyInfos = parentKeyInfos;
+    this.createPrefix = createPrefix;
   }
 
   @Override
@@ -67,16 +70,18 @@ public class OMKeyCreateResponse extends OMClientResponse {
           openKey, omKeyInfo);
       LOG.debug("putWithBatch openKey : key {}", openKey);
 
-      if (parentKeyInfos != null) {
-        for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
-          String parentKey = omMetadataManager
-              .getOzoneDirKey(parentKeyInfo.getVolumeName(),
-                  parentKeyInfo.getBucketName(),
-                  parentKeyInfo.getKeyName());
-          LOG.debug("putWithBatch parent : key {} info : {}", parentKey, parentKeyInfo);
-          // create the parent directories without a key commit request.
-          omMetadataManager.getKeyTable()
-              .putWithBatch(batchOperation, parentKey, parentKeyInfo);
+      if (createPrefix) {
+        if (parentKeyInfos != null) {
+          for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
+            String parentKey = omMetadataManager
+                .getOzoneDirKey(parentKeyInfo.getVolumeName(), parentKeyInfo.getBucketName(),
+                    parentKeyInfo.getKeyName());
+            LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
+                parentKeyInfo);
+            // create the parent directories without a key commit request.
+            omMetadataManager.getKeyTable()
+                .putWithBatch(batchOperation, parentKey, parentKeyInfo);
+          }
         }
       }
     }

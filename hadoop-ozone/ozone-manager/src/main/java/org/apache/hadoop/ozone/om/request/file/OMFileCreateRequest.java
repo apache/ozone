@@ -162,6 +162,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
     // directories does not exist.
     boolean isRecursive = createFileRequest.getIsRecursive();
 
+    boolean createPrefixRecursive = ozoneManager.createPrefixRecursive();
+
     // if isOverWrite is true, file would be over written.
     boolean isOverWrite = createFileRequest.getIsOverwrite();
 
@@ -244,7 +246,13 @@ public class OMFileCreateRequest extends OMKeyRequest {
         // unnecessary check which is not required for those cases.
         if (omDirectoryResult == NONE ||
             omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH) {
-          boolean canBeCreated = missingParents.isEmpty();
+          boolean canBeCreated;
+          if (createPrefixRecursive) {
+            canBeCreated = missingParents.isEmpty();
+          } else {
+            canBeCreated = checkKeysUnderPath(omMetadataManager, volumeName,
+                bucketName, keyName);
+          }
           if (!canBeCreated) {
             throw new OMException("Can not create file: " + keyName + "as one" +
                 " of parent directory is not created",

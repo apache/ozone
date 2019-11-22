@@ -315,7 +315,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
                   .setOpenVersion(openVersion).build());
           omResponse.setCmdType(CreateFile);
           omClientResponse = new OMFileCreateResponse(omKeyInfo,
-              parentKeyInfos, clientID, omResponse.build());
+              parentKeyInfos, clientID, omResponse.build(),
+              ozoneManager.createPrefixRecursive());
         } else {
           omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
               .setKeyInfo(omKeyInfo.getProtobuf())
@@ -323,7 +324,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
               .build());
           omResponse.setCmdType(CreateKey);
           omClientResponse = new OMKeyCreateResponse(omKeyInfo, null, clientID,
-              omResponse.build());
+              omResponse.build(), ozoneManager.createPrefixRecursive());
         }
       }
 
@@ -490,12 +491,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
       omMetrics.incNumCreateFileFails();
       omResponse.setCmdType(CreateFile);
       return new OMFileCreateResponse(null, null, -1L,
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), false);
     } else {
       omMetrics.incNumKeyAllocateFails();
       omResponse.setCmdType(CreateKey);
       return new OMKeyCreateResponse(null, null,-1L,
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), false);
     }
   }
 

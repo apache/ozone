@@ -35,8 +35,10 @@ public class OMFileCreateResponse extends OMKeyCreateResponse {
 
   public OMFileCreateResponse(@Nullable OmKeyInfo omKeyInfo,
       @Nullable List<OmKeyInfo> parentKeyInfos,
-      long openKeySessionID, @Nonnull OMResponse omResponse) {
-    super(omKeyInfo, parentKeyInfos, openKeySessionID, omResponse);
+      long openKeySessionID, @Nonnull OMResponse omResponse,
+      boolean createPrefixRecursive) {
+    super(omKeyInfo, parentKeyInfos, openKeySessionID, omResponse,
+        createPrefixRecursive);
   }
 
 }

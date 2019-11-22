@@ -88,6 +88,10 @@ public final class OMConfigKeys {
       "ozone.om.save.metrics.interval";
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT = "5m";
 
+  public static final String OZONE_OM_KEY_PREFIX_CREATE =
+      "ozone.om.key.prefix.create";
+  public static final boolean OZONE_OM_KEY_PREFIX_CREATE_DEFAULT =
+      true;
   /**
    * OM Ratis related configurations.
    */

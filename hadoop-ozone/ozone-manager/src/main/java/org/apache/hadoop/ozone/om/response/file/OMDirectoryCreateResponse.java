@@ -42,13 +42,16 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
   private OmKeyInfo dirKeyInfo;
   private List<OmKeyInfo> parentKeyInfos;
+  private boolean createPrefix;
 
   public OMDirectoryCreateResponse(@Nullable OmKeyInfo dirKeyInfo,
       @Nullable List<OmKeyInfo> parentKeyInfos,
-      @Nonnull OMResponse omResponse) {
+      @Nonnull OMResponse omResponse,
+      boolean createPrefix) {
     super(omResponse);
     this.dirKeyInfo = dirKeyInfo;
     this.parentKeyInfos = parentKeyInfos;
+    this.createPrefix = createPrefix;
   }
 
   @Override
@@ -68,15 +71,17 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
             "OMDirectoryCreateResponse");
       }
 
-      if (parentKeyInfos != null) {
-        for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
-          String parentKey = omMetadataManager.getOzoneDirKey(
-              parentKeyInfo.getVolumeName(),
-              parentKeyInfo.getBucketName(),
-              parentKeyInfo.getKeyName());
-          LOG.debug("putWithBatch parent : key {} info : {}", parentKey, parentKeyInfo);
-          omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-              parentKey, parentKeyInfo);
+      if (createPrefix) {
+        if (parentKeyInfos != null) {
+          for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
+            String parentKey = omMetadataManager
+                .getOzoneDirKey(parentKeyInfo.getVolumeName(), parentKeyInfo.getBucketName(),
+                    parentKeyInfo.getKeyName());
+            LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
+                parentKeyInfo);
+            omMetadataManager.getKeyTable()
+                .putWithBatch(batchOperation, parentKey, parentKeyInfo);
+          }
         }
       }
     }
