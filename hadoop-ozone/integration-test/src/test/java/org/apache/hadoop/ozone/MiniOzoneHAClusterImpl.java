@@ -127,7 +127,8 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     for (OzoneManager ozoneManager : this.ozoneManagers) {
       if (ozoneManager.isLeader()) {
         if (res != null) {
-          // One than one leader. Return null to expect the caller to retry later.
+          // Found more than one leader
+          // Return null, expect the caller to retry in a while
           return null;
         }
         // Found a leader
