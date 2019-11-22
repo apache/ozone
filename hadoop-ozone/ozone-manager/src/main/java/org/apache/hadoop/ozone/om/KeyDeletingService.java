@@ -152,7 +152,7 @@ public class KeyDeletingService extends BackgroundService {
           long startTime = Time.monotonicNow();
           List<BlockGroup> keyBlocksList = manager
               .getPendingDeletionKeys(keyLimitPerTask);
-          if (keyBlocksList != null && keyBlocksList.size() > 0) {
+          if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
             List<DeleteBlockGroupResult> results =
                 scmClient.deleteKeyBlocks(keyBlocksList);
             if (results != null) {

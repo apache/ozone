@@ -988,7 +988,7 @@ public class KeyManagerImpl implements KeyManager {
               keyArgs.getBucketName() + OZONE_URI_DELIMITER +
               keyArgs.getKeyName());
 
-      if(prefixList.size() > 0) {
+      if (!prefixList.isEmpty()) {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
         if(prefixInfo  != null) {
@@ -2053,7 +2053,7 @@ public class KeyManagerImpl implements KeyManager {
       for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
         key.getLocationList().forEach(k -> {
           List<DatanodeDetails> nodes = k.getPipeline().getNodes();
-          if (nodes == null || nodes.size() == 0) {
+          if (nodes == null || nodes.isEmpty()) {
             LOG.warn("Datanodes for pipeline {} is empty",
                 k.getPipeline().getId().toString());
             return;
