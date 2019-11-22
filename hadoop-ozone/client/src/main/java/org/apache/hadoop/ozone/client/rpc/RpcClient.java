@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.client.io.LengthInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
@@ -604,12 +606,22 @@ public class RpcClient implements ClientProtocol {
     HddsClientUtils.checkNotNull(keyName, type, factor);
     String requestId = UUID.randomUUID().toString();
 
-    if(Boolean.valueOf(metadata.get(OzoneConsts.GDPR_FLAG))){
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
+        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+        .addAllMetadata(metadata)
+        .setAcls(getAclList());
+
+    if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
       try{
         GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
-        metadata.putAll(gKey.getKeyDetails());
-      }catch (Exception e) {
-        if(e instanceof InvalidKeyException &&
+        builder.addAllMetadata(gKey.getKeyDetails());
+      } catch (Exception e) {
+        if (e instanceof InvalidKeyException &&
             e.getMessage().contains("Illegal key size or default parameters")) {
           LOG.error("Missing Unlimited Strength Policy jars. Please install " +
               "Java Cryptography Extension (JCE) Unlimited Strength " +
@@ -619,18 +631,7 @@ public class RpcClient implements ClientProtocol {
       }
     }
 
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setDataSize(size)
-        .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
-        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
-        .addAllMetadata(metadata)
-        .setAcls(getAclList())
-        .build();
-
-    OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
+    OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     return createOutputStream(openKey, requestId, type, factor);
   }
 
@@ -709,6 +710,17 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
+      String startKeyName, String keyPrefix, int maxKeys) throws IOException {
+
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+
+    return ozoneManagerClient.listTrash(volumeName, bucketName, startKeyName,
+        keyPrefix, maxKeys);
+  }
+
+  @Override
   public OzoneKeyDetails getKeyDetails(
       String volumeName, String bucketName, String keyName)
       throws IOException {
@@ -743,6 +755,12 @@ public class RpcClient implements ClientProtocol {
 
     Preconditions.checkArgument(Strings.isNotBlank(s3BucketName), "bucket " +
         "name cannot be null or empty.");
+    try {
+      HddsClientUtils.verifyResourceName(s3BucketName);
+    } catch (IllegalArgumentException exception) {
+      throw new OMException("Invalid bucket name: " + s3BucketName,
+          OMException.ResultCodes.INVALID_BUCKET_NAME);
+    }
     ozoneManagerClient.createS3Bucket(userName, s3BucketName);
   }
 

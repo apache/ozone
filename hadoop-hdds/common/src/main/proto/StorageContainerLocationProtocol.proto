@@ -47,7 +47,7 @@ message ScmContainerLocationRequest {
   optional SCMListContainerRequestProto scmListContainerRequest = 9;
   optional SCMDeleteContainerRequestProto scmDeleteContainerRequest = 10;
   optional NodeQueryRequestProto nodeQueryRequest = 11;
-  optional ObjectStageChangeRequestProto objectStageChangeRequest = 12;
+  optional SCMCloseContainerRequestProto scmCloseContainerRequest = 12;
   optional PipelineRequestProto pipelineRequest = 13;
   optional ListPipelineRequestProto listPipelineRequest = 14;
   optional ActivatePipelineRequestProto activatePipelineRequest = 15;
@@ -81,7 +81,7 @@ message ScmContainerLocationResponse {
   optional SCMListContainerResponseProto scmListContainerResponse = 9;
   optional SCMDeleteContainerResponseProto scmDeleteContainerResponse = 10;
   optional NodeQueryResponseProto nodeQueryResponse = 11;
-  optional ObjectStageChangeResponseProto objectStageChangeResponse = 12;
+  optional SCMCloseContainerResponseProto scmCloseContainerResponse = 12;
   optional PipelineResponseProto pipelineResponse = 13;
   optional ListPipelineResponseProto listPipelineResponse = 14;
   optional ActivatePipelineResponseProto activatePipelineResponse = 15;
@@ -111,7 +111,7 @@ enum Type {
   ListContainer = 4;
   DeleteContainer = 5;
   QueryNode = 6;
-  NotifyObjectStageChange = 7;
+  CloseContainer = 7;
   AllocatePipeline = 8;
   ListPipelines = 9;
   ActivatePipeline = 10;
@@ -193,28 +193,12 @@ message SCMDeleteContainerResponseProto {
   // Empty response
 }
 
-message ObjectStageChangeRequestProto {
-  enum Type {
-    container = 1;
-    pipeline = 2;
-  }
-  // delete/copy operation may be added later
-  enum Op {
-    create = 1;
-    close = 2;
-  }
-  enum Stage {
-    begin = 1;
-    complete = 2;
-  }
-  required int64 id = 1;
-  required Type type = 2;
-  required Op op= 3;
-  required Stage stage = 4;
-  optional string traceID = 5;
+message SCMCloseContainerRequestProto {
+  required int64 containerID = 1;
+  optional string traceID = 2;
 }
 
-message ObjectStageChangeResponseProto {
+message SCMCloseContainerResponseProto {
   // Empty response
 }
 

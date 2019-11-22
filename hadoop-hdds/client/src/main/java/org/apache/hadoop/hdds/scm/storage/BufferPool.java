@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.nio.ByteBuffer;
@@ -32,7 +33,7 @@ import java.util.function.Function;
  */
 public class BufferPool {
 
-  private List<ByteBuffer> bufferList;
+  private List<ChunkBuffer> bufferList;
   private int currentBufferIndex;
   private final int bufferSize;
   private final int capacity;
@@ -56,7 +57,7 @@ public class BufferPool {
     return byteStringConversion;
   }
 
-  public ByteBuffer getCurrentBuffer() {
+  ChunkBuffer getCurrentBuffer() {
     return currentBufferIndex == -1 ? null : bufferList.get(currentBufferIndex);
   }
 
@@ -70,15 +71,15 @@ public class BufferPool {
    * chunk size.
    *
    */
-  public ByteBuffer allocateBufferIfNeeded() {
-    ByteBuffer buffer = getCurrentBuffer();
+  public ChunkBuffer allocateBufferIfNeeded() {
+    ChunkBuffer buffer = getCurrentBuffer();
     if (buffer != null && buffer.hasRemaining()) {
       return buffer;
     }
     if (currentBufferIndex < bufferList.size() - 1) {
       buffer = getBuffer(currentBufferIndex + 1);
     } else {
-      buffer = ByteBuffer.allocate(bufferSize);
+      buffer = ChunkBuffer.allocate(bufferSize);
       bufferList.add(buffer);
     }
     Preconditions.checkArgument(bufferList.size() <= capacity);
@@ -89,11 +90,11 @@ public class BufferPool {
     return buffer;
   }
 
-  public void releaseBuffer(ByteBuffer byteBuffer) {
+  void releaseBuffer(ChunkBuffer chunkBuffer) {
     // always remove from head of the list and append at last
-    ByteBuffer buffer = bufferList.remove(0);
+    final ChunkBuffer buffer = bufferList.remove(0);
     // Ensure the buffer to be removed is always at the head of the list.
-    Preconditions.checkArgument(buffer.equals(byteBuffer));
+    Preconditions.checkArgument(buffer == chunkBuffer);
     buffer.clear();
     bufferList.add(buffer);
     Preconditions.checkArgument(currentBufferIndex >= 0);
@@ -110,7 +111,7 @@ public class BufferPool {
   }
 
   public long computeBufferData() {
-    return bufferList.stream().mapToInt(value -> value.position())
+    return bufferList.stream().mapToInt(ChunkBuffer::position)
         .sum();
   }
 
@@ -118,7 +119,7 @@ public class BufferPool {
     return bufferList.size();
   }
 
-  public ByteBuffer getBuffer(int index) {
+  public ChunkBuffer getBuffer(int index) {
     return bufferList.get(index);
   }
 

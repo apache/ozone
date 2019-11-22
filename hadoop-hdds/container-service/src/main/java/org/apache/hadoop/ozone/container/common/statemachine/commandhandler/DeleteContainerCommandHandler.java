@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.ozone.container.common.statemachine
@@ -31,6 +32,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Handler to process the DeleteContainerCommand from SCM.
@@ -40,28 +47,39 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(DeleteContainerCommandHandler.class);
 
-  private int invocationCount;
-  private long totalTime;
+  private final AtomicInteger invocationCount = new AtomicInteger(0);
+  private final AtomicLong totalTime = new AtomicLong(0);
+  private final ExecutorService executor;
+
+  public DeleteContainerCommandHandler(int threadPoolSize) {
+    this.executor = new ThreadPoolExecutor(
+        0, threadPoolSize, 60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(),
+        new ThreadFactoryBuilder().setDaemon(true)
+            .setNameFormat("DeleteContainerThread-%d")
+            .build());
+  }
 
   @Override
   public void handle(final SCMCommand command,
                      final OzoneContainer ozoneContainer,
                      final StateContext context,
                      final SCMConnectionManager connectionManager) {
-    final long startTime = Time.monotonicNow();
-    invocationCount++;
-    try {
-      final DeleteContainerCommand deleteContainerCommand =
-          (DeleteContainerCommand) command;
-      final ContainerController controller = ozoneContainer.getController();
-      controller.deleteContainer(deleteContainerCommand.getContainerID(),
-          deleteContainerCommand.isForce());
-    } catch (IOException e) {
-      LOG.error("Exception occurred while deleting the container.", e);
-    } finally {
-      totalTime += Time.monotonicNow() - startTime;
-    }
-
+    final DeleteContainerCommand deleteContainerCommand =
+        (DeleteContainerCommand) command;
+    final ContainerController controller = ozoneContainer.getController();
+    executor.execute(() -> {
+      final long startTime = Time.monotonicNow();
+      invocationCount.incrementAndGet();
+      try {
+        controller.deleteContainer(deleteContainerCommand.getContainerID(),
+            deleteContainerCommand.isForce());
+      } catch (IOException e) {
+        LOG.error("Exception occurred while deleting the container.", e);
+      } finally {
+        totalTime.getAndAdd(Time.monotonicNow() - startTime);
+      }
+    });
   }
 
   @Override
@@ -71,11 +89,27 @@ public class DeleteContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return this.invocationCount;
+    return this.invocationCount.get();
   }
 
   @Override
   public long getAverageRunTime() {
-    return invocationCount == 0 ? 0 : totalTime / invocationCount;
+    final int invocations = invocationCount.get();
+    return invocations == 0 ?
+        0 : totalTime.get() / invocations;
   }
+
+  @Override
+  public void stop() {
+    try {
+      executor.shutdown();
+      if (!executor.awaitTermination(3, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+      }
+    } catch (InterruptedException ie) {
+      // Ignore, we don't really care about the failure.
+      Thread.currentThread().interrupt();
+    }
+  }
+
 }

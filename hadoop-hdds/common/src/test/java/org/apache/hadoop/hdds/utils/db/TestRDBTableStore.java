@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -91,10 +92,6 @@ public class TestRDBTableStore {
     if (rdbStore != null) {
       rdbStore.close();
     }
-  }
-
-  @Test
-  public void toIOException() {
   }
 
   @Test
@@ -232,20 +229,58 @@ public class TestRDBTableStore {
 
   @Test
   public void testIsExist() throws Exception {
-    try (Table<byte[], byte[]> testTable = rdbStore.getTable("Seventh")) {
-      byte[] key =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
-      byte[] value =
-          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+    DBOptions rocksDBOptions = new DBOptions();
+    rocksDBOptions.setCreateIfMissing(true);
+    rocksDBOptions.setCreateMissingColumnFamilies(true);
+
+    String tableName = DFSUtil.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
+
+    Set<TableConfig> configSet = new HashSet<>();
+    TableConfig newConfig = new TableConfig(tableName,
+        new ColumnFamilyOptions());
+    configSet.add(newConfig);
+
+    File rdbLocation = folder.newFolder();
+    RDBStore dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
+
+    byte[] key = RandomStringUtils.random(10, true, false)
+        .getBytes(StandardCharsets.UTF_8);
+    byte[] value = RandomStringUtils.random(10, true, false)
+        .getBytes(StandardCharsets.UTF_8);
+
+    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
       testTable.put(key, value);
+
+      // Test if isExist returns true for a key that definitely exists.
       Assert.assertTrue(testTable.isExist(key));
 
+      // Test if isExist returns false for a key that has been deleted.
       testTable.delete(key);
       Assert.assertFalse(testTable.isExist(key));
 
       byte[] invalidKey =
           RandomStringUtils.random(5).getBytes(StandardCharsets.UTF_8);
+      // Test if isExist returns false for a key that is definitely not present.
       Assert.assertFalse(testTable.isExist(invalidKey));
+
+      RDBMetrics rdbMetrics = dbStore.getMetrics();
+      Assert.assertEquals(3, rdbMetrics.getNumDBKeyMayExistChecks());
+      Assert.assertTrue(rdbMetrics.getNumDBKeyMayExistMisses() == 0);
+
+      // Reinsert key for further testing.
+      testTable.put(key, value);
+    }
+
+    dbStore.close();
+    rocksDBOptions = new DBOptions();
+    rocksDBOptions.setCreateIfMissing(true);
+    rocksDBOptions.setCreateMissingColumnFamilies(true);
+    dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
+    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
+      // Verify isExist works with key not in block cache.
+      Assert.assertTrue(testTable.isExist(key));
+    } finally {
+      dbStore.close();
     }
   }
 

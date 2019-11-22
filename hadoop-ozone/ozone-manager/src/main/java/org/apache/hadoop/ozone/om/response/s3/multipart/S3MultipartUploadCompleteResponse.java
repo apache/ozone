@@ -19,9 +19,11 @@
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -37,11 +39,14 @@ import javax.annotation.Nonnull;
 public class S3MultipartUploadCompleteResponse extends OMClientResponse {
   private String multipartKey;
   private OmKeyInfo omKeyInfo;
+  private List<OmKeyInfo> partsUnusedList;
 
 
   public S3MultipartUploadCompleteResponse(@Nullable String multipartKey,
-      @Nullable OmKeyInfo omKeyInfo, @Nonnull OMResponse omResponse) {
+      @Nullable OmKeyInfo omKeyInfo,
+      @Nullable List<OmKeyInfo> unUsedParts, @Nonnull OMResponse omResponse) {
     super(omResponse);
+    this.partsUnusedList = unUsedParts;
     this.multipartKey = multipartKey;
     this.omKeyInfo = omKeyInfo;
   }
@@ -58,8 +63,24 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
           multipartKey);
       omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
           multipartKey);
+
+      // Add unused parts to deleted key table.
+      String keyName =
+          omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
+              omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
+
+      RepeatedOmKeyInfo repeatedOmKeyInfo =
+          omMetadataManager.getDeletedTable().get(keyName);
+
+      if (repeatedOmKeyInfo == null) {
+        repeatedOmKeyInfo =
+            new RepeatedOmKeyInfo(partsUnusedList);
+      } else {
+        repeatedOmKeyInfo.addOmKeyInfo(omKeyInfo);
+      }
+
+      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+          keyName, repeatedOmKeyInfo);
     }
   }
 }
-
-

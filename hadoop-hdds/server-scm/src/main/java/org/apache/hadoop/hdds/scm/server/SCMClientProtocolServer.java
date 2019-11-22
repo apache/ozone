@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -407,33 +408,29 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public void notifyObjectStageChange(StorageContainerLocationProtocolProtos
-      .ObjectStageChangeRequestProto.Type type, long id,
-      StorageContainerLocationProtocolProtos.ObjectStageChangeRequestProto.Op
-          op, StorageContainerLocationProtocolProtos
-      .ObjectStageChangeRequestProto.Stage stage) throws IOException {
-
-    LOG.info("Object type {} id {} op {} new stage {}", type, id, op,
-        stage);
-    if (type == StorageContainerLocationProtocolProtos
-        .ObjectStageChangeRequestProto.Type.container) {
-      if (op == StorageContainerLocationProtocolProtos
-          .ObjectStageChangeRequestProto.Op.close) {
-        if (stage == StorageContainerLocationProtocolProtos
-            .ObjectStageChangeRequestProto.Stage.begin) {
-          scm.getContainerManager()
-              .updateContainerState(ContainerID.valueof(id),
-                  HddsProtos.LifeCycleEvent.FINALIZE);
-        } else {
-          scm.getContainerManager()
-              .updateContainerState(ContainerID.valueof(id),
-                  HddsProtos.LifeCycleEvent.CLOSE);
-        }
+  public void closeContainer(long containerID) throws IOException {
+    final String remoteUser = getRpcRemoteUsername();
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("containerID", String.valueOf(containerID));
+    auditMap.put("remoteUser", remoteUser);
+    try {
+      scm.checkAdminAccess(remoteUser);
+      final ContainerID cid = ContainerID.valueof(containerID);
+      final HddsProtos.LifeCycleState state = scm.getContainerManager()
+          .getContainer(cid).getState();
+      if (!state.equals(HddsProtos.LifeCycleState.OPEN)) {
+        throw new SCMException("Cannot close a " + state + " container.",
+            ResultCodes.UNEXPECTED_CONTAINER_STATE);
       }
-    } // else if (type == ObjectStageChangeRequestProto.Type.pipeline) {
-    // TODO: pipeline state update will be addressed in future patch.
-    // }
-
+      scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER,
+          ContainerID.valueof(containerID));
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          SCMAction.CLOSE_CONTAINER, auditMap));
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          SCMAction.CLOSE_CONTAINER, auditMap, ex));
+      throw ex;
+    }
   }
 
   @Override

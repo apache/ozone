@@ -21,17 +21,25 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
+    .PipelineReportFromDatanode;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -39,13 +47,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 
 /**
  * Test cases to verify PipelineManager.
@@ -147,72 +148,6 @@ public class TestSCMPipelineManager {
   }
 
   @Test
-  public void testPipelineReport() throws IOException {
-    EventQueue eventQueue = new EventQueue();
-    SCMPipelineManager pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, eventQueue, null);
-    PipelineProvider mockRatisProvider =
-        new MockRatisPipelineProvider(nodeManager,
-            pipelineManager.getStateManager(), conf);
-    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
-        mockRatisProvider);
-
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(new OzoneConfiguration(),
-            new ArrayList<>(), pipelineManager, eventQueue);
-
-    // create a pipeline in allocated state with no dns yet reported
-    Pipeline pipeline = pipelineManager
-        .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
-    Assert
-        .assertFalse(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isOpen());
-
-    // get pipeline report from each dn in the pipeline
-    PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
-    for (DatanodeDetails dn: pipeline.getNodes()) {
-      PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
-      // pipeline is not healthy until all dns report
-      Assert.assertFalse(
-          pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-      pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
-    }
-
-    // pipeline is healthy when all dns report
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-    // pipeline should now move to open state
-    Assert
-        .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isOpen());
-
-    // close the pipeline
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
-
-    for (DatanodeDetails dn: pipeline.getNodes()) {
-      PipelineReportFromDatanode pipelineReportFromDatanode =
-          TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId());
-      // pipeline report for destroyed pipeline should be ignored
-      pipelineReportHandler
-          .onMessage(pipelineReportFromDatanode, new EventQueue());
-    }
-
-    try {
-      pipelineManager.getPipeline(pipeline.getId());
-      Assert.fail("Pipeline should not have been retrieved");
-    } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().contains("not found"));
-    }
-
-    // clean up
-    pipelineManager.close();
-  }
-
-  @Test
   public void testPipelineCreationFailedMetric() throws Exception {
     MockNodeManager nodeManagerMock = new MockNodeManager(true,
         20);
@@ -267,6 +202,9 @@ public class TestSCMPipelineManager {
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
     Assert.assertTrue(numPipelineCreateFailed == 0);
+    
+    // clean up
+    pipelineManager.close();
   }
 
   @Test
@@ -313,5 +251,66 @@ public class TestSCMPipelineManager {
             Pipeline.PipelineState.OPEN).contains(pipeline));
 
     pipelineManager.close();
+  }
+
+  @Test
+  public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
+    EventQueue eventQueue = new EventQueue();
+    SCMPipelineManager pipelineManager =
+        new SCMPipelineManager(conf, nodeManager, eventQueue, null);
+    PipelineProvider mockRatisProvider =
+        new MockRatisPipelineProvider(nodeManager,
+            pipelineManager.getStateManager(), conf);
+    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        mockRatisProvider);
+    Pipeline pipeline = pipelineManager
+        .createPipeline(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
+    // close manager
+    pipelineManager.close();
+    // new pipeline manager loads the pipelines from the db in ALLOCATED state
+    pipelineManager =
+        new SCMPipelineManager(conf, nodeManager, eventQueue, null);
+    mockRatisProvider =
+        new MockRatisPipelineProvider(nodeManager,
+            pipelineManager.getStateManager(), conf);
+    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        mockRatisProvider);
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
+
+    SCMSafeModeManager scmSafeModeManager =
+        new SCMSafeModeManager(new OzoneConfiguration(),
+            new ArrayList<>(), pipelineManager, eventQueue);
+    PipelineReportHandler pipelineReportHandler =
+        new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
+
+    // Report pipelines with leaders
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+    Assert.assertEquals(3, nodes.size());
+    // Send report for all but no leader
+    nodes.forEach(dn -> sendPipelineReport(dn, pipeline, pipelineReportHandler,
+        false, eventQueue));
+
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
+
+    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
+        pipelineReportHandler, false, eventQueue));
+    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
+        pipelineReportHandler, true, eventQueue);
+
+    Assert.assertEquals(Pipeline.PipelineState.OPEN,
+        pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
+
+    pipelineManager.close();
+  }
+
+  private void sendPipelineReport(DatanodeDetails dn,
+      Pipeline pipeline, PipelineReportHandler pipelineReportHandler,
+      boolean isLeader, EventQueue eventQueue) {
+    PipelineReportFromDatanode report =
+        TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId(), isLeader);
+    pipelineReportHandler.onMessage(report, eventQueue);
   }
 }

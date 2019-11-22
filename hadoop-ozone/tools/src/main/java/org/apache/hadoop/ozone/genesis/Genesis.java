@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.genesis;
 
+import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.profile.StackProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
@@ -41,7 +42,8 @@ public final class Genesis {
 
   // After adding benchmark in genesis package add the benchmark name in the
   // description for this option.
-  @Option(names = "-benchmark", split = ",", description =
+  @Option(names = {"-b", "-benchmark", "--benchmark"},
+      split = ",", description =
       "Option used for specifying benchmarks to run.\n"
           + "Ex. ozone genesis -benchmark BenchMarkContainerStateMap,"
           + "BenchMarkOMKeyAllocation.\n"
@@ -83,6 +85,7 @@ public final class Genesis {
     optionsBuilder.warmupIterations(2)
         .measurementIterations(20)
         .addProfiler(StackProfiler.class)
+        .addProfiler(GCProfiler.class)
         .shouldDoGC(true)
         .forks(1)
         .threads(numThreads);

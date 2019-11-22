@@ -206,28 +206,28 @@ public class OzoneBucketStub extends OzoneBucket {
     } else {
       final Map<Integer, Part> partsList = partList.get(key);
 
-      if (partsMap.size() != partsList.size()) {
-        throw new OMException(ResultCodes.MISMATCH_MULTIPART_LIST);
-      }
-
       int count = 1;
 
       ByteArrayOutputStream output = new ByteArrayOutputStream();
 
+      int prevPartNumber = 0;
+      for (Map.Entry<Integer, String> part: partsMap.entrySet()) {
+        int currentPartNumber = part.getKey();
+        if (currentPartNumber <= prevPartNumber) {
+          throw new OMException(OMException.ResultCodes.INVALID_PART_ORDER);
+        }
+        prevPartNumber = currentPartNumber;
+      }
       for (Map.Entry<Integer, String> part: partsMap.entrySet()) {
         Part recordedPart = partsList.get(part.getKey());
-        if (part.getKey() != count) {
-          throw new OMException(ResultCodes.MISSING_UPLOAD_PARTS);
+        if (recordedPart == null ||
+            !recordedPart.getPartName().equals(part.getValue())) {
+          throw new OMException(ResultCodes.INVALID_PART);
         } else {
-          if (!part.getValue().equals(recordedPart.getPartName())) {
-            throw new OMException(ResultCodes.MISMATCH_MULTIPART_LIST);
-          } else {
-            count++;
-            output.write(recordedPart.getContent());
-          }
+          output.write(recordedPart.getContent());
         }
+        keyContents.put(key, output.toByteArray());
       }
-      keyContents.put(key, output.toByteArray());
     }
 
     return new OmMultipartUploadCompleteInfo(getVolumeName(), getName(), key,

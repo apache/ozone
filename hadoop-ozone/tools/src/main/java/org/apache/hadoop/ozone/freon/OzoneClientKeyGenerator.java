@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.OutputStream;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -59,7 +60,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   @Option(names = {"-s", "--size"},
       description = "Size of the generated key (in bytes)",
       defaultValue = "10240")
-  private int keySize;
+  private long keySize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used to generated the key content.",
@@ -76,6 +77,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
   private OzoneBucket bucket;
   private ContentGenerator contentGenerator;
+  private Map<String, String> metadata;
 
   @Override
   public Void call() throws Exception {
@@ -87,6 +89,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     ensureVolumeAndBucketExist(ozoneConfiguration, volumeName, bucketName);
 
     contentGenerator = new ContentGenerator(keySize, bufferSize);
+    metadata = new HashMap<>();
 
     try (OzoneClient rpcClient = OzoneClientFactory
         .getRpcClient(ozoneConfiguration)) {
@@ -104,13 +107,11 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   }
 
   private void createKey(long counter) throws Exception {
+    final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      try (OutputStream stream = bucket
-          .createKey(generateObjectName(counter), keySize,
-              ReplicationType.RATIS,
-              factor,
-              new HashMap<>())) {
+      try (OutputStream stream = bucket.createKey(key, keySize,
+              ReplicationType.RATIS, factor, metadata)) {
         contentGenerator.write(stream);
         stream.flush();
       }

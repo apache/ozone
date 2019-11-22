@@ -50,14 +50,12 @@ public class StorageContainerManagerStarter extends GenericCli {
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageContainerManagerStarter.class);
 
-  public static void main(String[] args) throws Exception {
-    TracingUtil.initTracing("StorageContainerManager");
+  public static void main(String[] args) {
     new StorageContainerManagerStarter(
         new StorageContainerManagerStarter.SCMStarterHelper()).run(args);
   }
 
   public StorageContainerManagerStarter(SCMStarterInterface receiverObj) {
-    super();
     receiver = receiverObj;
   }
 
@@ -121,6 +119,7 @@ public class StorageContainerManagerStarter extends GenericCli {
    */
   private void commonInit() {
     conf = createOzoneConfiguration();
+    TracingUtil.initTracing("StorageContainerManager", conf);
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);

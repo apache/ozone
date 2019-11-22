@@ -431,29 +431,35 @@ public final class HddsUtils {
       if (msg.hasReadChunk()) {
         return BlockID.getFromProtobuf(msg.getReadChunk().getBlockID());
       }
+      return null;
     case GetBlock:
       if (msg.hasGetBlock()) {
         return BlockID.getFromProtobuf(msg.getGetBlock().getBlockID());
       }
+      return null;
     case WriteChunk:
       if (msg.hasWriteChunk()) {
         return BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
       }
+      return null;
     case PutBlock:
       if (msg.hasPutBlock()) {
         return BlockID.getFromProtobuf(msg.getPutBlock().getBlockData()
             .getBlockID());
       }
+      return null;
     case PutSmallFile:
       if (msg.hasPutSmallFile()) {
         return BlockID.getFromProtobuf(msg.getPutSmallFile().getBlock()
             .getBlockData().getBlockID());
       }
+      return null;
     case GetSmallFile:
       if (msg.hasGetSmallFile()) {
         return BlockID.getFromProtobuf(msg.getGetSmallFile().getBlock()
             .getBlockID());
       }
+      return null;
     default:
       return null;
     }
@@ -589,6 +595,6 @@ public final class HddsUtils {
         "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
-        "Path should be a descendant of " + ancestor);
+        "Path should be a descendant of %s", ancestor);
   }
 }

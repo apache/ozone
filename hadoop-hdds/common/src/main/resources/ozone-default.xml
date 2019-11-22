@@ -494,8 +494,17 @@
     <description>
       Comma-separated list of OM service Ids.
 
-      If not set, the default value of "om-service-value" is assigned as the
+      If not set, the default value of "omServiceIdDefault" is assigned as the
       OM service ID.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.internal.service.id</name>
+    <value></value>
+    <tag>OM, HA</tag>
+    <description>
+      Service ID of the Ozone Manager. If this is not set fall back to
+      ozone.om.service.ids to find the service ID it belongs to.
     </description>
   </property>
   <property>
@@ -1492,7 +1501,7 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] determines
       which algorithm would be used to compute checksum for chunk data.
-      Default checksum type is SHA256.
+      Default checksum type is CRC32.
     </description>
   </property>
 
@@ -1742,22 +1751,6 @@
     <description>Key to enable/disable ozone acls.</description>
   </property>
   <property>
-    <name>hdds.scm.kerberos.keytab.file</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
-    <description> The keytab file used by each SCM daemon to login as its
-      service principal. The principal name is configured with
-      hdds.scm.kerberos.principal.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.kerberos.principal</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
-    <description>The SCM service principal. Ex scm/_HOST@REALM.COM</description>
-  </property>
-
-  <property>
     <name>ozone.om.kerberos.keytab.file</name>
     <value></value>
     <tag> OZONE, SECURITY</tag>
@@ -1772,16 +1765,6 @@
     <tag> OZONE, SECURITY</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
-
-  <property>
-    <name>hdds.scm.http.kerberos.principal</name>
-    <value>HTTP/_HOST@EXAMPLE.COM</value>
-  </property>
-  <property>
-    <name>hdds.scm.http.kerberos.keytab</name>
-    <value>/etc/security/keytabs/HTTP.keytab</value>
-  </property>
-
   <property>
     <name>ozone.om.http.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
@@ -2491,6 +2474,14 @@
       nodes added to the admin workflow or removed from it. The progress
       of decommissioning and entering maintenance nodes is also checked to see
       if they have completed.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.list.trash.keys.max</name>
+    <value>1000</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The maximum number of keys to return for a list trash request.
     </description>
   </property>
 </configuration>

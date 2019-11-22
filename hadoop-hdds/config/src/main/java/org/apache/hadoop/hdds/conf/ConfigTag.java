@@ -40,5 +40,6 @@ public enum ConfigTag {
   STORAGE,
   PIPELINE,
   STANDALONE,
-  S3GATEWAY
+  S3GATEWAY,
+  DATANODE
 }

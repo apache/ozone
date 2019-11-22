@@ -70,36 +70,38 @@ public class ListVolumeHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureRootAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    if (userName == null) {
-      userName = UserGroupInformation.getCurrentUser().getUserName();
-    }
+      if (userName == null) {
+        userName = UserGroupInformation.getCurrentUser().getUserName();
+      }
 
-    if (maxVolumes < 1) {
-      throw new IllegalArgumentException(
-          "the length should be a positive number");
-    }
+      if (maxVolumes < 1) {
+        throw new IllegalArgumentException(
+            "the length should be a positive number");
+      }
 
-    Iterator<? extends OzoneVolume> volumeIterator;
-    if(userName != null) {
-      volumeIterator = client.getObjectStore()
-          .listVolumesByUser(userName, prefix, startVolume);
-    } else {
-      volumeIterator = client.getObjectStore().listVolumes(prefix);
-    }
+      Iterator<? extends OzoneVolume> volumeIterator;
+      if (userName != null) {
+        volumeIterator = client.getObjectStore()
+            .listVolumesByUser(userName, prefix, startVolume);
+      } else {
+        volumeIterator = client.getObjectStore().listVolumes(prefix);
+      }
 
-    int counter = 0;
-    while (maxVolumes > 0 && volumeIterator.hasNext()) {
-      OzoneVolume next = volumeIterator.next();
-      ObjectPrinter.printObjectAsJson(next);
-      maxVolumes -= 1;
-      counter++;
-    }
+      int counter = 0;
+      while (maxVolumes > 0 && volumeIterator.hasNext()) {
+        OzoneVolume next = volumeIterator.next();
+        ObjectPrinter.printObjectAsJson(next);
+        maxVolumes -= 1;
+        counter++;
+      }
 
-    if (isVerbose()) {
-      System.out.printf("Found : %d volumes for user : %s ", counter,
-          userName);
+      if (isVerbose()) {
+        System.out.printf("Found : %d volumes for user : %s ", counter,
+            userName);
+      }
     }
 
     return null;

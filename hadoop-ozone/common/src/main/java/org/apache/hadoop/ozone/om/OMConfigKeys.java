@@ -39,6 +39,9 @@ public final class OMConfigKeys {
       "ozone.om.handler.count.key";
   public static final int OZONE_OM_HANDLER_COUNT_DEFAULT = 20;
 
+  public static final String OZONE_OM_INTERNAL_SERVICE_ID =
+      "ozone.om.internal.service.id";
+
   public static final String OZONE_OM_SERVICE_IDS_KEY =
       "ozone.om.service.ids";
   public static final String OZONE_OM_NODES_KEY =

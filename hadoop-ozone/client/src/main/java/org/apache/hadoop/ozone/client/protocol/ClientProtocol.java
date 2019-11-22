@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -314,6 +315,25 @@ public interface ClientProtocol {
                           String keyPrefix, String prevKey, int maxListResult)
       throws IOException;
 
+  /**
+   * List trash allows the user to list the keys that were marked as deleted,
+   * but not actually deleted by Ozone Manager. This allows a user to recover
+   * keys within a configurable window.
+   * @param volumeName - The volume name, which can also be a wild card
+   *                   using '*'.
+   * @param bucketName - The bucket name, which can also be a wild card
+   *                   using '*'.
+   * @param startKeyName - List keys from a specific key name.
+   * @param keyPrefix - List keys using a specific prefix.
+   * @param maxKeys - The number of keys to be returned. This must be below
+   *                the cluster level set by admins.
+   * @return The list of keys that are deleted from the deleted table.
+   * @throws IOException
+   */
+  List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
+                                    String startKeyName, String keyPrefix,
+                                    int maxKeys)
+      throws IOException;
 
   /**
    * Get OzoneKey.

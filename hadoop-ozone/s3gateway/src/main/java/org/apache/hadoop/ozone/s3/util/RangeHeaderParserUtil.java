@@ -50,12 +50,12 @@ public final class RangeHeaderParserUtil {
     Matcher matcher = RANGE_HEADER_MATCH_PATTERN.matcher(rangeHeaderVal);
     if (matcher.matches()) {
       if (!matcher.group("start").equals("")) {
-        start = Integer.parseInt(matcher.group("start"));
+        start = Long.parseLong(matcher.group("start"));
       } else {
         noStart = true;
       }
       if (!matcher.group("end").equals("")) {
-        end = Integer.parseInt(matcher.group("end"));
+        end = Long.parseLong(matcher.group("end"));
       } else {
         end = length - 1;
       }

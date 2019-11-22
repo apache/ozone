@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -43,9 +43,9 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -78,6 +78,7 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
@@ -140,23 +141,17 @@ public class ObjectEndpoint extends EndpointBase {
       String copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
-      ReplicationType replicationType;
-      ReplicationFactor replicationFactor;
+      S3StorageType s3StorageType;
       boolean storageTypeDefault;
       if (storageType == null || storageType.equals("")) {
-        replicationType = S3StorageType.getDefault().getType();
-        replicationFactor = S3StorageType.getDefault().getFactor();
+        s3StorageType = S3StorageType.getDefault();
         storageTypeDefault = true;
       } else {
-        try {
-          replicationType = S3StorageType.valueOf(storageType).getType();
-          replicationFactor = S3StorageType.valueOf(storageType).getFactor();
-        } catch (IllegalArgumentException ex) {
-          throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT,
-              storageType);
-        }
+        s3StorageType = toS3StorageType(storageType);
         storageTypeDefault = false;
       }
+      ReplicationType replicationType = s3StorageType.getType();
+      ReplicationFactor replicationFactor = s3StorageType.getFactor();
 
       if (copyHeader != null) {
         //Copy object, as copy source available.
@@ -213,10 +208,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       if (uploadId != null) {
         // When we have uploadId, this is the request for list Parts.
-        int partMarker = 0;
-        if (partNumberMarker != null) {
-          partMarker = Integer.parseInt(partNumberMarker);
-        }
+        int partMarker = parsePartNumberMarker(partNumberMarker);
         return listParts(bucketName, keyPath, uploadId,
             partMarker, maxParts);
       }
@@ -232,16 +224,15 @@ public class ObjectEndpoint extends EndpointBase {
       String rangeHeaderVal = headers.getHeaderString(RANGE_HEADER);
       RangeHeader rangeHeader = null;
 
-      LOG.debug("range Header provided value is {}", rangeHeaderVal);
+      LOG.debug("range Header provided value: {}", rangeHeaderVal);
 
       if (rangeHeaderVal != null) {
         rangeHeader = RangeHeaderParserUtil.parseRangeHeader(rangeHeaderVal,
             length);
-        LOG.debug("range Header provided value is {}", rangeHeader);
+        LOG.debug("range Header provided: {}", rangeHeader);
         if (rangeHeader.isInValidRange()) {
-          OS3Exception exception = S3ErrorTable.newError(S3ErrorTable
-              .INVALID_RANGE, rangeHeaderVal);
-          throw exception;
+          throw S3ErrorTable.newError(
+              S3ErrorTable.INVALID_RANGE, rangeHeaderVal);
         }
       }
       ResponseBuilder responseBuilder;
@@ -257,20 +248,13 @@ public class ObjectEndpoint extends EndpointBase {
             .header(CONTENT_LENGTH, keyDetails.getDataSize());
 
       } else {
-        LOG.debug("range Header provided value is {}", rangeHeader);
         OzoneInputStream key = bucket.readKey(keyPath);
 
         long startOffset = rangeHeader.getStartOffset();
         long endOffset = rangeHeader.getEndOffset();
-        long copyLength;
-        if (startOffset == endOffset) {
-          // if range header is given as bytes=0-0, then we should return 1
-          // byte from start offset
-          copyLength = 1;
-        } else {
-          copyLength = rangeHeader.getEndOffset() - rangeHeader
-              .getStartOffset() + 1;
-        }
+        // eg. if range header is given as bytes=0-0, then we should return 1
+        // byte from start offset
+        long copyLength = endOffset - startOffset + 1;
         StreamingOutput output = dest -> {
           try (S3WrapperInputStream s3WrapperInputStream =
               new S3WrapperInputStream(
@@ -330,7 +314,8 @@ public class ObjectEndpoint extends EndpointBase {
   @HEAD
   public Response head(
       @PathParam("bucket") String bucketName,
-      @PathParam("path") String keyPath) throws Exception {
+      @PathParam("path") String keyPath) throws IOException, OS3Exception {
+
     OzoneKeyDetails key;
 
     try {
@@ -350,8 +335,7 @@ public class ObjectEndpoint extends EndpointBase {
         .header("Content-Length", key.getDataSize())
         .header("Content-Type", "binary/octet-stream");
     addLastModifiedDate(response, key);
-    return response
-        .build();
+    return response.build();
   }
 
   /**
@@ -438,20 +422,14 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String storageType = headers.getHeaderString(STORAGE_CLASS_HEADER);
 
-      ReplicationType replicationType;
-      ReplicationFactor replicationFactor;
+      S3StorageType s3StorageType;
       if (storageType == null || storageType.equals("")) {
-        replicationType = S3StorageType.getDefault().getType();
-        replicationFactor = S3StorageType.getDefault().getFactor();
+        s3StorageType = S3StorageType.getDefault();
       } else {
-        try {
-          replicationType = S3StorageType.valueOf(storageType).getType();
-          replicationFactor = S3StorageType.valueOf(storageType).getFactor();
-        } catch (IllegalArgumentException ex) {
-          throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT,
-              storageType);
-        }
+        s3StorageType = toS3StorageType(storageType);
       }
+      ReplicationType replicationType = s3StorageType.getType();
+      ReplicationFactor replicationFactor = s3StorageType.getFactor();
 
       OmMultipartInfo multipartInfo = ozoneBucket
           .initiateMultipartUpload(key, replicationType, replicationFactor);
@@ -466,8 +444,8 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(
           multipartUploadInitiateResponse).build();
     } catch (IOException ex) {
-      LOG.error("Error in Initiate Multipart Upload Request for bucket: " +
-          bucket + ", key: " + key, ex);
+      LOG.error("Error in Initiate Multipart Upload Request for bucket: {}, " +
+          "key: {}", bucket, key, ex);
       throw ex;
     }
   }
@@ -483,18 +461,20 @@ public class ObjectEndpoint extends EndpointBase {
       CompleteMultipartUploadRequest multipartUploadRequest)
       throws IOException, OS3Exception {
     OzoneBucket ozoneBucket = getBucket(bucket);
-    Map<Integer, String> partsMap = new TreeMap<>();
+    // Using LinkedHashMap to preserve ordering of parts list.
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
     List<CompleteMultipartUploadRequest.Part> partList =
         multipartUploadRequest.getPartList();
 
-    for (CompleteMultipartUploadRequest.Part part : partList) {
-      partsMap.put(part.getPartNumber(), part.geteTag());
-    }
-
-    LOG.debug("Parts map {}", partsMap.toString());
-
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     try {
+      for (CompleteMultipartUploadRequest.Part part : partList) {
+        partsMap.put(part.getPartNumber(), part.geteTag());
+      }
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Parts map {}", partsMap);
+      }
+
       omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(
           key, uploadID, partsMap);
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
@@ -508,23 +488,21 @@ public class ObjectEndpoint extends EndpointBase {
       return Response.status(Status.OK).entity(completeMultipartUploadResponse)
           .build();
     } catch (OMException ex) {
-      LOG.error("Error in Complete Multipart Upload Request for bucket: " +
-          bucket + ", key: " + key, ex);
-      if (ex.getResult() == ResultCodes.MISMATCH_MULTIPART_LIST) {
-        OS3Exception oex =
-            S3ErrorTable.newError(S3ErrorTable.INVALID_PART, key);
-        throw oex;
-      } else if (ex.getResult() == ResultCodes.MISSING_UPLOAD_PARTS) {
-        OS3Exception oex =
-            S3ErrorTable.newError(S3ErrorTable.INVALID_PART_ORDER, key);
-        throw oex;
+      LOG.error("Error in Complete Multipart Upload Request for bucket: {}, " +
+          ", key: {}", bucket, key, ex);
+      if (ex.getResult() == ResultCodes.INVALID_PART) {
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_PART, key);
+      } else if (ex.getResult() == ResultCodes.INVALID_PART_ORDER) {
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_PART_ORDER, key);
       } else if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
-        OS3Exception os3Exception = S3ErrorTable.newError(NO_SUCH_UPLOAD,
-            uploadID);
-        throw os3Exception;
+        throw S3ErrorTable.newError(NO_SUCH_UPLOAD, uploadID);
       } else if (ex.getResult() == ResultCodes.ENTITY_TOO_SMALL) {
-        OS3Exception os3Exception = S3ErrorTable.newError(ENTITY_TOO_SMALL,
-            key);
+        throw S3ErrorTable.newError(ENTITY_TOO_SMALL, key);
+      } else if(ex.getResult() == ResultCodes.INVALID_REQUEST) {
+        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST, key);
+        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
+            "when calling the CompleteMultipartUpload operation: You must " +
+            "specify at least one part");
         throw os3Exception;
       }
       throw ex;
@@ -537,37 +515,41 @@ public class ObjectEndpoint extends EndpointBase {
       throws IOException, OS3Exception {
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
-      OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
-          key, length, partNumber, uploadID);
+      String copyHeader;
+      OzoneOutputStream ozoneOutputStream = null;
+      try {
+        ozoneOutputStream = ozoneBucket.createMultipartKey(
+            key, length, partNumber, uploadID);
+        copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
+        if (copyHeader != null) {
+          Pair<String, String> result = parseSourceHeader(copyHeader);
 
-      String copyHeader = headers.getHeaderString(COPY_SOURCE_HEADER);
-      if (copyHeader != null) {
-        Pair<String, String> result = parseSourceHeader(copyHeader);
+          String sourceBucket = result.getLeft();
+          String sourceKey = result.getRight();
 
-        String sourceBucket = result.getLeft();
-        String sourceKey = result.getRight();
+          try (OzoneInputStream sourceObject =
+                   getBucket(sourceBucket).readKey(sourceKey)) {
 
-        try (OzoneInputStream sourceObject =
-            getBucket(sourceBucket).readKey(sourceKey)) {
+            String range =
+                headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
+            if (range != null) {
+              RangeHeader rangeHeader =
+                  RangeHeaderParserUtil.parseRangeHeader(range, 0);
+              IOUtils.copyLarge(sourceObject, ozoneOutputStream,
+                  rangeHeader.getStartOffset(),
+                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset());
 
-          String range =
-              headers.getHeaderString(COPY_SOURCE_HEADER_RANGE);
-          if (range != null) {
-            RangeHeader rangeHeader =
-                RangeHeaderParserUtil.parseRangeHeader(range, 0);
-            IOUtils.copyLarge(sourceObject, ozoneOutputStream,
-                rangeHeader.getStartOffset(),
-                rangeHeader.getEndOffset() - rangeHeader.getStartOffset());
-
-          } else {
-            IOUtils.copy(sourceObject, ozoneOutputStream);
+            } else {
+              IOUtils.copy(sourceObject, ozoneOutputStream);
+            }
           }
+        } else {
+          IOUtils.copy(body, ozoneOutputStream);
         }
-
-      } else {
-        IOUtils.copy(body, ozoneOutputStream);
+      } finally {
+        IOUtils.closeQuietly(ozoneOutputStream);
       }
-      ozoneOutputStream.close();
+
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
           ozoneOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
@@ -669,30 +651,28 @@ public class ObjectEndpoint extends EndpointBase {
     try {
       // Checking whether we trying to copying to it self.
 
-      if (sourceBucket.equals(destBucket)) {
-        if (sourceKey.equals(destkey)) {
-          // When copying to same storage type when storage type is provided,
-          // we should not throw exception, as aws cli checks if any of the
-          // options like storage type are provided or not when source and
-          // dest are given same
-          if (storageTypeDefault) {
-            OS3Exception ex = S3ErrorTable.newError(S3ErrorTable
-                .INVALID_REQUEST, copyHeader);
-            ex.setErrorMessage("This copy request is illegal because it is " +
-                "trying to copy an object to it self itself without changing " +
-                "the object's metadata, storage class, website redirect " +
-                "location or encryption attributes.");
-            throw ex;
-          } else {
-            // TODO: Actually here we should change storage type, as ozone
-            // still does not support this just returning dummy response
-            // for now
-            CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
-            copyObjectResponse.setETag(OzoneUtils.getRequestID());
-            copyObjectResponse.setLastModified(Instant.ofEpochMilli(
-                Time.now()));
-            return copyObjectResponse;
-          }
+      if (sourceBucket.equals(destBucket) && sourceKey.equals(destkey)) {
+        // When copying to same storage type when storage type is provided,
+        // we should not throw exception, as aws cli checks if any of the
+        // options like storage type are provided or not when source and
+        // dest are given same
+        if (storageTypeDefault) {
+          OS3Exception ex = S3ErrorTable.newError(S3ErrorTable
+              .INVALID_REQUEST, copyHeader);
+          ex.setErrorMessage("This copy request is illegal because it is " +
+              "trying to copy an object to it self itself without changing " +
+              "the object's metadata, storage class, website redirect " +
+              "location or encryption attributes.");
+          throw ex;
+        } else {
+          // TODO: Actually here we should change storage type, as ozone
+          // still does not support this just returning dummy response
+          // for now
+          CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
+          copyObjectResponse.setETag(OzoneUtils.getRequestID());
+          copyObjectResponse.setLastModified(Instant.ofEpochMilli(
+              Time.now()));
+          return copyObjectResponse;
         }
       }
 
@@ -752,7 +732,7 @@ public class ObjectEndpoint extends EndpointBase {
     if (header.startsWith("/")) {
       header = copyHeader.substring(1);
     }
-    int pos = header.indexOf("/");
+    int pos = header.indexOf('/');
     if (pos == -1) {
       OS3Exception ex = S3ErrorTable.newError(S3ErrorTable
           .INVALID_ARGUMENT, header);
@@ -762,5 +742,23 @@ public class ObjectEndpoint extends EndpointBase {
     }
 
     return Pair.of(header.substring(0, pos), header.substring(pos + 1));
+  }
+
+  private static S3StorageType toS3StorageType(String storageType)
+      throws OS3Exception {
+    try {
+      return S3StorageType.valueOf(storageType);
+    } catch (IllegalArgumentException ex) {
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT,
+          storageType);
+    }
+  }
+
+  private static int parsePartNumberMarker(String partNumberMarker) {
+    int partMarker = 0;
+    if (partNumberMarker != null) {
+      partMarker = Integer.parseInt(partNumberMarker);
+    }
+    return partMarker;
   }
 }

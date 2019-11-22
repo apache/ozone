@@ -55,29 +55,30 @@ public class GetAclBucketHandler extends Handler {
   public Void call() throws Exception {
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
+      String volumeName = address.getVolumeName();
+      String bucketName = address.getBucketName();
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-      System.out.printf("Bucket Name : %s%n", bucketName);
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+        System.out.printf("Bucket Name : %s%n", bucketName);
+      }
+
+      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+          .setBucketName(bucketName)
+          .setVolumeName(volumeName)
+          .setResType(OzoneObj.ResourceType.BUCKET)
+          .setStoreType(storeType == null ? OZONE :
+              OzoneObj.StoreType.valueOf(storeType))
+          .build();
+
+      List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
+
+      System.out.printf("%s%n",
+          JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
     }
-
-    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-        .setBucketName(bucketName)
-        .setVolumeName(volumeName)
-        .setResType(OzoneObj.ResourceType.BUCKET)
-        .setStoreType(storeType == null ? OZONE :
-            OzoneObj.StoreType.valueOf(storeType))
-        .build();
-
-    List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
-
-    System.out.printf("%s%n",
-        JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
-    client.close();
     return null;
   }
 

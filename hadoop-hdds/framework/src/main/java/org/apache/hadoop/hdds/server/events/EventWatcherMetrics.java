@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -28,16 +28,16 @@ import com.google.common.annotations.VisibleForTesting;
  */
 public class EventWatcherMetrics {
 
-  @Metric()
+  @Metric
   private MutableCounterLong trackedEvents;
 
-  @Metric()
+  @Metric
   private MutableCounterLong timedOutEvents;
 
-  @Metric()
+  @Metric
   private MutableCounterLong completedEvents;
 
-  @Metric()
+  @Metric
   private MutableRate completionTime;
 
   public void incrementTrackedEvents() {
@@ -52,7 +52,6 @@ public class EventWatcherMetrics {
     completedEvents.incr();
   }
 
-  @VisibleForTesting
   public void updateFinishingTime(long duration) {
     completionTime.add(duration);
   }

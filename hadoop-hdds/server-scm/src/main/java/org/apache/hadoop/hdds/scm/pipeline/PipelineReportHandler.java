@@ -18,25 +18,23 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.Objects;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineReport;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.server
-    .SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.Objects;
+import com.google.common.base.Preconditions;
 
 /**
  * Handles Pipeline Reports from datanode.
@@ -44,8 +42,8 @@ import java.util.Objects;
 public class PipelineReportHandler implements
     EventHandler<PipelineReportFromDatanode> {
 
-  private static final Logger LOGGER = LoggerFactory
-      .getLogger(PipelineReportHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(
+      PipelineReportHandler.class);
   private final PipelineManager pipelineManager;
   private final Configuration conf;
   private final SCMSafeModeManager scmSafeModeManager;
@@ -62,7 +60,6 @@ public class PipelineReportHandler implements
     this.pipelineAvailabilityCheck = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT);
-
   }
 
   @Override
@@ -72,8 +69,8 @@ public class PipelineReportHandler implements
     DatanodeDetails dn = pipelineReportFromDatanode.getDatanodeDetails();
     PipelineReportsProto pipelineReport =
         pipelineReportFromDatanode.getReport();
-    Preconditions.checkNotNull(dn, "Pipeline Report is "
-        + "missing DatanodeDetails.");
+    Preconditions.checkNotNull(dn,
+        "Pipeline Report is missing DatanodeDetails.");
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("Processing pipeline report for dn: {}", dn);
     }
@@ -89,7 +86,6 @@ public class PipelineReportHandler implements
       publisher.fireEvent(SCMEvents.PROCESSED_PIPELINE_REPORT,
           pipelineReportFromDatanode);
     }
-
   }
 
   private void processPipelineReport(PipelineReport report, DatanodeDetails dn)
@@ -104,16 +100,24 @@ public class PipelineReportHandler implements
       return;
     }
 
+    pipeline.reportDatanode(dn);
+    if (report.getIsLeader()) {
+      pipeline.setLeaderId(dn.getUuid());
+    }
+    if ((pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED)
+        && pipeline.isHealthy()) {
+      pipelineManager.openPipeline(pipelineID);
+    }
+
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
-      LOGGER.info("Pipeline {} reported by {}", pipeline.getId(), dn);
-      pipeline.reportDatanode(dn);
-      if (pipeline.isHealthy()) {
-        // if all the dns have reported, pipeline can be moved to OPEN state
+
+
+      if (report.getIsLeader()) {
+        // Pipeline reported as the leader
+        pipeline.setLeaderId(dn.getUuid());
         pipelineManager.openPipeline(pipelineID);
       }
-    } else {
-      // In OPEN state case just report the datanode
-      pipeline.reportDatanode(dn);
     }
+    pipeline.reportDatanode(dn);
   }
 }

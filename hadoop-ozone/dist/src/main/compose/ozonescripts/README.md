@@ -22,10 +22,10 @@ similar to a real cluster.
 To use it, first start the cluster:
 
 ```
-docker-copmose up -d
+docker-compose up -d
 ```
 
-After a successfull startup (which starts only the ssh daemons) you can start ozone:
+After a successful startup (which starts only the ssh daemons) you can start ozone:
 
 ```
 ./start.sh
