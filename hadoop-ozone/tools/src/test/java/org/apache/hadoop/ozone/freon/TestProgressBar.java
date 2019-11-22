@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -23,45 +23,37 @@ import org.mockito.junit.MockitoJUnitRunner;
 
 import java.io.PrintStream;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
+import java.util.function.LongSupplier;
 import java.util.stream.LongStream;
 
 import static org.mockito.Mockito.*;
 
 /**
- * Using Mockito runner.
- */
-@RunWith(MockitoJUnitRunner.class)
-/**
  * Tests for the Progressbar class for Freon.
  */
+@RunWith(MockitoJUnitRunner.class)
 public class TestProgressBar {
 
   private PrintStream stream;
   private AtomicLong numberOfKeysAdded;
-  private Supplier<Long> currentValue;
+  private LongSupplier currentValue;
 
   @Before
   public void setupMock() {
     numberOfKeysAdded = new AtomicLong(0L);
-    currentValue = () -> numberOfKeysAdded.get();
+    currentValue = numberOfKeysAdded::get;
     stream = mock(PrintStream.class);
   }
 
   @Test
   public void testWithRunnable() {
 
-    Long maxValue = 10L;
+    long maxValue = 10L;
 
     ProgressBar progressbar = new ProgressBar(stream, maxValue, currentValue);
 
-    Runnable task = () -> {
-      LongStream.range(0, maxValue).forEach(
-          counter -> {
-            numberOfKeysAdded.getAndIncrement();
-          }
-      );
-    };
+    Runnable task = () -> LongStream.range(0, maxValue)
+        .forEach(counter -> numberOfKeysAdded.getAndIncrement());
 
     progressbar.start();
     task.run();
