@@ -91,16 +91,15 @@ public class TestOmMetadataManager {
 
   @Test
   public void testListVolumes() throws Exception {
-    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder().setAdminName("admin")
-        .setOwnerName("ownerA").setVolume("volume").build();
+    OmVolumeArgs.Builder argsBuilder =
+        OmVolumeArgs.newBuilder().setAdminName("admin");
+    String volName;
+    String ownerName;
     for (int i = 0; i < 50; i++) {
-      String volName = "vol" + i;
-      String ownerName = "owner" + i;
-      omVolumeArgs = OmVolumeArgs.newBuilder()
-          .setAdminName("admin")
-          .setOwnerName(ownerName)
-          .setVolume(volName)
-          .build();
+      ownerName = "owner" + i;
+      volName = "vol" + i;
+      OmVolumeArgs omVolumeArgs = argsBuilder.
+          setOwnerName(ownerName).setVolume(volName).build();
       TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
       TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
     }
