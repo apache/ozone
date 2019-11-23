@@ -860,12 +860,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   private List<String> getAllUsers() throws IOException {
-    TableIterator<String, ? extends KeyValue<String, UserVolumeInfo>> iterator
+    TableIterator<String, ? extends KeyValue<String, UserVolumeInfo>> dbIterator
         = getUserTable().iterator();
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<UserVolumeInfo>>>
+        cacheIterator = getUserTable().cacheIterator();
     List<String> allUsers = Lists.newArrayList();
 
-    while (iterator.hasNext()) {
-      allUsers.add(iterator.next().getKey());
+    // Get users from DB.
+    while (dbIterator.hasNext()) {
+      allUsers.add(dbIterator.next().getKey());
+    }
+    // Get users from Cache.
+    while (cacheIterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<UserVolumeInfo>> entry =
+          cacheIterator.next();
+      allUsers.add(entry.getKey().getCacheKey());
     }
 
     return  allUsers;
