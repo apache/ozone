@@ -18,25 +18,48 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import com.google.inject.AbstractModule;
+import com.google.inject.Injector;
+import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
+import org.hadoop.ozone.recon.schema.ReconInternalSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
+import org.jooq.Configuration;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import javax.ws.rs.core.Response;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+public class TestTaskStatusService extends AbstractSqlDatabaseTest {
+  private TaskStatusService taskStatusService;
+  private Configuration sqlConfiguration;
+  private Injector childInjector;
 
-public class TestTaskTimeService {
-  private TaskTimesService taskTimeService;
+  @Before
+  public void setUp() throws SQLException {
+    sqlConfiguration = getInjector().getInstance((Configuration.class));
+    Injector parentInjector = getInjector();
+    childInjector = parentInjector.createChildInjector(new AbstractModule() {
+      @Override
+      protected void configure() {
+        taskStatusService = new TaskStatusService();
+        bind(TaskStatusService.class).toInstance(taskStatusService);
+      }
+    });
+    ReconInternalSchemaDefinition schemaDefinition = getInjector().
+        getInstance(ReconInternalSchemaDefinition.class);
+    schemaDefinition.initializeSchema();
+  }
 
   @Test
   public void testGetTaskTimes() {
-    ReconTaskStatusDao reconTaskStatusDao = mock(ReconTaskStatusDao.class);
+    ReconTaskStatusDao reconTaskStatusDao =
+        new ReconTaskStatusDao(sqlConfiguration);
 
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
         "Dummy_Task", System.currentTimeMillis(), 0L);
@@ -45,19 +68,12 @@ public class TestTaskTimeService {
     List<ReconTaskStatus> resultList = new ArrayList<>();
     resultList.add(reconTaskStatusRecord);
 
-    taskTimeService = mock(TaskTimesService.class);
-
-    when(taskTimeService.getDao()).thenReturn(reconTaskStatusDao);
-    when(reconTaskStatusDao.findAll()).thenReturn(resultList);
-    when(taskTimeService.getTaskTimes()).thenCallRealMethod();
-
-
-    Response response = taskTimeService.getTaskTimes();
+    Response response = taskStatusService.getTaskTimes();
 
     List<ReconTaskStatus> responseList = (List<ReconTaskStatus>)
         response.getEntity();
 
-    Assert.assertEquals(1, responseList.size());
+    Assert.assertEquals(resultList.size(), responseList.size());
     for(ReconTaskStatus r : responseList) {
       Assert.assertEquals(reconTaskStatusRecord.getTaskName(), r.getTaskName());
       Assert.assertEquals(reconTaskStatusRecord.getLastUpdatedTimestamp(),

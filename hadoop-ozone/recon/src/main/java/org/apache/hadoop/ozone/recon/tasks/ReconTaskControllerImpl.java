@@ -80,7 +80,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public void registerTask(ReconDBUpdateTask task) {
     String taskName = task.getTaskName();
-    LOG.info("Registered task " + taskName + " with controller.");
+    LOG.info("Registered task {} with controller.", taskName);
 
     // Store task in Task Map.
     reconDBUpdateTasks.put(taskName, task);
@@ -147,7 +147,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           List<String> reprocessFailedTasks =
               processTaskResults(results, events);
           for (String taskName : reprocessFailedTasks) {
-            LOG.info("Reprocess step failed for task : " + taskName);
+            LOG.info("Reprocess step failed for task : {}", taskName);
             if (taskFailureCounter.get(taskName).incrementAndGet() >
                 TASK_FAILURE_THRESHOLD) {
               LOG.info("Blacklisting Task since it failed retry and " +
@@ -181,7 +181,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       for (Future<Pair> f : results) {
         String taskName = f.get().getLeft().toString();
         if (!(Boolean)f.get().getRight()) {
-          LOG.info("Init failed for task : " + taskName);
+          LOG.info("Init failed for task : {}", taskName);
         } else {
           //store the timestamp for the task
           ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
@@ -240,7 +240,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     for (Future<Pair> f : results) {
       String taskName = f.get().getLeft().toString();
       if (!(Boolean)f.get().getRight()) {
-        LOG.info("Failed task : " + taskName);
+        LOG.info("Failed task : {}", taskName);
         failedTasks.add(f.get().getLeft().toString());
       } else {
         taskFailureCounter.get(taskName).set(0);

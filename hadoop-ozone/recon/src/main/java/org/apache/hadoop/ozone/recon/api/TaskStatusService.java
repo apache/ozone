@@ -37,20 +37,14 @@ import java.util.List;
  */
 @Path("/task")
 @Produces(MediaType.APPLICATION_JSON)
-public class TaskTimesService {
+public class TaskStatusService {
   private static final Logger LOG =
-      LoggerFactory.getLogger(TaskTimesService.class);
+      LoggerFactory.getLogger(TaskStatusService.class);
 
   private ReconTaskStatusDao reconTaskStatusDao;
 
   @Inject
   private Configuration sqlConfiguration;
-
-  ReconTaskStatusDao getDao() {
-    return reconTaskStatusDao == null ? new
-        ReconTaskStatusDao(sqlConfiguration) : reconTaskStatusDao;
-  }
-
   /**
    * Return the list of Recon Tasks and the last successful timestamp and
    * sequence number.
@@ -59,7 +53,7 @@ public class TaskTimesService {
   @GET
   @Path("status")
   public Response getTaskTimes() {
-    reconTaskStatusDao = getDao();
+    reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
     List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();
     return Response.ok(resultSet).build();
   }
