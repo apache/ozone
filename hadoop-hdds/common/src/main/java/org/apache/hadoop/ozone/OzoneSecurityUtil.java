@@ -48,10 +48,10 @@ import java.util.Set;
 @InterfaceStability.Evolving
 public final class OzoneSecurityUtil {
 
-  private final static Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OzoneSecurityUtil.class);
   // List of ip's not recommended to be added to CSR.
-  private final static Set<String> INVALID_IPS = new HashSet<>(Arrays.asList(
+  private static final Set<String> INVALID_IPS = new HashSet<>(Arrays.asList(
       "0.0.0.0", "127.0.0.1"));
 
   private OzoneSecurityUtil() {
