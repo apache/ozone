@@ -98,13 +98,13 @@ public final class OzoneSecurityUtil {
           while (enumAdds.hasMoreElements()) {
             InetAddress addr = enumAdds.nextElement();
 
-            if (ipValidator.isValid(addr.getHostAddress())
-                && !INVALID_IPS.contains(addr.getHostAddress())) {
-              LOG.info("Adding ip:{},host:{}", addr.getHostAddress(),
-                  addr.getHostName());
+            String hostAddress = addr.getHostAddress();
+            if (ipValidator.isValid(hostAddress)
+                && !INVALID_IPS.contains(hostAddress)) {
+              LOG.info("Adding ip:{},host:{}", hostAddress, addr.getHostName());
               hostIps.add(addr);
             } else {
-              LOG.info("ip:{} not returned.", addr.getHostAddress());
+              LOG.info("ip:{} not returned.", hostAddress);
             }
           }
         }
