@@ -104,8 +104,7 @@ public final class OzoneSecurityUtil {
                   addr.getHostName());
               hostIps.add(addr);
             } else {
-              LOG.info("ip:{},host:{} not returned.", addr.getHostAddress(),
-                  addr.getHostName());
+              LOG.info("ip:{} not returned.", addr.getHostAddress());
             }
           }
         }
