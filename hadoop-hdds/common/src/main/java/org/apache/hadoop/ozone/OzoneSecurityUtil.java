@@ -28,12 +28,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -68,8 +67,9 @@ public final class OzoneSecurityUtil {
    * @return True if the key files exist.
    */
   public static boolean checkIfFileExist(Path path, String fileName) {
-    return Files.exists(path) && Files.exists(Paths.get(path.toString(),
-        fileName));
+    File dir = path.toFile();
+    return dir.exists()
+        && new File(dir, fileName).exists();
   }
 
   /**
