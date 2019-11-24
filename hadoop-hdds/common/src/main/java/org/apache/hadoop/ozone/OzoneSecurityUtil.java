@@ -99,8 +99,8 @@ public final class OzoneSecurityUtil {
             InetAddress addr = enumAdds.nextElement();
 
             String hostAddress = addr.getHostAddress();
-            if (ipValidator.isValid(hostAddress)
-                && !INVALID_IPS.contains(hostAddress)) {
+            if (!INVALID_IPS.contains(hostAddress)
+                && ipValidator.isValid(hostAddress)) {
               LOG.info("Adding ip:{},host:{}", hostAddress, addr.getHostName());
               hostIps.add(addr);
             } else {
