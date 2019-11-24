@@ -68,11 +68,8 @@ public final class OzoneSecurityUtil {
    * @return True if the key files exist.
    */
   public static boolean checkIfFileExist(Path path, String fileName) {
-    if (Files.exists(path) && Files.exists(Paths.get(path.toString(),
-        fileName))) {
-      return true;
-    }
-    return false;
+    return Files.exists(path) && Files.exists(Paths.get(path.toString(),
+        fileName));
   }
 
   /**
