@@ -90,28 +90,29 @@ public final class OzoneSecurityUtil {
 
     Enumeration<NetworkInterface> enumNI =
         NetworkInterface.getNetworkInterfaces();
-    if (enumNI != null) {
-      while (enumNI.hasMoreElements()) {
-        NetworkInterface ifc = enumNI.nextElement();
-        if (ifc.isUp()) {
-          Enumeration<InetAddress> enumAdds = ifc.getInetAddresses();
-          while (enumAdds.hasMoreElements()) {
-            InetAddress addr = enumAdds.nextElement();
+    if (enumNI == null) {
+      throw new IOException("Unable to get network interfaces.");
+    }
 
-            String hostAddress = addr.getHostAddress();
-            if (!INVALID_IPS.contains(hostAddress)
-                && ipValidator.isValid(hostAddress)) {
-              LOG.info("Adding ip:{},host:{}", hostAddress, addr.getHostName());
-              hostIps.add(addr);
-            } else {
-              LOG.info("ip:{} not returned.", hostAddress);
-            }
+    while (enumNI.hasMoreElements()) {
+      NetworkInterface ifc = enumNI.nextElement();
+      if (ifc.isUp()) {
+        Enumeration<InetAddress> enumAdds = ifc.getInetAddresses();
+        while (enumAdds.hasMoreElements()) {
+          InetAddress addr = enumAdds.nextElement();
+
+          String hostAddress = addr.getHostAddress();
+          if (!INVALID_IPS.contains(hostAddress)
+              && ipValidator.isValid(hostAddress)) {
+            LOG.info("Adding ip:{},host:{}", hostAddress, addr.getHostName());
+            hostIps.add(addr);
+          } else {
+            LOG.info("ip:{} not returned.", hostAddress);
           }
         }
       }
-      return hostIps;
-    } else {
-      throw new IOException("Unable to get network interfaces.");
     }
+
+    return hostIps;
   }
 }
