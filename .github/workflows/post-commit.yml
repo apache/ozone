@@ -59,6 +59,7 @@ jobs:
           with:
              args: ./hadoop-ozone/dev-support/checks/unit.sh
         - uses: ./.github/buildenv
+          if: github.repository == 'apache/hadoop-ozone'
           with:
             args: ./hadoop-ozone/dev-support/checks/sonar.sh
           env:
