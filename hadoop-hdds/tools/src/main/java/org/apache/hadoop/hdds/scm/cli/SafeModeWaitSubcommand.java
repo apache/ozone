@@ -80,6 +80,7 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
             "SCM is not available (yet?). Error is {}. Will retry in 1 sec. "
                 + "Remaining time (sec): {}",
             ex.getMessage(), getRemainingTimeInSec());
+        Thread.sleep(1000);
       }
     }
     throw new TimeoutException(
