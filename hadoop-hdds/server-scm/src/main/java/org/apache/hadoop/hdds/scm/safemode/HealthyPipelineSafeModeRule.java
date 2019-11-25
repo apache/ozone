@@ -147,7 +147,6 @@ public class HealthyPipelineSafeModeRule
         getSafeModeMetrics().incCurrentHealthyPipelinesCount();
         processedPipelineIDs.add(pipelineID);
       }
-
     }
 
     if (scmInSafeMode()) {
