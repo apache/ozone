@@ -15,9 +15,8 @@
  * the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
+package org.apache.hadoop.ozone.om.ratis;
 
-import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;

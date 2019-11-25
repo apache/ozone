@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.RatisServerConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -160,7 +160,7 @@ public class TestContainerStateMachine {
   public void testRatisSnapshotRetention() throws Exception {
 
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) ContainerTestHelper.getStateMachine(cluster);
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Assert.assertNull(storage.findLatestSnapshot());
@@ -181,7 +181,7 @@ public class TestContainerStateMachine {
         conf.getObject(RatisServerConfiguration.class);
 
     stateMachine =
-        (ContainerStateMachine) ContainerTestHelper.getStateMachine(cluster);
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Path parentPath = storage.findLatestSnapshot().getFile().getPath();
     int numSnapshots = parentPath.getParent().toFile().listFiles().length;
@@ -200,7 +200,7 @@ public class TestContainerStateMachine {
       key.write(("ratis" + i).getBytes());
     }
     stateMachine =
-        (ContainerStateMachine) ContainerTestHelper.getStateMachine(cluster);
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     parentPath = storage.findLatestSnapshot().getFile().getPath();
     numSnapshots = parentPath.getParent().toFile().listFiles().length;

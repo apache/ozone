@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -305,7 +306,7 @@ public class TestContainerStateMachineFailures {
         (KeyValueContainerData) containerData;
     key.close();
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) ContainerTestHelper.getStateMachine(cluster);
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Path parentPath = storage.findLatestSnapshot().getFile().getPath();
@@ -383,7 +384,7 @@ public class TestContainerStateMachineFailures {
     Assert.assertTrue(containerData instanceof KeyValueContainerData);
     key.close();
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) ContainerTestHelper.getStateMachine(cluster);
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Path parentPath = storage.findLatestSnapshot().getFile().getPath();
@@ -454,7 +455,7 @@ public class TestContainerStateMachineFailures {
     Assert.assertTrue(containerData instanceof KeyValueContainerData);
     key.close();
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) ContainerTestHelper.getStateMachine(cluster);
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Path parentPath = storage.findLatestSnapshot().getFile().getPath();

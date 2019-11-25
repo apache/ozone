@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -685,11 +686,11 @@ public class TestBlockOutputStream {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return ContainerTestHelper
+    return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
   private void validateData(String keyName, byte[] data) throws Exception {
-    ContainerTestHelper
+    TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 
