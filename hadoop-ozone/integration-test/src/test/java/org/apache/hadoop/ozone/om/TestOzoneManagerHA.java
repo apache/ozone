@@ -778,10 +778,6 @@ public class TestOzoneManagerHA {
     for (int i = 0; i < numOfOMs; i++) {
       // Failover OMFailoverProxyProvider to OM at index i
       OzoneManager ozoneManager = cluster.getOzoneManager(i);
-      String omHostName = ozoneManager.getOmRpcServerAddr().getHostName();
-      int rpcPort = ozoneManager.getOmRpcServerAddr().getPort();
-      // Test can pass without this line below
-      conf.set(OZONE_OM_ADDRESS_KEY, omHostName + ":" + rpcPort);
 
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
       final ObjectStore store = OzoneClientFactory.getRpcClient(
