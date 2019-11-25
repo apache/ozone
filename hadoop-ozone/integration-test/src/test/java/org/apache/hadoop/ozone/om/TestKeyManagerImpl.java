@@ -937,12 +937,12 @@ public class TestKeyManagerImpl {
     List<OzoneFileStatus> fileStatuses =
         keyManager.listStatus(rootDirArgs, true, "", 1000);
     // Should only get entries that are not marked as deleted.
-    Assert.assertEquals(fileStatuses.size(),  50);
+    Assert.assertEquals(50, fileStatuses.size());
     // Test startKey
     fileStatuses =
         keyManager.listStatus(rootDirArgs, true, prefixKey, 1000);
     // Should only get entries that are not marked as deleted.
-    Assert.assertEquals(fileStatuses.size(),  50);
+    Assert.assertEquals(50, fileStatuses.size());
     // Verify result
     TreeSet<String> expectedKeys = new TreeSet<>();
     for (OzoneFileStatus fileStatus : fileStatuses) {
@@ -974,7 +974,7 @@ public class TestKeyManagerImpl {
     fileStatuses = keyManager.listStatus(
         rootDirArgs, true, "", 1000);
     // Should only get entries that are not marked as deleted.
-    Assert.assertEquals(fileStatuses.size(),  50 / 2);
+    Assert.assertEquals(50 / 2, fileStatuses.size());
 
     // Verify result
     expectedKeys.clear();
@@ -983,6 +983,27 @@ public class TestKeyManagerImpl {
       expectedKeys.add(keyName);
       Assert.assertTrue(keyName.startsWith(prefixKey));
     }
+    Assert.assertEquals(expectedKeys, existKeySet);
+
+    // Test pagination
+    final int batchSize = 5;
+    String startKey = "";
+    expectedKeys.clear();
+    do {
+      fileStatuses = keyManager.listStatus(
+          rootDirArgs, true, startKey, batchSize);
+      // Note fileStatuses will never be empty since we are using the last
+      // keyName as the startKey of next batch,
+      // the startKey itself will show up in the next batch of results.
+      // This is fine as we are using a set to store results.
+      for (OzoneFileStatus fileStatus : fileStatuses) {
+        startKey = fileStatus.getKeyInfo().getKeyName();
+        expectedKeys.add(startKey);
+        Assert.assertTrue(startKey.startsWith(prefixKey));
+      }
+      // fileStatuses.size() == batchSize indicates there might be another batch
+      // fileStatuses.size() < batchSize indicates it is the last batch
+    } while (fileStatuses.size() == batchSize);
     Assert.assertEquals(expectedKeys, existKeySet);
 
     // Clean up by marking remaining entries as deleted
