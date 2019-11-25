@@ -28,12 +28,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -48,10 +47,10 @@ import java.util.Set;
 @InterfaceStability.Evolving
 public final class OzoneSecurityUtil {
 
-  private final static Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OzoneSecurityUtil.class);
   // List of ip's not recommended to be added to CSR.
-  private final static Set<String> INVALID_IPS = new HashSet<>(Arrays.asList(
+  private static final Set<String> INVALID_IPS = new HashSet<>(Arrays.asList(
       "0.0.0.0", "127.0.0.1"));
 
   private OzoneSecurityUtil() {
@@ -68,11 +67,9 @@ public final class OzoneSecurityUtil {
    * @return True if the key files exist.
    */
   public static boolean checkIfFileExist(Path path, String fileName) {
-    if (Files.exists(path) && Files.exists(Paths.get(path.toString(),
-        fileName))) {
-      return true;
-    }
-    return false;
+    File dir = path.toFile();
+    return dir.exists()
+        && new File(dir, fileName).exists();
   }
 
   /**
@@ -90,29 +87,29 @@ public final class OzoneSecurityUtil {
 
     Enumeration<NetworkInterface> enumNI =
         NetworkInterface.getNetworkInterfaces();
-    if (enumNI != null) {
-      while (enumNI.hasMoreElements()) {
-        NetworkInterface ifc = enumNI.nextElement();
-        if (ifc.isUp()) {
-          Enumeration<InetAddress> enumAdds = ifc.getInetAddresses();
-          while (enumAdds.hasMoreElements()) {
-            InetAddress addr = enumAdds.nextElement();
+    if (enumNI == null) {
+      throw new IOException("Unable to get network interfaces.");
+    }
 
-            if (ipValidator.isValid(addr.getHostAddress())
-                && !INVALID_IPS.contains(addr.getHostAddress())) {
-              LOG.info("Adding ip:{},host:{}", addr.getHostAddress(),
-                  addr.getHostName());
-              hostIps.add(addr);
-            } else {
-              LOG.info("ip:{},host:{} not returned.", addr.getHostAddress(),
-                  addr.getHostName());
-            }
+    while (enumNI.hasMoreElements()) {
+      NetworkInterface ifc = enumNI.nextElement();
+      if (ifc.isUp()) {
+        Enumeration<InetAddress> enumAdds = ifc.getInetAddresses();
+        while (enumAdds.hasMoreElements()) {
+          InetAddress addr = enumAdds.nextElement();
+
+          String hostAddress = addr.getHostAddress();
+          if (!INVALID_IPS.contains(hostAddress)
+              && ipValidator.isValid(hostAddress)) {
+            LOG.info("Adding ip:{},host:{}", hostAddress, addr.getHostName());
+            hostIps.add(addr);
+          } else {
+            LOG.info("ip:{} not returned.", hostAddress);
           }
         }
       }
-      return hostIps;
-    } else {
-      throw new IOException("Unable to get network interfaces.");
     }
+
+    return hostIps;
   }
 }
