@@ -182,6 +182,7 @@ public class TestChunkUtils {
             new ChunkInfo("chunk", 5, 5)));
   }
 
+  @Test
   public void readMissingFile() throws Exception {
     try {
       ChunkInfo chunkInfo =
