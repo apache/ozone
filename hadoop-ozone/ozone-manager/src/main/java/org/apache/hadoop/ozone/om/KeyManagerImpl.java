@@ -1917,7 +1917,6 @@ public class KeyManagerImpl implements KeyManager {
         startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       }
 
-      int countEntries = 0;
       Table keyTable = metadataManager.getKeyTable();
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
           cacheIter = keyTable.cacheIterator();
@@ -1927,7 +1926,7 @@ public class KeyManagerImpl implements KeyManager {
       // Note: eliminating the case where startCacheKey could end with '//'
 
       // First, find key in TableCache
-      while (cacheIter.hasNext() && numEntries - countEntries > 0) {
+      while (cacheIter.hasNext()) {
         Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
             cacheIter.next();
         String cacheKey = entry.getKey().getCacheKey();
@@ -1947,7 +1946,6 @@ public class KeyManagerImpl implements KeyManager {
             OzoneFileStatus fileStatus = new OzoneFileStatus(
                 cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
             cacheKeyMap.put(cacheKey, fileStatus);
-            countEntries++;
           }
         } else {
           deletedKeySet.add(cacheKey);
@@ -1969,7 +1967,7 @@ public class KeyManagerImpl implements KeyManager {
           iterator.next();
         }
         // Iterate through seek results
-        countEntries = 0;
+        int countEntries = 0;
         while (iterator.hasNext() && numEntries - countEntries > 0) {
           String entryInDb = iterator.key();
           OmKeyInfo value = iterator.value().getValue();
