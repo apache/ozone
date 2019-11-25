@@ -27,6 +27,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -75,6 +76,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final OMRatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
+  private AtomicLong term = new AtomicLong();
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer) {
     this.omRatisServer = ratisServer;
@@ -83,6 +85,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     updateLastAppliedIndexWithSnaphsotIndex();
 
+    // This is done, as we have a check in Ratis for not throwing
+    // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
+    // nextIndex.
+    if (snapshotInfo.getIndex() == -1) {
+      setLastAppliedTermIndex(TermIndex.newTermIndex(0, 0));
+    } else {
+      setLastAppliedTermIndex(TermIndex.newTermIndex(0, snapshotInfo.getIndex()));
+    }
     this.ozoneManagerDoubleBuffer =
         new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
             this::updateLastAppliedIndex);
@@ -197,7 +207,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // We can update the lastAppliedIndex to 100, and update it to 299,
       // only after completing 101 - 149. In initial stage, we are starting
       // with single global executor. Will revisit this when needed.
-
+      term.set(trx.getLogEntry().getTerm());
       CompletableFuture<Message> future = CompletableFuture.supplyAsync(
           () -> runCommand(request, trxLogIndex), executorService);
       return future;
@@ -325,13 +335,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   private Message runCommand(OMRequest request, long trxLogIndex) {
     OMResponse response = handler.handleApplyTransaction(request, trxLogIndex);
-    lastAppliedIndex = trxLogIndex;
+   // lastAppliedIndex = trxLogIndex;
     return OMRatisHelper.convertResponseToMessage(response);
   }
 
   @SuppressWarnings("HiddenField")
   public void updateLastAppliedIndex(long lastAppliedIndex) {
     this.lastAppliedIndex = lastAppliedIndex;
+    updateLastAppliedTermIndex(term.get(), lastAppliedIndex);
   }
 
   public void updateLastAppliedIndexWithSnaphsotIndex() {

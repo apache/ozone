@@ -112,7 +112,7 @@ public class TestOzoneManagerHA {
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final int LOG_PURGE_GAP = 50;
   /* Reduce max number of retries to speed up unit test. */
-  private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
+  private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 30;
   private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
 
   @Rule
