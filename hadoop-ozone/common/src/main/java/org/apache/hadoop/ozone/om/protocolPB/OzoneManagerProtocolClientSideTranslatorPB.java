@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.NotLeaderException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.RatisLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
@@ -157,6 +158,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
+import org.apache.ratis.protocol.LeaderNotReadyException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -255,6 +257,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                 notLeaderException.getSuggestedLeaderNodeId());
             return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
           }
+
+          RatisLeaderNotReadyException leaderNotReadyException =
+              getLeaderNotReadyException(exception);
+          // As in this case, current OM node is leader, but it is not ready.
+          // OMFailoverProxyProvider#performFailover() is a dummy call and
+          // does not perform any failover.
+          // So Just retry with same ON node.
+          if (leaderNotReadyException != null) {
+            return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
+          }
+
           // We need to failover manually to the next OM Node proxy.
           // OMFailoverProxyProvider#performFailover() is a dummy call and
           // does not perform any failover.
@@ -299,6 +312,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     return null;
   }
+
+  private RatisLeaderNotReadyException getLeaderNotReadyException(
+      Exception exception) {
+    Throwable cause = exception.getCause();
+    if (cause != null && cause instanceof RemoteException) {
+      IOException ioException =
+          ((RemoteException) cause).unwrapRemoteException();
+      if (ioException instanceof RatisLeaderNotReadyException) {
+        return (RatisLeaderNotReadyException) ioException;
+      }
+    }
+    return null;
+  }
+
 
   @VisibleForTesting
   public OMFailoverProxyProvider getOMFailoverProxyProvider() {
@@ -370,7 +397,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
       return omResponse;
     } catch (ServiceException e) {
-//      throw ProtobufHelper.getRemoteException(e);
       NotLeaderException notLeaderException = getNotLeaderException(e);
       if (notLeaderException == null) {
         throw ProtobufHelper.getRemoteException(e);

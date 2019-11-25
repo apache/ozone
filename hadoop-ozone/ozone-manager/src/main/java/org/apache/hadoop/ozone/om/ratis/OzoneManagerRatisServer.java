@@ -40,6 +40,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.RatisLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -58,6 +59,7 @@ import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
+import org.apache.ratis.protocol.LeaderNotReadyException;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.NotLeaderException;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -156,24 +158,45 @@ public final class OzoneManagerRatisServer {
     // NotLeader exception is thrown only when the raft server to which the
     // request is submitted is not the leader. This can happen first time
     // when client is submitting request to OM.
-    NotLeaderException notLeaderException = reply.getNotLeaderException();
-    if (notLeaderException != null) {
-      throw new ServiceException(notLeaderException);
-    }
-    StateMachineException stateMachineException =
-        reply.getStateMachineException();
-    if (stateMachineException != null) {
-      OMResponse.Builder omResponse = OMResponse.newBuilder();
-      omResponse.setCmdType(omRequest.getCmdType());
-      omResponse.setSuccess(false);
-      omResponse.setMessage(stateMachineException.getCause().getMessage());
-      omResponse.setStatus(parseErrorStatus(
-          stateMachineException.getCause().getMessage()));
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error while executing ratis request. " +
-            "stateMachineException: ", stateMachineException);
+
+    if (!reply.isSuccess()) {
+      NotLeaderException notLeaderException = reply.getNotLeaderException();
+      if (notLeaderException != null) {
+        RaftPeerId suggestedLeader =
+            notLeaderException.getSuggestedLeader() != null ?
+                notLeaderException.getSuggestedLeader().getId() : null;
+        org.apache.hadoop.ozone.om.exceptions.NotLeaderException notLeaderException1;
+        if (suggestedLeader != null) {
+          notLeaderException1 = new org.apache.hadoop.ozone.om.exceptions.NotLeaderException(getRaftPeerId(), suggestedLeader);
+        } else {
+          notLeaderException1 =
+              new org.apache.hadoop.ozone.om.exceptions.NotLeaderException(getRaftPeerId());
+        }
+        throw new ServiceException(notLeaderException1);
       }
-      return omResponse.build();
+
+      LeaderNotReadyException leaderNotReadyException =
+          reply.getLeaderNotReadyException();
+      if (leaderNotReadyException != null) {
+        throw new ServiceException(new RatisLeaderNotReadyException(
+            leaderNotReadyException.getMessage()));
+      }
+
+      StateMachineException stateMachineException =
+          reply.getStateMachineException();
+      if (stateMachineException != null) {
+        OMResponse.Builder omResponse = OMResponse.newBuilder();
+        omResponse.setCmdType(omRequest.getCmdType());
+        omResponse.setSuccess(false);
+        omResponse.setMessage(stateMachineException.getCause().getMessage());
+        omResponse.setStatus(parseErrorStatus(
+            stateMachineException.getCause().getMessage()));
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Error while executing ratis request. " +
+              "stateMachineException: ", stateMachineException);
+        }
+        return omResponse.build();
+      }
     }
 
     try {
