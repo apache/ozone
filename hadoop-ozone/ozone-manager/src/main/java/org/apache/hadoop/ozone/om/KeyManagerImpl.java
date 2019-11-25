@@ -1961,13 +1961,13 @@ public class KeyManagerImpl implements KeyManager {
           iterator = keyTable.iterator();
       iterator.seek(seekKeyInDb);
 
+      int countEntries = 0;
       if (iterator.hasNext()) {
         if (iterator.key().equals(keyInDb)) {
           // Skip the key itself (when listing a directory)
           iterator.next();
         }
         // Iterate through seek results
-        int countEntries = 0;
         while (iterator.hasNext() && numEntries - countEntries > 0) {
           String entryInDb = iterator.key();
           OmKeyInfo value = iterator.value().getValue();
