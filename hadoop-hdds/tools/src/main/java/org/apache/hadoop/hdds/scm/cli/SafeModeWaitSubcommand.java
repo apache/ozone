@@ -87,7 +87,7 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
         "Safe mode is not ended within the timeout period.");
   }
 
-  public long getRemainingTimeInSec() {
+  private long getRemainingTimeInSec() {
     return timeoutSeconds - (System.currentTimeMillis() - startTestTime) / 1000;
   }
 }
