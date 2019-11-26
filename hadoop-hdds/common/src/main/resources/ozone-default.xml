@@ -1270,7 +1270,14 @@
       create pipelines.
     </description>
   </property>
-
+  <property>
+    <name>ozone.scm.pipeline.creation.auto.factor.one</name>
+    <value>true</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      If enabled, SCM will auto create RATIS factor ONE pipeline.
+    </description>
+  </property>
   <property>
     <name>hdds.scm.safemode.threshold.pct</name>
     <value>0.99</value>
