@@ -195,7 +195,7 @@ public class ContainerSet {
         "{}", startContainerId, count);
     ConcurrentNavigableMap<Long, Container<?>> map;
     if (startContainerId == 0) {
-      map = containerMap.tailMap(containerMap.firstKey(), true);
+      map = containerMap;
     } else {
       map = containerMap.tailMap(startContainerId, true);
     }

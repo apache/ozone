@@ -20,11 +20,7 @@ import com.google.common.base.Optional;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -83,6 +79,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test class for {@link OzoneNativeAuthorizer}.
@@ -106,7 +103,6 @@ public class TestOzoneNativeAuthorizer {
   private static OMMetadataManager metadataManager;
   private static OzoneNativeAuthorizer nativeAuthorizer;
 
-  private static StorageContainerManager scm;
   private static UserGroupInformation ugi;
 
   private static OzoneObj volObj;
@@ -160,16 +156,8 @@ public class TestOzoneNativeAuthorizer {
     bucketManager = new BucketManagerImpl(metadataManager);
     prefixManager = new PrefixManagerImpl(metadataManager, false);
 
-    NodeManager nodeManager = new MockNodeManager(true, 10);
-    SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setScmNodeManager(nodeManager);
-    scm = TestUtils.getScm(ozConfig, configurator);
-    scm.start();
-    scm.exitSafeMode();
-    keyManager =
-        new KeyManagerImpl(scm.getBlockProtocolServer(), metadataManager,
-            ozConfig,
-            "om1", null);
+    keyManager = new KeyManagerImpl(mock(ScmBlockLocationProtocol.class),
+        metadataManager, ozConfig, "om1", null);
 
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
         keyManager, prefixManager);

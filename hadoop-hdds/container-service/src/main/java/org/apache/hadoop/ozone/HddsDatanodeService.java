@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.server.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -43,6 +45,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
+
+import io.prometheus.client.CollectorRegistry;
+import org.apache.ratis.metrics.MetricRegistries;
+import org.apache.ratis.metrics.MetricsReporting;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -172,6 +178,16 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
+
+    //All the Ratis metrics (registered from now) will be published via JMX and
+    //via the prometheus exporter (used by the /prom servlet
+    MetricRegistries.global()
+        .addReporterRegistration(MetricsReporting.jmxReporter());
+    MetricRegistries.global().addReporterRegistration(
+        registry -> CollectorRegistry.defaultRegistry.register(
+            new RatisDropwizardExports(
+                registry.getDropWizardMetricRegistry())));
+
     OzoneConfiguration.activate();
     HddsUtils.initializeMetrics(conf, "HddsDatanode");
     try {
