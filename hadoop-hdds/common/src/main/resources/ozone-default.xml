@@ -2131,6 +2131,37 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.du.factory.class</name>
+    <value>org.apache.hadoop.hdds.fs.DUFactory</value>
+    <tag>HDDS, DATANODE</tag>
+    <description>
+      The fully qualified name of the factory class that creates objects for
+      providing disk space usage information.  It should implement the
+      SpaceUsageCheckFactory interface.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.du.refresh.period</name>
+    <value>60m</value>
+    <tag>HDDS, DATANODE</tag>
+    <description>
+      Disk space usage information will be refreshed with the specified period
+      following the completion of the last check.  This setting is specific to
+      DUFactory.  Other implementations may introduce new config properties.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.df.refresh.period</name>
+    <value>5m</value>
+    <tag>HDDS, DATANODE</tag>
+    <description>
+      Disk space usage information will be refreshed with the specified period
+      following the completion of the last check.  This setting is specific to
+      DedicatedDiskSpaceUsageFactory.  Other implementations may introduce new
+      config properties.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.failover.max.attempts</name>
     <value>15</value>
     <description>

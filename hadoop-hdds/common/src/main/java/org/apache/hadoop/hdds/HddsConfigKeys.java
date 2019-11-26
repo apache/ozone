@@ -18,6 +18,8 @@ package org.apache.hadoop.hdds;
 
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 
+import java.time.Duration;
+
 /**
  * This class contains constants for configuration keys and default values
  * used in hdds.
@@ -169,6 +171,19 @@ public final class HddsConfigKeys {
       ".duration";
   // Default Certificate duration to one year.
   public static final String HDDS_X509_DEFAULT_DURATION_DEFAULT = "P365D";
+
+  public static final String HDDS_DU_FACTORY_CLASS_KEY =
+      "hdds.datanode.du.factory.class";
+
+  public static final String HDDS_DU_REFRESH_PERIOD =
+      "hdds.datanode.du.refresh.period";
+  public static final long HDDS_DU_REFRESH_PERIOD_DEFAULT_MILLIS =
+      Duration.ofMinutes(60).toMillis();
+
+  public static final String HDDS_DF_REFRESH_PERIOD =
+      "hdds.datanode.df.refresh.period";
+  public static final long HDDS_DF_REFRESH_PERIOD_DEFAULT_MILLIS =
+      Duration.ofMinutes(5).toMillis();
 
   /**
    * Do not instantiate.
