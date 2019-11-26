@@ -24,6 +24,8 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -78,6 +80,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService installSnapshotExecutor;
   private AtomicLong term = new AtomicLong();
 
+
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer) {
     this.omRatisServer = ratisServer;
     this.ozoneManager = omRatisServer.getOzoneManager();
@@ -85,14 +88,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     updateLastAppliedIndexWithSnaphsotIndex();
 
-    // This is done, as we have a check in Ratis for not throwing
-    // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
-    // nextIndex.
-    if (snapshotInfo.getIndex() == -1) {
-      setLastAppliedTermIndex(TermIndex.newTermIndex(0, 0));
-    } else {
-      setLastAppliedTermIndex(TermIndex.newTermIndex(0, snapshotInfo.getIndex()));
-    }
     this.ozoneManagerDoubleBuffer =
         new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
             this::updateLastAppliedIndex);
@@ -129,17 +124,19 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * internally by Raft Server, this currently happens when conf entries are
    * processed in raft Server. This keep state machine to keep a track of index
    * updates.
-   * @param term term of the current log entry
+   * @param currentTerm term of the current log entry
    * @param index index which is being updated
    */
   @Override
-  public void notifyIndexUpdate(long term, long index) {
+  public void notifyIndexUpdate(long currentTerm, long index) {
     // SnapshotInfo should be updated when the term changes.
     // The index here refers to the log entry index and the index in
     // SnapshotInfo represents the snapshotIndex i.e. the index of the last
     // transaction included in the snapshot. Hence, snaphsotInfo#index is not
     // updated here.
-    snapshotInfo.updateTerm(term);
+    LOG.info("Bharat notifyIndexUpdate {}", index);
+    setLastAppliedTermIndex(TermIndex.newTermIndex(currentTerm, index));
+    snapshotInfo.updateTerm(currentTerm);
   }
 
   /**
@@ -342,11 +339,18 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @SuppressWarnings("HiddenField")
   public void updateLastAppliedIndex(long lastAppliedIndex) {
     this.lastAppliedIndex = lastAppliedIndex;
-    updateLastAppliedTermIndex(term.get(), lastAppliedIndex);
+    setLastAppliedTermIndex(TermIndex.newTermIndex(term.get(),
+        lastAppliedIndex));
   }
 
   public void updateLastAppliedIndexWithSnaphsotIndex() {
     this.lastAppliedIndex = snapshotInfo.getIndex();
+    // This is done, as we have a check in Ratis for not throwing
+    // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
+    // nextIndex (placeHolderIndex).
+    setLastAppliedTermIndex(TermIndex.newTermIndex(snapshotInfo.getTerm(),
+        snapshotInfo.getIndex()));
+
   }
 
   /**
