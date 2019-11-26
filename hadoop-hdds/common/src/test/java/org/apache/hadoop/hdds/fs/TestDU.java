@@ -90,8 +90,8 @@ public class TestDU {
 
   @Test
   public void testExcludePattern() throws IOException {
-    createFile(new File(DIR, "include.txt"), (int) KB);
-    createFile(new File(DIR, "exclude.tmp"), (int) (10 * KB));
+    createFile(new File(DIR, "include.txt"), (int) (4 * KB));
+    createFile(new File(DIR, "exclude.tmp"), (int) (100 * KB));
     SpaceUsageSource du = new DU(DIR, "*.tmp");
 
     long usedSpace = du.getUsedSpace();
@@ -100,9 +100,9 @@ public class TestDU {
   }
 
   private static void assertFileSize(long expected, long actual) {
-    // Allow for extra 4K on-disk slack for local file systems
+    // Allow for extra 8K on-disk slack for local file systems
     // that may store additional file metadata (eg ext attrs).
-    final long max = expected + 4 * KB;
+    final long max = expected + 8 * KB;
     assertTrue(expected <= actual && actual <= max, () ->
         String.format(
             "Invalid on-disk size: %d, expected to be in [%d, %d]",
