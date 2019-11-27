@@ -1324,7 +1324,7 @@
   </property>
 
   <property>
-    <name>hdds.scm.safemode.healthy.pipelie.pct</name>
+    <name>hdds.scm.safemode.healthy.pipeline.pct</name>
     <value>0.10</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description>
