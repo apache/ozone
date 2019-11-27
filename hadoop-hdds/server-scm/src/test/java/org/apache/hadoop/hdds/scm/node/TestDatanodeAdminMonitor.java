@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
@@ -33,10 +34,12 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import static junit.framework.TestCase.assertEquals;
 
@@ -125,9 +128,9 @@ public class TestDatanodeAdminMonitor {
 
   }
 
-  /* Disabling this test for now, as it is consistently failing on the CI
-     runs, but it passes locally every time. Will revisit it in a later patch
+
   @Test
+  @Ignore // HDDS-2631
   public void testMonitoredNodeHasPipelinesClosed()
       throws NodeNotFoundException, TimeoutException, InterruptedException {
 
@@ -159,6 +162,5 @@ public class TestDatanodeAdminMonitor {
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
   }
-  */
 
 }
