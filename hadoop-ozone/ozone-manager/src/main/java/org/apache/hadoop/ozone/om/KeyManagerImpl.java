@@ -1900,7 +1900,6 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-
     // A map sorted by OmKey to combine results from TableCache and DB.
     TreeMap<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
     // A set to keep track of keys deleted in cache but not flushed to DB.
@@ -1924,12 +1923,17 @@ public class KeyManagerImpl implements KeyManager {
           OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
           ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
       // Note: eliminating the case where startCacheKey could end with '//'
+      String keyArgs = OzoneFSUtils.addTrailingSlashIfNeeded(
+          metadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
       // First, find key in TableCache
       while (cacheIter.hasNext()) {
         Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
             cacheIter.next();
         String cacheKey = entry.getKey().getCacheKey();
+        if (cacheKey.equals(keyArgs)) {
+          continue;
+        }
         OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
         // cacheOmKeyInfo is null if an entry is deleted in cache
         if (cacheOmKeyInfo != null) {
@@ -1955,23 +1959,20 @@ public class KeyManagerImpl implements KeyManager {
       // Then, find key in DB
       String seekKeyInDb =
           metadataManager.getOzoneKey(volumeName, bucketName, startKey);
-      String keyInDb = OzoneFSUtils.addTrailingSlashIfNeeded(
-          metadataManager.getOzoneKey(volumeName, bucketName, keyName));
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
           iterator = keyTable.iterator();
       iterator.seek(seekKeyInDb);
-
       int countEntries = 0;
       if (iterator.hasNext()) {
-        if (iterator.key().equals(keyInDb)) {
-          // Skip the key itself (when listing a directory)
+        if (iterator.key().equals(keyArgs)) {
+          // Skip the key itself, since we are listing inside the directory
           iterator.next();
         }
         // Iterate through seek results
         while (iterator.hasNext() && numEntries - countEntries > 0) {
           String entryInDb = iterator.key();
           OmKeyInfo value = iterator.value().getValue();
-          if (entryInDb.startsWith(keyInDb)) {
+          if (entryInDb.startsWith(keyArgs)) {
             String entryKeyName = value.getKeyName();
             if (recursive) {
               // for recursive list all the entries
@@ -2025,7 +2026,6 @@ public class KeyManagerImpl implements KeyManager {
           break;
         }
       }
-
       // Clean up temp map and set
       cacheKeyMap.clear();
       deletedKeySet.clear();
