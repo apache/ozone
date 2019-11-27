@@ -807,7 +807,8 @@ public abstract class TestOzoneRpcClientAbstract {
           ReplicationFactor.THREE));
       Assert.assertEquals(value, new String(fileContent));
       Assert.assertTrue(key.getCreationTime().compareTo(currentTime) >= 0);
-      Assert.assertTrue(key.getModificationTime().compareTo(currentTime) >= 0);    }
+      Assert.assertTrue(key.getModificationTime().compareTo(currentTime) >= 0);
+    }
   }
 
 
