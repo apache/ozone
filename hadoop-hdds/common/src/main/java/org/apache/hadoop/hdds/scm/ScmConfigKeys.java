@@ -310,6 +310,13 @@ public final class ScmConfigKeys {
       OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY =
       "ozone.scm.keyvalue.container.deletion-choosing.policy";
 
+  // Max timeout for pipeline to stay at ALLOCATED state before scrubbed.
+  public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT =
+      "ozone.scm.pipeline.allocated.timeout";
+
+  public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT =
+      "5m";
+
   public static final String OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT =
       "ozone.scm.container.creation.lease.timeout";
 

@@ -54,6 +54,7 @@ import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_PIPELINE_DB;
 
@@ -359,6 +360,31 @@ public class SCMPipelineManager implements PipelineManager {
           String.format("Destroy pipeline failed for pipeline:%s", pipeline));
     } else {
       destroyPipeline(pipeline);
+    }
+  }
+
+  @Override
+  public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
+      throws IOException{
+    if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
+      // Only srub pipeline for RATIS THREE pipeline
+      return;
+    }
+    Long currentTime = System.currentTimeMillis();
+    Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    List<Pipeline> needToSrubPipelines = stateManager.getPipelines(type, factor,
+        Pipeline.PipelineState.ALLOCATED).stream()
+        .filter(p -> (currentTime - p.getCreationTimestamp()
+            >= pipelineScrubTimeoutInMills))
+        .collect(Collectors.toList());
+    for (Pipeline p : needToSrubPipelines) {
+      LOG.info("srubbing pipeline: id: " + p.getId().toString() +
+          " since it stays at ALLOCATED stage for " +
+          (currentTime - p.getCreationTimestamp())/60000 + " mins.");
+      finalizeAndDestroyPipeline(p, false);
     }
   }
 

@@ -56,6 +56,8 @@ public final class Pipeline {
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
   // Current reported Leader for the pipeline
   private UUID leaderId;
+  // Timestamp for pipeline upon creation
+  private Long creationTimestamp;
 
   /**
    * The immutable properties of pipeline object is used in
@@ -70,6 +72,7 @@ public final class Pipeline {
     this.factor = factor;
     this.state = state;
     this.nodeStatus = nodeStatus;
+    this.creationTimestamp = System.currentTimeMillis();
   }
 
   /**
@@ -106,6 +109,24 @@ public final class Pipeline {
    */
   public PipelineState getPipelineState() {
     return state;
+  }
+
+  /**
+   * Return the creation time of pipeline.
+   *
+   * @return Creation Timestamp
+   */
+  public Long getCreationTimestamp() {
+    return creationTimestamp;
+  }
+
+  /**
+   * Set the creation timestamp. Only for protobuf now.
+   *
+   * @param creationTimestamp
+   */
+  void setCreationTimestamp(Long creationTimestamp) {
+    this.creationTimestamp = creationTimestamp;
   }
 
   /**
@@ -221,6 +242,7 @@ public final class Pipeline {
         .setFactor(factor)
         .setState(PipelineState.getProtobuf(state))
         .setLeaderID(leaderId != null ? leaderId.toString() : "")
+        .setCreationTimeStamp(creationTimestamp)
         .addAllMembers(nodeStatus.keySet().stream()
             .map(DatanodeDetails::getProtoBufMessage)
             .collect(Collectors.toList()));
@@ -299,7 +321,8 @@ public final class Pipeline {
     b.append(", Factor:").append(getFactor());
     b.append(", State:").append(getPipelineState());
     b.append(", leaderId:").append(getLeaderId());
-    b.append(" ]");
+    b.append(", CreationTimestamp").append(getCreationTimestamp());
+    b.append("]");
     return b.toString();
   }
 
@@ -323,6 +346,7 @@ public final class Pipeline {
     private List<Integer> nodeOrder = null;
     private List<DatanodeDetails> nodesInOrder = null;
     private UUID leaderId = null;
+    private Long creationTimestamp = null;
 
     public Builder() {}
 
@@ -334,6 +358,7 @@ public final class Pipeline {
       this.nodeStatus = pipeline.nodeStatus;
       this.nodesInOrder = pipeline.nodesInOrder.get();
       this.leaderId = pipeline.getLeaderId();
+      this.creationTimestamp = pipeline.getCreationTimestamp();
     }
 
     public Builder setId(PipelineID id1) {
@@ -380,6 +405,10 @@ public final class Pipeline {
       Preconditions.checkNotNull(nodeStatus);
       Pipeline pipeline = new Pipeline(id, type, factor, state, nodeStatus);
       pipeline.setLeaderId(leaderId);
+      // overwrite with original creationTimestamp
+      if (creationTimestamp != null) {
+        pipeline.setCreationTimestamp(creationTimestamp);
+      }
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         // This branch is for build from ProtoBuf

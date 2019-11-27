@@ -807,6 +807,18 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.allocated.timeout</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      Timeout for every pipeline to stay in ALLOCATED stage. When pipeline is created,
+      it should be at OPEN stage once pipeline report is successfully received by SCM.
+      If a pipeline stays at ALLOCATED for too long, it should be scrubbed so that new
+      pipeline can be created. This timeout is for how long pipeline can stay at ALLOCATED
+      stage until it gets scrubbed.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.size</name>
     <value>5GB</value>
     <tag>OZONE, PERFORMANCE, MANAGEMENT</tag>
