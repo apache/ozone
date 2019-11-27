@@ -18,30 +18,12 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
-import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
-import org.apache.hadoop.util.Time;
-import org.apache.ratis.util.function.CheckedSupplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -52,8 +34,28 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.*;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.util.Time;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import static java.util.Collections.unmodifiableSet;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_WRITE_SIZE;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
+import org.apache.ratis.util.function.CheckedSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility methods for chunk operations for KeyValue container.
@@ -163,14 +165,6 @@ public final class ChunkUtils {
   public static ByteBuffer readData(File chunkFile, ChunkInfo data,
       VolumeIOStats volumeIOStats) throws StorageContainerException {
 
-    if (!chunkFile.exists()) {
-      LOG.error("Unable to find the chunk file. chunk info : {}",
-          data.toString());
-      throw new StorageContainerException("Unable to find the chunk file. " +
-          "chunk info " +
-          data.toString(), UNABLE_TO_FIND_CHUNK);
-    }
-
     long offset = data.getOffset();
     long len = data.getLen();
     ByteBuffer buf = ByteBuffer.allocate((int) len);
@@ -194,6 +188,8 @@ public final class ChunkUtils {
         volumeIOStats.incReadBytes(len);
 
         return buf;
+      } catch (NoSuchFileException e) {
+        throw new StorageContainerException(e, UNABLE_TO_FIND_CHUNK);
       } catch (IOException e) {
         throw new StorageContainerException(e, IO_EXCEPTION);
       } finally {
