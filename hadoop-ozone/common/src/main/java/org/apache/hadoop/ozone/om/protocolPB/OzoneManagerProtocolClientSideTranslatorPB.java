@@ -158,6 +158,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
+import org.apache.zookeeper.server.quorum.Leader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -399,9 +400,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       NotLeaderException notLeaderException = getNotLeaderException(e);
       if (notLeaderException == null) {
         throw ProtobufHelper.getRemoteException(e);
-      } else {
-        throw new IOException("Could not determine or connect to OM Leader.");
       }
+      RatisLeaderNotReadyException leaderNotReadyException =
+          getLeaderNotReadyException(e);
+      if (leaderNotReadyException == null) {
+        throw ProtobufHelper.getRemoteException(e);
+      }
+      throw new IOException("Could not determine or connect to OM Leader.");
     }
   }
 
