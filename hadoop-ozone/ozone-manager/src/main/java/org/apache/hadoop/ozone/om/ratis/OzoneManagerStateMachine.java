@@ -24,12 +24,11 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -73,12 +72,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final OzoneManager ozoneManager;
   private OzoneManagerHARequestHandler handler;
   private RaftGroupId raftGroupId;
-  private long lastAppliedIndex;
+  private volatile long lastAppliedIndex;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final OMRatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
-  private AtomicLong term = new AtomicLong();
+
+  private ConcurrentMap<Long, Long> applyTransactionMap =
+      new ConcurrentSkipListMap<>();
 
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer) {
@@ -204,9 +205,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // We can update the lastAppliedIndex to 100, and update it to 299,
       // only after completing 101 - 149. In initial stage, we are starting
       // with single global executor. Will revisit this when needed.
-      term.set(trx.getLogEntry().getTerm());
+
+      // Add the term index and transaction log index to applyTransaction map.
+      applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
       CompletableFuture<Message> future = CompletableFuture.supplyAsync(
-          () -> runCommand(request, trxLogIndex), executorService);
+          () -> runCommand(request, trxLogIndex),
+          executorService);
       return future;
     } catch (IOException e) {
       return completeExceptionally(e);
@@ -332,15 +336,22 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   private Message runCommand(OMRequest request, long trxLogIndex) {
     OMResponse response = handler.handleApplyTransaction(request, trxLogIndex);
-   // lastAppliedIndex = trxLogIndex;
     return OMRatisHelper.convertResponseToMessage(response);
   }
 
   @SuppressWarnings("HiddenField")
   public void updateLastAppliedIndex(long lastAppliedIndex) {
+    long beforeLastAppliedIndex = this.lastAppliedIndex;
     this.lastAppliedIndex = lastAppliedIndex;
-    setLastAppliedTermIndex(TermIndex.newTermIndex(term.get(),
-        lastAppliedIndex));
+
+    setLastAppliedTermIndex(TermIndex.newTermIndex(
+        applyTransactionMap.get(lastAppliedIndex), lastAppliedIndex));
+
+    // Remove from applyTransaction map for which we have updated (term,
+    // index) to ratis state machine.
+    for (long i = beforeLastAppliedIndex; i < lastAppliedIndex; i++) {
+      applyTransactionMap.remove(i);
+    }
   }
 
   public void updateLastAppliedIndexWithSnaphsotIndex() {
