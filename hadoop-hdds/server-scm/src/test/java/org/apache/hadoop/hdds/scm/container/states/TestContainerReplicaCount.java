@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.container.states;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -43,48 +42,36 @@ import static org.apache.hadoop.hdds.protocol.proto
  */
 public class TestContainerReplicaCount {
 
-  private OzoneConfiguration conf;
-  private List<DatanodeDetails> dns;
-  private Set<ContainerReplica> replica;
-  private ContainerReplicaCount rcount;
-
-
-  public TestContainerReplicaCount() {
-  }
-
   @Before
   public void setup() {
-    conf = new OzoneConfiguration();
-    replica = new HashSet<>();
-    dns = new LinkedList<>();
   }
 
   @Test
   public void testThreeHealthyReplica() {
-    registerNodes(CLOSED, CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(true, 0, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, true, 0, false);
   }
 
   @Test
   public void testTwoHealthyReplica() {
-    registerNodes(CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(false, 1, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, false, 1, false);
   }
 
   @Test
   public void testOneHealthyReplica() {
-    registerNodes(CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(false, 2, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, false, 2, false);
   }
 
   @Test
   public void testTwoHealthyAndInflightAdd() {
-    registerNodes(CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 1, 0, 3, 2);
-    validate(false, 0, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 1, 0, 3, 2);
+    validate(rcnt, false, 0, false);
   }
 
   @Test
@@ -94,9 +81,9 @@ public class TestContainerReplicaCount {
    * completes there will be 4 healthy and it will get taken care of then.
    */
   public void testThreeHealthyAndInflightAdd() {
-    registerNodes(CLOSED, CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 1, 0, 3, 2);
-    validate(true, 0, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 1, 0, 3, 2);
+    validate(rcnt, true, 0, false);
   }
 
   @Test
@@ -105,9 +92,9 @@ public class TestContainerReplicaCount {
    * under replicated, we go ahead and schedule another replica to be added.
    */
   public void testThreeHealthyAndInflightDelete() {
-    registerNodes(CLOSED, CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 1, 3, 2);
-    validate(false, 1, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 1, 3, 2);
+    validate(rcnt, false, 1, false);
   }
 
   @Test
@@ -116,51 +103,54 @@ public class TestContainerReplicaCount {
    * inflight del could succeed, leaving only 2 healthy replicas.
    */
   public void testThreeHealthyAndInflightAddAndInFlightDelete() {
-    registerNodes(CLOSED, CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 1, 1, 3, 2);
-    validate(false, 0, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 1, 1, 3, 2);
+    validate(rcnt, false, 0, false);
   }
 
   @Test
   public void testFourHealthyReplicas() {
-    registerNodes(CLOSED, CLOSED, CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(true, -1, true);
+    Set<ContainerReplica> replica =
+        registerNodes(CLOSED, CLOSED, CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, true, -1, true);
   }
 
   @Test
   public void testFourHealthyReplicasAndInFlightDelete() {
-    registerNodes(CLOSED, CLOSED, CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 1, 3, 2);
-    validate(true, 0, false);
+    Set<ContainerReplica> replica =
+        registerNodes(CLOSED, CLOSED, CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 1, 3, 2);
+    validate(rcnt, true, 0, false);
   }
 
   @Test
   public void testFourHealthyReplicasAndTwoInFlightDelete() {
-    registerNodes(CLOSED, CLOSED, CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 2, 3, 2);
-    validate(false, 1, false);
+    Set<ContainerReplica> replica =
+        registerNodes(CLOSED, CLOSED, CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 2, 3, 2);
+    validate(rcnt, false, 1, false);
   }
 
   @Test
   public void testOneHealthyReplicaRepFactorOne() {
-    registerNodes(CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 1, 2);
-    validate(true, 0, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 1, 2);
+    validate(rcnt, true, 0, false);
   }
 
   @Test
   public void testOneHealthyReplicaRepFactorOneInFlightDelete() {
-    registerNodes(CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 1, 1, 2);
-    validate(false, 1, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 1, 1, 2);
+    validate(rcnt, false, 1, false);
   }
 
   @Test
   public void testTwoHealthyReplicaTwoInflightAdd() {
-    registerNodes(CLOSED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 2, 0, 3, 2);
-    validate(false, 0, false);
+    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 2, 0, 3, 2);
+    validate(rcnt, false, 0, false);
   }
 
   /**
@@ -169,52 +159,55 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testThreeHealthyAndTwoDecommission() {
-    registerNodes(CLOSED, CLOSED, CLOSED,
+    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED,
         DECOMMISSIONED, DECOMMISSIONED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(true, 0, false);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, true, 0, false);
   }
 
   @Test
   public void testOneDecommissionedReplica() {
-    registerNodes(CLOSED, CLOSED, DECOMMISSIONED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(false, 1, false);
+    Set<ContainerReplica> replica =
+        registerNodes(CLOSED, CLOSED, DECOMMISSIONED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, false, 1, false);
   }
 
   @Test
   public void testTwoHealthyOneDecommissionedneInFlightAdd() {
-    registerNodes(CLOSED, CLOSED, DECOMMISSIONED);
-    rcount = new ContainerReplicaCount(replica, 1, 0, 3, 2);
-    validate(false, 0, false);
+    Set<ContainerReplica> replica =
+        registerNodes(CLOSED, CLOSED, DECOMMISSIONED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 1, 0, 3, 2);
+    validate(rcnt, false, 0, false);
   }
 
   @Test
   public void testAllDecommissioned() {
-    registerNodes(DECOMMISSIONED, DECOMMISSIONED, DECOMMISSIONED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(false, 3, false);
+    Set<ContainerReplica> replica =
+        registerNodes(DECOMMISSIONED, DECOMMISSIONED, DECOMMISSIONED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, false, 3, false);
   }
 
   @Test
   public void testAllDecommissionedRepFactorOne() {
-    registerNodes(DECOMMISSIONED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 1, 2);
-    validate(false, 1, false);
+    Set<ContainerReplica> replica = registerNodes(DECOMMISSIONED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 1, 2);
+    validate(rcnt, false, 1, false);
   }
 
   @Test
   public void testAllDecommissionedRepFactorOneInFlightAdd() {
-    registerNodes(DECOMMISSIONED);
-    rcount = new ContainerReplicaCount(replica, 1, 0, 1, 2);
-    validate(false, 0, false);
+    Set<ContainerReplica> replica = registerNodes(DECOMMISSIONED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 1, 0, 1, 2);
+    validate(rcnt, false, 0, false);
   }
 
   @Test
   public void testOneHealthyOneDecommissioningRepFactorOne() {
-    registerNodes(DECOMMISSIONED, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 1, 2);
-    validate(true, 0, false);
+    Set<ContainerReplica> replica = registerNodes(DECOMMISSIONED, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 1, 2);
+    validate(rcnt, true, 0, false);
   }
 
   /**
@@ -223,39 +216,42 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneHealthyTwoMaintenanceMinRepOfTwo() {
-    registerNodes(CLOSED, MAINTENANCE, MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(false, 1, false);
+    Set<ContainerReplica> replica =
+        registerNodes(CLOSED, MAINTENANCE, MAINTENANCE);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, false, 1, false);
   }
 
   @Test
   public void testOneHealthyThreeMaintenanceMinRepOfTwo() {
-    registerNodes(CLOSED,
+    Set<ContainerReplica> replica = registerNodes(CLOSED,
         MAINTENANCE, MAINTENANCE, MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(false, 1, false);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, false, 1, false);
   }
 
   @Test
   public void testOneHealthyTwoMaintenanceMinRepOfOne() {
-    registerNodes(CLOSED, MAINTENANCE, MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 1);
-    validate(true, 0, false);
+    Set<ContainerReplica> replica =
+        registerNodes(CLOSED, MAINTENANCE, MAINTENANCE);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 1);
+    validate(rcnt, true, 0, false);
   }
 
   @Test
   public void testOneHealthyThreeMaintenanceMinRepOfTwoInFlightAdd() {
-    registerNodes(CLOSED,
+    Set<ContainerReplica> replica = registerNodes(CLOSED,
         MAINTENANCE, MAINTENANCE, MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 1, 0, 3, 2);
-    validate(false, 0, false);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 1, 0, 3, 2);
+    validate(rcnt, false, 0, false);
   }
 
   @Test
   public void testAllMaintenance() {
-    registerNodes(MAINTENANCE, MAINTENANCE, MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(false, 2, false);
+    Set<ContainerReplica> replica =
+        registerNodes(MAINTENANCE, MAINTENANCE, MAINTENANCE);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, false, 2, false);
   }
 
   @Test
@@ -265,10 +261,10 @@ public class TestContainerReplicaCount {
    * come back online, and then deal with them.
    */
   public void testThreeHealthyTwoInMaintenance() {
-    registerNodes(CLOSED, CLOSED, CLOSED,
+    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED,
         MAINTENANCE, MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(true, 0, false);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, true, 0, false);
   }
 
   @Test
@@ -278,48 +274,50 @@ public class TestContainerReplicaCount {
    * the over-replicated healthy container.
    */
   public void testFourHealthyOneInMaintenance() {
-    registerNodes(CLOSED, CLOSED, CLOSED, CLOSED,
-        MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 3, 2);
-    validate(true, -1, true);
+    Set<ContainerReplica> replica =
+        registerNodes(CLOSED, CLOSED, CLOSED, CLOSED, MAINTENANCE);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 3, 2);
+    validate(rcnt, true, -1, true);
   }
 
   @Test
   public void testOneMaintenanceMinRepOfTwoRepFactorOne() {
-    registerNodes(MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 1, 2);
-    validate(false, 1, false);
+    Set<ContainerReplica> replica = registerNodes(MAINTENANCE);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 1, 2);
+    validate(rcnt, false, 1, false);
   }
 
   @Test
   public void testOneMaintenanceMinRepOfTwoRepFactorOneInFlightAdd() {
-    registerNodes(MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 1, 0, 1, 2);
-    validate(false, 0, false);
+    Set<ContainerReplica> replica = registerNodes(MAINTENANCE);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 1, 0, 1, 2);
+    validate(rcnt, false, 0, false);
   }
 
   @Test
   public void testOneHealthyOneMaintenanceRepFactorOne() {
-    registerNodes(MAINTENANCE, CLOSED);
-    rcount = new ContainerReplicaCount(replica, 0, 0, 1, 2);
-    validate(true, 0, false);
+    Set<ContainerReplica> replica = registerNodes(MAINTENANCE, CLOSED);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 0, 0, 1, 2);
+    validate(rcnt, true, 0, false);
   }
 
   @Test
   public void testTwoDecomTwoMaintenanceOneInflightAdd() {
-    registerNodes(DECOMMISSIONED, DECOMMISSIONED,
-        MAINTENANCE, MAINTENANCE);
-    rcount = new ContainerReplicaCount(replica, 1, 0, 3, 2);
-    validate(false, 1, false);
+    Set<ContainerReplica> replica =
+        registerNodes(DECOMMISSIONED, DECOMMISSIONED, MAINTENANCE, MAINTENANCE);
+    ContainerReplicaCount rcnt = new ContainerReplicaCount(replica, 1, 0, 3, 2);
+    validate(rcnt, false, 1, false);
   }
 
-  private void validate(boolean sufficientlyReplicated, int replicaDelta,
-      boolean overRelicated) {
-    assertEquals(sufficientlyReplicated, rcount.isSufficientlyReplicated());
-    assertEquals(replicaDelta, rcount.additionalReplicaNeeded());
+  private void validate(ContainerReplicaCount rcnt,
+      boolean sufficientlyReplicated, int replicaDelta, boolean overRelicated) {
+    assertEquals(sufficientlyReplicated, rcnt.isSufficientlyReplicated());
+    assertEquals(replicaDelta, rcnt.additionalReplicaNeeded());
   }
 
-  private void registerNodes(ContainerReplicaProto.State... states) {
+  private Set<ContainerReplica> registerNodes(
+      ContainerReplicaProto.State... states) {
+    Set<ContainerReplica> replica = new HashSet<>();
     for (ContainerReplicaProto.State s : states) {
       DatanodeDetails dn = TestUtils.randomDatanodeDetails();
       replica.add(new ContainerReplica.ContainerReplicaBuilder()
@@ -330,5 +328,6 @@ public class TestContainerReplicaCount {
           .setSequenceId(1)
           .build());
     }
+    return replica;
   }
 }
