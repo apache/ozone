@@ -48,8 +48,9 @@ public class ContainerReplicaCount {
     this.inFlightAdd = inFlightAdd;
     this.inFlightDel = inFlightDelete;
     this.repFactor = replicationFactor;
-    this.minHealthyForMaintenance = minHealthyForMaintenance;
     this.replica = replica;
+    this.minHealthyForMaintenance
+        = Math.min(this.repFactor, minHealthyForMaintenance);
 
     for (ContainerReplica cr : this.replica) {
       ContainerReplicaProto.State state = cr.getState();
@@ -97,7 +98,13 @@ public class ContainerReplicaCount {
 
   /**
    * Calculates the the delta of replicas which need to be created or removed
-   * to ensure the container is correctly replicated.
+   * to ensure the container is correctly replicated when considered inflight
+   * adds and deletes.
+   *
+   * When considering inflight operations, it is assumed any operation will
+   * fail. However, to consider the worst case and avoid data loss, we always
+   * assume a delete will succeed and and add will fail. In this way, we will
+   * avoid scheduling too many deletes which could result in dataloss.
    *
    * Decisions around over-replication are made only on healthy replicas,
    * ignoring any in maintenance and also any inflight adds. InFlight adds are
@@ -130,7 +137,7 @@ public class ContainerReplicaCount {
    * For under replicated containers we do consider inflight add and delete to
    * avoid scheduling more adds than needed. There is additional logic around
    * containers with maintenance replica to ensure minHealthyForMaintenance
-   * replia are maintained/
+   * replia are maintained.
    *
    * @return Delta of replicas needed. Negative indicates over replication and
    *         containers should be removed. Positive indicates over replication
@@ -138,7 +145,7 @@ public class ContainerReplicaCount {
    *         replica
    */
   public int additionalReplicaNeeded() {
-    int delta = repFactor - healthyCount;
+    int delta = missingReplicas();
 
     if (delta < 0) {
       // Over replicated, so may need to remove a container. Do not consider
@@ -147,24 +154,57 @@ public class ContainerReplicaCount {
       // Note this could make the delta positive if there are too many in flight
       // deletes, which will result in an additional being scheduled.
       return delta + inFlightDel;
+    } else {
+      // May be under or perfectly replicated.
+      // We must consider in flight add and delete when calculating the new
+      // containers needed, but we bound the lower limit at zero to allow
+      // inflight operations to complete before handling any potential over
+      // replication
+      return Math.max(0, delta - inFlightAdd + inFlightDel);
+    }
+  }
+
+  /**
+   * Returns the count of replicas which need to be created or removed to
+   * ensure the container is perfectly replicate. Inflight operations are not
+   * considered here, but the logic to determine the missing or excess counts
+   * for maintenance is present.
+   *
+   * Decisions around over-replication are made only on healthy replicas,
+   * ignoring any in maintenance. For example, if we have:
+   *
+   *     H, H, H, M, M
+   *
+   * This will not be consider over replicated until one of the Maintenance
+   * replicas moves to Healthy.
+   *
+   * If the container is perfectly replicated, zero will be return.
+   *
+   * If it is under replicated a positive value will be returned, indicating
+   * how many replicas must be added.
+   *
+   * If it is over replicated a negative value will be returned, indicating now
+   * many replicas to remove.
+   *
+   * @return Zero if the container is perfectly replicated, a positive value
+   *         for under replicated and a negative value for over replicated.
+   */
+  private int missingReplicas() {
+    int delta = repFactor - healthyCount;
+
+    if (delta < 0) {
+      // Over replicated, so may need to remove a container.
+      return delta;
     } else if (delta > 0) {
-      // May be under-replicated, depending on maintenance. When a container is
-      // under-replicated, we must consider in flight add and delete when
-      // calculating the new containers needed.
+      // May be under-replicated, depending on maintenance.
       delta = Math.max(0, delta - maintenanceCount);
-      // Check we have enough healthy replicas
-      minHealthyForMaintenance = Math.min(repFactor, minHealthyForMaintenance);
       int neededHealthy =
           Math.max(0, minHealthyForMaintenance - healthyCount);
       delta = Math.max(neededHealthy, delta);
-      return delta - inFlightAdd + inFlightDel;
+      return delta;
     } else { // delta == 0
-      // We have exactly the number of healthy replicas needed, but there may
-      // be inflight add or delete. Some of these may fail, but we want to
-      // avoid scheduling needless extra replicas. Therefore enforce a lower
-      // bound of 0 on the delta, but include the in flight requests in the
-      // calculation.
-      return Math.max(0, delta + inFlightDel - inFlightAdd);
+      // We have exactly the number of healthy replicas needed.
+      return delta;
     }
   }
 
@@ -183,9 +223,7 @@ public class ContainerReplicaCount {
    *         otherwise.
    */
   public boolean isSufficientlyReplicated() {
-    return (healthyCount + maintenanceCount - inFlightDel) >= repFactor
-        && healthyCount - inFlightDel
-        >= Math.min(repFactor, minHealthyForMaintenance);
+    return missingReplicas() + inFlightDel <= 0;
   }
 
   /**
@@ -198,6 +236,6 @@ public class ContainerReplicaCount {
    * @return True if the container is over replicated, false otherwise.
    */
   public boolean isOverReplicated() {
-    return healthyCount - inFlightDel > repFactor;
+    return missingReplicas() + inFlightDel < 0;
   }
 }

@@ -156,6 +156,13 @@ public class TestContainerReplicaCount {
     validate(false, 1, false);
   }
 
+  @Test
+  public void testTwoHealthyReplicaTwoInflightAdd() {
+    registerNodes(CLOSED, CLOSED);
+    rcount = new ContainerReplicaCount(replica, 2, 0, 3, 2);
+    validate(false, 0, false);
+  }
+
   /**
    * From here consider decommission replicas.
    */
