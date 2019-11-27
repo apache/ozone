@@ -17,16 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
-import org.apache.hadoop.test.GenericTestUtils;
-
-import org.junit.Assert;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -43,9 +33,21 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
+import org.apache.hadoop.test.GenericTestUtils;
+
+import org.apache.commons.io.FileUtils;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
+import org.junit.Assert;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests for {@link ChunkUtils}.
@@ -178,6 +180,19 @@ public class TestChunkUtils {
     Assert.assertFalse(
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
             new ChunkInfo("chunk", 5, 5)));
+  }
+
+  @Test
+  public void readMissingFile() throws Exception {
+    try {
+      ChunkInfo chunkInfo =
+          new ChunkInfo("chunk_name", 0, 123);
+      ChunkUtils
+          .readData(new File("nosuchfile"), chunkInfo, new VolumeIOStats());
+      fail("Exception is Expected");
+    } catch (StorageContainerException ex) {
+      Assert.assertEquals(UNABLE_TO_FIND_CHUNK, ex.getResult());
+    }
   }
 
 }
