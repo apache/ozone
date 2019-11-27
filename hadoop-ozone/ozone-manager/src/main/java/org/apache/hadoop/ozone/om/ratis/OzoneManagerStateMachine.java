@@ -346,8 +346,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return OMRatisHelper.convertResponseToMessage(response);
   }
 
-  @SuppressWarnings("HiddenField")
-  public void updateLastAppliedIndex(long lastFlushedIndex) {
+  /**
+   * Update lastAppliedIndex term and it's corresponding term in the
+   * stateMachine.
+   * @param lastFlushedIndex
+   */
+  public synchronized void updateLastAppliedIndex(long lastFlushedIndex) {
     Long appliedTerm = null;
     long appliedIndex = -1;
     for(long i = getLastAppliedTermIndex().getIndex() + 1;
@@ -382,10 +386,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private Message queryCommand(OMRequest request) {
     OMResponse response = handler.handle(request);
     return OMRatisHelper.convertResponseToMessage(response);
-  }
-
-  public long getLastAppliedIndex() {
-    return getLastAppliedTermIndex().getIndex();
   }
 
   private static <T> CompletableFuture<T> completeExceptionally(Exception e) {

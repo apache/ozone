@@ -671,9 +671,6 @@ public final class OzoneManagerRatisServer {
     return UUID.nameUUIDFromBytes(omServiceId.getBytes(StandardCharsets.UTF_8));
   }
 
-  public long getStateMachineLastAppliedIndex() {
-    return omStateMachine.getLastAppliedIndex();
-  }
   /**
    * Get the local directory where ratis logs will be stored.
    */
