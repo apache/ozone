@@ -158,7 +158,6 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
-import org.apache.ratis.protocol.LeaderNotReadyException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
