@@ -75,6 +75,7 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.SizeInBytes;
@@ -673,7 +674,6 @@ public final class OzoneManagerRatisServer {
   public long getStateMachineLastAppliedIndex() {
     return omStateMachine.getLastAppliedIndex();
   }
-
   /**
    * Get the local directory where ratis logs will be stored.
    */
@@ -694,5 +694,9 @@ public final class OzoneManagerRatisServer {
           "snapshot").toString();
     }
     return snapshotDir;
+  }
+
+  public TermIndex getLastAppliedTermIndex() {
+    return omStateMachine.getLastAppliedTermIndex();
   }
 }
