@@ -165,12 +165,15 @@ public final class OzoneManagerRatisServer {
         RaftPeerId suggestedLeader =
             notLeaderException.getSuggestedLeader() != null ?
                 notLeaderException.getSuggestedLeader().getId() : null;
-        org.apache.hadoop.ozone.om.exceptions.NotLeaderException notLeaderException1;
+        org.apache.hadoop.ozone.om.exceptions.NotLeaderException
+            notLeaderException1;
         if (suggestedLeader != null) {
-          notLeaderException1 = new org.apache.hadoop.ozone.om.exceptions.NotLeaderException(getRaftPeerId(), suggestedLeader);
+          notLeaderException1 = new org.apache.hadoop.ozone.om.exceptions
+              .NotLeaderException(getRaftPeerId(), suggestedLeader);
         } else {
           notLeaderException1 =
-              new org.apache.hadoop.ozone.om.exceptions.NotLeaderException(getRaftPeerId());
+              new org.apache.hadoop.ozone.om.exceptions
+                  .NotLeaderException(getRaftPeerId());
         }
         throw new ServiceException(notLeaderException1);
       }
