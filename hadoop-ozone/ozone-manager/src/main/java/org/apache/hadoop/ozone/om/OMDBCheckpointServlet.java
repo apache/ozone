@@ -124,6 +124,8 @@ public class OMDBCheckpointServlet extends HttpServlet {
         // If OM follower is downloading the checkpoint, we should save a
         // ratis snapshot first. This step also included flushing the OM DB.
         // Hence, we can set flush to false.
+
+        // We need to set both snapshot term index and snapshot index.
         flush = false;
         TermIndex lastAppliedTermIndex = om.saveRatisSnapshot();
         ratisSnapshotTermIndex = lastAppliedTermIndex.getTerm();

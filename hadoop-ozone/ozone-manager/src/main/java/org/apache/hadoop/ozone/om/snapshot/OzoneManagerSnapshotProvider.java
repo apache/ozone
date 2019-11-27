@@ -180,7 +180,7 @@ public class OzoneManagerSnapshotProvider {
         header = response.getFirstHeader(OM_RATIS_SNAPSHOT_TERM_INDEX);
         if (header == null) {
           throw new IOException("The HTTP response header " +
-              OM_RATIS_SNAPSHOT_INDEX + " is missing.");
+              OM_RATIS_SNAPSHOT_TERM_INDEX + " is missing.");
         }
 
         long snapshotTermIndex = Long.parseLong(header.getValue());

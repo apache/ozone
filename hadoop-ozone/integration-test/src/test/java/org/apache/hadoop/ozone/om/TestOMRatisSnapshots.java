@@ -136,13 +136,13 @@ public class TestOMRatisSnapshots {
     OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
     long leaderOMappliedLogIndex =
-        leaderRatisServer.getStateMachineLastAppliedIndex();
+        leaderRatisServer.getLastAppliedTermIndex().getIndex();
 
     List<String> keys = new ArrayList<>();
     while (leaderOMappliedLogIndex < 2000) {
       keys.add(createKey(ozoneBucket));
       leaderOMappliedLogIndex =
-          leaderRatisServer.getStateMachineLastAppliedIndex();
+          leaderRatisServer.getLastAppliedTermIndex().getIndex();
     }
 
     // Get the latest db checkpoint from the leader OM.
@@ -158,7 +158,7 @@ public class TestOMRatisSnapshots {
 
     // The recently started OM should be lagging behind the leader OM.
     long followerOMLastAppliedIndex =
-        followerOM.getOmRatisServer().getStateMachineLastAppliedIndex();
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     Assert.assertTrue(
         followerOMLastAppliedIndex < leaderOMSnaphsotIndex);
 
@@ -177,7 +177,7 @@ public class TestOMRatisSnapshots {
     // follower OM lastAppliedIndex must match the snapshot index of the
     // checkpoint.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
-        .getStateMachineLastAppliedIndex();
+        .getLastAppliedTermIndex().getIndex();
     Assert.assertEquals(leaderOMSnaphsotIndex, followerOMLastAppliedIndex);
     Assert.assertEquals(leaderOMSnapshotTermIndex,
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getTerm());
