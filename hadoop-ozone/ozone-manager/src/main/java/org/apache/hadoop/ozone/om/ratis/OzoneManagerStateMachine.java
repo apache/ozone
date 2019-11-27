@@ -135,8 +135,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // SnapshotInfo represents the snapshotIndex i.e. the index of the last
     // transaction included in the snapshot. Hence, snaphsotInfo#index is not
     // updated here.
-    LOG.info("Bharat notifyIndexUpdate {}", index);
-    setLastAppliedTermIndex(TermIndex.newTermIndex(currentTerm, index));
+    applyTransactionMap.put(index, currentTerm);
+    // We need to call updateLastApplied here because now in ratis when a
+    // node becomes leader, it is checking stateMachineIndex >=
+    // placeHolderIndex (when a node becomes leader, it writes a conf entry
+    // with some information like its peers and termIndex). So, calling
+    // updateLastApplied updates lastAppliedTermIndex.
+    updateLastAppliedIndex(index);
     snapshotInfo.updateTerm(currentTerm);
   }
 
@@ -206,7 +211,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // only after completing 101 - 149. In initial stage, we are starting
       // with single global executor. Will revisit this when needed.
 
-      // Add the term index and transaction log index to applyTransaction map.
+      // Add the term index and transaction log index to applyTransaction map
+      // . This map will be used to update lastAppliedIndex.
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
       CompletableFuture<Message> future = CompletableFuture.supplyAsync(
           () -> runCommand(request, trxLogIndex),
@@ -340,17 +346,21 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @SuppressWarnings("HiddenField")
-  public void updateLastAppliedIndex(long lastAppliedIndex) {
-    long beforeLastAppliedIndex = this.lastAppliedIndex;
-    this.lastAppliedIndex = lastAppliedIndex;
-
-    setLastAppliedTermIndex(TermIndex.newTermIndex(
-        applyTransactionMap.get(lastAppliedIndex), lastAppliedIndex));
-
-    // Remove from applyTransaction map for which we have updated (term,
-    // index) to ratis state machine.
-    for (long i = beforeLastAppliedIndex; i < lastAppliedIndex; i++) {
-      applyTransactionMap.remove(i);
+  public void updateLastAppliedIndex(long lastFlushedIndex) {
+    Long appliedTerm = null;
+    long appliedIndex = -1;
+    for(long i = getLastAppliedTermIndex().getIndex() + 1;
+        i <= lastFlushedIndex; i++) {
+      final Long removed = applyTransactionMap.remove(i);
+      if (removed == null) {
+        break;
+      }
+      appliedTerm = removed;
+      appliedIndex = i;
+    }
+    if (appliedTerm != null) {
+      updateLastAppliedTermIndex(appliedTerm, appliedIndex);
+      this.lastAppliedIndex = appliedIndex;
     }
   }
 
