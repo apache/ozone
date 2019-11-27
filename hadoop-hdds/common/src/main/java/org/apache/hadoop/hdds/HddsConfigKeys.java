@@ -93,7 +93,7 @@ public final class HddsConfigKeys {
   // percentage of healthy pipelines, where all 3 datanodes are reported in the
   // pipeline.
   public static final String HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT =
-      "hdds.scm.safemode.healthy.pipelie.pct";
+      "hdds.scm.safemode.healthy.pipeline.pct";
   public static final double
       HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT = 0.10;
 
