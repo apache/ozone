@@ -421,7 +421,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       } else {
         return new BasicKeyInfo(
             next.getName(),
-            next.getModificationTime(),
+            next.getModificationTime().toEpochMilli(),
             next.getDataSize()
         );
       }

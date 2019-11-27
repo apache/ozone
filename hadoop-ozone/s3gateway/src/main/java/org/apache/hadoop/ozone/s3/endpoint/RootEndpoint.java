@@ -22,7 +22,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Iterator;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -74,8 +73,7 @@ public class RootEndpoint extends EndpointBase {
       OzoneBucket next = bucketIterator.next();
       BucketMetadata bucketMetadata = new BucketMetadata();
       bucketMetadata.setName(next.getName());
-      bucketMetadata.setCreationDate(Instant.ofEpochMilli(next
-          .getCreationTime()));
+      bucketMetadata.setCreationDate(next.getCreationTime());
       response.addBucket(bucketMetadata);
     }
 
