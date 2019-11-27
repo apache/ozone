@@ -158,7 +158,6 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 
-import org.apache.zookeeper.server.quorum.Leader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
