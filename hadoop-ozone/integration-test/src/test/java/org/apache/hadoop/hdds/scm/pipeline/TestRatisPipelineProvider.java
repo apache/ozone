@@ -142,7 +142,7 @@ public class TestRatisPipelineProvider {
     List<DatanodeDetails> allHealthyNodes =
         nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
     int totalHealthyNodesCount = allHealthyNodes.size();
-    
+
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
 
     List<DatanodeDetails> closePipelineDns = new ArrayList<>();

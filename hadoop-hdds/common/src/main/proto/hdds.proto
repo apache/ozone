@@ -75,6 +75,7 @@ message Pipeline {
     required PipelineID id = 5;
     optional string leaderID = 6;
     repeated uint32 memberOrders = 7;
+    optional uint64 creationTimeStamp = 8;
 }
 
 message KeyValue {
