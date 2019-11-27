@@ -23,13 +23,14 @@ import java.util.Map;
 /**
  * Defines audit message structure.
  */
-public class AuditMessage implements Message {
+public final class AuditMessage implements Message {
 
-  private String message;
-  private Throwable throwable;
+  private final String message;
+  private final Throwable throwable;
 
-  public AuditMessage(){
-
+  private AuditMessage(String message, Throwable throwable) {
+    this.message = message;
+    this.throwable = throwable;
   }
 
   @Override
@@ -53,26 +54,6 @@ public class AuditMessage implements Message {
   }
 
   /**
-   * Use when there are custom string to be added to default msg.
-   * @param customMessage custom string
-   */
-  private void appendMessage(String customMessage) {
-    this.message += customMessage;
-  }
-
-  public String getMessage() {
-    return message;
-  }
-
-  public void setMessage(String message) {
-    this.message = message;
-  }
-
-  public void setThrowable(Throwable throwable) {
-    this.throwable = throwable;
-  }
-
-  /**
    * Builder class for AuditMessage.
    */
   public static class Builder {
@@ -82,10 +63,6 @@ public class AuditMessage implements Message {
     private String op;
     private Map<String, String> params;
     private String ret;
-
-    public Builder(){
-
-    }
 
     public Builder setUser(String usr){
       this.user = usr;
@@ -118,11 +95,9 @@ public class AuditMessage implements Message {
     }
 
     public AuditMessage build(){
-      AuditMessage auditMessage = new AuditMessage();
-      auditMessage.message = "user=" + this.user + " | ip=" + this.ip + " | " +
+      String message = "user=" + this.user + " | ip=" + this.ip + " | " +
           "op=" + this.op + " " + this.params + " | " + "ret=" + this.ret;
-      auditMessage.throwable = this.throwable;
-      return auditMessage;
+      return new AuditMessage(message, throwable);
     }
   }
 }

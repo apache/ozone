@@ -127,7 +127,7 @@ public class TestOzoneAuditLogger {
 
   @Test
   public void messageIncludesAllParts() {
-    String message = WRITE_FAIL_MSG.getMessage();
+    String message = WRITE_FAIL_MSG.getFormattedMessage();
     assertTrue(message, message.contains(USER));
     assertTrue(message, message.contains(IP_ADDRESS));
     assertTrue(message, message.contains(DummyAction.CREATE_VOLUME.name()));
