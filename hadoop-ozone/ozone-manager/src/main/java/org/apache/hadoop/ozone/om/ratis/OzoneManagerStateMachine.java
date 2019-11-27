@@ -72,7 +72,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final OzoneManager ozoneManager;
   private OzoneManagerHARequestHandler handler;
   private RaftGroupId raftGroupId;
-  private volatile long lastAppliedIndex;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final OMRatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
@@ -360,12 +359,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
     if (appliedTerm != null) {
       updateLastAppliedTermIndex(appliedTerm, appliedIndex);
-      this.lastAppliedIndex = appliedIndex;
     }
   }
 
   public void updateLastAppliedIndexWithSnaphsotIndex() {
-    this.lastAppliedIndex = snapshotInfo.getIndex();
     // This is done, as we have a check in Ratis for not throwing
     // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
     // nextIndex (placeHolderIndex).
@@ -386,7 +383,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   public long getLastAppliedIndex() {
-    return lastAppliedIndex;
+    return getLastAppliedTermIndex().getIndex();
   }
 
   private static <T> CompletableFuture<T> completeExceptionally(Exception e) {
