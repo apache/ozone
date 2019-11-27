@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -53,9 +54,11 @@ public class TestRatisPipelineProvider {
   @Before
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
-    stateManager = new PipelineStateManager(new OzoneConfiguration());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 1);
+    stateManager = new PipelineStateManager(conf);
     provider = new MockRatisPipelineProvider(nodeManager,
-        stateManager, new OzoneConfiguration());
+        stateManager, conf);
   }
 
   private void createPipelineAndAssertions(
@@ -64,6 +67,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     stateManager.addPipeline(pipeline);
+    nodeManager.addPipeline(pipeline);
 
     Pipeline pipeline1 = provider.create(factor);
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
@@ -149,6 +153,9 @@ public class TestRatisPipelineProvider {
     Pipeline pipeline = provider.create(factor);
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
+    nodeManager.addPipeline(pipeline);
+    stateManager.addPipeline(pipeline);
+
 
     List<DatanodeDetails> nodes = pipeline.getNodes();
 
@@ -184,5 +191,6 @@ public class TestRatisPipelineProvider {
         .build();
 
     stateManager.addPipeline(openPipeline);
+    nodeManager.addPipeline(openPipeline);
   }
 }

@@ -33,6 +33,15 @@ import java.util.List;
  */
 public class MockRatisPipelineProvider extends RatisPipelineProvider {
 
+  private boolean autoOpenPipeline;
+
+  public MockRatisPipelineProvider(NodeManager nodeManager,
+                                   PipelineStateManager stateManager,
+                                   Configuration conf, boolean autoOpen) {
+    super(nodeManager, stateManager, conf, null);
+    autoOpenPipeline = autoOpen;
+  }
+
   public MockRatisPipelineProvider(NodeManager nodeManager,
                             PipelineStateManager stateManager,
                             Configuration conf) {
@@ -43,10 +52,29 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
       PipelineStateManager stateManager, Configuration conf,
       EventPublisher eventPublisher) {
     super(nodeManager, stateManager, conf, eventPublisher);
+    autoOpenPipeline = true;
   }
 
   protected void initializePipeline(Pipeline pipeline) throws IOException {
     // do nothing as the datanodes do not exists
+  }
+
+  @Override
+  public Pipeline create(HddsProtos.ReplicationFactor factor)
+      throws IOException {
+    if (autoOpenPipeline) {
+      return super.create(factor);
+    } else {
+      Pipeline initialPipeline = super.create(factor);
+      return Pipeline.newBuilder()
+          .setId(initialPipeline.getId())
+          // overwrite pipeline state to main ALLOCATED
+          .setState(Pipeline.PipelineState.ALLOCATED)
+          .setType(initialPipeline.getType())
+          .setFactor(factor)
+          .setNodes(initialPipeline.getNodes())
+          .build();
+    }
   }
 
   @Override
