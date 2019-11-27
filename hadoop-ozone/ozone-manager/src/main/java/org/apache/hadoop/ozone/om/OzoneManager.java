@@ -3261,7 +3261,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * All the classes which use/ store MetadataManager should also be updated
    * with the new MetadataManager instance.
    */
-  void reloadOMState(long newSnapshotIndex, long newSnapShotTermIndex) throws IOException {
+  void reloadOMState(long newSnapshotIndex,
+      long newSnapShotTermIndex) throws IOException {
 
     instantiateServices();
 
