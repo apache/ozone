@@ -1229,7 +1229,7 @@ public class TestOzoneManagerHA {
     followerOM1.restart();
 
     // Get the latest snapshotIndex from the leader OM.
-    long leaderOMSnaphsotIndex = leaderOM.saveRatisSnapshot();
+    long leaderOMSnaphsotIndex = leaderOM.saveRatisSnapshot().getIndex();
 
     // The recently started OM should be lagging behind the leader OM.
     long followerOMLastAppliedIndex =

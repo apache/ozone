@@ -248,12 +248,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * lastAppliedIndex. This should be done after uploading new state to the
    * StateMachine.
    */
-  public void unpause(long newLastAppliedSnaphsotIndex) {
+  public void unpause(long newLastAppliedSnaphsotIndex,
+      long newLastAppliedSnapShotTermIndex) {
     lifeCycle.startAndTransition(() -> {
       this.ozoneManagerDoubleBuffer =
           new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
               this::updateLastAppliedIndex);
-      this.updateLastAppliedIndex(newLastAppliedSnaphsotIndex);
+      this.setLastAppliedTermIndex(TermIndex.newTermIndex(
+          newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
     });
   }
 
@@ -269,7 +271,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public long takeSnapshot() throws IOException {
     LOG.info("Saving Ratis snapshot on the OM.");
     if (ozoneManager != null) {
-      return ozoneManager.saveRatisSnapshot();
+      return ozoneManager.saveRatisSnapshot().getIndex();
     }
     return 0;
   }

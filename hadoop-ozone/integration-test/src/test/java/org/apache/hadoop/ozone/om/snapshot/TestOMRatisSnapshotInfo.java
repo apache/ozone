@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -48,8 +49,8 @@ public class TestOMRatisSnapshotInfo {
     int termIndex = random.nextInt(10);
 
     // Save snapshotInfo to disk
-    omRatisSnapshotInfo.updateTerm(termIndex);
-    omRatisSnapshotInfo.saveRatisSnapshotToDisk(snapshotIndex);
+    omRatisSnapshotInfo.saveRatisSnapshotToDisk(
+        TermIndex.newTermIndex(termIndex, snapshotIndex));
 
     Assert.assertEquals(termIndex, omRatisSnapshotInfo.getTerm());
     Assert.assertEquals(snapshotIndex, omRatisSnapshotInfo.getIndex());
