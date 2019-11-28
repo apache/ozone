@@ -114,7 +114,8 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
     return cache.entrySet().iterator();
   }
 
-  private void evictCache(List<Long> epochs) {
+  @VisibleForTesting
+  protected void evictCache(List<Long> epochs) {
     EpochEntry<CACHEKEY> currentEntry;
     final AtomicBoolean removed = new AtomicBoolean();
     CACHEKEY cachekey;
