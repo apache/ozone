@@ -28,7 +28,6 @@ import java.util.concurrent.CompletableFuture;
 import com.google.common.base.Optional;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -39,7 +38,6 @@ import static org.junit.Assert.fail;
  * Class tests partial table cache.
  */
 @RunWith(value = Parameterized.class)
-@Ignore("HDDS-2639")
 public class TestTableCacheImpl {
   private TableCacheImpl<CacheKey<String>, CacheValue<String>> tableCache;
 
