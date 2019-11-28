@@ -282,11 +282,11 @@ public class TestMiniOzoneCluster {
    * Test that a DN can register with SCM even if it was started before the SCM.
    * @throws Exception
    */
-  @Test (timeout = 300_000)
+  @Test (timeout = 60000)
   public void testDNstartAfterSCM() throws Exception {
-    // Start a cluster with 1 DN
+    // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1)
+        .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
 
