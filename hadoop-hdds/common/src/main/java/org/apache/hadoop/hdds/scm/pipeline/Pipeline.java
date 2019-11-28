@@ -279,7 +279,8 @@ public final class Pipeline {
     b.append(", Type:").append(getType());
     b.append(", Factor:").append(getFactor());
     b.append(", State:").append(getPipelineState());
-    b.append("]");
+    b.append(", leaderId:").append(getLeaderId());
+    b.append(" ]");
     return b.toString();
   }
 
