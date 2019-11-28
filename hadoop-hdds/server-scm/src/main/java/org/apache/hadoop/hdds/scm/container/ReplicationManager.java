@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -98,6 +99,11 @@ public class ReplicationManager implements MetricsSource {
   private final LockManager<ContainerID> lockManager;
 
   /**
+   * Used to lookup the health of a nodes or the nodes operational state.
+   */
+  private final NodeManager nodeManager;
+
+  /**
    * This is used for tracking container replication commands which are issued
    * by ReplicationManager and not yet complete.
    */
@@ -127,6 +133,11 @@ public class ReplicationManager implements MetricsSource {
   private volatile boolean running;
 
   /**
+   * Minimum number of replica in a healthy state for maintenance.
+   */
+  private int minHealthyForMaintenance;
+
+  /**
    * Constructs ReplicationManager instance with the given configuration.
    *
    * @param conf OzoneConfiguration
@@ -138,15 +149,18 @@ public class ReplicationManager implements MetricsSource {
                             final ContainerManager containerManager,
                             final ContainerPlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
-                            final LockManager<ContainerID> lockManager) {
+                            final LockManager<ContainerID> lockManager,
+                            final NodeManager nodeManager) {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
     this.eventPublisher = eventPublisher;
     this.lockManager = lockManager;
+    this.nodeManager = nodeManager;
     this.conf = conf;
     this.running = false;
     this.inflightReplication = new ConcurrentHashMap<>();
     this.inflightDeletion = new ConcurrentHashMap<>();
+    this.minHealthyForMaintenance = conf.getMaintenanceReplicaMinimum();
   }
 
   /**
@@ -241,7 +255,7 @@ public class ReplicationManager implements MetricsSource {
    * @param id ContainerID
    */
   private void processContainer(ContainerID id) {
-    lockManager.lock(id);
+    lockManager.writeLock(id);
     try {
       final ContainerInfo container = containerManager.getContainer(id);
       final Set<ContainerReplica> replicas = containerManager
@@ -291,24 +305,15 @@ public class ReplicationManager implements MetricsSource {
           action -> replicas.stream()
               .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
 
-
-      /*
-       * We don't have to take any action if the container is healthy.
-       *
-       * According to ReplicationMonitor container is considered healthy if
-       * the container is either in QUASI_CLOSED or in CLOSED state and has
-       * exact number of replicas in the same state.
-       */
-      if (isContainerHealthy(container, replicas)) {
-        return;
-      }
+      ContainerReplicaCount replicaSet =
+          getContainerReplicaCount(container, replicas);
 
       /*
        * Check if the container is under replicated and take appropriate
        * action.
        */
-      if (isContainerUnderReplicated(container, replicas)) {
-        handleUnderReplicatedContainer(container, replicas);
+      if (!replicaSet.isSufficientlyReplicated()) {
+        handleUnderReplicatedContainer(container, replicaSet);
         return;
       }
 
@@ -316,22 +321,24 @@ public class ReplicationManager implements MetricsSource {
        * Check if the container is over replicated and take appropriate
        * action.
        */
-      if (isContainerOverReplicated(container, replicas)) {
-        handleOverReplicatedContainer(container, replicas);
+      if (replicaSet.isOverReplicated()) {
+        handleOverReplicatedContainer(container, replicaSet);
         return;
       }
 
       /*
-       * The container is neither under nor over replicated and the container
-       * is not healthy. This means that the container has unhealthy/corrupted
-       * replica.
+       If we get here, the container is not over replicated or under replicated
+       but it may be "unhealthy", which means it has one or more replica which
+       are not in the same state as the container itself.
        */
-      handleUnstableContainer(container, replicas);
+      if (!isContainerHealthy(container, replicas)) {
+        handleUnstableContainer(container, replicas);
+      }
 
     } catch (ContainerNotFoundException ex) {
       LOG.warn("Missing container {}.", id);
     } finally {
-      lockManager.unlock(id);
+      lockManager.writeUnlock(id);
     }
   }
 
@@ -361,7 +368,8 @@ public class ReplicationManager implements MetricsSource {
    * Returns true if the container is healthy according to ReplicationMonitor.
    *
    * According to ReplicationMonitor container is considered healthy if
-   * it has exact number of replicas in the same state as the container.
+   * all replica which are not in a decommission or maintenance state are in
+   * the same state as the container and in QUASI_CLOSED or in CLOSED state.
    *
    * @param container Container to check
    * @param replicas Set of ContainerReplicas
@@ -369,50 +377,76 @@ public class ReplicationManager implements MetricsSource {
    */
   private boolean isContainerHealthy(final ContainerInfo container,
                                      final Set<ContainerReplica> replicas) {
-    return container.getReplicationFactor().getNumber() == replicas.size() &&
-        replicas.stream().allMatch(
-            r -> compareState(container.getState(), r.getState()));
+    return (container.getState() == LifeCycleState.CLOSED
+        || container.getState() == LifeCycleState.QUASI_CLOSED)
+        && replicas.stream()
+        .filter(r -> r.getState() != State.DECOMMISSIONED)
+        .filter(r -> r.getState() != State.MAINTENANCE)
+        .allMatch(r -> compareState(container.getState(), r.getState()));
   }
 
   /**
-   * Checks if the container is under replicated or not.
-   *
-   * @param container Container to check
-   * @param replicas Set of ContainerReplicas
-   * @return true if the container is under replicated, false otherwise
+   * Returns the number replica which are pending creation for the given
+   * container ID.
+   * @param id The ContainerID for which to check the pending replica
+   * @return The number of inflight additions or zero if none
    */
-  private boolean isContainerUnderReplicated(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) {
-    return container.getReplicationFactor().getNumber() >
-        getReplicaCount(container.containerID(), replicas);
+  private int getInflightAdd(final ContainerID id) {
+    return inflightReplication.getOrDefault(id, Collections.emptyList()).size();
   }
 
   /**
-   * Checks if the container is over replicated or not.
-   *
-   * @param container Container to check
-   * @param replicas Set of ContainerReplicas
-   * @return true if the container if over replicated, false otherwise
+   * Returns the number replica which are pending delete for the given
+   * container ID.
+   * @param id The ContainerID for which to check the pending replica
+   * @return The number of inflight deletes or zero if none
    */
-  private boolean isContainerOverReplicated(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) {
-    return container.getReplicationFactor().getNumber() <
-        getReplicaCount(container.containerID(), replicas);
+  private int getInflightDel(final ContainerID id) {
+    return inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
   }
 
   /**
-   * Returns the replication count of the given container. This also
-   * considers inflight replication and deletion.
+   * Given a container, obtain the set of known replica for it, and return a
+   * ContainerReplicaCount object. This object will contain the set of replica
+   * as well as all information required to determine if the container is over
+   * or under replicated, including the delta of replica required to repair the
+   * over or under replication.
    *
-   * @param id ContainerID
-   * @param replicas Set of existing replicas
-   * @return number of estimated replicas for this container
+   * @param container The container to create a ContainerReplicaCount for
+   * @return ContainerReplicaCount representing the replicated state of the
+   *         container.
+   * @throws ContainerNotFoundException
    */
-  private int getReplicaCount(final ContainerID id,
-                              final Set<ContainerReplica> replicas) {
-    return replicas.size()
-        + inflightReplication.getOrDefault(id, Collections.emptyList()).size()
-        - inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
+  public ContainerReplicaCount getContainerReplicaCount(ContainerInfo container)
+      throws ContainerNotFoundException {
+    lockManager.readLock(container.containerID());
+    try {
+      final Set<ContainerReplica> replica = containerManager
+          .getContainerReplicas(container.containerID());
+      return getContainerReplicaCount(container, replica);
+    } finally {
+      lockManager.readUnlock(container.containerID());
+    }
+  }
+
+  /**
+   * Given a container and its set of replicas, create and return a
+   * ContainerReplicaCount representing the container.
+   *
+   * @param container The container for which to construct a
+   *                  ContainerReplicaCount
+   * @param replica The set of existing replica for this container
+   * @return ContainerReplicaCount representing the current state of the
+   *         container
+   */
+  private ContainerReplicaCount getContainerReplicaCount(
+      ContainerInfo container, Set<ContainerReplica> replica) {
+    return new ContainerReplicaCount(
+        replica,
+        getInflightAdd(container.containerID()),
+        getInflightDel(container.containerID()),
+        container.getReplicationFactor().getNumber(),
+        minHealthyForMaintenance);
   }
 
   /**
@@ -478,13 +512,29 @@ public class ReplicationManager implements MetricsSource {
    * and send replicate container command to the identified datanode(s).
    *
    * @param container ContainerInfo
-   * @param replicas Set of ContainerReplicas
+   * @param replicaSet An instance of ContainerReplicaCount, containing the
+   *                   current replica count and inflight adds and deletes
    */
   private void handleUnderReplicatedContainer(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) {
-    LOG.debug("Handling underreplicated container: {}",
+      final ContainerReplicaCount replicaSet) {
+    LOG.debug("Handling under replicated container: {}",
         container.getContainerID());
+    Set<ContainerReplica> replicas = replicaSet.getReplica();
     try {
+
+      if (replicaSet.isSufficientlyReplicated()) {
+        LOG.info("The container {} with replicas {} is sufficiently "+
+            "replicated", container.getContainerID(), replicaSet);
+        return;
+      }
+      int repDelta = replicaSet.additionalReplicaNeeded();
+      if (repDelta <= 0) {
+        LOG.info("The container {} with {} is not sufficiently " +
+            "replicated but no further replicas will be scheduled until "+
+            "in-flight operations complete",
+            container.getContainerID(), replicaSet);
+        return;
+      }
       final ContainerID id = container.containerID();
       final List<DatanodeDetails> deletionInFlight = inflightDeletion
           .getOrDefault(id, Collections.emptyList())
@@ -494,15 +544,19 @@ public class ReplicationManager implements MetricsSource {
       final List<DatanodeDetails> source = replicas.stream()
           .filter(r ->
               r.getState() == State.QUASI_CLOSED ||
-              r.getState() == State.CLOSED)
+              r.getState() == State.CLOSED ||
+              r.getState() == State.DECOMMISSIONED ||
+              r.getState() == State.MAINTENANCE)
+          // Exclude stale and dead nodes. This is particularly important for
+          // maintenance nodes, as the replicas will remain present in the
+          // container manager, even when they go dead.
+          .filter(r ->
+              nodeManager.getNodeStatus(r.getDatanodeDetails()).isHealthy())
           .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
           .sorted((r1, r2) -> r2.getSequenceId().compareTo(r1.getSequenceId()))
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
       if (source.size() > 0) {
-        final int replicationFactor = container
-            .getReplicationFactor().getNumber();
-        final int delta = replicationFactor - getReplicaCount(id, replicas);
         final List<DatanodeDetails> excludeList = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
@@ -511,13 +565,14 @@ public class ReplicationManager implements MetricsSource {
           actionList.stream().map(r -> r.datanode)
               .forEach(excludeList::add);
         }
+        // At this point we have all live source nodes and we have consider
         final List<DatanodeDetails> selectedDatanodes = containerPlacement
-            .chooseDatanodes(excludeList, null, delta,
+            .chooseDatanodes(excludeList, null, repDelta,
                 container.getUsedBytes());
 
         LOG.info("Container {} is under replicated. Expected replica count" +
-                " is {}, but found {}.", id, replicationFactor,
-            replicationFactor - delta);
+                " is {}, but found {}. An additional {} replica are needed",
+            id, replicaSet.getReplicationFactor(), replicaSet, repDelta);
 
         for (DatanodeDetails datanode : selectedDatanodes) {
           sendReplicateCommand(container, datanode, source);
@@ -538,17 +593,16 @@ public class ReplicationManager implements MetricsSource {
    * identified datanode(s).
    *
    * @param container ContainerInfo
-   * @param replicas Set of ContainerReplicas
+   * @param replicaSet An instance of ContainerReplicaCount, containing the
+   *                   current replica count and inflight adds and deletes
    */
   private void handleOverReplicatedContainer(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) {
+      final ContainerReplicaCount replicaSet) {
 
+    final Set<ContainerReplica> replicas = replicaSet.getReplica();
     final ContainerID id = container.containerID();
     final int replicationFactor = container.getReplicationFactor().getNumber();
-    // Dont consider inflight replication while calculating excess here.
-    final int excess = replicas.size() - replicationFactor -
-        inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
-
+    final int excess = replicaSet.additionalReplicaNeeded() * -1;
     if (excess > 0) {
 
       LOG.info("Container {} is over replicated. Expected replica count" +
@@ -566,6 +620,11 @@ public class ReplicationManager implements MetricsSource {
       // Retain one healthy replica per origin node Id.
       final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
       eligibleReplicas.removeAll(uniqueReplicas.values());
+      // Replica which are maintenance or decommissioned are not eligible to
+      // be removed, as they do not count toward over-replication and they also
+      // many not be available
+      eligibleReplicas.removeIf(r -> (r.getState() == State.MAINTENANCE
+          || r.getState() == State.DECOMMISSIONED));
 
       final List<ContainerReplica> unhealthyReplicas = eligibleReplicas
           .stream()
@@ -801,6 +860,12 @@ public class ReplicationManager implements MetricsSource {
      */
     private long eventTimeout = 10 * 60 * 1000;
 
+    /**
+     * The number of container replica which must be available for a node to
+     * enter maintenance.
+     */
+    private int maintenanceReplicaMinimum = 2;
+
     @Config(key = "thread.interval",
         type = ConfigType.TIME,
         defaultValue = "300s",
@@ -825,12 +890,29 @@ public class ReplicationManager implements MetricsSource {
       this.eventTimeout = eventTimeout;
     }
 
+    @Config(key = "maintenance.replica.minimum",
+        type = ConfigType.INT,
+        defaultValue = "2",
+        tags = {SCM, OZONE},
+        description = "The minimum number of container replicas which must " +
+            " be available for a node to enter maintenance. If putting a " +
+            " node into maintenance reduces the available replicas for any " +
+            " container below this level, the node will remain in the " +
+            " entering maintenance state until a new replica is created.")
+    public void setMaintenanceReplicaMinimum(int replicaCount) {
+      this.maintenanceReplicaMinimum = replicaCount;
+    }
+
     public long getInterval() {
       return interval;
     }
 
     public long getEventTimeout() {
       return eventTimeout;
+    }
+
+    public int getMaintenanceReplicaMinimum() {
+      return maintenanceReplicaMinimum;
     }
   }
 

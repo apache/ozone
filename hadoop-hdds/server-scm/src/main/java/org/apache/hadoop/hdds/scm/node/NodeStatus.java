@@ -61,6 +61,75 @@ public class NodeStatus {
     return operationalState;
   }
 
+  /**
+   * Returns true if the nodeStatus indicates the node is in any decommission
+   * state.
+   *
+   * @return True if the node is in any decommission state, false otherwise
+   */
+  public boolean isDecommission() {
+    return operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONING
+        || operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONED;
+  }
+
+  /**
+   * Returns true if the node is currently decommissioning.
+   *
+   * @return True if the node is decommissioning, false otherwise
+   */
+  public boolean isDecommissioning() {
+    return operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONING;
+  }
+
+  /**
+   * Returns true if the node is decommissioned.
+   *
+   * @return True if the node is decommissioned, false otherwise
+   */
+  public boolean isDecommissioned() {
+    return operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONED;
+  }
+
+  /**
+   * Returns true if the node is in any maintenance state.
+   *
+   * @return True if the node is in any maintenance state, false otherwise
+   */
+  public boolean isMaintenance() {
+    return operationalState
+        == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE
+        || operationalState == HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+  }
+
+  /**
+   * Returns true if the node is currently entering maintenance.
+   *
+   * @return True if the node is entering maintenance, false otherwise
+   */
+  public boolean isEnteringMaintenance() {
+    return operationalState
+        == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+  }
+
+  /**
+   * Returns true if the node is currently in maintenance.
+   *
+   * @return True if the node is in maintenance, false otherwise.
+   */
+  public boolean isInMaintenance() {
+    return operationalState == HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+  }
+
+  /**
+   * Returns true if the nodeStatus is healthy (ie not stale or dead) and false
+   * otherwise.
+   *
+   * @return True if the node is Healthy, false otherwise
+   */
+  public boolean isHealthy() {
+    return health == HddsProtos.NodeState.HEALTHY;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (this == obj) {

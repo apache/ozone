@@ -23,11 +23,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.BlockManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .ContainerPlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
@@ -54,6 +56,7 @@ public class TestSafeModeHandler {
   private EventQueue eventQueue;
   private SCMSafeModeManager.SafeModeStatus safeModeStatus;
   private PipelineManager scmPipelineManager;
+  private NodeManager nodeManager;
 
   public void setup(boolean enabled) {
     configuration = new OzoneConfiguration();
@@ -68,10 +71,11 @@ public class TestSafeModeHandler {
         Mockito.mock(ContainerManager.class);
     Mockito.when(containerManager.getContainerIDs())
         .thenReturn(new HashSet<>());
+    nodeManager = new MockNodeManager(false, 0);
     replicationManager = new ReplicationManager(
         new ReplicationManagerConfiguration(),
         containerManager, Mockito.mock(ContainerPlacementPolicy.class),
-        eventQueue, new LockManager(configuration));
+        eventQueue, new LockManager(configuration), nodeManager);
     scmPipelineManager = Mockito.mock(SCMPipelineManager.class);
     blockManager = Mockito.mock(BlockManagerImpl.class);
     safeModeHandler =
