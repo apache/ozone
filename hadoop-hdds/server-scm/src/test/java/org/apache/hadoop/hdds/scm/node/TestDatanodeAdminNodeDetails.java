@@ -93,12 +93,6 @@ public class TestDatanodeAdminNodeDetails {
     assertEquals(DatanodeAdminMonitor.States.CLOSE_PIPELINES,
         details.getCurrentState());
 
-    // Next State is GET_CONTAINERS
-    details.transitionState(monitor.getWorkflowStateMachine(),
-        NodeOperationalState.DECOMMISSIONING);
-    assertEquals(DatanodeAdminMonitor.States.GET_CONTAINERS,
-        details.getCurrentState());
-
     // Next State is REPLICATE_CONTAINERS
     details.transitionState(monitor.getWorkflowStateMachine(),
         NodeOperationalState.DECOMMISSIONING);
@@ -121,12 +115,6 @@ public class TestDatanodeAdminNodeDetails {
 
     // Initial state should be CLOSE_PIPELINES
     assertEquals(DatanodeAdminMonitor.States.CLOSE_PIPELINES,
-        details.getCurrentState());
-
-    // Next State is GET_CONTAINERS
-    details.transitionState(monitor.getWorkflowStateMachine(),
-        NodeOperationalState.ENTERING_MAINTENANCE);
-    assertEquals(DatanodeAdminMonitor.States.GET_CONTAINERS,
         details.getCurrentState());
 
     // Next State is REPLICATE_CONTAINER

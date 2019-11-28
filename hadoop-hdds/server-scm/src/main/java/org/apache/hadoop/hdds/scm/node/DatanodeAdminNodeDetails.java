@@ -36,6 +36,9 @@ public class DatanodeAdminNodeDetails {
   private long maintenanceEndTime;
   private DatanodeAdminMonitor.States currentState;
   private long enteredStateAt = 0;
+  private int unHealthyContainers = 0;
+  private int underReplicatedContainers = 0;
+  private int sufficientlyReplicatedContainers = 0;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminNodeDetails.class);
@@ -65,6 +68,30 @@ public class DatanodeAdminNodeDetails {
 
   public DatanodeDetails getDatanodeDetails() {
     return datanodeDetails;
+  }
+
+  public void setUnHealthyContainers(int val) {
+    this.unHealthyContainers = val;
+  }
+
+  public void setUnderReplicatedContainers(int val) {
+    this.underReplicatedContainers = val;
+  }
+
+  public void setSufficientlyReplicatedContainers(int val) {
+    this.sufficientlyReplicatedContainers = val;
+  }
+
+  public int getUnHealthyContainers()  {
+    return unHealthyContainers;
+  }
+
+  public int getUnderReplicatedContainers() {
+    return underReplicatedContainers;
+  }
+
+  public int getSufficientlyReplicatedContainers() {
+    return sufficientlyReplicatedContainers;
   }
 
   /**

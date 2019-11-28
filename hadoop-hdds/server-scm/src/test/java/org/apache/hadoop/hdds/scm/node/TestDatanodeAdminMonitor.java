@@ -17,95 +17,61 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.*;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
-
+import org.mockito.Mockito;
 import java.io.IOException;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.assertTrue;
+import static org.mockito.Mockito.reset;
 
 /**
- * Tests to ensure the DatanodeAdminMonitor is working correctly.
+ * Tests to ensure the DatanodeAdminMonitor is working correctly. This class
+ * uses mocks or basic implementations of the key classes outside of the
+ * datanodeAdminMonitor to allow it to be tested in isolation.
  */
 public class TestDatanodeAdminMonitor {
 
-  private StorageContainerManager scm;
-  private NodeManager nodeManager;
-  private ContainerManager containerManager;
-  private SCMPipelineManager pipelineManager;
+  private SimpleMockNodeManager nodeManager;
   private OzoneConfiguration conf;
   private DatanodeAdminMonitor monitor;
-  private DatanodeDetails datanode1;
-  private DatanodeDetails datanode2;
-  private DatanodeDetails datanode3;
+  private DatanodeAdminHandler startAdminHandler;
+  private ReplicationManager repManager;
 
   @Before
   public void setup() throws IOException, AuthenticationException {
-    // This creates a mocked cluster of 6 nodes, where there are mock pipelines
-    // etc. Borrows heavily from TestDeadNodeHandler.
     conf = new OzoneConfiguration();
-    String storageDir = GenericTestUtils.getTempPath(
-        TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
 
-    scm = HddsTestUtils.getScm(conf);
-    nodeManager = scm.getScmNodeManager();
-    pipelineManager = (SCMPipelineManager)scm.getPipelineManager();
-    containerManager = scm.getContainerManager();
+    EventQueue eventQueue = new EventQueue();
+    startAdminHandler = new DatanodeAdminHandler();
+    eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE, startAdminHandler);
+
+    nodeManager = new SimpleMockNodeManager();
+
+    repManager = Mockito.mock(ReplicationManager.class);
 
     monitor = new DatanodeAdminMonitor(conf);
-    monitor.setEventQueue(scm.getEventQueue());
+    monitor.setEventQueue(eventQueue);
     monitor.setNodeManager(nodeManager);
-    monitor.setPipelineManager(pipelineManager);
-
-    PipelineProvider mockRatisProvider =
-        new MockRatisPipelineProvider(nodeManager,
-            pipelineManager.getStateManager(), conf);
-    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
-        mockRatisProvider);
-
-    datanode1 = TestUtils.randomDatanodeDetails();
-    datanode2 = TestUtils.randomDatanodeDetails();
-    datanode3 = TestUtils.randomDatanodeDetails();
-
-    String storagePath = GenericTestUtils.getRandomizedTempPath()
-        .concat("/" + datanode1.getUuidString());
-
-    StorageContainerDatanodeProtocolProtos.StorageReportProto
-        storageOne = TestUtils.createStorageReport(
-        datanode1.getUuid(), storagePath, 100, 10, 90, null);
-
-    nodeManager.register(datanode1,
-        TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(datanode2,
-        TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(datanode3,
-        TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
-        TestUtils.createNodeReport(storageOne), null);
+    monitor.setReplicationManager(repManager);
   }
 
   @After
@@ -125,42 +91,428 @@ public class TestDatanodeAdminMonitor {
     monitor.startMonitoring(dn, 0);
     assertEquals(1, monitor.getPendingCount());
     assertEquals(0, monitor.getCancelledCount());
-
   }
 
-
+  /**
+   * In this test we ensure there are some pipelines for the node being
+   * decommissioned, but there are no containers. Therefore the workflow
+   * must wait until the piplines have closed before completing the decommission
+   * flow.
+   */
   @Test
-  @Ignore // HDDS-2631
-  public void testMonitoredNodeHasPipelinesClosed()
-      throws NodeNotFoundException, TimeoutException, InterruptedException {
-
-    GenericTestUtils.waitFor(() -> nodeManager
-        .getPipelines(datanode1).size() == 2, 100, 20000);
-
-    nodeManager.setNodeOperationalState(datanode1,
-        HddsProtos.NodeOperationalState.DECOMMISSIONING);
-    monitor.startMonitoring(datanode1, 0);
+  public void testClosePipelinesEventFiredWhenAdminStarted() {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+    // Ensure the node has some pipelines
+    nodeManager.setPipelines(dn1, 2);
+    // Add the node to the monitor
+    monitor.startMonitoring(dn1, 0);
     monitor.run();
-    // Ensure the node moves from pending to tracked
-    assertEquals(0, monitor.getPendingCount());
+    // Ensure a StartAdmin event was fired
+    assertEquals(1, startAdminHandler.getInvocation());
+    // Ensure a node is now tracked for decommission
     assertEquals(1, monitor.getTrackedNodeCount());
-
-    // Ensure the pipelines are closed, as this is the first step in the admin
-    // workflow
-    GenericTestUtils.waitFor(() -> nodeManager
-        .getPipelines(datanode1).size() == 0, 100, 20000);
-
-    // Run the run loop again and ensure the tracked node is moved to the next
-    // state
+    // Ensure the node at the CLOSE_PIPELINES state
+    assertEquals(DatanodeAdminMonitor.States.CLOSE_PIPELINES,
+        getFirstTrackedNode().getCurrentState());
+    // Run the monitor again, and it should remain in CLOSE_PIPELINES state
     monitor.run();
-    for (DatanodeAdminNodeDetails node : monitor.getTrackedNodes()) {
-      assertEquals(
-          DatanodeAdminMonitor.States.GET_CONTAINERS, node.getCurrentState());
-    }
-    // Finally, cancel decommission and see the node is removed from tracking
-    monitor.stopMonitoring(datanode1);
+    assertEquals(DatanodeAdminMonitor.States.CLOSE_PIPELINES,
+        getFirstTrackedNode().getCurrentState());
+    // Clear the pipelines and the node should transition to the next state
+    nodeManager.setPipelines(dn1, 0);
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
+    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        newStatus.getOperationalState());
   }
 
+  /**
+   * In this test, there are no open pipelines and no containers on the node.
+   * Therefore, we expect the decommission flow to finish on the first run
+   * on the monitor, leaving zero nodes tracked and the node in DECOMMISSIONED
+   * state.
+   */
+  @Test
+  public void testDecommissionNodeTransitionsToCompleteWhenNoContainers() {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    // Add the node to the monitor. By default we have zero pipelines and
+    // zero containers in the test setup, so the node should immediately
+    // transition to COMPLETED state
+    monitor.startMonitoring(dn1, 0);
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        newStatus.getOperationalState());
+  }
+
+  @Test
+  public void testDecommissionNodeWaitsForContainersToReplicate()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    nodeManager.setContainers(dn1, generateContainers(3));
+    // Mock Replication Manager to return ContainerReplicaCount's which
+    // always have a DECOMMISSIONED replica.
+    mockGetContainerReplicaCount(
+        HddsProtos.LifeCycleState.CLOSED,
+        ContainerReplicaProto.State.DECOMMISSIONED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED);
+
+    // Run the monitor for the first time and the node will transition to
+    // REPLICATE_CONTAINERS as there are no pipelines to close.
+    monitor.startMonitoring(dn1, 0);
+    monitor.run();
+    DatanodeAdminNodeDetails node = getFirstTrackedNode();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
+        node.getCurrentState());
+
+    // Running the monitor again causes it to remain at replicate_containers
+    // as nothing has changed.
+    monitor.run();
+    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
+        node.getCurrentState());
+    assertEquals(0, node.getSufficientlyReplicatedContainers());
+    assertEquals(0, node.getUnHealthyContainers());
+    assertEquals(3, node.getUnderReplicatedContainers());
+
+    // Now change the replicationManager mock to return 3 CLOSED replicas
+    // and the node should complete the REPLICATE_CONTAINERS step, moving to
+    // complete which will end the decommission workflow
+    mockGetContainerReplicaCount(
+        HddsProtos.LifeCycleState.CLOSED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED);
+
+    monitor.run();
+
+    assertEquals(0, monitor.getTrackedNodeCount());
+    assertEquals(3, node.getSufficientlyReplicatedContainers());
+    assertEquals(0, node.getUnHealthyContainers());
+    assertEquals(0, node.getUnderReplicatedContainers());
+    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        newStatus.getOperationalState());
+  }
+
+  @Test
+  public void testDecommissionAbortedWhenNodeInUnexpectedState()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    nodeManager.setContainers(dn1, generateContainers(3));
+    mockGetContainerReplicaCount(
+        HddsProtos.LifeCycleState.CLOSED,
+        ContainerReplicaProto.State.DECOMMISSIONED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED);
+
+    // Add the node to the monitor, it should have 3 under-replicated containers
+    // after the first run
+    monitor.startMonitoring(dn1, 0);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    DatanodeAdminNodeDetails node = getFirstTrackedNode();
+    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
+        node.getCurrentState());
+    assertEquals(3, node.getUnderReplicatedContainers());
+
+    // Set the node to dead, and then the workflow should get aborted, setting
+    // the node state back to IN_SERVICE on the next run.
+    nodeManager.setNodeStatus(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
+            HddsProtos.NodeState.HEALTHY));
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        newStatus.getOperationalState());
+  }
+
+  @Test
+  public void testDecommissionAbortedWhenNodeGoesDead()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    nodeManager.setContainers(dn1, generateContainers(3));
+    mockGetContainerReplicaCount(
+        HddsProtos.LifeCycleState.CLOSED,
+        ContainerReplicaProto.State.DECOMMISSIONED,
+        ContainerReplicaProto.State.CLOSED,
+        ContainerReplicaProto.State.CLOSED);
+
+    // Add the node to the monitor, it should have 3 under-replicated containers
+    // after the first run
+    monitor.startMonitoring(dn1, 0);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    DatanodeAdminNodeDetails node = getFirstTrackedNode();
+    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
+        node.getCurrentState());
+    assertEquals(3, node.getUnderReplicatedContainers());
+
+    // Set the node to dead, and then the workflow should get aborted, setting
+    // the node state back to IN_SERVICE.
+    nodeManager.setNodeStatus(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.DEAD));
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        newStatus.getOperationalState());
+  }
+
+  @Test
+  public void testMaintenanceWaitsForMaintenanceToComplete() {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+            HddsProtos.NodeState.HEALTHY));
+
+    // Add the node to the monitor, it should transiting to
+    // AWAIT_MAINTENANCE_END as there are no under-replicated containers.
+    // The operational state should also goto IN_MAINTENANCE
+    monitor.startMonitoring(dn1, 1);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    DatanodeAdminNodeDetails node = getFirstTrackedNode();
+    assertEquals(DatanodeAdminMonitor.States.AWAIT_MAINTENANCE_END,
+        node.getCurrentState());
+    assertEquals(0, node.getUnderReplicatedContainers());
+    assertTrue(nodeManager.getNodeStatus(dn1).isInMaintenance());
+
+    // Running the monitor again causes the node to remain in maintenance
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(DatanodeAdminMonitor.States.AWAIT_MAINTENANCE_END,
+        node.getCurrentState());
+    assertTrue(nodeManager.getNodeStatus(dn1).isInMaintenance());
+
+    // Set the maintenance end time to a time in the past and then the node
+    // should complete the workflow and transition to IN_SERVICE
+    node.setMaintenanceEnd(-1);
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        newStatus.getOperationalState());
+  }
+
+  @Test
+  public void testMaintenanceEndsClosingPipelines() {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+            HddsProtos.NodeState.HEALTHY));
+    // Ensure the node has some pipelines
+    nodeManager.setPipelines(dn1, 2);
+    // Add the node to the monitor
+    monitor.startMonitoring(dn1, 1);
+    monitor.run();
+    DatanodeAdminNodeDetails node = getFirstTrackedNode();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(DatanodeAdminMonitor.States.CLOSE_PIPELINES,
+        node.getCurrentState());
+
+    // Set the maintenance end time to the past and the node should complete
+    // the workflow and return to IN_SERVICE
+    node.setMaintenanceEnd(-1);
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        newStatus.getOperationalState());
+  }
+
+  @Test
+  public void testMaintenanceEndsWhileReplicatingContainers()
+      throws ContainerNotFoundException, NodeNotFoundException {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+            HddsProtos.NodeState.HEALTHY));
+
+    nodeManager.setContainers(dn1, generateContainers(3));
+    mockGetContainerReplicaCount(
+        HddsProtos.LifeCycleState.CLOSED,
+        ContainerReplicaProto.State.MAINTENANCE,
+        ContainerReplicaProto.State.MAINTENANCE,
+        ContainerReplicaProto.State.MAINTENANCE);
+
+    // Add the node to the monitor, it should transiting to
+    // REPLICATE_CONTAINERS as the containers are under-replicated for
+    // maintenance.
+    monitor.startMonitoring(dn1, 1);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    DatanodeAdminNodeDetails node = getFirstTrackedNode();
+    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
+        node.getCurrentState());
+    assertEquals(3, node.getUnderReplicatedContainers());
+
+    node.setMaintenanceEnd(-1);
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        newStatus.getOperationalState());
+  }
+
+  @Test
+  public void testDeadMaintenanceNodeDoesNotAbortWorkflow() {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+            HddsProtos.NodeState.HEALTHY));
+
+    // Add the node to the monitor, it should transiting to
+    // AWAIT_MAINTENANCE_END as there are no under-replicated containers.
+    monitor.startMonitoring(dn1, 1);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    DatanodeAdminNodeDetails node = getFirstTrackedNode();
+    assertEquals(DatanodeAdminMonitor.States.AWAIT_MAINTENANCE_END,
+        node.getCurrentState());
+    assertEquals(0, node.getUnderReplicatedContainers());
+
+    // Set the node dead and ensure the workflow does not end
+    NodeStatus status = nodeManager.getNodeStatus(dn1);
+    nodeManager.setNodeStatus(dn1, new NodeStatus(
+        status.getOperationalState(), HddsProtos.NodeState.DEAD));
+
+    // Running the monitor again causes the node to remain in maintenance
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(DatanodeAdminMonitor.States.AWAIT_MAINTENANCE_END,
+        node.getCurrentState());
+  }
+
+  /**
+   * Generate a set of ContainerID, starting from an ID of zero up to the given
+   * count minus 1.
+   * @param count The number of ContainerID objects to generate.
+   * @return A Set of ContainerID objects.
+   */
+  private Set<ContainerID> generateContainers(int count) {
+    Set<ContainerID> containers = new HashSet<>();
+    for (int i=0; i<count; i++) {
+      containers.add(new ContainerID(i));
+    }
+    return containers;
+  }
+
+  /**
+   * Create a ContainerReplicaCount object, including a container with the
+   * requested ContainerID and state, along with a set of replicas of the given
+   * states.
+   * @param containerID The ID of the container to create an included
+   * @param containerState The state of the container
+   * @param states Create a replica for each of the given states.
+   * @return A ContainerReplicaCount containing the generated container and
+   *         replica set
+   */
+  private ContainerReplicaCount generateReplicaCount(ContainerID containerID,
+      HddsProtos.LifeCycleState containerState,
+      ContainerReplicaProto.State... states) {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (ContainerReplicaProto.State s : states) {
+      replicas.add(generateReplica(containerID, s));
+    }
+    ContainerInfo container = new ContainerInfo.Builder()
+        .setContainerID(containerID.getId())
+        .setState(containerState)
+        .build();
+
+    return new ContainerReplicaCount(container, replicas, 0, 0, 3, 2);
+  }
+
+  /**
+   * Generate a new ContainerReplica with the given containerID and State.
+   * @param containerID The ID the replica is associated with
+   * @param state The state of the generated replica.
+   * @return A containerReplica with the given ID and state
+   */
+  private ContainerReplica generateReplica(ContainerID containerID,
+      ContainerReplicaProto.State state) {
+    return ContainerReplica.newBuilder()
+        .setContainerState(state)
+        .setContainerID(containerID)
+        .setSequenceId(1)
+        .setDatanodeDetails(TestUtils.randomDatanodeDetails())
+        .build();
+  }
+
+  /**
+   * Helper method to get the first node from the set of trackedNodes within
+   * the monitor.
+   * @return DatanodeAdminNodeDetails for the first tracked node found.
+   */
+  private DatanodeAdminNodeDetails getFirstTrackedNode() {
+    return
+        monitor.getTrackedNodes().toArray(new DatanodeAdminNodeDetails[0])[0];
+  }
+
+  /**
+   * The only interaction the DatanodeAdminMonitor has with the
+   * ReplicationManager, is to request a ContainerReplicaCount object for each
+   * container on nodes being deocmmissioned or moved to maintenance. This
+   * method mocks that interface to return a ContainerReplicaCount with a
+   * container in the given containerState and a set of replias in the given
+   * replicaStates.
+   * @param containerState
+   * @param replicaStates
+   * @throws ContainerNotFoundException
+   */
+  private void mockGetContainerReplicaCount(
+      HddsProtos.LifeCycleState containerState,
+      ContainerReplicaProto.State... replicaStates)
+      throws ContainerNotFoundException {
+    reset(repManager);
+    Mockito.when(repManager.getContainerReplicaCount(
+        Mockito.any(ContainerID.class)))
+        .thenAnswer(invocation ->
+            generateReplicaCount((ContainerID)invocation.getArguments()[0],
+                containerState, replicaStates));
+  }
+
+  /**
+   * This simple internal class is used to track and handle any DatanodeAdmin
+   * events fired by the DatanodeAdminMonitor during tests.
+   */
+  private class DatanodeAdminHandler implements
+      EventHandler<DatanodeDetails> {
+
+    private AtomicInteger invocation = new AtomicInteger(0);
+
+    @Override
+    public void onMessage(final DatanodeDetails dn,
+                          final EventPublisher publisher) {
+      invocation.incrementAndGet();
+    }
+
+    public int getInvocation() {
+      return invocation.get();
+    }
+  }
 }

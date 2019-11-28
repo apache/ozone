@@ -340,7 +340,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         pipelineManager);
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
-        pipelineManager, containerManager, eventQueue);
+        pipelineManager, containerManager, eventQueue, replicationManager);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);

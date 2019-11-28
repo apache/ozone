@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import java.util.Set;
@@ -37,9 +38,11 @@ public class ContainerReplicaCount {
   private int inFlightDel = 0;
   private int repFactor;
   private int minHealthyForMaintenance;
+  private ContainerInfo container;
   private Set<ContainerReplica> replica;
 
-  public ContainerReplicaCount(Set<ContainerReplica> replica, int inFlightAdd,
+  public ContainerReplicaCount(ContainerInfo container,
+                               Set<ContainerReplica> replica, int inFlightAdd,
                                int inFlightDelete, int replicationFactor,
                                int minHealthyForMaintenance) {
     this.healthyCount = 0;
@@ -51,6 +54,7 @@ public class ContainerReplicaCount {
     this.replica = replica;
     this.minHealthyForMaintenance
         = Math.min(this.repFactor, minHealthyForMaintenance);
+    this.container = container;
 
     for (ContainerReplica cr : this.replica) {
       ContainerReplicaProto.State state = cr.getState();
@@ -80,13 +84,18 @@ public class ContainerReplicaCount {
     return repFactor;
   }
 
+  public ContainerInfo getContainer() {
+    return container;
+  }
+
   public Set<ContainerReplica> getReplica() {
     return replica;
   }
 
   @Override
   public String toString() {
-    return "Replica Count: "+replica.size()+
+    return "Container State: " +container.getState()+
+        " Replica Count: "+replica.size()+
         " Healthy Count: "+healthyCount+
         " Decommission Count: "+decommissionCount+
         " Maintenance Count: "+maintenanceCount+
@@ -237,5 +246,22 @@ public class ContainerReplicaCount {
    */
   public boolean isOverReplicated() {
     return missingReplicas() + inFlightDel < 0;
+  }
+
+  /**
+   * Returns true if the container is healthy, meaning all replica which are not
+   * in a decommission or maintenance state are in the same state as the
+   * container and in QUASI_CLOSED or in CLOSED state.
+   *
+   * @return true if the container is healthy, false otherwise
+   */
+  public boolean isHealthy() {
+    return (container.getState() == HddsProtos.LifeCycleState.CLOSED
+        || container.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED)
+        && replica.stream()
+        .filter(r -> r.getState() != ContainerReplicaProto.State.DECOMMISSIONED)
+        .filter(r -> r.getState() != ContainerReplicaProto.State.MAINTENANCE)
+        .allMatch(r -> ReplicationManager.compareState(
+            container.getState(), r.getState()));
   }
 }

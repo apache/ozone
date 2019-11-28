@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -49,8 +50,9 @@ public class NodeDecommissionManager {
 
   private NodeManager nodeManager;
   private PipelineManager pipelineManager;
- // private ContainerManager containerManager;
+  //private ContainerManager containerManager;
   private EventPublisher eventQueue;
+  private ReplicationManager replicationManager;
   private OzoneConfiguration conf;
   private boolean useHostnames;
   private long monitorInterval;
@@ -166,12 +168,13 @@ public class NodeDecommissionManager {
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
       PipelineManager pm, ContainerManager containerManager,
-      EventPublisher eventQueue) {
+      EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
     conf = config;
     this.pipelineManager = pm;
     //this.containerManager = containerManager;
     this.eventQueue = eventQueue;
+    this.replicationManager = rm;
 
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat("DatanodeAdminManager-%d")
@@ -202,6 +205,7 @@ public class NodeDecommissionManager {
     monitor.setEventQueue(this.eventQueue);
     monitor.setNodeManager(nodeManager);
     monitor.setPipelineManager(pipelineManager);
+    monitor.setReplicationManager(replicationManager);
 
     executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
         TimeUnit.SECONDS);
@@ -239,8 +243,7 @@ public class NodeDecommissionManager {
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.DECOMMISSIONING);
       monitor.startMonitoring(dn, 0);
-    } else if (opState == NodeOperationalState.DECOMMISSIONING
-        || opState == NodeOperationalState.DECOMMISSIONED) {
+    } else if (nodeStatus.isDecommission()) {
       LOG.info("Start Decommission called on node {} in state {}. Nothing to "+
           "do.", dn, opState);
     } else {
@@ -317,8 +320,7 @@ public class NodeDecommissionManager {
           dn, NodeOperationalState.ENTERING_MAINTENANCE);
       monitor.startMonitoring(dn, endInHours);
       LOG.info("Starting Maintenance for node {}", dn);
-    } else if (opState == NodeOperationalState.ENTERING_MAINTENANCE ||
-        opState == NodeOperationalState.IN_MAINTENANCE) {
+    } else if (nodeStatus.isMaintenance()) {
       LOG.info("Starting Maintenance called on node {} with state {}. "+
           "Nothing to do.", dn, opState);
     } else {

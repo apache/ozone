@@ -21,10 +21,7 @@ package org.apache.hadoop.hdds.scm.container;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto
@@ -33,24 +30,14 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManager
     .ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .ContainerPlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.lock.LockManager;
-import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -84,7 +71,7 @@ public class TestReplicationManager {
   private ContainerPlacementPolicy containerPlacementPolicy;
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
-  private SimpleNodeManager nodeManager;
+  private SimpleMockNodeManager nodeManager;
   private ContainerManager containerManager;
   private Configuration conf;
 
@@ -93,7 +80,7 @@ public class TestReplicationManager {
     conf = new OzoneConfiguration();
     containerManager =
         Mockito.mock(ContainerManager.class);
-    nodeManager = new SimpleNodeManager();
+    nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
     containerStateManager = new ContainerStateManager(conf);
 
@@ -897,182 +884,6 @@ public class TestReplicationManager {
       return commands.stream().anyMatch(dc ->
           dc.getCommand().getType().equals(type) &&
               dc.getDatanodeId().equals(datanode.getUuid()));
-    }
-  }
-
-  private class SimpleNodeManager implements NodeManager {
-
-    private Map<UUID, DatanodeInfo> nodeMap = new HashMap();
-
-    public void register(DatanodeDetails dd, NodeStatus status) {
-      nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status));
-    }
-
-    /**
-     * If the given node was registed with the nodeManager, return the
-     * NodeStatus for the node. Otherwise return a NodeStatus of "In Service
-     * and Healthy".
-     * @param datanodeDetails DatanodeDetails
-     * @return The NodeStatus of the node if it is registered, otherwise an
-     *         Inservice and Healthy NodeStatus.
-     */
-    @Override
-    public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails) {
-      DatanodeInfo dni = nodeMap.get(datanodeDetails.getUuid());
-      if (dni != null) {
-        return dni.getNodeStatus();
-      } else {
-        return NodeStatus.inServiceHealthy();
-      }
-    }
-
-    /**
-     * Below here, are all auto-generate placeholder methods to implement the
-     * interface.
-     */
-    @Override
-    public List<DatanodeDetails> getNodes(NodeStatus nodeStatus) {
-      return null;
-    }
-
-    @Override
-    public List<DatanodeDetails> getNodes(
-        HddsProtos.NodeOperationalState opState, HddsProtos.NodeState health) {
-      return null;
-    }
-
-    @Override
-    public int getNodeCount(NodeStatus nodeStatus) {
-      return 0;
-    }
-
-    @Override
-    public int getNodeCount(HddsProtos.NodeOperationalState opState,
-        HddsProtos.NodeState health) {
-      return 0;
-    }
-
-    @Override
-    public List<DatanodeDetails> getAllNodes() {
-      return null;
-    }
-
-    @Override
-    public SCMNodeStat getStats() {
-      return null;
-    }
-
-    @Override
-    public Map<DatanodeDetails, SCMNodeStat> getNodeStats() {
-      return null;
-    }
-
-    @Override
-    public SCMNodeMetric getNodeStat(DatanodeDetails datanodeDetails) {
-      return null;
-    }
-
-    @Override
-    public void setNodeOperationalState(DatanodeDetails datanodeDetails,
-        HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
-    }
-
-    @Override
-    public Set<PipelineID> getPipelines(DatanodeDetails datanodeDetails) {
-      return null;
-    }
-
-    @Override
-    public void addPipeline(Pipeline pipeline) {
-    }
-
-    @Override
-    public void removePipeline(Pipeline pipeline) {
-    }
-
-    @Override
-    public void addContainer(DatanodeDetails datanodeDetails,
-        ContainerID containerId) throws NodeNotFoundException {
-    }
-
-    @Override
-    public void setContainers(DatanodeDetails datanodeDetails,
-        Set<ContainerID> containerIds) throws NodeNotFoundException {
-    }
-
-    @Override
-    public Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
-        throws NodeNotFoundException {
-      return null;
-    }
-
-    @Override
-    public void addDatanodeCommand(UUID dnId, SCMCommand command) {
-    }
-
-    @Override
-    public void processNodeReport(DatanodeDetails datanodeDetails,
-        StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport) {
-    }
-
-    @Override
-    public List<SCMCommand> getCommandQueue(UUID dnID) {
-      return null;
-    }
-
-    @Override
-    public DatanodeDetails getNodeByUuid(String uuid) {
-      return null;
-    }
-
-    @Override
-    public List<DatanodeDetails> getNodesByAddress(String address) {
-      return null;
-    }
-
-    @Override
-    public void close() throws IOException {
-
-    }
-
-    @Override
-    public Map<String, Integer> getNodeCount() {
-      return null;
-    }
-
-    @Override
-    public Map<String, Long> getNodeInfo() {
-      return null;
-    }
-
-    @Override
-    public void onMessage(CommandForDatanode commandForDatanode,
-        EventPublisher publisher) {
-    }
-
-    @Override
-    public VersionResponse getVersion(
-        StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto
-            versionRequest) {
-      return null;
-    }
-
-    @Override
-    public RegisteredCommand register(DatanodeDetails datanodeDetails,
-        StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport,
-        StorageContainerDatanodeProtocolProtos.PipelineReportsProto
-        pipelineReport) {
-      return null;
-    }
-
-    @Override
-    public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
-      return null;
-    }
-
-    @Override
-    public Boolean isNodeRegistered(DatanodeDetails datanodeDetails) {
-      return null;
     }
   }
 
