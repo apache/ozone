@@ -34,6 +34,7 @@ import org.junit.rules.Timeout;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
@@ -96,13 +97,16 @@ public class TestMiniOzoneHACluster {
 
   @Test
   public void testGetOMLeader() throws InterruptedException, TimeoutException {
+    AtomicReference<OzoneManager> ozoneManager = new AtomicReference<>();
     // Wait for OM leader election to finish
-    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null,
-            100, 30000);
-    OzoneManager ozoneManager = cluster.getOMLeader();
+    GenericTestUtils.waitFor(() -> {
+      OzoneManager om = cluster.getOMLeader();
+      ozoneManager.set(om);
+      return om != null;
+    }, 100, 30000);
     Assert.assertNotNull("Timed out waiting OM leader election to finish: "
             + "no leader or more than one leader.", ozoneManager);
     Assert.assertTrue("Should have gotten the leader!",
-        ozoneManager.isLeader());
+        ozoneManager.get().isLeader());
   }
 }
