@@ -34,6 +34,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -127,7 +128,9 @@ public class TestDatanodeAdminMonitor {
 
   }
 
+
   @Test
+  @Ignore // HDDS-2631
   public void testMonitoredNodeHasPipelinesClosed()
       throws NodeNotFoundException, TimeoutException, InterruptedException {
 

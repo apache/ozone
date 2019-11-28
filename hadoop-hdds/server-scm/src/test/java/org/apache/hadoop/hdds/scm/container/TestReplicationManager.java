@@ -21,21 +21,36 @@ package org.apache.hadoop.hdds.scm.container;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager
+    .ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms
     .ContainerPlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.lock.LockManager;
+import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -69,12 +84,16 @@ public class TestReplicationManager {
   private ContainerPlacementPolicy containerPlacementPolicy;
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
+  private SimpleNodeManager nodeManager;
+  private ContainerManager containerManager;
+  private Configuration conf;
 
   @Before
   public void setup() throws IOException, InterruptedException {
-    final Configuration conf = new OzoneConfiguration();
-    final ContainerManager containerManager =
+    conf = new OzoneConfiguration();
+    containerManager =
         Mockito.mock(ContainerManager.class);
+    nodeManager = new SimpleNodeManager();
     eventQueue = new EventQueue();
     containerStateManager = new ContainerStateManager(conf);
 
@@ -106,12 +125,27 @@ public class TestReplicationManager {
               .collect(Collectors.toList());
         });
 
+    createReplicationManager(new ReplicationManagerConfiguration());
     replicationManager = new ReplicationManager(
         new ReplicationManagerConfiguration(),
         containerManager,
         containerPlacementPolicy,
         eventQueue,
-        new LockManager<>(conf));
+        new LockManager<>(conf),
+        nodeManager);
+    replicationManager.start();
+    Thread.sleep(100L);
+  }
+
+  private void createReplicationManager(ReplicationManagerConfiguration rmConf)
+      throws InterruptedException {
+    replicationManager = new ReplicationManager(
+        rmConf,
+        containerManager,
+        containerPlacementPolicy,
+        eventQueue,
+        new LockManager<>(conf),
+        nodeManager);
     replicationManager.start();
     Thread.sleep(100L);
   }
@@ -606,6 +640,213 @@ public class TestReplicationManager {
 
   }
 
+  /**
+   * ReplicationManager should replicate an additional replica if there are
+   * decommissioned replicas.
+   */
+  @Test
+  public void testUnderReplicatedDueToDecommission() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.CLOSED, State.DECOMMISSIONED, State.DECOMMISSIONED);
+    assertReplicaScheduled(2);
+  }
+
+  /**
+   * ReplicationManager should replicate an additional replica when all copies
+   * are decommissioning.
+   */
+  @Test
+  public void testUnderReplicatedDueToAllDecommission() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.DECOMMISSIONED, State.DECOMMISSIONED, State.DECOMMISSIONED);
+    assertReplicaScheduled(3);
+  }
+
+  /**
+   * ReplicationManager should not take any action when the container is
+   * correctly replicated with decommissioned replicas still present.
+   */
+  @Test
+  public void testCorrectlyReplicatedWithDecommission() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.CLOSED, State.CLOSED, State.CLOSED, State.DECOMMISSIONED);
+    assertReplicaScheduled(0);
+  }
+
+  /**
+   * ReplicationManager should replicate an additional replica when min rep
+   * is not met for maintenance.
+   */
+  @Test
+  public void testUnderReplicatedDueToMaintenance() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.CLOSED, State.MAINTENANCE, State.MAINTENANCE);
+    assertReplicaScheduled(1);
+  }
+
+  /**
+   * ReplicationManager should not replicate an additional replica when if
+   * min replica for maintenance is 1 and another replica is available.
+   */
+  @Test
+  public void testNotUnderReplicatedDueToMaintenanceMinRepOne() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    replicationManager.stop();
+    ReplicationManagerConfiguration newConf =
+        new ReplicationManagerConfiguration();
+    newConf.setMaintenanceReplicaMinimum(1);
+    createReplicationManager(newConf);
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.CLOSED, State.MAINTENANCE, State.MAINTENANCE);
+    assertReplicaScheduled(0);
+  }
+
+  /**
+   * ReplicationManager should replicate an additional replica when all copies
+   * are going off line and min rep is 1.
+   */
+  @Test
+  public void testUnderReplicatedDueToMaintenanceMinRepOne() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    replicationManager.stop();
+    ReplicationManagerConfiguration newConf =
+        new ReplicationManagerConfiguration();
+    newConf.setMaintenanceReplicaMinimum(1);
+    createReplicationManager(newConf);
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.MAINTENANCE, State.MAINTENANCE, State.MAINTENANCE);
+    assertReplicaScheduled(1);
+  }
+
+  /**
+   * ReplicationManager should replicate additional replica when all copies
+   * are going into maintenance.
+   */
+  @Test
+  public void testUnderReplicatedDueToAllMaintenance() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.MAINTENANCE, State.MAINTENANCE, State.MAINTENANCE);
+    assertReplicaScheduled(2);
+  }
+
+  /**
+   * ReplicationManager should not replicate additional replica sufficient
+   * replica are available.
+   */
+  @Test
+  public void testCorrectlyReplicatedWithMaintenance() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.CLOSED, State.CLOSED, State.MAINTENANCE, State.MAINTENANCE);
+    assertReplicaScheduled(0);
+  }
+
+  /**
+   * ReplicationManager should replicate additional replica when all copies
+   * are decommissioning or maintenance.
+   */
+  @Test
+  public void testUnderReplicatedWithDecommissionAndMaintenance() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.DECOMMISSIONED, State.DECOMMISSIONED, State.MAINTENANCE,
+        State.MAINTENANCE);
+    assertReplicaScheduled(2);
+  }
+
+  /**
+   * When a CLOSED container is over replicated, ReplicationManager
+   * deletes the excess replicas. While choosing the replica for deletion
+   * ReplicationManager should not attempt to remove a DECOMMISSION or
+   * MAINTENANCE replica.
+   */
+  @Test
+  public void testOverReplicatedClosedContainerWithDecomAndMaint()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        State.DECOMMISSIONED, State.MAINTENANCE,
+        State.CLOSED, State.CLOSED, State.CLOSED, State.CLOSED);
+
+    final int currentDeleteCommandCount = datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+
+    replicationManager.processContainersNow();
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    Assert.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+    // Get the DECOM and Maint replica and ensure none of them are scheduled
+    // for removal
+    Set<ContainerReplica> decom =
+        containerStateManager.getContainerReplicas(container.containerID())
+        .stream()
+        .filter(r -> r.getState() != State.CLOSED)
+        .collect(Collectors.toSet());
+    for (ContainerReplica r : decom) {
+      Assert.assertFalse(datanodeCommandHandler.received(
+          SCMCommandProto.Type.deleteContainerCommand,
+          r.getDatanodeDetails()));
+    }
+  }
+
+  /**
+   * Replication Manager should not attempt to replicate from an unhealthy
+   * (stale or dead) node. To test this, setup a scenario where a replia needs
+   * to be created, but mark all nodes stale. That way, no new replica will be
+   * scheduled.
+   */
+  @Test
+  public void testUnderReplicatedNotHealthySource()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = setupReplicas(LifeCycleState.CLOSED,
+        NodeStatus.inServiceStale(),
+        State.CLOSED, State.DECOMMISSIONED, State.DECOMMISSIONED);
+    // There should be replica scheduled, but as all nodes are stale, nothing
+    // gets scheduled.
+    assertReplicaScheduled(0);
+  }
+
+  private ContainerInfo setupReplicas(
+      LifeCycleState containerState, State... states)
+      throws SCMException, ContainerNotFoundException {
+    return setupReplicas(containerState, NodeStatus.inServiceHealthy(), states);
+  }
+
+  private ContainerInfo setupReplicas(
+      LifeCycleState containerState, NodeStatus allNodesStatus, State... states)
+      throws SCMException, ContainerNotFoundException {
+    final ContainerInfo container = getContainer(containerState);
+    final ContainerID id = container.containerID();
+    containerStateManager.loadContainer(container);
+    final UUID originNodeId = UUID.randomUUID();
+
+    for (State s : states) {
+      DatanodeDetails dn = randomDatanodeDetails();
+      nodeManager.register(dn, allNodesStatus);
+      final ContainerReplica replica = getReplicas(
+          id, s, 1000L, originNodeId, dn);
+      containerStateManager.updateContainerReplica(id, replica);
+    }
+    return container;
+  }
+
+  private void assertReplicaScheduled(int delta) throws InterruptedException {
+    final int currentReplicateCommandCount = datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
+
+    replicationManager.processContainersNow();
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    Assert.assertEquals(currentReplicateCommandCount + delta,
+        datanodeCommandHandler.getInvocationCount(
+            SCMCommandProto.Type.replicateContainerCommand));
+  }
+
   @After
   public void teardown() throws IOException {
     containerStateManager.close();
@@ -656,6 +897,182 @@ public class TestReplicationManager {
       return commands.stream().anyMatch(dc ->
           dc.getCommand().getType().equals(type) &&
               dc.getDatanodeId().equals(datanode.getUuid()));
+    }
+  }
+
+  private class SimpleNodeManager implements NodeManager {
+
+    private Map<UUID, DatanodeInfo> nodeMap = new HashMap();
+
+    public void register(DatanodeDetails dd, NodeStatus status) {
+      nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status));
+    }
+
+    /**
+     * If the given node was registed with the nodeManager, return the
+     * NodeStatus for the node. Otherwise return a NodeStatus of "In Service
+     * and Healthy".
+     * @param datanodeDetails DatanodeDetails
+     * @return The NodeStatus of the node if it is registered, otherwise an
+     *         Inservice and Healthy NodeStatus.
+     */
+    @Override
+    public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails) {
+      DatanodeInfo dni = nodeMap.get(datanodeDetails.getUuid());
+      if (dni != null) {
+        return dni.getNodeStatus();
+      } else {
+        return NodeStatus.inServiceHealthy();
+      }
+    }
+
+    /**
+     * Below here, are all auto-generate placeholder methods to implement the
+     * interface.
+     */
+    @Override
+    public List<DatanodeDetails> getNodes(NodeStatus nodeStatus) {
+      return null;
+    }
+
+    @Override
+    public List<DatanodeDetails> getNodes(
+        HddsProtos.NodeOperationalState opState, HddsProtos.NodeState health) {
+      return null;
+    }
+
+    @Override
+    public int getNodeCount(NodeStatus nodeStatus) {
+      return 0;
+    }
+
+    @Override
+    public int getNodeCount(HddsProtos.NodeOperationalState opState,
+        HddsProtos.NodeState health) {
+      return 0;
+    }
+
+    @Override
+    public List<DatanodeDetails> getAllNodes() {
+      return null;
+    }
+
+    @Override
+    public SCMNodeStat getStats() {
+      return null;
+    }
+
+    @Override
+    public Map<DatanodeDetails, SCMNodeStat> getNodeStats() {
+      return null;
+    }
+
+    @Override
+    public SCMNodeMetric getNodeStat(DatanodeDetails datanodeDetails) {
+      return null;
+    }
+
+    @Override
+    public void setNodeOperationalState(DatanodeDetails datanodeDetails,
+        HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+    }
+
+    @Override
+    public Set<PipelineID> getPipelines(DatanodeDetails datanodeDetails) {
+      return null;
+    }
+
+    @Override
+    public void addPipeline(Pipeline pipeline) {
+    }
+
+    @Override
+    public void removePipeline(Pipeline pipeline) {
+    }
+
+    @Override
+    public void addContainer(DatanodeDetails datanodeDetails,
+        ContainerID containerId) throws NodeNotFoundException {
+    }
+
+    @Override
+    public void setContainers(DatanodeDetails datanodeDetails,
+        Set<ContainerID> containerIds) throws NodeNotFoundException {
+    }
+
+    @Override
+    public Set<ContainerID> getContainers(DatanodeDetails datanodeDetails)
+        throws NodeNotFoundException {
+      return null;
+    }
+
+    @Override
+    public void addDatanodeCommand(UUID dnId, SCMCommand command) {
+    }
+
+    @Override
+    public void processNodeReport(DatanodeDetails datanodeDetails,
+        StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport) {
+    }
+
+    @Override
+    public List<SCMCommand> getCommandQueue(UUID dnID) {
+      return null;
+    }
+
+    @Override
+    public DatanodeDetails getNodeByUuid(String uuid) {
+      return null;
+    }
+
+    @Override
+    public List<DatanodeDetails> getNodesByAddress(String address) {
+      return null;
+    }
+
+    @Override
+    public void close() throws IOException {
+
+    }
+
+    @Override
+    public Map<String, Integer> getNodeCount() {
+      return null;
+    }
+
+    @Override
+    public Map<String, Long> getNodeInfo() {
+      return null;
+    }
+
+    @Override
+    public void onMessage(CommandForDatanode commandForDatanode,
+        EventPublisher publisher) {
+    }
+
+    @Override
+    public VersionResponse getVersion(
+        StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto
+            versionRequest) {
+      return null;
+    }
+
+    @Override
+    public RegisteredCommand register(DatanodeDetails datanodeDetails,
+        StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport,
+        StorageContainerDatanodeProtocolProtos.PipelineReportsProto
+        pipelineReport) {
+      return null;
+    }
+
+    @Override
+    public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
+      return null;
+    }
+
+    @Override
+    public Boolean isNodeRegistered(DatanodeDetails datanodeDetails) {
+      return null;
     }
   }
 
