@@ -42,6 +42,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.protocol.GroupMismatchException;
 import org.apache.ratis.protocol.RaftRetryFailureException;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -61,6 +62,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * This class verifies the watchForCommit Handling by xceiverClient.
  */
+@Ignore
 public class TestWatchForCommit {
 
   private MiniOzoneCluster cluster;
