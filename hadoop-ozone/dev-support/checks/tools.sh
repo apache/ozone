@@ -13,20 +13,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 cd "$DIR/../../.." || exit 1
-
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/integration"}
-mkdir -p "$REPORT_DIR"
 
 export MAVEN_OPTS="-Xmx4096m"
 mvn -B install -DskipTests
-mvn -B -fn test -pl :hadoop-ozone-integration-test "$@" | tee $REPORT_DIR/output.log
+mvn -B -fn test -pl :hadoop-ozone-tools "$@"
+
+REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/tools"}
+mkdir -p "$REPORT_DIR"
 
 # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
 source "$DIR/_mvn_unit_report.sh"
 
-if [[ -s "$REPORT_DIR/summary.txt" ]] ; then
-    exit 1
+if [[ -s "$REPORT_DIR/summary.txt" ]]; then
+  exit 1
 fi
 exit 0

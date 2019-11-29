@@ -12,110 +12,46 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-name: build-branch
+name: integration-pilot
 on:
   - push
 jobs:
-  build:
-    name: compile
+  integration:
+    name: integration
+    runs-on: ubuntu-18.04
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/buildenv
+          with:
+             args: ./hadoop-ozone/dev-support/checks/integration.sh
+        - uses: actions/upload-artifact@master
+          if: always()
+          with:
+            name: integration
+            path: target/integration
+  ozonefs:
+    name: ozonefs
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@master
       - uses: ./.github/buildenv
         with:
-          args: ./hadoop-ozone/dev-support/checks/build.sh
-  rat:
-    name: rat
+          args: ./hadoop-ozone/dev-support/checks/ozonefs.sh
+      - uses: actions/upload-artifact@master
+        if: always()
+        with:
+          name: ozonefs
+          path: target/ozonefs
+  tools:
+    name: tools
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/rat.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: rat
-            path: target/rat
-  author:
-    name: author
-    runs-on: ubuntu-18.04
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/author.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: author
-            path: target/author
-  unit:
-    name: unit
-    runs-on: ubuntu-18.04
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/unit.sh
-        - uses: ./.github/buildenv
-          if: github.repository == 'apache/hadoop-ozone'
-          with:
-            args: ./hadoop-ozone/dev-support/checks/sonar.sh
-          env:
-            SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: unit
-            path: target/unit
-  checkstyle:
-    name: checkstyle
-    runs-on: ubuntu-18.04
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: checkstyle
-            path: target/checkstyle
-  findbugs:
-    name: findbugs
-    runs-on: ubuntu-18.04
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/findbugs.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: findbugs
-            path: target/findbugs
-  acceptance:
-    name: acceptance
-    runs-on: ubuntu-18.04
-    needs:
-       - build
-       - rat
-       - checkstyle
-       - unit
-       - findbugs
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-            args: ./hadoop-ozone/dev-support/checks/build.sh
-        - run: sudo pip install robotframework
-        - run: sudo chown runner -R .
-        - run: cd ./hadoop-ozone/dist/target/ozone-*-SNAPSHOT/ && mkdir .aws && sudo chown 1000 .aws 
-        - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: acceptance
-            path: target/acceptance
+      - uses: actions/checkout@master
+      - uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/tools.sh
+      - uses: actions/upload-artifact@master
+        if: always()
+        with:
+          name: tools
+          path: target/tools

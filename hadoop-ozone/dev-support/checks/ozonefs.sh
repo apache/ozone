@@ -16,12 +16,12 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/integration"}
-mkdir -p "$REPORT_DIR"
-
 export MAVEN_OPTS="-Xmx4096m"
 mvn -B install -DskipTests
-mvn -B -fn test -pl :hadoop-ozone-integration-test "$@" | tee $REPORT_DIR/output.log
+mvn -B -fn test -pl :hadoop-ozone-filesystem "$@"
+
+REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/ozonefs"}
+mkdir -p "$REPORT_DIR"
 
 # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
 source "$DIR/_mvn_unit_report.sh"
