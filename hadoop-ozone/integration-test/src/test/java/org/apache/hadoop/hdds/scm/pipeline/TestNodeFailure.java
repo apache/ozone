@@ -43,6 +43,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
 /**
  * Test Node failure detection and handling in Ratis.
  */
+@Ignore
 public class TestNodeFailure {
 
   private static MiniOzoneCluster cluster;
