@@ -70,6 +70,7 @@ import static org.mockito.Mockito.when;
 /**
  * This class tests OzoneManagerDouble Buffer with actual OMResponse classes.
  */
+@Ignore("HDDS-2648")
 public class TestOzoneManagerDoubleBufferWithOMResponse {
 
   private OzoneManager ozoneManager;

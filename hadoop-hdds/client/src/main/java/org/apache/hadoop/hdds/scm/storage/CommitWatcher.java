@@ -34,9 +34,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.ExecutionException;
@@ -95,10 +97,7 @@ public class CommitWatcher {
       Preconditions.checkState(commitIndex2flushedDataMap.containsKey(index));
       final List<ChunkBuffer> buffers
           = commitIndex2flushedDataMap.remove(index);
-      long length = buffers.stream().mapToLong(value -> {
-        int pos = value.position();
-        return pos;
-      }).sum();
+      long length = buffers.stream().mapToLong(ChunkBuffer::position).sum();
       totalAckDataLength += length;
       // clear the future object from the future Map
       Preconditions.checkNotNull(futureMap.remove(totalAckDataLength));
@@ -110,7 +109,8 @@ public class CommitWatcher {
   }
 
   public void updateCommitInfoMap(long index, List<ChunkBuffer> buffers) {
-    commitIndex2flushedDataMap.put(index, buffers);
+    commitIndex2flushedDataMap.computeIfAbsent(index, k -> new LinkedList<>())
+      .addAll(buffers);
   }
 
   int getCommitInfoMapSize() {
@@ -132,7 +132,7 @@ public class CommitWatcher {
           commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).min()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for first index " + index + " to catch up");
+        LOG.debug("waiting for first index {} to catch up", index);
       }
       return watchForCommit(index);
     } else {
@@ -156,7 +156,7 @@ public class CommitWatcher {
           commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).max()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for last flush Index " + index + " to catch up");
+        LOG.debug("waiting for last flush Index {} to catch up", index);
       }
       return watchForCommit(index);
     } else {
@@ -168,9 +168,7 @@ public class CommitWatcher {
   private void adjustBuffers(long commitIndex) {
     List<Long> keyList = commitIndex2flushedDataMap.keySet().stream()
         .filter(p -> p <= commitIndex).collect(Collectors.toList());
-    if (keyList.isEmpty()) {
-      return;
-    } else {
+    if (!keyList.isEmpty()) {
       releaseBuffers(keyList);
     }
   }
@@ -217,9 +215,9 @@ public class CommitWatcher {
     return commitIndex2flushedDataMap;
   }
 
-  public ConcurrentHashMap<Long,
-      CompletableFuture<ContainerProtos.
-          ContainerCommandResponseProto>> getFutureMap() {
+  public ConcurrentMap<Long,
+        CompletableFuture<ContainerProtos.
+            ContainerCommandResponseProto>> getFutureMap() {
     return futureMap;
   }
 

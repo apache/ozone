@@ -42,19 +42,23 @@ Start OM
     [arguments]             ${OM_HOST}
                             Set Global Variable             ${HOST}                 ${OM_HOST}
                             Open Connection And Log In
-                            Execute Command                 /opt/startOM.sh --restart
-    ${startupMsg} =         Execute Command                 sudo ps aux | grep om
+    ${rc1} =                Execute Command                 /opt/startOM.sh --restart       return_stdout=False    return_rc=True
+                            Should Be Equal As Integers     ${rc1}                  0
+    ${startMsg}  ${rc2} =   Execute Command                 sudo ps aux | grep om           return_rc=True
+                            Should Be Equal As Integers     ${rc2}                  0
                             Close Connection
-                            Should Contain                  ${startupMsg}           OzoneManagerStarter
+                            Should Contain                  ${startMsg}             OzoneManagerStarter
 
 Stop OM
     [arguments]             ${OM_HOST}
                             Set Global Variable             ${HOST}                 ${OM_HOST}
                             Open Connection And Log In
-                            Execute Command                 /opt/stopOM.sh
-    ${shutdownMsg} =        Execute Command                 sudo ps aux | grep om
+    ${rc1} =                Execute Command                 /opt/stopOM.sh                  return_stdout=False    return_rc=True
+                            Should Be Equal As Integers     ${rc1}                  0
+    ${stopMsg}  ${rc2} =    Execute Command                 sudo ps aux | grep om           return_rc=True
+                            Should Be Equal As Integers     ${rc2}                  0
                             Close Connection
-                            Should Not Contain              ${shutdownMsg}          OzoneManagerStarter
+                            Should Not Contain              ${stopMsg}              OzoneManagerStarter
 
 Create volume and bucket
     Execute                 ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME}
@@ -99,12 +103,14 @@ Get Ratis Logs
     [arguments]             ${OM_HOST}
                             Set Global Variable     ${HOST}                 ${OM_HOST}
                             Open Connection And Log In
-    ${gorupId} =            Execute Command         ls ${RATIS_DIR} | grep -v 'snapshot'
-                            LOG                     Ratis GroupId: ${gorupId}
-    ${currDir} =            Catenate                SEPARATOR=              ${RATIS_DIR}    /    ${gorupId}    /current/
+    ${groupId}   ${rc} =    Execute Command         ls ${RATIS_DIR} | grep -v 'snapshot'         return_rc=True
+                            Should Be Equal As Integers                     ${rc}                0
+                            LOG                     Ratis GroupId: ${groupId}
+    ${currDir} =            Catenate                SEPARATOR=              ${RATIS_DIR}    /    ${groupId}    /current/
     @{logs} =               SSHLibrary.List Files In Directory              ${currDir}           log_*
-    ${numLogs} =            Get Length                          ${logs}
-    [return]                ${numLogs}                          ${logs}
+                            Close Connection
+    ${numLogs} =            Get Length                                      ${logs}
+    [return]                ${numLogs}                                      ${logs}
 
 ** Test Cases ***
 Stop Leader OM and Verify Failover

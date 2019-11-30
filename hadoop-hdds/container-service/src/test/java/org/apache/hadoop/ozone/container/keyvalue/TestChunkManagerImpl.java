@@ -237,8 +237,7 @@ public class TestChunkManagerImpl {
           blockID, chunkInfo, getDispatcherContext());
       fail("testReadChunkFileNotExists failed");
     } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains("Unable to find the chunk " +
-          "file.", ex);
+      GenericTestUtils.assertExceptionContains("Chunk file can't be found", ex);
       assertEquals(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, ex.getResult());
     }
   }

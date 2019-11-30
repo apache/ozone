@@ -122,6 +122,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KMS_PROVIDER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
@@ -653,37 +654,17 @@ public class KeyManagerImpl implements KeyManager {
       }
       // Refresh container pipeline info from SCM
       // based on OmKeyArgs.refreshPipeline flag
-      // 1. Client send initial read request OmKeyArgs.refreshPipeline = false
-      // and uses the pipeline cached in OM to access datanode
-      // 2. If succeeded, done.
-      // 3. If failed due to pipeline does not exist or invalid pipeline state
-      //    exception, client should retry lookupKey with
-      //    OmKeyArgs.refreshPipeline = true
       if (args.getRefreshPipeline()) {
-        for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-          key.getLocationList().forEach(k -> {
-            // TODO: fix Some tests that may not initialize container client
-            // The production should always have containerClient initialized.
-            if (scmClient.getContainerClient() != null) {
-              try {
-                ContainerWithPipeline cp = scmClient.getContainerClient()
-                    .getContainerWithPipeline(k.getContainerID());
-                if (!cp.getPipeline().equals(k.getPipeline())) {
-                  k.setPipeline(cp.getPipeline());
-                }
-              } catch (IOException e) {
-                LOG.error("Unable to update pipeline for container:{}",
-                    k.getContainerID());
-              }
-            }
-          });
-        }
+        refreshPipeline(value);
       }
       if (args.getSortDatanodes()) {
         sortDatanodeInPipeline(value, clientAddress);
       }
       return value;
     } catch (IOException ex) {
+      if (ex instanceof OMException) {
+        throw ex;
+      }
       LOG.debug("Get key failed for volume:{} bucket:{} key:{}",
           volumeName, bucketName, keyName, ex);
       throw new OMException(ex.getMessage(),
@@ -691,6 +672,43 @@ public class KeyManagerImpl implements KeyManager {
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
+    }
+  }
+
+  /**
+   * Refresh pipeline info in OM by asking SCM.
+   * @param value OmKeyInfo
+   */
+  @VisibleForTesting
+  protected void refreshPipeline(OmKeyInfo value) throws IOException {
+    Map<Long, ContainerWithPipeline> containerWithPipelineMap = new HashMap<>();
+    for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+      for (OmKeyLocationInfo k : key.getLocationList()) {
+        // TODO: fix Some tests that may not initialize container client
+        // The production should always have containerClient initialized.
+        if (scmClient.getContainerClient() != null) {
+          try {
+            if (!containerWithPipelineMap.containsKey(k.getContainerID())) {
+              ContainerWithPipeline containerWithPipeline = scmClient
+                  .getContainerClient()
+                  .getContainerWithPipeline(k.getContainerID());
+              containerWithPipelineMap.put(k.getContainerID(),
+                  containerWithPipeline);
+            }
+          } catch (IOException ioEx) {
+            LOG.debug("Get containerPipeline failed for volume:{} bucket:{} " +
+                    "key:{}", value.getVolumeName(), value.getBucketName(),
+                value.getKeyName(), ioEx);
+            throw new OMException(ioEx.getMessage(),
+                SCM_GET_PIPELINE_EXCEPTION);
+          }
+          ContainerWithPipeline cp =
+              containerWithPipelineMap.get(k.getContainerID());
+          if (!cp.getPipeline().equals(k.getPipeline())) {
+            k.setPipeline(cp.getPipeline());
+          }
+        }
+      }
     }
   }
 
@@ -970,7 +988,7 @@ public class KeyManagerImpl implements KeyManager {
               keyArgs.getBucketName() + OZONE_URI_DELIMITER +
               keyArgs.getKeyName());
 
-      if(prefixList.size() > 0) {
+      if (!prefixList.isEmpty()) {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
         if(prefixInfo  != null) {
@@ -2035,7 +2053,7 @@ public class KeyManagerImpl implements KeyManager {
       for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
         key.getLocationList().forEach(k -> {
           List<DatanodeDetails> nodes = k.getPipeline().getNodes();
-          if (nodes == null || nodes.size() == 0) {
+          if (nodes == null || nodes.isEmpty()) {
             LOG.warn("Datanodes for pipeline {} is empty",
                 k.getPipeline().getId().toString());
             return;

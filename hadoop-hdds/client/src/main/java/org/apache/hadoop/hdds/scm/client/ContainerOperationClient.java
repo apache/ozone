@@ -221,7 +221,7 @@ public class ContainerOperationClient implements ScmClient {
     // That makes sense, but it is not needed for the client to work.
     if (LOG.isDebugEnabled()) {
       LOG.debug("Pipeline creation successful. Pipeline: {}",
-          pipeline.toString());
+          pipeline);
     }
   }
 

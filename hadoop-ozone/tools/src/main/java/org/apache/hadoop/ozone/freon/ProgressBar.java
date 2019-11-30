@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
+import java.util.function.LongSupplier;
 
 /**
  * Creates and runs a ProgressBar in new Thread which gets printed on
@@ -34,8 +34,8 @@ public class ProgressBar {
   private static final long REFRESH_INTERVAL = 1000L;
 
   private final long maxValue;
-  private final Supplier<Long> currentValue;
-  private final Thread progressBar;
+  private final LongSupplier currentValue;
+  private final Thread thread;
 
   private volatile boolean running;
 
@@ -49,11 +49,11 @@ public class ProgressBar {
    * @param maxValue Maximum value of the progress
    * @param currentValue Supplier that provides the current value
    */
-  public ProgressBar(final PrintStream stream, final Long maxValue,
-                     final Supplier<Long> currentValue) {
+  public ProgressBar(final PrintStream stream, final long maxValue,
+                     final LongSupplier currentValue) {
     this.maxValue = maxValue;
     this.currentValue = currentValue;
-    this.progressBar = new Thread(getProgressBar(stream));
+    this.thread = new Thread(getProgressBar(stream));
     this.running = false;
   }
 
@@ -65,7 +65,7 @@ public class ProgressBar {
     if (!running) {
       running = true;
       startTime = System.nanoTime();
-      progressBar.start();
+      thread.start();
     }
   }
 
@@ -76,11 +76,12 @@ public class ProgressBar {
   public synchronized void shutdown() {
     if (running) {
       try {
-        progressBar.join();
+        thread.join();
         running = false;
       } catch (InterruptedException e) {
         LOG.warn("Got interrupted while waiting for the progress bar to " +
                 "complete.");
+        Thread.currentThread().interrupt();
       }
     }
   }
@@ -93,10 +94,11 @@ public class ProgressBar {
     if (running) {
       try {
         running = false;
-        progressBar.join();
+        thread.join();
       } catch (InterruptedException e) {
         LOG.warn("Got interrupted while waiting for the progress bar to " +
                 "complete.");
+        Thread.currentThread().interrupt();
       }
     }
   }
@@ -104,12 +106,13 @@ public class ProgressBar {
   private Runnable getProgressBar(final PrintStream stream) {
     return () -> {
       stream.println();
-      while (running && currentValue.get() < maxValue) {
-        print(stream, currentValue.get());
+      while (running && currentValue.getAsLong() < maxValue) {
+        print(stream, currentValue.getAsLong());
         try {
           Thread.sleep(REFRESH_INTERVAL);
         } catch (InterruptedException e) {
           LOG.warn("ProgressBar was interrupted.");
+          Thread.currentThread().interrupt();
         }
       }
       print(stream, maxValue);
@@ -127,7 +130,7 @@ public class ProgressBar {
     stream.print('\r');
     double percent = 100.0 * value / maxValue;
     StringBuilder sb = new StringBuilder();
-    sb.append(" " + String.format("%.2f", percent) + "% |");
+    sb.append(" ").append(String.format("%.2f", percent)).append("% |");
 
     for (int i = 0; i <= percent; i++) {
       sb.append('█');
@@ -136,12 +139,12 @@ public class ProgressBar {
       sb.append(' ');
     }
     sb.append("|  ");
-    sb.append(value + "/" + maxValue);
+    sb.append(value).append("/").append(maxValue);
     long timeInSec = TimeUnit.SECONDS.convert(
             System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
     String timeToPrint = String.format("%d:%02d:%02d", timeInSec / 3600,
             (timeInSec % 3600) / 60, timeInSec % 60);
-    sb.append(" Time: " + timeToPrint);
+    sb.append(" Time: ").append(timeToPrint);
     stream.print(sb.toString());
   }
 }
