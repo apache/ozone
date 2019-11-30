@@ -53,6 +53,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * Tests for ContainerStateManager.
  */
+@Ignore
 public class TestContainerStateManagerIntegration {
 
   private static final Logger LOG =
