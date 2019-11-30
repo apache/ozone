@@ -14,12 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3"
+version: "3.4"
 services:
-   freon:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
-      volumes:
-         - ../..:/opt/hadoop
-      env_file:
-         - ./docker-config
-      command: ["ozone","freon","rk"]
+  freon:
+    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    volumes:
+      - ../..:/opt/hadoop
+    env_file:
+      - docker-config
+      - monitoring.conf
+    command: ["ozone","freon","rk"]

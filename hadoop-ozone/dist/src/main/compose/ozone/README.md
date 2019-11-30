@@ -12,43 +12,51 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-# Compose files for local performance tests
+# Compose file with optional monitoring and profiling configs
 
-This directory contains docker-compose definition for an ozone cluster where
-all the metrics are saved to a prometheus instance, and profiling and Jaeger
-tracing is turned on and set up.
+This directory contains a docker-compose definition for an Ozone cluster with all components (including S3 Gateway and Recon).
 
-Prometheus follows a pull based approach where the metrics are published
- on a HTTP endpoint.
+There are two optional add-ons:
 
-Prometheus compatible metrics endpoint can be enabled by setting `hdds.prometheus.endpoint.enabled` property to `true`
+ * monitoring: adds Grafana, Jaeger and Prometheus sercvies, and configures Ozone to work with them
+ * profiling: allows sampling Ozone CPU/memory using [async-profiler](https://github.com/jvm-profiling-tools/async-profiler)
 
 ## How to start
 
 Start the cluster with `docker-compose`
 
+ * one datanode: `docker-compose up -d`
+ * three datanodes: `docker-compose up -d --scale datanode=3`
+
+### Add-ons
+
+Monitoring and/or performance add-ons can be enabled via docker-compose's ability to use multiple compose files (by using the [`-f` option repeatedly](https://docs.docker.com/compose/reference/overview/#specifying-multiple-compose-files), or more easily by defining the [`COMPOSE_FILE` environment variable](https://docs.docker.com/compose/reference/envvars/#compose_file)):
+
 ```
-docker-compose up -d
+# no COMPOSE_FILE var                                                  # => only Ozone
+export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml                # => add monitoring
+export COMPOSE_FILE=docker-compose.yaml:profiling.yaml                 # => add profiling
+export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml:profiling.yaml # => add both
 ```
 
-Scale datanodes up:
+Once the variable is defined, Ozone cluster with add-ons can be started/scaled/stopped etc. using the same `docker-compose` commands as for the base cluster.
 
-```
-docker-compose up -d --scale datanode=3
-```
+### Load generator
 
-You can enter to the SCM container and start a freon test:
+Ozone comes with a load generator called Freon.
+
+You can enter one of the containers (eg. SCM) and start a Freon test:
 
 ```
 docker-compose exec scm bash
 ozone freon ockg -n1000
 ```
 
-Or you can start freon instances in containers (to make it possible to scale them up):
-If all the datanodes are started, start the freon instance:
+You can also start two flavors of Freon as separate services, which allows scaling it up.  Once all the datanodes are started, start Freon by adding its definition to `COMPOSE_FILE` and re-running the `docker-compose up` command:
 
 ```
-docker-compose -f docker-compose.yaml -f freon-ockg.yaml up --scale datanode=3 -d
+export COMPOSE_FILE="${COMPOSE_FILE}:freon-ockg.yaml"
+docker-compose up -d --scale datanode=3
 ```
 
 ## How to use
@@ -58,17 +66,14 @@ You can check the ozone web ui:
 OzoneManager: http://localhost:9874
 SCM: http://localhost:9876
 
-You can check the ozone metrics from the prometheus web ui.
+### Monitoring
 
-http://localhost:9090/graph
+ * Prometheus: follows a pull based approach where metrics are published on an HTTP endpoint.  Metrics can be checked on [Prometheus' web UI](http://localhost:9090/)
+ * Grafana: comes with two [dashboards](http://localhost:3000) for Ozone
+   * Ozone - Object Metrics
+   * Ozone - RPC Metrics
+ * Jaeger: collects distributed tracing information from Ozone, can be queried on the [Jaeger web UI](http://localhost:16686)
 
-You can view Grafana dashboards at:
+### Profiling
 
-http://localhost:3000
-
-Default dashboards available are:
-Ozone - Object Metrics
-Ozone - RPC Metrics
-
-You can access the Jaeger UI at:
-http://localhost:16686
+Start by hitting the `/prof` endpoint on the service to be profiled, eg. http://localhost:9876/prof for SCM.  [Detailed instructions](https://cwiki.apache.org/confluence/display/HADOOP/Java+Profiling+of+Ozone) can be found in the Hadoop wiki.
