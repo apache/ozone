@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,16 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.4"
-services:
-  freon:
-    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
-    volumes:
-      - ../..:/opt/hadoop
-    env_file:
-      - docker-config
-      - monitoring.conf
-    environment:
-      - "OZONE-SITE.XML_hdds.scm.safemode.min.datanode=${OZONE_REPLICATION_FACTOR:-1}"
-      - "OZONE-SITE.XML_ozone.replication=${OZONE_REPLICATION_FACTOR:-1}"
-    command: ["ozone","freon","rk"]
+declare -ix OZONE_REPLICATION_FACTOR
+: ${OZONE_REPLICATION_FACTOR:=1}
+docker-compose up --scale datanode=${OZONE_REPLICATION_FACTOR} --no-recreate "$@"

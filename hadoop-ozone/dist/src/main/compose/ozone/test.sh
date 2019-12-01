@@ -19,6 +19,7 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 export SECURITY_ENABLED=false
+export OZONE_REPLICATION_FACTOR=3
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"

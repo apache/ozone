@@ -23,10 +23,27 @@ There are two optional add-ons:
 
 ## How to start
 
-Start the cluster with `docker-compose`
+TL;DR:
 
- * one datanode: `docker-compose up -d`
- * three datanodes: `docker-compose up -d --scale datanode=3`
+1. single datanode:
+   ```
+   ./run.sh -d
+   ```
+2. three datanodes for replication:
+   ```
+   export OZONE_REPLICATION_FACTOR=3
+   ./run.sh -d
+   ```
+
+### Basics
+
+The cluster can be started with regular `docker-compose up` command.  Use `-d` to start the cluster in the background.
+
+You can change the number of datanodes to start using the `--scale` option.  Eg. to start 3 datanodes: `docker-compose up -d --scale datanode=3`.
+
+The cluster's replication factor (1 or 3) can be controlled by setting the `OZONE_REPLICATION_FACTOR` environment variable.  It defaults to 1 to match the number of datanodes started by default, without the `--scale` option.
+
+For convenience the `run.sh` script can be used to make sure the replication factor and the number of datanodes match.  It also passes any additional arguments provided on the command-line (eg. `-d`) to `docker-compose`.
 
 ### Add-ons
 
@@ -52,11 +69,14 @@ docker-compose exec scm bash
 ozone freon ockg -n1000
 ```
 
-You can also start two flavors of Freon as separate services, which allows scaling it up.  Once all the datanodes are started, start Freon by adding its definition to `COMPOSE_FILE` and re-running the `docker-compose up` command:
+You can also start two flavors of Freon as separate services, which allows scaling them up.  Once all the datanodes are started, start Freon by adding its definition to `COMPOSE_FILE` and re-running the `docker-compose up` or `run.sh` command:
 
 ```
 export COMPOSE_FILE="${COMPOSE_FILE}:freon-ockg.yaml"
-docker-compose up -d --scale datanode=3
+
+docker-compose up -d --no-recreate --scale datanode=3
+# OR
+./run.sh -d
 ```
 
 ## How to use

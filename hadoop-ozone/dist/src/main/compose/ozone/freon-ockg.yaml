@@ -23,4 +23,7 @@ services:
     env_file:
       - docker-config
       - monitoring.conf
+    environment:
+      - "OZONE-SITE.XML_hdds.scm.safemode.min.datanode=${OZONE_REPLICATION_FACTOR:-1}"
+      - "OZONE-SITE.XML_ozone.replication=${OZONE_REPLICATION_FACTOR:-1}"
     command: ["ozone","freon","ockg","-n100000"]

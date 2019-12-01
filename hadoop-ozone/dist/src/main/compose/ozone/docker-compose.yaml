@@ -24,6 +24,9 @@ x-common-config:
     - ../..:/opt/hadoop
   env_file:
     - docker-config
+  environment:
+    - "OZONE-SITE.XML_hdds.scm.safemode.min.datanode=${OZONE_REPLICATION_FACTOR:-1}"
+    - "OZONE-SITE.XML_ozone.replication=${OZONE_REPLICATION_FACTOR:-1}"
 
 services:
   datanode:
@@ -34,17 +37,19 @@ services:
     command: ["ozone","datanode"]
   om:
     <<: *common-config
+    env_file:
+      - docker-config
+      - om.conf
     ports:
       - 9874:9874
-    environment:
-      ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
     command: ["ozone","om"]
   scm:
     <<: *common-config
     ports:
       - 9876:9876
-    environment:
-      ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+    env_file:
+      - docker-config
+      - scm.conf
     command: ["ozone","scm"]
   s3g:
     <<: *common-config
@@ -55,6 +60,7 @@ services:
     <<: *common-config
     ports:
       - 9888:9888
-    environment:
-      WAITFOR: om:9874
+    env_file:
+      - docker-config
+      - recon.conf
     command: ["ozone","recon"]
