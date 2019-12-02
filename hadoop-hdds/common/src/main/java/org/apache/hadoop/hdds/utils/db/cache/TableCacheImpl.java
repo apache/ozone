@@ -101,7 +101,7 @@ public class TableCacheImpl<CACHEKEY extends CacheKey,
   }
 
   public void cleanup(List<Long> epochs) {
-    executorService.submit(() -> evictCache(epochs));
+    executorService.execute(() -> evictCache(epochs));
   }
 
   @Override
