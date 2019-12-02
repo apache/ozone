@@ -53,6 +53,7 @@ import org.apache.hadoop.util.Time;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -67,6 +68,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
+@Ignore
 public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
 
   private static MiniOzoneCluster cluster = null;
