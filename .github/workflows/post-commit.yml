@@ -14,7 +14,8 @@
 # limitations under the License.
 name: integration-pilot
 on:
-  - push
+  schedule:
+    - cron:  '0 */4 * * *'
 jobs:
   integration:
     name: integration
