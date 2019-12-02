@@ -147,12 +147,6 @@ public final class OmKeyArgs implements Auditable {
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.KEY, this.keyName);
     auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(this.dataSize));
-    auditMap.put(OzoneConsts.REPLICATION_TYPE,
-        (this.type != null) ? this.type.name() : null);
-    auditMap.put(OzoneConsts.REPLICATION_FACTOR,
-        (this.factor != null) ? this.factor.name() : null);
-    auditMap.put(OzoneConsts.KEY_LOCATION_INFO,
-        (this.locationInfoList != null) ? locationInfoList.toString() : null);
     return auditMap;
   }
 
