@@ -21,14 +21,8 @@ package org.apache.hadoop.ozone;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.test.PathUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 
@@ -40,9 +34,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Unit tests for {@link OmUtils}.
@@ -54,54 +46,6 @@ public class TestOmUtils {
 
   @Rule
   public Timeout timeout = new Timeout(60_000);
-
-  @Rule
-  public ExpectedException thrown= ExpectedException.none();
-
-  /**
-   * Test {@link OmUtils#getOmDbDir}.
-   */
-  @Test
-  public void testGetOmDbDir() {
-    final File testDir = PathUtils.getTestDir(TestOmUtils.class);
-    final File dbDir = new File(testDir, "omDbDir");
-    final File metaDir = new File(testDir, "metaDir");   // should be ignored.
-    final Configuration conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, dbDir.getPath());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
-
-    try {
-      assertEquals(dbDir, OmUtils.getOmDbDir(conf));
-      assertTrue(dbDir.exists());          // should have been created.
-    } finally {
-      FileUtils.deleteQuietly(dbDir);
-    }
-  }
-
-  /**
-   * Test {@link OmUtils#getOmDbDir} with fallback to OZONE_METADATA_DIRS
-   * when OZONE_OM_DB_DIRS is undefined.
-   */
-  @Test
-  public void testGetOmDbDirWithFallback() {
-    final File testDir = PathUtils.getTestDir(TestOmUtils.class);
-    final File metaDir = new File(testDir, "metaDir");
-    final Configuration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
-
-    try {
-      assertEquals(metaDir, OmUtils.getOmDbDir(conf));
-      assertTrue(metaDir.exists());        // should have been created.
-    } finally {
-      FileUtils.deleteQuietly(metaDir);
-    }
-  }
-
-  @Test
-  public void testNoOmDbDirConfigured() {
-    thrown.expect(IllegalArgumentException.class);
-    OmUtils.getOmDbDir(new OzoneConfiguration());
-  }
 
   @Test
   public void testWriteCheckpointToOutputStream() throws Exception {

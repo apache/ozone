@@ -189,6 +189,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryUpToMaximumCountWithFixedSleep;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
@@ -345,7 +346,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Read configuration and set values.
     ozAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
-    omMetaDir = OmUtils.getOmDbDir(configuration);
+    omMetaDir = OMStorage.getOmDbDir(configuration);
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
@@ -418,7 +419,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isRatisEnabled) {
       // Create Ratis storage dir
-      String omRatisDirectory = OmUtils.getOMRatisDirectory(configuration);
+      String omRatisDirectory =
+          OzoneManagerRatisServer.getOMRatisDirectory(configuration);
       if (omRatisDirectory == null || omRatisDirectory.isEmpty()) {
         throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
             " must be defined.");
@@ -426,7 +428,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmUtils.createOMDir(omRatisDirectory);
       // Create Ratis snapshot dir
       omRatisSnapshotDir = OmUtils.createOMDir(
-          OmUtils.getOMRatisSnapshotDirectory(configuration));
+          OzoneManagerRatisServer.getOMRatisSnapshotDirectory(configuration));
 
       if (peerNodes != null && !peerNodes.isEmpty()) {
         this.omSnapshotProvider = new OzoneManagerSnapshotProvider(
@@ -2352,29 +2354,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
       Map<String, String> auditMap) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.SUCCESS.toString())
-        .withException(null)
+        .withResult(AuditEventStatus.SUCCESS)
         .build();
   }
 
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.FAILURE.toString())
+        .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
   }
