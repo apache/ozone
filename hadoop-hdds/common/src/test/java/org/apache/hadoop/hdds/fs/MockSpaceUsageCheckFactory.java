@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import org.apache.hadoop.conf.Configuration;
-
 import java.io.File;
 import java.time.Duration;
 
@@ -34,9 +32,7 @@ public final class MockSpaceUsageCheckFactory {
    */
   public static SpaceUsageCheckFactory of(SpaceUsageSource source,
       Duration refresh, SpaceUsagePersistence persistence) {
-
-    return (conf, dir) ->
-        new SpaceUsageCheckParams(dir, source, refresh, persistence);
+    return dir -> new SpaceUsageCheckParams(dir, source, refresh, persistence);
   }
 
   /**
@@ -45,7 +41,7 @@ public final class MockSpaceUsageCheckFactory {
    */
   public static class None implements SpaceUsageCheckFactory {
     @Override
-    public SpaceUsageCheckParams paramsFor(Configuration conf, File dir) {
+    public SpaceUsageCheckParams paramsFor(File dir) {
       return new SpaceUsageCheckParams(dir,
           MockSpaceUsageSource.unlimited(),
           Duration.ZERO,

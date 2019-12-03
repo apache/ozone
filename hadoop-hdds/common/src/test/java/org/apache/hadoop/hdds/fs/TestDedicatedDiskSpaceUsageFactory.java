@@ -18,12 +18,12 @@
 package org.apache.hadoop.hdds.fs;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.junit.Test;
 
 import java.io.File;
 import java.time.Duration;
 
+import static org.apache.hadoop.hdds.fs.DedicatedDiskSpaceUsageFactory.Conf.configKeyForRefreshPeriod;
 import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -42,11 +42,12 @@ public class TestDedicatedDiskSpaceUsageFactory {
   @Test
   public void testParams() {
     Configuration conf = new Configuration();
-    conf.set(HddsConfigKeys.HDDS_DF_REFRESH_PERIOD, "2m");
+    conf.set(configKeyForRefreshPeriod(), "2m");
     File dir = getTestDir(getClass().getSimpleName());
 
     SpaceUsageCheckParams params = new DedicatedDiskSpaceUsageFactory()
-        .paramsFor(conf, dir);
+        .setConfiguration(conf)
+        .paramsFor(dir);
 
     assertSame(dir, params.getDir());
     assertEquals(Duration.ofMinutes(2), params.getRefresh());

@@ -18,11 +18,12 @@
 package org.apache.hadoop.hdds.fs;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.junit.Test;
 
 import java.io.File;
 
+import static org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory.Conf.configKeyForClassName;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
@@ -30,16 +31,29 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  */
 public class TestSpaceUsageFactory {
 
-  protected static void testCreateViaConfig(
-      Class<? extends SpaceUsageCheckFactory> factoryClass) {
+  /**
+   * Verifies that {@link SpaceUsageCheckFactory#create(Configuration)} creates
+   * the correct implementation if configured.  This should be called from each
+   * specific implementation's test class.
+   * @return the instance created, so that further checks can done, if needed
+   */
+  protected static <T extends SpaceUsageCheckFactory> T testCreateViaConfig(
+      Class<T> factoryClass) {
 
-    Configuration conf = new Configuration();
-    conf.setClass(HddsConfigKeys.HDDS_DU_FACTORY_CLASS_KEY,
-        factoryClass, SpaceUsageCheckFactory.class);
+    Configuration conf = configFor(factoryClass);
 
     SpaceUsageCheckFactory factory = SpaceUsageCheckFactory.create(conf);
 
     assertSame(factoryClass, factory.getClass());
+
+    return factoryClass.cast(factory);
+  }
+
+  @Test
+  public void configuresFactoryInstance() {
+    SpyFactory factory = testCreateViaConfig(SpyFactory.class);
+
+    assertNotNull(factory.getConf());
   }
 
   @Test
@@ -67,23 +81,30 @@ public class TestSpaceUsageFactory {
     testDefaultFactoryForWrongConfig("java.lang.String");
   }
 
+  private static <T extends SpaceUsageCheckFactory> Configuration configFor(
+      Class<T> factoryClass) {
+
+    Configuration conf = new Configuration();
+    conf.setClass(configKeyForClassName(),
+        factoryClass, SpaceUsageCheckFactory.class);
+
+    return conf;
+  }
+
   private static void testDefaultFactoryForBrokenImplementation(
       Class<? extends SpaceUsageCheckFactory> brokenImplementationClass) {
-    Configuration conf = new Configuration();
-    conf.setClass(HddsConfigKeys.HDDS_DU_FACTORY_CLASS_KEY,
-        brokenImplementationClass, SpaceUsageCheckFactory.class);
-
-    testDefaultFactory(conf);
+    Configuration conf = configFor(brokenImplementationClass);
+    assertCreatesDefaultImplementation(conf);
   }
 
   private static void testDefaultFactoryForWrongConfig(String value) {
     Configuration conf = new Configuration();
-    conf.set(HddsConfigKeys.HDDS_DU_FACTORY_CLASS_KEY, value);
+    conf.set(configKeyForClassName(), value);
 
-    testDefaultFactory(conf);
+    assertCreatesDefaultImplementation(conf);
   }
 
-  private static void testDefaultFactory(Configuration conf) {
+  private static void assertCreatesDefaultImplementation(Configuration conf) {
     // given
     // conf
 
@@ -91,7 +112,7 @@ public class TestSpaceUsageFactory {
     SpaceUsageCheckFactory factory = SpaceUsageCheckFactory.create(conf);
 
     // then
-    assertSame(SpaceUsageCheckFactory.defaultFactory().getClass(),
+    assertSame(SpaceUsageCheckFactory.defaultImplementation().getClass(),
         factory.getClass());
   }
 
@@ -101,7 +122,7 @@ public class TestSpaceUsageFactory {
    */
   protected static class BrokenFactoryImpl implements SpaceUsageCheckFactory {
     @Override
-    public SpaceUsageCheckParams paramsFor(Configuration conf, File dir) {
+    public SpaceUsageCheckParams paramsFor(File dir) {
       throw new UnsupportedOperationException();
     }
   }
@@ -118,6 +139,30 @@ public class TestSpaceUsageFactory {
    */
   public static final class PrivateConstructor extends BrokenFactoryImpl {
     private PrivateConstructor() { }
+  }
+
+  /**
+   * Spy factory to verify {@link SpaceUsageCheckFactory#create(Configuration)}
+   * properly configures it.
+   */
+  public static final class SpyFactory implements SpaceUsageCheckFactory {
+
+    private Configuration conf;
+
+    @Override
+    public SpaceUsageCheckFactory setConfiguration(Configuration config) {
+      this.conf = config;
+      return this;
+    }
+
+    @Override
+    public SpaceUsageCheckParams paramsFor(File dir) {
+      throw new UnsupportedOperationException();
+    }
+
+    public Configuration getConf() {
+      return conf;
+    }
   }
 
 }

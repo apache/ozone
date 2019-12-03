@@ -18,12 +18,12 @@
 package org.apache.hadoop.hdds.fs;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.junit.Test;
 
 import java.io.File;
 import java.time.Duration;
 
+import static org.apache.hadoop.hdds.fs.DUFactory.Conf.configKeyForRefreshPeriod;
 import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -41,10 +41,12 @@ public class TestDUFactory {
   @Test
   public void testParams() {
     Configuration conf = new Configuration();
-    conf.set(HddsConfigKeys.HDDS_DU_REFRESH_PERIOD, "1h");
+    conf.set(configKeyForRefreshPeriod(), "1h");
     File dir = getTestDir(getClass().getSimpleName());
 
-    SpaceUsageCheckParams params = new DUFactory().paramsFor(conf, dir);
+    SpaceUsageCheckParams params = new DUFactory()
+        .setConfiguration(conf)
+        .paramsFor(dir);
 
     assertSame(dir, params.getDir());
     assertEquals(Duration.ofHours(1), params.getRefresh());

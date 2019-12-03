@@ -20,7 +20,10 @@ package org.apache.hadoop.hdds.fs;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,51 +46,97 @@ import java.lang.reflect.InvocationTargetException;
 public interface SpaceUsageCheckFactory {
 
   /**
-   * Creates configuration for the HDDS volume rooted at {@code dir}.  Can use
-   * implementation-specific settings from {@code conf}.
+   * Creates configuration for the HDDS volume rooted at {@code dir}.
    *
    * @throws UncheckedIOException if canonical path for {@code dir} cannot be
    * resolved
    */
-  SpaceUsageCheckParams paramsFor(Configuration conf, File dir);
+  SpaceUsageCheckParams paramsFor(File dir);
+
+  /**
+   * Updates the factory with global configuration.
+   * @return factory configured with {@code conf}
+   */
+  default SpaceUsageCheckFactory setConfiguration(Configuration conf) {
+    // override if configurable
+    return this;
+  }
 
   /**
    * Creates a "global" implementation based on the class specified for
-   * {@link HddsConfigKeys#HDDS_DU_FACTORY_CLASS_KEY} in {@code conf}.
+   * {@link Conf#setClassName(String)} in {@code conf}.
    * Defaults to {@link DUFactory} if no class is configured or it cannot be
    * instantiated.
    */
-  static SpaceUsageCheckFactory create(Configuration conf) {
-    Class<? extends SpaceUsageCheckFactory> aClass;
+  static SpaceUsageCheckFactory create(Configuration config) {
+    Conf conf = OzoneConfiguration.of(config).getObject(Conf.class);
+    Class<? extends SpaceUsageCheckFactory> aClass = null;
     try {
-      aClass = conf.getClass(
-          HddsConfigKeys.HDDS_DU_FACTORY_CLASS_KEY, null,
-          SpaceUsageCheckFactory.class);
-    } catch (RuntimeException e) {
+      aClass = config.getClassByName(conf.getClassName())
+          .asSubclass(SpaceUsageCheckFactory.class);
+    } catch (ClassNotFoundException | RuntimeException e) {
       Logger log = LoggerFactory.getLogger(SpaceUsageCheckFactory.class);
-      String className = conf.get(HddsConfigKeys.HDDS_DU_FACTORY_CLASS_KEY);
       log.warn("Error trying to create SpaceUsageCheckFactory: '{}'",
-          className, e);
-
-      return defaultFactory();
+          conf.getClassName(), e);
     }
 
-    try {
-      Constructor<? extends SpaceUsageCheckFactory> constructor =
-          aClass.getConstructor();
-      return constructor.newInstance();
-    } catch (IllegalAccessException | InstantiationException |
-        InvocationTargetException | NoSuchMethodException e) {
+    SpaceUsageCheckFactory instance = null;
 
-      Logger log = LoggerFactory.getLogger(SpaceUsageCheckFactory.class);
-      log.warn("Error trying to create {}", aClass, e);
+    if (aClass != null) {
+      try {
+        Constructor<? extends SpaceUsageCheckFactory> constructor =
+            aClass.getConstructor();
+        instance = constructor.newInstance();
+      } catch (IllegalAccessException | InstantiationException |
+          InvocationTargetException | NoSuchMethodException e) {
 
-      return defaultFactory();
+        Logger log = LoggerFactory.getLogger(SpaceUsageCheckFactory.class);
+        log.warn("Error trying to create {}", aClass, e);
+      }
     }
+
+    if (instance == null) {
+      instance = defaultImplementation();
+    }
+
+    return instance.setConfiguration(config);
   }
 
-  static DUFactory defaultFactory() {
+  static DUFactory defaultImplementation() {
     return new DUFactory();
+  }
+
+  String CONFIG_PREFIX = "hdds.datanode.du.factory";
+
+  /**
+   * Configuration for {@link SpaceUsageCheckFactory}.
+   */
+  @ConfigGroup(prefix = CONFIG_PREFIX)
+  class Conf {
+
+    private static final String CLASSNAME_KEY = "classname";
+
+    private String className;
+
+    @Config(
+        key = CLASSNAME_KEY,
+        defaultValue = "",
+        tags = { ConfigTag.DATANODE },
+        description = "The fully qualified name of the factory class that "
+            + "creates objects for providing disk space usage information.  It "
+            + "should implement the SpaceUsageCheckFactory interface."
+    )
+    public void setClassName(String className) {
+      this.className = className;
+    }
+
+    public String getClassName() {
+      return className;
+    }
+
+    public static String configKeyForClassName() {
+      return CONFIG_PREFIX + "." + CLASSNAME_KEY;
+    }
   }
 
 }

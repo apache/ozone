@@ -122,7 +122,7 @@ public final class SCMTestUtils {
         .getRandomizedTempPath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, GenericTestUtils
         .getRandomizedTempPath());
-    conf.setClass(HddsConfigKeys.HDDS_DU_FACTORY_CLASS_KEY,
+    conf.setClass(SpaceUsageCheckFactory.Conf.configKeyForClassName(),
         MockSpaceUsageCheckFactory.None.class,
         SpaceUsageCheckFactory.class);
     return conf;

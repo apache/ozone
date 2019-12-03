@@ -18,13 +18,14 @@
 package org.apache.hadoop.hdds.fs;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.io.File;
 import java.time.Duration;
-
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DU_REFRESH_PERIOD;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DU_REFRESH_PERIOD_DEFAULT_MILLIS;
 
 /**
  * Uses DU for all volumes.  Saves used value in cache file.
@@ -34,11 +35,19 @@ public class DUFactory implements SpaceUsageCheckFactory {
   private static final String DU_CACHE_FILE = "scmUsed";
   private static final String EXCLUDE_PATTERN = "*.tmp.*";
 
+  private static final String CONFIG_PREFIX = "hdds.datanode.du";
+
+  private Conf conf;
+
   @Override
-  public SpaceUsageCheckParams paramsFor(Configuration conf, File dir) {
-    Duration refreshPeriod = Duration.ofMillis(conf.getTimeDuration(
-        HDDS_DU_REFRESH_PERIOD,
-        HDDS_DU_REFRESH_PERIOD_DEFAULT_MILLIS, MILLISECONDS));
+  public SpaceUsageCheckFactory setConfiguration(Configuration configuration) {
+    conf = OzoneConfiguration.of(configuration).getObject(Conf.class);
+    return this;
+  }
+
+  @Override
+  public SpaceUsageCheckParams paramsFor(File dir) {
+    Duration refreshPeriod = conf.getRefreshPeriod();
 
     SpaceUsageSource source = new DU(dir, EXCLUDE_PATTERN);
 
@@ -46,5 +55,36 @@ public class DUFactory implements SpaceUsageCheckFactory {
         new File(dir, DU_CACHE_FILE), refreshPeriod);
 
     return new SpaceUsageCheckParams(dir, source, refreshPeriod, persistence);
+  }
+
+  /**
+   * Configuration for {@link DUFactory}.
+   */
+  @ConfigGroup(prefix = CONFIG_PREFIX)
+  public static class Conf {
+
+    private static final String REFRESH_PERIOD = "refresh.period";
+
+    private Duration refreshPeriod;
+
+    @Config(
+        key = REFRESH_PERIOD,
+        defaultValue = "1h",
+        type = ConfigType.TIME,
+        tags = { ConfigTag.DATANODE },
+        description = "Disk space usage information will be refreshed with the"
+            + "specified period following the completion of the last check."
+    )
+    public void setRefreshPeriod(long millis) {
+      refreshPeriod = Duration.ofMillis(millis);
+    }
+
+    public Duration getRefreshPeriod() {
+      return refreshPeriod;
+    }
+
+    static String configKeyForRefreshPeriod() {
+      return CONFIG_PREFIX + "." + REFRESH_PERIOD;
+    }
   }
 }

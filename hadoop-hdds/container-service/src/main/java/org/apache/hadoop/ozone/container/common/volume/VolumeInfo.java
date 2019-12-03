@@ -105,7 +105,7 @@ public final class VolumeInfo {
       usageCheckFactory = SpaceUsageCheckFactory.create(b.conf);
     }
     SpaceUsageCheckParams checkParams =
-        usageCheckFactory.paramsFor(b.conf, root);
+        usageCheckFactory.paramsFor(root);
 
     this.usage = new VolumeUsage(checkParams);
   }
