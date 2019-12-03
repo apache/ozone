@@ -139,7 +139,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
   public void testPutKeySuccessWithBlockToken() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -168,8 +168,8 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
           keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime().compareTo(currentTime) >= 0);
-      Assert.assertTrue(key.getModificationTime().compareTo(currentTime) >= 0);
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 

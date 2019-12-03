@@ -162,7 +162,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
   public void testPutKeyWithEncryption() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -196,8 +196,8 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
           keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent, "UTF-8"));
-      Assert.assertTrue(key.getCreationTime().compareTo(currentTime) >= 0);
-      Assert.assertTrue(key.getModificationTime().compareTo(currentTime) >= 0);
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 
@@ -213,7 +213,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     //Step 1
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -254,8 +254,8 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
         keyName, ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE));
     Assert.assertEquals(value, new String(fileContent, "UTF-8"));
-    Assert.assertTrue(key.getCreationTime().compareTo(currentTime) >= 0);
-    Assert.assertTrue(key.getModificationTime().compareTo(currentTime) >= 0);
+    Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     Assert.assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
     //As TDE is enabled, the TDE encryption details should not be null.
     Assert.assertNotNull(key.getFileEncryptionInfo());

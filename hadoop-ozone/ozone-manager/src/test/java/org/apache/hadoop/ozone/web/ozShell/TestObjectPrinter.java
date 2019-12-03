@@ -40,7 +40,7 @@ public class TestObjectPrinter {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneVolume volume =
         new OzoneVolume(conf, Mockito.mock(ClientProtocol.class), "name",
-            "admin", "owner", 1L, Instant.ofEpochMilli(0).toEpochMilli(),
+            "admin", "owner", 1L, Instant.EPOCH.toEpochMilli(),
             new ArrayList<>());
 
     String result = ObjectPrinter.getObjectAsJson(volume);

@@ -299,7 +299,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testCreateBucket()
       throws IOException {
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -307,14 +307,14 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertTrue(bucket.getCreationTime().compareTo(currentTime) >= 0);
-    Assert.assertTrue(volume.getCreationTime().compareTo(currentTime) >= 0);
+    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
   }
 
   @Test
   public void testCreateS3Bucket()
       throws IOException {
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
     String userName = UserGroupInformation.getCurrentUser().getUserName();
     String bucketName = UUID.randomUUID().toString();
     store.createS3Bucket(userName, bucketName);
@@ -322,13 +322,13 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertTrue(bucket.getCreationTime().compareTo(currentTime) >= 0);
-    Assert.assertTrue(volume.getCreationTime().compareTo(currentTime) >= 0);
+    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
   }
 
   @Test
   public void testCreateSecureS3Bucket() throws IOException {
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
     String userName = "ozone/localhost@EXAMPLE.COM";
     String bucketName = UUID.randomUUID().toString();
     String s3VolumeName = OzoneS3Util.getVolumeName(userName);
@@ -339,8 +339,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertTrue(bucket.getCreationTime().compareTo(currentTime) >= 0);
-    Assert.assertTrue(volume.getCreationTime().compareTo(currentTime) >= 0);
+    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
   }
 
 
@@ -375,7 +375,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testDeleteS3Bucket()
       throws Exception {
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
     String userName = "ozone1";
     String bucketName = UUID.randomUUID().toString();
     store.createS3Bucket(userName, bucketName);
@@ -383,8 +383,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertTrue(bucket.getCreationTime().compareTo(currentTime) >= 0);
-    Assert.assertTrue(volume.getCreationTime().compareTo(currentTime) >= 0);
+    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
     store.deleteS3Bucket(bucketName);
 
     OzoneTestUtils.expectOmException(ResultCodes.S3_BUCKET_NOT_FOUND,
@@ -679,7 +679,7 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testPutKey() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -704,8 +704,8 @@ public abstract class TestOzoneRpcClientAbstract {
           keyName, STAND_ALONE,
           ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime().compareTo(currentTime) >= 0);
-      Assert.assertTrue(key.getModificationTime().compareTo(currentTime) >= 0);
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 
@@ -746,7 +746,7 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testPutKeyRatisOneNode() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -771,8 +771,8 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, ReplicationType.RATIS, ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime().compareTo(currentTime) >= 0);
-      Assert.assertTrue(key.getModificationTime().compareTo(currentTime) >= 0);
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 
@@ -780,7 +780,7 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testPutKeyRatisThreeNodes() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -806,8 +806,8 @@ public abstract class TestOzoneRpcClientAbstract {
           keyName, ReplicationType.RATIS,
           ReplicationFactor.THREE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime().compareTo(currentTime) >= 0);
-      Assert.assertTrue(key.getModificationTime().compareTo(currentTime) >= 0);
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 
@@ -818,7 +818,7 @@ public abstract class TestOzoneRpcClientAbstract {
       InterruptedException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -848,9 +848,8 @@ public abstract class TestOzoneRpcClientAbstract {
               keyName, ReplicationType.RATIS,
               ReplicationFactor.THREE));
           Assert.assertEquals(data, new String(fileContent));
-          Assert.assertTrue(key.getCreationTime().compareTo(currentTime) >= 0);
-          Assert.assertTrue(key.getModificationTime()
-              .compareTo(currentTime) >= 0);
+          Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+          Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
         }
         latch.countDown();
       } catch (IOException ex) {

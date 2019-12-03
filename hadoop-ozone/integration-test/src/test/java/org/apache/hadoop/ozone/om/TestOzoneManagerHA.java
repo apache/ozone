@@ -228,8 +228,7 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(bucketName, ozoneBucket.getName());
     Assert.assertTrue(ozoneBucket.getVersioning());
     Assert.assertEquals(StorageType.DISK, ozoneBucket.getStorageType());
-    Assert.assertTrue(ozoneBucket.getCreationTime().compareTo(
-        Instant.now()) <= 0);
+    Assert.assertTrue(ozoneBucket.getCreationTime().isBefore(Instant.now()));
 
 
     // Change versioning to false

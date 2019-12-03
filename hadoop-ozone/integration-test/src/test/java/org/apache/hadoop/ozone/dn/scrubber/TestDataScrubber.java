@@ -114,7 +114,7 @@ public class TestDataScrubber {
   public void testOpenContainerIntegrity() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant currentTime = Instant.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -139,8 +139,8 @@ public class TestDataScrubber {
           keyName, STAND_ALONE,
           ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime().compareTo(currentTime) >= 0);
-      Assert.assertTrue(key.getModificationTime().compareTo(currentTime) >= 0);
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
 
     // wait for the container report to propagate to SCM
