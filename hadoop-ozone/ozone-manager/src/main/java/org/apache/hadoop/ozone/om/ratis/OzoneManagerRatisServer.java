@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,11 +35,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.base.Strings;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -364,7 +366,7 @@ public final class OzoneManagerRatisServer {
     }
 
     // Set Ratis storage directory
-    String storageDir = OmUtils.getOMRatisDirectory(conf);
+    String storageDir = OzoneManagerRatisServer.getOMRatisDirectory(conf);
     RaftServerConfigKeys.setStorageDirs(properties,
         Collections.singletonList(new File(storageDir)));
 
@@ -644,5 +646,27 @@ public final class OzoneManagerRatisServer {
 
   public long getStateMachineLastAppliedIndex() {
     return omStateMachine.getLastAppliedIndex();
+  }
+
+  /**
+   * Get the local directory where ratis logs will be stored.
+   */
+  public static String getOMRatisDirectory(Configuration conf) {
+    String storageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
+
+    if (Strings.isNullOrEmpty(storageDir)) {
+      storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+    }
+    return storageDir;
+  }
+
+  public static String getOMRatisSnapshotDirectory(Configuration conf) {
+    String snapshotDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+
+    if (Strings.isNullOrEmpty(snapshotDir)) {
+      snapshotDir = Paths.get(getOMRatisDirectory(conf),
+          "snapshot").toString();
+    }
+    return snapshotDir;
   }
 }

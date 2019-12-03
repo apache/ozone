@@ -26,7 +26,6 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -37,8 +36,6 @@ import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.common.base.Strings;
-
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -48,11 +45,8 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -193,16 +187,6 @@ public final class OmUtils {
         .orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
   }
 
-  /**
-   * Get the location where OM should store its metadata directories.
-   * Fall back to OZONE_METADATA_DIRS if not defined.
-   *
-   * @param conf - Config
-   * @return File path, after creating all the required Directories.
-   */
-  public static File getOmDbDir(Configuration conf) {
-    return ServerUtils.getDBPath(conf, OMConfigKeys.OZONE_OM_DB_DIRS);
-  }
 
   /**
    * Checks if the OM request is read only or not.
@@ -458,28 +442,6 @@ public final class OmUtils {
 
     return hostName + ":" +
         addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
-  }
-
-  /**
-   * Get the local directory where ratis logs will be stored.
-   */
-  public static String getOMRatisDirectory(Configuration conf) {
-    String storageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
-
-    if (Strings.isNullOrEmpty(storageDir)) {
-      storageDir = HddsServerUtil.getDefaultRatisDirectory(conf);
-    }
-    return storageDir;
-  }
-
-  public static String getOMRatisSnapshotDirectory(Configuration conf) {
-    String snapshotDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
-
-    if (Strings.isNullOrEmpty(snapshotDir)) {
-      snapshotDir = Paths.get(getOMRatisDirectory(conf),
-          "snapshot").toString();
-    }
-    return snapshotDir;
   }
 
   public static File createOMDir(String dirPath) {
