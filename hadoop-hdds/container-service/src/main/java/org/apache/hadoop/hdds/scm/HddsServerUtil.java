@@ -29,10 +29,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys
@@ -76,7 +74,7 @@ public final class HddsServerUtil {
    * to the SCM.
    *
    * @param conf
-   * @return Target InetSocketAddress for the SCM service endpoint.
+   * @return Target {@code InetSocketAddress} for the SCM service endpoint.
    */
   public static InetSocketAddress getScmAddressForDataNodes(
       Configuration conf) {
@@ -91,33 +89,15 @@ public final class HddsServerUtil {
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
 
     if (!host.isPresent()) {
-      // Fallback to Ozone SCM names.
-      Collection<InetSocketAddress> scmAddresses = getSCMAddresses(conf);
-      if (scmAddresses.size() > 1) {
-        throw new IllegalArgumentException(
-            ScmConfigKeys.OZONE_SCM_NAMES +
-                " must contain a single hostname. Multiple SCM hosts are " +
-                "currently unsupported");
-      }
-      host = Optional.of(scmAddresses.iterator().next().getHostName());
+      // Fallback to Ozone SCM name
+      host = Optional.of(getSingleSCMAddress(conf).getHostName());
     }
 
-    if (!host.isPresent()) {
-      throw new IllegalArgumentException(
-          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY +
-              " must be defined. See" +
-              " https://wiki.apache.org/hadoop/Ozone#Configuration "
-              + "for details on configuring Ozone.");
-    }
+    final int port = getPortNumberFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY)
+        .orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT);
 
-    // If no port number is specified then we'll just try the defaultBindPort.
-    final Optional<Integer> port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY);
-
-    InetSocketAddress addr = NetUtils.createSocketAddr(host.get() + ":" +
-        port.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
-
-    return addr;
+    return NetUtils.createSocketAddr(host.get() + ":" + port);
   }
 
   /**
@@ -125,19 +105,19 @@ public final class HddsServerUtil {
    * to the SCM.
    *
    * @param conf
-   * @return Target InetSocketAddress for the SCM client endpoint.
+   * @return Target {@code InetSocketAddress} for the SCM client endpoint.
    */
   public static InetSocketAddress getScmClientBindAddress(
       Configuration conf) {
-    final Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY);
+    final String host = getHostNameFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY)
+        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_DEFAULT);
 
-    final Optional<Integer> port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+    final int port = getPortNumberFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
+        .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
 
-    return NetUtils.createSocketAddr(
-        host.orElse(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT));
+    return NetUtils.createSocketAddr(host + ":" + port);
   }
 
   /**
@@ -145,20 +125,19 @@ public final class HddsServerUtil {
    * to the SCM Block service.
    *
    * @param conf
-   * @return Target InetSocketAddress for the SCM block client endpoint.
+   * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
    */
   public static InetSocketAddress getScmBlockClientBindAddress(
       Configuration conf) {
-    final Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY);
+    final String host = getHostNameFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY)
+        .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT);
 
-    final Optional<Integer> port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY);
+    final int port = getPortNumberFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
+        .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
 
-    return NetUtils.createSocketAddr(
-        host.orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT)
-            + ":"
-            + port.orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
+    return NetUtils.createSocketAddr(host + ":" + port);
   }
 
   /**
@@ -166,18 +145,19 @@ public final class HddsServerUtil {
    * service clients.
    *
    * @param conf
-   * @return Target InetSocketAddress for the SCM security service.
+   * @return Target {@code InetSocketAddress} for the SCM security service.
    */
   public static InetSocketAddress getScmSecurityInetAddress(
       Configuration conf) {
-    final Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY);
+    final String host = getHostNameFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY)
+        .orElse(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_DEFAULT);
 
-    final Optional<Integer> port = getPortNumberFromConfigKeys(conf,
+    final OptionalInt port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY);
 
     return NetUtils.createSocketAddr(
-        host.orElse(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_DEFAULT)
+        host
             + ":" + port
             .orElse(conf.getInt(ScmConfigKeys
                     .OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
@@ -189,15 +169,14 @@ public final class HddsServerUtil {
    * to the SCM.
    *
    * @param conf
-   * @return Target InetSocketAddress for the SCM service endpoint.
+   * @return Target {@code InetSocketAddress} for the SCM service endpoint.
    */
   public static InetSocketAddress getScmDataNodeBindAddress(
       Configuration conf) {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY);
 
-    // If no port number is specified then we'll just try the defaultBindPort.
-    final Optional<Integer> port = getPortNumberFromConfigKeys(conf,
+    final OptionalInt port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY);
 
     return NetUtils.createSocketAddr(
@@ -317,27 +296,6 @@ public final class HddsServerUtil {
   public static int getContainerPort(Configuration conf) {
     return conf.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
-  }
-
-
-  /**
-   * Return the list of service addresses for the Ozone SCM. This method is used
-   * by the DataNodes to determine the service instances to connect to.
-   *
-   * @param conf
-   * @return list of SCM service addresses.
-   */
-  public static Map<String, ? extends Map<String, InetSocketAddress>>
-      getScmServiceRpcAddresses(Configuration conf) {
-
-    final Map<String, InetSocketAddress> serviceInstances = new HashMap<>();
-    serviceInstances.put(OZONE_SCM_SERVICE_INSTANCE_ID,
-        getScmAddressForDataNodes(conf));
-
-    final Map<String, Map<String, InetSocketAddress>> services =
-        new HashMap<>();
-    services.put(OZONE_SCM_SERVICE_ID, serviceInstances);
-    return services;
   }
 
   public static String getOzoneDatanodeRatisDirectory(Configuration conf) {
