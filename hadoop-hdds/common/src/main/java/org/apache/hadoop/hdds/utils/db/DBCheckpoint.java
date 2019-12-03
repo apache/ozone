@@ -73,14 +73,14 @@ public interface DBCheckpoint {
   long getRatisSnapshotIndex();
 
   /**
-   * Set the term index for the corresponding OM DB checkpoint.
-   * @param omRatisSnapshotTermIndex
+   * Set the Ratis snapshot term for the corresponding OM DB checkpoint.
+   * @param omRatisSnapshotTerm
    */
-  void setRatisSnapshotTermIndex(long omRatisSnapshotTermIndex);
+  void setRatisSnapshotTerm(long omRatisSnapshotTerm);
 
   /**
-   * Get the OM Ratis snapshot term index corresponding to the OM DB checkpoint.
+   * Get the OM Ratis snapshot term corresponding to the OM DB checkpoint.
    * @return
    */
-  long getRatisSnapshotTermIndex();
+  long getRatisSnapshotTerm();
 }

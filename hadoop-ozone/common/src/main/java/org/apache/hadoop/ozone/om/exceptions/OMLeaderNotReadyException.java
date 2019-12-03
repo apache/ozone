@@ -24,11 +24,11 @@ import java.io.IOException;
  * Exception thrown by
  * {@link org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB} when
  * OM leader is not ready to serve requests. This error is thrown when Raft
- * Server returns RatisLeaderNotReadyException.
+ * Server returns {@link org.apache.ratis.protocol.LeaderNotReadyException}.
  */
-public class RatisLeaderNotReadyException extends IOException  {
+public class OMLeaderNotReadyException extends IOException  {
 
-  public RatisLeaderNotReadyException(String message) {
+  public OMLeaderNotReadyException(String message) {
     super(message);
   }
 }

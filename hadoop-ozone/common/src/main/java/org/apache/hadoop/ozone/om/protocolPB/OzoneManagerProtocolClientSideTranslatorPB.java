@@ -37,9 +37,9 @@ import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.exceptions.NotLeaderException;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.RatisLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
@@ -245,7 +245,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
         if (exception instanceof ServiceException) {
-          NotLeaderException notLeaderException =
+          OMNotLeaderException notLeaderException =
               getNotLeaderException(exception);
           if (notLeaderException != null &&
               notLeaderException.getSuggestedLeaderNodeId() != null) {
@@ -257,7 +257,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
           }
 
-          RatisLeaderNotReadyException leaderNotReadyException =
+          OMLeaderNotReadyException leaderNotReadyException =
               getLeaderNotReadyException(exception);
           // As in this case, current OM node is leader, but it is not ready.
           // OMFailoverProxyProvider#performFailover() is a dummy call and
@@ -297,29 +297,34 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Check if exception is a NotLeaderException.
-   * @return NotLeaderException.
+   * Check if exception is a OMNotLeaderException.
+   * @return OMNotLeaderException.
    */
-  private NotLeaderException getNotLeaderException(Exception exception) {
+  private OMNotLeaderException getNotLeaderException(Exception exception) {
     Throwable cause = exception.getCause();
     if (cause != null && cause instanceof RemoteException) {
       IOException ioException =
           ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof NotLeaderException) {
-        return (NotLeaderException) ioException;
+      if (ioException instanceof OMNotLeaderException) {
+        return (OMNotLeaderException) ioException;
       }
     }
     return null;
   }
 
-  private RatisLeaderNotReadyException getLeaderNotReadyException(
+  /**
+   * Check if exception is OMLeaderNotReadyException.
+   * @param exception
+   * @return OMLeaderNotReadyException
+   */
+  private OMLeaderNotReadyException getLeaderNotReadyException(
       Exception exception) {
     Throwable cause = exception.getCause();
     if (cause != null && cause instanceof RemoteException) {
       IOException ioException =
           ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof RatisLeaderNotReadyException) {
-        return (RatisLeaderNotReadyException) ioException;
+      if (ioException instanceof OMLeaderNotReadyException) {
+        return (OMLeaderNotReadyException) ioException;
       }
     }
     return null;
@@ -396,13 +401,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
       return omResponse;
     } catch (ServiceException e) {
-      NotLeaderException notLeaderException = getNotLeaderException(e);
+      OMNotLeaderException notLeaderException = getNotLeaderException(e);
       if (notLeaderException == null) {
-        throw ProtobufHelper.getRemoteException(e);
-      }
-      RatisLeaderNotReadyException leaderNotReadyException =
-          getLeaderNotReadyException(e);
-      if (leaderNotReadyException == null) {
         throw ProtobufHelper.getRemoteException(e);
       }
       throw new IOException("Could not determine or connect to OM Leader.");

@@ -3137,7 +3137,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     long lastAppliedIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     long checkpointSnapshotIndex = omDBcheckpoint.getRatisSnapshotIndex();
     long checkpointSnapshotTermIndex =
-        omDBcheckpoint.getRatisSnapshotTermIndex();
+        omDBcheckpoint.getRatisSnapshotTerm();
     if (checkpointSnapshotIndex <= lastAppliedIndex) {
       LOG.error("Failed to install checkpoint from OM leader: {}. The last " +
           "applied index: {} is greater than or equal to the checkpoint's " +

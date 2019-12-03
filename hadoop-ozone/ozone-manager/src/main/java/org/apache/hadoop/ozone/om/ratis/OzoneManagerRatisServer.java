@@ -42,7 +42,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.exceptions.RatisLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -165,26 +166,15 @@ public final class OzoneManagerRatisServer {
     if (!reply.isSuccess()) {
       NotLeaderException notLeaderException = reply.getNotLeaderException();
       if (notLeaderException != null) {
-        RaftPeerId suggestedLeader =
-            notLeaderException.getSuggestedLeader() != null ?
-                notLeaderException.getSuggestedLeader().getId() : null;
-        org.apache.hadoop.ozone.om.exceptions.NotLeaderException
-            notLeaderException1;
-        if (suggestedLeader != null) {
-          notLeaderException1 = new org.apache.hadoop.ozone.om.exceptions
-              .NotLeaderException(getRaftPeerId(), suggestedLeader);
-        } else {
-          notLeaderException1 =
-              new org.apache.hadoop.ozone.om.exceptions
-                  .NotLeaderException(getRaftPeerId());
-        }
-        throw new ServiceException(notLeaderException1);
+        throw new ServiceException(
+            OMNotLeaderException.convertToOMNotLeaderException(
+                  notLeaderException, getRaftPeerId()));
       }
 
       LeaderNotReadyException leaderNotReadyException =
           reply.getLeaderNotReadyException();
       if (leaderNotReadyException != null) {
-        throw new ServiceException(new RatisLeaderNotReadyException(
+        throw new ServiceException(new OMLeaderNotReadyException(
             leaderNotReadyException.getMessage()));
       }
 

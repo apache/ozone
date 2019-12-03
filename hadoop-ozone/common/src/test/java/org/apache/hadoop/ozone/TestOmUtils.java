@@ -123,11 +123,11 @@ class TestDBCheckpoint implements DBCheckpoint {
   }
 
   @Override
-  public void setRatisSnapshotTermIndex(long omRatisSnapshotTermIndex) {
+  public void setRatisSnapshotTerm(long omRatisSnapshotTermIndex) {
   }
 
   @Override
-  public long getRatisSnapshotTermIndex() {
+  public long getRatisSnapshotTerm() {
     return 0;
   }
 }

@@ -93,12 +93,12 @@ public class RocksDBCheckpoint implements DBCheckpoint {
   }
 
   @Override
-  public void setRatisSnapshotTermIndex(long omRatisSnapshotTermIndex) {
+  public void setRatisSnapshotTerm(long omRatisSnapshotTermIndex) {
     this.ratisSnapShotTermIndex = omRatisSnapshotTermIndex;
   }
 
   @Override
-  public long getRatisSnapshotTermIndex() {
+  public long getRatisSnapshotTerm() {
     return ratisSnapShotTermIndex;
   }
 }

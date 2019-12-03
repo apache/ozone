@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_INDEX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_TERM_INDEX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_TERM;
 import static org.apache.hadoop.ozone.OzoneConsts.
     OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
@@ -117,9 +117,6 @@ public class OMDBCheckpointServlet extends HttpServlet {
         takeRatisSnapshot = Boolean.valueOf(snapshotBeforeCheckpointParam);
       }
 
-      long ratisSnapshotIndex = -1L;
-      long ratisSnapshotTermIndex = -1L;
-      boolean setBothHeaders = false;
       if (takeRatisSnapshot) {
         // If OM follower is downloading the checkpoint, we should save a
         // ratis snapshot first. This step also included flushing the OM DB.
@@ -128,13 +125,13 @@ public class OMDBCheckpointServlet extends HttpServlet {
         // We need to set both snapshot term index and snapshot index.
         flush = false;
         TermIndex lastAppliedTermIndex = om.saveRatisSnapshot();
-        ratisSnapshotTermIndex = lastAppliedTermIndex.getTerm();
-        ratisSnapshotIndex = lastAppliedTermIndex.getIndex();
-        setBothHeaders = true;
-      } else {
-        ratisSnapshotIndex = om.getRatisSnapshotIndex();
+
+        // Ratis snapshot index and term index is used when downloading DB
+        // checkpoint to OM follower.
         response.setHeader(OM_RATIS_SNAPSHOT_INDEX,
-            String.valueOf(ratisSnapshotIndex));
+            String.valueOf(lastAppliedTermIndex.getIndex()));
+        response.setHeader(OM_RATIS_SNAPSHOT_TERM,
+            String.valueOf(lastAppliedTermIndex.getTerm()));
       }
 
       checkpoint = omDbStore.getCheckpoint(flush);
@@ -155,20 +152,6 @@ public class OMDBCheckpointServlet extends HttpServlet {
       response.setHeader("Content-Disposition",
           "attachment; filename=\"" +
                file.toString() + ".tgz\"");
-
-      if (setBothHeaders) {
-        // Ratis snapshot index and term index is used when downloading DB
-        // checkpoint to OM follower.
-        response.setHeader(OM_RATIS_SNAPSHOT_INDEX,
-            String.valueOf(ratisSnapshotIndex));
-        response.setHeader(OM_RATIS_SNAPSHOT_TERM_INDEX,
-            String.valueOf(ratisSnapshotTermIndex));
-      } else {
-        // Ratis snapshot index used when downloading DB checkpoint to OM
-        // follower.
-        response.setHeader(OM_RATIS_SNAPSHOT_INDEX,
-            String.valueOf(ratisSnapshotIndex));
-      }
 
       Instant start = Instant.now();
       OmUtils.writeOmDBCheckpointToStream(checkpoint,

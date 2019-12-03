@@ -60,10 +60,6 @@ public class OMRatisSnapshotInfo implements SnapshotInfo {
     term = newTerm;
   }
 
-  private void updateSnapshotIndex(long newSnapshotIndex) {
-    snapshotIndex = newSnapshotIndex;
-  }
-
   private void updateTermIndex(long newTerm, long newIndex) {
     this.term = newTerm;
     this.snapshotIndex = newIndex;
