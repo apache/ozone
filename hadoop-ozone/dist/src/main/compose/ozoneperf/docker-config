@@ -25,7 +25,6 @@ OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.prometheus.endpoint.enabled=true
 OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
-OZONE-SITE.XML_hdds.scm.safemode.min.datanode=3
 
 ASYNC_PROFILER_HOME=/opt/profiler
 
