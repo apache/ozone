@@ -575,7 +575,7 @@ public class TestContainerPersistence {
         getDispatcherContext());
     chunkManager.deleteChunk(container, blockID, info);
     exception.expect(StorageContainerException.class);
-    exception.expectMessage("Unable to find the chunk file.");
+    exception.expectMessage("Chunk file can't be found");
     chunkManager.readChunk(container, blockID, info, getDispatcherContext());
   }
 

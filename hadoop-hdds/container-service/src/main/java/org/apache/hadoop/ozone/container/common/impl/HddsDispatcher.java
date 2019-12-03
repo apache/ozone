@@ -608,13 +608,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
       Map<String, String> auditMap) {
+
     return new AuditMessage.Builder()
         .setUser(null)
         .atIp(null)
-        .forOperation(op.getAction())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.SUCCESS.toString())
-        .withException(null)
+        .withResult(AuditEventStatus.SUCCESS)
         .build();
   }
 
@@ -622,12 +622,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
+
     return new AuditMessage.Builder()
         .setUser(null)
         .atIp(null)
-        .forOperation(op.getAction())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.FAILURE.toString())
+        .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
   }

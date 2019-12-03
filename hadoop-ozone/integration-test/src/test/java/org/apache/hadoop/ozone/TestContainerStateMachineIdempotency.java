@@ -61,7 +61,7 @@ public class TestContainerStateMachineIdempotency {
     ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, ContainerPlacementPolicy.class);
     cluster =
-        MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(1).build();
+        MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();

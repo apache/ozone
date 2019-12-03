@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.NotImplementedException;
@@ -139,12 +140,11 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   }
 
   /**
-   * Removes all the entries from the table cache which are having epoch value
-   * less
-   * than or equal to specified epoch value.
-   * @param epoch
+   * Removes all the entries from the table cache which are matching with
+   * epoch provided in the epoch list.
+   * @param epochs
    */
-  default void cleanupCache(long epoch) {
+  default void cleanupCache(List<Long> epochs) {
     throw new NotImplementedException("cleanupCache is not implemented");
   }
 

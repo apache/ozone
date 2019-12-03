@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -293,7 +294,11 @@ public class TestTypedRDBTableStore {
         }
       }
 
-      testTable.cleanupCache(5);
+      ArrayList<Long> epochs = new ArrayList<>();
+      for (long i=0; i<=5L; i++) {
+        epochs.add(i);
+      }
+      testTable.cleanupCache(epochs);
 
       GenericTestUtils.waitFor(() ->
           ((TypedTable<String, String>) testTable).getCache().size() == 4,
