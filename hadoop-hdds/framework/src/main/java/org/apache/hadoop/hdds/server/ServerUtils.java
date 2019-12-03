@@ -231,4 +231,12 @@ public final class ServerUtils {
     UserGroupInformation remoteUser = Server.getRemoteUser();
     return remoteUser != null ? remoteUser.getUserName() : null;
   }
+
+  public static String getDefaultRatisDirectory(Configuration conf) {
+    LOG.warn("Storage directory for Ratis is not configured. It is a good " +
+            "idea to map this to an SSD disk. Falling back to {}",
+        HddsConfigKeys.OZONE_METADATA_DIRS);
+    File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+    return (new File(metaDirPath, "ratis")).getPath();
+  }
 }
