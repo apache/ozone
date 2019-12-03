@@ -146,18 +146,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           List<String> reprocessFailedTasks =
               processTaskResults(results, events);
           blacklistFailedTasks(reprocessFailedTasks);
-          for (String taskName : reprocessFailedTasks) {
-            LOG.info("Reprocess step failed for task : {}", taskName);
-            if (taskFailureCounter.get(taskName).incrementAndGet() >
-                TASK_FAILURE_THRESHOLD) {
-              LOG.info("Blacklisting Task since it failed retry and " +
-                  "reprocess more than " + TASK_FAILURE_THRESHOLD + " times.");
-              reconDBUpdateTasks.remove(taskName);
-            }
-          }
         }
-
-        }
+      }
     } catch (ExecutionException e) {
       LOG.error("Unexpected error : ", e);
     } finally {
@@ -175,7 +165,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       if (taskFailureCounter.get(taskName).incrementAndGet() >
           TASK_FAILURE_THRESHOLD) {
         LOG.info("Blacklisting Task since it failed retry and " +
-            "reprocess more than " + TASK_FAILURE_THRESHOLD + " times.");
+            "reprocess more than {} times.", TASK_FAILURE_THRESHOLD);
         reconDBUpdateTasks.remove(taskName);
       }
     }
