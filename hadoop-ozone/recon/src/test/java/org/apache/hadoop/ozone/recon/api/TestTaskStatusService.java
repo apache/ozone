@@ -35,6 +35,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Test for Task Status Service.
+ */
 public class TestTaskStatusService extends AbstractSqlDatabaseTest {
   private TaskStatusService taskStatusService;
   private Configuration sqlConfiguration;

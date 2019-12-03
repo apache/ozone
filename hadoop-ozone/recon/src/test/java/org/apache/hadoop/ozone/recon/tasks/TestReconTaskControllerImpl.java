@@ -80,8 +80,6 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
 
   @Test
   public void testConsumeOMEvents() throws Exception {
-    ReconOMMetadataManager omMetadataManagerMock = mock(
-        ReconOMMetadataManager.class);
     ReconDBUpdateTask reconDBUpdateTaskMock = getMockTask("MockTask");
     when(reconDBUpdateTaskMock.process(any(OMUpdateEventBatch.class)))
         .thenReturn(new ImmutablePair<>("MockTask", true));

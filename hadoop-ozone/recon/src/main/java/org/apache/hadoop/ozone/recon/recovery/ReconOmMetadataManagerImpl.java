@@ -110,7 +110,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
   }
 
   @Override
-  public long getLastSequenceNumberFromDB () {
+  public long getLastSequenceNumberFromDB() {
     RDBStore rocksDBStore = (RDBStore) getStore();
     if (null == rocksDBStore) {
       return 0;

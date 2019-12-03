@@ -169,7 +169,7 @@ public class OzoneManagerServiceProviderImpl
     this.configuration = configuration;
   }
 
-  public void registerOMDBTasks () {
+  public void registerOMDBTasks() {
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
         OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name(),
         System.currentTimeMillis(), getCurrentOMDBSequenceNumber());

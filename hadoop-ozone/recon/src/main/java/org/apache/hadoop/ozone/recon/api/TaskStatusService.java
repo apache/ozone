@@ -33,7 +33,7 @@ import javax.ws.rs.core.MediaType;
 import java.util.List;
 
 /**
- * Endpoint for displaying the last successful run of each Recon Task
+ * Endpoint for displaying the last successful run of each Recon Task.
  */
 @Path("/task")
 @Produces(MediaType.APPLICATION_JSON)
