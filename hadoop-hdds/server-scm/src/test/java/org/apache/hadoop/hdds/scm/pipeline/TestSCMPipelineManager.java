@@ -383,10 +383,12 @@ public class TestSCMPipelineManager {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
+    EventQueue eventQueue = new EventQueue();
     final SCMPipelineManager pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
+        new SCMPipelineManager(conf, nodeManager, eventQueue);
     final PipelineProvider ratisProvider = new MockRatisPipelineProvider(
-        nodeManager, pipelineManager.getStateManager(), conf, false);
+        nodeManager, pipelineManager.getStateManager(), conf, eventQueue,
+        false);
 
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         ratisProvider);
