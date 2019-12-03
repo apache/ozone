@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -41,6 +42,7 @@ class BackgroundPipelineCreator {
   private final AtomicBoolean isPipelineCreatorRunning;
   private final PipelineManager pipelineManager;
   private final Configuration conf;
+  private ScheduledFuture<?> periodicTask;
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
       Scheduler scheduler, Configuration conf) {
@@ -57,13 +59,16 @@ class BackgroundPipelineCreator {
   /**
    * Schedules a fixed interval job to create pipelines.
    */
-  void startFixedIntervalPipelineCreator() {
+  synchronized void startFixedIntervalPipelineCreator() {
+    if (periodicTask != null) {
+      return;
+    }
     long intervalInMillis = conf
         .getTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
             ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
     // TODO: #CLUTIL We can start the job asap
-    scheduler.scheduleWithFixedDelay(() -> {
+    periodicTask = scheduler.scheduleWithFixedDelay(() -> {
       if (!shouldSchedulePipelineCreator()) {
         return;
       }
@@ -83,14 +88,28 @@ class BackgroundPipelineCreator {
     scheduler.schedule(this::createPipelines, 0, TimeUnit.MILLISECONDS);
   }
 
+  private boolean skipCreation(HddsProtos.ReplicationFactor factor,
+                               HddsProtos.ReplicationType type,
+                               boolean autoCreate) {
+    return factor == HddsProtos.ReplicationFactor.ONE &&
+        type == HddsProtos.ReplicationType.RATIS && (!autoCreate);
+  }
+
   private void createPipelines() {
     // TODO: #CLUTIL Different replication factor may need to be supported
     HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
         conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
             OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
+    boolean autoCreateFactorOne = conf.getBoolean(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
     for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
         .values()) {
+      if (skipCreation(factor, type, autoCreateFactorOne)) {
+        // Skip this iteration for creating pipeline
+        continue;
+      }
       while (true) {
         try {
           if (scheduler.isClosed()) {

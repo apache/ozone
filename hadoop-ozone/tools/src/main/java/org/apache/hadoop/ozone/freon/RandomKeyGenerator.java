@@ -34,7 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
+import java.util.function.LongSupplier;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.opentracing.Scope;
@@ -307,7 +307,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       LOG.info("Data validation is enabled.");
     }
 
-    Supplier<Long> currentValue = numberOfKeysAdded::get;
+    LongSupplier currentValue = numberOfKeysAdded::get;
     progressbar = new ProgressBar(System.out, totalKeyCount, currentValue);
 
     LOG.info("Starting progress bar Thread.");

@@ -17,13 +17,15 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.common.Storage;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
@@ -43,7 +45,7 @@ public class OMStorage extends Storage {
    * @throws IOException if any directories are inaccessible.
    */
   public OMStorage(OzoneConfiguration conf) throws IOException {
-    super(NodeType.OM, OmUtils.getOmDbDir(conf), STORAGE_DIR);
+    super(NodeType.OM, getOmDbDir(conf), STORAGE_DIR);
   }
 
   public void setScmId(String scmId) throws IOException {
@@ -103,5 +105,16 @@ public class OMStorage extends Storage {
       omProperties.setProperty(OM_CERT_SERIAL_ID, getOmCertSerialId());
     }
     return omProperties;
+  }
+
+  /**
+   * Get the location where OM should store its metadata directories.
+   * Fall back to OZONE_METADATA_DIRS if not defined.
+   *
+   * @param conf - Config
+   * @return File path, after creating all the required Directories.
+   */
+  public static File getOmDbDir(Configuration conf) {
+    return ServerUtils.getDBPath(conf, OMConfigKeys.OZONE_OM_DB_DIRS);
   }
 }

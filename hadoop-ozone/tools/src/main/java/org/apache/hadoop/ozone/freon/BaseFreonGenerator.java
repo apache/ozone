@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -100,8 +100,6 @@ public class BaseFreonGenerator {
 
   private MetricRegistry metrics = new MetricRegistry();
 
-  private ExecutorService executor;
-
   private AtomicLong successCounter;
 
   private AtomicLong failureCounter;
@@ -117,7 +115,7 @@ public class BaseFreonGenerator {
    */
   public void runTests(TaskProvider provider) {
 
-    executor = Executors.newFixedThreadPool(threadNo);
+    ExecutorService executor = Executors.newFixedThreadPool(threadNo);
 
     ProgressBar progressBar =
         new ProgressBar(System.out, testNo, successCounter::get);
@@ -345,7 +343,7 @@ public class BaseFreonGenerator {
   /**
    * Calculate checksum of a byte array.
    */
-  public byte[] getDigest(byte[] content) throws IOException {
+  public static byte[] getDigest(byte[] content) {
     DigestUtils dig = new DigestUtils(DIGEST_ALGORITHM);
     dig.getMessageDigest().reset();
     return dig.digest(content);
@@ -354,7 +352,7 @@ public class BaseFreonGenerator {
   /**
    * Calculate checksum of an Input stream.
    */
-  public byte[] getDigest(InputStream stream) throws IOException {
+  public static byte[] getDigest(InputStream stream) throws IOException {
     DigestUtils dig = new DigestUtils(DIGEST_ALGORITHM);
     dig.getMessageDigest().reset();
     return dig.digest(stream);

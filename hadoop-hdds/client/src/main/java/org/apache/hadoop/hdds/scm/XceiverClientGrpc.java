@@ -478,7 +478,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       IOException {
     // there is no notion of watch for commit index in standalone pipeline
     return null;
-  };
+  }
 
   public long getReplicatedMinCommitIndex() {
     return 0;

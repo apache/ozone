@@ -142,10 +142,11 @@ public class ContainerOperationClient implements ScmClient {
       Pipeline pipeline = containerWithPipeline.getPipeline();
       client = xceiverClientManager.acquireClient(pipeline);
 
-      Preconditions.checkState(pipeline.isOpen(), String
-          .format("Unexpected state=%s for pipeline=%s, expected state=%s",
-              pipeline.getPipelineState(), pipeline.getId(),
-              Pipeline.PipelineState.OPEN));
+      Preconditions.checkState(
+          pipeline.isOpen(),
+          "Unexpected state=%s for pipeline=%s, expected state=%s",
+          pipeline.getPipelineState(), pipeline.getId(),
+          Pipeline.PipelineState.OPEN);
       createContainer(client,
           containerWithPipeline.getContainerInfo().getContainerID());
       return containerWithPipeline;
@@ -220,7 +221,7 @@ public class ContainerOperationClient implements ScmClient {
     // That makes sense, but it is not needed for the client to work.
     if (LOG.isDebugEnabled()) {
       LOG.debug("Pipeline creation successful. Pipeline: {}",
-          pipeline.toString());
+          pipeline);
     }
   }
 

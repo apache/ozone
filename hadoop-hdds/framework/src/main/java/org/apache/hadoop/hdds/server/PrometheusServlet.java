@@ -22,8 +22,12 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.PrintWriter;
 
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+
+import io.prometheus.client.CollectorRegistry;
+import io.prometheus.client.exporter.common.TextFormat;
 
 /**
  * Servlet to publish hadoop metrics in prometheus format.
@@ -40,7 +44,12 @@ public class PrometheusServlet extends HttpServlet {
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
     DefaultMetricsSystem.instance().publishMetricsNow();
-    getPrometheusSink().writeMetrics(resp.getWriter());
-    resp.getWriter().flush();
+    PrintWriter writer = resp.getWriter();
+    getPrometheusSink().writeMetrics(writer);
+    writer.write("\n\n#Dropwizard metrics\n\n");
+    //print out dropwizard metrics used by ratis.
+    TextFormat.write004(writer,
+        CollectorRegistry.defaultRegistry.metricFamilySamples());
+    writer.flush();
   }
 }

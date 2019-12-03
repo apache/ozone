@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -234,8 +235,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void cleanupCache(long epoch) {
-    cache.cleanup(epoch);
+  public void cleanupCache(List<Long> epochs) {
+    cache.cleanup(epochs);
   }
 
   @VisibleForTesting

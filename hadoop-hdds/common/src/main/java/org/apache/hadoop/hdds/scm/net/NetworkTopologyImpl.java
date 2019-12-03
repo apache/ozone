@@ -511,8 +511,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
         }
         // excludeScope and finalScope share nothing case
         if (s.startsWith(finalScope)) {
-          if (!mutableExcludedScopes.stream().anyMatch(
-              e -> s.startsWith(e))) {
+          if (mutableExcludedScopes.stream().noneMatch(s::startsWith)) {
             mutableExcludedScopes.add(s);
           }
         }
@@ -694,7 +693,10 @@ public class NetworkTopologyImpl implements NetworkTopology{
     if (scopeNode == null) {
       return 0;
     }
-    NetUtils.removeOutscope(mutableExcludedNodes, scope);
+    if (!CollectionUtils.isEmpty(mutableExcludedNodes)) {
+      mutableExcludedNodes.removeIf(
+          next -> !next.getNetworkFullPath().startsWith(scope));
+    }
     List<Node> excludedAncestorList =
         NetUtils.getAncestorList(this, mutableExcludedNodes, ancestorGen);
     for (Node ancestor : excludedAncestorList) {
@@ -717,7 +719,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
       }
     }
     // excludedNodes is not null case
-    if (mutableExcludedNodes != null && (!mutableExcludedNodes.isEmpty())) {
+    if (!CollectionUtils.isEmpty(mutableExcludedNodes)) {
       if (ancestorGen == 0) {
         for (Node node: mutableExcludedNodes) {
           if (contains(node)) {

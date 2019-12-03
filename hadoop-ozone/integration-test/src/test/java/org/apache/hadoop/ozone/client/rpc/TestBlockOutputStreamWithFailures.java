@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ratis.protocol.GroupMismatchException;
 import org.apache.ratis.protocol.RaftRetryFailureException;
 import org.junit.After;
@@ -221,7 +222,7 @@ public class TestBlockOutputStreamWithFailures {
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
     Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
     // Close the containers on the Datanode and write more data
-    ContainerTestHelper.waitForContainerClose(key, cluster);
+    TestHelper.waitForContainerClose(key, cluster);
     // 4 writeChunks = maxFlushSize + 2 putBlocks  will be discarded here
     // once exception is hit
     key.write(data1);
@@ -624,7 +625,7 @@ public class TestBlockOutputStreamWithFailures {
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
     Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
     // Close the containers on the Datanode and write more data
-    ContainerTestHelper.waitForContainerClose(key, cluster);
+    TestHelper.waitForContainerClose(key, cluster);
     key.write(data1);
 
     // As a part of handling the exception, 2 failed writeChunks  will be
@@ -745,7 +746,7 @@ public class TestBlockOutputStreamWithFailures {
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
     Assert.assertEquals(3, raftClient.getCommitInfoMap().size());
     // Close the containers on the Datanode and write more data
-    ContainerTestHelper.waitForContainerClose(key, cluster);
+    TestHelper.waitForContainerClose(key, cluster);
     key.write(data1);
 
     // commitInfoMap will remain intact as there is no server failure
@@ -879,7 +880,7 @@ public class TestBlockOutputStreamWithFailures {
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
     Assert.assertEquals(1, raftClient.getCommitInfoMap().size());
     // Close the containers on the Datanode and write more data
-    ContainerTestHelper.waitForContainerClose(key, cluster);
+    TestHelper.waitForContainerClose(key, cluster);
     // 4 writeChunks = maxFlushSize + 2 putBlocks  will be discarded here
     // once exception is hit
     key.write(data1);
@@ -1206,13 +1207,13 @@ public class TestBlockOutputStreamWithFailures {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size, ReplicationFactor factor) throws Exception {
-    return ContainerTestHelper
+    return TestHelper
         .createKey(keyName, type, factor, size, objectStore, volumeName,
             bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    ContainerTestHelper
+    TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

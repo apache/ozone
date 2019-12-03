@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
@@ -121,6 +121,6 @@ public class TestFreonWithDatanodeFastRestart {
   }
 
   private StateMachine getStateMachine() throws Exception {
-    return ContainerTestHelper.getStateMachine(cluster);
+    return TestHelper.getStateMachine(cluster);
   }
 }
