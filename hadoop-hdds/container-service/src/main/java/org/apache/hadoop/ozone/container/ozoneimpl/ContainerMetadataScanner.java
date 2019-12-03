@@ -66,6 +66,8 @@ public class ContainerMetadataScanner extends Thread {
           metrics.resetNumContainersScanned();
         }
       }
+    } catch (Exception e) {
+      LOG.error("{} exiting because of exception ", this, e);
     } finally {
       if (metrics != null) {
         metrics.unregister();
