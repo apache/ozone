@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.common.helpers;
 
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.client.BlockID;
 import com.google.common.base.Preconditions;
@@ -115,6 +113,11 @@ public class BlockData {
     builder.addAllChunks(getChunks());
     builder.setSize(size);
     return builder.build();
+  }
+
+  public int getSerializedSize() {
+    //TODO: the serialized size may be computed without creating the proto.
+    return getProtoBufMessage().getSerializedSize();
   }
 
   /**
@@ -249,9 +252,19 @@ public class BlockData {
       size = 0L;
     } else {
       final int n = chunks.size();
-      chunkList = n == 0? null: n == 1? chunks.get(0): chunks;
-      size = chunks.parallelStream().mapToLong(
-          ContainerProtos.ChunkInfo::getLen).sum();
+      if (n == 0) {
+        chunkList = null;
+        size = 0;
+      } else if (n == 1) {
+        ContainerProtos.ChunkInfo singleChunk = chunks.get(0);
+        chunkList = singleChunk;
+        size = singleChunk.getLen();
+      } else {
+        chunkList = chunks;
+        size = chunks.parallelStream()
+            .mapToLong(ContainerProtos.ChunkInfo::getLen)
+            .sum();
+      }
     }
   }
 
@@ -265,9 +278,15 @@ public class BlockData {
 
   @Override
   public String toString() {
-    return new ToStringBuilder(this, ToStringStyle.NO_CLASS_NAME_STYLE)
-        .append("blockId", blockID.toString())
-        .append("size", this.size)
-        .toString();
+    StringBuilder sb = new StringBuilder(112);
+    appendTo(sb);
+    return sb.toString();
+  }
+
+  public void appendTo(StringBuilder sb) {
+    sb.append("[blockId=");
+    blockID.appendTo(sb);
+    sb.append(",size=").append(size);
+    sb.append("]");
   }
 }

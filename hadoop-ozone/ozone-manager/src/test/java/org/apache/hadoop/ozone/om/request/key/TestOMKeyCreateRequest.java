@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -210,7 +211,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, id);
 
-    TestOMRequestUtils.addVolumeToDB(volumeName, "ozone", omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, OzoneConsts.OZONE,
+        omMetadataManager);
 
     // Before calling
     OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);

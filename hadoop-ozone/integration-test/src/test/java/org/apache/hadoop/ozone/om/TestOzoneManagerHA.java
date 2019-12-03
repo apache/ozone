@@ -23,14 +23,19 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -62,13 +67,16 @@ import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.util.Time;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
+    .IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
+    .IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY;
 
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl
     .NODE_FAILURE_TIMEOUT;
@@ -80,8 +88,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_CLIENT_RETRY_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
@@ -105,6 +111,9 @@ public class TestOzoneManagerHA {
   private int numOfOMs = 3;
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final int LOG_PURGE_GAP = 50;
+  /* Reduce max number of retries to speed up unit test. */
+  private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
+  private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -129,8 +138,12 @@ public class TestOzoneManagerHA {
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
     conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
-    conf.setInt(OZONE_CLIENT_RETRY_MAX_ATTEMPTS_KEY, 10);
-    conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 10);
+    conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
+        OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS);
+    conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
+        IPC_CLIENT_CONNECT_MAX_RETRIES);
+    /* Reduce IPC retry interval to speed up unit test. */
+    conf.setInt(IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY, 200);
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
@@ -695,8 +708,7 @@ public class TestOzoneManagerHA {
 
     // Perform a manual failover of the proxy provider to move the
     // currentProxyIndex to a node other than the leader OM.
-    omFailoverProxyProvider.performFailover(
-        (OzoneManagerProtocolPB) omFailoverProxyProvider.getProxy().proxy);
+    omFailoverProxyProvider.performFailoverToNextProxy();
 
     String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
     Assert.assertNotEquals(leaderOMNodeId, newProxyNodeId);
@@ -717,8 +729,7 @@ public class TestOzoneManagerHA {
 
   @Test
   public void testOMRetryProxy() throws Exception {
-    // Stop all the OMs. After making 5 (set maxRetries value) attempts at
-    // connection, the RpcClient should give up.
+    // Stop all the OMs.
     for (int i = 0; i < numOfOMs; i++) {
       cluster.stopOzoneManager(i);
     }
@@ -729,16 +740,26 @@ public class TestOzoneManagerHA {
 
     try {
       createVolumeTest(true);
+      // After making N (set maxRetries value) connection attempts to OMs,
+      // the RpcClient should give up.
       fail("TestOMRetryProxy should fail when there are no OMs running");
     } catch (ConnectException e) {
-      // Each retry attempt tries upto 10 times to connect. So there should be
-      // 10*10 "Retrying connect to server" messages
-      Assert.assertEquals(100,
+      // Each retry attempt tries IPC_CLIENT_CONNECT_MAX_RETRIES times.
+      // So there should be at least
+      // OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS * IPC_CLIENT_CONNECT_MAX_RETRIES
+      // "Retrying connect to server" messages.
+      // Also, the first call will result in EOFException.
+      // That will result in another IPC_CLIENT_CONNECT_MAX_RETRIES attempts.
+      Assert.assertEquals(
+          (OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS + 1) *
+              IPC_CLIENT_CONNECT_MAX_RETRIES,
           appender.countLinesWithMessage("Retrying connect to server:"));
 
       Assert.assertEquals(1,
-          appender.countLinesWithMessage("Failed to connect to OM. Attempted " +
-              "10 retries and 10 failovers"));
+          appender.countLinesWithMessage("Failed to connect to OMs:"));
+      Assert.assertEquals(1,
+          appender.countLinesWithMessage("Attempted " +
+              OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS + " failovers."));
     }
   }
 
@@ -1244,5 +1265,137 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(followerOM1lastAppliedIndex,
         followerOM2lastAppliedIndex);
 
+  }
+
+  @Test
+  public void testListParts() throws Exception {
+
+    OzoneBucket ozoneBucket = setupBucket();
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(ozoneBucket, keyName);
+
+    Map<Integer, String> partsMap = new HashMap<>();
+    partsMap.put(1, createMultipartUploadPartKey(ozoneBucket, 1, keyName,
+        uploadID));
+    partsMap.put(2, createMultipartUploadPartKey(ozoneBucket, 2, keyName,
+        uploadID));
+    partsMap.put(3, createMultipartUploadPartKey(ozoneBucket, 3, keyName,
+        uploadID));
+
+    validateListParts(ozoneBucket, keyName, uploadID, partsMap);
+
+    // Stop leader OM, and then validate list parts.
+    stopLeaderOM();
+    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+
+    validateListParts(ozoneBucket, keyName, uploadID, partsMap);
+
+  }
+
+  @Test
+  public void testListVolumes() throws Exception {
+    String userName = UserGroupInformation.getCurrentUser().getUserName();
+    String adminName = userName;
+
+    Set<String> expectedVolumes = new TreeSet<>();
+    for (int i=0; i < 100; i++) {
+      String volumeName = "vol" + i;
+      expectedVolumes.add(volumeName);
+      VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+          .setOwner(userName)
+          .setAdmin(adminName)
+          .build();
+      objectStore.createVolume(volumeName, createVolumeArgs);
+    }
+
+    validateVolumesList(userName, expectedVolumes);
+
+    // Stop leader OM, and then validate list volumes for user.
+    stopLeaderOM();
+    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+
+    validateVolumesList(userName, expectedVolumes);
+
+  }
+
+  private void validateVolumesList(String userName,
+      Set<String> expectedVolumes) throws Exception {
+
+    int expectedCount = 0;
+    Iterator<? extends OzoneVolume> volumeIterator =
+        objectStore.listVolumesByUser(userName, "", "");
+
+    while (volumeIterator.hasNext()) {
+      OzoneVolume next = volumeIterator.next();
+      Assert.assertTrue(expectedVolumes.contains(next.getName()));
+      expectedCount++;
+    }
+
+    Assert.assertEquals(expectedVolumes.size(),  expectedCount);
+  }
+
+
+  /**
+   * Stop the current leader OM.
+   * @throws Exception
+   */
+  private void stopLeaderOM() {
+    //Stop the leader OM.
+    OMFailoverProxyProvider omFailoverProxyProvider =
+        objectStore.getClientProxy().getOMProxyProvider();
+
+    // The OMFailoverProxyProvider will point to the current leader OM node.
+    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+
+    // Stop one of the ozone manager, to see when the OM leader changes
+    // multipart upload is happening successfully or not.
+    cluster.stopOzoneManager(leaderOMNodeId);
+  }
+
+  /**
+   * Validate parts uploaded to a MPU Key.
+   * @param ozoneBucket
+   * @param keyName
+   * @param uploadID
+   * @param partsMap
+   * @throws Exception
+   */
+  private void validateListParts(OzoneBucket ozoneBucket, String keyName,
+      String uploadID, Map<Integer, String> partsMap) throws Exception {
+    OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
+        ozoneBucket.listParts(keyName, uploadID, 0, 1000);
+
+    List<OzoneMultipartUploadPartListParts.PartInfo> partInfoList =
+        ozoneMultipartUploadPartListParts.getPartInfoList();
+
+    Assert.assertTrue(partInfoList.size() == partsMap.size());
+
+    for (int i=0; i< partsMap.size(); i++) {
+      Assert.assertEquals(partsMap.get(partInfoList.get(i).getPartNumber()),
+          partInfoList.get(i).getPartName());
+
+    }
+
+    Assert.assertFalse(ozoneMultipartUploadPartListParts.isTruncated());
+  }
+
+  /**
+   * Create an Multipart upload part Key with specified partNumber and uploadID.
+   * @param ozoneBucket
+   * @param partNumber
+   * @param keyName
+   * @param uploadID
+   * @return Part name for the uploaded part.
+   * @throws Exception
+   */
+  private String createMultipartUploadPartKey(OzoneBucket ozoneBucket,
+      int partNumber, String keyName, String uploadID) throws Exception {
+    String value = "random data";
+    OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
+        keyName, value.length(), partNumber, uploadID);
+    ozoneOutputStream.write(value.getBytes(), 0, value.length());
+    ozoneOutputStream.close();
+
+    return ozoneOutputStream.getCommitUploadPartInfo().getPartName();
   }
 }

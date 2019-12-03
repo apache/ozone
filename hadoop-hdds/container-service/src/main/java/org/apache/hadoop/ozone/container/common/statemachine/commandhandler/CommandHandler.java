@@ -68,8 +68,16 @@ public interface CommandHandler {
   default void updateCommandStatus(StateContext context, SCMCommand command,
       Consumer<CommandStatus> cmdStatusUpdater, Logger log) {
     if (!context.updateCommandStatus(command.getId(), cmdStatusUpdater)) {
-      log.debug("{} with Id:{} not found.", command.getType(),
+      log.warn("{} with Id:{} not found.", command.getType(),
           command.getId());
     }
+  }
+
+  /**
+   * Override for any command with an internal threadpool, and stop the
+   * executor when this method is invoked.
+   */
+  default void stop() {
+    // Default implementation does nothing
   }
 }

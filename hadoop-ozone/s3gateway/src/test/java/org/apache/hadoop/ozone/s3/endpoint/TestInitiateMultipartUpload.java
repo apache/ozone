@@ -20,6 +20,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -43,13 +44,13 @@ public class TestInitiateMultipartUpload {
   @Test
   public void testInitiateMultipartUpload() throws Exception {
 
-    String bucket = "s3bucket";
-    String key = "key1";
+    String bucket = OzoneConsts.S3_BUCKET;
+    String key = OzoneConsts.KEY;
     OzoneClientStub client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket("ozone", bucket);
+    client.getObjectStore().createS3Bucket(OzoneConsts.OZONE, bucket);
     String volumeName = client.getObjectStore().getOzoneVolumeName(bucket);
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket ozoneBucket = volume.getBucket("s3bucket");
+    OzoneBucket ozoneBucket = volume.getBucket(OzoneConsts.S3_BUCKET);
 
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);

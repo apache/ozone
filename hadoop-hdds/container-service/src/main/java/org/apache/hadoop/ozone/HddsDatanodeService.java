@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.server.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -43,6 +45,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ServicePlugin;
 import org.apache.hadoop.util.StringUtils;
+
+import io.prometheus.client.CollectorRegistry;
+import org.apache.ratis.metrics.MetricRegistries;
+import org.apache.ratis.metrics.MetricsReporting;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +92,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private boolean printBanner;
   private String[] args;
   private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
+
+  //Constructor for DataNode PluginService
+  public HddsDatanodeService(){}
 
   public HddsDatanodeService(boolean printBanner, String[] args) {
     this.printBanner = printBanner;
@@ -169,64 +178,72 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
+
+    //All the Ratis metrics (registered from now) will be published via JMX and
+    //via the prometheus exporter (used by the /prom servlet
+    MetricRegistries.global()
+        .addReporterRegistration(MetricsReporting.jmxReporter());
+    MetricRegistries.global().addReporterRegistration(
+        registry -> CollectorRegistry.defaultRegistry.register(
+            new RatisDropwizardExports(
+                registry.getDropWizardMetricRegistry())));
+
     OzoneConfiguration.activate();
     HddsUtils.initializeMetrics(conf, "HddsDatanode");
-    if (HddsUtils.isHddsEnabled(conf)) {
-      try {
-        String hostname = HddsUtils.getHostName(conf);
-        String ip = InetAddress.getByName(hostname).getHostAddress();
-        datanodeDetails = initializeDatanodeDetails();
-        datanodeDetails.setHostName(hostname);
-        datanodeDetails.setIpAddress(ip);
-        TracingUtil.initTracing(
-            "HddsDatanodeService." + datanodeDetails.getUuidString()
-                .substring(0, 8));
-        LOG.info("HddsDatanodeService host:{} ip:{}", hostname, ip);
-        // Authenticate Hdds Datanode service if security is enabled
-        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          component = "dn-" + datanodeDetails.getUuidString();
+    try {
+      String hostname = HddsUtils.getHostName(conf);
+      String ip = InetAddress.getByName(hostname).getHostAddress();
+      datanodeDetails = initializeDatanodeDetails();
+      datanodeDetails.setHostName(hostname);
+      datanodeDetails.setIpAddress(ip);
+      TracingUtil.initTracing(
+          "HddsDatanodeService." + datanodeDetails.getUuidString()
+              .substring(0, 8), conf);
+      LOG.info("HddsDatanodeService host:{} ip:{}", hostname, ip);
+      // Authenticate Hdds Datanode service if security is enabled
+      if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+        component = "dn-" + datanodeDetails.getUuidString();
 
-          dnCertClient = new DNCertificateClient(new SecurityConfig(conf),
-              datanodeDetails.getCertSerialId());
+        dnCertClient = new DNCertificateClient(new SecurityConfig(conf),
+            datanodeDetails.getCertSerialId());
 
-          if (SecurityUtil.getAuthenticationMethod(conf).equals(
-              UserGroupInformation.AuthenticationMethod.KERBEROS)) {
-            LOG.info("Ozone security is enabled. Attempting login for Hdds " +
-                    "Datanode user. Principal: {},keytab: {}", conf.get(
-                DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
-                conf.get(DFSConfigKeys.DFS_DATANODE_KEYTAB_FILE_KEY));
+        if (SecurityUtil.getAuthenticationMethod(conf).equals(
+            UserGroupInformation.AuthenticationMethod.KERBEROS)) {
+          LOG.info("Ozone security is enabled. Attempting login for Hdds " +
+                  "Datanode user. Principal: {},keytab: {}", conf.get(
+              DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY),
+              conf.get(DFSConfigKeys.DFS_DATANODE_KEYTAB_FILE_KEY));
 
-            UserGroupInformation.setConfiguration(conf);
+          UserGroupInformation.setConfiguration(conf);
 
-            SecurityUtil.login(conf, DFSConfigKeys.DFS_DATANODE_KEYTAB_FILE_KEY,
-                DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, hostname);
-          } else {
-            throw new AuthenticationException(SecurityUtil.
-                getAuthenticationMethod(conf) + " authentication method not " +
-                "supported. Datanode user" + " login " + "failed.");
-          }
-          LOG.info("Hdds Datanode login successful.");
+          SecurityUtil.login(conf, DFSConfigKeys.DFS_DATANODE_KEYTAB_FILE_KEY,
+              DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, hostname);
+        } else {
+          throw new AuthenticationException(SecurityUtil.
+              getAuthenticationMethod(conf) + " authentication method not " +
+              "supported. Datanode user" + " login " + "failed.");
         }
-        if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-          initializeCertificateClient(conf);
-        }
-        datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-            dnCertClient, this::terminateDatanode);
-        try {
-          httpServer = new HddsDatanodeHttpServer(conf);
-          httpServer.start();
-        } catch (Exception ex) {
-          LOG.error("HttpServer failed to start.", ex);
-        }
-        startPlugins();
-        // Starting HDDS Daemons
-        datanodeStateMachine.startDaemon();
-      } catch (IOException e) {
-        throw new RuntimeException("Can't start the HDDS datanode plugin", e);
-      } catch (AuthenticationException ex) {
-        throw new RuntimeException("Fail to authentication when starting" +
-            " HDDS datanode plugin", ex);
+        LOG.info("Hdds Datanode login successful.");
       }
+      if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+        initializeCertificateClient(conf);
+      }
+      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
+          dnCertClient, this::terminateDatanode);
+      try {
+        httpServer = new HddsDatanodeHttpServer(conf);
+        httpServer.start();
+      } catch (Exception ex) {
+        LOG.error("HttpServer failed to start.", ex);
+      }
+      startPlugins();
+      // Starting HDDS Daemons
+      datanodeStateMachine.startDaemon();
+    } catch (IOException e) {
+      throw new RuntimeException("Can't start the HDDS datanode plugin", e);
+    } catch (AuthenticationException ex) {
+      throw new RuntimeException("Fail to authentication when starting" +
+          " HDDS datanode plugin", ex);
     }
   }
 

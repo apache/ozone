@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.client.io.LengthInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
@@ -63,7 +64,9 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB
@@ -72,6 +75,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
@@ -221,6 +225,23 @@ public class RpcClient implements ClientProtocol {
     topologyAwareReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
+  }
+
+  @Override
+  public List<OMRoleInfo> getOmRoleInfos() throws IOException {
+
+    List<ServiceInfo> serviceList = ozoneManagerClient.getServiceList();
+    List<OMRoleInfo> roleInfos = new ArrayList<>();
+
+    for (ServiceInfo serviceInfo : serviceList) {
+      if (serviceInfo.getNodeType().equals(HddsProtos.NodeType.OM)) {
+        OMRoleInfo omRoleInfo = serviceInfo.getOmRoleInfo();
+        if (omRoleInfo != null) {
+          roleInfos.add(omRoleInfo);
+        }
+      }
+    }
+    return roleInfos;
   }
 
   @Override
@@ -585,12 +606,22 @@ public class RpcClient implements ClientProtocol {
     HddsClientUtils.checkNotNull(keyName, type, factor);
     String requestId = UUID.randomUUID().toString();
 
-    if(Boolean.valueOf(metadata.get(OzoneConsts.GDPR_FLAG))){
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
+        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+        .addAllMetadata(metadata)
+        .setAcls(getAclList());
+
+    if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
       try{
         GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
-        metadata.putAll(gKey.getKeyDetails());
-      }catch (Exception e) {
-        if(e instanceof InvalidKeyException &&
+        builder.addAllMetadata(gKey.getKeyDetails());
+      } catch (Exception e) {
+        if (e instanceof InvalidKeyException &&
             e.getMessage().contains("Illegal key size or default parameters")) {
           LOG.error("Missing Unlimited Strength Policy jars. Please install " +
               "Java Cryptography Extension (JCE) Unlimited Strength " +
@@ -600,18 +631,7 @@ public class RpcClient implements ClientProtocol {
       }
     }
 
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setDataSize(size)
-        .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
-        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
-        .addAllMetadata(metadata)
-        .setAcls(getAclList())
-        .build();
-
-    OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
+    OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     return createOutputStream(openKey, requestId, type, factor);
   }
 
@@ -690,6 +710,17 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
+      String startKeyName, String keyPrefix, int maxKeys) throws IOException {
+
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+
+    return ozoneManagerClient.listTrash(volumeName, bucketName, startKeyName,
+        keyPrefix, maxKeys);
+  }
+
+  @Override
   public OzoneKeyDetails getKeyDetails(
       String volumeName, String bucketName, String keyName)
       throws IOException {
@@ -724,6 +755,12 @@ public class RpcClient implements ClientProtocol {
 
     Preconditions.checkArgument(Strings.isNotBlank(s3BucketName), "bucket " +
         "name cannot be null or empty.");
+    try {
+      HddsClientUtils.verifyResourceName(s3BucketName);
+    } catch (IllegalArgumentException exception) {
+      throw new OMException("Invalid bucket name: " + s3BucketName,
+          OMException.ResultCodes.INVALID_BUCKET_NAME);
+    }
     ozoneManagerClient.createS3Bucket(userName, s3BucketName);
   }
 
@@ -1026,7 +1063,7 @@ public class RpcClient implements ClientProtocol {
    * false.
    *
    * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl top be added.
+   * @param acl ozone acl to be added.
    * @throws IOException if there is error.
    */
   @Override

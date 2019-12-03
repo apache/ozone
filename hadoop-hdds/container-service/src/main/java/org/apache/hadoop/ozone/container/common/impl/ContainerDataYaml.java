@@ -27,11 +27,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerType;
@@ -53,6 +55,7 @@ import org.yaml.snakeyaml.introspector.Property;
 import org.yaml.snakeyaml.introspector.PropertyUtils;
 import org.yaml.snakeyaml.nodes.MappingNode;
 import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.NodeTuple;
 import org.yaml.snakeyaml.nodes.ScalarNode;
 import org.yaml.snakeyaml.nodes.Tag;
 import org.yaml.snakeyaml.representer.Representer;
@@ -90,9 +93,8 @@ public final class ContainerDataYaml {
       // Write the ContainerData with checksum to Yaml file.
       out = new FileOutputStream(
           containerFile);
-      writer = new OutputStreamWriter(out, "UTF-8");
+      writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
       yaml.dump(containerData, writer);
-
     } finally {
       try {
         if (writer != null) {
@@ -105,6 +107,7 @@ public final class ContainerDataYaml {
         LOG.warn("Error occurred during closing the writer. ContainerID: " +
             containerData.getContainerID());
       }
+      IOUtils.closeQuietly(out);
     }
   }
 
@@ -217,6 +220,17 @@ public final class ContainerDataYaml {
       }
       return filtered;
     }
+
+    /**
+     * Omit properties with null value.
+     */
+    @Override
+    protected NodeTuple representJavaBeanProperty(
+        Object bean, Property property, Object value, Tag tag) {
+      return value == null
+          ? null
+          : super.representJavaBeanProperty(bean, property, value, tag);
+    }
   }
 
   /**
@@ -260,6 +274,8 @@ public final class ContainerDataYaml {
         Map<String, String> meta = (Map) nodes.get(OzoneConsts.METADATA);
         kvData.setMetadata(meta);
         kvData.setChecksum((String) nodes.get(OzoneConsts.CHECKSUM));
+        Long timestamp = (Long) nodes.get(OzoneConsts.DATA_SCAN_TIMESTAMP);
+        kvData.setDataScanTimestamp(timestamp);
         String state = (String) nodes.get(OzoneConsts.STATE);
         kvData
             .setState(ContainerProtos.ContainerDataProto.State.valueOf(state));

@@ -84,4 +84,9 @@ public class ContainerKeyPrefixCodec implements Codec<ContainerKeyPrefix>{
     long version = ByteBuffer.wrap(versionBytes).getLong();
     return new ContainerKeyPrefix(containerIdFromDB, keyPrefix, version);
   }
+
+  @Override
+  public ContainerKeyPrefix copyObject(ContainerKeyPrefix object) {
+    return object;
+  }
 }

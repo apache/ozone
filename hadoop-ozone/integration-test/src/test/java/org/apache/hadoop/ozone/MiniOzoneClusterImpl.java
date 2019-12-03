@@ -28,6 +28,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
@@ -94,7 +95,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private final List<HddsDatanodeService> hddsDatanodes;
 
   // Timeout for the cluster to be ready
-  private int waitForClusterToBeReadyTimeout = 60000; // 1 min
+  private int waitForClusterToBeReadyTimeout = 120000; // 2 min
   private CertificateClient caClient;
 
   /**
@@ -143,11 +144,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       final int healthy = scm.getNodeCount(HEALTHY);
-      final boolean isReady = healthy == hddsDatanodes.size();
+      final boolean isNodeReady = healthy == hddsDatanodes.size();
+      final boolean exitSafeMode = !scm.isInSafeMode();
+
       LOG.info("{}. Got {} of {} DN Heartbeats.",
-          isReady? "Cluster is ready" : "Waiting for cluster to be ready",
+          isNodeReady? "Nodes are ready" : "Waiting for nodes to be ready",
           healthy, hddsDatanodes.size());
-      return isReady;
+      LOG.info(exitSafeMode? "Cluster exits safe mode" :
+              "Waiting for cluster to exit safe mode",
+          healthy, hddsDatanodes.size());
+
+      return isNodeReady && exitSafeMode;
     }, 1000, waitForClusterToBeReadyTimeout);
   }
 
@@ -260,6 +267,19 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     ozoneManager.restart();
   }
 
+  private void waitForHddsDatanodesStop() throws TimeoutException,
+      InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      final int healthy = scm.getNodeCount(HEALTHY);
+      boolean isReady = healthy == hddsDatanodes.size();
+      if (!isReady) {
+        LOG.info("Waiting on {} datanodes out of {} to be marked unhealthy.",
+            healthy, hddsDatanodes.size());
+      }
+      return isReady;
+    }, 1000, waitForClusterToBeReadyTimeout);
+  }
+
   @Override
   public void restartHddsDatanode(int i, boolean waitForDatanode)
       throws InterruptedException, TimeoutException {
@@ -279,7 +299,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     hddsDatanodes.remove(i);
     if (waitForDatanode) {
       // wait for node to be removed from SCM healthy node list.
-      waitForClusterToBeReady();
+      waitForHddsDatanodesStop();
     }
     String[] args = new String[]{};
     HddsDatanodeService service =
@@ -465,7 +485,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * @throws IOException
      */
     void initializeConfiguration() throws IOException {
-      conf.setBoolean(OzoneConfigKeys.OZONE_ENABLED, ozoneEnabled);
       Path metaDir = Paths.get(path, "ozone-meta");
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
@@ -513,7 +532,15 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       configureSCM();
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
-      return StorageContainerManager.createSCM(conf);
+      StorageContainerManager scm = StorageContainerManager.createSCM(conf);
+      HealthyPipelineSafeModeRule rule =
+          scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
+      if (rule != null) {
+        // Set threshold to wait for safe mode exit - this is needed since a
+        // pipeline is marked open only after leader election.
+        rule.setHealthyPipelineThresholdCount(numOfDatanodes / 3);
+      }
+      return scm;
     }
 
     private void initializeScmStorage(SCMStorageConfig scmStore)
@@ -615,7 +642,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       if (hbInterval.isPresent()) {
         conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
             hbInterval.get(), TimeUnit.MILLISECONDS);
-
       } else {
         conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
             DEFAULT_HB_INTERVAL_MS,

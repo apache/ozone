@@ -19,9 +19,14 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Mock Ratis Pipeline Provider for Mock Nodes.
@@ -31,7 +36,13 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   public MockRatisPipelineProvider(NodeManager nodeManager,
                             PipelineStateManager stateManager,
                             Configuration conf) {
-    super(nodeManager, stateManager, conf, null);
+    super(nodeManager, stateManager, conf, new EventQueue());
+  }
+
+  public MockRatisPipelineProvider(NodeManager nodeManager,
+      PipelineStateManager stateManager, Configuration conf,
+      EventPublisher eventPublisher) {
+    super(nodeManager, stateManager, conf, eventPublisher);
   }
 
   protected void initializePipeline(Pipeline pipeline) throws IOException {
@@ -41,5 +52,17 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   @Override
   public void shutdown() {
     // Do nothing.
+  }
+
+  @Override
+  public Pipeline create(HddsProtos.ReplicationFactor factor,
+                         List<DatanodeDetails> nodes) {
+    return Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setState(Pipeline.PipelineState.OPEN)
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .setFactor(factor)
+        .setNodes(nodes)
+        .build();
   }
 }

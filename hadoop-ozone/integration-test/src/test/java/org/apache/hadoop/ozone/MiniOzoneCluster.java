@@ -252,8 +252,7 @@ public interface MiniOzoneCluster {
     protected Optional<Integer> hbProcessorInterval = Optional.empty();
     protected Optional<String> scmId = Optional.empty();
     protected Optional<String> omId = Optional.empty();
-
-    protected Boolean ozoneEnabled = true;
+    
     protected Boolean randomContainerPort = true;
     protected Optional<Integer> chunkSize = Optional.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
@@ -263,7 +262,7 @@ public interface MiniOzoneCluster {
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
     protected int numOfScmHandlers = 20;
-    protected int numOfDatanodes = 1;
+    protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
 
@@ -387,16 +386,6 @@ public interface MiniOzoneCluster {
      */
     public Builder setTrace(Boolean trace) {
       enableTrace = Optional.of(trace);
-      return this;
-    }
-
-    /**
-     * Modifies the configuration such that Ozone will be disabled.
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder disableOzone() {
-      ozoneEnabled = false;
       return this;
     }
 

@@ -57,20 +57,22 @@ public class UpdateVolumeHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
+      String volumeName = address.getVolumeName();
 
-    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-    if (quota != null && !quota.isEmpty()) {
-      volume.setQuota(OzoneQuota.parseQuota(quota));
+      OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+      if (quota != null && !quota.isEmpty()) {
+        volume.setQuota(OzoneQuota.parseQuota(quota));
+      }
+
+      if (ownerName != null && !ownerName.isEmpty()) {
+        volume.setOwner(ownerName);
+      }
+
+      ObjectPrinter.printObjectAsJson(volume);
     }
-
-    if (ownerName != null && !ownerName.isEmpty()) {
-      volume.setOwner(ownerName);
-    }
-
-    ObjectPrinter.printObjectAsJson(volume);
     return null;
   }
 }

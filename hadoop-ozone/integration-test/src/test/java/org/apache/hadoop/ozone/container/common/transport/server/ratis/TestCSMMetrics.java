@@ -136,7 +136,7 @@ public class TestCSMMetrics {
           getTestContainerID());
       ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
           ContainerTestHelper.getWriteChunkRequest(
-              pipeline, blockID, 1024);
+              pipeline, blockID, 1024, null);
       ContainerCommandResponseProto response =
           client.sendCommand(writeChunkRequest);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,

@@ -319,15 +319,6 @@
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
-    <name>hdds.command.status.report.interval</name>
-    <value>60000ms</value>
-    <tag>OZONE, CONTAINER, MANAGEMENT</tag>
-    <description>Time interval of the datanode to send status of command
-      execution. Each datanode periodically the execution status of commands
-      received from SCM to SCM. Unit could be defined with postfix
-      (ns,ms,s,m,h,d)</description>
-  </property>
-  <property>
     <name>hdds.pipeline.report.interval</name>
     <value>60000ms</value>
     <tag>OZONE, PIPELINE, MANAGEMENT</tag>
@@ -477,20 +468,6 @@
       postfix (ns,ms,s,m,h,d)</description>
   </property>
   <property>
-    <name>ozone.enabled</name>
-    <value>false</value>
-    <tag>OZONE, REQUIRED</tag>
-    <description>
-      Status of the Ozone Object Storage service is enabled.
-      Set to true to enable Ozone.
-      Set to false to disable Ozone.
-      Unless this value is set to true, Ozone services will not be started in
-      the cluster.
-
-      Please note: By default ozone is disabled on a hadoop cluster.
-    </description>
-  </property>
-  <property>
     <name>ozone.key.deleting.limit.per.task</name>
     <value>1000</value>
     <tag>OM, PERFORMANCE</tag>
@@ -508,8 +485,17 @@
     <description>
       Comma-separated list of OM service Ids.
 
-      If not set, the default value of "om-service-value" is assigned as the
+      If not set, the default value of "omServiceIdDefault" is assigned as the
       OM service ID.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.internal.service.id</name>
+    <value></value>
+    <tag>OM, HA</tag>
+    <description>
+      Service ID of the Ozone Manager. If this is not set fall back to
+      ozone.om.service.ids to find the service ID it belongs to.
     </description>
   </property>
   <property>
@@ -1275,7 +1261,14 @@
       create pipelines.
     </description>
   </property>
-
+  <property>
+    <name>ozone.scm.pipeline.creation.auto.factor.one</name>
+    <value>true</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      If enabled, SCM will auto create RATIS factor ONE pipeline.
+    </description>
+  </property>
   <property>
     <name>hdds.scm.safemode.threshold.pct</name>
     <value>0.99</value>
@@ -1314,7 +1307,7 @@
 
   <property>
     <name>hdds.scm.safemode.pipeline-availability.check</name>
-    <value>false</value>
+    <value>true</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description>
       Boolean value to enable pipeline availability check during SCM safe mode.
@@ -1322,7 +1315,7 @@
   </property>
 
   <property>
-    <name>hdds.scm.safemode.healthy.pipelie.pct</name>
+    <name>hdds.scm.safemode.healthy.pipeline.pct</name>
     <value>0.10</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description>
@@ -1396,6 +1389,15 @@
     <description>Temporary which is used during the container replication
       betweeen datanodes. Should have enough space to store multiple container
       (in compressed format), but doesn't require fast io access such as SSD.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.scm.safemode.pipeline.creation</name>
+    <value>true</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description>
+      Boolean value to enable background pipeline creation in SCM safe mode.
     </description>
   </property>
 
@@ -1506,7 +1508,7 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] determines
       which algorithm would be used to compute checksum for chunk data.
-      Default checksum type is SHA256.
+      Default checksum type is CRC32.
     </description>
   </property>
 
@@ -1756,22 +1758,6 @@
     <description>Key to enable/disable ozone acls.</description>
   </property>
   <property>
-    <name>hdds.scm.kerberos.keytab.file</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
-    <description> The keytab file used by each SCM daemon to login as its
-      service principal. The principal name is configured with
-      hdds.scm.kerberos.principal.
-    </description>
-  </property>
-  <property>
-    <name>hdds.scm.kerberos.principal</name>
-    <value></value>
-    <tag> OZONE, SECURITY</tag>
-    <description>The SCM service principal. Ex scm/_HOST@REALM.COM</description>
-  </property>
-
-  <property>
     <name>ozone.om.kerberos.keytab.file</name>
     <value></value>
     <tag> OZONE, SECURITY</tag>
@@ -1786,16 +1772,6 @@
     <tag> OZONE, SECURITY</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
-
-  <property>
-    <name>hdds.scm.http.kerberos.principal</name>
-    <value>HTTP/_HOST@EXAMPLE.COM</value>
-  </property>
-  <property>
-    <name>hdds.scm.http.kerberos.keytab</name>
-    <value>/etc/security/keytabs/HTTP.keytab</value>
-  </property>
-
   <property>
     <name>ozone.om.http.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
@@ -2162,18 +2138,13 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.retry.max.attempts</name>
-    <value>10</value>
-    <description>
-      Max retry attempts for Ozone RpcClient talking to OzoneManagers.
-    </description>
-  </property>
-  <property>
     <name>ozone.client.failover.max.attempts</name>
     <value>15</value>
     <description>
-      Expert only. The number of client failover attempts that should be
-      made before the failover is considered failed.
+      Expert only. Ozone RpcClient attempts talking to each OzoneManager
+      ipc.client.connect.max.retries (default = 10) number of times before
+      failing over to another OzoneManager, if available. This parameter
+      represents the number of times the client will failover before giving up.
     </description>
   </property>
   <property>
@@ -2499,6 +2470,14 @@
     <tag>OZONE, RECON</tag>
     <description>
       The number of Recon Tasks that are waiting on updates from OM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.list.trash.keys.max</name>
+    <value>1000</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The maximum number of keys to return for a list trash request.
     </description>
   </property>
 </configuration>

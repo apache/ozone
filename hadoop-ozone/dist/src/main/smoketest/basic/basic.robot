@@ -30,6 +30,6 @@ Check webui static resources
                        Should contain         ${result}    200
 
 Start freon testing
-    ${result} =        Execute              ozone freon randomkeys --numOfVolumes 5 --numOfBuckets 5 --numOfKeys 5 --numOfThreads 1
+    ${result} =        Execute              ozone freon randomkeys --numOfVolumes 5 --numOfBuckets 5 --numOfKeys 5 --numOfThreads 1 --replicationType RATIS --factor THREE
                        Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   Number of Keys added: 125
                        Should Not Contain               ${result}  ERROR

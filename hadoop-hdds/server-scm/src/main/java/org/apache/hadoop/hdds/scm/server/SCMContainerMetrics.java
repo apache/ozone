@@ -33,12 +33,13 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * Metrics source to report number of containers in different states.
  */
 @InterfaceAudience.Private
-@Metrics(about = "SCM Container Manager Metrics", context = "ozone")
+@Metrics(about = "SCM Container Manager Metrics", context = OzoneConsts.OZONE)
 public class SCMContainerMetrics implements MetricsSource {
 
   private final SCMMXBean scmmxBean;

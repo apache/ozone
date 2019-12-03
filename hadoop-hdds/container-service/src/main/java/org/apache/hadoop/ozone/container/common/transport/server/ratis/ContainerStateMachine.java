@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -32,11 +31,12 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.impl.RaftServerProxy;
@@ -59,8 +59,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ReadChunkResponseProto;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-import org.apache.hadoop.hdds.security.token.TokenVerifier;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -107,7 +105,7 @@ import java.io.OutputStream;
  * The write requests can be divided into requests with user data
  * (WriteChunkRequest) and other request without user data.
  *
- * Inorder to optimize the write throughput, the writeChunk request is
+ * In order to optimize the write throughput, the writeChunk request is
  * processed in 2 phases. The 2 phases are divided in
  * {@link #startTransaction(RaftClientRequest)}, in the first phase the user
  * data is written directly into the state machine via
@@ -127,7 +125,7 @@ import java.io.OutputStream;
  *
  * 2) Write chunk commit operation is executed after write chunk state machine
  * operation. This will ensure that commit operation is sync'd with the state
- * machine operation.For example, synchronization between writeChunk and
+ * machine operation. For example, synchronization between writeChunk and
  * createContainer in {@link ContainerStateMachine}.
  **/
 
@@ -149,8 +147,6 @@ public class ContainerStateMachine extends BaseStateMachine {
   private ExecutorService[] executors;
   private final Map<Long, Long> applyTransactionCompletionMap;
   private final Cache<Long, ByteString> stateMachineDataCache;
-  private final boolean isBlockTokenEnabled;
-  private final TokenVerifier tokenVerifier;
   private final AtomicBoolean stateMachineHealthy;
 
   private final Semaphore applyTransactionSemaphore;
@@ -162,9 +158,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
       ContainerController containerController, ThreadPoolExecutor chunkExecutor,
-      XceiverServerRatis ratisServer, long expiryInterval,
-      boolean isBlockTokenEnabled, TokenVerifier tokenVerifier,
-      Configuration conf) {
+      XceiverServerRatis ratisServer, long expiryInterval, Configuration conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -178,8 +172,6 @@ public class ContainerStateMachine extends BaseStateMachine {
         // set the limit on no of cached entries equal to no of max threads
         // executing writeStateMachineData
         .maximumSize(chunkExecutor.getCorePoolSize()).build();
-    this.isBlockTokenEnabled = isBlockTokenEnabled;
-    this.tokenVerifier = tokenVerifier;
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
     final int numContainerOpExecutors = conf.getInt(
@@ -243,10 +235,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     // initialize the dispatcher with snapshot so that it build the missing
     // container list
     try (FileInputStream fin = new FileInputStream(snapshotFile)) {
-      byte[] container2BCSIDData = IOUtils.toByteArray(fin);
       ContainerProtos.Container2BCSIDMapProto proto =
           ContainerProtos.Container2BCSIDMapProto
-              .parseFrom(container2BCSIDData);
+              .parseFrom(fin);
       // read the created containers list from the snapshot file and add it to
       // the container2BCSIDMap here.
       // container2BCSIDMap will further grow as and when containers get created
@@ -269,7 +260,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     // TODO : while snapshot is being taken, deleteContainer call should not
     // should not happen. Lock protection will be required if delete
     // container happens outside of Ratis.
-    IOUtils.write(builder.build().toByteArray(), out);
+    builder.build().writeTo(out);
   }
 
   public boolean isStateMachineHealthy() {
@@ -396,19 +387,6 @@ public class ContainerStateMachine extends BaseStateMachine {
           requestProto.getCmdType(), requestProto.getContainerID(),
           requestProto.getPipelineID(), requestProto.getTraceID());
     }
-    if (isBlockTokenEnabled) {
-      try {
-        // ServerInterceptors intercepts incoming request and creates ugi.
-        tokenVerifier
-            .verify(UserGroupInformation.getCurrentUser().getShortUserName(),
-                requestProto.getEncodedToken());
-      } catch (IOException ioe) {
-        StorageContainerException sce = new StorageContainerException(
-            "Block token verification failed. " + ioe.getMessage(), ioe,
-            ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
-        return ContainerUtils.logAndReturnError(LOG, sce, requestProto);
-      }
-    }
     ContainerCommandResponseProto response =
         dispatcher.dispatch(requestProto, context);
     if (LOG.isTraceEnabled()) {
@@ -460,6 +438,10 @@ public class ContainerStateMachine extends BaseStateMachine {
             LOG.error(gid + ": writeChunk writeStateMachineData failed: blockId"
                 + write.getBlockID() + " logIndex " + entryIndex + " chunkName "
                 + write.getChunkData().getChunkName() + e);
+            metrics.incNumWriteDataFails();
+            // write chunks go in parallel. It's possible that one write chunk
+            // see the stateMachine is marked unhealthy by other parallel thread
+            stateMachineHealthy.set(false);
             raftFuture.completeExceptionally(e);
             throw e;
           }
@@ -474,7 +456,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     // Remove the future once it finishes execution from the
     // writeChunkFutureMap.
     writeChunkFuture.thenApply(r -> {
-      if (r.getResult() != ContainerProtos.Result.SUCCESS) {
+      if (r.getResult() != ContainerProtos.Result.SUCCESS
+          && r.getResult() != ContainerProtos.Result.CONTAINER_NOT_OPEN
+          && r.getResult() != ContainerProtos.Result.CLOSED_CONTAINER_IO) {
         StorageContainerException sce =
             new StorageContainerException(r.getMessage(), r.getResult());
         LOG.error(gid + ": writeChunk writeStateMachineData failed: blockId" +
@@ -482,6 +466,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             write.getChunkData().getChunkName() + " Error message: " +
             r.getMessage() + " Container Result: " + r.getResult());
         metrics.incNumWriteDataFails();
+        stateMachineHealthy.set(false);
         raftFuture.completeExceptionally(sce);
       } else {
         metrics.incNumBytesWrittenCount(
@@ -584,6 +569,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       LOG.error("gid {} : ReadStateMachine failed. cmd {} logIndex {} msg : "
               + "{} Container Result: {}", gid, response.getCmdType(), index,
           response.getMessage(), response.getResult());
+      stateMachineHealthy.set(false);
       throw sce;
     }
 
@@ -592,10 +578,10 @@ public class ContainerStateMachine extends BaseStateMachine {
     ByteString data = responseProto.getData();
     // assert that the response has data in it.
     Preconditions
-        .checkNotNull(data, "read chunk data is null for chunk:" + chunkInfo);
-    Preconditions.checkState(data.size() == chunkInfo.getLen(), String.format(
-        "read chunk len=%d does not match chunk expected len=%d for chunk:%s",
-        data.size(), chunkInfo.getLen(), chunkInfo));
+        .checkNotNull(data, "read chunk data is null for chunk: %s", chunkInfo);
+    Preconditions.checkState(data.size() == chunkInfo.getLen(),
+        "read chunk len=%s does not match chunk expected len=%s for chunk:%s",
+        data.size(), chunkInfo.getLen(), chunkInfo);
     return data;
   }
 
@@ -739,6 +725,8 @@ public class ContainerStateMachine extends BaseStateMachine {
               LOG.error("gid {} : ApplyTransaction failed. cmd {} logIndex "
                       + "{} exception {}", gid, requestProto.getCmdType(),
                   index, e);
+              stateMachineHealthy.compareAndSet(true, false);
+              metrics.incNumApplyTransactionsFails();
               applyTransactionFuture.completeExceptionally(e);
               throw e;
             }
@@ -867,5 +855,11 @@ public class ContainerStateMachine extends BaseStateMachine {
     for (ExecutorService executor : executors) {
       executor.shutdown();
     }
+  }
+
+  @Override
+  public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
+                                  RaftPeerId raftPeerId) {
+    ratisServer.handleLeaderChangedNotification(groupMemberId, raftPeerId);
   }
 }

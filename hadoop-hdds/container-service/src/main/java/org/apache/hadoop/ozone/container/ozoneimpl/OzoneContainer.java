@@ -18,16 +18,23 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Maps;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -40,23 +47,19 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.replication.GrpcReplicationService;
-import org.apache.hadoop.ozone.container.replication
-    .OnDemandContainerReplicationSource;
+import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.*;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
 
 /**
  * Ozone main class sets up the network servers and initializes the container
@@ -98,13 +101,28 @@ public class OzoneContainer {
     buildContainerSet();
     final ContainerMetrics metrics = ContainerMetrics.create(conf);
     this.handlers = Maps.newHashMap();
+
+    Consumer<ContainerReplicaProto> icrSender = containerReplicaProto -> {
+      IncrementalContainerReportProto icr = IncrementalContainerReportProto
+          .newBuilder()
+          .addReport(containerReplicaProto)
+          .build();
+      context.addReport(icr);
+      context.getParent().triggerHeartbeat();
+    };
+
     for (ContainerType containerType : ContainerType.values()) {
       handlers.put(containerType,
           Handler.getHandlerForContainerType(
-              containerType, conf, context, containerSet, volumeSet, metrics));
+              containerType, conf,
+              context.getParent().getDatanodeDetails().getUuidString(),
+              containerSet, volumeSet, metrics, icrSender));
     }
+
+    SecurityConfig secConf = new SecurityConfig(conf);
     this.hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
-        handlers, context, metrics);
+        handlers, context, metrics, secConf.isBlockTokenEnabled()?
+        new BlockTokenVerifier(secConf, certClient) : null);
 
     /*
      * ContainerController is the control plane
@@ -163,7 +181,6 @@ public class OzoneContainer {
     }
 
   }
-
 
   /**
    * Start background daemon thread for performing container integrity checks.
@@ -235,13 +252,14 @@ public class OzoneContainer {
     ContainerMetrics.remove();
   }
 
-
   @VisibleForTesting
   public ContainerSet getContainerSet() {
     return containerSet;
   }
+
   /**
    * Returns container report.
+   *
    * @return - container report.
    */
 

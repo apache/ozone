@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -29,6 +29,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
+import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -42,44 +45,44 @@ public class TestOzoneAuditLogger {
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.OMLOGGER);
 
-  private static final String SUCCESS = AuditEventStatus.SUCCESS.name();
-  private static final String FAILURE = AuditEventStatus.FAILURE.name();
-
   private static final Map<String, String> PARAMS =
       new DummyEntity().toAuditMap();
 
+  private static final String IP_ADDRESS = "192.168.0.1";
+  private static final String USER = "john";
+
   private static final AuditMessage WRITE_FAIL_MSG =
       new AuditMessage.Builder()
-          .setUser("john")
-          .atIp("192.168.0.1")
-          .forOperation(DummyAction.CREATE_VOLUME.name())
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
+          .forOperation(DummyAction.CREATE_VOLUME)
           .withParams(PARAMS)
           .withResult(FAILURE)
           .withException(null).build();
 
   private static final AuditMessage WRITE_SUCCESS_MSG =
       new AuditMessage.Builder()
-          .setUser("john")
-          .atIp("192.168.0.1")
-          .forOperation(DummyAction.CREATE_VOLUME.name())
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
+          .forOperation(DummyAction.CREATE_VOLUME)
           .withParams(PARAMS)
           .withResult(SUCCESS)
           .withException(null).build();
 
   private static final AuditMessage READ_FAIL_MSG =
       new AuditMessage.Builder()
-          .setUser("john")
-          .atIp("192.168.0.1")
-          .forOperation(DummyAction.READ_VOLUME.name())
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
+          .forOperation(DummyAction.READ_VOLUME)
           .withParams(PARAMS)
           .withResult(FAILURE)
           .withException(null).build();
 
   private static final AuditMessage READ_SUCCESS_MSG =
       new AuditMessage.Builder()
-          .setUser("john")
-          .atIp("192.168.0.1")
-          .forOperation(DummyAction.READ_VOLUME.name())
+          .setUser(USER)
+          .atIp(IP_ADDRESS)
+          .forOperation(DummyAction.READ_VOLUME)
           .withParams(PARAMS)
           .withResult(SUCCESS)
           .withException(null).build();
@@ -122,6 +125,16 @@ public class TestOzoneAuditLogger {
     verifyLog(expected);
   }
 
+  @Test
+  public void messageIncludesAllParts() {
+    String message = WRITE_FAIL_MSG.getFormattedMessage();
+    assertTrue(message, message.contains(USER));
+    assertTrue(message, message.contains(IP_ADDRESS));
+    assertTrue(message, message.contains(DummyAction.CREATE_VOLUME.name()));
+    assertTrue(message, message.contains(PARAMS.toString()));
+    assertTrue(message, message.contains(FAILURE.getStatus()));
+  }
+
   /**
    * Test to verify no READ event is logged.
    */
@@ -161,6 +174,6 @@ public class TestOzoneAuditLogger {
     File file = new File("audit.log");
     List<String> lines = FileUtils.readLines(file, (String)null);
     // When no log entry is expected, the log file must be empty
-    assertTrue(lines.size() == 0);
+    assertEquals(0, lines.size());
   }
 }

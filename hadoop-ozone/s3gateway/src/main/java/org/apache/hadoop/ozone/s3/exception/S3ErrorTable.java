@@ -76,6 +76,10 @@ public final class S3ErrorTable {
       "upload ID might be invalid, or the multipart upload might have " +
       "been aborted or completed.", HTTP_NOT_FOUND);
 
+  public static final OS3Exception INVALID_BUCKET_NAME = new OS3Exception(
+      "InvalidBucketName", "The specified bucket is not valid.",
+      HTTP_BAD_REQUEST);
+
   public static final OS3Exception INVALID_PART = new OS3Exception(
       "InvalidPart", "One or more of the specified parts could not be found." +
       " The part might not have been uploaded, or the specified entity " +

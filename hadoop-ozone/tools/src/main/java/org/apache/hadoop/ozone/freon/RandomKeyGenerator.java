@@ -34,7 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
+import java.util.function.LongSupplier;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.opentracing.Scope;
@@ -113,7 +113,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       LoggerFactory.getLogger(RandomKeyGenerator.class);
 
   private volatile boolean completed = false;
-  private volatile Exception exception = null;
+  private volatile Throwable exception;
 
   @Option(names = "--numOfThreads",
       description = "number of threads to be launched for the run",
@@ -307,7 +307,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       LOG.info("Data validation is enabled.");
     }
 
-    Supplier<Long> currentValue = numberOfKeysAdded::get;
+    LongSupplier currentValue = numberOfKeysAdded::get;
     progressbar = new ProgressBar(System.out, totalKeyCount, currentValue);
 
     LOG.info("Starting progress bar Thread.");
@@ -338,7 +338,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     }
     ozoneClient.close();
     if (exception != null) {
-      throw exception;
+      throw new RuntimeException(exception);
     }
     return null;
   }
@@ -636,7 +636,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       OzoneVolume volume = objectStore.getVolume(volumeName);
       volumes.put(volumeNumber, volume);
       return true;
-    } catch (IOException e) {
+    } catch (Throwable e) {
       exception = e;
       LOG.error("Could not create volume", e);
       return false;
@@ -648,6 +648,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     int bucketNumber = globalBucketNumber / numOfVolumes;
     OzoneVolume volume = getVolume(volumeNumber);
     if (volume == null) {
+      LOG.error("Could not find volume {}", volumeNumber);
       return false;
     }
     String bucketName = "bucket-" + bucketNumber + "-" +
@@ -667,7 +668,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       OzoneBucket bucket = volume.getBucket(bucketName);
       buckets.put(globalBucketNumber, bucket);
       return true;
-    } catch (IOException e) {
+    } catch (Throwable e) {
       exception = e;
       LOG.error("Could not create bucket ", e);
       return false;
@@ -680,6 +681,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     long keyNumber = globalKeyNumber / totalBucketCount;
     OzoneBucket bucket = getBucket(globalBucketNumber);
     if (bucket == null) {
+      LOG.error("Could not find bucket {}", globalBucketNumber);
       return false;
     }
     String bucketName = bucket.getName();
@@ -728,7 +730,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       }
 
       return true;
-    } catch (Exception e) {
+    } catch (Throwable e) {
       exception = e;
       LOG.error("Exception while adding key: {} in bucket: {}" +
           " of volume: {}.", keyName, bucketName, volumeName, e);

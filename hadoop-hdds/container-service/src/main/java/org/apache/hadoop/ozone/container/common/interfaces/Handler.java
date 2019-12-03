@@ -18,25 +18,19 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.function.Consumer;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerType;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -54,41 +48,46 @@ public abstract class Handler {
   protected final VolumeSet volumeSet;
   protected String scmID;
   protected final ContainerMetrics metrics;
+  protected String datanodeId;
+  private Consumer<ContainerReplicaProto> icrSender;
 
-  private final StateContext context;
-  private final DatanodeDetails datanodeDetails;
-
-  protected Handler(Configuration config, StateContext context,
+  protected Handler(Configuration config, String datanodeId,
       ContainerSet contSet, VolumeSet volumeSet,
-      ContainerMetrics containerMetrics) {
+      ContainerMetrics containerMetrics,
+      Consumer<ContainerReplicaProto> icrSender) {
     this.conf = config;
-    this.context = context;
     this.containerSet = contSet;
     this.volumeSet = volumeSet;
     this.metrics = containerMetrics;
-    this.datanodeDetails = context.getParent().getDatanodeDetails();
+    this.datanodeId = datanodeId;
+    this.icrSender = icrSender;
   }
 
   public static Handler getHandlerForContainerType(
       final ContainerType containerType, final Configuration config,
-      final StateContext context, final ContainerSet contSet,
-      final VolumeSet volumeSet, final ContainerMetrics metrics) {
+      final String datanodeId, final ContainerSet contSet,
+      final VolumeSet volumeSet, final ContainerMetrics metrics,
+      Consumer<ContainerReplicaProto> icrSender) {
     switch (containerType) {
     case KeyValueContainer:
-      return new KeyValueHandler(config, context, contSet, volumeSet, metrics);
+      return new KeyValueHandler(config,
+          datanodeId, contSet, volumeSet, metrics,
+          icrSender);
     default:
       throw new IllegalArgumentException("Handler for ContainerType: " +
-        containerType + "doesn't exist.");
+          containerType + "doesn't exist.");
     }
   }
 
   /**
    * Returns the Id of this datanode.
+   *
    * @return datanode Id
    */
-  protected DatanodeDetails getDatanodeDetails() {
-    return datanodeDetails;
+  protected String getDatanodeId() {
+    return datanodeId;
   }
+
   /**
    * This should be called whenever there is state change. It will trigger
    * an ICR to SCM.
@@ -97,12 +96,8 @@ public abstract class Handler {
    */
   protected void sendICR(final Container container)
       throws StorageContainerException {
-    IncrementalContainerReportProto icr = IncrementalContainerReportProto
-        .newBuilder()
-        .addReport(container.getContainerReport())
-        .build();
-    context.addReport(icr);
-    context.getParent().triggerHeartbeat();
+    ContainerReplicaProto containerReport = container.getContainerReport();
+    icrSender.accept(containerReport);
   }
 
   public abstract ContainerCommandResponseProto handle(
@@ -175,8 +170,9 @@ public abstract class Handler {
    * Deletes the given container.
    *
    * @param container container to be deleted
-   * @param force if this is set to true, we delete container without checking
-   * state of the container.
+   * @param force     if this is set to true, we delete container without
+   *                  checking
+   *                  state of the container.
    * @throws IOException
    */
   public abstract void deleteContainer(Container container, boolean force)

@@ -25,7 +25,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.protobuf.BlockingService;
 import java.util.Objects;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -36,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.BlockManagerImpl;
@@ -115,10 +115,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ENABLED;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -180,7 +177,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * Key = DatanodeUuid, value = ContainerStat.
    */
-  private Cache<String, ContainerStat> containerReportCache;
+  private final Cache<String, ContainerStat> containerReportCache;
 
   private ReplicationManager replicationManager;
 
@@ -234,7 +231,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     configuration = conf;
     initMetrics();
-    initContainerReportCache(conf);
+    containerReportCache = buildContainerReportCache();
+
     /**
      * It is assumed the scm --init command creates the SCM Storage Config.
      */
@@ -402,8 +400,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       pipelineManager = configurator.getPipelineManager();
     } else {
       pipelineManager =
-          new SCMPipelineManager(conf, scmNodeManager, eventQueue,
-              grpcTlsConfig);
+          new SCMPipelineManager(conf, scmNodeManager, eventQueue);
     }
 
     if (configurator.getContainerManager() != null) {
@@ -480,10 +477,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmMetadataStore = configurator.getMetadataStore();
     } else {
       scmMetadataStore = new SCMMetadataStoreRDBImpl(conf);
-      if (scmMetadataStore == null) {
-        throw new SCMException("Unable to initialize metadata store",
-            ResultCodes.SCM_NOT_INITIALIZED);
-      }
     }
   }
 
@@ -495,10 +488,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private void loginAsSCMUser(Configuration conf)
       throws IOException, AuthenticationException {
     if (LOG.isDebugEnabled()) {
+      ScmConfig scmConfig = configuration.getObject(ScmConfig.class);
       LOG.debug("Ozone security is enabled. Attempting login for SCM user. "
               + "Principal: {}, keytab: {}",
-          conf.get(HDDS_SCM_KERBEROS_PRINCIPAL_KEY),
-          conf.get(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY));
+          scmConfig.getKerberosPrincipal(),
+          scmConfig.getKerberosKeytab());
     }
 
     if (SecurityUtil.getAuthenticationMethod(conf).equals(
@@ -506,8 +500,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       UserGroupInformation.setConfiguration(conf);
       InetSocketAddress socAddr = HddsServerUtil
           .getScmBlockClientBindAddress(conf);
-      SecurityUtil.login(conf, HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
-          HDDS_SCM_KERBEROS_PRINCIPAL_KEY, socAddr.getHostName());
+      SecurityUtil.login(conf,
+            ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
+            ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
+            socAddr.getHostName());
     } else {
       throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
           conf) + " authentication method not support. "
@@ -594,15 +590,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return SCM instance
    * @throws IOException, AuthenticationException
    */
-  public static StorageContainerManager createSCM(
-      OzoneConfiguration conf)
+  public static StorageContainerManager createSCM(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    if (!HddsUtils.isHddsEnabled(conf)) {
-      System.err.println(
-          "SCM cannot be started in secure mode or when " + OZONE_ENABLED + "" +
-              " is set to false");
-      System.exit(1);
-    }
     return new StorageContainerManager(conf);
   }
 
@@ -623,7 +612,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
         scmStorageConfig.initialize();
-        System.out.println(
+        LOG.info(
             "SCM initialization succeeded."
                 + "Current cluster id for sd="
                 + scmStorageConfig.getStorageDir()
@@ -635,7 +624,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         return false;
       }
     } else {
-      System.out.println(
+      LOG.info(
           "SCM already initialized. Reusing existing"
               + " cluster id for sd="
               + scmStorageConfig.getStorageDir()
@@ -681,28 +670,25 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   /**
    * Initialize container reports cache that sent from datanodes.
-   *
-   * @param conf
    */
-  private void initContainerReportCache(OzoneConfiguration conf) {
-    containerReportCache =
+  @SuppressWarnings("UnstableApiUsage")
+  private Cache<String, ContainerStat> buildContainerReportCache() {
+    return
         CacheBuilder.newBuilder()
             .expireAfterAccess(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
             .maximumSize(Integer.MAX_VALUE)
-            .removalListener(
-                new RemovalListener<String, ContainerStat>() {
-                  @Override
-                  public void onRemoval(
-                      RemovalNotification<String, ContainerStat>
-                          removalNotification) {
-                    synchronized (containerReportCache) {
-                      ContainerStat stat = removalNotification.getValue();
+            .removalListener((
+                RemovalListener<String, ContainerStat>) removalNotification -> {
+                  synchronized (containerReportCache) {
+                    ContainerStat stat = removalNotification.getValue();
+                    if (stat != null) {
+                      // TODO: Are we doing the right thing here?
                       // remove invalid container report
                       metrics.decrContainerStat(stat);
-                      if (LOG.isDebugEnabled()) {
-                        LOG.debug("Remove expired container stat entry for " +
-                            "datanode: {}.", removalNotification.getKey());
-                      }
+                    }
+                    if (LOG.isDebugEnabled()) {
+                      LOG.debug("Remove expired container stat entry for " +
+                          "datanode: {}.", removalNotification.getKey());
                     }
                   }
                 })
@@ -769,22 +755,27 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Start service.
    */
   public void start() throws IOException {
-    LOG.info(
-        buildRpcServerStartMessage(
-            "StorageContainerLocationProtocol RPC server",
-            getClientRpcAddress()));
+    if (LOG.isInfoEnabled()) {
+      LOG.info(buildRpcServerStartMessage(
+          "StorageContainerLocationProtocol RPC server",
+          getClientRpcAddress()));
+    }
 
     ms = HddsUtils.initializeMetrics(configuration, "StorageContainerManager");
 
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();
 
-    LOG.info(buildRpcServerStartMessage("ScmBlockLocationProtocol RPC " +
-        "server", getBlockProtocolServer().getBlockRpcAddress()));
+    if (LOG.isInfoEnabled()) {
+      LOG.info(buildRpcServerStartMessage("ScmBlockLocationProtocol RPC " +
+          "server", getBlockProtocolServer().getBlockRpcAddress()));
+    }
     getBlockProtocolServer().start();
 
-    LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
-        "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
+    if (LOG.isInfoEnabled()) {
+      LOG.info(buildRpcServerStartMessage("ScmDatanodeProtocl RPC " +
+          "server", getDatanodeProtocolServer().getDatanodeRpcAddress()));
+    }
     getDatanodeProtocolServer().start();
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().start();
@@ -977,12 +968,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   public void checkAdminAccess(String remoteUser) throws IOException {
-    if (remoteUser != null) {
-      if (!scmAdminUsernames.contains(remoteUser)) {
-        throw new IOException(
-            "Access denied for user " + remoteUser + ". Superuser privilege " +
-                "is required.");
-      }
+    if (remoteUser != null && !scmAdminUsernames.contains(remoteUser)) {
+      throw new IOException(
+          "Access denied for user " + remoteUser + ". Superuser privilege " +
+              "is required.");
     }
   }
 

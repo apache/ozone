@@ -36,6 +36,7 @@ import java.util.Objects;
 
 import org.apache.commons.codec.digest.DigestUtils;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -78,6 +79,7 @@ import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerServerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
@@ -86,6 +88,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.security.OzoneSecurityException;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -154,6 +157,7 @@ import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 
+import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
@@ -185,6 +189,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryUpToMaximumCountWithFixedSleep;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
@@ -300,6 +305,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final int preallocateBlocksMax;
   private final boolean grpcBlockTokenEnabled;
   private final boolean useRatisForReplication;
+
+  private boolean isNativeAuthorizerEnabled;
 
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
@@ -473,6 +480,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (accessAuthorizer instanceof OzoneNativeAuthorizer) {
         OzoneNativeAuthorizer authorizer =
             (OzoneNativeAuthorizer) accessAuthorizer;
+        isNativeAuthorizerEnabled = true;
         authorizer.setVolumeManager(volumeManager);
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
@@ -1353,6 +1361,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setSubject(subject)
         .addIpAddress(ip);
 
+
+    OMHANodeDetails haOMHANodeDetails = OMHANodeDetails.loadOMHAConfig(config);
+    String serviceName =
+        haOMHANodeDetails.getLocalNodeDetails().getOMServiceId();
+    if (!StringUtils.isEmpty(serviceName)) {
+      builder.addServiceName(serviceName);
+    }
+
     LOG.info("Creating csr for OM->dns:{},ip:{},scmId:{},clusterId:{}," +
             "subject:{}", hostname, ip,
         omStore.getScmId(), omStore.getClusterID(), subject);
@@ -1587,7 +1603,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws OMException {
     checkAcls(resType, store, acl, vol, bucket, key,
         ProtobufRpcEngine.Server.getRemoteUser(),
-        ProtobufRpcEngine.Server.getRemoteIp());
+        ProtobufRpcEngine.Server.getRemoteIp(),
+        ProtobufRpcEngine.Server.getRemoteIp().getHostName());
   }
 
   /**
@@ -1600,12 +1617,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param key
    * @param ugi
    * @param remoteAddress
+   * @param hostName
    * @throws OMException
    */
   @SuppressWarnings("parameternumber")
   public void checkAcls(ResourceType resType, StoreType storeType,
       ACLType aclType, String vol, String bucket, String key,
-      UserGroupInformation ugi, InetAddress remoteAddress)
+      UserGroupInformation ugi, InetAddress remoteAddress, String hostName)
       throws OMException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(resType)
@@ -1616,6 +1634,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     RequestContext context = RequestContext.newBuilder()
         .setClientUgi(ugi)
         .setIp(remoteAddress)
+        .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
         .build();
@@ -2231,6 +2250,41 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName,
+      String bucketName, String startKeyName, String keyPrefix, int maxKeys)
+      throws IOException {
+
+    if (isAclEnabled) {
+      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+          volumeName, bucketName, keyPrefix);
+    }
+
+    boolean auditSuccess = true;
+    Map<String, String> auditMap = buildAuditMap(volumeName);
+    auditMap.put(OzoneConsts.BUCKET, bucketName);
+    auditMap.put(OzoneConsts.START_KEY, startKeyName);
+    auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
+    auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
+
+    try {
+      metrics.incNumKeyLists();
+      return keyManager.listTrash(volumeName, bucketName,
+          startKeyName, keyPrefix, maxKeys);
+    } catch (IOException ex) {
+      metrics.incNumKeyListFails();
+      auditSuccess = false;
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_KEYS,
+          auditMap, ex));
+      throw ex;
+    } finally {
+      if (auditSuccess) {
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_KEYS,
+            auditMap));
+      }
+    }
+  }
+
   /**
    * Sets bucket property from args.
    *
@@ -2299,29 +2353,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
       Map<String, String> auditMap) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.SUCCESS.toString())
-        .withException(null)
+        .withResult(AuditEventStatus.SUCCESS)
         .build();
   }
 
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.FAILURE.toString())
+        .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
   }
@@ -2381,6 +2432,43 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           .setValue(httpServer.getHttpsAddress().getPort())
           .build());
     }
+
+    // Since this OM is processing the request, we can assume it to be the
+    // leader OM
+
+    OMRoleInfo omRole = OMRoleInfo.newBuilder()
+        .setNodeId(getOMNodeId())
+        .setServerRole(RaftPeerRole.LEADER.name())
+        .build();
+    omServiceInfoBuilder.setOmRoleInfo(omRole);
+
+    if (isRatisEnabled) {
+      if (omRatisServer != null) {
+        omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
+            .setType(ServicePort.Type.RATIS)
+            .setValue(omNodeDetails.getRatisPort())
+            .build());
+      }
+
+      for (OMNodeDetails peerNode : peerNodes) {
+        ServiceInfo.Builder peerOmServiceInfoBuilder = ServiceInfo.newBuilder()
+            .setNodeType(HddsProtos.NodeType.OM)
+            .setHostname(peerNode.getAddress().getHostName())
+            .addServicePort(ServicePort.newBuilder()
+                .setType(ServicePort.Type.RPC)
+                .setValue(peerNode.getRpcPort())
+                .build());
+
+        OMRoleInfo peerOmRole = OMRoleInfo.newBuilder()
+            .setNodeId(peerNode.getOMNodeId())
+            .setServerRole(RaftPeerRole.FOLLOWER.name())
+            .build();
+        peerOmServiceInfoBuilder.setOmRoleInfo(peerOmRole);
+
+        services.add(peerOmServiceInfoBuilder.build());
+      }
+    }
+
     services.add(omServiceInfoBuilder.build());
 
     // For client we have to return SCM with container protocol port,
@@ -2862,7 +2950,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * false.
    *
    * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl top be added.
+   * @param acl ozone acl to be added.
    * @throws IOException if there is error.
    */
   @Override
@@ -3292,4 +3380,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return ozAdmins;
   }
 
+  /**
+   * Returns true if OzoneNativeAuthorizer is enabled and false if otherwise.
+   * @return if native authorizer is enabled.
+   */
+  public boolean isNativeAuthorizerEnabled() {
+    return isNativeAuthorizerEnabled;
+  }
 }

@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.ozone.common;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -40,7 +40,7 @@ public class ChecksumData {
   private final List<ByteString> checksums;
 
   public ChecksumData(ChecksumType checksumType, int bytesPerChecksum) {
-    this(checksumType, bytesPerChecksum, Lists.newArrayList());
+    this(checksumType, bytesPerChecksum, Collections.emptyList());
   }
 
   public ChecksumData(ChecksumType checksumType, int bytesPerChecksum,
@@ -67,18 +67,8 @@ public class ChecksumData {
   /**
    * Getter method for checksums.
    */
-  @VisibleForTesting
   public List<ByteString> getChecksums() {
     return this.checksums;
-  }
-
-  /**
-   * Setter method for checksums.
-   * @param checksumList list of checksums
-   */
-  public void setChecksums(List<ByteString> checksumList) {
-    this.checksums.clear();
-    this.checksums.addAll(checksumList);
   }
 
   /**
@@ -105,14 +95,10 @@ public class ChecksumData {
       ContainerProtos.ChecksumData checksumDataProto) {
     Preconditions.checkNotNull(checksumDataProto);
 
-    ChecksumData checksumData = new ChecksumData(
-        checksumDataProto.getType(), checksumDataProto.getBytesPerChecksum());
-
-    if (checksumDataProto.getChecksumsCount() != 0) {
-      checksumData.setChecksums(checksumDataProto.getChecksumsList());
-    }
-
-    return checksumData;
+    return new ChecksumData(
+        checksumDataProto.getType(),
+        checksumDataProto.getBytesPerChecksum(),
+        checksumDataProto.getChecksumsList());
   }
 
   /**

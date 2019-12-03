@@ -32,6 +32,7 @@ import java.io.OutputStream;
 public class OzoneOutputStreamStub extends OzoneOutputStream {
 
   private final String partName;
+  private boolean closed;
 
   /**
    * Constructs OzoneOutputStreamStub with outputStream and partName.
@@ -62,12 +63,15 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
   @Override
   public synchronized void close() throws IOException {
     //commitKey can be done here, if needed.
-    getOutputStream().close();
+    if (!closed) {
+      getOutputStream().close();
+      closed = true;
+    }
   }
 
   @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    return new OmMultipartCommitUploadPartInfo(partName);
+    return closed ? new OmMultipartCommitUploadPartInfo(partName) : null;
   }
 
 }

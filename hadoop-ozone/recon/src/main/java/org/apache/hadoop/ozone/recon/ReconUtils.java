@@ -40,6 +40,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -94,11 +95,13 @@ public class ReconUtils {
    */
   public static File createTarFile(Path sourcePath) throws IOException {
     TarArchiveOutputStream tarOs = null;
+    FileOutputStream fileOutputStream = null;
+    GZIPOutputStream gzipOutputStream = null;
     try {
       String sourceDir = sourcePath.toString();
       String fileName = sourceDir.concat(".tar.gz");
-      FileOutputStream fileOutputStream = new FileOutputStream(fileName);
-      GZIPOutputStream gzipOutputStream =
+      fileOutputStream = new FileOutputStream(fileName);
+      gzipOutputStream =
           new GZIPOutputStream(new BufferedOutputStream(fileOutputStream));
       tarOs = new TarArchiveOutputStream(gzipOutputStream);
       File folder = new File(sourceDir);
@@ -112,6 +115,8 @@ public class ReconUtils {
     } finally {
       try {
         org.apache.hadoop.io.IOUtils.closeStream(tarOs);
+        org.apache.hadoop.io.IOUtils.closeStream(fileOutputStream);
+        org.apache.hadoop.io.IOUtils.closeStream(gzipOutputStream);
       } catch (Exception e) {
         LOG.error("Exception encountered when closing " +
             "TAR file output stream: " + e);
@@ -125,13 +130,13 @@ public class ReconUtils {
       throws IOException {
     tarFileOutputStream.putArchiveEntry(new TarArchiveEntry(file, source));
     if (file.isFile()) {
-      FileInputStream fileInputStream = new FileInputStream(file);
-      BufferedInputStream bufferedInputStream =
-          new BufferedInputStream(fileInputStream);
-      org.apache.commons.compress.utils.IOUtils.copy(bufferedInputStream,
-          tarFileOutputStream);
-      tarFileOutputStream.closeArchiveEntry();
-      fileInputStream.close();
+      try (FileInputStream fileInputStream = new FileInputStream(file)) {
+        BufferedInputStream bufferedInputStream =
+            new BufferedInputStream(fileInputStream);
+        org.apache.commons.compress.utils.IOUtils.copy(bufferedInputStream,
+            tarFileOutputStream);
+        tarFileOutputStream.closeArchiveEntry();
+      }
     } else if (file.isDirectory()) {
       tarFileOutputStream.closeArchiveEntry();
       File[] filesInDir = file.listFiles();
@@ -172,13 +177,14 @@ public class ReconUtils {
 
       try (TarArchiveInputStream tarInStream =
                new TarArchiveInputStream(gzIn)) {
-        TarArchiveEntry entry = null;
+        TarArchiveEntry entry;
 
         while ((entry = (TarArchiveEntry) tarInStream.getNextEntry()) != null) {
+          Path path = Paths.get(destPath.toString(), entry.getName());
+          HddsUtils.validatePath(path, destPath);
+          File f = path.toFile();
           //If directory, create a directory.
           if (entry.isDirectory()) {
-            File f = new File(Paths.get(destPath.toString(),
-                entry.getName()).toString());
             boolean success = f.mkdirs();
             if (!success) {
               LOG.error("Unable to create directory found in tar.");
@@ -188,8 +194,7 @@ public class ReconUtils {
             int count;
             byte[] data = new byte[WRITE_BUFFER];
 
-            FileOutputStream fos = new FileOutputStream(
-                Paths.get(destPath.toString(), entry.getName()).toString());
+            FileOutputStream fos = new FileOutputStream(f);
             try (BufferedOutputStream dest =
                      new BufferedOutputStream(fos, WRITE_BUFFER)) {
               while ((count =

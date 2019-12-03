@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
+import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -45,6 +47,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import org.mockito.Mockito;
+import org.rocksdb.Options;
 
 import java.io.File;
 
@@ -61,6 +64,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -73,7 +77,6 @@ public class TestKeyValueContainer {
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
-
 
   private OzoneConfiguration conf;
   private String scmId = UUID.randomUUID().toString();
@@ -100,9 +103,7 @@ public class TestKeyValueContainer {
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 
-    keyValueContainer = new KeyValueContainer(
-        keyValueContainerData, conf);
-
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
   }
 
   @Test
@@ -138,8 +139,9 @@ public class TestKeyValueContainer {
         // Creating BlockData
         BlockID blockID = new BlockID(containerId, i);
         BlockData blockData = new BlockData(blockID);
-        blockData.addMetadata("VOLUME", "ozone");
-        blockData.addMetadata("OWNER", "hdfs");
+        blockData.addMetadata(OzoneConsts.VOLUME, OzoneConsts.OZONE);
+        blockData.addMetadata(OzoneConsts.OWNER,
+            OzoneConsts.OZONE_SIMPLE_HDFS_USER);
         List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
         ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", blockID
             .getLocalID(), 0), 0, 1024);
@@ -159,17 +161,15 @@ public class TestKeyValueContainer {
     // Create Container.
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
-    keyValueContainerData = keyValueContainer
-        .getContainerData();
+    keyValueContainerData = keyValueContainer.getContainerData();
 
-    String containerMetaDataPath = keyValueContainerData
-        .getMetadataPath();
+    String containerMetaDataPath = keyValueContainerData.getMetadataPath();
     String chunksPath = keyValueContainerData.getChunksPath();
 
     // Check whether containerMetaDataPath and chunksPath exists or not.
     assertTrue(containerMetaDataPath != null);
     assertTrue(chunksPath != null);
-    //Check whether container file and container db file exists or not.
+    // Check whether container file and container db file exists or not.
     assertTrue(keyValueContainer.getContainerFile().exists(),
         ".Container File does not exist");
     assertTrue(keyValueContainer.getContainerDBFile().exists(), "Container " +
@@ -235,18 +235,18 @@ public class TestKeyValueContainer {
       container.importContainerData(fis, packer);
     }
 
-    Assert.assertEquals("value1", containerData.getMetadata().get("key1"));
-    Assert.assertEquals(keyValueContainerData.getContainerDBType(),
+    assertEquals("value1", containerData.getMetadata().get("key1"));
+    assertEquals(keyValueContainerData.getContainerDBType(),
         containerData.getContainerDBType());
-    Assert.assertEquals(keyValueContainerData.getState(),
+    assertEquals(keyValueContainerData.getState(),
         containerData.getState());
-    Assert.assertEquals(numberOfKeysToWrite,
+    assertEquals(numberOfKeysToWrite,
         containerData.getKeyCount());
-    Assert.assertEquals(keyValueContainerData.getLayOutVersion(),
+    assertEquals(keyValueContainerData.getLayOutVersion(),
         containerData.getLayOutVersion());
-    Assert.assertEquals(keyValueContainerData.getMaxSize(),
+    assertEquals(keyValueContainerData.getMaxSize(),
         containerData.getMaxSize());
-    Assert.assertEquals(keyValueContainerData.getBytesUsed(),
+    assertEquals(keyValueContainerData.getBytesUsed(),
         containerData.getBytesUsed());
 
     //Can't overwrite existing container
@@ -313,7 +313,6 @@ public class TestKeyValueContainer {
         keyValueContainer.getContainerDBFile().exists());
   }
 
-
   @Test
   public void testCloseContainer() throws Exception {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -353,8 +352,8 @@ public class TestKeyValueContainer {
   public void testUpdateContainer() throws IOException {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     Map<String, String> metadata = new HashMap<>();
-    metadata.put("VOLUME", "ozone");
-    metadata.put("OWNER", "hdfs");
+    metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
+    metadata.put(OzoneConsts.OWNER, OzoneConsts.OZONE_SIMPLE_HDFS_USER);
     keyValueContainer.update(metadata, true);
 
     keyValueContainerData = keyValueContainer
@@ -379,7 +378,7 @@ public class TestKeyValueContainer {
       keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
       Map<String, String> metadata = new HashMap<>();
-      metadata.put("VOLUME", "ozone");
+      metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
       keyValueContainer.update(metadata, false);
       fail("testUpdateContainerUnsupportedRequest failed");
     } catch (StorageContainerException ex) {
@@ -390,5 +389,27 @@ public class TestKeyValueContainer {
     }
   }
 
+  @Test
+  public void testRocksDBCreateUsesCachedOptions() throws Exception {
+    int initialSize = MetadataStoreBuilder.CACHED_OPTS.size();
 
+    // Create Container 1
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    Assert.assertTrue("Rocks DB options should be cached.",
+        MetadataStoreBuilder.CACHED_OPTS.containsKey(conf));
+
+    Options opts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
+
+    // Create Container 2
+    keyValueContainerData = new KeyValueContainerData(2L,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+        datanodeId.toString());
+
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    assertEquals(initialSize + 1, MetadataStoreBuilder.CACHED_OPTS.size());
+    Options cachedOpts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
+    assertSame("Cache object should not be updated.", opts, cachedOpts);
+  }
 }

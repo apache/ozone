@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -38,9 +39,9 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.transport.server.XceiverServer;
 
 import io.opentracing.Scope;
+import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -66,14 +67,17 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -82,7 +86,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Creates a ratis server endpoint that acts as the communication layer for
  * Ozone containers.
  */
-public final class XceiverServerRatis extends XceiverServer {
+public final class XceiverServerRatis implements XceiverServerSpi {
   private static final Logger LOG = LoggerFactory
       .getLogger(XceiverServerRatis.class);
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
@@ -107,14 +111,14 @@ public final class XceiverServerRatis extends XceiverServer {
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
   private final Set<RaftGroupId> raftGids = new HashSet<>();
+  private final RaftPeerId raftPeerId;
+  // pipelines for which I am the leader
+  private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
 
-  @SuppressWarnings("parameternumber")
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
-      StateContext context, GrpcTlsConfig tlsConfig, CertificateClient caClient,
-      OzoneConfiguration conf)
+      StateContext context, GrpcTlsConfig tlsConfig, OzoneConfiguration conf)
       throws IOException {
-    super(conf, caClient);
     this.conf = conf;
     Objects.requireNonNull(dd, "id == null");
     datanodeDetails = dd;
@@ -139,9 +143,10 @@ public final class XceiverServerRatis extends XceiverServer {
         TimeUnit.MILLISECONDS);
     this.dispatcher = dispatcher;
     this.containerController = containerController;
+    this.raftPeerId = RatisHelper.toRaftPeerId(dd);
 
     RaftServer.Builder builder =
-        RaftServer.newBuilder().setServerId(RatisHelper.toRaftPeerId(dd))
+        RaftServer.newBuilder().setServerId(raftPeerId)
             .setProperties(serverProperties)
             .setStateMachineRegistry(this::getStateMachine);
     if (tlsConfig != null) {
@@ -153,7 +158,6 @@ public final class XceiverServerRatis extends XceiverServer {
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
     return new ContainerStateMachine(gid, dispatcher, containerController,
         chunkExecutor, this, cacheEntryExpiryInteval,
-        getSecurityConfig().isBlockTokenEnabled(), getBlockTokenVerifier(),
         conf);
   }
 
@@ -409,7 +413,7 @@ public final class XceiverServerRatis extends XceiverServer {
           new SecurityConfig(ozoneConf), caClient);
 
     return new XceiverServerRatis(datanodeDetails, localPort, dispatcher,
-        containerController, context, tlsConfig, caClient, ozoneConf);
+        containerController, context, tlsConfig, ozoneConf);
   }
 
   @Override
@@ -493,7 +497,6 @@ public final class XceiverServerRatis extends XceiverServer {
   @Override
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
-    super.submitRequest(request, pipelineID);
     RaftClientReply reply;
     try (Scope scope = TracingUtil
         .importAndCreateScope(
@@ -598,6 +601,7 @@ public final class XceiverServerRatis extends XceiverServer {
       for (RaftGroupId groupId : gids) {
         reports.add(PipelineReport.newBuilder()
             .setPipelineID(PipelineID.valueOf(groupId.getUuid()).getProtobuf())
+            .setIsLeader(groupLeaderMap.getOrDefault(groupId, Boolean.FALSE))
             .build());
       }
       return reports;
@@ -615,6 +619,41 @@ public final class XceiverServerRatis extends XceiverServer {
       LOG.info("pipeline id {}", PipelineID.valueOf(groupId.getUuid()));
     }
     return pipelineIDs;
+  }
+
+  @Override
+  public void addGroup(HddsProtos.PipelineID pipelineId,
+      Collection<DatanodeDetails> peers) throws IOException {
+    final PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineId);
+    final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
+    final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers);
+    GroupManagementRequest request = GroupManagementRequest.newAdd(
+        clientId, server.getId(), nextCallId(), group);
+
+    RaftClientReply reply;
+    try {
+      reply = server.groupManagement(request);
+    } catch (Exception e) {
+      throw new IOException(e.getMessage(), e);
+    }
+    processReply(reply);
+  }
+
+  @Override
+  public void removeGroup(HddsProtos.PipelineID pipelineId)
+      throws IOException {
+    GroupManagementRequest request = GroupManagementRequest.newRemove(
+        clientId, server.getId(), nextCallId(),
+        RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()),
+        true);
+
+    RaftClientReply reply;
+    try {
+      reply = server.groupManagement(request);
+    } catch (Exception e) {
+      throw new IOException(e.getMessage(), e);
+    }
+    processReply(reply);
   }
 
   void handleNodeSlowness(RaftGroupId groupId, RoleInfoProto roleInfoProto) {
@@ -681,9 +720,26 @@ public final class XceiverServerRatis extends XceiverServer {
 
   void notifyGroupRemove(RaftGroupId gid) {
     raftGids.remove(gid);
+    // Remove any entries for group leader map
+    groupLeaderMap.remove(gid);
   }
 
   void notifyGroupAdd(RaftGroupId gid) {
     raftGids.add(gid);
+  }
+
+  void handleLeaderChangedNotification(RaftGroupMemberId groupMemberId,
+                                       RaftPeerId raftPeerId1) {
+    LOG.info("Leader change notification received for group: {} with new " +
+        "leaderId: {}", groupMemberId.getGroupId(), raftPeerId1);
+    // Save the reported leader to be sent with the report to SCM
+    boolean leaderForGroup = this.raftPeerId.equals(raftPeerId1);
+    groupLeaderMap.put(groupMemberId.getGroupId(), leaderForGroup);
+    if (context != null && leaderForGroup) {
+      // Publish new report from leader
+      context.addReport(context.getParent().getContainer().getPipelineReport());
+      // Trigger HB immediately
+      context.getParent().triggerHeartbeat();
+    }
   }
 }

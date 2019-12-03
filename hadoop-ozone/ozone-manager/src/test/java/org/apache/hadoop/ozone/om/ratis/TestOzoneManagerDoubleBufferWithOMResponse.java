@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -40,6 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -68,6 +70,7 @@ import static org.mockito.Mockito.when;
 /**
  * This class tests OzoneManagerDouble Buffer with actual OMResponse classes.
  */
+@Ignore("HDDS-2648")
 public class TestOzoneManagerDoubleBufferWithOMResponse {
 
   private OzoneManager ozoneManager;
@@ -121,6 +124,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
    * @throws Exception
    */
   @Test(timeout = 500_000)
+  @Ignore("see HDDS-2535")
   public void testDoubleBuffer() throws Exception {
     // This test checks whether count in tables are correct or not.
     testDoubleBuffer(1, 10);
@@ -380,13 +384,14 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
       }
 
       // We are doing +1 for volume transaction.
+      // Here not checking lastAppliedIndex because transactionIndex is
+      // shared across threads, and lastAppliedIndex cannot be always
+      // expectedTransactions. So, skipping that check here.
       long expectedTransactions = (bucketCount + 1) * iterations;
-      GenericTestUtils.waitFor(() -> lastAppliedIndex == expectedTransactions,
-          100, 500000);
 
-      Assert.assertEquals(expectedTransactions,
-          doubleBuffer.getFlushedTransactionCount()
-      );
+      GenericTestUtils.waitFor(() -> expectedTransactions ==
+              doubleBuffer.getFlushedTransactionCount(),
+          100, 500000);
 
       GenericTestUtils.waitFor(() -> {
         long count = 0L;
@@ -441,7 +446,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private OMClientResponse createVolume(String volumeName,
       long transactionId) {
 
-    String admin = "ozone";
+    String admin = OzoneConsts.OZONE;
     String owner = UUID.randomUUID().toString();
     OzoneManagerProtocolProtos.OMRequest omRequest =
         TestOMRequestUtils.createVolumeRequest(volumeName, admin, owner);

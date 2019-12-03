@@ -53,19 +53,25 @@ public class ExcludeList {
   }
 
   public void addDatanodes(Collection<DatanodeDetails> dns) {
-    datanodes.addAll(dns);
+    dns.forEach(dn -> addDatanode(dn));
   }
 
   public void addDatanode(DatanodeDetails dn) {
-    datanodes.add(dn);
+    if (!datanodes.contains(dn)) {
+      datanodes.add(dn);
+    }
   }
 
   public void addConatinerId(ContainerID containerId) {
-    containerIds.add(containerId);
+    if (!containerIds.contains(containerId)) {
+      containerIds.add(containerId);
+    }
   }
 
   public void addPipeline(PipelineID pipelineId) {
-    pipelineIds.add(pipelineId);
+    if (!pipelineIds.contains(pipelineId)) {
+      pipelineIds.add(pipelineId);
+    }
   }
 
   public List<PipelineID> getPipelineIds() {
@@ -112,5 +118,14 @@ public class ExcludeList {
     datanodes.clear();
     containerIds.clear();
     pipelineIds.clear();
+  }
+
+  @Override
+  public String toString() {
+    return "ExcludeList {" +
+        "datanodes = " + datanodes +
+        ", containerIds = " + containerIds +
+        ", pipelineIds = " + pipelineIds +
+        '}';
   }
 }

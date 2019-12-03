@@ -27,22 +27,24 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of ChunkManager built for running performance tests.
  * Chunks are not written to disk, Reads are returned with zero-filled buffers
  */
 public class ChunkManagerDummyImpl extends ChunkManagerImpl {
-  static final Logger LOG = LoggerFactory.getLogger(
-      ChunkManagerDummyImpl.class);
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ChunkManagerDummyImpl.class);
 
   public ChunkManagerDummyImpl(boolean sync) {
     super(sync);
@@ -67,25 +69,15 @@ public class ChunkManagerDummyImpl extends ChunkManagerImpl {
     Preconditions.checkNotNull(dispatcherContext);
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
 
-    Logger log = LoggerFactory.getLogger(ChunkManagerImpl.class);
-
     try {
       KeyValueContainerData containerData =
           (KeyValueContainerData) container.getContainerData();
       HddsVolume volume = containerData.getVolume();
       VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
-      int bufferSize;
 
       switch (stage) {
       case WRITE_DATA:
-        bufferSize = data.capacity();
-        if (bufferSize != info.getLen()) {
-          String err = String.format("data array does not match the length "
-                  + "specified. DataLen: %d Byte Array: %d",
-              info.getLen(), bufferSize);
-          log.error(err);
-          throw new StorageContainerException(err, INVALID_WRITE_SIZE);
-        }
+        ChunkUtils.validateBufferSize(info, data);
 
         // Increment volumeIO stats here.
         volumeIOStats.incWriteTime(Time.monotonicNow() - writeTimeStart);
@@ -102,7 +94,7 @@ public class ChunkManagerDummyImpl extends ChunkManagerImpl {
         throw new IOException("Can not identify write operation.");
       }
     } catch (IOException ex) {
-      LOG.error("write data failed. error: {}", ex);
+      LOG.error("write data failed", ex);
       throw new StorageContainerException("Internal error: ", ex,
           CONTAINER_INTERNAL_ERROR);
     }

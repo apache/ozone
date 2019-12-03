@@ -27,6 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.apache.hadoop.conf.Configuration;
@@ -47,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers
@@ -60,7 +62,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis
     .DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis
@@ -109,9 +110,10 @@ public class KeyValueHandler extends Handler {
   private final AutoCloseableLock containerCreationLock;
   private final boolean doSyncWrite;
 
-  public KeyValueHandler(Configuration config, StateContext context,
-      ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics) {
-    super(config, context, contSet, volSet, metrics);
+  public KeyValueHandler(Configuration config, String datanodeId,
+      ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
+      Consumer<ContainerReplicaProto> icrSender) {
+    super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
     doSyncWrite =
@@ -220,7 +222,7 @@ public class KeyValueHandler extends Handler {
 
     KeyValueContainerData newContainerData = new KeyValueContainerData(
         containerID, maxContainerSize, request.getPipelineID(),
-        getDatanodeDetails().getUuidString());
+        getDatanodeId());
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
     KeyValueContainer newContainer = new KeyValueContainer(
@@ -387,7 +389,6 @@ public class KeyValueHandler extends Handler {
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext) {
 
-    long blockLength;
     if (!request.hasPutBlock()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Put Key request. trace ID: {}",
@@ -406,7 +407,7 @@ public class KeyValueHandler extends Handler {
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
-      long numBytes = blockData.getProtoBufMessage().toByteArray().length;
+      final long numBytes = blockData.getSerializedSize();
       blockManager.putBlock(kvContainer, blockData);
       metrics.incContainerBytesStats(Type.PutBlock, numBytes);
     } catch (StorageContainerException ex) {
@@ -447,7 +448,7 @@ public class KeyValueHandler extends Handler {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
       responseData = blockManager.getBlock(kvContainer, blockID);
-      long numBytes = responseData.getProtoBufMessage().toByteArray().length;
+      final long numBytes = responseData.getSerializedSize();
       metrics.incContainerBytesStats(Type.GetBlock, numBytes);
 
     } catch (StorageContainerException ex) {
@@ -818,8 +819,8 @@ public class KeyValueHandler extends Handler {
         chunkInfo = chunk;
       }
       metrics.incContainerBytesStats(Type.GetSmallFile, dataBuf.size());
-      return SmallFileUtils.getGetSmallFileResponseSuccess(request, dataBuf
-          .toByteArray(), ChunkInfo.getFromProtoBuf(chunkInfo));
+      return SmallFileUtils.getGetSmallFileResponseSuccess(request, dataBuf,
+          ChunkInfo.getFromProtoBuf(chunkInfo));
     } catch (StorageContainerException e) {
       return ContainerUtils.logAndReturnError(LOG, e, request);
     } catch (IOException ex) {

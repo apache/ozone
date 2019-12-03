@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.google.common.base.Strings;
 
@@ -224,6 +225,7 @@ public final class OmUtils {
     case ListBuckets:
     case LookupKey:
     case ListKeys:
+    case ListTrash:
     case InfoS3Bucket:
     case ListS3Buckets:
     case ServiceList:
@@ -368,13 +370,14 @@ public final class OmUtils {
                new TarArchiveOutputStream(gzippedOut)) {
 
         Path checkpointPath = checkpoint.getCheckpointLocation();
-        for (Path path : Files.list(checkpointPath)
-            .collect(Collectors.toList())) {
-          if (path != null) {
-            Path fileName = path.getFileName();
-            if (fileName != null) {
-              includeFile(path.toFile(), fileName.toString(),
-                  archiveOutputStream);
+        try (Stream<Path> files = Files.list(checkpointPath)) {
+          for (Path path : files.collect(Collectors.toList())) {
+            if (path != null) {
+              Path fileName = path.getFileName();
+              if (fileName != null) {
+                includeFile(path.toFile(), fileName.toString(),
+                    archiveOutputStream);
+              }
             }
           }
         }
@@ -507,12 +510,13 @@ public final class OmUtils {
   public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
       RepeatedOmKeyInfo repeatedOmKeyInfo) throws IOException{
     // If this key is in a GDPR enforced bucket, then before moving
-    // KeyInfo to deletedTable, remove the GDPR related metadata from
-    // KeyInfo.
+    // KeyInfo to deletedTable, remove the GDPR related metadata and
+    // FileEncryptionInfo from KeyInfo.
     if(Boolean.valueOf(keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))) {
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
+      keyInfo.clearFileEncryptionInfo();
     }
 
     if(repeatedOmKeyInfo == null) {

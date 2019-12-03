@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -213,7 +213,7 @@ public class TestContainerReplicationEndToEnd {
     }
     // This will try to read the data from the dn to which the container got
     // replicated after the container got closed.
-    ContainerTestHelper
+    TestHelper
         .validateData(keyName, testData, objectStore, volumeName, bucketName);
   }
 }

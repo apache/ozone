@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -65,7 +64,6 @@ public class TestOzoneManagerConfiguration {
     scmId = UUID.randomUUID().toString();
     final String path = GenericTestUtils.getTempPath(omId);
     Path metaDirPath = Paths.get(path, "om-meta");
-    conf.setBoolean(OzoneConfigKeys.OZONE_ENABLED, true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
@@ -279,6 +277,57 @@ public class TestOzoneManagerConfiguration {
       GenericTestUtils.assertExceptionContains("Configuration has no " +
           OMConfigKeys.OZONE_OM_ADDRESS_KEY + " address that matches local " +
           "node's address.", e);
+    }
+  }
+
+  /**
+   * A configuration with an empty node list while service ID is configured.
+   * Cluster should fail to start during config check.
+   * @throws Exception
+   */
+  @Test
+  public void testNoOMNodes() throws Exception {
+    String omServiceId = "service1";
+    conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
+    // Deliberately skip OZONE_OM_NODES_KEY and OZONE_OM_ADDRESS_KEY config
+
+    try {
+      startCluster();
+      Assert.fail("Should have failed to start the cluster!");
+    } catch (OzoneIllegalArgumentException e) {
+      // Expect error message
+      Assert.assertTrue(e.getMessage().contains(
+          "List of OM Node ID's should be specified"));
+    }
+  }
+
+  /**
+   * A configuration with no OM addresses while service ID is configured.
+   * Cluster should fail to start during config check.
+   * @throws Exception
+   */
+  @Test
+  public void testNoOMAddrs() throws Exception {
+    String omServiceId = "service1";
+
+    String omNode1Id = "omNode1";
+    String omNode2Id = "omNode2";
+    String omNode3Id = "omNode3";
+    String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
+    String omNodesKey = OmUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
+
+    conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
+    conf.set(omNodesKey, omNodesKeyValue);
+    // Deliberately skip OZONE_OM_ADDRESS_KEY config
+
+    try {
+      startCluster();
+      Assert.fail("Should have failed to start the cluster!");
+    } catch (OzoneIllegalArgumentException e) {
+      // Expect error message
+      Assert.assertTrue(e.getMessage().contains(
+          "OM Rpc Address should be set for all node"));
     }
   }
 

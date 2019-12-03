@@ -24,10 +24,12 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
@@ -66,8 +68,9 @@ public class TestCloseContainerEventHandler {
     configuration
         .set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     nodeManager = new MockNodeManager(true, 10);
+    eventQueue = new EventQueue();
     pipelineManager =
-        new SCMPipelineManager(configuration, nodeManager, eventQueue, null);
+        new SCMPipelineManager(configuration, nodeManager, eventQueue);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), configuration);
@@ -76,10 +79,13 @@ public class TestCloseContainerEventHandler {
     containerManager = new
         SCMContainerManager(configuration, nodeManager,
         pipelineManager, new EventQueue());
-    eventQueue = new EventQueue();
+    pipelineManager.triggerPipelineCreation();
     eventQueue.addHandler(CLOSE_CONTAINER,
         new CloseContainerEventHandler(pipelineManager, containerManager));
     eventQueue.addHandler(DATANODE_COMMAND, nodeManager);
+    // Move all pipelines created by background from ALLOCATED to OPEN state
+    Thread.sleep(2000);
+    TestUtils.openAllRatisPipelines(pipelineManager);
   }
 
   @AfterClass
@@ -115,10 +121,9 @@ public class TestCloseContainerEventHandler {
 
   @Test
   public void testCloseContainerEventWithValidContainers() throws IOException {
-
     ContainerInfo container = containerManager
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, "ozone");
+            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     DatanodeDetails datanode = pipelineManager
         .getPipeline(container.getPipelineID()).getFirstNode();
@@ -133,12 +138,11 @@ public class TestCloseContainerEventHandler {
 
   @Test
   public void testCloseContainerEventWithRatis() throws IOException {
-
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(CloseContainerEventHandler.LOG);
     ContainerInfo container = containerManager
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, "ozone");
+            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     int[] closeCount = new int[3];
     eventQueue.fireEvent(CLOSE_CONTAINER, id);

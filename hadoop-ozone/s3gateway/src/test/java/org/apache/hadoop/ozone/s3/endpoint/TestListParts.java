@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -43,15 +44,14 @@ public class TestListParts {
 
 
   private final static ObjectEndpoint REST = new ObjectEndpoint();
-  private final static String BUCKET = "s3bucket";
-  private final static String KEY = "key1";
   private static String uploadID;
 
   @BeforeClass
   public static void setUp() throws Exception {
 
     OzoneClientStub client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket("ozone", BUCKET);
+    client.getObjectStore().createS3Bucket(OzoneConsts.OZONE,
+        OzoneConsts.S3_BUCKET);
 
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
@@ -61,7 +61,8 @@ public class TestListParts {
     REST.setHeaders(headers);
     REST.setClient(client);
 
-    Response response = REST.initializeMultipartUpload(BUCKET, KEY);
+    Response response = REST.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        OzoneConsts.KEY);
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
@@ -71,22 +72,26 @@ public class TestListParts {
 
     String content = "Multipart Upload";
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());
-    response = REST.put(BUCKET, KEY, content.length(), 1, uploadID, body);
+    response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 1, uploadID, body);
 
     assertNotNull(response.getHeaderString("ETag"));
 
-    response = REST.put(BUCKET, KEY, content.length(), 2, uploadID, body);
+    response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 2, uploadID, body);
 
     assertNotNull(response.getHeaderString("ETag"));
 
-    response = REST.put(BUCKET, KEY, content.length(), 3, uploadID, body);
+    response = REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 3, uploadID, body);
 
     assertNotNull(response.getHeaderString("ETag"));
   }
 
   @Test
   public void testListParts() throws Exception {
-    Response response = REST.get(BUCKET, KEY, uploadID, 3, "0", null);
+    Response response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        uploadID, 3, "0", null);
 
     ListPartsResponse listPartsResponse =
         (ListPartsResponse) response.getEntity();
@@ -98,7 +103,8 @@ public class TestListParts {
 
   @Test
   public void testListPartsContinuation() throws Exception {
-    Response response = REST.get(BUCKET, KEY, uploadID, 2, "0", null);
+    Response response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        uploadID, 2, "0", null);
     ListPartsResponse listPartsResponse =
         (ListPartsResponse) response.getEntity();
 
@@ -106,7 +112,7 @@ public class TestListParts {
     Assert.assertTrue(listPartsResponse.getPartList().size() == 2);
 
     // Continue
-    response = REST.get(BUCKET, KEY, uploadID, 2,
+    response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, 2,
         Integer.toString(listPartsResponse.getNextPartNumberMarker()), null);
     listPartsResponse = (ListPartsResponse) response.getEntity();
 
@@ -118,7 +124,8 @@ public class TestListParts {
   @Test
   public void testListPartsWithUnknownUploadID() throws Exception {
     try {
-      Response response = REST.get(BUCKET, KEY, uploadID, 2, "0", null);
+      Response response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+          uploadID, 2, "0", null);
     } catch (OS3Exception ex) {
       Assert.assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),
           ex.getErrorMessage());

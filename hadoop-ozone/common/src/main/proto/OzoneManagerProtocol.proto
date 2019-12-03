@@ -92,6 +92,8 @@ enum Type {
   PurgeKeys = 81;
 
   ListMultipartUploads = 82;
+
+  ListTrash = 91;
 }
 
 message OMRequest {
@@ -161,6 +163,8 @@ message OMRequest {
 
   optional UpdateGetS3SecretRequest         updateGetS3SecretRequest       = 82;
   optional ListMultipartUploadsRequest      listMultipartUploadsRequest    = 83;
+
+  optional ListTrashRequest                 listTrashRequest               = 91;
 }
 
 message OMResponse {
@@ -230,6 +234,8 @@ message OMResponse {
   optional PurgeKeysResponse                  purgeKeysResponse            = 81;
 
   optional ListMultipartUploadsResponse listMultipartUploadsResponse = 82;
+
+  optional ListTrashResponse                  listTrashResponse            = 91;
 }
 
 enum Status {
@@ -297,8 +303,28 @@ enum Status {
 
     USER_MISMATCH = 54; // Error code when requested user name passed is
     // different from remote user.
+
+    INVALID_PART = 55;
+    INVALID_PART_ORDER = 56;
+    SCM_GET_PIPELINE_EXCEPTION = 57;
+    INVALID_BUCKET_NAME = 58;
 }
 
+/**
+    This command acts as a list command for deleted keys that are still present
+    in the deleted table on Ozone Manager.
+*/
+message ListTrashRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  optional string startKeyName = 3;
+  optional string keyPrefix = 4;
+  optional int32 maxKeys = 5;
+}
+
+message ListTrashResponse {
+  repeated RepeatedKeyInfo deletedKeys = 1;
+}
 
 message VolumeInfo {
     required string adminName = 1;
@@ -319,6 +345,7 @@ message VolumeInfo {
 message UserInfo {
     optional string userName = 1;
     optional string remoteAddress = 3;
+    optional string hostName = 4;
 }
 
 /**
@@ -903,10 +930,16 @@ message ServicePort {
     required uint32 value = 2;
 }
 
+message OMRoleInfo {
+    required string nodeId = 1;
+    required string serverRole = 2;
+}
+
 message ServiceInfo {
     required hadoop.hdds.NodeType nodeType = 1;
     required string hostname = 2;
     repeated ServicePort servicePorts = 3;
+    optional OMRoleInfo omRole = 4;
 }
 
 message S3CreateBucketRequest {
@@ -969,7 +1002,10 @@ message MultipartInfoInitiateResponse {
 }
 
 message MultipartKeyInfo {
-    required string uploadID = 4;
+    required string uploadID = 1;
+    required uint64 creationTime = 2;
+    required hadoop.hdds.ReplicationType type = 3;
+    required hadoop.hdds.ReplicationFactor factor = 4;
     repeated PartKeyInfo partKeyInfoList = 5;
 }
 

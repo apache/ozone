@@ -49,4 +49,8 @@ public class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
     }
   }
 
+  @Override
+  public OzoneTokenIdentifier copyObject(OzoneTokenIdentifier object) {
+    return object;
+  }
 }

@@ -175,9 +175,10 @@ public class KeyInputStream extends InputStream implements Seekable {
         // This implies that there is either data loss or corruption in the
         // chunk entries. Even EOF in the current stream would be covered in
         // this case.
-        throw new IOException(String.format(
-            "Inconsistent read for blockID=%s length=%d numBytesRead=%d",
-            current.getBlockID(), current.getLength(), numBytesRead));
+        throw new IOException(String.format("Inconsistent read for blockID=%s "
+                        + "length=%d numBytesToRead=%d numBytesRead=%d",
+                current.getBlockID(), current.getLength(), numBytesToRead,
+                numBytesRead));
       }
       totalReadLen += numBytesRead;
       off += numBytesRead;
@@ -239,6 +240,12 @@ public class KeyInputStream extends InputStream implements Seekable {
     // Reset the previous blockStream's position
     blockStreams.get(blockIndexOfPrevPosition).resetPosition();
 
+    // Reset all the blockStreams above the blockIndex. We do this to reset
+    // any previous reads which might have updated the blockPosition and
+    // chunkIndex.
+    for (int index =  blockIndex + 1; index < blockStreams.size(); index++) {
+      blockStreams.get(index).seek(0);
+    }
     // 2. Seek the blockStream to the adjusted position
     blockStreams.get(blockIndex).seek(pos - blockOffsets[blockIndex]);
     blockIndexOfPrevPosition = blockIndex;

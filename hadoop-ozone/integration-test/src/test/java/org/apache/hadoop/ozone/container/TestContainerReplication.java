@@ -73,7 +73,7 @@ public class TestContainerReplication {
   @Before
   public void setup() throws Exception {
     conf = newOzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(2)
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .setRandomContainerPort(true).build();
   }
 
@@ -145,7 +145,7 @@ public class TestContainerReplication {
     //wait for the replication
     GenericTestUtils.waitFor(()
         -> destinationDatanodeDatanodeStateMachine.getSupervisor()
-        .getReplicationCounter() > 0, 1000, 20_000);
+        .getReplicationRequestCount() > 0, 1000, 20_000);
 
     OzoneContainer ozoneContainer =
         destinationDatanodeDatanodeStateMachine.getContainer();

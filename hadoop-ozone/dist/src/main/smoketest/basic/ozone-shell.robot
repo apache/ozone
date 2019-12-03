@@ -52,6 +52,8 @@ RpcClient without scheme
 *** Keywords ***
 Test ozone shell
     [arguments]     ${protocol}         ${server}       ${volume}
+    ${result} =     Execute And Ignore Error    ozone sh volume info ${protocol}${server}/${volume}
+                    Should contain      ${result}       VOLUME_NOT_FOUND
     ${result} =     Execute             ozone sh volume create ${protocol}${server}/${volume} --quota 100TB
                     Should not contain  ${result}       Failed
     ${result} =     Execute             ozone sh volume list ${protocol}${server}/ | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="${volume}")'
@@ -109,9 +111,9 @@ Test Bucket Acls
 Test key handling
     [arguments]     ${protocol}         ${server}       ${volume}
                     Execute             ozone sh key put ${protocol}${server}/${volume}/bb1/key1 /opt/hadoop/NOTICE.txt
-                    Execute             rm -f NOTICE.txt.1
-                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1 NOTICE.txt.1
-                    Execute             ls -l NOTICE.txt.1
+                    Execute             rm -f /tmp/NOTICE.txt.1
+                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
+                    Execute             ls -l /tmp/NOTICE.txt.1
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
     ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="key1") | .name'

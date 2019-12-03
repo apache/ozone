@@ -18,12 +18,15 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
@@ -95,14 +98,19 @@ public class ContainerDataScanner extends Thread {
     while (!stopping && itr.hasNext()) {
       Container c = itr.next();
       if (c.shouldScanData()) {
+        ContainerData containerData = c.getContainerData();
+        long containerId = containerData.getContainerID();
         try {
+          logScanStart(containerData);
           if (!c.scanData(throttler, canceler)) {
             metrics.incNumUnHealthyContainers();
-            controller.markContainerUnhealthy(
-                c.getContainerData().getContainerID());
+            controller.markContainerUnhealthy(containerId);
+          } else {
+            Instant now = Instant.now();
+            logScanCompleted(containerData, now);
+            controller.updateDataScanTimestamp(containerId, now);
           }
         } catch (IOException ex) {
-          long containerId = c.getContainerData().getContainerID();
           LOG.warn("Unexpected exception while scanning container "
               + containerId, ex);
         } finally {
@@ -132,6 +140,23 @@ public class ContainerDataScanner extends Thread {
         } catch (InterruptedException ignored) {
         }
       }
+    }
+  }
+
+  private static void logScanStart(ContainerData containerData) {
+    if (LOG.isDebugEnabled()) {
+      Optional<Instant> scanTimestamp = containerData.lastDataScanTime();
+      Object lastScanTime = scanTimestamp.map(ts -> "at " + ts).orElse("never");
+      LOG.debug("Scanning container {}, last scanned {}",
+          containerData.getContainerID(), lastScanTime);
+    }
+  }
+
+  private static void logScanCompleted(
+      ContainerData containerData, Instant timestamp) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Completed scan of container {} at {}",
+          containerData.getContainerID(), timestamp);
     }
   }
 

@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
  */
 public abstract class XceiverClientSpi implements Closeable {
 
-  final private AtomicInteger referenceCount;
+  private final AtomicInteger referenceCount;
   private boolean isEvicted;
 
   XceiverClientSpi() {

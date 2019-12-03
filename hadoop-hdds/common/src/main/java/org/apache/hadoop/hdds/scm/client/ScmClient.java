@@ -69,15 +69,6 @@ public interface ScmClient extends Closeable {
    * Close a container.
    *
    * @param containerId - ID of the container.
-   * @param pipeline - Pipeline where the container is located.
-   * @throws IOException
-   */
-  void closeContainer(long containerId, Pipeline pipeline) throws IOException;
-
-  /**
-   * Close a container.
-   *
-   * @param containerId - ID of the container.
    * @throws IOException
    */
   void closeContainer(long containerId) throws IOException;

@@ -65,34 +65,36 @@ public class ListBucketHandler extends Handler {
 
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
-    OzoneClient client = address.createClient(createOzoneConfiguration());
+    try (OzoneClient client =
+             address.createClient(createOzoneConfiguration())) {
 
-    String volumeName = address.getVolumeName();
-    if (maxBuckets < 1) {
-      throw new IllegalArgumentException(
-          "the length should be a positive number");
-    }
+      String volumeName = address.getVolumeName();
+      if (maxBuckets < 1) {
+        throw new IllegalArgumentException(
+            "the length should be a positive number");
+      }
 
-    if (isVerbose()) {
-      System.out.printf("Volume Name : %s%n", volumeName);
-    }
+      if (isVerbose()) {
+        System.out.printf("Volume Name : %s%n", volumeName);
+      }
 
 
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    Iterator<? extends OzoneBucket> bucketIterator =
-        vol.listBuckets(prefix, startBucket);
+      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+      Iterator<? extends OzoneBucket> bucketIterator =
+          vol.listBuckets(prefix, startBucket);
 
-    int counter = 0;
-    while (maxBuckets > 0 && bucketIterator.hasNext()) {
-      ObjectPrinter.printObjectAsJson(bucketIterator.next());
+      int counter = 0;
+      while (maxBuckets > 0 && bucketIterator.hasNext()) {
+        ObjectPrinter.printObjectAsJson(bucketIterator.next());
 
-      maxBuckets -= 1;
-      counter++;
-    }
+        maxBuckets -= 1;
+        counter++;
+      }
 
-    if (isVerbose()) {
-      System.out.printf("Found : %d buckets for volume : %s ",
-          counter, volumeName);
+      if (isVerbose()) {
+        System.out.printf("Found : %d buckets for volume : %s ",
+            counter, volumeName);
+      }
     }
 
     return null;

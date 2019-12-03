@@ -109,9 +109,7 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
 
     for (OzoneConfiguration.Property p : allProperties) {
       if (p.getTag() != null && p.getTag().contains("REQUIRED")) {
-        if (p.getName().equalsIgnoreCase(OzoneConfigKeys.OZONE_ENABLED)) {
-          p.setValue(String.valueOf(Boolean.TRUE));
-        } else if (p.getName().equalsIgnoreCase(
+        if (p.getName().equalsIgnoreCase(
             OzoneConfigKeys.OZONE_METADATA_DIRS)) {
           p.setValue(System.getProperty(OzoneConsts.JAVA_TMP_DIR));
         } else if (p.getName().equalsIgnoreCase(

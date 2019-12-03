@@ -40,4 +40,10 @@ public interface Codec<T> {
    * @param rawData Byte array from the key/value store. Should not be null.
    */
   T fromPersistedFormat(byte[] rawData) throws IOException;
+
+  /**
+   * Copy Object from the provided object, and returns a new object.
+   * @param object
+   */
+  T copyObject(T object);
 }

@@ -18,23 +18,26 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.google.common.base.Preconditions;
 
 /**
  * Represents a group of datanodes which store a container.
@@ -50,6 +53,8 @@ public final class Pipeline {
   private Map<DatanodeDetails, Long> nodeStatus;
   // nodes with ordered distance to client
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
+  // Current reported Leader for the pipeline
+  private UUID leaderId;
 
   /**
    * The immutable properties of pipeline object is used in
@@ -103,6 +108,22 @@ public final class Pipeline {
   }
 
   /**
+   * Return the pipeline leader's UUID.
+   *
+   * @return DatanodeDetails.UUID.
+   */
+  public UUID getLeaderId() {
+    return leaderId;
+  }
+
+  /**
+   * Pipeline object, outside of letting leader id to be set, is immutable.
+   */
+  void setLeaderId(UUID leaderId) {
+    this.leaderId = leaderId;
+  }
+
+  /**
    * Returns the list of nodes which form this pipeline.
    *
    * @return List of DatanodeDetails
@@ -134,6 +155,11 @@ public final class Pipeline {
     return state == PipelineState.OPEN;
   }
 
+  public boolean isAllocationTimeout() {
+    //TODO: define a system property to control the timeout value
+    return false;
+  }
+
   public void setNodesInOrder(List<DatanodeDetails> nodes) {
     nodesInOrder.set(nodes);
   }
@@ -154,13 +180,13 @@ public final class Pipeline {
     nodeStatus.put(dn, System.currentTimeMillis());
   }
 
-  boolean isHealthy() {
+  public boolean isHealthy() {
     for (Long reportedTime : nodeStatus.values()) {
       if (reportedTime < 0) {
         return false;
       }
     }
-    return true;
+    return leaderId != null;
   }
 
   public boolean isEmpty() {
@@ -174,7 +200,7 @@ public final class Pipeline {
         .setType(type)
         .setFactor(factor)
         .setState(PipelineState.getProtobuf(state))
-        .setLeaderID("")
+        .setLeaderID(leaderId != null ? leaderId.toString() : "")
         .addAllMembers(nodeStatus.keySet().stream()
             .map(DatanodeDetails::getProtoBufMessage)
             .collect(Collectors.toList()));
@@ -206,6 +232,8 @@ public final class Pipeline {
         .setFactor(pipeline.getFactor())
         .setType(pipeline.getType())
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
+        .setLeaderId(StringUtils.isNotEmpty(pipeline.getLeaderID()) ?
+            UUID.fromString(pipeline.getLeaderID()) : null)
         .setNodes(pipeline.getMembersList().stream()
             .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList()))
         .setNodesInOrder(pipeline.getMemberOrdersList())
@@ -251,7 +279,8 @@ public final class Pipeline {
     b.append(", Type:").append(getType());
     b.append(", Factor:").append(getFactor());
     b.append(", State:").append(getPipelineState());
-    b.append("]");
+    b.append(", leaderId:").append(getLeaderId());
+    b.append(" ]");
     return b.toString();
   }
 
@@ -274,6 +303,7 @@ public final class Pipeline {
     private Map<DatanodeDetails, Long> nodeStatus = null;
     private List<Integer> nodeOrder = null;
     private List<DatanodeDetails> nodesInOrder = null;
+    private UUID leaderId = null;
 
     public Builder() {}
 
@@ -284,6 +314,7 @@ public final class Pipeline {
       this.state = pipeline.state;
       this.nodeStatus = pipeline.nodeStatus;
       this.nodesInOrder = pipeline.nodesInOrder.get();
+      this.leaderId = pipeline.getLeaderId();
     }
 
     public Builder setId(PipelineID id1) {
@@ -306,6 +337,11 @@ public final class Pipeline {
       return this;
     }
 
+    public Builder setLeaderId(UUID leaderId1) {
+      this.leaderId = leaderId1;
+      return this;
+    }
+
     public Builder setNodes(List<DatanodeDetails> nodes) {
       this.nodeStatus = new LinkedHashMap<>();
       nodes.forEach(node -> nodeStatus.put(node, -1L));
@@ -324,6 +360,7 @@ public final class Pipeline {
       Preconditions.checkNotNull(state);
       Preconditions.checkNotNull(nodeStatus);
       Pipeline pipeline = new Pipeline(id, type, factor, state, nodeStatus);
+      pipeline.setLeaderId(leaderId);
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         // This branch is for build from ProtoBuf

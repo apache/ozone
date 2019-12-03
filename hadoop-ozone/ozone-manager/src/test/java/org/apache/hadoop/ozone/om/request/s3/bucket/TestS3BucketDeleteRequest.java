@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.request.s3.bucket;
 import java.util.UUID;
 
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -52,7 +53,7 @@ public class TestS3BucketDeleteRequest extends TestS3BucketRequest {
     OMRequest omRequest = doPreExecute(s3BucketName);
 
     // Add s3Bucket to s3Bucket table.
-    TestOMRequestUtils.addS3BucketToDB("ozone", s3BucketName,
+    TestOMRequestUtils.addS3BucketToDB(OzoneConsts.OZONE, s3BucketName,
         omMetadataManager);
 
     S3BucketDeleteRequest s3BucketDeleteRequest =

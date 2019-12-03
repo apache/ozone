@@ -192,7 +192,7 @@ public class ReplicationManager implements MetricsSource {
   @SuppressFBWarnings(value="NN_NAKED_NOTIFY",
       justification="Used only for testing")
   public synchronized void processContainersNow() {
-    notify();
+    notifyAll();
   }
 
   /**
@@ -204,7 +204,7 @@ public class ReplicationManager implements MetricsSource {
       inflightReplication.clear();
       inflightDeletion.clear();
       running = false;
-      notify();
+      notifyAll();
     } else {
       LOG.info("Replication Monitor Thread is not running.");
     }
@@ -805,21 +805,10 @@ public class ReplicationManager implements MetricsSource {
         type = ConfigType.TIME,
         defaultValue = "300s",
         tags = {SCM, OZONE},
-        description = "When a heartbeat from the data node arrives on SCM, "
-            + "It is queued for processing with the time stamp of when the "
-            + "heartbeat arrived. There is a heartbeat processing thread "
-            + "inside "
-            + "SCM that runs at a specified interval. This value controls how "
-            + "frequently this thread is run.\n\n"
-            + "There are some assumptions build into SCM such as this "
-            + "value should allow the heartbeat processing thread to run at "
-            + "least three times more frequently than heartbeats and at least "
-            + "five times more than stale node detection time. "
-            + "If you specify a wrong value, SCM will gracefully refuse to "
-            + "run. "
-            + "For more info look at the node manager tests in SCM.\n"
-            + "\n"
-            + "In short, you don't need to change this."
+        description = "There is a replication monitor thread running inside " +
+            "SCM which takes care of replicating the containers in the " +
+            "cluster. This property is used to configure the interval in " +
+            "which that thread runs."
     )
     public void setInterval(long interval) {
       this.interval = interval;

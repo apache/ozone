@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -25,7 +25,7 @@ import java.util.List;
  */
 public class EventHandlerStub<PAYLOAD> implements EventHandler<PAYLOAD> {
 
-  private List<PAYLOAD> receivedEvents = new ArrayList<>();
+  private final List<PAYLOAD> receivedEvents = new ArrayList<>();
 
   @Override
   public void onMessage(PAYLOAD payload, EventPublisher publisher) {

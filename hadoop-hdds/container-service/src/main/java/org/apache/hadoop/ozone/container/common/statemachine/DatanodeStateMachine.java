@@ -39,7 +39,11 @@ import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .CloseContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
+    .ClosePipelineCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .CommandDispatcher;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
+    .CreatePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
@@ -97,6 +101,10 @@ public class DatanodeStateMachine implements Closeable {
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
       Configuration conf, CertificateClient certClient,
       HddsDatanodeStopService hddsDatanodeStopService) throws IOException {
+    OzoneConfiguration ozoneConf = new OzoneConfiguration(conf);
+    DatanodeConfiguration dnConf =
+        ozoneConf.getObject(DatanodeConfiguration.class);
+
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
@@ -106,7 +114,7 @@ public class DatanodeStateMachine implements Closeable {
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
     container = new OzoneContainer(this.datanodeDetails,
-        new OzoneConfiguration(conf), context, certClient);
+        ozoneConf, context, certClient);
     dnCertClient = certClient;
     nextHB = new AtomicLong(Time.monotonicNow());
 
@@ -116,7 +124,8 @@ public class DatanodeStateMachine implements Closeable {
             new SimpleContainerDownloader(conf), new TarContainerPacker());
 
     supervisor =
-        new ReplicationSupervisor(container.getContainerSet(), replicator, 10);
+        new ReplicationSupervisor(container.getContainerSet(), replicator,
+            dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
      // trick.
@@ -125,7 +134,10 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
             conf))
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
-        .addHandler(new DeleteContainerCommandHandler())
+        .addHandler(new DeleteContainerCommandHandler(
+            dnConf.getContainerDeleteThreads()))
+        .addHandler(new ClosePipelineCommandHandler())
+        .addHandler(new CreatePipelineCommandHandler())
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -272,6 +284,10 @@ public class DatanodeStateMachine implements Closeable {
 
     if (jvmPauseMonitor != null) {
       jvmPauseMonitor.stop();
+    }
+
+    if (commandDispatcher != null) {
+      commandDispatcher.stop();
     }
   }
 

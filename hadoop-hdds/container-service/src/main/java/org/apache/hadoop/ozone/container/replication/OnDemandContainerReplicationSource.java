@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -25,8 +25,6 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A naive implementation of the replication source which creates a tar file
@@ -35,12 +33,9 @@ import org.slf4j.LoggerFactory;
 public class OnDemandContainerReplicationSource
     implements ContainerReplicationSource {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerReplicationSource.class);
+  private final ContainerController controller;
 
-  private ContainerController controller;
-
-  private TarContainerPacker packer = new TarContainerPacker();
+  private final TarContainerPacker packer = new TarContainerPacker();
 
   public OnDemandContainerReplicationSource(
       ContainerController controller) {
@@ -49,7 +44,7 @@ public class OnDemandContainerReplicationSource
 
   @Override
   public void prepare(long containerId) {
-
+    // no pre-create in this implementation
   }
 
   @Override

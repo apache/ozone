@@ -89,6 +89,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.SecurityUtil;
@@ -108,11 +109,12 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KEYS_MAX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
@@ -120,6 +122,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KMS_PROVIDER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
@@ -144,6 +147,7 @@ public class KeyManagerImpl implements KeyManager {
   private final boolean useRatis;
 
   private final int preallocateBlocksMax;
+  private final int listTrashKeysMax;
   private final String omId;
   private final OzoneBlockTokenSecretManager secretManager;
   private final boolean grpcBlockTokenEnabled;
@@ -184,6 +188,9 @@ public class KeyManagerImpl implements KeyManager {
     this.grpcBlockTokenEnabled = conf.getBoolean(
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+    this.listTrashKeysMax = conf.getInt(
+      OZONE_CLIENT_LIST_TRASH_KEYS_MAX,
+      OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT);
 
     this.ozoneManager = om;
     this.omId = omId;
@@ -647,37 +654,17 @@ public class KeyManagerImpl implements KeyManager {
       }
       // Refresh container pipeline info from SCM
       // based on OmKeyArgs.refreshPipeline flag
-      // 1. Client send initial read request OmKeyArgs.refreshPipeline = false
-      // and uses the pipeline cached in OM to access datanode
-      // 2. If succeeded, done.
-      // 3. If failed due to pipeline does not exist or invalid pipeline state
-      //    exception, client should retry lookupKey with
-      //    OmKeyArgs.refreshPipeline = true
       if (args.getRefreshPipeline()) {
-        for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-          key.getLocationList().forEach(k -> {
-            // TODO: fix Some tests that may not initialize container client
-            // The production should always have containerClient initialized.
-            if (scmClient.getContainerClient() != null) {
-              try {
-                ContainerWithPipeline cp = scmClient.getContainerClient()
-                    .getContainerWithPipeline(k.getContainerID());
-                if (!cp.getPipeline().equals(k.getPipeline())) {
-                  k.setPipeline(cp.getPipeline());
-                }
-              } catch (IOException e) {
-                LOG.error("Unable to update pipeline for container:{}",
-                    k.getContainerID());
-              }
-            }
-          });
-        }
+        refreshPipeline(value);
       }
       if (args.getSortDatanodes()) {
         sortDatanodeInPipeline(value, clientAddress);
       }
       return value;
     } catch (IOException ex) {
+      if (ex instanceof OMException) {
+        throw ex;
+      }
       LOG.debug("Get key failed for volume:{} bucket:{} key:{}",
           volumeName, bucketName, keyName, ex);
       throw new OMException(ex.getMessage(),
@@ -685,6 +672,43 @@ public class KeyManagerImpl implements KeyManager {
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
+    }
+  }
+
+  /**
+   * Refresh pipeline info in OM by asking SCM.
+   * @param value OmKeyInfo
+   */
+  @VisibleForTesting
+  protected void refreshPipeline(OmKeyInfo value) throws IOException {
+    Map<Long, ContainerWithPipeline> containerWithPipelineMap = new HashMap<>();
+    for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+      for (OmKeyLocationInfo k : key.getLocationList()) {
+        // TODO: fix Some tests that may not initialize container client
+        // The production should always have containerClient initialized.
+        if (scmClient.getContainerClient() != null) {
+          try {
+            if (!containerWithPipelineMap.containsKey(k.getContainerID())) {
+              ContainerWithPipeline containerWithPipeline = scmClient
+                  .getContainerClient()
+                  .getContainerWithPipeline(k.getContainerID());
+              containerWithPipelineMap.put(k.getContainerID(),
+                  containerWithPipeline);
+            }
+          } catch (IOException ioEx) {
+            LOG.debug("Get containerPipeline failed for volume:{} bucket:{} " +
+                    "key:{}", value.getVolumeName(), value.getBucketName(),
+                value.getKeyName(), ioEx);
+            throw new OMException(ioEx.getMessage(),
+                SCM_GET_PIPELINE_EXCEPTION);
+          }
+          ContainerWithPipeline cp =
+              containerWithPipelineMap.get(k.getContainerID());
+          if (!cp.getPipeline().equals(k.getPipeline())) {
+            k.setPipeline(cp.getPipeline());
+          }
+        }
+      }
     }
   }
 
@@ -828,6 +852,21 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
+  public List<RepeatedOmKeyInfo> listTrash(String volumeName,
+      String bucketName, String startKeyName, String keyPrefix,
+      int maxKeys) throws IOException {
+
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+    Preconditions.checkArgument(maxKeys < listTrashKeysMax,
+        "The max keys limit specified is not less than the cluster " +
+          "allowed limit.");
+
+    return metadataManager.listTrash(volumeName, bucketName,
+     startKeyName, keyPrefix, maxKeys);
+  }
+
+  @Override
   public List<BlockGroup> getPendingDeletionKeys(final int count)
       throws IOException {
     return  metadataManager.getPendingDeletionKeys(count);
@@ -892,17 +931,18 @@ public class KeyManagerImpl implements KeyManager {
       // Not checking if there is an already key for this in the keyTable, as
       // during final complete multipart upload we take care of this.
 
-
+      long currentTime = Time.now();
       Map<Integer, PartKeyInfo> partKeyInfoMap = new HashMap<>();
       OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
-          multipartUploadID, partKeyInfoMap);
+          multipartUploadID, currentTime, keyArgs.getType(),
+          keyArgs.getFactor(), partKeyInfoMap);
       List<OmKeyLocationInfo> locations = new ArrayList<>();
       OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
           .setBucketName(keyArgs.getBucketName())
           .setKeyName(keyArgs.getKeyName())
-          .setCreationTime(Time.now())
-          .setModificationTime(Time.now())
+          .setCreationTime(currentTime)
+          .setModificationTime(currentTime)
           .setReplicationType(keyArgs.getType())
           .setReplicationFactor(keyArgs.getFactor())
           .setOmKeyLocationInfos(Collections.singletonList(
@@ -948,7 +988,7 @@ public class KeyManagerImpl implements KeyManager {
               keyArgs.getBucketName() + OZONE_URI_DELIMITER +
               keyArgs.getKeyName());
 
-      if(prefixList.size() > 0) {
+      if (!prefixList.isEmpty()) {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
         if(prefixInfo  != null) {
@@ -1092,9 +1132,6 @@ public class KeyManagerImpl implements KeyManager {
     try {
       String multipartKey = metadataManager.getMultipartKey(volumeName,
           bucketName, keyName, uploadID);
-      String ozoneKey = metadataManager.getOzoneKey(volumeName, bucketName,
-          keyName);
-      OmKeyInfo keyInfo = metadataManager.getKeyTable().get(ozoneKey);
 
       OmMultipartKeyInfo multipartKeyInfo = metadataManager
           .getMultipartInfoTable().get(multipartKey);
@@ -1103,119 +1140,10 @@ public class KeyManagerImpl implements KeyManager {
             volumeName + "bucket: " + bucketName + "key: " + keyName,
             ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
-      TreeMap<Integer, PartKeyInfo> partKeyInfoMap = multipartKeyInfo
-          .getPartKeyInfoMap();
+      //TODO: Actual logic has been removed from this, and the old code has a
+      // bug. New code for this is in S3MultipartUploadCompleteRequest.
+      // This code will be cleaned up as part of HDDS-2353.
 
-      TreeMap<Integer, String> multipartMap = multipartUploadList
-          .getMultipartMap();
-
-      // Last key in the map should be having key value as size, as map's
-      // are sorted. Last entry in both maps should have partNumber as size
-      // of the map. As we have part entries 1, 2, 3, 4 and then we get
-      // complete multipart upload request so the map last entry should have 4,
-      // if it is having value greater or less than map size, then there is
-      // some thing wrong throw error.
-
-      Map.Entry<Integer, String> multipartMapLastEntry = multipartMap
-          .lastEntry();
-      Map.Entry<Integer, PartKeyInfo> partKeyInfoLastEntry = partKeyInfoMap
-          .lastEntry();
-      if (partKeyInfoMap.size() != multipartMap.size()) {
-        throw new OMException("Complete Multipart Upload Failed: volume: " +
-            volumeName + "bucket: " + bucketName + "key: " + keyName,
-            ResultCodes.MISMATCH_MULTIPART_LIST);
-      }
-
-      // Last entry part Number should be the size of the map, otherwise this
-      // means we have missing some parts but we got a complete request.
-      if (multipartMapLastEntry.getKey() != partKeyInfoMap.size() ||
-          partKeyInfoLastEntry.getKey() != partKeyInfoMap.size()) {
-        throw new OMException("Complete Multipart Upload Failed: volume: " +
-            volumeName + "bucket: " + bucketName + "key: " + keyName,
-            ResultCodes.MISSING_UPLOAD_PARTS);
-      }
-      ReplicationType type = partKeyInfoLastEntry.getValue().getPartKeyInfo()
-          .getType();
-      ReplicationFactor factor = partKeyInfoLastEntry.getValue()
-          .getPartKeyInfo().getFactor();
-      List<OmKeyLocationInfo> locations = new ArrayList<>();
-      long size = 0;
-      int partsCount =1;
-      int partsMapSize = partKeyInfoMap.size();
-      for(Map.Entry<Integer, PartKeyInfo> partKeyInfoEntry : partKeyInfoMap
-          .entrySet()) {
-        int partNumber = partKeyInfoEntry.getKey();
-        PartKeyInfo partKeyInfo = partKeyInfoEntry.getValue();
-        // Check we have all parts to complete multipart upload and also
-        // check partNames provided match with actual part names
-        String providedPartName = multipartMap.get(partNumber);
-        String actualPartName = partKeyInfo.getPartName();
-        if (partNumber == partsCount) {
-          if (!actualPartName.equals(providedPartName)) {
-            throw new OMException("Complete Multipart Upload Failed: volume: " +
-                volumeName + "bucket: " + bucketName + "key: " + keyName,
-                ResultCodes.MISMATCH_MULTIPART_LIST);
-          }
-          OmKeyInfo currentPartKeyInfo = OmKeyInfo
-              .getFromProtobuf(partKeyInfo.getPartKeyInfo());
-          // Check if any part size is less than 5mb, last part can be less
-          // than 5 mb.
-          if (partsCount != partsMapSize &&
-              currentPartKeyInfo.getDataSize() < OM_MULTIPART_MIN_SIZE) {
-            LOG.error("MultipartUpload: " + ozoneKey + "Part number: " +
-                partKeyInfo.getPartNumber() + "size " + currentPartKeyInfo
-                    .getDataSize() + " is less than minimum part size " +
-                OzoneConsts.OM_MULTIPART_MIN_SIZE);
-            throw new OMException("Complete Multipart Upload Failed: Entity " +
-                "too small: volume: " + volumeName + "bucket: " + bucketName
-                + "key: " + keyName, ResultCodes.ENTITY_TOO_SMALL);
-          }
-          // As all part keys will have only one version.
-          OmKeyLocationInfoGroup currentKeyInfoGroup = currentPartKeyInfo
-              .getKeyLocationVersions().get(0);
-          locations.addAll(currentKeyInfoGroup.getLocationList());
-          size += currentPartKeyInfo.getDataSize();
-        } else {
-          throw new OMException("Complete Multipart Upload Failed: volume: " +
-              volumeName + "bucket: " + bucketName + "key: " + keyName,
-              ResultCodes.MISSING_UPLOAD_PARTS);
-        }
-        partsCount++;
-      }
-      if (keyInfo == null) {
-        // This is a newly added key, it does not have any versions.
-        OmKeyLocationInfoGroup keyLocationInfoGroup = new
-            OmKeyLocationInfoGroup(0, locations);
-        // A newly created key, this is the first version.
-        keyInfo = new OmKeyInfo.Builder()
-            .setVolumeName(omKeyArgs.getVolumeName())
-            .setBucketName(omKeyArgs.getBucketName())
-            .setKeyName(omKeyArgs.getKeyName())
-            .setReplicationFactor(factor)
-            .setReplicationType(type)
-            .setCreationTime(Time.now())
-            .setModificationTime(Time.now())
-            .setDataSize(size)
-            .setOmKeyLocationInfos(
-                Collections.singletonList(keyLocationInfoGroup))
-            .setAcls(omKeyArgs.getAcls()).build();
-      } else {
-        // Already a version exists, so we should add it as a new version.
-        // But now as versioning is not supported, just following the commit
-        // key approach. When versioning support comes, then we can uncomment
-        // below code keyInfo.addNewVersion(locations);
-        keyInfo.updateLocationInfoList(locations);
-      }
-      DBStore store = metadataManager.getStore();
-      try (BatchOperation batch = store.initBatchOperation()) {
-        //Remove entry in multipart table and add a entry in to key table
-        metadataManager.getMultipartInfoTable().deleteWithBatch(batch,
-            multipartKey);
-        metadataManager.getKeyTable().putWithBatch(batch,
-            ozoneKey, keyInfo);
-        metadataManager.getOpenKeyTable().deleteWithBatch(batch, multipartKey);
-        store.commitBatchOperation(batch);
-      }
       return new OmMultipartUploadCompleteInfo(omKeyArgs.getVolumeName(),
           omKeyArgs.getBucketName(), omKeyArgs.getKeyName(), DigestUtils
               .sha256Hex(keyName));
@@ -1322,29 +1250,29 @@ public class KeyManagerImpl implements KeyManager {
 
       List<OmMultipartUpload> collect = multipartUploadKeys.stream()
           .map(OmMultipartUpload::from)
-          .map(upload -> {
+          .peek(upload -> {
             String dbKey = metadataManager
                 .getOzoneKey(upload.getVolumeName(),
                     upload.getBucketName(),
                     upload.getKeyName());
             try {
-              Table<String, OmKeyInfo> openKeyTable =
-                  metadataManager.getOpenKeyTable();
+              Table<String, OmMultipartKeyInfo> keyInfoTable =
+                  metadataManager.getMultipartInfoTable();
 
-              OmKeyInfo omKeyInfo =
-                  openKeyTable.get(upload.getDbKey());
+              OmMultipartKeyInfo multipartKeyInfo =
+                  keyInfoTable.get(upload.getDbKey());
 
               upload.setCreationTime(
-                  Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
-
-              upload.setReplicationType(omKeyInfo.getType());
-              upload.setReplicationFactor(omKeyInfo.getFactor());
+                  Instant.ofEpochMilli(multipartKeyInfo.getCreationTime()));
+              upload.setReplicationType(
+                  multipartKeyInfo.getReplicationType());
+              upload.setReplicationFactor(
+                  multipartKeyInfo.getReplicationFactor());
             } catch (IOException e) {
               LOG.warn(
                   "Open key entry for multipart upload record can be read  {}",
                   dbKey);
             }
-            return upload;
           })
           .collect(Collectors.toList());
 
@@ -1470,7 +1398,7 @@ public class KeyManagerImpl implements KeyManager {
    * false.
    *
    * @param obj Ozone object for which acl should be added.
-   * @param acl ozone acl top be added.
+   * @param acl ozone acl to be added.
    * @throws IOException if there is error.
    */
   @Override
@@ -1654,28 +1582,28 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
     try {
       validateBucket(volume, bucket);
-      OmKeyInfo keyInfo = null;
-      try {
-        OzoneFileStatus fileStatus = getFileStatus(args);
-        keyInfo = fileStatus.getKeyInfo();
-        if (keyInfo == null) {
-          // the key does not exist, but it is a parent "dir" of some key
-          // let access be determined based on volume/bucket/prefix ACL
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("key:{} is non-existent parent, permit access to user:{}",
-                keyName, context.getClientUgi());
-          }
-          return true;
-        }
-      } catch (OMException e) {
-        if (e.getResult() == FILE_NOT_FOUND) {
-          keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
+      OmKeyInfo keyInfo;
+
+      // For Acl Type "WRITE", the key can only be found in
+      // OpenKeyTable since appends to existing keys are not supported.
+      if (context.getAclRights() == IAccessAuthorizer.ACLType.WRITE) {
+        keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
+      } else {
+        try {
+          OzoneFileStatus fileStatus = getFileStatus(args);
+          keyInfo = fileStatus.getKeyInfo();
+        } catch (IOException e) {
+          throw new OMException("Key not found, checkAccess failed. Key:" +
+              objectKey, KEY_NOT_FOUND);
         }
       }
 
       if (keyInfo == null) {
-        throw new OMException("Key not found, checkAccess failed. Key:" +
-            objectKey, KEY_NOT_FOUND);
+        // the key does not exist, but it is a parent "dir" of some key
+        // let access be determined based on volume/bucket/prefix ACL
+        LOG.debug("key:{} is non-existent parent, permit access to user:{}",
+            keyName, context.getClientUgi());
+        return true;
       }
 
       boolean hasAccess = OzoneAclUtil.checkAclRight(
@@ -2125,7 +2053,7 @@ public class KeyManagerImpl implements KeyManager {
       for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
         key.getLocationList().forEach(k -> {
           List<DatanodeDetails> nodes = k.getPipeline().getNodes();
-          if (nodes == null || nodes.size() == 0) {
+          if (nodes == null || nodes.isEmpty()) {
             LOG.warn("Datanodes for pipeline {} is empty",
                 k.getPipeline().getId().toString());
             return;

@@ -19,11 +19,13 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -129,21 +131,34 @@ public class OzoneManagerDoubleBuffer {
       try {
         if (canFlush()) {
           setReadyBuffer();
-          final BatchOperation batchOperation = omMetadataManager.getStore()
-              .initBatchOperation();
+          try(BatchOperation batchOperation = omMetadataManager.getStore()
+              .initBatchOperation()) {
 
-          readyBuffer.iterator().forEachRemaining((entry) -> {
-            try {
-              entry.getResponse().addToDBBatch(omMetadataManager,
-                  batchOperation);
-            } catch (IOException ex) {
-              // During Adding to RocksDB batch entry got an exception.
-              // We should terminate the OM.
-              terminate(ex);
-            }
-          });
+            readyBuffer.iterator().forEachRemaining((entry) -> {
+              try {
+                entry.getResponse().addToDBBatch(omMetadataManager,
+                    batchOperation);
+              } catch (IOException ex) {
+                // During Adding to RocksDB batch entry got an exception.
+                // We should terminate the OM.
+                terminate(ex);
+              }
+            });
 
-          omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            omMetadataManager.getStore().commitBatchOperation(batchOperation);
+          }
+
+          // Complete futures first and then do other things. So, that
+          // handler threads will be released.
+          if (!isRatisEnabled) {
+            // Once all entries are flushed, we can complete their future.
+            readyFutureQueue.iterator().forEachRemaining((entry) -> {
+              entry.complete(null);
+            });
+
+            readyFutureQueue.clear();
+          }
+
           int flushedTransactionsSize = readyBuffer.size();
           flushedTransactionCount.addAndGet(flushedTransactionsSize);
           flushIterations.incrementAndGet();
@@ -156,12 +171,16 @@ public class OzoneManagerDoubleBuffer {
 
           long lastRatisTransactionIndex =
               readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
-              .max(Long::compareTo).get();
+                  .max(Long::compareTo).get();
+
+          List<Long> flushedEpochs =
+              readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
+                  .sorted().collect(Collectors.toList());
+
+          cleanupCache(flushedEpochs);
+
 
           readyBuffer.clear();
-
-          // cleanup cache.
-          cleanupCache(lastRatisTransactionIndex);
 
           // TODO: Need to revisit this logic, once we have multiple
           //  executors for volume/bucket request handling. As for now
@@ -173,14 +192,7 @@ public class OzoneManagerDoubleBuffer {
           // set metrics.
           updateMetrics(flushedTransactionsSize);
 
-          if (!isRatisEnabled) {
-            // Once all entries are flushed, we can complete their future.
-            readyFutureQueue.iterator().forEachRemaining((entry) -> {
-              entry.complete(null);
-            });
 
-            readyFutureQueue.clear();
-          }
         }
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
@@ -204,7 +216,7 @@ public class OzoneManagerDoubleBuffer {
     }
   }
 
-  private void cleanupCache(long lastRatisTransactionIndex) {
+  private void cleanupCache(List<Long> lastRatisTransactionIndex) {
     // As now only volume and bucket transactions are handled only called
     // cleanupCache on bucketTable.
     // TODO: After supporting all write operations we need to call
@@ -222,6 +234,11 @@ public class OzoneManagerDoubleBuffer {
     omMetadataManager.getS3Table().cleanupCache(lastRatisTransactionIndex);
     omMetadataManager.getMultipartInfoTable().cleanupCache(
         lastRatisTransactionIndex);
+    omMetadataManager.getS3SecretTable().cleanupCache(
+        lastRatisTransactionIndex);
+    omMetadataManager.getDelegationTokenTable().cleanupCache(
+        lastRatisTransactionIndex);
+    omMetadataManager.getPrefixTable().cleanupCache(lastRatisTransactionIndex);
 
   }
 
