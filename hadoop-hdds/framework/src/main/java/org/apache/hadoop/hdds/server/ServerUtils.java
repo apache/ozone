@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -223,5 +225,18 @@ public final class ServerUtils {
             + "Falling back to {} instead.", key,
         HddsConfigKeys.OZONE_METADATA_DIRS);
     return ServerUtils.getOzoneMetaDirPath(conf);
+  }
+
+  public static String getRemoteUserName() {
+    UserGroupInformation remoteUser = Server.getRemoteUser();
+    return remoteUser != null ? remoteUser.getUserName() : null;
+  }
+
+  public static String getDefaultRatisDirectory(Configuration conf) {
+    LOG.warn("Storage directory for Ratis is not configured. It is a good " +
+            "idea to map this to an SSD disk. Falling back to {}",
+        HddsConfigKeys.OZONE_METADATA_DIRS);
+    File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
+    return (new File(metaDirPath, "ratis")).getPath();
   }
 }

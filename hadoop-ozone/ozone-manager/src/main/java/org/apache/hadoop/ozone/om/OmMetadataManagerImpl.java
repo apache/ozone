@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
@@ -243,7 +242,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     // We need to create the DB here, as when during restart, stop closes the
     // db, so we need to create the store object and initialize DB.
     if (store == null) {
-      File metaDir = OmUtils.getOmDbDir(configuration);
+      File metaDir = OMStorage.getOmDbDir(configuration);
 
       RocksDBConfiguration rocksDBConfiguration =
           configuration.getObject(RocksDBConfiguration.class);
