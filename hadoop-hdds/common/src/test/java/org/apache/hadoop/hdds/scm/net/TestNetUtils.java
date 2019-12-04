@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,25 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hdds.scm.net;
 
-package org.apache.hadoop.ozone.om.protocol;
+import org.junit.Test;
 
-import org.apache.ratis.server.protocol.TermIndex;
-
-import java.io.IOException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Protocol to talk to OM HA. These methods are needed only called from
- * OmRequestHandler.
+ * Tests for {@link NetUtils}.
  */
-public interface OzoneManagerHAProtocol {
+public class TestNetUtils {
 
-  /**
-   * Store the snapshot index i.e. the raft log index, corresponding to the
-   * last transaction applied to the OM RocksDB, in OM metadata dir on disk.
-   * @return the snapshot term index which has both term and index.
-   * @throws IOException
-   */
-  TermIndex saveRatisSnapshot() throws IOException;
-
+  @Test
+  public void testNormalize() {
+    assertEquals("", NetUtils.normalize(null));
+    assertEquals("", NetUtils.normalize(""));
+    assertEquals("/", NetUtils.normalize("/"));
+    assertThrows(IllegalArgumentException.class, () -> NetUtils.normalize("x"));
+    assertEquals("/a/b/c", NetUtils.normalize("/a/b/c"));
+    assertEquals("/a/b/c", NetUtils.normalize("/a/b/c////"));
+    assertEquals("/a/b/c/$", NetUtils.normalize("/a/b/c/$"));
+  }
 }

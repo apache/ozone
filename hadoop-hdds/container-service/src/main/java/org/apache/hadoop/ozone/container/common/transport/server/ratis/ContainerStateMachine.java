@@ -681,6 +681,12 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public void notifyIndexUpdate(long term, long index) {
     applyTransactionCompletionMap.put(index, term);
+    // We need to call updateLastApplied here because now in ratis when a
+    // node becomes leader, it is checking stateMachineIndex >=
+    // placeHolderIndex (when a node becomes leader, it writes a conf entry
+    // with some information like its peers and termIndex). So, calling
+    // updateLastApplied updates lastAppliedTermIndex.
+    updateLastApplied();
   }
 
   /*
