@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -32,8 +32,10 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 @InterfaceAudience.Private
 @Metrics(about="DataNode container data scrubber metrics", context="dfs")
 public final class ContainerMetadataScrubberMetrics {
+
   private final String name;
   private final MetricsSystem ms;
+
   @Metric("number of containers scanned in the current iteration")
   private MutableGaugeInt numContainersScanned;
   @Metric("number of unhealthy containers found in the current iteration")
@@ -75,6 +77,10 @@ public final class ContainerMetadataScrubberMetrics {
 
   public void unregister() {
     ms.unregisterSource(name);
+  }
+
+  public String getName() {
+    return name;
   }
 
   private ContainerMetadataScrubberMetrics(String name, MetricsSystem ms) {
