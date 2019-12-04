@@ -30,6 +30,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
@@ -45,6 +46,7 @@ import static org.mockito.Mockito.when;
  */
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({ OzoneClientFactory.class, UserGroupInformation.class })
+@PowerMockIgnore("javax.management.*")
 public class TestOFileSystemWithMocks {
 
   @Test
@@ -68,12 +70,16 @@ public class TestOFileSystemWithMocks {
     PowerMockito.when(UserGroupInformation.getCurrentUser()).thenReturn(ugi);
     when(ugi.getShortUserName()).thenReturn("user1");
 
-    URI uri = new URI("o3fs://bucket1.volume1.local.host:5899");
+    // TODO: FileSystem#loadFileSystems somehow is not loading the ofs://
+    //  hence the workaround.
+    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.OFileSystem");
+
+    URI uri = new URI("ofs://bucket1.volume1.local.host:5899");
 
     FileSystem fileSystem = FileSystem.get(uri, conf);
-    OzoneFileSystem ozfs = (OzoneFileSystem) fileSystem;
+    OFileSystem ofs = (OFileSystem) fileSystem;
 
-    assertEquals(ozfs.getUri().getAuthority(),
+    assertEquals(ofs.getUri().getAuthority(),
         "bucket1.volume1.local.host:5899");
     PowerMockito.verifyStatic();
     OzoneClientFactory.getRpcClient("local.host", 5899, conf);
