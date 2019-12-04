@@ -113,7 +113,7 @@ public final class ScmConfigKeys {
   public static final String DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
       "dfs.container.ratis.leader.pending.bytes.limit";
   public static final String
-      DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT = "256MB";
+      DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT = "1GB";
 
   // expiry interval stateMachineData cache entry inside containerStateMachine
   public static final String

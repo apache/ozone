@@ -405,7 +405,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Write.setByteLimit(properties,
-        SizeInBytes.valueOf(pendingRequestsByteLimit));
+        pendingRequestsByteLimit);
   }
 
   public static XceiverServerRatis newXceiverServerRatis(
