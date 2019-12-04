@@ -154,7 +154,7 @@ public final class HddsClientUtils {
 
   private static void doCharacterChecks(char currChar, char prev) {
     if (currChar > 'A' && currChar < 'Z') {
-      throw new IllegalArgumentException (
+      throw new IllegalArgumentException(
           "Bucket or Volume name does not support uppercase characters");
     }
     if (!isSupportedCharacter(currChar)) {
@@ -185,6 +185,7 @@ public final class HddsClientUtils {
   public static void verifyResourceName(String resName) {
 
     doNameChecks(resName);
+
     boolean isIPv4 = true;
     char prev = (char) 0;
 
