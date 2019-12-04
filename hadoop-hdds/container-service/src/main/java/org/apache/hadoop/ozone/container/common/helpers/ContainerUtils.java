@@ -146,6 +146,7 @@ public final class ContainerUtils {
     log.info("Operation: {} , Trace ID: {} , Message: {} , Result: {}",
         request.getCmdType().name(), request.getTraceID(),
         ex.getMessage(), ex.getResult().getValueDescriptor().getName());
+    log.error("StorageContainerException Occurred!", ex);
     return getContainerCommandResponse(request, ex.getResult(), ex.getMessage())
         .build();
   }
