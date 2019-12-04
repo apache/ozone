@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.chaos;
+package org.apache.hadoop.ozone.utils;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.RandomUtils;

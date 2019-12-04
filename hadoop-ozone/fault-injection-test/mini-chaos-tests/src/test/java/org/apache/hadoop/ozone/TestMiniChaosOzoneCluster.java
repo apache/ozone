@@ -15,12 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.chaos;
+package org.apache.hadoop.ozone;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.utils.LoadBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
@@ -69,7 +69,8 @@ public class TestMiniChaosOzoneCluster implements Runnable {
 
   @BeforeClass
   public static void init() throws Exception {
-    cluster = new MiniOzoneChaosCluster.Builder(new OzoneConfiguration())
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    cluster = new MiniOzoneChaosCluster.Builder(configuration)
         .setNumDatanodes(numDatanodes).build();
     cluster.waitForClusterToBeReady();
 
@@ -79,16 +80,17 @@ public class TestMiniChaosOzoneCluster implements Runnable {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
-    List<OzoneBucket> ozoneBuckets = new ArrayList<>(numClients);
+    List<LoadBucket> ozoneBuckets = new ArrayList<>(numClients);
     for (int i = 0; i < numClients; i++) {
-      ozoneBuckets.add(volume.getBucket(bucketName));
+      ozoneBuckets.add(new LoadBucket(volume.getBucket(bucketName)));
     }
 
     String agedBucketName =
         RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
     volume.createBucket(agedBucketName);
-    OzoneBucket agedLoadBucket = volume.getBucket(agedBucketName);
+    LoadBucket agedLoadBucket =
+            new LoadBucket(volume.getBucket(agedBucketName));
     loadGenerator =
         new MiniOzoneLoadGenerator(ozoneBuckets, agedLoadBucket, numThreads,
             numBuffers);

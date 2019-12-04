@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.chaos;
+package org.apache.hadoop.ozone;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -26,13 +26,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.MiniOzoneClusterImpl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.grpc.client.GrpcClientProtocolClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,8 +66,6 @@ public class MiniOzoneChaosCluster extends MiniOzoneClusterImpl {
     this.executorService =  Executors.newSingleThreadScheduledExecutor();
     this.numDatanodes = getHddsDatanodes().size();
     LOG.info("Starting MiniOzoneChaosCluster with {} datanodes", numDatanodes);
-    GenericTestUtils.setLogLevel(GrpcClientProtocolClient.LOG,
-        org.slf4j.event.Level.WARN);
   }
 
   // Get the number of datanodes to fail in the cluster.
