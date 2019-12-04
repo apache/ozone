@@ -46,8 +46,8 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -150,28 +150,18 @@ public class TestOzoneFsHAURLs {
    * @return the leader OM's RPC address in the MiniOzoneHACluster
    */
   private String getLeaderOMNodeAddr() {
-    String leaderOMNodeAddr = null;
-    Collection<String> omNodeIds = OmUtils.getOMNodeIds(conf, omServiceId);
-    assert(omNodeIds.size() == numOfOMs);
     MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
-    // Note: this loop may be implemented inside MiniOzoneHAClusterImpl
-    for (String omNodeId : omNodeIds) {
-      // Find the leader OM
-      if (!haCluster.getOzoneManager(omNodeId).isLeader()) {
-        continue;
-      }
-      // ozone.om.address.omServiceId.omNode
-      String leaderOMNodeAddrKey = OmUtils.addKeySuffixes(
-          OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
-      leaderOMNodeAddr = conf.get(leaderOMNodeAddrKey);
-      LOG.info("Found leader OM: nodeId=" + omNodeId + ", " +
-          leaderOMNodeAddrKey + "=" + leaderOMNodeAddr);
-      // Leader found, no need to continue loop
-      break;
-    }
-    // There has to be a leader
-    assert(leaderOMNodeAddr != null);
-    return leaderOMNodeAddr;
+    OzoneManager omLeader = haCluster.getOMLeader();
+    Assert.assertNotNull("There should be a leader OM at this point.",
+        omLeader);
+    String omNodeId = omLeader.getOMNodeId();
+    // omLeaderAddrKey=ozone.om.address.omServiceId.omNodeId
+    String omLeaderAddrKey = OmUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
+    String omLeaderAddr = conf.get(omLeaderAddrKey);
+    LOG.info("OM leader: nodeId=" + omNodeId + ", " +
+        omLeaderAddrKey + "=" + omLeaderAddr);
+    return omLeaderAddr;
   }
 
   /**
@@ -191,9 +181,9 @@ public class TestOzoneFsHAURLs {
    * @return Port number
    */
   private int getPortFromAddress(String addr) {
-    Optional<Integer> portOptional = getHostPort(addr);
+    OptionalInt portOptional = getHostPort(addr);
     assert(portOptional.isPresent());
-    return portOptional.get();
+    return portOptional.getAsInt();
   }
 
   /**
@@ -221,12 +211,12 @@ public class TestOzoneFsHAURLs {
       // Expectation: Success.
       res = ToolRunner.run(shell, new String[] {"-ls", "/"});
       // Check return value, should be 0 (success)
-      Assert.assertEquals(res, 0);
+      Assert.assertEquals(0, res);
 
       // Test case 2: ozone fs -ls o3fs:///
       // Expectation: Success. fs.defaultFS is a fully qualified path.
       res = ToolRunner.run(shell, new String[] {"-ls", "o3fs:///"});
-      Assert.assertEquals(res, 0);
+      Assert.assertEquals(0, res);
 
       // Test case 3: ozone fs -ls o3fs://bucket.volume/
       // Expectation: Fail. Must have service id or host name when HA is enabled
@@ -253,7 +243,7 @@ public class TestOzoneFsHAURLs {
           getHostFromAddress(leaderOMNodeAddr));
       res = ToolRunner.run(shell, new String[] {"-ls", qualifiedPath1});
       // Note: this test case will fail if the port is not from the leader node
-      Assert.assertEquals(res, 0);
+      Assert.assertEquals(0, res);
 
       // Test case 5: ozone fs -ls o3fs://bucket.volume.om1:port/
       // Expectation: Success.
@@ -261,14 +251,14 @@ public class TestOzoneFsHAURLs {
           OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName,
           leaderOMNodeAddr);
       res = ToolRunner.run(shell, new String[] {"-ls", qualifiedPath2});
-      Assert.assertEquals(res, 0);
+      Assert.assertEquals(0, res);
 
       // Test case 6: ozone fs -ls o3fs://bucket.volume.id1/
       // Expectation: Success.
       String qualifiedPath3 = String.format("%s://%s.%s.%s/",
           OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName, omServiceId);
       res = ToolRunner.run(shell, new String[] {"-ls", qualifiedPath3});
-      Assert.assertEquals(res, 0);
+      Assert.assertEquals(0, res);
 
       // Test case 7: ozone fs -ls o3fs://bucket.volume.id1:port/
       // Expectation: Fail. Service ID does not use port information.

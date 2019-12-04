@@ -581,7 +581,7 @@ public class TestOzoneManagerHA {
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
           GenericTestUtils.assertExceptionContains(
-              "NotLeaderException", e);
+              "OMNotLeaderException", e);
         }
       } else {
         throw e;
@@ -622,7 +622,7 @@ public class TestOzoneManagerHA {
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
           GenericTestUtils.assertExceptionContains(
-              "NotLeaderException", e);
+              "OMNotLeaderException", e);
         }
       } else {
         throw e;
@@ -1114,7 +1114,7 @@ public class TestOzoneManagerHA {
     while (appliedLogIndex <= SNAPSHOT_THRESHOLD) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
-          .getStateMachineLastAppliedIndex();
+          .getLastAppliedTermIndex().getIndex();
     }
 
     GenericTestUtils.waitFor(() -> {
@@ -1127,7 +1127,7 @@ public class TestOzoneManagerHA {
     // The current lastAppliedLogIndex on the state machine should be greater
     // than or equal to the saved snapshot index.
     long smLastAppliedIndex =
-        ozoneManager.getOmRatisServer().getStateMachineLastAppliedIndex();
+        ozoneManager.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     long ratisSnapshotIndex = ozoneManager.getRatisSnapshotIndex();
     Assert.assertTrue("LastAppliedIndex on OM State Machine ("
             + smLastAppliedIndex + ") is less than the saved snapshot index("
@@ -1138,7 +1138,7 @@ public class TestOzoneManagerHA {
     while (appliedLogIndex <= (smLastAppliedIndex + SNAPSHOT_THRESHOLD)) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
-          .getStateMachineLastAppliedIndex();
+          .getLastAppliedTermIndex().getIndex();
     }
 
     GenericTestUtils.waitFor(() -> {
@@ -1205,7 +1205,7 @@ public class TestOzoneManagerHA {
     }
 
     long lastAppliedTxOnFollowerOM =
-        followerOM1.getOmRatisServer().getStateMachineLastAppliedIndex();
+        followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
 
     // Stop one follower OM
     followerOM1.stop();
@@ -1216,31 +1216,31 @@ public class TestOzoneManagerHA {
     // restarted.
     long minNewTxIndex = lastAppliedTxOnFollowerOM + (LOG_PURGE_GAP * 10);
     long leaderOMappliedLogIndex = leaderOM.getOmRatisServer()
-        .getStateMachineLastAppliedIndex();
+        .getLastAppliedTermIndex().getIndex();
 
     List<String> missedKeys = new ArrayList<>();
     while (leaderOMappliedLogIndex < minNewTxIndex) {
       missedKeys.add(createKey(ozoneBucket));
       leaderOMappliedLogIndex = leaderOM.getOmRatisServer()
-          .getStateMachineLastAppliedIndex();
+          .getLastAppliedTermIndex().getIndex();
     }
 
     // Restart the stopped OM.
     followerOM1.restart();
 
     // Get the latest snapshotIndex from the leader OM.
-    long leaderOMSnaphsotIndex = leaderOM.saveRatisSnapshot();
+    long leaderOMSnaphsotIndex = leaderOM.saveRatisSnapshot().getIndex();
 
     // The recently started OM should be lagging behind the leader OM.
     long followerOMLastAppliedIndex =
-        followerOM1.getOmRatisServer().getStateMachineLastAppliedIndex();
+        followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     Assert.assertTrue(
         followerOMLastAppliedIndex < leaderOMSnaphsotIndex);
 
     // Wait for the follower OM to catch up
     GenericTestUtils.waitFor(() -> {
       long lastAppliedIndex =
-          followerOM1.getOmRatisServer().getStateMachineLastAppliedIndex();
+          followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
       if (lastAppliedIndex >= leaderOMSnaphsotIndex) {
         return true;
       }
@@ -1254,14 +1254,14 @@ public class TestOzoneManagerHA {
       createKey(ozoneBucket);
     }
     long followerOM1lastAppliedIndex = followerOM1.getOmRatisServer()
-        .getStateMachineLastAppliedIndex();
+        .getLastAppliedTermIndex().getIndex();
     Assert.assertTrue(followerOM1lastAppliedIndex >
         leaderOMSnaphsotIndex);
 
     // The follower OMs should be in sync. There can be a small lag between
     // leader OM and follower OMs as txns are applied first on leader OM.
     long followerOM2lastAppliedIndex = followerOM1.getOmRatisServer()
-        .getStateMachineLastAppliedIndex();
+        .getLastAppliedTermIndex().getIndex();
     Assert.assertEquals(followerOM1lastAppliedIndex,
         followerOM2lastAppliedIndex);
 
