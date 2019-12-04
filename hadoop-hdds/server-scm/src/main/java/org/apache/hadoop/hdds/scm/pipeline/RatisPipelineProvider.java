@@ -157,7 +157,6 @@ public class RatisPipelineProvider implements PipelineProvider {
     }
 
     List<DatanodeDetails> dns;
-
     switch(factor) {
     case ONE:
       dns = pickNodesNeverUsed(ReplicationFactor.ONE);
@@ -170,12 +169,18 @@ public class RatisPipelineProvider implements PipelineProvider {
       throw new IllegalStateException("Unknown factor: " + factor.name());
     }
 
+    int nodeIdHash = 0;
+    if (factor == ReplicationFactor.THREE) {
+      nodeIdHash = RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(dns);
+    }
+
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.ALLOCATED)
         .setType(ReplicationType.RATIS)
         .setFactor(factor)
         .setNodes(dns)
+        .setNodeIdsHash(nodeIdHash)
         .build();
 
     // Send command to datanodes to create pipeline
@@ -197,12 +202,17 @@ public class RatisPipelineProvider implements PipelineProvider {
   @Override
   public Pipeline create(ReplicationFactor factor,
                          List<DatanodeDetails> nodes) {
+    int nodeIdHash = 0;
+    if (factor == ReplicationFactor.THREE) {
+      nodeIdHash = RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(nodes);
+    }
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.ALLOCATED)
         .setType(ReplicationType.RATIS)
         .setFactor(factor)
         .setNodes(nodes)
+        .setNodeIdsHash(nodeIdHash)
         .build();
   }
 

@@ -57,6 +57,8 @@ public final class Pipeline {
   private UUID leaderId;
   // Timestamp for pipeline upon creation
   private Long creationTimestamp;
+  // Only valid for Ratis THREE pipeline. No need persist.
+  private int nodeIdsHash;
 
   /**
    * The immutable properties of pipeline object is used in
@@ -72,6 +74,7 @@ public final class Pipeline {
     this.state = state;
     this.nodeStatus = nodeStatus;
     this.creationTimestamp = System.currentTimeMillis();
+    this.nodeIdsHash = 0;
   }
 
   /**
@@ -126,6 +129,14 @@ public final class Pipeline {
    */
   void setCreationTimestamp(Long creationTimestamp) {
     this.creationTimestamp = creationTimestamp;
+  }
+
+  public int getNodeIdsHash() {
+    return nodeIdsHash;
+  }
+
+  void setNodeIdsHash(int nodeIdsHash) {
+    this.nodeIdsHash = nodeIdsHash;
   }
 
   /**
@@ -328,6 +339,7 @@ public final class Pipeline {
     private List<DatanodeDetails> nodesInOrder = null;
     private UUID leaderId = null;
     private Long creationTimestamp = null;
+    private int nodeIdsHash = 0;
 
     public Builder() {}
 
@@ -340,6 +352,7 @@ public final class Pipeline {
       this.nodesInOrder = pipeline.nodesInOrder.get();
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
+      this.nodeIdsHash = 0;
     }
 
     public Builder setId(PipelineID id1) {
@@ -378,6 +391,11 @@ public final class Pipeline {
       return this;
     }
 
+    public Builder setNodeIdsHash(int nodeIdsHash1) {
+      this.nodeIdsHash = nodeIdsHash1;
+      return this;
+    }
+
     public Pipeline build() {
       Preconditions.checkNotNull(id);
       Preconditions.checkNotNull(type);
@@ -386,6 +404,7 @@ public final class Pipeline {
       Preconditions.checkNotNull(nodeStatus);
       Pipeline pipeline = new Pipeline(id, type, factor, state, nodeStatus);
       pipeline.setLeaderId(leaderId);
+      pipeline.setNodeIdsHash(nodeIdsHash);
       // overwrite with original creationTimestamp
       if (creationTimestamp != null) {
         pipeline.setCreationTimestamp(creationTimestamp);

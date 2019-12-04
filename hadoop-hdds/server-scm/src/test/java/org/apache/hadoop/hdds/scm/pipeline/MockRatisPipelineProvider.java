@@ -73,6 +73,8 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
           .setType(initialPipeline.getType())
           .setFactor(factor)
           .setNodes(initialPipeline.getNodes())
+          .setNodeIdsHash(RatisPipelineUtils
+              .encodeNodeIdsOfFactorThreePipeline(initialPipeline.getNodes()))
           .build();
     }
   }
@@ -91,6 +93,8 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
         .setType(HddsProtos.ReplicationType.RATIS)
         .setFactor(factor)
         .setNodes(nodes)
+        .setNodeIdsHash(RatisPipelineUtils
+            .encodeNodeIdsOfFactorThreePipeline(nodes))
         .build();
   }
 }

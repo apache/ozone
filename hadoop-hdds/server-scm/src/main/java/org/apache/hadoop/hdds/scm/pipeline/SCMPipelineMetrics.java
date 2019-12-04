@@ -54,6 +54,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
   private @Metric MutableCounterLong numPipelineDestroyFailed;
   private @Metric MutableCounterLong numPipelineReportProcessed;
   private @Metric MutableCounterLong numPipelineReportProcessingFailed;
+  private @Metric MutableCounterLong numPipelineContainSameDatanodes;
   private Map<PipelineID, MutableCounterLong> numBlocksAllocated;
 
   /** Private constructor. */
@@ -92,6 +93,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
     numPipelineDestroyFailed.snapshot(recordBuilder, true);
     numPipelineReportProcessed.snapshot(recordBuilder, true);
     numPipelineReportProcessingFailed.snapshot(recordBuilder, true);
+    numPipelineContainSameDatanodes.snapshot(recordBuilder, true);
     numBlocksAllocated
         .forEach((pid, metric) -> metric.snapshot(recordBuilder, true));
   }
@@ -175,5 +177,12 @@ public final class SCMPipelineMetrics implements MetricsSource {
    */
   void incNumPipelineReportProcessingFailed() {
     numPipelineReportProcessingFailed.incr();
+  }
+
+  /**
+   * Increments number of pipeline who contains same set of datanodes.
+   */
+  void incNumPipelineContainSameDatanodes() {
+    numPipelineContainSameDatanodes.incr();
   }
 }
