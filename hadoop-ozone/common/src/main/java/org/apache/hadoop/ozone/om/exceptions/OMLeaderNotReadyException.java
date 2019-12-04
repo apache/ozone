@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,24 +16,19 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.protocol;
-
-import org.apache.ratis.server.protocol.TermIndex;
+package org.apache.hadoop.ozone.om.exceptions;
 
 import java.io.IOException;
 
 /**
- * Protocol to talk to OM HA. These methods are needed only called from
- * OmRequestHandler.
+ * Exception thrown by
+ * {@link org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB} when
+ * OM leader is not ready to serve requests. This error is thrown when Raft
+ * Server returns {@link org.apache.ratis.protocol.LeaderNotReadyException}.
  */
-public interface OzoneManagerHAProtocol {
+public class OMLeaderNotReadyException extends IOException  {
 
-  /**
-   * Store the snapshot index i.e. the raft log index, corresponding to the
-   * last transaction applied to the OM RocksDB, in OM metadata dir on disk.
-   * @return the snapshot term index which has both term and index.
-   * @throws IOException
-   */
-  TermIndex saveRatisSnapshot() throws IOException;
-
+  public OMLeaderNotReadyException(String message) {
+    super(message);
+  }
 }
