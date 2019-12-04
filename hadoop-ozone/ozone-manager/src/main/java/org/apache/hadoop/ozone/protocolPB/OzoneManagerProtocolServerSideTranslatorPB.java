@@ -21,7 +21,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.NotLeaderException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -182,12 +182,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     Optional<RaftPeerId> leaderRaftPeerId = omRatisServer
         .getCachedLeaderPeerId();
 
-    NotLeaderException notLeaderException;
+    OMNotLeaderException notLeaderException;
     if (leaderRaftPeerId.isPresent()) {
-      notLeaderException = new NotLeaderException(
+      notLeaderException = new OMNotLeaderException(
           raftPeerId, leaderRaftPeerId.get());
     } else {
-      notLeaderException = new NotLeaderException(raftPeerId);
+      notLeaderException = new OMNotLeaderException(raftPeerId);
     }
 
     if (LOG.isDebugEnabled()) {
