@@ -78,7 +78,7 @@ public class TestChunkUtils {
       AtomicBoolean failed = new AtomicBoolean();
       for (int i = 0; i < threads; i++) {
         final int threadNumber = i;
-        executor.submit(() -> {
+        executor.execute(() -> {
           try {
             ByteBuffer readBuffer = ChunkUtils.readData(file, chunkInfo, stats);
             LOG.info("Read data ({}): {}", threadNumber,
@@ -120,7 +120,7 @@ public class TestChunkUtils {
       for (int i = 0; i < threads; i++) {
         Path path = Files.createTempFile(PREFIX, String.valueOf(i));
         paths.add(path);
-        executor.submit(() -> {
+        executor.execute(() -> {
           ChunkUtils.processFileExclusively(path, () -> {
             try {
               Thread.sleep(perThreadWait);
