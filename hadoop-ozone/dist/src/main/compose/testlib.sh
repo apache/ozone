@@ -31,54 +31,6 @@ create_results_dir() {
   chmod ogu+w "$RESULT_DIR"
 }
 
-## @description print the number of datanodes up
-## @param the docker-compose file
-count_datanodes() {
-  local compose_file=$1
-
-  local jmx_url='http://scm:9876/jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo'
-  if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-    docker-compose -f "${compose_file}" exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && curl --negotiate -u : -s '${jmx_url}'"
-  else
-    docker-compose -f "${compose_file}" exec -T scm curl -s "${jmx_url}"
-  fi \
-    | jq -r '.beans[0].NodeCount[] | select(.key=="HEALTHY") | .value' || true
-}
-
-## @description wait until datanodes are up (or 30 seconds)
-## @param the docker-compose file
-## @param number of datanodes to wait for (default: 3)
-wait_for_datanodes(){
-  local compose_file=$1
-  local -i datanode_count=${2:-3}
-
-  #Reset the timer
-  SECONDS=0
-
-  #Don't give it up until 30 seconds
-  while [[ $SECONDS -lt 90 ]]; do
-
-     #This line checks the number of HEALTHY datanodes registered in scm over the
-     # jmx HTTP servlet
-     datanodes=$(count_datanodes "${compose_file}")
-     if [[ "$datanodes" ]]; then
-       if [[ ${datanodes} -ge ${datanode_count} ]]; then
-
-         #It's up and running. Let's return from the function.
-         echo "$datanodes datanodes are up and registered to the scm"
-         return
-       else
-
-           #Print it only if a number. Could be not a number if scm is not yet started
-           echo "$datanodes datanode is up and healthy (until now)"
-         fi
-     fi
-
-      sleep 2
-   done
-   echo "WARNING! Datanodes are not started successfully. Please check the docker-compose files"
-   return 1
-}
 
 ## @description wait until safemode exit (or 30 seconds)
 ## @param the docker-compose file
@@ -120,10 +72,9 @@ start_docker_env(){
   local -i datanode_count=${1:-3}
 
   create_results_dir
-
+  export OZONE_SAFEMODE_MIN_DATANODE="${datanode_count}"
   docker-compose -f "$COMPOSE_FILE" --no-ansi down
   docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
-    && wait_for_datanodes "$COMPOSE_FILE" "${datanode_count}" \
     && wait_for_safemode_exit "$COMPOSE_FILE" \
     && sleep 10
 
