@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -1244,17 +1245,13 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
 
-      List<String> multipartUploadKeys =
+      Set<String> multipartUploadKeys =
           metadataManager
               .getMultipartUploadKeys(volumeName, bucketName, prefix);
 
       List<OmMultipartUpload> collect = multipartUploadKeys.stream()
           .map(OmMultipartUpload::from)
           .peek(upload -> {
-            String dbKey = metadataManager
-                .getOzoneKey(upload.getVolumeName(),
-                    upload.getBucketName(),
-                    upload.getKeyName());
             try {
               Table<String, OmMultipartKeyInfo> keyInfoTable =
                   metadataManager.getMultipartInfoTable();
@@ -1271,7 +1268,8 @@ public class KeyManagerImpl implements KeyManager {
             } catch (IOException e) {
               LOG.warn(
                   "Open key entry for multipart upload record can be read  {}",
-                  dbKey);
+                  metadataManager.getOzoneKey(upload.getVolumeName(),
+                          upload.getBucketName(), upload.getKeyName()));
             }
           })
           .collect(Collectors.toList());
