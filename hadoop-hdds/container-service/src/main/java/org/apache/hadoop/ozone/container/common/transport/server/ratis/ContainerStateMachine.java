@@ -861,6 +861,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     for (ExecutorService executor : executors) {
       executor.shutdown();
     }
+    metrics.unRegister();
   }
 
   @Override
