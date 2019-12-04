@@ -41,7 +41,7 @@ import java.net.URI;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class OFileSystem extends BasicOzoneFileSystem
+public class OFileSystem extends BasicOFileSystem
     implements KeyProviderTokenIssuer {
 
   private OzoneFSStorageStatistics storageStatistics;

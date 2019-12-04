@@ -84,6 +84,7 @@ public final class OzoneConsts {
 
   // Ozone File System scheme
   public static final String OZONE_URI_SCHEME = "o3fs";
+  public static final String OZONE_OFS_URI_SCHEME = "ofs";
 
   public static final String OZONE_RPC_SCHEME = "o3";
   public static final String OZONE_HTTP_SCHEME = "http";

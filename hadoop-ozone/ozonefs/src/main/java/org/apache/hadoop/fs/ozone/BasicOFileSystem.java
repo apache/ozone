@@ -56,7 +56,7 @@ import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 
 /**
  * The minimal Ozone Filesystem implementation.
@@ -134,7 +134,7 @@ public class BasicOFileSystem extends FileSystem {
     }
 
     try {
-      uri = new URIBuilder().setScheme(OZONE_URI_SCHEME)
+      uri = new URIBuilder().setScheme(OZONE_OFS_URI_SCHEME)
           .setHost(authority)
           .build();
       LOG.trace("Ozone URI for ozfs initialization is " + uri);
@@ -202,7 +202,7 @@ public class BasicOFileSystem extends FileSystem {
 
   @Override
   public String getScheme() {
-    return OZONE_URI_SCHEME;
+    return OZONE_OFS_URI_SCHEME;
   }
 
   @Override
