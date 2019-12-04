@@ -426,6 +426,7 @@ public class SCMPipelineManager implements PipelineManager {
         try {
           Thread.sleep((long)100);
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
         }
       }
     } while (!ready && Time.monotonicNow() - st < timeout);
