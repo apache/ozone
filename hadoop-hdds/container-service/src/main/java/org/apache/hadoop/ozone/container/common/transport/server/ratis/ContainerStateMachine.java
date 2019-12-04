@@ -31,8 +31,10 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
@@ -861,5 +863,49 @@ public class ContainerStateMachine extends BaseStateMachine {
   public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
                                   RaftPeerId raftPeerId) {
     ratisServer.handleLeaderChangedNotification(groupMemberId, raftPeerId);
+  }
+
+  @Override
+  public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
+    try {
+      ContainerCommandRequestProto requestProto =
+              getContainerCommandRequestProto(proto.getLogData());
+      return getWriteChunkInfo(requestProto);
+    } catch (Throwable t) {
+      return "";
+    }
+  }
+
+  private String getWriteChunkInfo(ContainerCommandRequestProto requestProto) {
+    StringBuilder builder = new StringBuilder();
+    Preconditions.checkArgument(requestProto.getCmdType() == Type.WriteChunk);
+
+    long contId = requestProto.getContainerID();
+    WriteChunkRequestProto wc = requestProto.getWriteChunk();
+
+    builder.append("cmd=");
+    builder.append(requestProto.getCmdType().toString());
+
+    builder.append(", container id=");
+    builder.append(contId);
+
+    builder.append(", blockid=");
+    builder.append(contId);
+    builder.append(":localid=");
+    builder.append(wc.getBlockID().getLocalID());
+
+    builder.append(", chunk=");
+    builder.append(wc.getChunkData().getChunkName());
+    builder.append(":offset=");
+    builder.append(wc.getChunkData().getOffset());
+    builder.append(":length=");
+    builder.append(wc.getChunkData().getLen());
+
+    Container cont = containerController.getContainer(contId);
+    if (cont != null) {
+      builder.append(", container path=");
+      builder.append(cont.getContainerData().getContainerPath());
+    }
+    return builder.toString();
   }
 }
