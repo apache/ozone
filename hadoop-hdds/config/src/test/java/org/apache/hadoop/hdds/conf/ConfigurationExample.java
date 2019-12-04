@@ -23,46 +23,46 @@ import java.util.concurrent.TimeUnit;
  * Example configuration to test the configuration injection.
  */
 @ConfigGroup(prefix = "ozone.scm.client")
-public class ConfigurationExample {
-
-  private String clientAddress;
-
-  private String bindHost;
-
-  private boolean compressionEnabled;
-
-  private int port = 1234;
-
-  private long waitTime = 1;
+public class ConfigurationExample extends ConfigurationExampleParent {
 
   @Config(key = "address", defaultValue = "localhost", description = "Client "
       + "addres (To test string injection).", tags = ConfigTag.MANAGEMENT)
-  public void setClientAddress(String clientAddress) {
-    this.clientAddress = clientAddress;
-  }
+  private String clientAddress;
 
   @Config(key = "bind.host", defaultValue = "0.0.0.0", description = "Bind "
       + "host(To test string injection).", tags = ConfigTag.MANAGEMENT)
-  public void setBindHost(String bindHost) {
-    this.bindHost = bindHost;
-  }
+  private String bindHost;
 
   @Config(key = "compression.enabled", defaultValue = "true", description =
       "Compression enabled. (Just to test boolean flag)", tags =
       ConfigTag.MANAGEMENT)
-  public void setCompressionEnabled(boolean compressionEnabled) {
-    this.compressionEnabled = compressionEnabled;
-  }
+  private boolean compressionEnabled;
 
   @Config(key = "port", defaultValue = "1234", description = "Port number "
       + "config (To test in injection)", tags = ConfigTag.MANAGEMENT)
-  public void setPort(int port) {
-    this.port = port;
-  }
+  private int port = 1234;
 
   @Config(key = "wait", type = ConfigType.TIME, timeUnit =
       TimeUnit.SECONDS, defaultValue = "30m", description = "Wait time (To "
       + "test TIME config type)", tags = ConfigTag.MANAGEMENT)
+  private long waitTime = 1;
+
+  public void setClientAddress(String clientAddress) {
+    this.clientAddress = clientAddress;
+  }
+
+  public void setBindHost(String bindHost) {
+    this.bindHost = bindHost;
+  }
+
+  public void setCompressionEnabled(boolean compressionEnabled) {
+    this.compressionEnabled = compressionEnabled;
+  }
+
+  public void setPort(int port) {
+    this.port = port;
+  }
+
   public void setWaitTime(long waitTime) {
     this.waitTime = waitTime;
   }

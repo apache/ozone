@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import javax.annotation.PostConstruct;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
@@ -26,6 +27,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -115,27 +117,54 @@ public class OzoneConfiguration extends Configuration {
         configurationClass.getAnnotation(ConfigGroup.class);
     String prefix = configGroup.prefix();
 
-    for (Method setterMethod : configurationClass.getMethods()) {
-      if (setterMethod.isAnnotationPresent(Config.class)) {
+    processConfigAnnotationFromClass(configurationClass, configuration, prefix);
+    Class<? super T> superClass = configurationClass.getSuperclass();
+    while (superClass != null) {
+      processConfigAnnotationFromClass(superClass, configuration, prefix);
+      superClass = superClass.getSuperclass();
+    }
 
-        String methodLocation =
-            configurationClass + "." + setterMethod.getName();
+    for (Method method : configurationClass.getMethods()) {
+      if (method.isAnnotationPresent(PostConstruct.class)) {
+        try {
+          method.invoke(configuration);
+        } catch (IllegalAccessException ex) {
+          throw new IllegalArgumentException(
+              "@PostConstruct method in " + configurationClass
+                  + " is not accessible");
+        } catch (InvocationTargetException e) {
+          if (e.getCause() != null && e
+              .getCause() instanceof RuntimeException) {
+            throw (RuntimeException) e.getCause();
+          } else {
+            throw new IllegalArgumentException(
+                "@PostConstruct can't be executed on " + configurationClass
+                    + " after configuration "
+                    + "injection", e);
+          }
+        }
+      }
+    }
+    return configuration;
 
-        Config configAnnotation = setterMethod.getAnnotation(Config.class);
+  }
+
+  private <T> void processConfigAnnotationFromClass(Class<T> configurationClass,
+      T configuration, String prefix) {
+    for (Field field : configurationClass.getDeclaredFields()) {
+      if (field.isAnnotationPresent(Config.class)) {
+
+        String fieldLocation =
+            configurationClass + "." + field.getName();
+
+        Config configAnnotation = field.getAnnotation(Config.class);
 
         String key = prefix + "." + configAnnotation.key();
-
-        Class<?>[] parameterTypes = setterMethod.getParameterTypes();
-        if (parameterTypes.length != 1) {
-          throw new ConfigurationException(
-              "@Config annotation should be used on simple setter: "
-                  + methodLocation);
-        }
 
         ConfigType type = configAnnotation.type();
 
         if (type == ConfigType.AUTO) {
-          type = detectConfigType(parameterTypes[0], methodLocation);
+          type = detectConfigType(field.getType(), fieldLocation);
         }
 
         //Note: default value is handled by ozone-default.xml. Here we can
@@ -143,37 +172,48 @@ public class OzoneConfiguration extends Configuration {
         try {
           switch (type) {
           case STRING:
-            setterMethod.invoke(configuration, get(key));
+            forcedFieldSet(field, configuration, get(key));
             break;
           case INT:
-            setterMethod.invoke(configuration,
-                getInt(key, 0));
+            forcedFieldSet(field, configuration, getInt(key, 0));
             break;
           case BOOLEAN:
-            setterMethod.invoke(configuration,
-                getBoolean(key, false));
+            forcedFieldSet(field, configuration, getBoolean(key, false));
             break;
           case LONG:
-            setterMethod.invoke(configuration,
-                getLong(key, 0));
+            forcedFieldSet(field, configuration, getLong(key, 0));
             break;
           case TIME:
-            setterMethod.invoke(configuration,
+            forcedFieldSet(field, configuration,
                 getTimeDuration(key, 0, configAnnotation.timeUnit()));
             break;
           default:
             throw new ConfigurationException(
-                "Unsupported ConfigType " + type + " on " + methodLocation);
+                "Unsupported ConfigType " + type + " on " + fieldLocation);
           }
-        } catch (InvocationTargetException | IllegalAccessException e) {
+        } catch (IllegalAccessException e) {
           throw new ConfigurationException(
-              "Can't inject configuration to " + methodLocation, e);
+              "Can't inject configuration to " + fieldLocation, e);
         }
 
       }
     }
-    return configuration;
+  }
 
+  /**
+   * Set the value of one field even if it's private.
+   */
+  private <T> void forcedFieldSet(Field field, T object, Object value)
+      throws IllegalAccessException {
+    boolean accessChanged = false;
+    if (!field.isAccessible()) {
+      field.setAccessible(true);
+      accessChanged = true;
+    }
+    field.set(object, value);
+    if (accessChanged) {
+      field.setAccessible(false);
+    }
   }
 
   private ConfigType detectConfigType(Class<?> parameterType,

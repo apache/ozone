@@ -28,10 +28,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
  * */
 @ConfigGroup(prefix = "ozone.om")
 public class OzoneAclConfig {
-  // OM Default user/group permissions
-  private ACLType userDefaultRights = ACLType.ALL;
-  private ACLType groupDefaultRights = ACLType.ALL;
 
+  // OM Default user/group permissions
   @Config(key = "user.rights",
       defaultValue = "ALL",
       type = ConfigType.STRING,
@@ -39,12 +37,7 @@ public class OzoneAclConfig {
       description = "Default user permissions set for an object in " +
           "OzoneManager."
   )
-  public void setUserDefaultRights(String userRights) {
-    if(userRights == null) {
-      userRights = "ALL";
-    }
-    this.userDefaultRights = ACLType.valueOf(userRights);
-  }
+  private String userDefaultRights;
 
   @Config(key = "group.rights",
       defaultValue = "ALL",
@@ -53,19 +46,17 @@ public class OzoneAclConfig {
       description = "Default group permissions set for an object in " +
           "OzoneManager."
   )
-  public void setGroupDefaultRights(String groupRights) {
-    if(groupRights == null) {
-      groupRights = "ALL";
-    }
-    this.groupDefaultRights = ACLType.valueOf(groupRights);
-  }
+  private String groupDefaultRights;
 
   public ACLType getUserDefaultRights() {
-    return userDefaultRights;
+    return ACLType.valueOf(userDefaultRights);
   }
 
   public ACLType getGroupDefaultRights() {
-    return groupDefaultRights;
+    if (groupDefaultRights == null) {
+      return ACLType.ALL;
+    }
+    return ACLType.valueOf(groupDefaultRights);
   }
 
 }

@@ -24,6 +24,8 @@ import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.util.SimpleTypeVisitor8;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
@@ -43,6 +45,15 @@ import java.util.Set;
 public class ConfigFileGenerator extends AbstractProcessor {
 
   public static final String OUTPUT_FILE_NAME = "ozone-default-generated.xml";
+
+  private static final SimpleTypeVisitor8<Element, Void> GET_PARENT_ELEMENT =
+      new SimpleTypeVisitor8<Element, Void>() {
+        @Override
+        public Element visitDeclared(DeclaredType t, Void aVoid) {
+          return t.asElement();
+        }
+      };
+
 
   @Override
   public boolean process(Set<? extends TypeElement> annotations,
@@ -68,32 +79,26 @@ public class ConfigFileGenerator extends AbstractProcessor {
       Set<? extends Element> annotatedElements =
           roundEnv.getElementsAnnotatedWith(ConfigGroup.class);
       for (Element annotatedElement : annotatedElements) {
-        TypeElement configGroup = (TypeElement) annotatedElement;
+        TypeElement configurationObject = (TypeElement) annotatedElement;
 
-        //check if any of the setters are annotated with @Config
-        for (Element element : configGroup.getEnclosedElements()) {
-          if (element.getKind() == ElementKind.METHOD) {
-            processingEnv.getMessager()
-                .printMessage(Kind.WARNING, element.getSimpleName().toString());
-            if (element.getSimpleName().toString().startsWith("set")
-                && element.getAnnotation(Config.class) != null) {
+        ConfigGroup configGroupAnnotation =
+            configurationObject.getAnnotation(ConfigGroup.class);
 
-              //update the ozone-site-generated.xml
-              Config configAnnotation = element.getAnnotation(Config.class);
-              ConfigGroup configGroupAnnotation =
-                  configGroup.getAnnotation(ConfigGroup.class);
+        TypeElement elementToCheck = configurationObject;
+        while (elementToCheck != null) {
 
-              String key = configGroupAnnotation.prefix() + "."
-                  + configAnnotation.key();
-
-              appender.addConfig(key,
-                  configAnnotation.defaultValue(),
-                  configAnnotation.description(),
-                  configAnnotation.tags());
-            }
+          writeConfigAnnotations(configGroupAnnotation, appender,
+              elementToCheck);
+          if (!elementToCheck.getSuperclass().toString()
+              .equals("java.lang.Object")) {
+            elementToCheck =
+                (TypeElement) elementToCheck.getSuperclass()
+                    .accept(GET_PARENT_ELEMENT, null);
+          } else {
+            elementToCheck = null;
           }
-
         }
+
       }
       FileObject resource = filer
           .createResource(StandardLocation.CLASS_OUTPUT, "",
@@ -109,6 +114,30 @@ public class ConfigFileGenerator extends AbstractProcessor {
           "Can't generate the config file from annotation: " + e);
     }
     return false;
+  }
+
+  private void writeConfigAnnotations(ConfigGroup configGroup,
+      ConfigFileAppender appender,
+      TypeElement typeElement) {
+    //check if any of the setters are annotated with @Config
+    for (Element element : typeElement.getEnclosedElements()) {
+      if (element.getKind() == ElementKind.FIELD) {
+        if (element.getAnnotation(Config.class) != null) {
+
+          //update the ozone-site-generated.xml
+          Config configAnnotation = element.getAnnotation(Config.class);
+
+          String key = configGroup.prefix() + "."
+              + configAnnotation.key();
+
+          appender.addConfig(key,
+              configAnnotation.defaultValue(),
+              configAnnotation.description(),
+              configAnnotation.tags());
+        }
+      }
+
+    }
   }
 
 }

@@ -27,26 +27,30 @@ import org.apache.hadoop.hdds.conf.ConfigType;
  */
 @ConfigGroup(prefix = "hdds.scm")
 public class ScmConfig {
-  private String principal;
-  private String keytab;
 
   @Config(key = "kerberos.principal",
-        type = ConfigType.STRING,
-        defaultValue = "",
-        tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
-        description = "This Kerberos principal is used by the SCM service."
+      type = ConfigType.STRING,
+      defaultValue = "",
+      tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
+      description = "This Kerberos principal is used by the SCM service."
   )
+  private String principal;
+
+  @Config(key = "kerberos.keytab.file",
+      type = ConfigType.STRING,
+      defaultValue = "",
+      tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
+      description = "The keytab file used by SCM daemon to login as "+
+          "its service principal."
+  )
+  private String keytab;
+
+
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
   }
 
-  @Config(key = "kerberos.keytab.file",
-        type = ConfigType.STRING,
-        defaultValue = "",
-        tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
-        description = "The keytab file used by SCM daemon to login as "+
-              "its service principal."
-  )
+
   public void setKerberosKeytab(String kerberosKeytab) {
     this.keytab = kerberosKeytab;
   }

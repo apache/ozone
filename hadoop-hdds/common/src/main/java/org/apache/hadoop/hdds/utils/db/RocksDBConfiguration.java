@@ -29,13 +29,29 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hadoop.hdds.db")
 public class RocksDBConfiguration {
 
-  private boolean rocksdbLogEnabled;
-
   @Config(key = "rocksdb.logging.enabled",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = {ConfigTag.OM},
       description = "Enable/Disable RocksDB logging for OM.")
+  private boolean rocksdbLogEnabled;
+
+  @Config(key = "rocksdb.logging.level",
+      type = ConfigType.STRING,
+      defaultValue = "INFO",
+      tags = {ConfigTag.OM},
+      description = "OM RocksDB logging level (INFO/DEBUG/WARN/ERROR/FATAL)")
+  private String rocksdbLogLevel;
+
+  @Config(key = "rocksdb.writeoption.sync",
+      type = ConfigType.BOOLEAN,
+      defaultValue = "false",
+      tags = {ConfigTag.OM},
+      description = "Enable/Disable Sync option. If true write will be " +
+          "considered complete, once flushed to persistent storage. If false," +
+          " writes are flushed asynchronously.")
+  private boolean syncOption;
+
   public void setRocksdbLoggingEnabled(boolean enabled) {
     this.rocksdbLogEnabled = enabled;
   }
@@ -44,13 +60,6 @@ public class RocksDBConfiguration {
     return rocksdbLogEnabled;
   }
 
-  private String rocksdbLogLevel;
-
-  @Config(key = "rocksdb.logging.level",
-      type = ConfigType.STRING,
-      defaultValue = "INFO",
-      tags = {ConfigTag.OM},
-      description = "OM RocksDB logging level (INFO/DEBUG/WARN/ERROR/FATAL)")
   public void setRocksdbLogLevel(String level) {
     this.rocksdbLogLevel = level;
   }
@@ -59,14 +68,6 @@ public class RocksDBConfiguration {
     return rocksdbLogLevel;
   }
 
-  private boolean syncOption;
-  @Config(key = "rocksdb.writeoption.sync",
-      type = ConfigType.BOOLEAN,
-      defaultValue = "false",
-      tags = {ConfigTag.OM},
-      description = "Enable/Disable Sync option. If true write will be " +
-          "considered complete, once flushed to persistent storage. If false," +
-          " writes are flushed asynchronously.")
   public void setSyncOption(boolean enabled) {
     this.syncOption = enabled;
   }

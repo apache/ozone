@@ -27,16 +27,42 @@ import org.apache.hadoop.hdds.conf.ConfigType;
  **/
 @ConfigGroup(prefix = "hdds.containerscrub")
 public class ContainerScrubberConfiguration {
-  private boolean enabled;
-  private long metadataScanInterval;
-  private long dataScanInterval;
-  private long bandwidthPerVolume;
 
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to enable container scrubber.")
+  private boolean enabled;
+
+  @Config(key = "metadata.scan.interval",
+      type = ConfigType.TIME,
+      defaultValue = "3h",
+      tags = {ConfigTag.STORAGE},
+      description = "Config parameter define time interval in milliseconds" +
+          " between two metadata scans by container scrubber.")
+  private long metadataScanInterval;
+
+  @Config(key = "data.scan.interval",
+      type = ConfigType.TIME,
+      defaultValue = "1m",
+      tags = {ConfigTag.STORAGE},
+      description = "Minimum time interval between two iterations of container"
+          + " data scanning.  If an iteration takes less time than this, the"
+          + " scanner will wait before starting the next iteration."
+  )
+  private long dataScanInterval;
+
+  @Config(key = "volume.bytes.per.second",
+      type = ConfigType.LONG,
+      defaultValue = "1048576",
+      tags = {ConfigTag.STORAGE},
+      description = "Config parameter to throttle I/O bandwidth used"
+          + " by scrubber per volume.")
+
+  private long bandwidthPerVolume;
+
+
   public void setEnabled(boolean enabled) {
     this.enabled = enabled;
   }
@@ -45,12 +71,6 @@ public class ContainerScrubberConfiguration {
     return enabled;
   }
 
-  @Config(key = "metadata.scan.interval",
-      type = ConfigType.TIME,
-      defaultValue = "3h",
-      tags = {ConfigTag.STORAGE},
-      description = "Config parameter define time interval in milliseconds" +
-          " between two metadata scans by container scrubber.")
   public void setMetadataScanInterval(long metadataScanInterval) {
     this.metadataScanInterval = metadataScanInterval;
   }
@@ -59,30 +79,12 @@ public class ContainerScrubberConfiguration {
     return metadataScanInterval;
   }
 
-  @Config(key = "data.scan.interval",
-      type = ConfigType.TIME,
-      defaultValue = "1m",
-      tags = { ConfigTag.STORAGE },
-      description = "Minimum time interval between two iterations of container"
-          + " data scanning.  If an iteration takes less time than this, the"
-          + " scanner will wait before starting the next iteration."
-  )
   public void setDataScanInterval(long dataScanInterval) {
     this.dataScanInterval = dataScanInterval;
   }
 
   public long getDataScanInterval() {
     return dataScanInterval;
-  }
-
-  @Config(key = "volume.bytes.per.second",
-      type = ConfigType.LONG,
-      defaultValue = "1048576",
-      tags = {ConfigTag.STORAGE},
-      description = "Config parameter to throttle I/O bandwidth used"
-          + " by scrubber per volume.")
-  public void setBandwidthPerVolume(long bandwidthPerVolume) {
-    this.bandwidthPerVolume = bandwidthPerVolume;
   }
 
   public long getBandwidthPerVolume() {
