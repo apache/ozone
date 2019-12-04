@@ -215,7 +215,7 @@ public class BasicOFileSystem extends FileSystem {
   }
 
   protected void incrementCounter(Statistic statistic) {
-    //don't do anyting in this default implementation.
+    //don't do anything in this default implementation.
   }
 
   @Override
