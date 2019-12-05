@@ -49,12 +49,13 @@ public class RatisInsight extends BaseInsightPoint implements InsightPoint {
   @Override
   public List<LoggerSource> getRelatedLoggers(boolean verbose,
       Map<String, String> filters) {
-    if (filters == null || !filters.containsKey(PIPLINE_FILTER)) {
-      throw new IllegalArgumentException(PIPLINE_FILTER
-          + " filter should be specified (-f pipeline=<pipelineid)");
+    if (filters == null || !filters.containsKey(PIPELINE_FILTER)) {
+      throw new IllegalArgumentException(PIPELINE_FILTER
+          + " filter should be specified (-f " + PIPELINE_FILTER
+          + "=<pipelineid)");
     }
 
-    String pipelineId = filters.get(PIPLINE_FILTER);
+    String pipelineId = filters.get(PIPELINE_FILTER);
     List<LoggerSource> result = new ArrayList<>();
 
     try (ScmClient scmClient = createScmClient(conf)) {
