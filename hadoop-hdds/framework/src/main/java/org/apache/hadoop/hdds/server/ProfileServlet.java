@@ -335,6 +335,7 @@ public class ProfileServlet extends HttpServlet {
       } catch (InterruptedException e) {
         LOG.warn("Interrupted while acquiring profile lock.", e);
         resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        Thread.currentThread().interrupt();
       }
     } else {
       setResponseHeader(resp);
