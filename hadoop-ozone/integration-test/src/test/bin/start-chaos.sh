@@ -30,6 +30,6 @@ echo "heapdump to ${heapdumpfile}"
 echo "Starting MiniOzoneChaosCluster"
 mvn clean install -DskipTests > "${filename}" 2>&1
 mvn exec:java \
-  -Dexec.mainClass="org.apache.hadoop.ozone.TestMiniChaosOzoneCluster" \
+  -Dexec.mainClass="org.apache.hadoop.ozone.chaos.TestMiniChaosOzoneCluster" \
   -Dexec.classpathScope=test \
   -Dexec.args="$*" >> "${filename}" 2>&1
