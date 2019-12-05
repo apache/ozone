@@ -47,9 +47,10 @@ public interface RequestHandler {
   void validateRequest(OMRequest omRequest) throws OMException;
 
   /**
-   * Handle write requests. In HA this will be called from OMClientResponse
-   * OzoneManagerStateMachine applyTransaction. In non-HA this will be called
-   * from{@link OzoneManagerProtocolServerSideTranslatorPB} for write requests.
+   * Handle write requests. In HA this will be called from
+   * OzoneManagerStateMachine applyTransaction method. In non-HA this will be
+   * called from {@link OzoneManagerProtocolServerSideTranslatorPB} for write
+   * requests.
    * @param omRequest
    * @param transactionLogIndex - ratis transaction log index
    * @return OMClientResponse
