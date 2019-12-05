@@ -144,16 +144,13 @@ public final class HddsClientUtils {
     }
   }
 
-  private static boolean isLowercaseAlphanumeric(char c) {
-    return (Character.toString(c).matches("[a-z0-9]"));
-  }
-
   private static boolean isSupportedCharacter(char c) {
-    return (c == '.' || c == '-' || isLowercaseAlphanumeric(c));
+    return (c == '.' || c == '-' ||
+        Character.isLowerCase(c) || Character.isDigit(c));
   }
 
   private static void doCharacterChecks(char currChar, char prev) {
-    if (currChar > 'A' && currChar < 'Z') {
+    if (Character.isUpperCase(currChar)) {
       throw new IllegalArgumentException(
           "Bucket or Volume name does not support uppercase characters");
     }
