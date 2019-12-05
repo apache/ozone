@@ -1061,7 +1061,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
             is.close();
           }
         } catch (IOException ex) {
-          LOG.error("Exception while validating write: " + ex.getMessage());
+          LOG.error("Exception while validating write.", ex);
         } catch (InterruptedException ex) {
           Thread.currentThread().interrupt();
         }
