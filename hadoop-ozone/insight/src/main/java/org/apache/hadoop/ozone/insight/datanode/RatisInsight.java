@@ -61,7 +61,6 @@ public class RatisInsight extends BaseInsightPoint implements InsightPoint {
     try (ScmClient scmClient = createScmClient(conf)) {
       Optional<Pipeline> pipelineSelection = scmClient.listPipelines()
           .stream()
-          .filter(d -> d.getNodes().size() > 1)
           .filter(
               pipline -> pipline.getId().getId().toString().equals(pipelineId))
           .findFirst();
