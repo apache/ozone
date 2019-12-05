@@ -72,7 +72,7 @@ start_docker_env(){
   local -i datanode_count=${1:-3}
 
   create_results_dir
-  export OZONE_SAFEMODE_MIN_DATANODE="${datanode_count}"
+  export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
   docker-compose -f "$COMPOSE_FILE" --no-ansi down
   docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
     && wait_for_safemode_exit "$COMPOSE_FILE" \
