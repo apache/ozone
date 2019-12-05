@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.jooq.Configuration;
@@ -164,14 +165,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       if (taskFailureCounter.get(taskName).incrementAndGet() >
           TASK_FAILURE_THRESHOLD) {
         LOG.info("Blacklisting Task since it failed retry and " +
-            "reprocess more than " + TASK_FAILURE_THRESHOLD + " times.");
+            "reprocess more than {} times.", TASK_FAILURE_THRESHOLD);
         reconDBUpdateTasks.remove(taskName);
       }
     }
   }
 
   @Override
-  public void reInitializeTasks(OMMetadataManager omMetadataManager)
+  public void reInitializeTasks(ReconOMMetadataManager omMetadataManager)
       throws InterruptedException {
     taskSemaphore.acquire();
 
@@ -189,6 +190,12 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         String taskName = f.get().getLeft();
         if (!f.get().getRight()) {
           LOG.info("Init failed for task {}.", taskName);
+        } else {
+          //store the timestamp for the task
+          ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(taskName,
+              System.currentTimeMillis(),
+              omMetadataManager.getLastSequenceNumberFromDB());
+          reconTaskStatusDao.update(reconTaskStatusRecord);
         }
       }
     } catch (ExecutionException e) {
