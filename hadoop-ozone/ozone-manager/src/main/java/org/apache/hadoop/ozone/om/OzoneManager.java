@@ -86,8 +86,6 @@ import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.security.OzoneSecurityException;
@@ -2039,23 +2037,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             OMAction.ALLOCATE_KEY, (args == null) ? null : args.toAuditMap()));
       }
     }
-  }
-
-  private Map<String, String> toAuditMap(KeyArgs omKeyArgs) {
-    Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(OzoneConsts.VOLUME, omKeyArgs.getVolumeName());
-    auditMap.put(OzoneConsts.BUCKET, omKeyArgs.getBucketName());
-    auditMap.put(OzoneConsts.KEY, omKeyArgs.getKeyName());
-    auditMap.put(OzoneConsts.DATA_SIZE,
-        String.valueOf(omKeyArgs.getDataSize()));
-    auditMap.put(OzoneConsts.REPLICATION_TYPE,
-        omKeyArgs.hasType() ? omKeyArgs.getType().name() : null);
-    auditMap.put(OzoneConsts.REPLICATION_FACTOR,
-        omKeyArgs.hasFactor() ? omKeyArgs.getFactor().name() : null);
-    auditMap.put(OzoneConsts.KEY_LOCATION_INFO,
-        (omKeyArgs.getKeyLocationsList() != null) ?
-            omKeyArgs.getKeyLocationsList().toString() : null);
-    return auditMap;
   }
 
   @Override

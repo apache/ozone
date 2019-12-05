@@ -72,9 +72,6 @@ public interface RequestAuditor {
           (keyArgs.getType() != null) ? keyArgs.getType().name() : null);
       auditMap.put(OzoneConsts.REPLICATION_FACTOR,
           (keyArgs.getFactor() != null) ? keyArgs.getFactor().name() : null);
-      auditMap.put(OzoneConsts.KEY_LOCATION_INFO,
-          (keyArgs.getKeyLocationsList() != null) ?
-              keyArgs.getKeyLocationsList().toString() : null);
       return auditMap;
     }
   }
