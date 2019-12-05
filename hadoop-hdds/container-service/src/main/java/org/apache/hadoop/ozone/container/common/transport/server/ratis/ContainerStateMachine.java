@@ -20,9 +20,8 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
@@ -30,6 +29,7 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.ResourceLimitMap;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
@@ -83,8 +83,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.concurrent.Executors;
@@ -146,7 +144,8 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final Map<Long, Long> container2BCSIDMap;
   private ExecutorService[] executors;
   private final Map<Long, Long> applyTransactionCompletionMap;
-  private final Cache<Long, ByteString> stateMachineDataCache;
+  private final org.apache.hadoop.hdds.utils.Map<Long, ByteString>
+      stateMachineDataMap;
   private final AtomicBoolean stateMachineHealthy;
 
   private final Semaphore applyTransactionSemaphore;
@@ -158,7 +157,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
       ContainerController containerController, ThreadPoolExecutor chunkExecutor,
-      XceiverServerRatis ratisServer, long expiryInterval, Configuration conf) {
+      XceiverServerRatis ratisServer, Configuration conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -167,11 +166,17 @@ public class ContainerStateMachine extends BaseStateMachine {
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
-    stateMachineDataCache = CacheBuilder.newBuilder()
-        .expireAfterAccess(expiryInterval, TimeUnit.MILLISECONDS)
-        // set the limit on no of cached entries equal to no of max threads
-        // executing writeStateMachineData
-        .maximumSize(chunkExecutor.getCorePoolSize()).build();
+    int numPendingRequests = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
+    );
+    int pendingRequestsByteLimit = (int) conf.getStorageSize(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    stateMachineDataMap = new ResourceLimitMap<>(new ConcurrentHashMap<>(),
+        (index, data) -> new int[] { 1, data.size() }, numPendingRequests,
+        pendingRequestsByteLimit);
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
     final int numContainerOpExecutors = conf.getInt(
@@ -415,9 +420,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     Preconditions.checkState(server instanceof RaftServerProxy);
     try {
       if (((RaftServerProxy) server).getImpl(gid).isLeader()) {
-        stateMachineDataCache.put(entryIndex, write.getData());
+        stateMachineDataMap.put(entryIndex, write.getData());
       }
-    } catch (IOException ioe) {
+    } catch (IOException | InterruptedException ioe) {
       return completeExceptionally(ioe);
     }
     DispatcherContext context =
@@ -588,10 +593,14 @@ public class ContainerStateMachine extends BaseStateMachine {
   /**
    * Reads the Entry from the Cache or loads it back by reading from disk.
    */
-  private ByteString getCachedStateMachineData(Long logIndex, long term,
-      ContainerCommandRequestProto requestProto) throws ExecutionException {
-    return stateMachineDataCache.get(logIndex,
-        () -> readStateMachineData(requestProto, term, logIndex));
+  private ByteString getStateMachineData(Long logIndex, long term,
+      ContainerCommandRequestProto requestProto)
+      throws IOException {
+    ByteString data = stateMachineDataMap.get(logIndex);
+    if (data == null) {
+      data = readStateMachineData(requestProto, term, logIndex);
+    }
+    return data;
   }
 
   /**
@@ -635,9 +644,9 @@ public class ContainerStateMachine extends BaseStateMachine {
         CompletableFuture.supplyAsync(() -> {
           try {
             future.complete(
-                getCachedStateMachineData(entry.getIndex(), entry.getTerm(),
+                getStateMachineData(entry.getIndex(), entry.getTerm(),
                     requestProto));
-          } catch (ExecutionException e) {
+          } catch (IOException e) {
             metrics.incNumReadStateMachineFails();
             future.completeExceptionally(e);
           }
@@ -695,6 +704,10 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
     long index = trx.getLogEntry().getIndex();
+    // Since leader and one of the followers has written the data, it can
+    // be removed from the stateMachineDataMap.
+    stateMachineDataMap.remove(index);
+
     DispatcherContext.Builder builder =
         new DispatcherContext.Builder()
             .setTerm(trx.getLogEntry().getTerm())
@@ -805,8 +818,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @VisibleForTesting
   public void evictStateMachineCache() {
-    stateMachineDataCache.invalidateAll();
-    stateMachineDataCache.cleanUp();
+    stateMachineDataMap.clear();
   }
 
   @Override
