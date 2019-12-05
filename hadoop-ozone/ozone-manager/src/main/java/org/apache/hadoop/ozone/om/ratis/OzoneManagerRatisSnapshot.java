@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
+import java.util.List;
+
 /**
  * Functional interface for OM RatisSnapshot.
  */
@@ -24,9 +26,9 @@ package org.apache.hadoop.ozone.om.ratis;
 public interface OzoneManagerRatisSnapshot {
 
   /**
-   * Update lastAppliedIndex with the specified value in OzoneManager
-   * StateMachine.
-   * @param lastAppliedIndex
+   * Update lastAppliedIndex in OzoneManager StateMachine.
+   * @param flushedEpochs - list of ratis transaction indexes which are
+   * flushed to DB.
    */
-  void updateLastAppliedIndex(long lastAppliedIndex);
+  void updateLastAppliedIndex(List<Long> flushedEpochs);
 }

@@ -187,7 +187,7 @@ public class OzoneManagerDoubleBuffer {
           //  transactions are serialized this should be fine.
           // update the last updated index in OzoneManagerStateMachine.
           ozoneManagerRatisSnapShot.updateLastAppliedIndex(
-              lastRatisTransactionIndex);
+              flushedEpochs);
 
           // set metrics.
           updateMetrics(flushedTransactionsSize);
