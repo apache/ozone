@@ -212,6 +212,14 @@
     </description>
   </property>
   <property>
+    <name>dfs.container.ratis.leader.pending.bytes.limit</name>
+    <value>1GB</value>
+    <tag>OZONE, RATIS, PERFORMANCE</tag>
+    <description>Limit on the total bytes of pending requests after which
+      leader starts rejecting requests from client.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ratis.replication.level</name>
     <value>MAJORITY</value>
     <tag>OZONE, RATIS</tag>

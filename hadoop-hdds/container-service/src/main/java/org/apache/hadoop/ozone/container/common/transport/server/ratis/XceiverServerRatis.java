@@ -231,11 +231,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       setAutoTriggerEnabled(properties, true);
     RaftServerConfigKeys.Snapshot.
       setAutoTriggerThreshold(properties, snapshotThreshold);
-    int maxPendingRequets = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
-    );
-    RaftServerConfigKeys.Write.setElementLimit(properties, maxPendingRequets);
+
+    // Set the limit on num/ bytes of pending requests a Ratis leader can hold
+    setPendingRequestsLimits(properties);
+
     int logQueueNumElements =
         conf.getInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS,
             OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT);
@@ -392,6 +391,21 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final RpcType rpc = SupportedRpcType.valueOfIgnoreCase(rpcType);
     RaftConfigKeys.Rpc.setType(properties, rpc);
     return rpc;
+  }
+
+  private void setPendingRequestsLimits(RaftProperties properties) {
+    final int maxPendingRequests = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
+    );
+    RaftServerConfigKeys.Write.setElementLimit(properties, maxPendingRequests);
+
+    final int pendingRequestsByteLimit = (int)conf.getStorageSize(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    RaftServerConfigKeys.Write.setByteLimit(properties,
+        pendingRequestsByteLimit);
   }
 
   public static XceiverServerRatis newXceiverServerRatis(
