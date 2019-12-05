@@ -327,10 +327,8 @@ public class ProfileServlet extends HttpServlet {
           resp.getWriter().write(
               "Unable to acquire lock. Another instance of profiler might be "
                   + "running.");
-          LOG.warn(
-              "Unable to acquire lock in {} seconds. Another instance of "
-                  + "profiler might be running.",
-              lockTimeoutSecs);
+          LOG.warn("Unable to acquire lock in {} seconds. Another instance of "
+                  + "profiler might be running.", lockTimeoutSecs);
         }
       } catch (InterruptedException e) {
         LOG.warn("Interrupted while acquiring profile lock.", e);
