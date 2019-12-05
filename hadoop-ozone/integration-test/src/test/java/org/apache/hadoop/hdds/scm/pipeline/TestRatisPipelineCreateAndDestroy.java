@@ -24,7 +24,14 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.container.common.transport.server
+    .XceiverServerSpi;
+import org.apache.hadoop.ozone.container.common.transport.server
+    .ratis.XceiverServerRatis;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.server.impl.RaftServerImpl;
+import org.apache.ratis.server.impl.RaftServerProxy;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
@@ -32,8 +39,11 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
@@ -47,15 +57,16 @@ public class TestRatisPipelineCreateAndDestroy {
   private static MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private static PipelineManager pipelineManager;
+  private static int MAX_PIPELINE_PER_NODE = 4;
 
   public void init(int numDatanodes) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         GenericTestUtils.getRandomizedTempPath());
-    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 2);
+    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, MAX_PIPELINE_PER_NODE);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
-            .setTotalPipelineNumLimit(numDatanodes + numDatanodes/3)
+            .setTotalPipelineNumLimit(numDatanodes + numDatanodes)
             .setHbInterval(2000)
             .setHbProcessorInterval(1000)
             .build();
@@ -160,6 +171,58 @@ public class TestRatisPipelineCreateAndDestroy {
       pipelineManager.triggerPipelineCreation();
       waitForPipelines(1);
     }
+  }
+
+  @Test(timeout = 300000)
+  public void testMultiRaftStorageDir() throws Exception {
+    final String suffix = "-testMultiRaftStorageDir-";
+    Map<String, AtomicInteger> directories = new ConcurrentHashMap<>();
+    int maxPipelinePerNode = MAX_PIPELINE_PER_NODE;
+    int index = 0;
+    while(maxPipelinePerNode > 1) {
+      directories.put("ratis" + suffix + (index++),  new AtomicInteger(0));
+      maxPipelinePerNode--;
+    }
+
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
+        5, TimeUnit.SECONDS);
+    conf.set("dfs.container.ratis.datanode.storage.dir.suffix", suffix);
+
+    // Create 3 RATIS THREE pipeline
+    init(3);
+    // make sure a pipelines is created
+    waitForPipelines(3);
+    List<Pipeline> pipelines =
+        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
+    List<RaftGroupId> raftGroupIds = new ArrayList<>();
+    pipelines.stream().forEach(pipeline ->
+        raftGroupIds.add(RaftGroupId.valueOf(pipeline.getId().getId())));
+
+    List<HddsDatanodeService> dns = new ArrayList<>(cluster.getHddsDatanodes());
+    dns.stream().forEach(dn -> {
+      XceiverServerSpi writeChannel =
+          dn.getDatanodeStateMachine().getContainer().getWriteChannel();
+      RaftServerProxy server =
+          (RaftServerProxy)((XceiverServerRatis)writeChannel).getServer();
+      raftGroupIds.stream().forEach(group -> {
+        try {
+          RaftServerImpl raft = server.getImpl(group);
+          String raftDir =
+              raft.getState().getStorage().getStorageDir().getRoot().toString();
+          directories.keySet().stream().forEach(path -> {
+            if (raftDir.contains(path)) {
+              directories.get(path).incrementAndGet();
+            }
+          });
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      });
+    });
+
+    directories.values().stream().forEach(
+        count -> Assert.assertEquals(MAX_PIPELINE_PER_NODE - 1, count.get()));
   }
 
   private void waitForPipelines(int numPipelines)

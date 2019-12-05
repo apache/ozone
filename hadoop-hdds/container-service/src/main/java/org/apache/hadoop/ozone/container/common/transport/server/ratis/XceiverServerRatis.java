@@ -82,6 +82,11 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys
+    .OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys
+    .OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT;
+
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
  * Ozone containers.
@@ -212,6 +217,20 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     String storageDir = HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
     RaftServerConfigKeys.setStorageDirs(properties,
         Collections.singletonList(new File(storageDir)));
+
+    // Check raft storage dir number and max allowed pipeline number
+    String[] dirs = storageDir.split(",");
+    int maxPipelinePerNode = conf.getInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT,
+            OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT);
+    if (maxPipelinePerNode == 0 ||
+        (maxPipelinePerNode > 2 && dirs.length < (maxPipelinePerNode - 1))) {
+      LOG.warn("{} = {} is smaller than {} = {}. Suggest increase {} or " +
+          "lower {} ", OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+          dirs.length,
+          OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, maxPipelinePerNode,
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+          OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT);
+    }
 
     // For grpc set the maximum message size
     GrpcConfigKeys.setMessageSizeMax(properties,

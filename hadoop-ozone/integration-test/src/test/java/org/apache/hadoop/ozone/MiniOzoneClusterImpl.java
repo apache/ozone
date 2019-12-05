@@ -23,6 +23,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
+import io.netty.util.internal.StringUtil;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
@@ -69,6 +71,8 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState
     .HEALTHY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys
+    .OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
@@ -604,22 +608,39 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       String[] args = new String[] {};
       conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, scmAddress);
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
+
+      String suffix =
+          conf.get("dfs.container.ratis.datanode.storage.dir.suffix");
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);
         String datanodeBaseDir = path + "/datanode-" + Integer.toString(i);
         Path metaDir = Paths.get(datanodeBaseDir, "meta");
         Path dataDir = Paths.get(datanodeBaseDir, "data", "containers");
-        Path ratisDir = Paths.get(datanodeBaseDir, "data", "ratis");
+        String ratisPath = "";
+        if (StringUtil.isNullOrEmpty(suffix)) {
+          ratisPath = Paths.get(datanodeBaseDir, "data", "ratis").toString();
+        } else {
+          int index = 0;
+          int maxPipelinePerNode =
+              conf.getInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 0);
+          while (maxPipelinePerNode > 1) {
+            ratisPath += Paths.get(datanodeBaseDir,
+                "data", "ratis" + suffix + (index++)).toString() + ",";
+            maxPipelinePerNode--;
+          }
+          // remove the tail ","
+          ratisPath = ratisPath.substring(0, ratisPath.length() - 1);
+        }
+
         Path wrokDir = Paths.get(datanodeBaseDir, "data", "replication",
             "work");
         Files.createDirectories(metaDir);
         Files.createDirectories(dataDir);
-        Files.createDirectories(ratisDir);
         Files.createDirectories(wrokDir);
         dnConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
         dnConf.set(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY, dataDir.toString());
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
-            ratisDir.toString());
+            ratisPath);
         dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
             wrokDir.toString());
 
