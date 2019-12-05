@@ -51,7 +51,7 @@ public class RatisInsight extends BaseInsightPoint implements InsightPoint {
       Map<String, String> filters) {
     if (filters == null || !filters.containsKey(PIPLINE_FILTER)) {
       throw new IllegalArgumentException(PIPLINE_FILTER
-          + " filter should be specified (-f pipline=<pipelineid)");
+          + " filter should be specified (-f pipeline=<pipelineid)");
     }
 
     String pipelineId = filters.get(PIPLINE_FILTER);
