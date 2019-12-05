@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.insight.LoggerSource;
  */
 public class RatisInsight extends BaseInsightPoint implements InsightPoint {
 
-  public static final String PIPLINE_FILTER = "pipeline";
+  public static final String PIPELINE_FILTER = "pipeline";
   private OzoneConfiguration conf;
 
   public RatisInsight(OzoneConfiguration conf) {
