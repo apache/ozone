@@ -231,8 +231,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     try {
       return sendCommandWithTraceIDAndRetry(request, null).
           getResponse().get();
-    } catch (ExecutionException | InterruptedException e) {
+    } catch (ExecutionException e) {
       throw new IOException("Failed to execute command " + request, e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return null;
     }
   }
 
@@ -244,8 +247,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       XceiverClientReply reply;
       reply = sendCommandWithTraceIDAndRetry(request, validators);
       return reply.getResponse().get();
-    } catch (ExecutionException | InterruptedException e) {
+    } catch (ExecutionException e) {
       throw new IOException("Failed to execute command " + request, e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return null;
     }
   }
 
@@ -327,7 +333,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       } catch (IOException e) {
         ioException = e;
         responseProto = null;
-      } catch (ExecutionException | InterruptedException e) {
+      } catch (ExecutionException e) {
         LOG.debug("Failed to execute command {} on datanode {}",
             request, dn.getUuid(), e);
         if (Status.fromThrowable(e.getCause()).getCode()
@@ -337,6 +343,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         }
 
         ioException = new IOException(e);
+        responseProto = null;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         responseProto = null;
       }
     }
