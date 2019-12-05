@@ -55,12 +55,13 @@ public class TestDatanodeAdminMonitor {
   private DatanodeAdminMonitor monitor;
   private DatanodeAdminHandler startAdminHandler;
   private ReplicationManager repManager;
+  private EventQueue eventQueue;
 
   @Before
   public void setup() throws IOException, AuthenticationException {
     conf = new OzoneConfiguration();
 
-    EventQueue eventQueue = new EventQueue();
+    eventQueue = new EventQueue();
     startAdminHandler = new DatanodeAdminHandler();
     eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE, startAdminHandler);
 
@@ -111,6 +112,7 @@ public class TestDatanodeAdminMonitor {
     monitor.startMonitoring(dn1, 0);
     monitor.run();
     // Ensure a StartAdmin event was fired
+    eventQueue.processAll(20000);
     assertEquals(1, startAdminHandler.getInvocation());
     // Ensure a node is now tracked for decommission
     assertEquals(1, monitor.getTrackedNodeCount());
