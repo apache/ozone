@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.After;
 import org.junit.Assert;
@@ -71,6 +72,7 @@ public class TestOzoneManagerRatisServer {
   private OMMetadataManager omMetadataManager;
   private OzoneManager ozoneManager;
   private OMNodeDetails omNodeDetails;
+  private TermIndex initialTermIndex;
 
   @Before
   public void init() throws Exception {
@@ -100,6 +102,8 @@ public class TestOzoneManagerRatisServer {
         folder.newFolder().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    initialTermIndex = TermIndex.newTermIndex(0, 0);
+    when(ozoneManager.saveRatisSnapshot()).thenReturn(initialTermIndex);
     OMRatisSnapshotInfo omRatisSnapshotInfo = new OMRatisSnapshotInfo(
         folder.newFolder());
     when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
@@ -133,19 +137,24 @@ public class TestOzoneManagerRatisServer {
   @Test
   public void testLoadSnapshotInfoOnStart() throws Exception {
     // Stop the Ratis server and manually update the snapshotInfo.
-    long oldSnaphsotIndex = ozoneManager.saveRatisSnapshot();
+    TermIndex oldSnaphsotIndex = ozoneManager.saveRatisSnapshot();
     ozoneManager.getSnapshotInfo().saveRatisSnapshotToDisk(oldSnaphsotIndex);
     omRatisServer.stop();
-    long newSnapshotIndex = oldSnaphsotIndex + 100;
+    TermIndex newSnapshotIndex = TermIndex.newTermIndex(
+        oldSnaphsotIndex.getTerm(), oldSnaphsotIndex.getIndex() + 100);
     ozoneManager.getSnapshotInfo().saveRatisSnapshotToDisk(newSnapshotIndex);
 
     // Start new Ratis server. It should pick up and load the new SnapshotInfo
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
         omNodeDetails, Collections.emptyList());
     omRatisServer.start();
-    long lastAppliedIndex = omRatisServer.getStateMachineLastAppliedIndex();
+    TermIndex lastAppliedTermIndex =
+        omRatisServer.getLastAppliedTermIndex();
 
-    Assert.assertEquals(newSnapshotIndex, lastAppliedIndex);
+    Assert.assertEquals(newSnapshotIndex.getIndex(),
+        lastAppliedTermIndex.getIndex());
+    Assert.assertEquals(newSnapshotIndex.getTerm(),
+        lastAppliedTermIndex.getTerm());
   }
 
   /**

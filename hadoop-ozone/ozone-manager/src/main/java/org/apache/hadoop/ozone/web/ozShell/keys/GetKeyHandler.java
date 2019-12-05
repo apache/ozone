@@ -96,8 +96,8 @@ public class GetKeyHandler extends Handler {
 
       OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
       OzoneBucket bucket = vol.getBucket(bucketName);
-      try (OutputStream output = new FileOutputStream(dataFile);
-           InputStream input = bucket.readKey(keyName)) {
+      try (InputStream input = bucket.readKey(keyName);
+          OutputStream output = new FileOutputStream(dataFile)) {
         IOUtils.copyBytes(input, output, chunkSize);
       }
 

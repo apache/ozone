@@ -146,4 +146,12 @@ if [ -n "$BYTEMAN_SCRIPT" ] || [ -n "$BYTEMAN_SCRIPT_URL" ]; then
   echo "Process is instrumented with adding $AGENT_STRING to HADOOP_OPTS"
 fi
 
+if [[ -n "${ASYNC_PROFILER_HOME}" ]]; then
+  set +e
+  echo 1 | sudo tee /proc/sys/kernel/perf_event_paranoid > /dev/null \
+    && echo 0 | sudo tee /proc/sys/kernel/kptr_restrict > /dev/null \
+    && echo "Enabled profiling in kernel"
+  set -e
+fi
+
 exec "$@"

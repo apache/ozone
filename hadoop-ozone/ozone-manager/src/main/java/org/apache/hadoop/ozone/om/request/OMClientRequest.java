@@ -229,10 +229,10 @@ public abstract class OMClientRequest implements RequestAuditor {
     return new AuditMessage.Builder()
         .setUser(userInfo != null ? userInfo.getUserName() : null)
         .atIp(userInfo != null ? userInfo.getRemoteAddress() : null)
-        .forOperation(op.getAction())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(throwable != null ? AuditEventStatus.FAILURE.toString() :
-            AuditEventStatus.SUCCESS.toString())
+        .withResult(throwable != null ? AuditEventStatus.FAILURE :
+            AuditEventStatus.SUCCESS)
         .withException(throwable)
         .build();
   }

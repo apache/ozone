@@ -37,7 +37,8 @@ import org.apache.hadoop.ipc.ProtocolTranslator;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.exceptions.NotLeaderException;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
@@ -244,7 +245,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
         if (exception instanceof ServiceException) {
-          NotLeaderException notLeaderException =
+          OMNotLeaderException notLeaderException =
               getNotLeaderException(exception);
           if (notLeaderException != null &&
               notLeaderException.getSuggestedLeaderNodeId() != null) {
@@ -255,6 +256,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                 notLeaderException.getSuggestedLeaderNodeId());
             return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
           }
+
+          OMLeaderNotReadyException leaderNotReadyException =
+              getLeaderNotReadyException(exception);
+          // As in this case, current OM node is leader, but it is not ready.
+          // OMFailoverProxyProvider#performFailover() is a dummy call and
+          // does not perform any failover.
+          // So Just retry with same ON node.
+          if (leaderNotReadyException != null) {
+            return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
+          }
+
           // We need to failover manually to the next OM Node proxy.
           // OMFailoverProxyProvider#performFailover() is a dummy call and
           // does not perform any failover.
@@ -285,20 +297,39 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Check if exception is a NotLeaderException.
-   * @return NotLeaderException.
+   * Check if exception is a OMNotLeaderException.
+   * @return OMNotLeaderException.
    */
-  private NotLeaderException getNotLeaderException(Exception exception) {
+  private OMNotLeaderException getNotLeaderException(Exception exception) {
     Throwable cause = exception.getCause();
     if (cause != null && cause instanceof RemoteException) {
       IOException ioException =
           ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof NotLeaderException) {
-        return (NotLeaderException) ioException;
+      if (ioException instanceof OMNotLeaderException) {
+        return (OMNotLeaderException) ioException;
       }
     }
     return null;
   }
+
+  /**
+   * Check if exception is OMLeaderNotReadyException.
+   * @param exception
+   * @return OMLeaderNotReadyException
+   */
+  private OMLeaderNotReadyException getLeaderNotReadyException(
+      Exception exception) {
+    Throwable cause = exception.getCause();
+    if (cause != null && cause instanceof RemoteException) {
+      IOException ioException =
+          ((RemoteException) cause).unwrapRemoteException();
+      if (ioException instanceof OMLeaderNotReadyException) {
+        return (OMLeaderNotReadyException) ioException;
+      }
+    }
+    return null;
+  }
+
 
   @VisibleForTesting
   public OMFailoverProxyProvider getOMFailoverProxyProvider() {
@@ -370,13 +401,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
       return omResponse;
     } catch (ServiceException e) {
-//      throw ProtobufHelper.getRemoteException(e);
-      NotLeaderException notLeaderException = getNotLeaderException(e);
+      OMNotLeaderException notLeaderException = getNotLeaderException(e);
       if (notLeaderException == null) {
         throw ProtobufHelper.getRemoteException(e);
-      } else {
-        throw new IOException("Could not determine or connect to OM Leader.");
       }
+      throw new IOException("Could not determine or connect to OM Leader.");
     }
   }
 

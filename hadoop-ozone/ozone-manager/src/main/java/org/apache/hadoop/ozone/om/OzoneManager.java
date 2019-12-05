@@ -86,8 +86,6 @@ import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.security.OzoneSecurityException;
@@ -189,6 +187,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryUpToMaximumCountWithFixedSleep;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
@@ -345,7 +344,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Read configuration and set values.
     ozAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
-    omMetaDir = OmUtils.getOmDbDir(configuration);
+    omMetaDir = OMStorage.getOmDbDir(configuration);
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
     this.scmBlockSize = (long) conf.getStorageSize(OZONE_SCM_BLOCK_SIZE,
@@ -418,7 +417,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isRatisEnabled) {
       // Create Ratis storage dir
-      String omRatisDirectory = OmUtils.getOMRatisDirectory(configuration);
+      String omRatisDirectory =
+          OzoneManagerRatisServer.getOMRatisDirectory(configuration);
       if (omRatisDirectory == null || omRatisDirectory.isEmpty()) {
         throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
             " must be defined.");
@@ -426,7 +426,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmUtils.createOMDir(omRatisDirectory);
       // Create Ratis snapshot dir
       omRatisSnapshotDir = OmUtils.createOMDir(
-          OmUtils.getOMRatisSnapshotDirectory(configuration));
+          OzoneManagerRatisServer.getOMRatisSnapshotDirectory(configuration));
 
       if (peerNodes != null && !peerNodes.isEmpty()) {
         this.omSnapshotProvider = new OzoneManagerSnapshotProvider(
@@ -1253,8 +1253,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public long saveRatisSnapshot() throws IOException {
-    long snapshotIndex = omRatisServer.getStateMachineLastAppliedIndex();
+  public TermIndex saveRatisSnapshot() throws IOException {
+    TermIndex snapshotIndex = omRatisServer.getLastAppliedTermIndex();
 
     // Flush the OM state to disk
     metadataManager.getStore().flush();
@@ -2039,23 +2039,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private Map<String, String> toAuditMap(KeyArgs omKeyArgs) {
-    Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(OzoneConsts.VOLUME, omKeyArgs.getVolumeName());
-    auditMap.put(OzoneConsts.BUCKET, omKeyArgs.getBucketName());
-    auditMap.put(OzoneConsts.KEY, omKeyArgs.getKeyName());
-    auditMap.put(OzoneConsts.DATA_SIZE,
-        String.valueOf(omKeyArgs.getDataSize()));
-    auditMap.put(OzoneConsts.REPLICATION_TYPE,
-        omKeyArgs.hasType() ? omKeyArgs.getType().name() : null);
-    auditMap.put(OzoneConsts.REPLICATION_FACTOR,
-        omKeyArgs.hasFactor() ? omKeyArgs.getFactor().name() : null);
-    auditMap.put(OzoneConsts.KEY_LOCATION_INFO,
-        (omKeyArgs.getKeyLocationsList() != null) ?
-            omKeyArgs.getKeyLocationsList().toString() : null);
-    return auditMap;
-  }
-
   @Override
   public void commitKey(OmKeyArgs args, long clientID)
       throws IOException {
@@ -2352,29 +2335,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
       Map<String, String> auditMap) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.SUCCESS.toString())
-        .withException(null)
+        .withResult(AuditEventStatus.SUCCESS)
         .build();
   }
 
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.FAILURE.toString())
+        .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
   }
@@ -3135,8 +3115,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // snapshot index. If yes, proceed by stopping the ratis server so that
     // the OM state can be re-initialized. If no, then do not proceed with
     // installSnapshot.
-    long lastAppliedIndex = omRatisServer.getStateMachineLastAppliedIndex();
+    long lastAppliedIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     long checkpointSnapshotIndex = omDBcheckpoint.getRatisSnapshotIndex();
+    long checkpointSnapshotTermIndex =
+        omDBcheckpoint.getRatisSnapshotTerm();
     if (checkpointSnapshotIndex <= lastAppliedIndex) {
       LOG.error("Failed to install checkpoint from OM leader: {}. The last " +
           "applied index: {} is greater than or equal to the checkpoint's " +
@@ -3175,8 +3157,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Restart (unpause) the state machine and update its last applied index
     // to the installed checkpoint's snapshot index.
     try {
-      reloadOMState(checkpointSnapshotIndex);
-      omRatisServer.getOmStateMachine().unpause(checkpointSnapshotIndex);
+      reloadOMState(checkpointSnapshotIndex, checkpointSnapshotTermIndex);
+      omRatisServer.getOmStateMachine().unpause(checkpointSnapshotIndex,
+          checkpointSnapshotTermIndex);
     } catch (IOException e) {
       LOG.error("Failed to reload OM state with new DB checkpoint.", e);
       return null;
@@ -3191,7 +3174,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
-    TermIndex newTermIndex = TermIndex.newTermIndex(0,
+    TermIndex newTermIndex = TermIndex.newTermIndex(checkpointSnapshotTermIndex,
         checkpointSnapshotIndex);
 
     return newTermIndex;
@@ -3259,7 +3242,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * All the classes which use/ store MetadataManager should also be updated
    * with the new MetadataManager instance.
    */
-  void reloadOMState(long newSnapshotIndex) throws IOException {
+  void reloadOMState(long newSnapshotIndex,
+      long newSnapShotTermIndex) throws IOException {
 
     instantiateServices();
 
@@ -3282,7 +3266,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Update OM snapshot index with the new snapshot index (from the new OM
     // DB state) and save the snapshot index to disk
-    omRatisSnapshotInfo.saveRatisSnapshotToDisk(newSnapshotIndex);
+    omRatisSnapshotInfo.saveRatisSnapshotToDisk(
+        TermIndex.newTermIndex(newSnapShotTermIndex, newSnapshotIndex));
   }
 
   public static  Logger getLogger() {

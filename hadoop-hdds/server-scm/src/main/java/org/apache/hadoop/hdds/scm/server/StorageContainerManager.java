@@ -191,6 +191,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final OzoneConfiguration configuration;
   private final SafeModeHandler safeModeHandler;
   private SCMContainerMetrics scmContainerMetrics;
+  private SCMContainerPlacementMetrics placementMetrics;
   private MetricsSystem ms;
 
   /**
@@ -390,8 +391,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           conf, scmStorageConfig, eventQueue, clusterMap);
     }
 
-    SCMContainerPlacementMetrics placementMetrics =
-        SCMContainerPlacementMetrics.create();
+    placementMetrics = SCMContainerPlacementMetrics.create();
     ContainerPlacementPolicy containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
@@ -863,6 +863,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     unregisterMXBean();
     if (scmContainerMetrics != null) {
       scmContainerMetrics.unRegister();
+    }
+    if (placementMetrics != null) {
+      placementMetrics.unRegister();
     }
 
     // Event queue must be stopped before the DB store is closed at the end.

@@ -27,7 +27,6 @@ x-common-config:
 
 x-replication:
   &replication
-  OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_REPLICATION_FACTOR:-1}
   OZONE-SITE.XML_ozone.replication: ${OZONE_REPLICATION_FACTOR:-1}
 
 services:
@@ -53,6 +52,7 @@ services:
       - 9876:9876
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: ${OZONE_SAFEMODE_MIN_DATANODES:-1}
       <<: *replication
     command: ["ozone","scm"]
   s3g:

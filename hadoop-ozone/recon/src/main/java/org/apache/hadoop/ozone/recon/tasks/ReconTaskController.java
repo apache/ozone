@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 
 /**
@@ -47,7 +48,7 @@ public interface ReconTaskController {
    * Pass on the handle to a new OM DB instance to the registered tasks.
    * @param omMetadataManager OM Metadata Manager instance
    */
-  void reInitializeTasks(OMMetadataManager omMetadataManager)
+  void reInitializeTasks(ReconOMMetadataManager omMetadataManager)
       throws InterruptedException;
 
   /**
