@@ -92,11 +92,8 @@ public class OzoneQuota {
    * @param quotaString Quota String
    *
    * @return OzoneQuota object
-   *
-   * @throws IllegalArgumentException
    */
-  public static OzoneQuota parseQuota(String quotaString)
-      throws IllegalArgumentException {
+  public static OzoneQuota parseQuota(String quotaString) {
 
     if ((quotaString == null) || (quotaString.isEmpty())) {
       throw new IllegalArgumentException(
@@ -136,10 +133,11 @@ public class OzoneQuota {
       found = true;
     }
 
-    if (!found) {
-      throw new IllegalArgumentException(
-          "Quota unit not recognized. Supported values are BYTES, MB, GB and " +
-              "TB.");
+    if (Boolean.FALSE.equals(found)) {
+      String exceptionInfo =
+          "Quota unit not recognized. " +
+          "Supported values are BYTES, MB, GB and TB.";
+      throw new IllegalArgumentException(exceptionInfo);
     }
 
     nSize = Integer.parseInt(size);
