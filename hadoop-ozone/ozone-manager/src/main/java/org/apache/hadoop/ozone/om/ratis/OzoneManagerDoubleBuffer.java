@@ -182,9 +182,6 @@ public class OzoneManagerDoubleBuffer {
 
           readyBuffer.clear();
 
-          // TODO: Need to revisit this logic, once we have multiple
-          //  executors for volume/bucket request handling. As for now
-          //  transactions are serialized this should be fine.
           // update the last updated index in OzoneManagerStateMachine.
           ozoneManagerRatisSnapShot.updateLastAppliedIndex(
               flushedEpochs);
