@@ -211,6 +211,7 @@ public class VolumeSet {
     try {
       failedVolumes = volumeChecker.checkAllVolumes(allVolumes);
     } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new IOException("Interrupted while running disk check", e);
     }
 
