@@ -143,7 +143,8 @@ public interface RatisHelper {
   static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
       RetryPolicy retryPolicy, int maxOutStandingRequest,
       GrpcTlsConfig tlsConfig, TimeDuration timeout) throws IOException {
-    return newRaftClient(rpcType, toRaftPeerId(pipeline.getFirstNode()),
+    return newRaftClient(rpcType,
+        toRaftPeerId(pipeline.getLeaderNodeIfPresent()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, maxOutStandingRequest, tlsConfig,
         timeout);
@@ -158,16 +159,14 @@ public interface RatisHelper {
         OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_KEY,
         OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT
             .getDuration(), timeUnit);
-    final TimeDuration clientRequestTimeout =
-        TimeDuration.valueOf(duration, timeUnit);
-    return clientRequestTimeout;
+    return TimeDuration.valueOf(duration, timeUnit);
   }
 
   static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
       RetryPolicy retryPolicy, int maxOutstandingRequests,
       GrpcTlsConfig tlsConfig, TimeDuration clientRequestTimeout) {
     return newRaftClient(rpcType, leader.getId(),
-        newRaftGroup(new ArrayList<>(Arrays.asList(leader))), retryPolicy,
+        newRaftGroup(Collections.singletonList(leader)), retryPolicy,
         maxOutstandingRequests, tlsConfig, clientRequestTimeout);
   }
 
@@ -175,7 +174,7 @@ public interface RatisHelper {
       RetryPolicy retryPolicy, int maxOutstandingRequests,
       TimeDuration clientRequestTimeout) {
     return newRaftClient(rpcType, leader.getId(),
-        newRaftGroup(new ArrayList<>(Arrays.asList(leader))), retryPolicy,
+        newRaftGroup(Collections.singletonList(leader)), retryPolicy,
         maxOutstandingRequests, null, clientRequestTimeout);
   }
 

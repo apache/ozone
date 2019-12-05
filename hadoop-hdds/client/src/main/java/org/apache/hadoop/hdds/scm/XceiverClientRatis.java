@@ -179,7 +179,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     // maxOutstandingRequests so as to set the upper bound on max no of async
     // requests to be handled by raft client
     if (!client.compareAndSet(null,
-        RatisHelper.newRaftClient(rpcType, getPipeline(), retryPolicy,
+        RatisHelper.newRaftClient(rpcType, pipeline, retryPolicy,
             maxOutstandingRequests, tlsConfig, clientRequestTimeout))) {
       throw new IllegalStateException("Client is already connected.");
     }
@@ -207,7 +207,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     }
   }
 
-  private RaftClient getClient() {
+  @VisibleForTesting
+  RaftClient getClient() {
     return Objects.requireNonNull(client.get(), "client is null");
   }
 
