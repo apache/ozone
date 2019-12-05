@@ -105,51 +105,62 @@ public class OzoneConfiguration extends Configuration {
    */
   public <T> T getObject(Class<T> configurationClass) {
 
-    T configuration;
+    T configObject;
 
     try {
-      configuration = configurationClass.newInstance();
+      configObject = configurationClass.newInstance();
     } catch (InstantiationException | IllegalAccessException e) {
       throw new ConfigurationException(
           "Configuration class can't be created: " + configurationClass, e);
     }
     ConfigGroup configGroup =
         configurationClass.getAnnotation(ConfigGroup.class);
+    
     String prefix = configGroup.prefix();
 
-    processConfigAnnotationFromClass(configurationClass, configuration, prefix);
+    injectConfiguration(configurationClass, configObject, prefix);
+
+    callPostConstruct(configurationClass, configObject);
+
+    return configObject;
+
+  }
+
+  private <T> void injectConfiguration(Class<T> configurationClass,
+      T configObject, String prefix) {
+    injectConfigurationToObject(configurationClass, configObject, prefix);
     Class<? super T> superClass = configurationClass.getSuperclass();
     while (superClass != null) {
-      processConfigAnnotationFromClass(superClass, configuration, prefix);
+      injectConfigurationToObject(superClass, configObject, prefix);
       superClass = superClass.getSuperclass();
     }
+  }
 
+  private <T> void callPostConstruct(Class<T> configurationClass,
+      T configObject) {
     for (Method method : configurationClass.getMethods()) {
       if (method.isAnnotationPresent(PostConstruct.class)) {
         try {
-          method.invoke(configuration);
+          method.invoke(configObject);
         } catch (IllegalAccessException ex) {
           throw new IllegalArgumentException(
               "@PostConstruct method in " + configurationClass
                   + " is not accessible");
         } catch (InvocationTargetException e) {
-          if (e.getCause() != null && e
-              .getCause() instanceof RuntimeException) {
+          if (e.getCause() instanceof RuntimeException) {
             throw (RuntimeException) e.getCause();
           } else {
             throw new IllegalArgumentException(
                 "@PostConstruct can't be executed on " + configurationClass
-                    + " after configuration "
+                    + " after configObject "
                     + "injection", e);
           }
         }
       }
     }
-    return configuration;
-
   }
 
-  private <T> void processConfigAnnotationFromClass(Class<T> configurationClass,
+  private <T> void injectConfigurationToObject(Class<T> configurationClass,
       T configuration, String prefix) {
     for (Field field : configurationClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
