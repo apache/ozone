@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
@@ -81,9 +81,10 @@ public class TestOzoneFsRenameDir {
 
   /**
    * Tests directory rename opertion through OzoneFS.
+   * @throws Exception
    */
   @Test(timeout=300_000)
-  public void testRenameDir() throws IOException {
+  public void testRenameDir() throws Exception {
     final String dir = "/root_dir/dir1";
     final Path source = new Path(fs.getUri().toString() + dir);
     final Path dest = new Path(source.toString() + ".renamed");
@@ -98,5 +99,13 @@ public class TestOzoneFsRenameDir {
     // sub-directories of the renamed directory have also been renamed.
     assertTrue("Keys under the renamed direcotry not renamed",
         fs.exists(new Path(dest, "sub_dir1")));
+
+    // Test if one path belongs to other FileSystem.
+    LambdaTestUtils.intercept(IllegalArgumentException.class, "Wrong FS",
+        () -> fs.rename(new Path(fs.getUri().toString() + "fake" + dir), dest));
+
+    // Renaming to same path when src is specified with scheme.
+    assertTrue("Renaming to same path should be success.",
+        fs.rename(source, new Path(dir)));
   }
 }
