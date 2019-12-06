@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.GeneratedMessage;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.conf.Configuration;
@@ -39,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.commands
     .DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
+import com.google.protobuf.GeneratedMessageV3;
 import static java.lang.Math.min;
 import static org.apache.hadoop.hdds.scm.HddsServerUtil.getScmHeartbeatInterval;
 import org.slf4j.Logger;
@@ -69,7 +69,7 @@ public class StateContext {
   private final DatanodeStateMachine parent;
   private final AtomicLong stateExecutionCount;
   private final Configuration conf;
-  private final List<GeneratedMessage> reports;
+  private final List<GeneratedMessageV3> reports;
   private final Queue<ContainerAction> containerActions;
   private final Queue<PipelineAction> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
@@ -174,7 +174,7 @@ public class StateContext {
    *
    * @param report report to be added
    */
-  public void addReport(GeneratedMessage report) {
+  public void addReport(GeneratedMessageV3 report) {
     if (report != null) {
       synchronized (reports) {
         reports.add(report);
@@ -189,7 +189,7 @@ public class StateContext {
    * @param reportsToPutBack list of reports which failed to be sent by
    *                         heartbeat.
    */
-  public void putBackReports(List<GeneratedMessage> reportsToPutBack) {
+  public void putBackReports(List<GeneratedMessageV3> reportsToPutBack) {
     synchronized (reports) {
       reports.addAll(0, reportsToPutBack);
     }
@@ -201,7 +201,7 @@ public class StateContext {
    *
    * @return List of reports
    */
-  public List<GeneratedMessage> getAllAvailableReports() {
+  public List<GeneratedMessageV3> getAllAvailableReports() {
     return getReports(Integer.MAX_VALUE);
   }
 
@@ -211,10 +211,10 @@ public class StateContext {
    *
    * @return List of reports
    */
-  public List<GeneratedMessage> getReports(int maxLimit) {
-    List<GeneratedMessage> reportsToReturn = new LinkedList<>();
+  public List<GeneratedMessageV3> getReports(int maxLimit) {
+    List<GeneratedMessageV3> reportsToReturn = new LinkedList<>();
     synchronized (reports) {
-      List<GeneratedMessage> tempList = reports.subList(
+      List<GeneratedMessageV3> tempList = reports.subList(
           0, min(reports.size(), maxLimit));
       reportsToReturn.addAll(tempList);
       tempList.clear();

@@ -56,7 +56,7 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.GeneratedMessageV3;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
@@ -723,7 +723,7 @@ public class ReplicationManager implements MetricsSource {
    * @param tracker Tracker which tracks the inflight actions
    * @param <T> Type of SCMCommand
    */
-  private <T extends GeneratedMessage> void sendAndTrackDatanodeCommand(
+  private <T extends GeneratedMessageV3> void sendAndTrackDatanodeCommand(
       final DatanodeDetails datanode,
       final SCMCommand<T> command,
       final Consumer<InflightAction> tracker) {

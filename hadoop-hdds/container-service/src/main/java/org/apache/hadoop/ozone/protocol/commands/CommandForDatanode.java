@@ -19,13 +19,14 @@ package org.apache.hadoop.ozone.protocol.commands;
 
 import java.util.UUID;
 
-import com.google.protobuf.GeneratedMessage;
 import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
+
+import com.google.protobuf.GeneratedMessageV3;
 
 /**
  * Command for the datanode with the destination address.
  */
-public class CommandForDatanode<T extends GeneratedMessage> implements
+public class CommandForDatanode<T extends GeneratedMessageV3> implements
     IdentifiableEventPayload {
 
   private final UUID datanodeId;

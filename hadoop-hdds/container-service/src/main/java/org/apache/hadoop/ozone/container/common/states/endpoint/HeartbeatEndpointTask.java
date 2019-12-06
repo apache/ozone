@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
+import com.google.protobuf.GeneratedMessageV3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,7 +161,7 @@ public class HeartbeatEndpointTask
 
   // TODO: Make it generic.
   private void putBackReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
-    List<GeneratedMessage> reports = new LinkedList<>();
+    List<GeneratedMessageV3> reports = new LinkedList<>();
     if (requestBuilder.hasContainerReport()) {
       reports.add(requestBuilder.getContainerReport());
     }
@@ -182,7 +183,7 @@ public class HeartbeatEndpointTask
    * @param requestBuilder builder to which the report has to be added.
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
-    for (GeneratedMessage report : context.getAllAvailableReports()) {
+    for (GeneratedMessageV3 report : context.getAllAvailableReports()) {
       String reportName = report.getDescriptorForType().getFullName();
       for (Descriptors.FieldDescriptor descriptor :
           SCMHeartbeatRequestProto.getDescriptor().getFields()) {

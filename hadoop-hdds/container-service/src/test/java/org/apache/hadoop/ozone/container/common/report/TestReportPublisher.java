@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.protocol.proto.
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
+
+import com.google.protobuf.GeneratedMessageV3;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -76,7 +78,7 @@ public class TestReportPublisher {
     }
 
     @Override
-    protected GeneratedMessage getReport() {
+    protected GeneratedMessageV3 getReport() {
       getReportCount++;
       return null;
     }

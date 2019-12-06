@@ -190,7 +190,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           </protocArtifact>
           <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
           <includes>
+            <include>StorageContainerDatanodeProtocol.proto</include>
             <include>DatanodeContainerProtocol.proto</include>
+            <include>hdds.proto</include>
+            <include>SCMSecurityProtocol.proto</include>
+            <include>ScmBlockLocationProtocol.proto</include>
+            <include>StorageContainerLocationProtocol.proto</include>
+            <include>FSProtos.proto</include>
+            <include>Security.proto</include>
           </includes>
           <outputDirectory>target/generated-sources/java</outputDirectory>
           <clearOutputDirectory>false</clearOutputDirectory>
@@ -250,28 +257,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <includes>
                   <include>*/src/main/java/**/*.java</include>
                   <include>*/src/main/proto/*.proto</include>
-                </includes>
-              </source>
-            </configuration>
-          </execution>
-          <execution>
-            <id>compile-protoc</id>
-            <goals>
-              <goal>protoc</goal>
-            </goals>
-            <configuration>
-              <protocVersion>${protobuf.version}</protocVersion>
-              <protocCommand>${protoc.path}</protocCommand>
-              <imports>
-                <param>${basedir}/src/main/proto</param>
-              </imports>
-              <source>
-                <directory>${basedir}/src/main/proto</directory>
-                <includes>
-                  <include>StorageContainerLocationProtocol.proto</include>
-                  <include>hdds.proto</include>
-                  <include>ScmBlockLocationProtocol.proto</include>
-                  <include>SCMSecurityProtocol.proto</include>
                 </includes>
               </source>
             </configuration>

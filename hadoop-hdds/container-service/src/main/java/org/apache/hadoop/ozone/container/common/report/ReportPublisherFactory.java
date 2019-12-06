@@ -17,7 +17,8 @@
 
 package org.apache.hadoop.ozone.container.common.report;
 
-import com.google.protobuf.GeneratedMessage;
+import com.google.protobuf.GeneratedMessageV3;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.proto.
         StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -38,7 +39,7 @@ import java.util.Map;
 public class ReportPublisherFactory {
 
   private final Configuration conf;
-  private final Map<Class<? extends GeneratedMessage>,
+  private final Map<Class<? extends GeneratedMessageV3>,
       Class<? extends ReportPublisher>> report2publisher;
 
   /**
@@ -67,7 +68,7 @@ public class ReportPublisherFactory {
    * @return report publisher
    */
   public ReportPublisher getPublisherFor(
-      Class<? extends GeneratedMessage> report) {
+      Class<? extends GeneratedMessageV3> report) {
     Class<? extends ReportPublisher> publisherClass =
         report2publisher.get(report);
     if (publisherClass == null) {
