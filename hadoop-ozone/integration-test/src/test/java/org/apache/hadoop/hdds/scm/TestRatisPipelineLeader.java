@@ -38,7 +38,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
- * Test pipeline leader information is correctly used
+ * Test pipeline leader information is correctly used.
  */
 public class TestRatisPipelineLeader {
   private static MiniOzoneCluster cluster;
