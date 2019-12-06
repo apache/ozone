@@ -104,7 +104,7 @@ public class OzoneQuota {
     String size = "";
     int nSize;
     Units currUnit = Units.MB;
-    Boolean found = false;
+    boolean found = false;
     if (uppercase.endsWith(OZONE_QUOTA_MB)) {
       size = uppercase
           .substring(0, uppercase.length() - OZONE_QUOTA_MB.length());
@@ -133,7 +133,7 @@ public class OzoneQuota {
       found = true;
     }
 
-    if (Boolean.FALSE.equals(found)) {
+    if (!found) {
       String exceptionInfo =
           "Quota unit not recognized. " +
           "Supported values are BYTES, MB, GB and TB.";
