@@ -59,6 +59,10 @@ public class BlockManagerImpl implements BlockManager {
 
   private Configuration config;
 
+  private static final String DB_NULL_ERR_MSG = "DB cannot be null here";
+  private static final String NO_SUCH_BLOCK_ERR_MSG =
+      "Unable to find the block.";
+
   /**
    * Constructs a Block Manager.
    *
@@ -88,7 +92,7 @@ public class BlockManagerImpl implements BlockManager {
         getDB((KeyValueContainerData) container.getContainerData(), config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
-      Preconditions.checkNotNull(db, "DB cannot be null here");
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
 
       long bcsId = data.getBlockCommitSequenceId();
       long containerBCSId = ((KeyValueContainerData) container.
@@ -97,18 +101,16 @@ public class BlockManagerImpl implements BlockManager {
       // default blockCommitSequenceId for any block is 0. It the putBlock
       // request is not coming via Ratis(for test scenarios), it will be 0.
       // In such cases, we should overwrite the block as well
-      if (bcsId != 0) {
-        if (bcsId <= containerBCSId) {
-          // Since the blockCommitSequenceId stored in the db is greater than
-          // equal to blockCommitSequenceId to be updated, it means the putBlock
-          // transaction is reapplied in the ContainerStateMachine on restart.
-          // It also implies that the given block must already exist in the db.
-          // just log and return
-          LOG.warn("blockCommitSequenceId " + containerBCSId
-              + " in the Container Db is greater than" + " the supplied value "
-              + bcsId + " .Ignoring it");
-          return data.getSize();
-        }
+      if ((bcsId != 0) && (bcsId <= containerBCSId)) {
+        // Since the blockCommitSequenceId stored in the db is greater than
+        // equal to blockCommitSequenceId to be updated, it means the putBlock
+        // transaction is reapplied in the ContainerStateMachine on restart.
+        // It also implies that the given block must already exist in the db.
+        // just log and return
+        LOG.warn("blockCommitSequenceId {} in the Container Db is greater than"
+            + " the supplied value {}. Ignoring it",
+            containerBCSId, bcsId);
+        return data.getSize();
       }
       // update the blockData as well as BlockCommitSequenceId here
       BatchOperation batch = new BatchOperation();
@@ -151,7 +153,7 @@ public class BlockManagerImpl implements BlockManager {
     try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
-      Preconditions.checkNotNull(db, "DB cannot be null here");
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
 
       long containerBCSId = containerData.getBlockCommitSequenceId();
       if (containerBCSId < bcsId) {
@@ -162,8 +164,8 @@ public class BlockManagerImpl implements BlockManager {
       }
       byte[] kData = db.getStore().get(Longs.toByteArray(blockID.getLocalID()));
       if (kData == null) {
-        throw new StorageContainerException("Unable to find the block." +
-            blockID, NO_SUCH_BLOCK);
+        throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG + blockID,
+            NO_SUCH_BLOCK);
       }
       ContainerProtos.BlockData blockData =
           ContainerProtos.BlockData.parseFrom(kData);
@@ -193,10 +195,10 @@ public class BlockManagerImpl implements BlockManager {
     try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
-      Preconditions.checkNotNull(db, "DB cannot be null here");
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
       byte[] kData = db.getStore().get(Longs.toByteArray(blockID.getLocalID()));
       if (kData == null) {
-        throw new StorageContainerException("Unable to find the block.",
+        throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG,
             NO_SUCH_BLOCK);
       }
       ContainerProtos.BlockData blockData =
@@ -225,7 +227,7 @@ public class BlockManagerImpl implements BlockManager {
     try(ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
-      Preconditions.checkNotNull(db, "DB cannot be null here");
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
       // Note : There is a race condition here, since get and delete
       // are not atomic. Leaving it here since the impact is refusing
       // to delete a Block which might have just gotten inserted after
@@ -234,7 +236,7 @@ public class BlockManagerImpl implements BlockManager {
 
       byte[] kData = db.getStore().get(kKey);
       if (kData == null) {
-        throw new StorageContainerException("Unable to find the block.",
+        throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG,
             NO_SUCH_BLOCK);
       }
       db.getStore().delete(kKey);
