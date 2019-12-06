@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -67,6 +66,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_DEADNODE_INTERVAL;
@@ -1115,7 +1115,7 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails[] nodes = new DatanodeDetails[nodeCount];
       for (int i = 0; i < nodeCount; i++) {
-        DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails(
+        DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
         nodeManager.register(node, null, null);
         nodes[i] = node;
@@ -1157,7 +1157,7 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails[] nodes = new DatanodeDetails[nodeCount];
       for (int i = 0; i < nodeCount; i++) {
-        DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails(
+        DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
         nodeManager.register(node, null, null);
         nodes[i] = node;
@@ -1207,7 +1207,7 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails[] nodes = new DatanodeDetails[nodeCount];
       for (int i = 0; i < nodeCount; i++) {
-        DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails(
+        DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
         nodeManager.register(node, null, null);
       }
