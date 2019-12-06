@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import java.io.IOException;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
