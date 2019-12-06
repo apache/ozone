@@ -446,4 +446,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
   }
+
+  @VisibleForTesting
+  void addApplyTransactionTermIndex(long term, long index) {
+    applyTransactionMap.put(index, term);
+  }
 }
