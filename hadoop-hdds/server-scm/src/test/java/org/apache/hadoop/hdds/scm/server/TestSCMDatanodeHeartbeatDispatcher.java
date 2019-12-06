@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .ContainerReportFromDatanode;
@@ -46,6 +45,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
@@ -81,7 +81,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
           }
         });
 
-    DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
 
     SCMHeartbeatRequestProto heartbeat =
         SCMHeartbeatRequestProto.newBuilder()
@@ -132,7 +132,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
           }
         });
 
-    DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
 
     SCMHeartbeatRequestProto heartbeat =
         SCMHeartbeatRequestProto.newBuilder()
@@ -159,7 +159,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
         new SCMDatanodeHeartbeatDispatcher(
             mockNodeManager, Mockito.mock(EventPublisher.class));
 
-    DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
 
     SCMHeartbeatRequestProto heartbeat =
         SCMHeartbeatRequestProto.newBuilder()

@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.RatisTestHelper;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -80,7 +80,7 @@ public class TestOzoneContainerRatis {
 
       final String containerName = OzoneUtils.getRequestID();
       final List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
-      final Pipeline pipeline = ContainerTestHelper.createPipeline(
+      final Pipeline pipeline = MockPipeline.createPipeline(
           CollectionUtils.as(datanodes,
               HddsDatanodeService::getDatanodeDetails));
       LOG.info("pipeline=" + pipeline);

@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -44,6 +43,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto
     .ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result;
 import static org.apache.hadoop.hdds.protocol.proto
@@ -118,7 +118,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   public List<AllocatedBlock> allocateBlock(long size, int num,
       HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
       String owner, ExcludeList excludeList) throws IOException {
-    DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
     Pipeline pipeline = createPipeline(datanodeDetails);
     long containerID = Time.monotonicNow();
     long localID = Time.monotonicNow();

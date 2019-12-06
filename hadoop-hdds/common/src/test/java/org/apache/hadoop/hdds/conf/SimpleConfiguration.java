@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Example configuration to test the configuration injection.
  */
-@ConfigGroup(prefix = "ozone.scm.client")
+@ConfigGroup(prefix = "fake.scm.client")
 public class SimpleConfiguration {
 
   private String clientAddress;
