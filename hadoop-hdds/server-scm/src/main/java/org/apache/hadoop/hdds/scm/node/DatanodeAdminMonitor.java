@@ -31,9 +31,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.common.statemachine
-    .InvalidStateTransitionException;
-import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,43 +67,12 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
   private Queue<DatanodeAdminNodeDetails> pendingNodes = new ArrayDeque();
   private Queue<DatanodeAdminNodeDetails> cancelledNodes = new ArrayDeque();
   private Set<DatanodeAdminNodeDetails> trackedNodes = new HashSet<>();
-  private Queue<DatanodeAdminNodeDetails> completedNodes = new ArrayDeque<>();
-  private StateMachine<States, Transitions> workflowSM;
-
-  /**
-   * States that a node must pass through when being decommissioned or placed
-   * into maintenance.
-   */
-  public enum States {
-    CLOSE_PIPELINES(1),
-    REPLICATE_CONTAINERS(2),
-    AWAIT_MAINTENANCE_END(3),
-    COMPLETE(4);
-
-    private int sequenceNumber;
-
-    States(int sequenceNumber) {
-      this.sequenceNumber = sequenceNumber;
-    }
-
-    public int getSequenceNumber() {
-      return sequenceNumber;
-    }
-  }
-
-  /**
-   * Transition events that occur to move a node from one state to the next.
-   */
-  public enum Transitions {
-    COMPLETE_DECOM_STAGE, COMPLETE_MAINT_STAGE, UNEXPECTED_NODE_STATE
-  }
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminMonitor.class);
 
   public DatanodeAdminMonitor(OzoneConfiguration config) {
     conf = config;
-    initializeStateMachine();
   }
 
   @Override
@@ -146,8 +112,7 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
   @Override
   public synchronized void startMonitoring(DatanodeDetails dn, int endInHours) {
     DatanodeAdminNodeDetails nodeDetails =
-        new DatanodeAdminNodeDetails(dn, workflowSM.getInitialState(),
-            endInHours);
+        new DatanodeAdminNodeDetails(dn, endInHours);
     cancelledNodes.remove(nodeDetails);
     pendingNodes.add(nodeDetails);
   }
@@ -160,8 +125,7 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
    */
   @Override
   public synchronized void stopMonitoring(DatanodeDetails dn) {
-    DatanodeAdminNodeDetails nodeDetails = new DatanodeAdminNodeDetails(dn,
-        workflowSM.getInitialState(), 0);
+    DatanodeAdminNodeDetails nodeDetails = new DatanodeAdminNodeDetails(dn, 0);
     pendingNodes.remove(nodeDetails);
     cancelledNodes.add(nodeDetails);
   }
@@ -215,16 +179,6 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
     return trackedNodes;
   }
 
-  /**
-   * Return the state machine used to transition a node through the admin
-   * workflow.
-   * @return The StateMachine used by the admin workflow
-   */
-  @VisibleForTesting
-  public StateMachine<States, Transitions> getWorkflowStateMachine() {
-    return workflowSM;
-  }
-
   private void processCancelledNodes() {
     while(!cancelledNodes.isEmpty()) {
       stopTrackingNode(cancelledNodes.poll());
@@ -239,33 +193,44 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
   }
 
   private void processTransitioningNodes() {
-    for (DatanodeAdminNodeDetails dn : trackedNodes) {
+    Iterator<DatanodeAdminNodeDetails> iterator = trackedNodes.iterator();
+    while (iterator.hasNext()) {
+      DatanodeAdminNodeDetails dn = iterator.next();
       try {
-        if (!shouldContinueWorkflow(dn)) {
+        NodeStatus status = getNodeStatus(dn.getDatanodeDetails());
+
+        if (!shouldContinueWorkflow(dn, status)) {
           abortWorkflow(dn);
+          iterator.remove();
           continue;
         }
-        if (dn.getCurrentState() == States.CLOSE_PIPELINES) {
-          checkPipelinesClosedOnNode(dn);
+
+        if (status.isMaintenance()) {
+          if (dn.shouldMaintenanceEnd()) {
+            completeMaintenance(dn);
+            iterator.remove();
+            continue;
+          }
         }
-        if (dn.getCurrentState() == States.REPLICATE_CONTAINERS) {
-          checkContainersOnNode(dn);
+
+        if (status.isDecommissioning() || status.isEnteringMaintenance()) {
+          if (checkPipelinesClosedOnNode(dn)
+              && checkContainersReplicatedOnNode(dn)) {
+            if (status.isDecommissioning()) {
+              completeDecommission(dn);
+              iterator.remove();
+            } else {
+              putIntoMaintenance(dn);
+            }
+          }
         }
-        if (dn.getCurrentState() == States.AWAIT_MAINTENANCE_END) {
-          checkMaintenanceEndOnNode(dn);
-        }
-        if (dn.getCurrentState() == States.COMPLETE) {
-          handleCompletedNode(dn);
-        }
-      } catch (NodeNotFoundException | InvalidStateTransitionException e) {
-        LOG.error("An unexpected error occurred processing datanode {}. "+
+
+      } catch (NodeNotFoundException e) {
+        LOG.error("An unexpected error occurred processing datanode {}. " +
             "Aborting the admin workflow", dn.getDatanodeDetails(), e);
         abortWorkflow(dn);
+        iterator.remove();
       }
-    }
-    while(!completedNodes.isEmpty()) {
-      DatanodeAdminNodeDetails dn = completedNodes.poll();
-      stopTrackingNode(dn);
     }
   }
 
@@ -274,12 +239,11 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
    * decommissioning or entering maintenance. If the node is not in a valid
    * state to continue the admin workflow, return false, otherwise return true.
    * @param dn The Datanode for which to check the current state
+   * @param nodeStatus The current NodeStatus for the datanode
    * @return True if admin can continue, false otherwise
-   * @throws NodeNotFoundException
    */
-  private boolean shouldContinueWorkflow(DatanodeAdminNodeDetails dn)
-      throws NodeNotFoundException {
-    NodeStatus nodeStatus = getNodeStatus(dn.getDatanodeDetails());
+  private boolean shouldContinueWorkflow(DatanodeAdminNodeDetails dn,
+      NodeStatus nodeStatus) {
     if (!nodeStatus.isDecommission() && !nodeStatus.isMaintenance()) {
       LOG.warn("Datanode {} has an operational state of {} when it should "+
               "be undergoing decommission or maintenance. Aborting admin for "+
@@ -295,21 +259,21 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
     return true;
   }
 
-  private void checkPipelinesClosedOnNode(DatanodeAdminNodeDetails dn)
-      throws InvalidStateTransitionException, NodeNotFoundException {
+  private boolean checkPipelinesClosedOnNode(DatanodeAdminNodeDetails dn) {
     DatanodeDetails dnd = dn.getDatanodeDetails();
     Set<PipelineID> pipelines = nodeManager.getPipelines(dnd);
     if (pipelines == null || pipelines.size() == 0
         || dn.shouldMaintenanceEnd()) {
-      completeStage(dn);
+      return true;
     } else {
       LOG.info("Waiting for pipelines to close for {}. There are {} "+
           "pipelines", dnd, pipelines.size());
+      return false;
     }
   }
 
-  private void checkContainersOnNode(DatanodeAdminNodeDetails dn)
-      throws NodeNotFoundException, InvalidStateTransitionException {
+  private boolean checkContainersReplicatedOnNode(DatanodeAdminNodeDetails dn)
+      throws NodeNotFoundException {
     int sufficientlyReplicated = 0;
     int underReplicated = 0;
     int unhealthy = 0;
@@ -335,46 +299,13 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
     dn.setSufficientlyReplicatedContainers(sufficientlyReplicated);
     dn.setUnderReplicatedContainers(underReplicated);
     dn.setUnHealthyContainers(unhealthy);
-    if (getNodeStatus(dn.getDatanodeDetails()).isDead()) {
-      // If the node is dead, we cannot continue decommission so we abort
-      LOG.warn("Datanode {} has been marked as dead and the decommission "+
-          "workflow cannot continue.", dn.getDatanodeDetails());
-      abortWorkflow(dn);
-    } else if ((underReplicated == 0 && unhealthy == 0)
-        || dn.shouldMaintenanceEnd()) {
-      completeStage(dn);
-    }
+
+    return underReplicated == 0 && unhealthy == 0;
   }
 
-  private void checkMaintenanceEndOnNode(DatanodeAdminNodeDetails dn)
-      throws InvalidStateTransitionException, NodeNotFoundException {
-    // Move the node to IN_MAINTENANCE if it is not already at that state
-    if (!getNodeStatus(dn.getDatanodeDetails()).isInMaintenance()) {
-      setNodeOpState(dn, NodeOperationalState.IN_MAINTENANCE);
-    }
-    if (dn.shouldMaintenanceEnd()) {
-      completeStage(dn);
-    }
-  }
-
-  private void handleCompletedNode(DatanodeAdminNodeDetails dn)
-      throws NodeNotFoundException {
-    DatanodeDetails dnd = dn.getDatanodeDetails();
-    NodeStatus nodeStatus = getNodeStatus(dnd);
-    if (nodeStatus.isDecommission()) {
-      completeDecommission(dn, nodeStatus);
-    } else if (nodeStatus.isMaintenance()) {
-      completeMaintenance(dn, nodeStatus);
-    } else {
-      // Node must already be IN_SERVICE
-      LOG.warn("Datanode {} has completed the admin workflow but already has "+
-          "an operationalState of {}", dnd, nodeStatus.getOperationalState());
-    }
-    completedNodes.add(dn);
-  }
-
-  private void completeDecommission(DatanodeAdminNodeDetails dn,
-      NodeStatus nodeStatus) throws NodeNotFoundException{
+  private void completeDecommission(DatanodeAdminNodeDetails dn)
+      throws NodeNotFoundException{
+    NodeStatus nodeStatus = getNodeStatus(dn.getDatanodeDetails());
     if (nodeStatus.isAlive()) {
       setNodeOpState(dn, NodeOperationalState.DECOMMISSIONED);
       LOG.info("Datanode {} has completed the admin workflow. The operational "+
@@ -392,12 +323,20 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
     }
   }
 
-  private void completeMaintenance(DatanodeAdminNodeDetails dn,
-      NodeStatus nodeStatus) throws NodeNotFoundException {
+  private void putIntoMaintenance(DatanodeAdminNodeDetails dn)
+      throws NodeNotFoundException {
+    LOG.info("Datanode {} has entered maintenance", dn.getDatanodeDetails());
+    setNodeOpState(dn, NodeOperationalState.IN_MAINTENANCE);
+  }
+
+  private void completeMaintenance(DatanodeAdminNodeDetails dn)
+      throws NodeNotFoundException {
     // The end state of Maintenance is to put the node back IN_SERVICE, whether
     // it is dead or not.
     // TODO - if the node is dead do we trigger a dead node event here or leave
     //        it to the heartbeat manager?
+    LOG.info("Datanode {} has ended maintenance automatically",
+        dn.getDatanodeDetails());
     putNodeBackInService(dn);
   }
 
@@ -424,13 +363,6 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
       LOG.error("Unable to set the node OperationalState for {} while "+
           "aborting the datanode admin workflow", dn.getDatanodeDetails());
     }
-    completedNodes.add(dn);
-  }
-
-  private void completeStage(DatanodeAdminNodeDetails dn)
-      throws InvalidStateTransitionException, NodeNotFoundException {
-    NodeStatus nodeStatus = getNodeStatus(dn.getDatanodeDetails());
-    dn.transitionState(workflowSM, nodeStatus.getOperationalState());
   }
 
   private void putNodeBackInService(DatanodeAdminNodeDetails dn)
@@ -441,26 +373,6 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
   private void setNodeOpState(DatanodeAdminNodeDetails dn,
       HddsProtos.NodeOperationalState state) throws NodeNotFoundException {
     nodeManager.setNodeOperationalState(dn.getDatanodeDetails(), state);
-  }
-
-  /**
-   * Setup the state machine with the allowed transitions for a node to move
-   * through the maintenance workflow.
-   */
-  private void initializeStateMachine() {
-    Set<States> finalStates = new HashSet<>();
-    workflowSM = new StateMachine<>(States.CLOSE_PIPELINES, finalStates);
-    workflowSM.addTransition(States.CLOSE_PIPELINES,
-        States.REPLICATE_CONTAINERS, Transitions.COMPLETE_DECOM_STAGE);
-    workflowSM.addTransition(States.REPLICATE_CONTAINERS, States.COMPLETE,
-        Transitions.COMPLETE_DECOM_STAGE);
-
-    workflowSM.addTransition(States.CLOSE_PIPELINES,
-        States.REPLICATE_CONTAINERS, Transitions.COMPLETE_MAINT_STAGE);
-    workflowSM.addTransition(States.REPLICATE_CONTAINERS,
-        States.AWAIT_MAINTENANCE_END, Transitions.COMPLETE_MAINT_STAGE);
-    workflowSM.addTransition(States.AWAIT_MAINTENANCE_END,
-        States.COMPLETE, Transitions.COMPLETE_MAINT_STAGE);
   }
 
   // TODO - The nodeManager.getNodeStatus call should really throw

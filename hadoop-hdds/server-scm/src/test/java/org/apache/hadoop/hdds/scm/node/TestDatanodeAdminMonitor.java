@@ -97,8 +97,7 @@ public class TestDatanodeAdminMonitor {
   /**
    * In this test we ensure there are some pipelines for the node being
    * decommissioned, but there are no containers. Therefore the workflow
-   * must wait until the piplines have closed before completing the decommission
-   * flow.
+   * must wait until the pipelines have closed before completing the flow.
    */
   @Test
   public void testClosePipelinesEventFiredWhenAdminStarted() {
@@ -116,20 +115,20 @@ public class TestDatanodeAdminMonitor {
     assertEquals(1, startAdminHandler.getInvocation());
     // Ensure a node is now tracked for decommission
     assertEquals(1, monitor.getTrackedNodeCount());
-    // Ensure the node at the CLOSE_PIPELINES state
-    assertEquals(DatanodeAdminMonitor.States.CLOSE_PIPELINES,
-        getFirstTrackedNode().getCurrentState());
-    // Run the monitor again, and it should remain in CLOSE_PIPELINES state
+    // Ensure the node remains decommissioning
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+    // Run the monitor again, and it should remain decommissioning
     monitor.run();
-    assertEquals(DatanodeAdminMonitor.States.CLOSE_PIPELINES,
-        getFirstTrackedNode().getCurrentState());
-    // Clear the pipelines and the node should transition to the next state
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+
+    // Clear the pipelines and the node should transition to DECOMMISSIONED
     nodeManager.setPipelines(dn1, 0);
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
-    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
-        newStatus.getOperationalState());
+        nodeManager.getNodeStatus(dn1).getOperationalState());
   }
 
   /**
@@ -179,14 +178,14 @@ public class TestDatanodeAdminMonitor {
     monitor.run();
     DatanodeAdminNodeDetails node = getFirstTrackedNode();
     assertEquals(1, monitor.getTrackedNodeCount());
-    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
-        node.getCurrentState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
 
-    // Running the monitor again causes it to remain at replicate_containers
+    // Running the monitor again causes it to remain DECOMMISSIONING
     // as nothing has changed.
     monitor.run();
-    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
-        node.getCurrentState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
     assertEquals(0, node.getSufficientlyReplicatedContainers());
     assertEquals(0, node.getUnHealthyContainers());
     assertEquals(3, node.getUnderReplicatedContainers());
@@ -206,9 +205,8 @@ public class TestDatanodeAdminMonitor {
     assertEquals(3, node.getSufficientlyReplicatedContainers());
     assertEquals(0, node.getUnHealthyContainers());
     assertEquals(0, node.getUnderReplicatedContainers());
-    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
-        newStatus.getOperationalState());
+        nodeManager.getNodeStatus(dn1).getOperationalState());
   }
 
   @Test
@@ -232,8 +230,8 @@ public class TestDatanodeAdminMonitor {
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeAdminNodeDetails node = getFirstTrackedNode();
-    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
-        node.getCurrentState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
     assertEquals(3, node.getUnderReplicatedContainers());
 
     // Set the node to dead, and then the workflow should get aborted, setting
@@ -243,9 +241,8 @@ public class TestDatanodeAdminMonitor {
             HddsProtos.NodeState.HEALTHY));
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
-    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
-        newStatus.getOperationalState());
+        nodeManager.getNodeStatus(dn1).getOperationalState());
   }
 
   @Test
@@ -269,8 +266,8 @@ public class TestDatanodeAdminMonitor {
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeAdminNodeDetails node = getFirstTrackedNode();
-    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
-        node.getCurrentState());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
     assertEquals(3, node.getUnderReplicatedContainers());
 
     // Set the node to dead, and then the workflow should get aborted, setting
@@ -280,9 +277,8 @@ public class TestDatanodeAdminMonitor {
             HddsProtos.NodeState.DEAD));
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
-    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
-        newStatus.getOperationalState());
+        nodeManager.getNodeStatus(dn1).getOperationalState());
   }
 
   @Test
@@ -293,22 +289,17 @@ public class TestDatanodeAdminMonitor {
             HddsProtos.NodeState.HEALTHY));
 
     // Add the node to the monitor, it should transiting to
-    // AWAIT_MAINTENANCE_END as there are no under-replicated containers.
-    // The operational state should also goto IN_MAINTENANCE
+    // IN_MAINTENANCE as there are no containers to replicate.
     monitor.startMonitoring(dn1, 1);
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeAdminNodeDetails node = getFirstTrackedNode();
-    assertEquals(DatanodeAdminMonitor.States.AWAIT_MAINTENANCE_END,
-        node.getCurrentState());
     assertEquals(0, node.getUnderReplicatedContainers());
     assertTrue(nodeManager.getNodeStatus(dn1).isInMaintenance());
 
     // Running the monitor again causes the node to remain in maintenance
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
-    assertEquals(DatanodeAdminMonitor.States.AWAIT_MAINTENANCE_END,
-        node.getCurrentState());
     assertTrue(nodeManager.getNodeStatus(dn1).isInMaintenance());
 
     // Set the maintenance end time to a time in the past and then the node
@@ -316,9 +307,8 @@ public class TestDatanodeAdminMonitor {
     node.setMaintenanceEnd(-1);
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
-    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
-        newStatus.getOperationalState());
+        nodeManager.getNodeStatus(dn1).getOperationalState());
   }
 
   @Test
@@ -334,17 +324,15 @@ public class TestDatanodeAdminMonitor {
     monitor.run();
     DatanodeAdminNodeDetails node = getFirstTrackedNode();
     assertEquals(1, monitor.getTrackedNodeCount());
-    assertEquals(DatanodeAdminMonitor.States.CLOSE_PIPELINES,
-        node.getCurrentState());
+    assertTrue(nodeManager.getNodeStatus(dn1).isEnteringMaintenance());
 
     // Set the maintenance end time to the past and the node should complete
     // the workflow and return to IN_SERVICE
     node.setMaintenanceEnd(-1);
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
-    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
-        newStatus.getOperationalState());
+        nodeManager.getNodeStatus(dn1).getOperationalState());
   }
 
   @Test
@@ -369,16 +357,14 @@ public class TestDatanodeAdminMonitor {
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeAdminNodeDetails node = getFirstTrackedNode();
-    assertEquals(DatanodeAdminMonitor.States.REPLICATE_CONTAINERS,
-        node.getCurrentState());
+    assertTrue(nodeManager.getNodeStatus(dn1).isEnteringMaintenance());
     assertEquals(3, node.getUnderReplicatedContainers());
 
     node.setMaintenanceEnd(-1);
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
-    NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
-        newStatus.getOperationalState());
+        nodeManager.getNodeStatus(dn1).getOperationalState());
   }
 
   @Test
@@ -394,8 +380,7 @@ public class TestDatanodeAdminMonitor {
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeAdminNodeDetails node = getFirstTrackedNode();
-    assertEquals(DatanodeAdminMonitor.States.AWAIT_MAINTENANCE_END,
-        node.getCurrentState());
+    assertTrue(nodeManager.getNodeStatus(dn1).isInMaintenance());
     assertEquals(0, node.getUnderReplicatedContainers());
 
     // Set the node dead and ensure the workflow does not end
@@ -406,8 +391,7 @@ public class TestDatanodeAdminMonitor {
     // Running the monitor again causes the node to remain in maintenance
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
-    assertEquals(DatanodeAdminMonitor.States.AWAIT_MAINTENANCE_END,
-        node.getCurrentState());
+    assertTrue(nodeManager.getNodeStatus(dn1).isInMaintenance());
   }
 
   /**
