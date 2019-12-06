@@ -65,7 +65,6 @@ public class TestOzoneManagerRatisServer {
 
   private OzoneConfiguration conf;
   private OzoneManagerRatisServer omRatisServer;
-  private OzoneManagerRatisClient omRatisClient;
   private String omID;
   private String clientId = UUID.randomUUID().toString();
   private static final long LEADER_ELECTION_TIMEOUT = 500L;
@@ -110,18 +109,12 @@ public class TestOzoneManagerRatisServer {
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
       omNodeDetails, Collections.emptyList());
     omRatisServer.start();
-    omRatisClient = OzoneManagerRatisClient.newOzoneManagerRatisClient(omID,
-        omRatisServer.getRaftGroup(), conf);
-    omRatisClient.connect();
   }
 
   @After
   public void shutdown() {
     if (omRatisServer != null) {
       omRatisServer.stop();
-    }
-    if (omRatisClient != null) {
-      omRatisClient.close();
     }
   }
 
@@ -219,11 +212,6 @@ public class TestOzoneManagerRatisServer {
         .newOMRatisServer(newConf, ozoneManager, nodeDetails,
             Collections.emptyList());
     newOmRatisServer.start();
-    OzoneManagerRatisClient newOmRatisClient = OzoneManagerRatisClient
-        .newOzoneManagerRatisClient(
-            newOmId,
-            newOmRatisServer.getRaftGroup(), newConf);
-    newOmRatisClient.connect();
 
     UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes());
     RaftGroupId raftGroupId = newOmRatisServer.getRaftGroup().getGroupId();

@@ -121,7 +121,6 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisClient;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
@@ -282,7 +281,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private boolean isRatisEnabled;
   private OzoneManagerRatisServer omRatisServer;
-  private OzoneManagerRatisClient omRatisClient;
   private OzoneManagerSnapshotProvider omSnapshotProvider;
   private OMNodeDetails omNodeDetails;
   private List<OMNodeDetails> peerNodes;
@@ -413,7 +411,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omStorage.getCurrentDir());
 
     initializeRatisServer();
-    initializeRatisClient();
 
     if (isRatisEnabled) {
       // Create Ratis storage dir
@@ -1084,9 +1081,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omRatisServer != null) {
       omRatisServer.start();
     }
-    if (omRatisClient != null) {
-      omRatisClient.connect();
-    }
 
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
@@ -1166,10 +1160,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omRatisServer != null) {
       omRatisServer.start();
     }
-    initializeRatisClient();
-    if (omRatisClient != null) {
-      omRatisClient.connect();
-    }
 
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
@@ -1228,21 +1218,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  /**
-   * Creates an instance of ratis client.
-   */
-  private void initializeRatisClient() throws IOException {
-    if (isRatisEnabled) {
-      if (omRatisClient == null) {
-        omRatisClient = OzoneManagerRatisClient.newOzoneManagerRatisClient(
-            omNodeDetails.getOMNodeId(), omRatisServer.getRaftGroup(),
-            configuration);
-      }
-    } else {
-      omRatisClient = null;
-    }
-  }
-
   public OMRatisSnapshotInfo getSnapshotInfo() {
     return omRatisSnapshotInfo;
   }
@@ -1284,10 +1259,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisServer != null) {
         omRatisServer.stop();
         omRatisServer = null;
-      }
-      if (omRatisClient != null) {
-        omRatisClient.close();
-        omRatisClient = null;
       }
       isOmRpcServerRunning = false;
       keyManager.stop();
