@@ -411,7 +411,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omStorage.getCurrentDir());
 
     initializeRatisServer();
-    initializeRatisClient();
 
     if (isRatisEnabled) {
       // Create Ratis storage dir
@@ -1082,9 +1081,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omRatisServer != null) {
       omRatisServer.start();
     }
-    if (omRatisClient != null) {
-      omRatisClient.connect();
-    }
 
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
@@ -1163,10 +1159,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     initializeRatisServer();
     if (omRatisServer != null) {
       omRatisServer.start();
-    }
-    initializeRatisClient();
-    if (omRatisClient != null) {
-      omRatisClient.connect();
     }
 
     try {
@@ -1267,10 +1259,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omRatisServer != null) {
         omRatisServer.stop();
         omRatisServer = null;
-      }
-      if (omRatisClient != null) {
-        omRatisClient.close();
-        omRatisClient = null;
       }
       isOmRpcServerRunning = false;
       keyManager.stop();
