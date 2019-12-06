@@ -245,8 +245,6 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       conf.setTimeDuration(
           OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
           NODE_FAILURE_TIMEOUT, TimeUnit.MILLISECONDS);
-      conf.setInt(OMConfigKeys.OZONE_OM_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY,
-          10);
     }
 
     /**

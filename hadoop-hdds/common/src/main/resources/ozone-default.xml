@@ -1600,15 +1600,6 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
-    <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
-    <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on OM.(16 KB by default)
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.ratis.log.appender.queue.num-elements</name>
     <value>1024</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
@@ -1659,27 +1650,6 @@
     <value>1s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for OM's Ratis server rpc.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.ratis.client.request.timeout.duration</name>
-    <value>3s</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for OM Ratis client request.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.ratis.client.request.max.retries</name>
-    <value>180</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>Number of retries for OM client request.</description>
-  </property>
-  <property>
-    <name>ozone.om.ratis.client.request.retry.interval</name>
-    <value>100ms</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>Interval between successive retries for a OM client request.
     </description>
   </property>
 
