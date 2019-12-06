@@ -4,11 +4,9 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mock;
 import org.mockito.Mockito;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static org.mockito.Mockito.when;
@@ -130,8 +128,71 @@ public class TestOzoneManagerStateMachine {
 
     Assert.assertEquals(0L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assert.assertEquals(1L,
+    Assert.assertEquals(5L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
 
+  }
+
+
+  @Test
+  public void testLastAppliedIndexWithMultipleExecutors() {
+
+    // first flush batch
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 1L);
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 2L);
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 4L);
+
+    List<Long> flushedEpochs = new ArrayList<>();
+
+
+    flushedEpochs.add(1L);
+    flushedEpochs.add(2L);
+    flushedEpochs.add(4L);
+
+    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
+
+    Assert.assertEquals(0L,
+        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
+    Assert.assertEquals(2L,
+        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+
+
+
+
+    // 2nd flush batch
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 3L);
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 5L);
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 6L);
+
+    flushedEpochs.clear();
+    flushedEpochs.add(3L);
+    flushedEpochs.add(5L);
+    flushedEpochs.add(6L);
+
+    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
+
+    Assert.assertEquals(0L,
+        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
+    Assert.assertEquals(6L,
+        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+
+    // 3rd flush batch
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 7L);
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 8L);
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 9L);
+    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 10L);
+
+    flushedEpochs.clear();
+    flushedEpochs.add(7L);
+    flushedEpochs.add(8L);
+    flushedEpochs.add(9L);
+    flushedEpochs.add(10L);
+
+    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
+
+    Assert.assertEquals(0L,
+        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
+    Assert.assertEquals(10L,
+        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
   }
 }

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -148,7 +149,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // placeHolderIndex (when a node becomes leader, it writes a conf entry
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
-    updateLastAppliedIndex(index, currentTerm, null, false);
+    computeAndUpdateLastAppliedIndex(index, currentTerm, null, false);
     snapshotInfo.updateTerm(currentTerm);
   }
 
@@ -361,7 +362,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public void updateLastAppliedIndex(List<Long> flushedEpochs) {
     Preconditions.checkArgument(flushedEpochs.size() > 0);
-    updateLastAppliedIndex(flushedEpochs.get(flushedEpochs.size() -1),
+    computeAndUpdateLastAppliedIndex(flushedEpochs.get(flushedEpochs.size() -1),
         -1L, flushedEpochs, true);
   }
 
@@ -375,21 +376,29 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * Map and update lastAppliedTermIndex accordingly, else check
    * lastAppliedTermIndex and update it.
    */
-  private synchronized void updateLastAppliedIndex(long lastFlushedIndex,
-      long currentTerm, List<Long> flushedEpochs, boolean checkMap) {
+  private synchronized void computeAndUpdateLastAppliedIndex(
+      long lastFlushedIndex, long currentTerm, List<Long> flushedEpochs,
+      boolean checkMap) {
     if (checkMap) {
+      List<Long> flushedTrans = new ArrayList<>(flushedEpochs);
       Long appliedTerm = null;
       long appliedIndex = -1;
       for (long i = getLastAppliedTermIndex().getIndex() + 1; ; i++) {
-        if (flushedEpochs.contains(i)) {
+        if (flushedTrans.contains(i)) {
           appliedIndex = i;
           final Long removed = applyTransactionMap.remove(i);
           appliedTerm = removed;
+          flushedTrans.remove(i);
         } else if (ratisTransactionMap.containsKey(i)) {
           final Long removed = ratisTransactionMap.remove(i);
           appliedTerm = removed;
           appliedIndex = i;
         } else {
+          // Add remaining which are left in flushedEpochs to
+          // ratisTransactionMap to be considered further.
+          for (long epoch : flushedTrans) {
+            ratisTransactionMap.put(epoch, applyTransactionMap.remove(epoch));
+          }
           break;
         }
       }
