@@ -162,11 +162,7 @@ public class BlockManagerImpl implements BlockManager {
                 + container.getContainerData().getContainerID() + " bcsId is "
                 + containerBCSId + ".", UNKNOWN_BCSID);
       }
-      byte[] kData = db.getStore().get(Longs.toByteArray(blockID.getLocalID()));
-      if (kData == null) {
-        throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG + blockID,
-            NO_SUCH_BLOCK);
-      }
+      byte[] kData = getBlockByID(db, blockID);
       ContainerProtos.BlockData blockData =
           ContainerProtos.BlockData.parseFrom(kData);
       long id = blockData.getBlockID().getBlockCommitSequenceId();
@@ -196,11 +192,7 @@ public class BlockManagerImpl implements BlockManager {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-      byte[] kData = db.getStore().get(Longs.toByteArray(blockID.getLocalID()));
-      if (kData == null) {
-        throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG,
-            NO_SUCH_BLOCK);
-      }
+      byte[] kData = getBlockByID(db, blockID);
       ContainerProtos.BlockData blockData =
           ContainerProtos.BlockData.parseFrom(kData);
       return blockData.getSize();
@@ -234,11 +226,7 @@ public class BlockManagerImpl implements BlockManager {
       // the get check.
       byte[] kKey = Longs.toByteArray(blockID.getLocalID());
 
-      byte[] kData = db.getStore().get(kKey);
-      if (kData == null) {
-        throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG,
-            NO_SUCH_BLOCK);
-      }
+      getBlockByID(db, blockID);
       db.getStore().delete(kKey);
       // Decrement blockcount here
       container.getContainerData().decrKeyCount();
@@ -289,5 +277,18 @@ public class BlockManagerImpl implements BlockManager {
    */
   public void shutdown() {
     BlockUtils.shutdownCache(ContainerCache.getInstance(config));
+  }
+
+  private byte[] getBlockByID(ReferenceCountedDB db, BlockID blockID)
+      throws IOException {
+    byte[] blockKey = Longs.toByteArray(blockID.getLocalID());
+
+    byte[] blockData = db.getStore().get(blockKey);
+    if (blockData == null) {
+      throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG,
+          NO_SUCH_BLOCK);
+    }
+
+    return blockData;
   }
 }
