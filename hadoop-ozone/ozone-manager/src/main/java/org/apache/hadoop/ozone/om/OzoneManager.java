@@ -121,7 +121,6 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisClient;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
@@ -282,7 +281,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private boolean isRatisEnabled;
   private OzoneManagerRatisServer omRatisServer;
-  private OzoneManagerRatisClient omRatisClient;
   private OzoneManagerSnapshotProvider omSnapshotProvider;
   private OMNodeDetails omNodeDetails;
   private List<OMNodeDetails> peerNodes;
@@ -1225,21 +1223,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omRatisServer.getServerPort());
     } else {
       omRatisServer = null;
-    }
-  }
-
-  /**
-   * Creates an instance of ratis client.
-   */
-  private void initializeRatisClient() throws IOException {
-    if (isRatisEnabled) {
-      if (omRatisClient == null) {
-        omRatisClient = OzoneManagerRatisClient.newOzoneManagerRatisClient(
-            omNodeDetails.getOMNodeId(), omRatisServer.getRaftGroup(),
-            configuration);
-      }
-    } else {
-      omRatisClient = null;
     }
   }
 
