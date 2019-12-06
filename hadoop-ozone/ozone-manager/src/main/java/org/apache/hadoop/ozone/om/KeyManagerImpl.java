@@ -178,7 +178,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @SuppressWarnings("parameternumber")
-  private KeyManagerImpl(OzoneManager om, ScmClient scmClient,
+  public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
       OzoneBlockTokenSecretManager secretManager,
       KeyProviderCryptoExtension kmsProvider, PrefixManager prefixManager) {
@@ -1859,6 +1859,9 @@ public class KeyManagerImpl implements KeyManager {
     try {
       OzoneFileStatus fileStatus = getFileStatus(args);
       if (fileStatus.isFile()) {
+        if (args.getRefreshPipeline()) {
+          refreshPipeline(fileStatus.getKeyInfo());
+        }
         if (args.getSortDatanodes()) {
           sortDatanodeInPipeline(fileStatus.getKeyInfo(), clientAddress);
         }
