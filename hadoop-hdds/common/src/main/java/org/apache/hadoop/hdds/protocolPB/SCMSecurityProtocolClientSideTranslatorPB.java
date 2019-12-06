@@ -76,7 +76,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
 
       response = rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
     } catch (ServiceException ex) {
-      throw ProtobufHelper.getRemoteException(new com.google.protobuf.ServiceException(ex.getCause()));
+      throw ProtobufHelper.getRemoteException(ex);
     }
     return response;
   }

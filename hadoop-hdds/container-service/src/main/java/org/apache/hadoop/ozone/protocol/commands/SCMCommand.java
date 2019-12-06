@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.GeneratedMessageV3;
 
 import org.apache.hadoop.hdds.HddsIdFactory;
