@@ -875,12 +875,13 @@ public class ContainerStateMachine extends BaseStateMachine {
     try {
       ContainerCommandRequestProto requestProto =
               getContainerCommandRequestProto(proto.getLogData());
+      long contId = requestProto.getContainerID();
 
       switch (requestProto.getCmdType()) {
       case WriteChunk:
-        String location = containerController.
-                getContainerLocation(requestProto.getContainerID());
-        return HddsUtils.writeChunkToString(requestProto, location);
+        String location = containerController.getContainerLocation(contId);
+        return HddsUtils.writeChunkToString(requestProto.getWriteChunk(),
+                contId, location);
       default:
         throw new IllegalStateException("Cmd Type:" + requestProto.getCmdType()
                 + " should not have state machine data");

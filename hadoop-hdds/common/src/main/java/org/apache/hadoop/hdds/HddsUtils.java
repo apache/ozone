@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -554,15 +555,13 @@ public final class HddsUtils {
         "Path should be a descendant of %s", ancestor);
   }
 
-  public static String writeChunkToString(ContainerCommandRequestProto requestProto, String location) {
+  public static String writeChunkToString(WriteChunkRequestProto wc,
+                                          long contId, String location) {
+    Preconditions.checkNotNull(wc);
     StringBuilder builder = new StringBuilder();
-    Preconditions.checkArgument(requestProto.getCmdType() == ContainerProtos.Type.WriteChunk);
-
-    long contId = requestProto.getContainerID();
-    ContainerProtos.WriteChunkRequestProto wc = requestProto.getWriteChunk();
 
     builder.append("cmd=");
-    builder.append(requestProto.getCmdType().toString());
+    builder.append(ContainerProtos.Type.WriteChunk.toString());
 
     builder.append(", container id=");
     builder.append(contId);
