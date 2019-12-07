@@ -553,4 +553,35 @@ public final class HddsUtils {
         path.normalize().startsWith(ancestor.normalize()),
         "Path should be a descendant of %s", ancestor);
   }
+
+  public static String writeChunkToString(ContainerCommandRequestProto requestProto, String location) {
+    StringBuilder builder = new StringBuilder();
+    Preconditions.checkArgument(requestProto.getCmdType() == ContainerProtos.Type.WriteChunk);
+
+    long contId = requestProto.getContainerID();
+    ContainerProtos.WriteChunkRequestProto wc = requestProto.getWriteChunk();
+
+    builder.append("cmd=");
+    builder.append(requestProto.getCmdType().toString());
+
+    builder.append(", container id=");
+    builder.append(contId);
+
+    builder.append(", blockid=");
+    builder.append(wc.getBlockID().getContainerID());
+    builder.append(":localid=");
+    builder.append(wc.getBlockID().getLocalID());
+
+    builder.append(", chunk=");
+    builder.append(wc.getChunkData().getChunkName());
+    builder.append(":offset=");
+    builder.append(wc.getChunkData().getOffset());
+    builder.append(":length=");
+    builder.append(wc.getChunkData().getLen());
+
+    builder.append(", container path=");
+    builder.append(location);
+
+    return builder.toString();
+  }
 }
