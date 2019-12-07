@@ -18,7 +18,8 @@
 package org.apache.hadoop.hdds.scm.protocolPB;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto.Builder;
@@ -33,8 +34,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkR
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
@@ -125,7 +124,7 @@ public final class ContainerCommandResponseBuilders {
    * @return Response.
    */
   public static ContainerCommandResponseProto putBlockResponseSuccess(
-      ContainerCommandRequestProto msg, ContainerProtos.BlockData blockData) {
+      ContainerCommandRequestProto msg, BlockData blockData) {
 
     PutBlockResponseProto.Builder putBlock = PutBlockResponseProto.newBuilder()
         .setCommittedBlockLength(getCommittedBlockLengthResponseBuilder(
@@ -151,7 +150,7 @@ public final class ContainerCommandResponseBuilders {
       ContainerCommandRequestProto msg, BlockData data) {
 
     GetBlockResponseProto.Builder getBlock = GetBlockResponseProto.newBuilder()
-        .setBlockData(data.getProtoBufMessage());
+        .setBlockData(data);
 
     return getSuccessResponseBuilder(msg)
         .setGetBlock(getBlock)
@@ -192,12 +191,10 @@ public final class ContainerCommandResponseBuilders {
   public static ContainerCommandResponseProto getPutFileResponseSuccess(
       ContainerCommandRequestProto msg, BlockData blockData) {
 
-    ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
-
     PutSmallFileResponseProto.Builder putSmallFile =
         PutSmallFileResponseProto.newBuilder()
             .setCommittedBlockLength(getCommittedBlockLengthResponseBuilder(
-                blockDataProto.getSize(), blockDataProto.getBlockID()));
+                blockData.getSize(), blockData.getBlockID()));
 
     return getSuccessResponseBuilder(msg)
         .setCmdType(Type.PutSmallFile)
@@ -219,7 +216,7 @@ public final class ContainerCommandResponseBuilders {
 
     ReadChunkResponseProto.Builder readChunk =
         ReadChunkResponseProto.newBuilder()
-            .setChunkData(info.getProtoBufMessage())
+            .setChunkData(info)
             .setData((data))
             .setBlockID(msg.getGetSmallFile().getBlock().getBlockID());
 
@@ -252,8 +249,21 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
+  public static ContainerCommandResponseProto getReadChunkResponse(
+      ContainerCommandRequestProto request, ByteString data) {
+
+    ReadChunkResponseProto.Builder response =
+        ReadChunkResponseProto.newBuilder()
+            .setChunkData(request.getReadChunk().getChunkData())
+            .setData(data)
+            .setBlockID(request.getReadChunk().getBlockID());
+
+    return getSuccessResponseBuilder(request)
+        .setReadChunk(response)
+        .build();
+  }
+
   private ContainerCommandResponseBuilders() {
     throw new UnsupportedOperationException("no instances");
   }
-
 }

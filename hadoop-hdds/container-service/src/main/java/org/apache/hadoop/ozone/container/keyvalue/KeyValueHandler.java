@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
-import org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -90,8 +89,9 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
-import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponseBuilder;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
@@ -297,7 +297,7 @@ public class KeyValueHandler extends Handler {
     }
 
     KeyValueContainerData containerData = kvContainer.getContainerData();
-    return ContainerCommandResponseBuilders.getReadContainerResponse(
+    return getReadContainerResponse(
         request, containerData.getProtoBufMessage());
   }
 
@@ -405,18 +405,21 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
 
-    BlockData blockData;
+    final ContainerProtos.BlockData blockDataProto;
     try {
       checkContainerOpen(kvContainer);
 
-      blockData = BlockData.getFromProtoBuf(
+      BlockData blockData = BlockData.getFromProtoBuf(
           request.getPutBlock().getBlockData());
       Preconditions.checkNotNull(blockData);
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
-      final long numBytes = blockData.getSerializedSize();
       blockManager.putBlock(kvContainer, blockData);
+
+      blockDataProto = blockData.getProtoBufMessage();
+
+      final long numBytes = blockDataProto.getSerializedSize();
       metrics.incContainerBytesStats(Type.PutBlock, numBytes);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -426,7 +429,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return putBlockResponseSuccess(request, blockData.getProtoBufMessage());
+    return putBlockResponseSuccess(request, blockDataProto);
   }
 
   /**
@@ -451,11 +454,12 @@ public class KeyValueHandler extends Handler {
       return ContainerUtils.logAndReturnError(LOG, sce, request);
     }
 
-    BlockData responseData;
+    ContainerProtos.BlockData responseData;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
-      responseData = blockManager.getBlock(kvContainer, blockID);
+      responseData = blockManager.getBlock(kvContainer, blockID)
+          .getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
       metrics.incContainerBytesStats(Type.GetBlock, numBytes);
 
@@ -563,12 +567,11 @@ public class KeyValueHandler extends Handler {
       return ContainerUtils.logAndReturnError(LOG, sce, request);
     }
 
-    ChunkInfo chunkInfo;
     ByteBuffer data;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getReadChunk().getBlockID());
-      chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
+      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
           .getChunkData());
       Preconditions.checkNotNull(chunkInfo);
 
@@ -589,16 +592,7 @@ public class KeyValueHandler extends Handler {
 
     Preconditions.checkNotNull(data, "Chunk data is null");
 
-    ContainerProtos.ReadChunkResponseProto.Builder response =
-        ContainerProtos.ReadChunkResponseProto.newBuilder();
-    response.setChunkData(chunkInfo.getProtoBufMessage());
-    response.setData(byteBufferToByteString.apply(data));
-    response.setBlockID(request.getReadChunk().getBlockID());
-
-    ContainerCommandResponseProto.Builder builder =
-        getSuccessResponseBuilder(request);
-    builder.setReadChunk(response);
-    return builder.build();
+    return getReadChunkResponse(request, byteBufferToByteString.apply(data));
   }
 
   /**
@@ -737,26 +731,26 @@ public class KeyValueHandler extends Handler {
       }
       return malformedRequest(request);
     }
-    PutSmallFileRequestProto putSmallFileReq =
-        request.getPutSmallFile();
-    BlockData blockData;
 
+    PutSmallFileRequestProto putSmallFileReq = request.getPutSmallFile();
+    final ContainerProtos.BlockData blockDataProto;
     try {
       checkContainerOpen(kvContainer);
 
-      BlockID blockID = BlockID.getFromProtobuf(putSmallFileReq.getBlock()
-          .getBlockData().getBlockID());
-      blockData = BlockData.getFromProtoBuf(
+      BlockData blockData = BlockData.getFromProtoBuf(
           putSmallFileReq.getBlock().getBlockData());
       Preconditions.checkNotNull(blockData);
 
-      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(
-          putSmallFileReq.getChunkInfo());
+      ContainerProtos.ChunkInfo chunkInfoProto = putSmallFileReq.getChunkInfo();
+      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
       Preconditions.checkNotNull(chunkInfo);
+
       ByteBuffer data = putSmallFileReq.getData().asReadOnlyByteBuffer();
       if (dispatcherContext == null) {
         dispatcherContext = new DispatcherContext.Builder().build();
       }
+
+      BlockID blockID = blockData.getBlockID();
 
       // chunks will be committed as a part of handling putSmallFile
       // here. There is no need to maintain this info in openContainerBlockMap.
@@ -764,13 +758,14 @@ public class KeyValueHandler extends Handler {
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();
-      chunks.add(chunkInfo.getProtoBufMessage());
+      chunks.add(chunkInfoProto);
       blockData.setChunks(chunks);
       blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
 
       blockManager.putBlock(kvContainer, blockData);
-      metrics.incContainerBytesStats(Type.PutSmallFile, data.capacity());
 
+      blockDataProto = blockData.getProtoBufMessage();
+      metrics.incContainerBytesStats(Type.PutSmallFile, data.capacity());
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -779,7 +774,7 @@ public class KeyValueHandler extends Handler {
               PUT_SMALL_FILE_ERROR), request);
     }
 
-    return getPutFileResponseSuccess(request, blockData);
+    return getPutFileResponseSuccess(request, blockDataProto);
   }
 
   /**
@@ -827,8 +822,7 @@ public class KeyValueHandler extends Handler {
         chunkInfo = chunk;
       }
       metrics.incContainerBytesStats(Type.GetSmallFile, dataBuf.size());
-      return getGetSmallFileResponseSuccess(request, dataBuf,
-          ChunkInfo.getFromProtoBuf(chunkInfo));
+      return getGetSmallFileResponseSuccess(request, dataBuf, chunkInfo);
     } catch (StorageContainerException e) {
       return ContainerUtils.logAndReturnError(LOG, e, request);
     } catch (IOException ex) {
