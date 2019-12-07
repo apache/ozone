@@ -21,8 +21,6 @@ package org.apache.hadoop.ozone.recon.api;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.jooq.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -38,13 +36,10 @@ import java.util.List;
 @Path("/task")
 @Produces(MediaType.APPLICATION_JSON)
 public class TaskStatusService {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TaskStatusService.class);
-
-  private ReconTaskStatusDao reconTaskStatusDao;
 
   @Inject
   private Configuration sqlConfiguration;
+
   /**
    * Return the list of Recon Tasks and the last successful timestamp and
    * sequence number.
@@ -53,7 +48,8 @@ public class TaskStatusService {
   @GET
   @Path("status")
   public Response getTaskTimes() {
-    reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
+    ReconTaskStatusDao reconTaskStatusDao =
+        new ReconTaskStatusDao(sqlConfiguration);
     List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();
     return Response.ok(resultSet).build();
   }
