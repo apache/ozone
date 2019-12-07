@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -66,7 +67,7 @@ public class OzoneVolume extends WithMetadata {
   /**
    * Creation time of the volume.
    */
-  private long creationTime;
+  private Instant creationTime;
   /**
    * Volume ACLs.
    */
@@ -97,7 +98,7 @@ public class OzoneVolume extends WithMetadata {
     this.admin = admin;
     this.owner = owner;
     this.quotaInBytes = quotaInBytes;
-    this.creationTime = creationTime;
+    this.creationTime = Instant.ofEpochMilli(creationTime);
     this.acls = acls;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.metadata = metadata;
@@ -120,7 +121,7 @@ public class OzoneVolume extends WithMetadata {
     this.admin = admin;
     this.owner = owner;
     this.quotaInBytes = quotaInBytes;
-    this.creationTime = creationTime;
+    this.creationTime = Instant.ofEpochMilli(creationTime);
     this.acls = acls;
     this.metadata = new HashMap<>();
   }
@@ -166,7 +167,7 @@ public class OzoneVolume extends WithMetadata {
    *
    * @return creation time.
    */
-  public long getCreationTime() {
+  public Instant getCreationTime() {
     return creationTime;
   }
 

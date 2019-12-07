@@ -22,7 +22,8 @@ current="/tmp/"
 filename="${current}${date}${fileformat}"
 heapdumpfile="${current}${date}${heapformat}"
 
-export MAVEN_OPTS="-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=${heapdumpfile} -Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false"
+#TODO: add gc log file details as well
+export MAVEN_OPTS="-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=${heapdumpfile} -Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dio.netty.leakDetection.level=advanced -Dio.netty.leakDetectionLevel=advanced -Dio.netty.threadLocalDirectBufferSize=0 -Djdk.nio.maxCachedBufferSize=33554432 -XX:NativeMemoryTracking=detail"
 
 echo "logging to ${filename}"
 echo "heapdump to ${heapdumpfile}"
@@ -30,6 +31,6 @@ echo "heapdump to ${heapdumpfile}"
 echo "Starting MiniOzoneChaosCluster"
 mvn clean install -DskipTests > "${filename}" 2>&1
 mvn exec:java \
-  -Dexec.mainClass="org.apache.hadoop.ozone.TestMiniChaosOzoneCluster" \
+  -Dexec.mainClass="org.apache.hadoop.ozone.chaos.TestMiniChaosOzoneCluster" \
   -Dexec.classpathScope=test \
   -Dexec.args="$*" >> "${filename}" 2>&1

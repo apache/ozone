@@ -25,7 +25,7 @@ import java.util.Objects;
 import java.util.function.Function;
 
 /** {@link ChunkBuffer} implementation using a single {@link ByteBuffer}. */
-public final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
+final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   private final ByteBuffer buffer;
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer) {
@@ -43,7 +43,7 @@ public final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
-  public Iterable<ByteBuffer> iterate(int bytesPerChecksum) {
+  public Iterable<ByteBuffer> iterate(int bufferSize) {
     return () -> new Iterator<ByteBuffer>() {
       @Override
       public boolean hasNext() {
@@ -54,7 +54,7 @@ public final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
       public ByteBuffer next() {
         final ByteBuffer duplicated = buffer.duplicate();
         final int min = Math.min(
-            buffer.position() + bytesPerChecksum, buffer.limit());
+            buffer.position() + bufferSize, buffer.limit());
         duplicated.limit(min);
         buffer.position(min);
         return duplicated;
@@ -80,8 +80,8 @@ public final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
-  public ByteString toByteString(Function<ByteBuffer, ByteString> function) {
-    return function.apply(buffer);
+  public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
+    return f.apply(buffer);
   }
 
   @Override

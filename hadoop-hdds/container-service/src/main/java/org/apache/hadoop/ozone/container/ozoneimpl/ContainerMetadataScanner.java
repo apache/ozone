@@ -58,11 +58,19 @@ public class ContainerMetadataScanner extends Thread {
      * the outer daemon loop exits on shutdown()
      */
     LOG.info("Background ContainerMetadataScanner starting up");
-    while (!stopping) {
-      runIteration();
-      if(!stopping) {
-        metrics.resetNumUnhealthyContainers();
-        metrics.resetNumContainersScanned();
+    try {
+      while (!stopping) {
+        runIteration();
+        if (!stopping) {
+          metrics.resetNumUnhealthyContainers();
+          metrics.resetNumContainersScanned();
+        }
+      }
+    } catch (Exception e) {
+      LOG.error("{} exiting because of exception ", this, e);
+    } finally {
+      if (metrics != null) {
+        metrics.unregister();
       }
     }
   }
