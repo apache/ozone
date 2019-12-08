@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -263,6 +264,17 @@ public class TestOzoneFileSystem {
         fileStatus1.equals(dir12.toString()));
     assertTrue(fileStatus2.equals(dir11.toString()) ||
         fileStatus2.equals(dir12.toString()));
+  }
+
+  @Test
+  public void testSeekOnFileLength() throws IOException {
+    Path file = new Path("/file");
+    ContractTestUtils.createFile(fs, file, true, "a".getBytes());
+    try (FSDataInputStream stream = fs.open(file)) {
+      long fileLength = fs.getFileStatus(file).getLen();
+      stream.seek(fileLength);
+      assertEquals(-1, stream.read());
+    }
   }
 
   @Test
