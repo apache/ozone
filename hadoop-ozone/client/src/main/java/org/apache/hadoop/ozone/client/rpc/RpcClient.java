@@ -721,6 +721,14 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public boolean recoverTrash(String volumeName, String bucketName,
+      String keyName, String destinationName) throws IOException {
+
+    return ozoneManagerClient.recoverTrash(volumeName, bucketName, keyName,
+        destinationName);
+  }
+
+  @Override
   public OzoneKeyDetails getKeyDetails(
       String volumeName, String bucketName, String keyName)
       throws IOException {

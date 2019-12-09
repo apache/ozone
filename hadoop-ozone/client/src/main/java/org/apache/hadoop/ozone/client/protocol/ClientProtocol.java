@@ -336,6 +336,19 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Recover trash allows the user to recover keys that were marked as deleted,
+   * but not actually deleted by Ozone Manager.
+   * @param volumeName - The volume name.
+   * @param bucketName - The bucket name.
+   * @param keyName - The key user want to recover.
+   * @param destinationBucket - The bucket user want to recover to.
+   * @return The recoverTrash
+   * @throws IOException
+   */
+  boolean recoverTrash(String volumeName, String bucketName, String keyName,
+      String destinationBucket) throws IOException;
+
+  /**
    * Get OzoneKey.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
