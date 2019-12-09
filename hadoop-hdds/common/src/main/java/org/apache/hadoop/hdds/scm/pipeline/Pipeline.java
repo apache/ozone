@@ -138,7 +138,7 @@ public final class Pipeline {
    *
    * @return {@link DatanodeDetails}
    */
-  public DatanodeDetails getLeaderNodeIfPresent() throws IOException {
+  public DatanodeDetails getLeaderNode() throws IOException {
     if (nodeStatus.isEmpty()) {
       throw new IOException(String.format("Pipeline=%s is empty", id));
     }

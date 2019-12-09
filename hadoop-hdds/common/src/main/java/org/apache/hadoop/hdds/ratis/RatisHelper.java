@@ -142,7 +142,7 @@ public interface RatisHelper {
       RetryPolicy retryPolicy, int maxOutStandingRequest,
       GrpcTlsConfig tlsConfig, TimeDuration timeout) throws IOException {
     return newRaftClient(rpcType,
-        toRaftPeerId(pipeline.getLeaderNodeIfPresent()),
+        toRaftPeerId(pipeline.getLeaderNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, maxOutStandingRequest, tlsConfig,
         timeout);
