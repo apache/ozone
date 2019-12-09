@@ -23,7 +23,6 @@ import java.lang.reflect.Proxy;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 
@@ -73,70 +72,6 @@ public final class OzoneClientFactory {
       throws IOException {
     Preconditions.checkNotNull(config);
     return getClient(getClientProtocol(config), config);
-  }
-
-  /**
-   * Returns an OzoneClient which will use RPC protocol.
-   *
-   * @param omHost
-   *        hostname of OzoneManager to connect.
-   *
-   * @return OzoneClient
-   *
-   * @throws IOException
-   */
-  public static OzoneClient getRpcClient(String omHost)
-      throws IOException {
-    Configuration config = new OzoneConfiguration();
-    int port = OmUtils.getOmRpcPort(config);
-    return getRpcClient(omHost, port, config);
-  }
-
-  /**
-   * Returns an OzoneClient which will use RPC protocol.
-   *
-   * @param omHost
-   *        hostname of OzoneManager to connect.
-   *
-   * @param omRpcPort
-   *        RPC port of OzoneManager.
-   *
-   * @return OzoneClient
-   *
-   * @throws IOException
-   */
-  public static OzoneClient getRpcClient(String omHost, Integer omRpcPort)
-      throws IOException {
-    return getRpcClient(omHost, omRpcPort, new OzoneConfiguration());
-  }
-
-  /**
-   * Returns an OzoneClient which will use RPC protocol.
-   *
-   * @param omHost
-   *        hostname of OzoneManager to connect.
-   *
-   * @param omRpcPort
-   *        RPC port of OzoneManager.
-   *
-   * @param omServiceId
-   *        Service ID of OzoneManager HA cluster.
-   *
-   * @param config
-   *        Configuration to be used for OzoneClient creation
-   *
-   * @return OzoneClient
-   *
-   * @throws IOException
-   */
-  public static OzoneClient getRpcClient(String omHost, Integer omRpcPort,
-      String omServiceId, Configuration config) throws IOException {
-    Preconditions.checkNotNull(omHost);
-    Preconditions.checkNotNull(omRpcPort);
-    Preconditions.checkNotNull(omServiceId);
-    Preconditions.checkNotNull(config);
-    config.set(OZONE_OM_ADDRESS_KEY, omHost + ":" + omRpcPort);
-    return getRpcClient(omServiceId, config);
   }
 
   /**
@@ -200,8 +135,7 @@ public final class OzoneClientFactory {
   public static OzoneClient getRpcClient(Configuration config)
       throws IOException {
     Preconditions.checkNotNull(config);
-    return getClient(getClientProtocol(config),
-        config);
+    return getClient(getClientProtocol(config), config);
   }
 
   /**
