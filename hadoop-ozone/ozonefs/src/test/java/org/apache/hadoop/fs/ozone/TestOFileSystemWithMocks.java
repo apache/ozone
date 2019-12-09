@@ -74,13 +74,13 @@ public class TestOFileSystemWithMocks {
     //  hence the workaround.
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.OFileSystem");
 
-    URI uri = new URI("ofs://bucket1.volume1.local.host:5899");
+//    URI uri = new URI("ofs://bucket1.volume1.local.host:5899");
+    URI uri = new URI("ofs://local.host:5899/volume1/bucket1");
 
     FileSystem fileSystem = FileSystem.get(uri, conf);
     OFileSystem ofs = (OFileSystem) fileSystem;
 
-    assertEquals(ofs.getUri().getAuthority(),
-        "bucket1.volume1.local.host:5899");
+    assertEquals(ofs.getUri().getAuthority(), "local.host:5899");
     PowerMockito.verifyStatic();
     OzoneClientFactory.getRpcClient("local.host", 5899, conf);
   }
