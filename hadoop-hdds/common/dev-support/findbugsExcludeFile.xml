@@ -30,8 +30,12 @@
     <Method name="update" />
     <Bug pattern="SF_SWITCH_FALLTHROUGH,SF_SWITCH_NO_DEFAULT" />
   </Match>
+
+  <!-- generated protobuf files -->
   <Match>
-    <!-- generated protobuf files -->
-    <Package name="org/apache/hadoop/fs"></Package>
+    <Package name="org.apache.hadoop.fs"></Package>
+  </Match>
+  <Match>
+    <Package name="org.apache.hadoop.security.proto"></Package>
   </Match>
 </FindBugsFilter>
