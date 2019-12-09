@@ -1683,6 +1683,9 @@ public class KeyManagerImpl implements KeyManager {
           volumeName, bucketName, keyName);
       OmKeyInfo fileKeyInfo = metadataManager.getKeyTable().get(fileKeyBytes);
       if (fileKeyInfo != null) {
+        if (args.getRefreshPipeline()) {
+          refreshPipeline(fileKeyInfo);
+        }
         // this is a file
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
