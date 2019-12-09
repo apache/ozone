@@ -98,6 +98,7 @@ services:
           - ./docker-config
       environment:
           ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+          OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
       command: ["/opt/hadoop/bin/ozone","scm"]
       networks:
          net:

@@ -292,7 +292,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     LOG.info("Buffer size: {} bytes", bufferSize);
     LOG.info("validateWrites : {}", validateWrites);
     for (int i = 0; i < numOfThreads; i++) {
-      executor.submit(new ObjectCreator());
+      executor.execute(new ObjectCreator());
     }
 
     Thread validator = null;

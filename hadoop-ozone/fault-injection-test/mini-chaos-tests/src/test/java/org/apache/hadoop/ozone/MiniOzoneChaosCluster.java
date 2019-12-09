@@ -28,8 +28,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.grpc.client.GrpcClientProtocolClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,8 +66,6 @@ public class MiniOzoneChaosCluster extends MiniOzoneClusterImpl {
     this.executorService =  Executors.newSingleThreadScheduledExecutor();
     this.numDatanodes = getHddsDatanodes().size();
     LOG.info("Starting MiniOzoneChaosCluster with {} datanodes", numDatanodes);
-    GenericTestUtils.setLogLevel(GrpcClientProtocolClient.LOG,
-        org.slf4j.event.Level.WARN);
   }
 
   // Get the number of datanodes to fail in the cluster.
@@ -215,7 +211,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneClusterImpl {
     }
 
     @Override
-    void initializeConfiguration() throws IOException {
+    protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
           2, StorageUnit.KB);

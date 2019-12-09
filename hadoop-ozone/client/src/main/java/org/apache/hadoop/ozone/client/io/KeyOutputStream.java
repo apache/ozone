@@ -364,6 +364,7 @@ public class KeyOutputStream extends OutputStream {
       try {
         Thread.sleep(action.delayMillis);
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw (IOException) new InterruptedIOException(
             "Interrupted: action=" + action + ", retry policy=" + retryPolicy)
             .initCause(e);

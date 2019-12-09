@@ -48,6 +48,24 @@ public class TestChunkBuffer {
     runTestImpl(expected, 0, ChunkBuffer.allocate(n));
   }
 
+  @Test(timeout = 1_000)
+  public void testIncrementalChunkBuffer() {
+    runTestIncrementalChunkBuffer(1, 1);
+    runTestIncrementalChunkBuffer(4, 8);
+    runTestIncrementalChunkBuffer(16, 1 << 10);
+    for(int i = 0; i < 10; i++) {
+      final int a = ThreadLocalRandom.current().nextInt(100) + 1;
+      final int b = ThreadLocalRandom.current().nextInt(100) + 1;
+      runTestIncrementalChunkBuffer(Math.min(a, b), Math.max(a, b));
+    }
+  }
+
+  private static void runTestIncrementalChunkBuffer(int increment, int n) {
+    final byte[] expected = new byte[n];
+    ThreadLocalRandom.current().nextBytes(expected);
+    runTestImpl(expected, increment, ChunkBuffer.allocate(n, increment));
+  }
+
   private static void runTestImpl(byte[] expected, int bpc, ChunkBuffer impl) {
     final int n = expected.length;
     System.out.println("n=" + n + ", impl=" + impl);

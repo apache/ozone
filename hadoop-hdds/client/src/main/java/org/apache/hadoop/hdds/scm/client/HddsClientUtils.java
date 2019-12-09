@@ -120,15 +120,7 @@ public final class HddsClientUtils {
         .toInstant().toEpochMilli();
   }
 
-  /**
-   * verifies that bucket name / volume name is a valid DNS name.
-   *
-   * @param resName Bucket or volume Name to be validated
-   *
-   * @throws IllegalArgumentException
-   */
-  public static void verifyResourceName(String resName)
-      throws IllegalArgumentException {
+  private static void doNameChecks(String resName) {
     if (resName == null) {
       throw new IllegalArgumentException("Bucket or Volume name is null");
     }
@@ -150,6 +142,46 @@ public final class HddsClientUtils {
       throw new IllegalArgumentException("Bucket or Volume name "
           + "cannot end with a period or dash");
     }
+  }
+
+  private static boolean isSupportedCharacter(char c) {
+    return (c == '.' || c == '-' ||
+        Character.isLowerCase(c) || Character.isDigit(c));
+  }
+
+  private static void doCharacterChecks(char currChar, char prev) {
+    if (Character.isUpperCase(currChar)) {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name does not support uppercase characters");
+    }
+    if (!isSupportedCharacter(currChar)) {
+      throw new IllegalArgumentException("Bucket or Volume name has an " +
+          "unsupported character : " + currChar);
+    }
+    if (prev == '.' && currChar == '.') {
+      throw new IllegalArgumentException("Bucket or Volume name should not " +
+          "have two contiguous periods");
+    }
+    if (prev == '-' && currChar == '.') {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name should not have period after dash");
+    }
+    if (prev == '.' && currChar == '-') {
+      throw new IllegalArgumentException(
+          "Bucket or Volume name should not have dash after period");
+    }
+  }
+
+  /**
+   * verifies that bucket name / volume name is a valid DNS name.
+   *
+   * @param resName Bucket or volume Name to be validated
+   *
+   * @throws IllegalArgumentException
+   */
+  public static void verifyResourceName(String resName) {
+
+    doNameChecks(resName);
 
     boolean isIPv4 = true;
     char prev = (char) 0;
@@ -159,30 +191,7 @@ public final class HddsClientUtils {
       if (currChar != '.') {
         isIPv4 = ((currChar >= '0') && (currChar <= '9')) && isIPv4;
       }
-      if (currChar > 'A' && currChar < 'Z') {
-        throw new IllegalArgumentException(
-            "Bucket or Volume name does not support uppercase characters");
-      }
-      if (currChar != '.' && currChar != '-') {
-        if (currChar < '0' || (currChar > '9' && currChar < 'a') ||
-            currChar > 'z') {
-          throw new IllegalArgumentException("Bucket or Volume name has an " +
-              "unsupported character : " +
-              currChar);
-        }
-      }
-      if (prev == '.' && currChar == '.') {
-        throw new IllegalArgumentException("Bucket or Volume name should not " +
-            "have two contiguous periods");
-      }
-      if (prev == '-' && currChar == '.') {
-        throw new IllegalArgumentException(
-            "Bucket or Volume name should not have period after dash");
-      }
-      if (prev == '.' && currChar == '-') {
-        throw new IllegalArgumentException(
-            "Bucket or Volume name should not have dash after period");
-      }
+      doCharacterChecks(currChar, prev);
       prev = currChar;
     }
 

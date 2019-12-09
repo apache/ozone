@@ -44,6 +44,7 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.File;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -243,4 +244,27 @@ public class TestVolumeSet {
     }
 
   }
+
+  @Test
+  public void testInterrupt() throws Exception {
+    Method method = this.volumeSet.getClass()
+        .getDeclaredMethod("checkAllVolumes");
+    method.setAccessible(true);
+    String exceptionMessage = "";
+
+    try {
+      Thread.currentThread().interrupt();
+      method.invoke(this.volumeSet);
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Interruption Occur");
+      }
+    } catch (InterruptedException interruptedException) {
+      exceptionMessage = "InterruptedException Occur.";
+    }
+
+    assertEquals(
+        "InterruptedException Occur.",
+        exceptionMessage);
+  }
+
 }

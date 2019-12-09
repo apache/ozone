@@ -208,7 +208,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
         throw new OMException("Can not write to directory: " + keyName,
             OMException.ResultCodes.NOT_A_FILE);
       } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-        throw new OMException("Can not create file: " + keyName + "as there " +
+        throw new OMException("Can not create file: " + keyName + " as there " +
             "is already file in the given path",
             OMException.ResultCodes.NOT_A_FILE);
       }
@@ -243,8 +243,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
           boolean canBeCreated = checkKeysUnderPath(omMetadataManager,
               volumeName, bucketName, keyName);
           if (!canBeCreated) {
-            throw new OMException("Can not create file: " + keyName + "as one" +
-                " of parent directory is not created",
+            throw new OMException("Can not create file: " + keyName +
+                " as one of parent directory is not created",
                 OMException.ResultCodes.NOT_A_FILE);
           }
         }

@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -135,17 +136,20 @@ public class TestOMRatisSnapshots {
     OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
     long leaderOMappliedLogIndex =
-        leaderRatisServer.getStateMachineLastAppliedIndex();
+        leaderRatisServer.getLastAppliedTermIndex().getIndex();
 
     List<String> keys = new ArrayList<>();
     while (leaderOMappliedLogIndex < 2000) {
       keys.add(createKey(ozoneBucket));
       leaderOMappliedLogIndex =
-          leaderRatisServer.getStateMachineLastAppliedIndex();
+          leaderRatisServer.getLastAppliedTermIndex().getIndex();
     }
 
     // Get the latest db checkpoint from the leader OM.
-    long leaderOMSnaphsotIndex = leaderOM.saveRatisSnapshot();
+    TermIndex leaderOMTermIndex = leaderOM.saveRatisSnapshot();
+    long leaderOMSnaphsotIndex = leaderOMTermIndex.getIndex();
+    long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
+
     DBCheckpoint leaderDbCheckpoint =
         leaderOM.getMetadataManager().getStore().getCheckpoint(false);
 
@@ -154,7 +158,7 @@ public class TestOMRatisSnapshots {
 
     // The recently started OM should be lagging behind the leader OM.
     long followerOMLastAppliedIndex =
-        followerOM.getOmRatisServer().getStateMachineLastAppliedIndex();
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     Assert.assertTrue(
         followerOMLastAppliedIndex < leaderOMSnaphsotIndex);
 
@@ -165,16 +169,18 @@ public class TestOMRatisSnapshots {
         leaderOMSnaphsotIndex, leaderDbCheckpoint.getCheckpointLocation());
 
     // Reload the follower OM with new DB checkpoint from the leader OM.
-    followerOM.reloadOMState(leaderOMSnaphsotIndex);
+    followerOM.reloadOMState(leaderOMSnaphsotIndex, leaderOMSnapshotTermIndex);
     followerOM.getOmRatisServer().getOmStateMachine().unpause(
-        leaderOMSnaphsotIndex);
+        leaderOMSnaphsotIndex, leaderOMSnapshotTermIndex);
 
     // After the new checkpoint is loaded and state machine is unpaused, the
     // follower OM lastAppliedIndex must match the snapshot index of the
     // checkpoint.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
-        .getStateMachineLastAppliedIndex();
+        .getLastAppliedTermIndex().getIndex();
     Assert.assertEquals(leaderOMSnaphsotIndex, followerOMLastAppliedIndex);
+    Assert.assertEquals(leaderOMSnapshotTermIndex,
+        followerOM.getOmRatisServer().getLastAppliedTermIndex().getTerm());
 
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.

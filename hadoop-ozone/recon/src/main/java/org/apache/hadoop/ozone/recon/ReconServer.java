@@ -21,22 +21,14 @@ package org.apache.hadoop.ozone.recon;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
-import com.google.inject.AbstractModule;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
-import org.apache.hadoop.ozone.recon.persistence.DefaultDataSourceProvider;
-import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
-import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
-import org.hadoop.ozone.recon.schema.ReconInternalSchemaDefinition;
-import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.inject.Guice;
-import com.google.inject.Inject;
 import com.google.inject.Injector;
 
 
@@ -46,11 +38,8 @@ import com.google.inject.Injector;
 public class ReconServer extends GenericCli {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconServer.class);
-  private final ScheduledExecutorService scheduler =
-      Executors.newScheduledThreadPool(1);
   private Injector injector;
 
-  @Inject
   private ReconHttpServer httpServer;
 
   public static void main(String[] args) {
@@ -71,6 +60,7 @@ public class ReconServer extends GenericCli {
               .packages("org.apache.hadoop.ozone.recon.api");
           }
         },
+        new ReconSchemaGenerationModule(),
         new ReconTaskBindingModule());
 
     //Pass on injector to listener that does the Guice - Jersey HK2 bridging.
@@ -78,17 +68,11 @@ public class ReconServer extends GenericCli {
 
     LOG.info("Initializing Recon server...");
     try {
-      StatsSchemaDefinition statsSchemaDefinition = injector.getInstance(
-          StatsSchemaDefinition.class);
-      statsSchemaDefinition.initializeSchema();
 
-      UtilizationSchemaDefinition utilizationSchemaDefinition =
-          injector.getInstance(UtilizationSchemaDefinition.class);
-      utilizationSchemaDefinition.initializeSchema();
-
-      ReconInternalSchemaDefinition reconInternalSchemaDefinition =
-          injector.getInstance(ReconInternalSchemaDefinition.class);
-      reconInternalSchemaDefinition.initializeSchema();
+      LOG.info("Creating Recon Schema.");
+      ReconSchemaManager reconSchemaManager = injector.getInstance(
+          ReconSchemaManager.class);
+      reconSchemaManager.createReconSchema();
 
       LOG.info("Recon server initialized successfully!");
 
