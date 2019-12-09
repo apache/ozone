@@ -37,8 +37,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocolPB.OzoneManagerHARequestHandler;
-import org.apache.hadoop.ozone.protocolPB.OzoneManagerHARequestHandlerImpl;
+import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
+import org.apache.hadoop.ozone.protocolPB.RequestHandler;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.Message;
@@ -70,7 +70,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       new SimpleStateMachineStorage();
   private final OzoneManagerRatisServer omRatisServer;
   private final OzoneManager ozoneManager;
-  private OzoneManagerHARequestHandler handler;
+  private RequestHandler handler;
   private RaftGroupId raftGroupId;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final OMRatisSnapshotInfo snapshotInfo;
@@ -92,7 +92,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
             this::updateLastAppliedIndex);
 
-    this.handler = new OzoneManagerHARequestHandlerImpl(ozoneManager,
+    this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
@@ -254,6 +254,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       this.ozoneManagerDoubleBuffer =
           new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
               this::updateLastAppliedIndex);
+      handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
       this.setLastAppliedTermIndex(TermIndex.newTermIndex(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
     });
@@ -342,7 +343,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @throws ServiceException
    */
   private Message runCommand(OMRequest request, long trxLogIndex) {
-    OMResponse response = handler.handleApplyTransaction(request, trxLogIndex);
+    OMResponse response = handler.handleWriteRequest(request,
+        trxLogIndex).getOMResponse();
     return OMRatisHelper.convertResponseToMessage(response);
   }
 
@@ -384,7 +386,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @throws ServiceException
    */
   private Message queryCommand(OMRequest request) {
-    OMResponse response = handler.handle(request);
+    OMResponse response = handler.handleReadRequest(request);
     return OMRatisHelper.convertResponseToMessage(response);
   }
 
@@ -395,7 +397,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @VisibleForTesting
-  public void setHandler(OzoneManagerHARequestHandler handler) {
+  public void setHandler(OzoneManagerRequestHandler handler) {
     this.handler = handler;
   }
 
