@@ -134,10 +134,8 @@ public class OzoneQuota {
     }
 
     if (!found) {
-      String exceptionInfo =
-          "Quota unit not recognized. " +
-          "Supported values are BYTES, MB, GB and TB.";
-      throw new IllegalArgumentException(exceptionInfo);
+      throw new IllegalArgumentException("Quota unit not recognized. " +
+          "Supported values are BYTES, MB, GB and TB.");
     }
 
     nSize = Integer.parseInt(size);
