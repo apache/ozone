@@ -57,12 +57,12 @@ public class TestRatisPipelineCreateAndDestroy {
   private static MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private static PipelineManager pipelineManager;
-  private static int MAX_PIPELINE_PER_NODE = 4;
+  private static int maxPipelinePerNode = 4;
 
   public void init(int numDatanodes) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         GenericTestUtils.getRandomizedTempPath());
-    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, MAX_PIPELINE_PER_NODE);
+    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, maxPipelinePerNode);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
@@ -177,11 +177,11 @@ public class TestRatisPipelineCreateAndDestroy {
   public void testMultiRaftStorageDir() throws Exception {
     final String suffix = "-testMultiRaftStorageDir-";
     Map<String, AtomicInteger> directories = new ConcurrentHashMap<>();
-    int maxPipelinePerNode = MAX_PIPELINE_PER_NODE;
+    int maxPipeline = maxPipelinePerNode;
     int index = 0;
-    while(maxPipelinePerNode > 1) {
+    while(maxPipeline > 1) {
       directories.put("ratis" + suffix + (index++),  new AtomicInteger(0));
-      maxPipelinePerNode--;
+      maxPipeline--;
     }
 
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
@@ -222,7 +222,7 @@ public class TestRatisPipelineCreateAndDestroy {
     });
 
     directories.values().stream().forEach(
-        count -> Assert.assertEquals(MAX_PIPELINE_PER_NODE - 1, count.get()));
+        count -> Assert.assertEquals(maxPipelinePerNode - 1, count.get()));
   }
 
   private void waitForPipelines(int numPipelines)
