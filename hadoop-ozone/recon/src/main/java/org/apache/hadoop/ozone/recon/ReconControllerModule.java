@@ -31,6 +31,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQ
 
 import java.io.IOException;
 
+import com.google.inject.Scopes;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -68,14 +69,15 @@ public class ReconControllerModule extends AbstractModule {
 
   @Override
   protected void configure() {
-    bind(Configuration.class).toProvider(ConfigurationProvider.class);
+    bind(OzoneConfiguration.class).toProvider(ConfigurationProvider.class);
     bind(ReconHttpServer.class).in(Singleton.class);
     bind(DBStore.class)
         .toProvider(ReconContainerDBProvider.class).in(Singleton.class);
+    //bind(ReconOmMetadataManagerImpl.class).in(Scopes.SINGLETON);
     bind(ReconOMMetadataManager.class)
-        .to(ReconOmMetadataManagerImpl.class).in(Singleton.class);
-    bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class)
-        .in(Singleton.class);
+        .to(ReconOmMetadataManagerImpl.class);//.in(Singleton.class);
+    bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
+        //.in(Singleton.class);
     bind(ContainerDBServiceProvider.class)
         .to(ContainerDBServiceProviderImpl.class).in(Singleton.class);
     bind(OzoneManagerServiceProvider.class)

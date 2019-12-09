@@ -21,8 +21,13 @@ package org.apache.hadoop.ozone.recon;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
+import com.google.inject.AbstractModule;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
+import org.apache.hadoop.ozone.recon.persistence.DefaultDataSourceProvider;
+import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
+import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.hadoop.ozone.recon.schema.ReconInternalSchemaDefinition;
 import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
@@ -110,11 +115,15 @@ public class ReconServer extends GenericCli {
     return null;
   }
 
-  void stop() throws Exception {
+  public void stop() throws Exception {
     LOG.info("Stopping Recon server");
     httpServer.stop();
     OzoneManagerServiceProvider ozoneManagerServiceProvider = injector
         .getInstance(OzoneManagerServiceProvider.class);
     ozoneManagerServiceProvider.stop();
+  }
+
+  public Injector getInjector() {
+    return injector;
   }
 }

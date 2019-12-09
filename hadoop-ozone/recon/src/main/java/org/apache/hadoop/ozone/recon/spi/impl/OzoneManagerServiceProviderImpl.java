@@ -190,8 +190,8 @@ public class OzoneManagerServiceProviderImpl
         RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     scheduler.scheduleWithFixedDelay(this::syncDataFromOM,
-        initialDelay,
-        interval,
+        2000,
+        10000,
         TimeUnit.MILLISECONDS);
   }
 
