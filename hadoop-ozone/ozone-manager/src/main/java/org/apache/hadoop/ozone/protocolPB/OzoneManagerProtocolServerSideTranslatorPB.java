@@ -162,8 +162,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    */
   private OMResponse submitRequestToRatis(OMRequest request)
       throws ServiceException {
-    //TODO: Need to remove OzoneManagerRatisClient, as now we are using
-    // RatisServer Api's.
     return omRatisServer.submitRequest(request);
   }
 

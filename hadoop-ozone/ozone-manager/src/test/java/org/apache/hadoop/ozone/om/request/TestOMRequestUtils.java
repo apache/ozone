@@ -545,6 +545,23 @@ public final class TestOMRequestUtils {
   }
 
   /**
+   * Add the Key information to OzoneManager DB and cache.
+   * @param omMetadataManager
+   * @param omKeyInfo
+   * @throws IOException
+   */
+  public static void addKeyToOM(final OMMetadataManager omMetadataManager,
+                                final OmKeyInfo omKeyInfo) throws IOException {
+    final String dbKey = omMetadataManager.getOzoneKey(
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName());
+    omMetadataManager.getKeyTable().put(dbKey, omKeyInfo);
+    omMetadataManager.getKeyTable().addCacheEntry(
+        new CacheKey<>(dbKey),
+        new CacheValue<>(Optional.of(omKeyInfo), 1L));
+  }
+
+  /**
    * Add the Bucket information to OzoneManager DB and cache.
    * @param omMetadataManager
    * @param omBucketInfo

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -71,7 +72,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
@@ -228,7 +228,7 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(bucketName, ozoneBucket.getName());
     Assert.assertTrue(ozoneBucket.getVersioning());
     Assert.assertEquals(StorageType.DISK, ozoneBucket.getStorageType());
-    Assert.assertTrue(ozoneBucket.getCreationTime() <= Time.now());
+    Assert.assertTrue(ozoneBucket.getCreationTime().isBefore(Instant.now()));
 
 
     // Change versioning to false

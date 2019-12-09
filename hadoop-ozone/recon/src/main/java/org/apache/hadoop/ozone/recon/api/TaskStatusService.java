@@ -18,45 +18,39 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import javax.inject.Inject;
-import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
+import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.jooq.Configuration;
 
+import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.MediaType;
 import java.util.List;
 
 /**
- * Endpoint for querying the counts of a certain file Size.
+ * Endpoint for displaying the last successful run of each Recon Task.
  */
-@Path("/utilization")
+@Path("/task")
 @Produces(MediaType.APPLICATION_JSON)
-public class UtilizationService {
-  private FileCountBySizeDao fileCountBySizeDao;
+public class TaskStatusService {
 
   @Inject
   private Configuration sqlConfiguration;
 
-
-  FileCountBySizeDao getDao() {
-    if (fileCountBySizeDao == null) {
-      fileCountBySizeDao = new FileCountBySizeDao(sqlConfiguration);
-    }
-    return fileCountBySizeDao;
-  }
   /**
-   * Return the file counts from Recon DB.
+   * Return the list of Recon Tasks and the last successful timestamp and
+   * sequence number.
    * @return {@link Response}
    */
   @GET
-  @Path("/fileCount")
-  public Response getFileCounts() {
-    fileCountBySizeDao = getDao();
-    List<FileCountBySize> resultSet = fileCountBySizeDao.findAll();
+  @Path("status")
+  public Response getTaskTimes() {
+    ReconTaskStatusDao reconTaskStatusDao =
+        new ReconTaskStatusDao(sqlConfiguration);
+    List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();
     return Response.ok(resultSet).build();
   }
 }
