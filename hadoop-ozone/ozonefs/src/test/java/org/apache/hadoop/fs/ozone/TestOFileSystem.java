@@ -58,7 +58,7 @@ public class TestOFileSystem {
   private static MiniOzoneCluster cluster = null;
 
   private static FileSystem fs;
-  private static OzoneFileSystem o3fs;
+  private static OzoneFileSystem ofs;
 
   private String volumeName;
   private String bucketName;
@@ -78,13 +78,13 @@ public class TestOFileSystem {
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
 
-    rootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
+    rootPath = String.format("%s:///%s/%s/",
+        OzoneConsts.OZONE_OFS_URI_SCHEME, bucket.getVolumeName(), bucket.getName());
 
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     fs = FileSystem.get(conf);
-    o3fs = (OzoneFileSystem) fs;
+    ofs = (OzoneFileSystem) fs;
   }
 
   @After
@@ -110,7 +110,7 @@ public class TestOFileSystem {
     ContractTestUtils.touch(fs, child);
 
     OzoneKeyDetails key = getKey(child, false);
-    assertEquals(key.getName(), o3fs.pathToKey(child));
+    assertEquals(key.getName(), ofs.pathToKey(child));
 
     // Creating a child should not add parent keys to the bucket
     try {
@@ -146,7 +146,7 @@ public class TestOFileSystem {
 
     // Deleting the only child should create the parent dir key if it does
     // not exist
-    String parentKey = o3fs.pathToKey(parent) + "/";
+    String parentKey = ofs.pathToKey(parent) + "/";
     OzoneKeyDetails parentKeyInfo = getKey(parent, true);
     assertEquals(parentKey, parentKeyInfo.getName());
   }
@@ -162,7 +162,7 @@ public class TestOFileSystem {
 
     // ListStatus on a directory should return all subdirs along with
     // files, even if there exists a file and sub-dir with the same name.
-    FileStatus[] fileStatuses = o3fs.listStatus(parent);
+    FileStatus[] fileStatuses = ofs.listStatus(parent);
     assertEquals("FileStatus did not return all children of the directory",
         2, fileStatuses.length);
 
@@ -171,7 +171,7 @@ public class TestOFileSystem {
     Path file4 = new Path(parent, "dir1/key4");
     ContractTestUtils.touch(fs, file3);
     ContractTestUtils.touch(fs, file4);
-    fileStatuses = o3fs.listStatus(parent);
+    fileStatuses = ofs.listStatus(parent);
     assertEquals("FileStatus did not return all children of the directory",
         3, fileStatuses.length);
   }
@@ -191,7 +191,7 @@ public class TestOFileSystem {
     // ListStatus on root should return dir1 (even though /dir1 key does not
     // exist) and dir2 only. dir12 is not an immediate child of root and
     // hence should not be listed.
-    FileStatus[] fileStatuses = o3fs.listStatus(root);
+    FileStatus[] fileStatuses = ofs.listStatus(root);
     assertEquals("FileStatus should return only the immediate children", 2,
         fileStatuses.length);
 
@@ -216,7 +216,7 @@ public class TestOFileSystem {
       paths.add(p.getName());
     }
 
-    FileStatus[] fileStatuses = o3fs.listStatus(root);
+    FileStatus[] fileStatuses = ofs.listStatus(root);
     assertEquals(
         "Total directories listed do not match the existing directories",
         numDirs, fileStatuses.length);
@@ -251,7 +251,7 @@ public class TestOFileSystem {
     ContractTestUtils.touch(fs, file121);
     fs.mkdirs(dir2);
 
-    FileStatus[] fileStatuses = o3fs.listStatus(dir1);
+    FileStatus[] fileStatuses = ofs.listStatus(dir1);
     assertEquals("FileStatus should return only the immediate children", 2,
         fileStatuses.length);
 
@@ -291,7 +291,7 @@ public class TestOFileSystem {
 
   private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
       throws IOException, OzoneClientException {
-    String key = o3fs.pathToKey(keyPath);
+    String key = ofs.pathToKey(keyPath);
     if (isDirectory) {
       key = key + "/";
     }
