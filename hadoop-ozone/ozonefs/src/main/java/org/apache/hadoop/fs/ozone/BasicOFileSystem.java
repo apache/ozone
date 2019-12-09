@@ -48,6 +48,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -82,14 +83,11 @@ public class BasicOFileSystem extends FileSystem {
 
   private OzoneClientAdapter adapter;
 
-  private static final Pattern URL_SCHEMA_PATTERN =
-      Pattern.compile("([^\\.]+)\\.([^\\.]+)\\.{0,1}(.*)");
-
   private static final String URI_EXCEPTION_TEXT = "Ozone file system URL " +
       "should be one of the following formats: " +
-      "o3fs://bucket.volume/key  OR " +
-      "o3fs://bucket.volume.om-host.example.com/key  OR " +
-      "o3fs://bucket.volume.om-host.example.com:5678/key";
+      "ofs://volume/bucket/[key]  OR " +
+      "ofs://om-host.example.com/volume/bucket/[key]  OR " +
+      "ofs://om-host.example.com:5678/volume/bucket/[key]";
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
@@ -100,37 +98,42 @@ public class BasicOFileSystem extends FileSystem {
         "Invalid scheme provided in " + name);
 
     String authority = name.getAuthority();
-    if (authority == null) {
-      // authority is null when fs.defaultFS is not a qualified o3fs URI and
-      // o3fs:/// is passed to the client. matcher will NPE if authority is null
+    String volbucket = name.getPath();
+    if (authority == null || volbucket == null || volbucket.isEmpty()) {
+      // authority is null when fs.defaultFS is not a qualified ofs URI and
+      // ofs:/// is passed to the client. matcher will NPE if authority is null
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
-    Matcher matcher = URL_SCHEMA_PATTERN.matcher(authority);
-
-    if (!matcher.matches()) {
+    // Parse hostname and port
+    String[] parts = authority.split(":");
+    if (parts.length > 2) {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
-    String bucketStr = matcher.group(1);
-    String volumeStr = matcher.group(2);
-    String remaining = matcher.groupCount() == 3 ? matcher.group(3) : null;
 
     String omHost = null;
     int omPort = -1;
-    if (!isEmpty(remaining)) {
-      String[] parts = remaining.split(":");
-      // Array length should be either 1(hostname or service id) or 2(host:port)
-      if (parts.length > 2) {
+    omHost = parts[0];
+    if (parts.length == 2) {
+      try {
+        omPort = Integer.parseInt(parts[1]);
+      } catch (NumberFormatException e) {
         throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
       }
-      omHost = parts[0];
-      if (parts.length == 2) {
-        try {
-          omPort = Integer.parseInt(parts[1]);
-        } catch (NumberFormatException e) {
-          throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
-        }
-      }
+    }
+
+    // Parse volume and bucket, or special path (/tmp)
+    String volumeStr = null;
+    String bucketStr = null;
+    String mountStr = null;  // TODO: Might not need this for /tmp ?
+    StringTokenizer token = new StringTokenizer(volbucket, "/");
+    if (token.countTokens() >= 2) {
+      volumeStr = token.nextToken();
+      bucketStr = token.nextToken();
+    } else if (token.countTokens() == 1) {
+      mountStr = token.nextToken();
+    } else {
+      throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
     try {
