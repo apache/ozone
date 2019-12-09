@@ -168,14 +168,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final RpcType rpc = setRpcType(properties);
 
     // set raft segment size
-    setRaftSegmentSize(properties);
+    setRaftSegmentAndWriteBufferSize(properties);
 
     // set raft segment pre-allocated size
     final int raftSegmentPreallocatedSize =
         setRaftSegmentPreallocatedSize(properties);
 
-    // Set max write buffer size, which is the scm chunk size
-    final int maxChunkSize = setMaxWriteBuffer(properties);
     TimeUnit timeUnit;
     long duration;
 
@@ -215,7 +213,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // For grpc set the maximum message size
     GrpcConfigKeys.setMessageSizeMax(properties,
-        SizeInBytes.valueOf(maxChunkSize + raftSegmentPreallocatedSize));
+        SizeInBytes.valueOf(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE
+                + raftSegmentPreallocatedSize));
 
     // Set the ratis port number
     if (rpc == SupportedRpcType.GRPC) {
@@ -345,13 +344,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setRequestTimeout(properties, serverRequestTimeout);
   }
 
-  private int setMaxWriteBuffer(RaftProperties properties) {
-    final int maxChunkSize = OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
-    RaftServerConfigKeys.Log.setWriteBufferSize(properties,
-        SizeInBytes.valueOf(maxChunkSize));
-    return maxChunkSize;
-  }
-
   private int setRaftSegmentPreallocatedSize(RaftProperties properties) {
     final int raftSegmentPreallocatedSize = (int) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
@@ -375,13 +367,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return raftSegmentPreallocatedSize;
   }
 
-  private void setRaftSegmentSize(RaftProperties properties) {
+  private void setRaftSegmentAndWriteBufferSize(RaftProperties properties) {
     final int raftSegmentSize = (int)conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
+    RaftServerConfigKeys.Log.setWriteBufferSize(properties,
+            SizeInBytes.valueOf(raftSegmentSize));
   }
 
   private RpcType setRpcType(RaftProperties properties) {
