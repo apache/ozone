@@ -18,19 +18,36 @@
 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
+    <artifactId>hadoop-ozone-fault-injection-test</artifactId>
     <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-ozone</artifactId>
     <version>0.5.0-SNAPSHOT</version>
   </parent>
-  <artifactId>hadoop-ozone-fault-injection-test</artifactId>
   <version>0.5.0-SNAPSHOT</version>
-  <description>Apache Hadoop Ozone Fault Injection Tests</description>
-  <name>Apache Hadoop Ozone Fault Injection Tests</name>
-  <packaging>pom</packaging>
+  <description>Apache Hadoop Ozone Mini Ozone Chaos Tests</description>
+  <name>Apache Hadoop Ozone Mini Ozone Chaos Tests</name>
 
-  <modules>
-    <module>network-tests</module>
-    <module>mini-chaos-tests</module>
-  </modules>
-
+  <artifactId>mini-chaos-tests</artifactId>
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-ozone-filesystem</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-ozone-integration-test</artifactId>
+      <scope>test</scope>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <scope>test</scope>
+      <type>test-jar</type>
+    </dependency>
+  </dependencies>
 </project>

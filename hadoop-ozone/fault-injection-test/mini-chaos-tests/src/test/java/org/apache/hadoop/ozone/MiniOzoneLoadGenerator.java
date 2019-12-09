@@ -15,24 +15,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.chaos;
+package org.apache.hadoop.ozone;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.utils.LoadBucket;
+import org.apache.hadoop.ozone.utils.TestProbability;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -63,15 +57,15 @@ public class MiniOzoneLoadGenerator {
 
   private AtomicBoolean isWriteThreadRunning;
 
-  private final List<OzoneBucket> ozoneBuckets;
+  private final List<LoadBucket> ozoneBuckets;
 
   private final AtomicInteger agedFileWrittenIndex;
   private final ExecutorService agedFileExecutor;
-  private final OzoneBucket agedLoadBucket;
+  private final LoadBucket agedLoadBucket;
   private final TestProbability agedWriteProbability;
 
-  MiniOzoneLoadGenerator(List<OzoneBucket> bucket,
-                         OzoneBucket agedLoadBucket, int numThreads,
+  MiniOzoneLoadGenerator(List<LoadBucket> bucket,
+                         LoadBucket agedLoadBucket, int numThreads,
       int numBuffers) {
     this.ozoneBuckets = bucket;
     this.numWriteThreads = numThreads;
@@ -107,15 +101,17 @@ public class MiniOzoneLoadGenerator {
 
     while (isWriteThreadRunning.get() &&
         (Time.monotonicNow() < startTime + runTimeMillis)) {
-      OzoneBucket bucket =
+      LoadBucket bucket =
           ozoneBuckets.get((int) (Math.random() * ozoneBuckets.size()));
       try {
         int index = RandomUtils.nextInt();
-        String keyName = writeData(index, bucket, threadName);
+        ByteBuffer buffer = getBuffer(index);
+        String keyName = getKeyName(index, threadName);
+        bucket.writeData(buffer, keyName);
 
-        readData(bucket, keyName, index);
+        bucket.readData(buffer, keyName);
 
-        deleteKey(bucket, keyName);
+        bucket.deleteKey(keyName);
       } catch (Exception e) {
         LOG.error("LOADGEN: Exiting due to exception", e);
         break;
@@ -124,68 +120,6 @@ public class MiniOzoneLoadGenerator {
     // This will terminate other threads too.
     isWriteThreadRunning.set(false);
     LOG.info("Terminating IO thread:{}.", threadID);
-  }
-
-
-  private String writeData(int keyIndex, OzoneBucket bucket, String threadName)
-      throws Exception {
-    // choose a random buffer.
-    ByteBuffer buffer = buffers.get(keyIndex % numBuffers);
-    int bufferCapacity = buffer.capacity();
-
-    String keyName = getKeyName(keyIndex, threadName);
-    LOG.trace("LOADGEN: Writing key {}", keyName);
-    try (OzoneOutputStream stream = bucket.createKey(keyName,
-        bufferCapacity, ReplicationType.RATIS, ReplicationFactor.THREE,
-        new HashMap<>())) {
-      stream.write(buffer.array());
-      LOG.trace("LOADGEN: Written key {}", keyName);
-    } catch (Throwable t) {
-      LOG.error("LOADGEN: Create key:{} failed with exception, skipping",
-          keyName, t);
-      throw t;
-    }
-
-    return keyName;
-  }
-
-  private void readData(OzoneBucket bucket, String keyName, int index)
-      throws Exception {
-    LOG.trace("LOADGEN: Reading key {}", keyName);
-
-    ByteBuffer buffer = buffers.get(index % numBuffers);
-    int bufferCapacity = buffer.capacity();
-
-    try (OzoneInputStream stream = bucket.readKey(keyName)) {
-      byte[] readBuffer = new byte[bufferCapacity];
-      int readLen = stream.read(readBuffer);
-
-      if (readLen < bufferCapacity) {
-        throw new IOException("Read mismatch, key:" + keyName +
-            " read data length:" + readLen +
-            " is smaller than excepted:" + bufferCapacity);
-      }
-
-      if (!Arrays.equals(readBuffer, buffer.array())) {
-        throw new IOException("Read mismatch, key:" + keyName +
-            " read data does not match the written data");
-      }
-      LOG.trace("LOADGEN: Read key {}", keyName);
-    } catch (Throwable t) {
-      LOG.error("LOADGEN: Read key:{} failed with exception", keyName, t);
-      throw t;
-    }
-  }
-
-  private void deleteKey(OzoneBucket bucket, String keyName) throws Exception {
-    LOG.trace("LOADGEN: Deleting key {}", keyName);
-    try {
-      bucket.deleteKey(keyName);
-      LOG.trace("LOADGEN: Deleted key {}", keyName);
-    } catch (Throwable t) {
-      LOG.error("LOADGEN: Unable to delete key:{}", keyName, t);
-      throw t;
-    }
   }
 
   private Optional<Integer> randomKeyToRead() {
@@ -207,13 +141,17 @@ public class MiniOzoneLoadGenerator {
       String keyName = null;
       try {
         if (agedWriteProbability.isTrue()) {
-          keyName = writeData(agedFileWrittenIndex.getAndIncrement(),
-              agedLoadBucket, threadName);
+          int index = agedFileWrittenIndex.getAndIncrement();
+          ByteBuffer buffer = getBuffer(index);
+          keyName = getKeyName(index, threadName);
+
+          agedLoadBucket.writeData(buffer, keyName);
         } else {
           Optional<Integer> index = randomKeyToRead();
           if (index.isPresent()) {
+            ByteBuffer buffer = getBuffer(index.get());
             keyName = getKeyName(index.get(), threadName);
-            readData(agedLoadBucket, keyName, index.get());
+            agedLoadBucket.readData(buffer, keyName);
           }
         }
       } catch (Throwable t) {
@@ -261,7 +199,11 @@ public class MiniOzoneLoadGenerator {
     }
   }
 
-  private static String getKeyName(int keyIndex, String threadName) {
+  public ByteBuffer getBuffer(int keyIndex) {
+    return buffers.get(keyIndex % numBuffers);
+  }
+
+  public String getKeyName(int keyIndex, String threadName) {
     return threadName + keyNameDelimiter + keyIndex;
   }
 }
