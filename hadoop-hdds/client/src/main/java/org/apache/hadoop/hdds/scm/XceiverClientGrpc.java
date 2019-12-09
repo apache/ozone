@@ -234,6 +234,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     } catch (ExecutionException e) {
       throw new IOException("Failed to execute command " + request, e);
     } catch (InterruptedException e) {
+      LOG.error("Command execution was interrupted ", e);
       Thread.currentThread().interrupt();
       return null;
     }
@@ -250,6 +251,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     } catch (ExecutionException e) {
       throw new IOException("Failed to execute command " + request, e);
     } catch (InterruptedException e) {
+      LOG.error("Command execution was interrupted ", e);
       Thread.currentThread().interrupt();
       return null;
     }
@@ -345,6 +347,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         ioException = new IOException(e);
         responseProto = null;
       } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted ", e);
         Thread.currentThread().interrupt();
         responseProto = null;
       }
