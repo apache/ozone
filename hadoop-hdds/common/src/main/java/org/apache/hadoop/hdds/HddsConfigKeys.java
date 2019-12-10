@@ -164,10 +164,13 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_FILE_NAME = "hdds.x509.file.name";
   public static final String HDDS_X509_FILE_NAME_DEFAULT = "certificate.crt";
 
+  public static final String HDDS_X509_CRL_NAME = "hdds.x509.CRL.name";
+  public static final String HDDS_X509_CRL_NAME_DEFAULT = "scm.crl";
+
   /**
-   * Default duration of certificates issued by SCM CA.
-   * The formats accepted are based on the ISO-8601 duration format PnDTnHnMn.nS
-   * Default value is 5 years and written as P1865D.
+   * Default duration of certificates issued by SCM CA. The formats accepted are
+   * based on the ISO-8601 duration format PnDTnHnMn.nS Default value is 5 years
+   * and written as P1865D.
    */
   public static final String HDDS_X509_DEFAULT_DURATION = "hdds.x509.default" +
       ".duration";
