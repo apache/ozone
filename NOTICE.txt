@@ -29,6 +29,5 @@ code and source code.
 The following provides more details on the included cryptographic software:
 
 This software uses the SSL libraries from the Jetty project written
-by mortbay.org.
-Hadoop Yarn Server Web Proxy uses the BouncyCastle Java
-cryptography APIs written by the Legion of the Bouncy Castle Inc.
+by mortbay.org abd BouncyCastle Java cryptography APIs written by the
+ Legion of the Bouncy Castle Inc.
