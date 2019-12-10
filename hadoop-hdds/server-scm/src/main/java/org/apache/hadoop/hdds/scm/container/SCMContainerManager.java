@@ -83,7 +83,6 @@ public class SCMContainerManager implements ContainerManager {
    * @param pipelineManager - PipelineManager
    * @throws IOException on Failure.
    */
-  @SuppressWarnings("unchecked")
   public SCMContainerManager(final Configuration conf,
       PipelineManager pipelineManager) throws IOException {
 
