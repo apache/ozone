@@ -87,8 +87,8 @@ public class TestOzoneClientKeyGenerator {
     out.getFD().sync();
     out.close();
     new Freon().execute(
-        new String[] { "-conf", new File(path, "conf").getAbsolutePath(),
-            "ockg", "-t", "1" });
+        new String[] {"-conf", new File(path, "conf").getAbsolutePath(),
+            "ockg", "-t", "1"});
     shutdown(cluster);
   }
 
