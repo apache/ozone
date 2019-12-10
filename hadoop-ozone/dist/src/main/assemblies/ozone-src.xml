@@ -25,11 +25,11 @@
   <includeBaseDirectory>true</includeBaseDirectory>
   <files>
     <file>
-      <source>hadoop-ozone/dist/src/main/license/src/LICENSE.txt</source>
+      <source>LICENSE.txt</source>
       <outputDirectory>/</outputDirectory>
     </file>
     <file>
-      <source>hadoop-ozone/dist/src/main/license/src/NOTICE.txt</source>
+      <source>NOTICE.txt</source>
       <outputDirectory>/</outputDirectory>
     </file>
     <file>
