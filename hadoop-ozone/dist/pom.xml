@@ -413,11 +413,11 @@
                   <attach>false</attach>
                   <finalName>hadoop-ozone-${project.version}-src</finalName>
                   <outputDirectory>target</outputDirectory>
-                  <basedir>../..</basedir>
+                  <basedir>${project.basedir}/../..</basedir>
                   <!-- Not using descriptorRef and hadoop-assembly dependency -->
                   <!-- to avoid making hadoop-main to depend on a module      -->
                   <descriptors>
-                    <descriptor>src/main/assemblies/ozone-src.xml</descriptor>
+                    <descriptor>${project.basedir}/src/main/assemblies/ozone-src.xml</descriptor>
                   </descriptors>
                 </configuration>
               </execution>
