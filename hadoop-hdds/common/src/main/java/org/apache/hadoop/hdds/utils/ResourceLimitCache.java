@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.utils;
 
 
+import java.util.Objects;
 import java.util.function.BiFunction;
+import java.util.function.Predicate;
 
 /**
  * Cache with resource limit constraints. At any time all entries in the cache
@@ -33,6 +35,9 @@ public class ResourceLimitCache<K, V> implements Cache<K, V> {
 
   public ResourceLimitCache(java.util.concurrent.ConcurrentMap<K, V> map,
       BiFunction<K, V, int[]> permitsSupplier, int... limits) {
+    Objects.requireNonNull(map);
+    Objects.requireNonNull(permitsSupplier);
+    Objects.requireNonNull(limits);
     this.map = map;
     this.group = new ResourceSemaphore.Group(limits);
     this.permitsSupplier = permitsSupplier;
@@ -40,11 +45,15 @@ public class ResourceLimitCache<K, V> implements Cache<K, V> {
 
   @Override
   public V get(K key) {
+    Objects.requireNonNull(key);
     return map.get(key);
   }
 
   @Override
   public V put(K key, V value) throws InterruptedException {
+    Objects.requireNonNull(key);
+    Objects.requireNonNull(value);
+
     // remove the old key to release the permits
     V oldVal = remove(key);
     int[] permits = permitsSupplier.apply(key, value);
@@ -59,11 +68,18 @@ public class ResourceLimitCache<K, V> implements Cache<K, V> {
 
   @Override
   public V remove(K key) {
+    Objects.requireNonNull(key);
     V val = map.remove(key);
     if (val != null) {
       group.release(permitsSupplier.apply(key, val));
     }
     return val;
+  }
+
+  @Override
+  public void removeIf(Predicate<K> predicate) {
+    Objects.requireNonNull(predicate);
+    map.keySet().removeIf(predicate);
   }
 
   @Override

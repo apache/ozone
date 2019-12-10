@@ -76,7 +76,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -819,6 +818,12 @@ public class ContainerStateMachine extends BaseStateMachine {
     return future;
   }
 
+  @Override
+  public CompletableFuture<Void> truncateStateMachineData(long index) {
+    stateMachineDataCache.removeIf(k -> k >= index);
+    return CompletableFuture.completedFuture(null);
+  }
+
   @VisibleForTesting
   public void evictStateMachineCache() {
     stateMachineDataCache.clear();
@@ -832,12 +837,6 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public void notifyExtendedNoLeader(RoleInfoProto roleInfoProto) {
     ratisServer.handleNoLeader(gid, roleInfoProto);
-  }
-
-  @Override
-  public void notifyNotLeader(Collection<TransactionContext> pendingEntries)
-      throws IOException {
-    evictStateMachineCache();
   }
 
   @Override

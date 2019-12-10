@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import java.util.function.Predicate;
+
 /**
  * Cache interface.
  */
@@ -27,6 +29,8 @@ public interface Cache<K, V> {
   V put(K key, V value) throws InterruptedException;
 
   V remove(K key);
+
+  void removeIf(Predicate<K> predicate);
 
   void clear();
 }
