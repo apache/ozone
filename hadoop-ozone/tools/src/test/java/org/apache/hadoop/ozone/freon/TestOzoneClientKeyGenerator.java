@@ -31,6 +31,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+/**
+ * Test for OzoneClientKeyGenerator.
+ */
 public class TestOzoneClientKeyGenerator {
 
   private String path;
