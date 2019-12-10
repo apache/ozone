@@ -883,9 +883,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         return HddsUtils.writeChunkToString(requestProto.getWriteChunk(),
                 contId, location);
       default:
-        throw new IllegalStateException("Cmd Type:" + requestProto.getCmdType()
-                + " should not have state machine data");
-
+        return "Cmd Type:" + requestProto.getCmdType()
+          + " should not have state machine data";
       }
     } catch (Throwable t) {
       return "";
