@@ -126,6 +126,7 @@
                     ${shaded.prefix}.com
                   </shadedPattern>
                   <includes>
+<!--                    <include>com.google.protobuf.**.*</include>-->
                     <include>com.google.common.**.*</include>
                     <include>com.google.gson.**.*</include>
                     <include>com.codahale.**.*</include>
