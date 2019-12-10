@@ -65,7 +65,7 @@ public class CRLCodec {
           .collect(Collectors.toSet());
 
   /**
-   * The CRL Codec allows us to encode and decode
+   * The CRL Codec allows us to encode and decode.
    *
    * @param securityConfig
    */
