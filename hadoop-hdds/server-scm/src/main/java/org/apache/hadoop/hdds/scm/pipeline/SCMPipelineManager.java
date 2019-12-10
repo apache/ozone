@@ -177,13 +177,15 @@ public class SCMPipelineManager implements PipelineManager {
         metrics.incNumPipelineCreated();
         metrics.createPerPipelineMetrics(pipeline);
       }
-      if (RatisPipelineUtils.checkPipelineContainSameDatanodes(
-          stateManager, pipeline) != null) {
+      Pipeline overlapPipeline = RatisPipelineUtils
+          .checkPipelineContainSameDatanodes(stateManager, pipeline);
+      if (overlapPipeline != null) {
         metrics.incNumPipelineContainSameDatanodes();
         //TODO remove until pipeline allocation is proved equally distributed.
-        LOG.info("Pipeline contains same datanodes as previous pipeline." +
-            " PipelineId:" + pipeline.getId().toString() +
-            " nodeIds: " + pipeline.getNodes().get(0).getUuid().toString() +
+        LOG.info("Pipeline: " + pipeline.getId().toString() +
+            " contains same datanodes as previous pipeline: " +
+            overlapPipeline.getId().toString() + " nodeIds: " +
+            pipeline.getNodes().get(0).getUuid().toString() +
             ", " + pipeline.getNodes().get(1).getUuid().toString() +
             ", " + pipeline.getNodes().get(2).getUuid().toString());
       }

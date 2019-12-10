@@ -134,9 +134,9 @@ public final class RatisPipelineUtils {
     List<Pipeline> matchedPipelines = stateManager.getPipelines(
         HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE)
-        .stream().filter(p ->
-            // For all OPEN or ALLOCATED pipelines
-            (p.getPipelineState() == Pipeline.PipelineState.OPEN ||
+        .stream().filter(p -> !p.equals(pipeline) &&
+            (// For all OPEN or ALLOCATED pipelines
+                p.getPipelineState() == Pipeline.PipelineState.OPEN ||
                 p.getPipelineState() == Pipeline.PipelineState.ALLOCATED) &&
                 p.getNodeIdsHash() == pipeline.getNodeIdsHash())
         .collect(Collectors.toList());

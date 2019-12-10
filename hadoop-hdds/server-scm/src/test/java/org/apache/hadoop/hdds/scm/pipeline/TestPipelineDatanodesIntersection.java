@@ -62,6 +62,9 @@ public class TestPipelineDatanodesIntersection {
     return Arrays.asList(new Object[][] {
         {4, 5},
         {10, 5},
+        {20, 5},
+        {50, 5},
+        {100, 5},
         {100, 10}
     });
   }
@@ -84,9 +87,20 @@ public class TestPipelineDatanodesIntersection {
         Pipeline pipeline = provider.create(HddsProtos.ReplicationFactor.THREE);
         stateManager.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
-        if (RatisPipelineUtils.checkPipelineContainSameDatanodes(
-            stateManager, pipeline) != null){
+        Pipeline overlapPipeline = RatisPipelineUtils
+            .checkPipelineContainSameDatanodes(stateManager, pipeline);
+        if (overlapPipeline != null){
           intersectionCount++;
+          System.out.println("This pipeline: " + pipeline.getId().toString() +
+              " overlaps with previous pipeline: " + overlapPipeline.getId() +
+              ". They share same set of datanodes as: " +
+              pipeline.getNodesInOrder().get(0).getUuid() + "/" +
+              pipeline.getNodesInOrder().get(1).getUuid() + "/" +
+              pipeline.getNodesInOrder().get(2).getUuid() + " and " +
+              overlapPipeline.getNodesInOrder().get(0).getUuid() + "/" +
+              overlapPipeline.getNodesInOrder().get(1).getUuid() + "/" +
+              overlapPipeline.getNodesInOrder().get(2).getUuid() +
+              " is the same.");
         }
         createdPipelineCount++;
       } catch(SCMException e) {
