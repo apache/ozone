@@ -20,6 +20,9 @@ package org.apache.hadoop.hdds.utils;
 import org.junit.Assert;
 import org.junit.Test;
 
+/**
+ * Test for ResourceSemaphore.
+ */
 public class TestResourceSemaphore {
   @Test(timeout = 1000)
   public void testGroup() {
@@ -65,7 +68,8 @@ public class TestResourceSemaphore {
     }
   }
 
-  static void assertAcquire(ResourceSemaphore.Group g, boolean expected, int... permits) {
+  static void assertAcquire(ResourceSemaphore.Group g, boolean expected,
+      int... permits) {
     final boolean computed = g.tryAcquire(permits);
     Assert.assertEquals(expected, computed);
   }

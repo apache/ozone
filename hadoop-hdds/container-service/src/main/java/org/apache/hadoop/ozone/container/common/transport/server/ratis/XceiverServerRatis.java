@@ -57,7 +57,6 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
-import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.util.SizeInBytes;

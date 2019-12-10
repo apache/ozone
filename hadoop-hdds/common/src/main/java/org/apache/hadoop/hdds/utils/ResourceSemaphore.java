@@ -30,7 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * A {@link Semaphore} with a limit for a resource.
  *
- * After {@link #close()}, the resource becomes unavailable, i.e. any acquire will not succeed.
+ * After {@link #close()}, the resource becomes unavailable,
+ * i.e. any acquire will not succeed.
  */
 public class ResourceSemaphore extends Semaphore {
   private final int limit;
@@ -56,15 +57,18 @@ public class ResourceSemaphore extends Semaphore {
   }
 
   private void assertRelease(int toRelease) {
-    Preconditions.assertTrue(toRelease >= 0, () -> "toRelease = " + toRelease + " < 0");
+    Preconditions
+        .assertTrue(toRelease >= 0, () -> "toRelease = " + toRelease + " < 0");
     final int available = assertAvailable();
     final int permits = Math.addExact(available, toRelease);
-    Preconditions.assertTrue(permits <= limit, () -> "permits = " + permits + " > limit = " + limit);
+    Preconditions.assertTrue(permits <= limit,
+        () -> "permits = " + permits + " > limit = " + limit);
   }
 
   private int assertAvailable() {
     final int available = availablePermits();
-    Preconditions.assertTrue(available >= 0, () -> "available = " + available + " < 0");
+    Preconditions
+        .assertTrue(available >= 0, () -> "available = " + available + " < 0");
     return available;
   }
 
@@ -113,10 +117,11 @@ public class ResourceSemaphore extends Semaphore {
 
     boolean tryAcquire(int... permits) {
       Preconditions.assertTrue(permits.length == resources.size(),
-          () -> "items.length = " + permits.length + " != resources.size() = " + resources.size());
+          () -> "items.length = " + permits.length + " != resources.size() = "
+              + resources.size());
       int i = 0;
       // try acquiring all resources
-      for(; i < permits.length; i++) {
+      for (; i < permits.length; i++) {
         if (!resources.get(i).tryAcquire(permits[i])) {
           break;
         }
@@ -134,8 +139,9 @@ public class ResourceSemaphore extends Semaphore {
 
     public void acquire(int... permits) throws InterruptedException {
       Preconditions.assertTrue(permits.length == resources.size(),
-          () -> "items.length = " + permits.length + " != resources.size() = " + resources.size());
-      for(int i = 0; i < permits.length; i++) {
+          () -> "items.length = " + permits.length + " != resources.size() = "
+              + resources.size());
+      for (int i = 0; i < permits.length; i++) {
         resources.get(i).acquire(permits[i]);
       }
     }

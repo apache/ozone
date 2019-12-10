@@ -29,7 +29,8 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdds.utils.ResourceLimitMap;
+import org.apache.hadoop.hdds.utils.Cache;
+import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
@@ -144,8 +145,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final Map<Long, Long> container2BCSIDMap;
   private ExecutorService[] executors;
   private final Map<Long, Long> applyTransactionCompletionMap;
-  private final org.apache.hadoop.hdds.utils.Map<Long, ByteString>
-      stateMachineDataMap;
+  private final Cache<Long, ByteString> stateMachineDataCache;
   private final AtomicBoolean stateMachineHealthy;
 
   private final Semaphore applyTransactionSemaphore;
@@ -174,8 +174,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
-    stateMachineDataMap = new ResourceLimitMap<>(new ConcurrentHashMap<>(),
-        (index, data) -> new int[] { 1, data.size() }, numPendingRequests,
+    stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
+        (index, data) -> new int[] {1, data.size()}, numPendingRequests,
         pendingRequestsByteLimit);
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
@@ -420,7 +420,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     Preconditions.checkState(server instanceof RaftServerProxy);
     try {
       if (((RaftServerProxy) server).getImpl(gid).isLeader()) {
-        stateMachineDataMap.put(entryIndex, write.getData());
+        stateMachineDataCache.put(entryIndex, write.getData());
       }
     } catch (IOException | InterruptedException ioe) {
       return completeExceptionally(ioe);
@@ -471,6 +471,9 @@ public class ContainerStateMachine extends BaseStateMachine {
             write.getChunkData().getChunkName() + " Error message: " +
             r.getMessage() + " Container Result: " + r.getResult());
         metrics.incNumWriteDataFails();
+        // If the write fails currently we mark the stateMachine as unhealthy.
+        // This leads to pipeline close. Any change in that behavior requires
+        // handling the entry for the write chunk in cache.
         stateMachineHealthy.set(false);
         raftFuture.completeExceptionally(sce);
       } else {
@@ -593,10 +596,10 @@ public class ContainerStateMachine extends BaseStateMachine {
   /**
    * Reads the Entry from the Cache or loads it back by reading from disk.
    */
-  private ByteString getStateMachineData(Long logIndex, long term,
+  private ByteString getCachedStateMachineData(Long logIndex, long term,
       ContainerCommandRequestProto requestProto)
       throws IOException {
-    ByteString data = stateMachineDataMap.get(logIndex);
+    ByteString data = stateMachineDataCache.get(logIndex);
     if (data == null) {
       data = readStateMachineData(requestProto, term, logIndex);
     }
@@ -644,7 +647,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         CompletableFuture.supplyAsync(() -> {
           try {
             future.complete(
-                getStateMachineData(entry.getIndex(), entry.getTerm(),
+                getCachedStateMachineData(entry.getIndex(), entry.getTerm(),
                     requestProto));
           } catch (IOException e) {
             metrics.incNumReadStateMachineFails();
@@ -706,7 +709,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     long index = trx.getLogEntry().getIndex();
     // Since leader and one of the followers has written the data, it can
     // be removed from the stateMachineDataMap.
-    stateMachineDataMap.remove(index);
+    stateMachineDataCache.remove(index);
 
     DispatcherContext.Builder builder =
         new DispatcherContext.Builder()
@@ -818,7 +821,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @VisibleForTesting
   public void evictStateMachineCache() {
-    stateMachineDataMap.clear();
+    stateMachineDataCache.clear();
   }
 
   @Override

@@ -20,12 +20,18 @@ package org.apache.hadoop.hdds.utils;
 
 import java.util.function.BiFunction;
 
-public class ResourceLimitMap<K, V> implements Map<K, V> {
+/**
+ * Cache with resource limit constraints. At any time all entries in the cache
+ * satisfy the resource limit constraints in the constructor. New put
+ * operations are blocked until resources are released via remove or clear
+ * operation.
+ */
+public class ResourceLimitCache<K, V> implements Cache<K, V> {
   private final java.util.concurrent.ConcurrentMap<K, V> map;
   private final ResourceSemaphore.Group group;
   private final BiFunction<K, V, int[]> permitsSupplier;
 
-  public ResourceLimitMap(java.util.concurrent.ConcurrentMap<K, V> map,
+  public ResourceLimitCache(java.util.concurrent.ConcurrentMap<K, V> map,
       BiFunction<K, V, int[]> permitsSupplier, int... limits) {
     this.map = map;
     this.group = new ResourceSemaphore.Group(limits);
@@ -40,7 +46,7 @@ public class ResourceLimitMap<K, V> implements Map<K, V> {
   @Override
   public V put(K key, V value) throws InterruptedException {
     // remove the old key to release the permits
-    remove(key);
+    V oldVal = remove(key);
     int[] permits = permitsSupplier.apply(key, value);
     group.acquire(permits);
     try {
@@ -48,7 +54,7 @@ public class ResourceLimitMap<K, V> implements Map<K, V> {
     } catch (Throwable t) {
       group.release(permits);
     }
-    return value;
+    return oldVal;
   }
 
   @Override

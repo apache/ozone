@@ -17,7 +17,10 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-public interface Map<K, V> {
+/**
+ * Cache interface.
+ */
+public interface Cache<K, V> {
 
   V get(K key);
 
