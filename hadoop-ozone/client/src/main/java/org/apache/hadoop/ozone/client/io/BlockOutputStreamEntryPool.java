@@ -102,11 +102,10 @@ public class BlockOutputStreamEntryPool {
     Preconditions.checkState(streamBufferFlushSize > 0);
     Preconditions.checkState(streamBufferMaxSize > 0);
     Preconditions.checkState(blockSize > 0);
-    Preconditions.checkState(streamBufferFlushSize % chunkSize == 0);
     Preconditions.checkState(streamBufferMaxSize % streamBufferFlushSize == 0);
-    Preconditions.checkState(blockSize % streamBufferMaxSize == 0);
     this.bufferPool =
-        new BufferPool(chunkSize, (int) streamBufferMaxSize / chunkSize,
+        new BufferPool(8192, // TODO configurable
+            (int) streamBufferMaxSize / 8192,
             xceiverClientManager.byteBufferToByteStringConversion());
   }
 

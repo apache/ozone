@@ -49,6 +49,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls
@@ -81,18 +82,16 @@ public class BlockOutputStream extends OutputStream {
   private final BlockData.Builder containerBlockData;
   private XceiverClientManager xceiverClientManager;
   private XceiverClientSpi xceiverClient;
-  private final ContainerProtos.ChecksumType checksumType;
   private final int bytesPerChecksum;
-  private int chunkIndex;
-  private int chunkSize;
+  private final AtomicLong chunkOffset = new AtomicLong();
   private final long streamBufferFlushSize;
   private final long streamBufferMaxSize;
   private final BufferPool bufferPool;
   // The IOException will be set by response handling thread in case there is an
   // exception received in the response. If the exception is set, the next
   // request will fail upfront.
-  private AtomicReference<IOException> ioException;
-  private ExecutorService responseExecutor;
+  private final AtomicReference<IOException> ioException;
+  private final ExecutorService responseExecutor;
 
   // the effective length of data flushed so far
   private long totalDataFlushedLength;
@@ -113,7 +112,8 @@ public class BlockOutputStream extends OutputStream {
   // be released from the buffer pool.
   private final CommitWatcher commitWatcher;
 
-  private List<DatanodeDetails> failedServers;
+  private final List<DatanodeDetails> failedServers;
+  private final Checksum checksum;
 
   /**
    * Creates a new BlockOutputStream.
@@ -121,7 +121,6 @@ public class BlockOutputStream extends OutputStream {
    * @param blockID              block ID
    * @param xceiverClientManager client manager that controls client
    * @param pipeline             pipeline where block will be written
-   * @param chunkSize            chunk size
    * @param bufferPool           pool of buffers
    * @param streamBufferFlushSize flush size
    * @param streamBufferMaxSize   max size of the currentBuffer
@@ -132,12 +131,11 @@ public class BlockOutputStream extends OutputStream {
   @SuppressWarnings("parameternumber")
   public BlockOutputStream(BlockID blockID,
       XceiverClientManager xceiverClientManager, Pipeline pipeline,
-      int chunkSize, long streamBufferFlushSize, long streamBufferMaxSize,
+      long streamBufferFlushSize, long streamBufferMaxSize,
       long watchTimeout, BufferPool bufferPool, ChecksumType checksumType,
       int bytesPerChecksum)
       throws IOException {
     this.blockID = new AtomicReference<>(blockID);
-    this.chunkSize = chunkSize;
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
     this.containerBlockData =
@@ -145,11 +143,9 @@ public class BlockOutputStream extends OutputStream {
             .addMetadata(keyValue);
     this.xceiverClientManager = xceiverClientManager;
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
-    this.chunkIndex = 0;
     this.streamBufferFlushSize = streamBufferFlushSize;
     this.streamBufferMaxSize = streamBufferMaxSize;
     this.bufferPool = bufferPool;
-    this.checksumType = checksumType;
     this.bytesPerChecksum = bytesPerChecksum;
 
     // A single thread executor handle the responses of async requests
@@ -160,6 +156,7 @@ public class BlockOutputStream extends OutputStream {
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
     ioException = new AtomicReference<>(null);
+    checksum = new Checksum(checksumType, bytesPerChecksum);
   }
 
 
@@ -226,15 +223,12 @@ public class BlockOutputStream extends OutputStream {
     }
 
     while (len > 0) {
-      int writeLen;
       // Allocate a buffer if needed. The buffer will be allocated only
       // once as needed and will be reused again for multiple blockOutputStream
       // entries.
       final ChunkBuffer currentBuffer = bufferPool.allocateBufferIfNeeded(
           bytesPerChecksum);
-      int pos = currentBuffer.position();
-      writeLen =
-          Math.min(chunkSize - pos % chunkSize, len);
+      final int writeLen = Math.min(currentBuffer.remaining(), len);
       currentBuffer.put(b, off, writeLen);
       if (!currentBuffer.hasRemaining()) {
         writeChunk(currentBuffer);
@@ -276,13 +270,15 @@ public class BlockOutputStream extends OutputStream {
     if (len == 0) {
       return;
     }
-    int count = 0;
     Preconditions.checkArgument(len <= streamBufferMaxSize);
+    final long offset = chunkOffset.addAndGet(-len);
+    Preconditions.checkArgument(0 <= offset);
+    int count = 0;
     while (len > 0) {
-      long writeLen;
-      writeLen = Math.min(chunkSize, len);
-      if (writeLen == chunkSize) {
-        writeChunk(bufferPool.getBuffer(count));
+      ChunkBuffer buffer = bufferPool.getBuffer(count);
+      long writeLen = Math.min(buffer.position(), len);
+      if (!buffer.hasRemaining()) {
+        writeChunk(buffer);
       }
       len -= writeLen;
       count++;
@@ -462,7 +458,7 @@ public class BlockOutputStream extends OutputStream {
     if (totalDataFlushedLength < writtenDataLength) {
       final ChunkBuffer currentBuffer = bufferPool.getCurrentBuffer();
       Preconditions.checkArgument(currentBuffer.position() > 0);
-      if (currentBuffer.position() != chunkSize) {
+      if (currentBuffer.hasRemaining()) {
         writeChunk(currentBuffer);
       }
       // This can be a partially filled chunk. Since we are flushing the buffer
@@ -586,13 +582,13 @@ public class BlockOutputStream extends OutputStream {
    */
   private void writeChunkToContainer(ChunkBuffer chunk) throws IOException {
     int effectiveChunkSize = chunk.remaining();
+    final long offset = chunkOffset.getAndAdd(effectiveChunkSize);
     final ByteString data = chunk.toByteString(
         bufferPool.byteStringConversion());
-    Checksum checksum = new Checksum(checksumType, bytesPerChecksum);
     ChecksumData checksumData = checksum.computeChecksum(chunk);
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
-        .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
-        .setOffset(0)
+        .setChunkName(blockID.get().getLocalID() + "_chunk")
+        .setOffset(offset)
         .setLen(effectiveChunkSize)
         .setChecksumData(checksumData.getProtoBufMessage())
         .build();
