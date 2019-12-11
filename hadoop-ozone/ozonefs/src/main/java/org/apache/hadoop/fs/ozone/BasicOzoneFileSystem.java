@@ -474,7 +474,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
     if (result) {
       // If this delete operation removes all files/directories from the
-      // parent direcotry, then an empty parent directory must be created.
+      // parent directory, then an empty parent directory must be created.
       createFakeParentDirectory(f);
     }
 

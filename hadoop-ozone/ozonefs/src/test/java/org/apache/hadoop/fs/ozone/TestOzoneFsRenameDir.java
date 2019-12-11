@@ -96,7 +96,7 @@ public class TestOzoneFsRenameDir {
     assertTrue("Directory rename failed", fs.exists(dest));
     // Verify that the subdir is also renamed i.e. keys corresponding to the
     // sub-directories of the renamed directory have also been renamed.
-    assertTrue("Keys under the renamed direcotry not renamed",
+    assertTrue("Keys under the renamed directory not renamed",
         fs.exists(new Path(dest, "sub_dir1")));
 
     // Test if one path belongs to other FileSystem.
