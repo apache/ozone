@@ -20,9 +20,11 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.Seekable;
 
@@ -34,7 +36,8 @@ import org.apache.hadoop.fs.Seekable;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public final class OzoneFSInputStream extends FSInputStream {
+public final class OzoneFSInputStream extends FSInputStream
+    implements ByteBufferReadable {
 
   private final InputStream inputStream;
 
@@ -75,5 +78,22 @@ public final class OzoneFSInputStream extends FSInputStream {
   @Override
   public int available() throws IOException {
     return inputStream.available();
+  }
+
+  /**
+   * @param buf the ByteBuffer to receive the results of the read operation.
+   * @return the number of bytes read, possibly zero.
+   * @throws IOException if there is some error performing the read
+   */
+  @Override
+  public int read(ByteBuffer buf) throws IOException {
+
+    int bufInitPos = buf.position();
+    while (buf.hasRemaining() && (inputStream.available() > 0)) {
+      buf.put((byte) inputStream.read());
+    }
+    int bufPosAfterRead = buf.position();
+
+    return (bufPosAfterRead - bufInitPos);
   }
 }
