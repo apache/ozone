@@ -19,11 +19,8 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.comparators.ComparableComparator;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -110,16 +107,9 @@ public final class RatisPipelineUtils {
     if (nodes.size() != HddsProtos.ReplicationFactor.THREE.getNumber()) {
       return 0;
     }
-    List<UUID> nodeIds = nodes.stream()
-        .map(DatanodeDetails::getUuid).distinct()
-        .collect(Collectors.toList());
-    nodeIds.sort(new ComparableComparator());
-    // Only for Factor THREE pipeline.
-    return new HashCodeBuilder()
-        .append(nodeIds.get(0).toString())
-        .append(nodeIds.get(1).toString())
-        .append(nodeIds.get(2).toString())
-        .toHashCode();
+    return nodes.get(0).getUuid().hashCode() ^
+        nodes.get(1).getUuid().hashCode() ^
+        nodes.get(2).getUuid().hashCode();
   }
 
   /**
@@ -134,7 +124,7 @@ public final class RatisPipelineUtils {
     List<Pipeline> matchedPipelines = stateManager.getPipelines(
         HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE)
-        .stream().filter(p -> !p.equals(pipeline) &&
+        .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
             (// For all OPEN or ALLOCATED pipelines
                 p.getPipelineState() == Pipeline.PipelineState.OPEN ||
                 p.getPipelineState() == Pipeline.PipelineState.ALLOCATED) &&

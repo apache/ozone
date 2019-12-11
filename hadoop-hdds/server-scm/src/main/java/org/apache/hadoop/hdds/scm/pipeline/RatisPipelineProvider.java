@@ -157,6 +157,8 @@ public class RatisPipelineProvider implements PipelineProvider {
     }
 
     List<DatanodeDetails> dns;
+    int nodeIdHash = 0;
+
     switch(factor) {
     case ONE:
       dns = pickNodesNeverUsed(ReplicationFactor.ONE);
@@ -164,14 +166,10 @@ public class RatisPipelineProvider implements PipelineProvider {
     case THREE:
       dns = placementPolicy.chooseDatanodes(null,
           null, factor.getNumber(), 0);
+      nodeIdHash = RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(dns);
       break;
     default:
       throw new IllegalStateException("Unknown factor: " + factor.name());
-    }
-
-    int nodeIdHash = 0;
-    if (factor == ReplicationFactor.THREE) {
-      nodeIdHash = RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(dns);
     }
 
     Pipeline pipeline = Pipeline.newBuilder()
