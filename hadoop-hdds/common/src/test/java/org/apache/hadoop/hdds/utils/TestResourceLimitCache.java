@@ -16,11 +16,13 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Test for ResourceLimitCache.
@@ -28,7 +30,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TestResourceLimitCache {
 
   @Test
-  public void testResourceLimitCache() throws InterruptedException {
+  public void testResourceLimitCache()
+      throws InterruptedException, TimeoutException {
     Cache<Integer, String> resourceCache =
         new ResourceLimitCache<>(new ConcurrentHashMap<>(),
             (k, v) -> new int[] {k}, 10);
@@ -48,6 +51,7 @@ public class TestResourceLimitCache {
       }
       return null;
     });
+    Assert.assertTrue(!future.isDone());
     Thread.sleep(100);
     Assert.assertTrue(!future.isDone());
 
@@ -55,7 +59,7 @@ public class TestResourceLimitCache {
     // has acquired 6 permits out of 10
     resourceCache.remove(4);
 
-    Thread.sleep(100);
+    GenericTestUtils.waitFor(future::isDone, 100, 1000);
     // map has the ket 1
     Assert.assertTrue(future.isDone() && !future.isCompletedExceptionally());
     Assert.assertNotNull(resourceCache.get(1));
@@ -70,6 +74,7 @@ public class TestResourceLimitCache {
       }
       return null;
     });
+    Assert.assertTrue(!future.isDone());
     Thread.sleep(100);
     Assert.assertTrue(!future.isDone());
 
