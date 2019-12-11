@@ -233,8 +233,10 @@ public class LeaseManager<T> {
           if(!Thread.interrupted()) {
             Thread.sleep(sleepTime);
           }
-        } catch (InterruptedException ignored) {
+        } catch (InterruptedException e) {
           // This means a new lease is added to activeLeases.
+          LOG.error("Execution was interrupted ", e);
+          Thread.currentThread().interrupt();
         }
       }
     }
