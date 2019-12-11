@@ -53,10 +53,10 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
       @Override
       public ByteBuffer next() {
-        final ByteBuffer duplicated = buffer.duplicate();
         if (!buffer.hasRemaining()) {
           throw new NoSuchElementException();
         }
+        final ByteBuffer duplicated = buffer.duplicate();
         final int min = Math.min(
             buffer.position() + bufferSize, buffer.limit());
         duplicated.limit(min);
