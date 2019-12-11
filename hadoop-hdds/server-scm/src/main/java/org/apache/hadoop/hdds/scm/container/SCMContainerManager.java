@@ -80,7 +80,8 @@ public class SCMContainerManager implements ContainerManager {
    * passed to LevelDB and this memory is allocated in Native code space.
    * CacheSize is specified
    * in MB.
-   * @param pipelineManager - PipelineManager
+   * @param conf - {@link Configuration}
+   * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
   public SCMContainerManager(final Configuration conf,
