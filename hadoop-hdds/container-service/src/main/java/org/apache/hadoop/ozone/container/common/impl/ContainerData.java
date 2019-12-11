@@ -231,8 +231,8 @@ public abstract class ContainerData {
    * Returns the layOutVersion of the actual container data format.
    * @return layOutVersion
    */
-  public int getLayOutVersion() {
-    return ChunkLayOutVersion.getChunkLayOutVersion(layOutVersion).getVersion();
+  public ChunkLayOutVersion getLayOutVersion() {
+    return ChunkLayOutVersion.getChunkLayOutVersion(layOutVersion);
   }
 
   /**
@@ -595,5 +595,18 @@ public abstract class ContainerData {
    * Returns the blockCommitSequenceId.
    */
   public abstract long getBlockCommitSequenceId();
+
+  public void updateReadStats(long length) {
+    incrReadCount();
+    incrReadBytes(length);
+  }
+
+  public void updateWriteStats(long bytesWritten, boolean overwrite) {
+    if (!overwrite) {
+      incrBytesUsed(bytesWritten);
+    }
+    incrWriteCount();
+    incrWriteBytes(bytesWritten);
+  }
 
 }

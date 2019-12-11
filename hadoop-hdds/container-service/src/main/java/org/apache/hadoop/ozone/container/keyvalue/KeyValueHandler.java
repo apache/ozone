@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -118,7 +117,6 @@ public class KeyValueHandler extends Handler {
 
   // A lock that is held during container creation.
   private final AutoCloseableLock containerCreationLock;
-  private final boolean doSyncWrite;
 
   public KeyValueHandler(Configuration config, String datanodeId,
       ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
@@ -126,10 +124,7 @@ public class KeyValueHandler extends Handler {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
-    doSyncWrite =
-        conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY,
-            OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT);
-    chunkManager = ChunkManagerFactory.getChunkManager(config, doSyncWrite);
+    chunkManager = ChunkManagerFactory.createChunkManager(config);
     volumeChoosingPolicy = ReflectionUtils.newInstance(conf.getClass(
         HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
             .class, VolumeChoosingPolicy.class), conf);

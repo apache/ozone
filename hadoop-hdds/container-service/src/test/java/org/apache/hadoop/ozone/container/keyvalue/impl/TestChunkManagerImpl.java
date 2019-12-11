@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.keyvalue;
+package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -27,13 +27,13 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerDummyImpl;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
@@ -48,6 +48,7 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V1;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -88,7 +89,7 @@ public class TestChunkManagerImpl {
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
-    keyValueContainerData = new KeyValueContainerData(1L,
+    keyValueContainerData = new KeyValueContainerData(1L, V1.getVersion(),
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 
@@ -168,8 +169,7 @@ public class TestChunkManagerImpl {
     } catch (StorageContainerException ex) {
       // As we got an exception, writeBytes should be 0.
       checkWriteIOStats(0, 0);
-      GenericTestUtils.assertExceptionContains("data array does not match " +
-          "the length ", ex);
+      GenericTestUtils.assertExceptionContains("Unexpected buffer size", ex);
       assertEquals(ContainerProtos.Result.INVALID_WRITE_SIZE, ex.getResult());
     }
   }
@@ -270,7 +270,7 @@ public class TestChunkManagerImpl {
 
   @Test
   public void dummyManagerDoesNotWriteToFile() throws Exception {
-    ChunkManager dummy = new ChunkManagerDummyImpl(true);
+    ChunkManager dummy = new ChunkManagerDummyImpl();
     DispatcherContext ctx = new DispatcherContext.Builder()
         .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
 
@@ -281,7 +281,7 @@ public class TestChunkManagerImpl {
 
   @Test
   public void dummyManagerReadsAnyChunk() throws Exception {
-    ChunkManager dummy = new ChunkManagerDummyImpl(true);
+    ChunkManager dummy = new ChunkManagerDummyImpl();
 
     ChunkBuffer dataRead = dummy.readChunk(keyValueContainer,
         blockID, chunkInfo, getDispatcherContext());

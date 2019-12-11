@@ -102,7 +102,7 @@ public class TestContainerDataYaml {
     assertEquals(containerFile.getParent(), kvData.getChunksPath());
     assertEquals(ContainerProtos.ContainerDataProto.State.OPEN, kvData
         .getState());
-    assertEquals(1, kvData.getLayOutVersion());
+    assertEquals(ChunkLayOutVersion.V1, kvData.getLayOutVersion());
     assertEquals(0, kvData.getMetadata().size());
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertEquals(MAXSIZE, kvData.getMaxSize());
@@ -133,7 +133,7 @@ public class TestContainerDataYaml {
     assertEquals(containerFile.getParent(), kvData.getChunksPath());
     assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
         .getState());
-    assertEquals(1, kvData.getLayOutVersion());
+    assertEquals(ChunkLayOutVersion.V1, kvData.getLayOutVersion());
     assertEquals(2, kvData.getMetadata().size());
     assertEquals(VOLUME_OWNER, kvData.getMetadata().get(OzoneConsts.VOLUME));
     assertEquals(OzoneConsts.OZONE,
@@ -189,7 +189,7 @@ public class TestContainerDataYaml {
           .getChunksPath());
       assertEquals("/hdds/current/aed-fg4-hji-jkl/containerDir0/1", kvData
           .getMetadataPath());
-      assertEquals(1, kvData.getLayOutVersion());
+      assertEquals(ChunkLayOutVersion.V1, kvData.getLayOutVersion());
       assertEquals(2, kvData.getMetadata().size());
 
     } catch (Exception ex) {

@@ -87,6 +87,8 @@ public interface ChunkManager {
   /**
    * Shutdown the chunkManager.
    */
-  void shutdown();
+  default void shutdown() {
+    // if applicable
+  }
 
 }
