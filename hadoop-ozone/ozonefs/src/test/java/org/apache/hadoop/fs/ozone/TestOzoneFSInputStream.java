@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import org.apache.hadoop.conf.StorageUnit;
@@ -132,6 +133,22 @@ public class TestOzoneFSInputStream {
     }
     Assert.assertEquals(i * tmp.length, data.length);
     Assert.assertTrue(Arrays.equals(value, data));
+    inputStream.close();
+  }
+
+  @Test
+  public void testO3FSByteBufferRead() throws IOException {
+    FSDataInputStream inputStream = fs.open(filePath);
+    ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
+    int byteRead = inputStream.read(buffer);
+
+    Assert.assertEquals(byteRead, 1024 * 1024);
+
+    byte[] value = new byte[1024 * 1024];
+    System.arraycopy(data, 0, value, 0, value.length);
+
+    Assert.assertArrayEquals(value, buffer.array());
+
     inputStream.close();
   }
 }
