@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -211,6 +212,11 @@ public class NodeDecommissionManager {
         TimeUnit.SECONDS);
   }
 
+  @VisibleForTesting
+  public DatanodeAdminMonitorInterface getMonitor() {
+    return monitor;
+  }
+
   public synchronized void decommissionNodes(List nodes)
       throws InvalidHostStringException {
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes);
@@ -276,10 +282,10 @@ public class NodeDecommissionManager {
     NodeStatus nodeStatus = getNodeStatus(dn);
     NodeOperationalState opState = nodeStatus.getOperationalState();
     if (opState != NodeOperationalState.IN_SERVICE) {
-      nodeManager.setNodeOperationalState(
-          dn, NodeOperationalState.IN_SERVICE);
+      // The node will be set back to IN_SERVICE when it is processed by the
+      // monitor
       monitor.stopMonitoring(dn);
-      LOG.info("Recommissioned node {}", dn);
+      LOG.info("Queued node {} for recommission", dn);
     } else {
       LOG.info("Recommission called on node {} with state {}. "+
           "Nothing to do.", dn, opState);

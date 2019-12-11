@@ -394,6 +394,30 @@ public class TestDatanodeAdminMonitor {
     assertTrue(nodeManager.getNodeStatus(dn1).isInMaintenance());
   }
 
+  @Test
+  public void testCancelledNodesMovedToInService() {
+    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+            HddsProtos.NodeState.HEALTHY));
+
+    // Add the node to the monitor, it should transiting to
+    // AWAIT_MAINTENANCE_END as there are no under-replicated containers.
+    monitor.startMonitoring(dn1, 1);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    DatanodeAdminNodeDetails node = getFirstTrackedNode();
+    assertTrue(nodeManager.getNodeStatus(dn1).isInMaintenance());
+    assertEquals(0, node.getUnderReplicatedContainers());
+
+    // Now cancel the node and run the monitor, the node should be IN_SERVICE
+    monitor.stopMonitoring(dn1);
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+  }
+
   /**
    * Generate a set of ContainerID, starting from an ID of zero up to the given
    * count minus 1.

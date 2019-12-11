@@ -162,6 +162,7 @@ public class TestNodeDecommissionManager {
     // Recommission all 3 hosts
     decom.recommissionNodes(Arrays.asList(
         multiAddr, dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+    decom.getMonitor().run();
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -200,6 +201,7 @@ public class TestNodeDecommissionManager {
     // Recommission all 3 hosts
     decom.recommissionNodes(Arrays.asList(
         multiAddr, dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+    decom.getMonitor().run();
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,

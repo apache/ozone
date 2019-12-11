@@ -181,7 +181,15 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
 
   private void processCancelledNodes() {
     while(!cancelledNodes.isEmpty()) {
-      stopTrackingNode(cancelledNodes.poll());
+      DatanodeAdminNodeDetails dn = cancelledNodes.poll();
+      try {
+        stopTrackingNode(dn);
+        putNodeBackInService(dn);
+        LOG.info("Recommissioned node {}", dn.getDatanodeDetails());
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Failed processing the cancel admin request for {}",
+            dn.getDatanodeDetails(), e);
+      }
       // TODO - fire event to bring node back into service?
     }
   }
@@ -216,10 +224,20 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
         if (status.isDecommissioning() || status.isEnteringMaintenance()) {
           if (checkPipelinesClosedOnNode(dn)
               && checkContainersReplicatedOnNode(dn)) {
-            if (status.isDecommissioning()) {
+            // CheckContainersReplicatedOnNode may take a short time to run
+            // so after it completes, re-get the nodestatus to check the health
+            // and ensure the state is still good to continue
+            status = getNodeStatus(dn.getDatanodeDetails());
+            if (status.isDead()) {
+              LOG.warn("Datanode {} is dead and the admin workflow cannot "+
+                  "continue. The node will be put back to IN_SERVICE and "+
+                  "handled as a dead node", dn);
+              putNodeBackInService(dn);
+              iterator.remove();
+            } else if (status.isDecommissioning()) {
               completeDecommission(dn);
               iterator.remove();
-            } else {
+            } else if (status.isEnteringMaintenance()) {
               putIntoMaintenance(dn);
             }
           }
@@ -305,22 +323,10 @@ public class DatanodeAdminMonitor implements DatanodeAdminMonitorInterface {
 
   private void completeDecommission(DatanodeAdminNodeDetails dn)
       throws NodeNotFoundException{
-    NodeStatus nodeStatus = getNodeStatus(dn.getDatanodeDetails());
-    if (nodeStatus.isAlive()) {
-      setNodeOpState(dn, NodeOperationalState.DECOMMISSIONED);
-      LOG.info("Datanode {} has completed the admin workflow. The operational "+
-          "state has been set to {}", dn.getDatanodeDetails(),
-          NodeOperationalState.DECOMMISSIONED);
-    } else {
-      // We cannot move a dead node to decommissioned, as it may not have
-      // replicated all its containers before it was marked as dead and they
-      // were all removed from the node manager. The node will have been
-      // handled as a dead node and here we should set it back to IN_SERVICE
-      LOG.warn("Datanode {} is not alive and therefore cannot complete "+
-          "decommission. The operational state has been set to {}",
-          dn.getDatanodeDetails(), NodeOperationalState.IN_SERVICE);
-      putNodeBackInService(dn);
-    }
+    setNodeOpState(dn, NodeOperationalState.DECOMMISSIONED);
+    LOG.info("Datanode {} has completed the admin workflow. The operational "+
+        "state has been set to {}", dn.getDatanodeDetails(),
+        NodeOperationalState.DECOMMISSIONED);
   }
 
   private void putIntoMaintenance(DatanodeAdminNodeDetails dn)
