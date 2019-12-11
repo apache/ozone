@@ -18,15 +18,23 @@
 
 package org.apache.hadoop.ozone.utils;
 
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,18 +47,39 @@ public class LoadBucket {
             LoggerFactory.getLogger(LoadBucket.class);
 
   private final OzoneBucket bucket;
+  private final OzoneFileSystem fs;
 
-  public LoadBucket(OzoneBucket bucket) {
+  public LoadBucket(OzoneBucket bucket, OzoneConfiguration conf)
+    throws Exception {
     this.bucket = bucket;
+    this.fs = (OzoneFileSystem)FileSystem.get(getFSUri(bucket), conf);
   }
 
-  public void writeData(ByteBuffer buffer, String keyName) throws Exception {
-    int bufferCapacity = buffer.capacity();
+  private boolean isFsOp() {
+    return RandomUtils.nextBoolean();
+  }
 
-    LOG.debug("LOADGEN: Writing key {}", keyName);
-    try (OzoneOutputStream stream = bucket.createKey(keyName,
-        bufferCapacity, ReplicationType.RATIS, ReplicationFactor.THREE,
-            new HashMap<>())) {
+  // Write ops.
+
+  private OutputStream getOutputStream(boolean fsOp,
+                                       String fileName) throws Exception {
+    if (fsOp) {
+      return bucket.createKey(fileName, 0, ReplicationType.RATIS,
+        ReplicationFactor.THREE, new HashMap<>());
+    } else {
+      return fs.create(new Path("/", fileName));
+    }
+  }
+
+  public void writeKey(ByteBuffer buffer,
+                       String keyName) throws Exception {
+    writeKey(isFsOp(), buffer, keyName);
+  }
+
+  public void writeKey(boolean fsOp, ByteBuffer buffer,
+                       String keyName) throws Exception {
+    LOG.info("LOADGEN: {} Writing key {}", fsOp, keyName);
+    try (OutputStream stream = getOutputStream(fsOp, keyName)) {
       stream.write(buffer.array());
       LOG.trace("LOADGEN: Written key {}", keyName);
     } catch (Throwable t) {
@@ -60,12 +89,28 @@ public class LoadBucket {
     }
   }
 
-  public void readData(ByteBuffer buffer, String keyName) throws Exception {
-    LOG.debug("LOADGEN: Reading key {}", keyName);
+  // Read ops.
+
+  private InputStream getInputStream(boolean fsOp,
+                                     String fileName) throws Exception {
+    if (fsOp) {
+      return bucket.readKey(fileName);
+    } else {
+      return fs.open(new Path("/", fileName));
+    }
+  }
+
+  public void readKey(ByteBuffer buffer, String keyName) throws Exception {
+    readKey(isFsOp(), buffer, keyName);
+  }
+
+  public void readKey(boolean fsOp, ByteBuffer buffer,
+                      String keyName) throws Exception {
+    LOG.info("LOADGEN: {} Reading key {}", fsOp, keyName);
 
     int bufferCapacity = buffer.capacity();
 
-    try (OzoneInputStream stream = bucket.readKey(keyName)) {
+    try (InputStream stream = getInputStream(fsOp, keyName)) {
       byte[] readBuffer = new byte[bufferCapacity];
       int readLen = stream.read(readBuffer);
 
@@ -86,14 +131,33 @@ public class LoadBucket {
     }
   }
 
+  // Delete ops.
+
+  private void delete(boolean fsOp, String fileName) throws IOException {
+    if (fsOp) {
+      bucket.deleteKey(fileName);
+    } else {
+      fs.delete(new Path("/", fileName), true);
+    }
+  }
+
   public void deleteKey(String keyName) throws Exception {
-    LOG.debug("LOADGEN: Deleting key {}", keyName);
+    deleteKey(isFsOp(), keyName);
+  }
+
+  public void deleteKey(boolean fsOp, String keyName) throws Exception {
+    LOG.info("LOADGEN: {} Deleting key {}", fsOp, keyName);
     try {
-      bucket.deleteKey(keyName);
+      delete(fsOp, keyName);
       LOG.trace("LOADGEN: Deleted key {}", keyName);
     } catch (Throwable t) {
       LOG.error("LOADGEN: Unable to delete key:{}", keyName, t);
       throw t;
     }
+  }
+
+  private static URI getFSUri(OzoneBucket bucket) throws URISyntaxException {
+    return new URI(String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
+      bucket.getName(), bucket.getVolumeName()));
   }
 }
