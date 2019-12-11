@@ -78,12 +78,14 @@ public class BasicOFileSystem extends FileSystem {
   private URI uri;
   private String userName;
   private Path workingDir;
+  private String volumeStr;
+  private String bucketStr;
+  private String mountStr;
 
   private OzoneClientAdapter adapter;
 
-  private static final String URI_EXCEPTION_TEXT = "Ozone file system URL " +
-      "should be one of the following formats: " +
-      "ofs://volume/bucket/[key]  OR " +
+  private static final String URI_EXCEPTION_TEXT =
+      "Ozone file system URL should be one of the following formats: " +
       "ofs://om-host.example.com/volume/bucket/[key]  OR " +
       "ofs://om-host.example.com:5678/volume/bucket/[key]";
 
@@ -96,21 +98,19 @@ public class BasicOFileSystem extends FileSystem {
         "Invalid scheme provided in " + name);
 
     String authority = name.getAuthority();
-    String volbucket = name.getPath();
-    if (authority == null || volbucket == null || volbucket.isEmpty()) {
+    if (authority == null) {
       // authority is null when fs.defaultFS is not a qualified ofs URI and
       // ofs:/// is passed to the client. matcher will NPE if authority is null
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
+    String omHost = null;
+    int omPort = -1;
     // Parse hostname and port
     String[] parts = authority.split(":");
     if (parts.length > 2) {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
-
-    String omHost = null;
-    int omPort = -1;
     omHost = parts[0];
     if (parts.length == 2) {
       try {
@@ -121,10 +121,12 @@ public class BasicOFileSystem extends FileSystem {
     }
 
     // Parse volume and bucket, or special path (/tmp)
-    String volumeStr = null;
-    String bucketStr = null;
-    String mountStr = null;  // TODO: Might not need this for /tmp ?
-    StringTokenizer token = new StringTokenizer(volbucket, "/");
+    volumeStr = null;
+    bucketStr = null;
+    mountStr = null;  // TODO: Might not need this for /tmp ?
+    String path = name.getPath();
+    // TODO: handle case where path is empty (e.g. -ls /)
+    StringTokenizer token = new StringTokenizer(path, "/");
     if (token.countTokens() >= 2) {
       volumeStr = token.nextToken();
       bucketStr = token.nextToken();
@@ -144,8 +146,7 @@ public class BasicOFileSystem extends FileSystem {
       // /ozonefs.txt, otherwise the default is false. It could be overridden.
       boolean defaultValue =
           BasicOFileSystem.class.getClassLoader()
-              .getResource("ozonefs.txt")
-              != null;
+              .getResource("ozonefs.txt") != null;
 
       //Use string here instead of the constant as constant may not be available
       //on the classpath of a hadoop 2.7
@@ -635,12 +636,20 @@ public class BasicOFileSystem extends FileSystem {
    * @return the key of the object that represents the file.
    */
   public String pathToKey(Path path) {
-    Objects.requireNonNull(path, "Path canf not be null!");
+    Objects.requireNonNull(path, "Path can't be null!");
     if (!path.isAbsolute()) {
       path = new Path(workingDir, path);
     }
     // removing leading '/' char
     String key = path.toUri().getPath().substring(1);
+    if (volumeStr != null && bucketStr != null) {
+      // Note: length plus 1 for '/'
+      int volbucketlen = volumeStr.length() + 1 + bucketStr.length() + 1;
+      // path could end with bucket name without '/', hence the <=
+      key = key.length() <= volbucketlen ? "" : key.substring(volbucketlen);
+    } else if (mountStr != null) {
+      // TODO: /tmp case
+    }
     LOG.trace("path for key:{} is:{}", key, path);
     return key;
   }
