@@ -70,14 +70,14 @@ Write Test File
     ${fileName} =           Catenate                SEPARATOR=              ${WRITE_FILE_COUNT}       .txt
                             Copy File               ${TEST_FILE}            ${fileName}
                             Execute                 ozone fs -copyFromLocal ${fileName} o3fs://${BUCKET}.${VOLUME}.${OM_SERVICE_ID}/
-    ${result} =             Execute                 ozone sh key list o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} | grep -v WARN | jq -r '.name'
+    ${result} =             Execute                 ozone sh key list o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} | jq -r '.name'
                             Should contain          ${result}               ${fileName}
                             Remove File             ${fileName}
 
 Put Key
     [arguments]             ${FILE}                 ${KEY}
                             Execute                 ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${KEY} ${FILE}
-    ${result} =             Execute                 ozone sh key info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${KEY} | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="${KEY}")'
+    ${result} =             Execute                 ozone sh key info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${KEY} | jq -r '. | select(.name=="${KEY}")'
                             Should contain          ${result}               creationTime
 
 Put Multiple Keys
