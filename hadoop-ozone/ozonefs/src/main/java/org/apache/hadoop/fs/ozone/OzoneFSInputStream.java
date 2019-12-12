@@ -84,7 +84,8 @@ public final class OzoneFSInputStream extends FSInputStream
 
   /**
    * @param buf the ByteBuffer to receive the results of the read operation.
-   * @return the number of bytes read, possibly zero.
+   * @return the number of bytes read, possibly zero, or -1 if
+   *         reach end-of-stream
    * @throws IOException if there is some error performing the read
    */
   @Override
@@ -94,10 +95,10 @@ public final class OzoneFSInputStream extends FSInputStream
     int readLen = Math.min(buf.remaining(), inputStream.available());
 
     byte[] readData = new byte[readLen];
-    inputStream.read(readData, bufInitPos, readLen);
+    int bytesRead = inputStream.read(readData, bufInitPos, readLen);
     buf.put(readData);
 
-    return readLen;
+    return bytesRead;
   }
 
   /**
