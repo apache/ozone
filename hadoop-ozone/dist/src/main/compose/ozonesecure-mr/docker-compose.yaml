@@ -100,7 +100,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-legacy-@project.version@.jar
     command: ["yarn", "resourcemanager"]
   nm:
     image: apache/hadoop:${HADOOP_VERSION}
@@ -112,7 +112,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-legacy-@project.version@.jar
       WAIT_FOR: rm:8088
     command: ["yarn","nodemanager"]
   jhs:
@@ -128,7 +128,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-legacy-@project.version@.jar
       WAIT_FOR: rm:8088
     command: ["yarn","timelineserver"]
 networks:
