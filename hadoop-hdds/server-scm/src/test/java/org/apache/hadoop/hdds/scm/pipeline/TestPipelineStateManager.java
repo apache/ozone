@@ -43,8 +43,7 @@ public class TestPipelineStateManager {
 
   @Before
   public void init() throws Exception {
-    Configuration conf = new OzoneConfiguration();
-    stateManager = new PipelineStateManager(conf);
+    stateManager = new PipelineStateManager();
   }
 
   private Pipeline createDummyPipeline(int numNodes) {

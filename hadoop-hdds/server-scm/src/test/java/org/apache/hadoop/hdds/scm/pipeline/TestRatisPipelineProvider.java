@@ -53,7 +53,7 @@ public class TestRatisPipelineProvider {
   @Before
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
-    stateManager = new PipelineStateManager(new OzoneConfiguration());
+    stateManager = new PipelineStateManager();
     provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, new OzoneConfiguration());
   }
