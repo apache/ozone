@@ -142,8 +142,6 @@ public class BasicOFileSystem extends FileSystem {
       // Note: adapter will be initialized in operations.
       // TODO: adapter shouldn't be global now.
       this.adapter = null;
-//      this.adapter = createAdapter(conf, bucketStr, volumeStr, omHost, omPort,
-//          isolatedClassloader);
 
       try {
         this.userName =
@@ -514,25 +512,13 @@ public class BasicOFileSystem extends FileSystem {
     List<FileStatus> tmpStatusList;
     String startKey = "";
 
-    // TODO: Modularize this snippet.
-    String volumeStr = "";
-    String bucketStr = "";
-    // TODO: handle case where path is empty (e.g. -ls /)
-    StringTokenizer token = new StringTokenizer(f.toUri().getPath(), "/");
-    if (token.countTokens() >= 2) {
-      volumeStr = token.nextToken();
-      bucketStr = token.nextToken();
-    } else if (token.countTokens() == 1) {
-      // TODO: /tmp case
-    } else {
-      throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
-    }
-    this.adapter = createAdapter(conf, bucketStr, volumeStr, omHost, omPort,
-        isolatedClassloader);
+    OFSPath ofsPath = new OFSPath(f.toUri().getPath());
+    this.adapter = createAdapter(conf, ofsPath.getBucketName(),
+        ofsPath.getVolumeName(), omHost, omPort, isolatedClassloader);
 
     do {
       tmpStatusList =
-          adapter.listStatus(pathToKey(f, volumeStr, bucketStr), false, startKey, numEntries, uri,
+          adapter.listStatus(pathToKey(f), false, startKey, numEntries, uri,
               workingDir, getUsername())
               .stream()
               .map(this::convertFileStatus)
@@ -643,27 +629,66 @@ public class BasicOFileSystem extends FileSystem {
     }
     // removing leading '/' char
     String key = path.toUri().getPath().substring(1);
+    // TODO: Clean up code.
+    key = new OFSPath(key).getKeyName();
     LOG.trace("path for key:{} is:{}", key, path);
     return key;
   }
 
-  public String pathToKey(Path path, String volumeStr, String bucketStr) {
-    Objects.requireNonNull(path, "Path can't be null!");
-    if (!path.isAbsolute()) {
-      path = new Path(workingDir, path);
+  static class OFSPath {
+    // Note: static class variables are defaulted to null / 0.
+    private String volumeName;
+    private String bucketName;
+    private String mountName;
+    private String keyName;
+
+    public OFSPath(String pathStr) {
+      StringTokenizer token = new StringTokenizer(pathStr, OZONE_URI_DELIMITER);
+      int numToken = token.countTokens();
+      if (numToken > 0) {
+        String firstToken = token.nextToken();
+        // TODO: Compare a "keyword" list later for expandability.
+        if (firstToken.equals("tmp")) {
+          mountName = firstToken;
+        } else if (numToken >= 2) {
+          // Regular volume and bucket path
+          volumeName = firstToken;
+          bucketName = token.nextToken();
+        } else {
+          // Volume only.
+          volumeName = firstToken;
+        }
+      } else {
+        // TODO: Root.
+      }
+
+      // Compose key name.
+      if (token.hasMoreTokens()) {
+        keyName = token.nextToken("");
+      } else {
+        keyName = "";  // Assign empty String, shouldn't be null.
+      }
     }
-    // removing leading '/' char
-    String key = path.toUri().getPath().substring(1);
-    if (volumeStr != null && bucketStr != null) {
-      // Note: length plus 1 for '/'
-      int volbucketlen = volumeStr.length() + 1 + bucketStr.length() + 1;
-      // path could end with bucket name without '/', hence the <=
-      key = key.length() <= volbucketlen ? "" : key.substring(volbucketlen);
-    } else if (false) {
-      // TODO: /tmp case
+
+    public String getVolumeName() {
+      return volumeName;
     }
-    LOG.trace("path for key:{} is:{}", key, path);
-    return key;
+
+    public String getBucketName() {
+      return bucketName;
+    }
+
+    public String getMountName() {
+      return mountName;
+    }
+
+    public String getKeyName() {
+      return keyName;
+    }
+
+    public boolean isMount() {
+      return mountName != null;
+    }
   }
 
   /**
