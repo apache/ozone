@@ -21,20 +21,8 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .GetBlockResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
-    GetCommittedBlockLengthResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
-    PutBlockResponseProto;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -103,7 +91,6 @@ public final class BlockUtils {
    *
    * @param cache - Cache for DB Handles.
    */
-  @SuppressWarnings("unchecked")
   public static void shutdownCache(ContainerCache cache)  {
     cache.shutdownCache();
   }
@@ -119,83 +106,12 @@ public final class BlockUtils {
     try {
       ContainerProtos.BlockData blockData = ContainerProtos.BlockData.parseFrom(
           bytes);
-      BlockData data = BlockData.getFromProtoBuf(blockData);
-      return data;
+      return BlockData.getFromProtoBuf(blockData);
     } catch (IOException e) {
       throw new StorageContainerException("Failed to parse block data from " +
           "the bytes array.", NO_SUCH_BLOCK);
     }
   }
 
-  /**
-   * Returns putBlock response success.
-   * @param msg - Request.
-   * @return Response.
-   */
-  public static ContainerCommandResponseProto putBlockResponseSuccess(
-      ContainerCommandRequestProto msg, BlockData blockData) {
-    ContainerProtos.BlockData blockDataProto = blockData.getProtoBufMessage();
-    GetCommittedBlockLengthResponseProto.Builder
-        committedBlockLengthResponseBuilder =
-        getCommittedBlockLengthResponseBuilder(blockData.getSize(),
-            blockDataProto.getBlockID());
-    PutBlockResponseProto.Builder putKeyResponse =
-        PutBlockResponseProto.newBuilder();
-    putKeyResponse
-        .setCommittedBlockLength(committedBlockLengthResponseBuilder);
-    ContainerProtos.ContainerCommandResponseProto.Builder builder =
-        ContainerUtils.getSuccessResponseBuilder(msg);
-    builder.setPutBlock(putKeyResponse);
-    return builder.build();
-  }
-  /**
-   * Returns successful blockResponse.
-   * @param msg - Request.
-   * @return Response.
-   */
-  public static ContainerCommandResponseProto getBlockResponseSuccess(
-      ContainerCommandRequestProto msg) {
-    return ContainerUtils.getSuccessResponse(msg);
-  }
 
-
-  public static ContainerCommandResponseProto getBlockDataResponse(
-      ContainerCommandRequestProto msg, BlockData data) {
-    GetBlockResponseProto.Builder getBlock = ContainerProtos
-        .GetBlockResponseProto
-        .newBuilder();
-    getBlock.setBlockData(data.getProtoBufMessage());
-    ContainerProtos.ContainerCommandResponseProto.Builder builder =
-        ContainerUtils.getSuccessResponseBuilder(msg);
-    builder.setGetBlock(getBlock);
-    return  builder.build();
-  }
-
-  /**
-   * Returns successful getCommittedBlockLength Response.
-   * @param msg - Request.
-   * @return Response.
-   */
-  public static ContainerCommandResponseProto getBlockLengthResponse(
-          ContainerCommandRequestProto msg, long blockLength) {
-    GetCommittedBlockLengthResponseProto.Builder
-        committedBlockLengthResponseBuilder =
-        getCommittedBlockLengthResponseBuilder(blockLength,
-            msg.getGetCommittedBlockLength().getBlockID());
-    ContainerProtos.ContainerCommandResponseProto.Builder builder =
-        ContainerUtils.getSuccessResponseBuilder(msg);
-    builder.setGetCommittedBlockLength(committedBlockLengthResponseBuilder);
-    return builder.build();
-  }
-
-  public static GetCommittedBlockLengthResponseProto.Builder
-          getCommittedBlockLengthResponseBuilder(long blockLength,
-      ContainerProtos.DatanodeBlockID blockID) {
-    ContainerProtos.GetCommittedBlockLengthResponseProto.Builder
-        getCommittedBlockLengthResponseBuilder = ContainerProtos.
-        GetCommittedBlockLengthResponseProto.newBuilder();
-    getCommittedBlockLengthResponseBuilder.setBlockLength(blockLength);
-    getCommittedBlockLengthResponseBuilder.setBlockID(blockID);
-    return getCommittedBlockLengthResponseBuilder;
-  }
 }
