@@ -14,5 +14,6 @@
 # limitations under the License.
 *** Settings ***
 Documentation       Smoketest ozone secure cluster
+Test Timeout        10 minutes
 Resource            commonlib.robot
 Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab

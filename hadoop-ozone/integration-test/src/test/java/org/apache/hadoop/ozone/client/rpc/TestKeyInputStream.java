@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -115,7 +116,7 @@ public class TestKeyInputStream {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return ContainerTestHelper
+    return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
@@ -126,7 +127,7 @@ public class TestKeyInputStream {
         .getXceiverClientMetrics();
 
     String keyName = getKeyName();
-    OzoneOutputStream key = ContainerTestHelper.createKey(keyName,
+    OzoneOutputStream key = TestHelper.createKey(keyName,
         ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
 
     // write data of more than 2 blocks.
@@ -230,7 +231,7 @@ public class TestKeyInputStream {
         ContainerProtos.Type.ReadChunk);
 
     String keyName = getKeyName();
-    OzoneOutputStream key = ContainerTestHelper.createKey(keyName,
+    OzoneOutputStream key = TestHelper.createKey(keyName,
         ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
 
     // write data spanning 3 chunks

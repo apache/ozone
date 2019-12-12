@@ -110,6 +110,11 @@ public final class ScmConfigKeys {
       "dfs.container.ratis.leader.num.pending.requests";
   public static final int
       DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT = 4096;
+  public static final String DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
+      "dfs.container.ratis.leader.pending.bytes.limit";
+  public static final String
+      DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT = "1GB";
+
   // expiry interval stateMachineData cache entry inside containerStateMachine
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_CACHE_EXPIRY_INTERVAL =
@@ -337,6 +342,13 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT =
       "120s";
 
+  // Allow SCM to auto create factor ONE ratis pipeline.
+  public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =
+      "ozone.scm.pipeline.creation.auto.factor.one";
+
+  public static final boolean
+      OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT = true;
+
   public static final String OZONE_SCM_BLOCK_DELETION_MAX_RETRY =
       "ozone.scm.block.deletion.max.retry";
   public static final int OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT = 4096;
@@ -346,7 +358,6 @@ public final class ScmConfigKeys {
 
   public static final String HDDS_SCM_WATCHER_TIMEOUT_DEFAULT =
       "10m";
-
 
   // Network topology
   public static final String OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE =

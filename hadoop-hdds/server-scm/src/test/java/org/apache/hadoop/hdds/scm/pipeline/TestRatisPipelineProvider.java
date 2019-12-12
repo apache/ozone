@@ -62,11 +62,13 @@ public class TestRatisPipelineProvider {
   private void createPipelineAndAssertions(
           HddsProtos.ReplicationFactor factor) throws IOException {
     Pipeline pipeline = provider.create(factor);
-    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
+        Pipeline.PipelineState.ALLOCATED);
     stateManager.addPipeline(pipeline);
 
     Pipeline pipeline1 = provider.create(factor);
-    assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE);
+    assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
+        Pipeline.PipelineState.ALLOCATED);
     // New pipeline should not overlap with the previous created pipeline
     assertTrue(
         intersection(pipeline.getNodes(), pipeline1.getNodes())
@@ -78,12 +80,14 @@ public class TestRatisPipelineProvider {
   public void testCreatePipelineWithFactor() throws IOException {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline = provider.create(factor);
-    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
+        Pipeline.PipelineState.ALLOCATED);
     stateManager.addPipeline(pipeline);
 
     factor = HddsProtos.ReplicationFactor.ONE;
     Pipeline pipeline1 = provider.create(factor);
-    assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE);
+    assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
+        Pipeline.PipelineState.ALLOCATED);
     stateManager.addPipeline(pipeline1);
     // New pipeline should overlap with the previous created pipeline,
     // and one datanode should overlap between the two types.
@@ -114,11 +118,13 @@ public class TestRatisPipelineProvider {
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
         provider.create(factor, createListOfNodes(factor.getNumber()));
-    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
+        Pipeline.PipelineState.OPEN);
 
     factor = HddsProtos.ReplicationFactor.ONE;
     pipeline = provider.create(factor, createListOfNodes(factor.getNumber()));
-    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
+        Pipeline.PipelineState.OPEN);
   }
 
   @Test
@@ -142,7 +148,8 @@ public class TestRatisPipelineProvider {
 
     // only 2 healthy DNs left that are not part of any pipeline
     Pipeline pipeline = provider.create(factor);
-    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE);
+    assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
+        Pipeline.PipelineState.ALLOCATED);
 
     List<DatanodeDetails> nodes = pipeline.getNodes();
 
@@ -157,8 +164,9 @@ public class TestRatisPipelineProvider {
 
   private static void assertPipelineProperties(
       Pipeline pipeline, HddsProtos.ReplicationFactor expectedFactor,
-      HddsProtos.ReplicationType expectedReplicationType) {
-    assertEquals(Pipeline.PipelineState.OPEN, pipeline.getPipelineState());
+      HddsProtos.ReplicationType expectedReplicationType,
+      Pipeline.PipelineState expectedState) {
+    assertEquals(expectedState, pipeline.getPipelineState());
     assertEquals(expectedReplicationType, pipeline.getType());
     assertEquals(expectedFactor, pipeline.getFactor());
     assertEquals(expectedFactor.getNumber(), pipeline.getNodes().size());

@@ -39,6 +39,7 @@ public class RocksDBCheckpoint implements DBCheckpoint {
   private long latestSequenceNumber = -1;
   private long checkpointCreationTimeTaken = 0L;
   private long ratisSnapshotIndex = 0L;
+  private long ratisSnapShotTerm = 0L;
 
   public RocksDBCheckpoint(Path checkpointLocation) {
     this.checkpointLocation = checkpointLocation;
@@ -89,5 +90,15 @@ public class RocksDBCheckpoint implements DBCheckpoint {
   @Override
   public long getRatisSnapshotIndex() {
     return ratisSnapshotIndex;
+  }
+
+  @Override
+  public void setRatisSnapshotTerm(long omRatisSnapshotTermIndex) {
+    this.ratisSnapShotTerm = omRatisSnapshotTermIndex;
+  }
+
+  @Override
+  public long getRatisSnapshotTerm() {
+    return ratisSnapShotTerm;
   }
 }

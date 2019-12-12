@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.protocol.GroupMismatchException;
 import org.apache.ratis.protocol.RaftRetryFailureException;
@@ -433,7 +434,7 @@ public class TestWatchForCommit {
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
     List<Pipeline> pipelineList = new ArrayList<>();
     pipelineList.add(pipeline);
-    ContainerTestHelper.waitForPipelineClose(pipelineList, cluster);
+    TestHelper.waitForPipelineClose(pipelineList, cluster);
     try {
       // just watch for a log index which in not updated in the commitInfo Map
       // as well as there is no logIndex generate in Ratis.
@@ -452,12 +453,12 @@ public class TestWatchForCommit {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return ContainerTestHelper
+    return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    ContainerTestHelper
+    TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

@@ -26,17 +26,15 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import com.google.common.base.Strings;
 
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -47,11 +45,8 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -171,10 +166,8 @@ public final class OmUtils {
   }
 
   public static int getOmRpcPort(Configuration conf) {
-    // If no port number is specified then we'll just try the defaultBindPort.
-    final Optional<Integer> port = getPortNumberFromConfigKeys(conf,
-        OZONE_OM_ADDRESS_KEY);
-    return port.orElse(OZONE_OM_PORT_DEFAULT);
+    return getPortNumberFromConfigKeys(conf, OZONE_OM_ADDRESS_KEY)
+        .orElse(OZONE_OM_PORT_DEFAULT);
   }
 
   /**
@@ -185,29 +178,15 @@ public final class OmUtils {
    * @return Port on which OM RPC server will listen on
    */
   public static int getOmRpcPort(Configuration conf, String confKey) {
-    // If no port number is specified then we'll just try the defaultBindPort.
-    final Optional<Integer> port = getPortNumberFromConfigKeys(conf, confKey);
-    return port.orElse(OZONE_OM_PORT_DEFAULT);
+    return getPortNumberFromConfigKeys(conf, confKey)
+        .orElse(OZONE_OM_PORT_DEFAULT);
   }
 
   public static int getOmRestPort(Configuration conf) {
-    // If no port number is specified then we'll just try the default
-    // HTTP BindPort.
-    final Optional<Integer> port =
-        getPortNumberFromConfigKeys(conf, OZONE_OM_HTTP_ADDRESS_KEY);
-    return port.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
+    return getPortNumberFromConfigKeys(conf, OZONE_OM_HTTP_ADDRESS_KEY)
+        .orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
   }
 
-  /**
-   * Get the location where OM should store its metadata directories.
-   * Fall back to OZONE_METADATA_DIRS if not defined.
-   *
-   * @param conf - Config
-   * @return File path, after creating all the required Directories.
-   */
-  public static File getOmDbDir(Configuration conf) {
-    return ServerUtils.getDBPath(conf, OMConfigKeys.OZONE_OM_DB_DIRS);
-  }
 
   /**
    * Checks if the OM request is read only or not.
@@ -430,7 +409,7 @@ public final class OmUtils {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTP_BIND_HOST_KEY, omServiceId, omNodeId));
 
-    final Optional<Integer> addressPort = getPortNumberFromConfigKeys(conf,
+    final OptionalInt addressPort = getPortNumberFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTP_ADDRESS_KEY, omServiceId, omNodeId));
 
     final Optional<String> addressHost = getHostNameFromConfigKeys(conf,
@@ -453,7 +432,7 @@ public final class OmUtils {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTPS_BIND_HOST_KEY, omServiceId, omNodeId));
 
-    final Optional<Integer> addressPort = getPortNumberFromConfigKeys(conf,
+    final OptionalInt addressPort = getPortNumberFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTPS_ADDRESS_KEY, omServiceId, omNodeId));
 
     final Optional<String> addressHost = getHostNameFromConfigKeys(conf,
@@ -463,28 +442,6 @@ public final class OmUtils {
 
     return hostName + ":" +
         addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
-  }
-
-  /**
-   * Get the local directory where ratis logs will be stored.
-   */
-  public static String getOMRatisDirectory(Configuration conf) {
-    String storageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
-
-    if (Strings.isNullOrEmpty(storageDir)) {
-      storageDir = HddsServerUtil.getDefaultRatisDirectory(conf);
-    }
-    return storageDir;
-  }
-
-  public static String getOMRatisSnapshotDirectory(Configuration conf) {
-    String snapshotDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
-
-    if (Strings.isNullOrEmpty(snapshotDir)) {
-      snapshotDir = Paths.get(getOMRatisDirectory(conf),
-          "snapshot").toString();
-    }
-    return snapshotDir;
   }
 
   public static File createOMDir(String dirPath) {

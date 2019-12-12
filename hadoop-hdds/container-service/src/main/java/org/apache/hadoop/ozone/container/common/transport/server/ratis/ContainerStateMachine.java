@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
@@ -65,7 +66,6 @@ import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
-import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.statemachine.StateMachineStorage;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
@@ -681,6 +681,12 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public void notifyIndexUpdate(long term, long index) {
     applyTransactionCompletionMap.put(index, term);
+    // We need to call updateLastApplied here because now in ratis when a
+    // node becomes leader, it is checking stateMachineIndex >=
+    // placeHolderIndex (when a node becomes leader, it writes a conf entry
+    // with some information like its peers and termIndex). So, calling
+    // updateLastApplied updates lastAppliedTermIndex.
+    updateLastApplied();
   }
 
   /*
@@ -855,11 +861,33 @@ public class ContainerStateMachine extends BaseStateMachine {
     for (ExecutorService executor : executors) {
       executor.shutdown();
     }
+    metrics.unRegister();
   }
 
   @Override
   public void notifyLeaderChanged(RaftGroupMemberId groupMemberId,
                                   RaftPeerId raftPeerId) {
     ratisServer.handleLeaderChangedNotification(groupMemberId, raftPeerId);
+  }
+
+  @Override
+  public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
+    try {
+      ContainerCommandRequestProto requestProto =
+              getContainerCommandRequestProto(proto.getLogData());
+      long contId = requestProto.getContainerID();
+
+      switch (requestProto.getCmdType()) {
+      case WriteChunk:
+        String location = containerController.getContainerLocation(contId);
+        return HddsUtils.writeChunkToString(requestProto.getWriteChunk(),
+                contId, location);
+      default:
+        return "Cmd Type:" + requestProto.getCmdType()
+          + " should not have state machine data";
+      }
+    } catch (Throwable t) {
+      return "";
+    }
   }
 }

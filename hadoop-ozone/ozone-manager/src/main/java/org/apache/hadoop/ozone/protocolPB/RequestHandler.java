@@ -18,23 +18,24 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
     OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
     OMResponse;
 
 /**
- * Handler to handle the OmRequests.
+ * Handler to handleRequest the OmRequests.
  */
 public interface RequestHandler {
 
   /**
-   * Handle the OmRequest, and returns OmResponse.
+   * Handle the read requests, and returns OmResponse.
    * @param request
    * @return OmResponse
    */
-  OMResponse handle(OMRequest request);
-
+  OMResponse handleReadRequest(OMRequest request);
 
   /**
    * Validates that the incoming OM request has required parameters.
@@ -44,5 +45,24 @@ public interface RequestHandler {
    * @throws OMException thrown if required parameters are set to null.
    */
   void validateRequest(OMRequest omRequest) throws OMException;
+
+  /**
+   * Handle write requests. In HA this will be called from
+   * OzoneManagerStateMachine applyTransaction method. In non-HA this will be
+   * called from {@link OzoneManagerProtocolServerSideTranslatorPB} for write
+   * requests.
+   * @param omRequest
+   * @param transactionLogIndex - ratis transaction log index
+   * @return OMClientResponse
+   */
+  OMClientResponse handleWriteRequest(OMRequest omRequest,
+      long transactionLogIndex);
+
+  /**
+   * Update the OzoneManagerDoubleBuffer. This will be called when
+   * stateMachine is unpaused and set with new doublebuffer object.
+   * @param ozoneManagerDoubleBuffer
+   */
+  void updateDoubleBuffer(OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer);
 
 }

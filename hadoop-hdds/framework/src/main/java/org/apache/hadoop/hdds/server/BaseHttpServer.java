@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -35,6 +35,7 @@ import javax.servlet.http.HttpServlet;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
@@ -70,15 +71,15 @@ public abstract class BaseHttpServer {
     if (isEnabled()) {
       this.httpAddress = getHttpBindAddress();
       this.httpsAddress = getHttpsBindAddress();
-      HttpServer2.Builder builder = null;
 
       // Avoid registering o.a.h.http.PrometheusServlet in HttpServer2.
       // TODO: Replace "hadoop.prometheus.endpoint.enabled" with
       // CommonConfigurationKeysPublic.HADOOP_PROMETHEUS_ENABLED when possible.
       conf.setBoolean("hadoop.prometheus.endpoint.enabled", false);
 
-      builder = DFSUtil.httpServerTemplateForNNAndJN(conf, this.httpAddress,
-          this.httpsAddress, name, getSpnegoPrincipal(), getKeytabFile());
+      HttpServer2.Builder builder = DFSUtil.httpServerTemplateForNNAndJN(conf,
+          httpAddress, httpsAddress,
+          name, getSpnegoPrincipal(), getKeytabFile());
 
       final boolean xFrameEnabled = conf.getBoolean(
           DFSConfigKeys.DFS_XFRAME_OPTION_ENABLED,
@@ -143,7 +144,7 @@ public abstract class BaseHttpServer {
     final Optional<String> bindHost =
         getHostNameFromConfigKeys(conf, bindHostKey);
 
-    final Optional<Integer> addressPort =
+    final OptionalInt addressPort =
         getPortNumberFromConfigKeys(conf, addressKey);
 
     final Optional<String> addressHost =
@@ -212,18 +213,14 @@ public abstract class BaseHttpServer {
       httpAddress = httpServer.getConnectorAddress(connIdx++);
       String realAddress = NetUtils.getHostPortString(httpAddress);
       conf.set(getHttpAddressKey(), realAddress);
-      LOG.info(
-          String.format("HTTP server of %s is listening at http://%s",
-              name.toUpperCase(), realAddress));
+      LOG.info("HTTP server of {} listening at http://{}", name, realAddress);
     }
 
     if (policy.isHttpsEnabled()) {
       httpsAddress = httpServer.getConnectorAddress(connIdx);
       String realAddress = NetUtils.getHostPortString(httpsAddress);
       conf.set(getHttpsAddressKey(), realAddress);
-      LOG.info(
-          String.format("HTTP server of %s is listening at https://%s",
-              name.toUpperCase(), realAddress));
+      LOG.info("HTTPS server of {} listening at https://{}", name, realAddress);
     }
   }
 

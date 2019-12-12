@@ -110,10 +110,11 @@ public class PrometheusMetricsSink implements MetricsSink {
   public String prometheusName(String recordName,
       String metricName) {
 
-    //RocksDB metric names already have underscores as delimiters.
+    // RocksDB metric names already have underscores as delimiters,
+    // but record name is from DB file name and '.' (as in 'om.db') is invalid
     if (StringUtils.isNotEmpty(recordName) &&
         recordName.startsWith(ROCKSDB_CONTEXT_PREFIX)) {
-      return recordName.toLowerCase() + "_" + metricName.toLowerCase();
+      return normalizeName(recordName) + "_" + metricName.toLowerCase();
     }
 
     String baseName = StringUtils.capitalize(recordName)

@@ -305,6 +305,8 @@ public final class OzoneConsts {
   // OM Ratis snapshot file to store the last applied index
   public static final String OM_RATIS_SNAPSHOT_INDEX = "ratisSnapshotIndex";
 
+  public static final String OM_RATIS_SNAPSHOT_TERM = "ratisSnapshotTerm";
+
   // OM Http request parameter to be used while downloading DB checkpoint
   // from OM leader to follower
   public static final String OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT =

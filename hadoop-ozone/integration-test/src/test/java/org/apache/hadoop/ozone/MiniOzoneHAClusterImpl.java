@@ -119,6 +119,26 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   }
 
   /**
+   * Get OzoneManager leader object.
+   * @return OzoneManager object, null if there isn't one or more than one
+   */
+  public OzoneManager getOMLeader() {
+    OzoneManager res = null;
+    for (OzoneManager ozoneManager : this.ozoneManagers) {
+      if (ozoneManager.isLeader()) {
+        if (res != null) {
+          // Found more than one leader
+          // Return null, expect the caller to retry in a while
+          return null;
+        }
+        // Found a leader
+        res = ozoneManager;
+      }
+    }
+    return res;
+  }
+
+  /**
    * Start a previously inactive OM.
    */
   public void startInactiveOM(String omNodeID) throws IOException {
@@ -215,7 +235,7 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
      * @throws IOException
      */
     @Override
-    void initializeConfiguration() throws IOException {
+    protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
       conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
       conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
@@ -225,8 +245,6 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       conf.setTimeDuration(
           OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
           NODE_FAILURE_TIMEOUT, TimeUnit.MILLISECONDS);
-      conf.setInt(OMConfigKeys.OZONE_OM_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY,
-          10);
     }
 
     /**

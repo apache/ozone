@@ -57,7 +57,7 @@ import static org.junit.Assert.fail;
 public class TestSCMMXBean {
 
   public static final Log LOG = LogFactory.getLog(TestSCMMXBean.class);
-  private static int numOfDatanodes = 1;
+  private static int numOfDatanodes = 3;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static StorageContainerManager scm;
