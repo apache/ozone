@@ -117,8 +117,7 @@ public class TestOFileSystem {
   @Test
   public void testCreateDoesNotAddParentDirKeys() throws Exception {
     Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path grandparent = new Path(rootBucket,
-        "/testCreateDoesNotAddParentDirKeys");
+    Path grandparent = new Path(rootBucket, "testCreateDoesNotAddParentDirKeys");
     Path parent = new Path(grandparent, "parent");
     Path child = new Path(parent, "child");
     ContractTestUtils.touch(fs, child);
@@ -143,8 +142,7 @@ public class TestOFileSystem {
   @Test
   public void testDeleteCreatesFakeParentDir() throws Exception {
     Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path grandparent = new Path(rootBucket,
-        "/testDeleteCreatesFakeParentDir");
+    Path grandparent = new Path(rootBucket, "testDeleteCreatesFakeParentDir");
     Path parent = new Path(grandparent, "parent");
     Path child = new Path(parent, "child");
     ContractTestUtils.touch(fs, child);
@@ -261,12 +259,12 @@ public class TestOFileSystem {
     // (/dir1/dir12/file121 and /dir1/dir11/dir111) should not be returned by
     // listStatus.
     Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path dir1 = new Path(rootBucket, "/dir1");
+    Path dir1 = new Path(rootBucket, "dir1");
     Path dir11 = new Path(dir1, "dir11");
     Path dir111 = new Path(dir11, "dir111");
     Path dir12 = new Path(dir1, "dir12");
     Path file121 = new Path(dir12, "file121");
-    Path dir2 = new Path(rootBucket, "/dir2");
+    Path dir2 = new Path(rootBucket, "dir2");
     fs.mkdirs(dir111);
     fs.mkdirs(dir12);
     ContractTestUtils.touch(fs, file121);
@@ -290,10 +288,10 @@ public class TestOFileSystem {
   public void testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved()
       throws Exception {
     Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path source = new Path(rootBucket, "/source");
+    Path source = new Path(rootBucket, "source");
     Path interimPath = new Path(source, "interimPath");
     Path leafInsideInterimPath = new Path(interimPath, "leaf");
-    Path target = new Path(rootBucket, "/target");
+    Path target = new Path(rootBucket, "target");
     Path leafInTarget = new Path(target, "leaf");
 
     fs.mkdirs(source);
