@@ -43,7 +43,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_TOKEN_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 
 /**
  * Parser to process AWS v4 auth request. Creates string to sign and auth
@@ -71,7 +71,7 @@ public class AWSV4AuthParser implements AWSAuthParser {
           .getPath().replaceAll("\\/+",
               "/")).normalize().getPath();
     } catch (URISyntaxException e) {
-      throw S3_TOKEN_CREATION_ERROR;
+      throw S3_AUTHINFO_CREATION_ERROR;
     }
 
     this.method = context.getMethod();
@@ -191,7 +191,7 @@ public class AWSV4AuthParser implements AWSAuthParser {
       } catch (UnknownHostException|URISyntaxException e) {
         LOG.error("Host value mentioned in signed header is not valid. " +
             "Host:{}", headerValue);
-        throw S3_TOKEN_CREATION_ERROR;
+        throw S3_AUTHINFO_CREATION_ERROR;
       }
       break;
     case X_AMAZ_DATE:
@@ -203,7 +203,7 @@ public class AWSV4AuthParser implements AWSAuthParser {
         LOG.error("AWS date not in valid range. Request timestamp:{} should " +
                 "not be older than {} seconds.", headerValue,
             PRESIGN_URL_MAX_EXPIRATION_SECONDS);
-        throw S3_TOKEN_CREATION_ERROR;
+        throw S3_AUTHINFO_CREATION_ERROR;
       }
       break;
     case X_AMZ_CONTENT_SHA256:

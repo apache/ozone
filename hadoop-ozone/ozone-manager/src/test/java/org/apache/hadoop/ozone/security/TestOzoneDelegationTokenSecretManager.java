@@ -52,7 +52,7 @@ import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3TOKEN;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 
 /**
@@ -319,13 +319,13 @@ public class TestOzoneDelegationTokenSecretManager {
   }
 
   @Test
-  public void testValidateS3TOKENSuccess() throws Exception {
+  public void testValidateS3AUTHINFOSuccess() throws Exception {
     secretManager = createSecretManager(conf, tokenMaxLifetime,
         expiryTime, tokenRemoverScanInterval);
     secretManager.start(certificateClient);
 
     OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
-    identifier.setTokenType(S3TOKEN);
+    identifier.setTokenType(S3AUTHINFO);
     identifier.setSignature("56ec73ba1974f8feda8365c3caef89c5d4a688d" +
         "5f9baccf4765f46a14cd745ad");
     identifier.setStrToSign("AWS4-HMAC-SHA256\n" +
@@ -337,13 +337,13 @@ public class TestOzoneDelegationTokenSecretManager {
   }
 
   @Test
-  public void testValidateS3TOKENFailure() throws Exception {
+  public void testValidateS3AUTHINFOFailure() throws Exception {
     secretManager = createSecretManager(conf, tokenMaxLifetime,
         expiryTime, tokenRemoverScanInterval);
     secretManager.start(certificateClient);
 
     OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
-    identifier.setTokenType(S3TOKEN);
+    identifier.setTokenType(S3AUTHINFO);
     identifier.setSignature("56ec73ba1974f8feda8365c3caef89c5d4a688d" +
         "5f9baccf4765f46a14cd745ad");
     identifier.setStrToSign("AWS4-HMAC-SHA256\n" +

@@ -360,12 +360,12 @@ public class SecurityConfig {
   }
 
   /**
-   * Returns max date for which S3 tokens will be valid.
+   * Returns max date for which S3 auth info objects will be valid.
    */
-  public long getS3TokenMaxDate() {
+  public long getS3AuthInfoMaxDate() {
     return getConfiguration().getTimeDuration(
-        OzoneConfigKeys.OZONE_S3_TOKEN_MAX_LIFETIME_KEY,
-        OzoneConfigKeys.OZONE_S3_TOKEN_MAX_LIFETIME_KEY_DEFAULT,
+        OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
+        OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT,
         TimeUnit.MICROSECONDS);
   }
 }

@@ -55,7 +55,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_SECURITY_PROVIDER,
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
-        OzoneConfigKeys.OZONE_S3_TOKEN_MAX_LIFETIME_KEY
+        OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY
     ));
   }
 }
