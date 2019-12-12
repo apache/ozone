@@ -182,7 +182,9 @@ public class BasicOFileSystem extends FileSystem {
   @Override
   public void close() throws IOException {
     try {
-      adapter.close();
+      if (adapter != null) {
+        adapter.close();
+      }
     } finally {
       super.close();
     }
@@ -203,6 +205,9 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_OPEN);
     statistics.incrementWriteOps(1);
     LOG.trace("open() path:{}", f);
+    if (this.adapter != null) {
+      this.adapter.close();
+    }
     this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     final String key = pathToKey(f);
     return new FSDataInputStream(new OzoneFSInputStream(adapter.readFile(key)));
@@ -218,6 +223,9 @@ public class BasicOFileSystem extends FileSystem {
       short replication, long blockSize,
       Progressable progress) throws IOException {
     LOG.trace("create() path:{}", f);
+    if (this.adapter != null) {
+      this.adapter.close();
+    }
     this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     incrementCounter(Statistic.INVOCATION_CREATE);
     statistics.incrementWriteOps(1);
@@ -433,6 +441,9 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_DELETE);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
+    if (this.adapter != null) {
+      this.adapter.close();
+    }
     this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     FileStatus status;
     try {
@@ -520,6 +531,9 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
+    if (this.adapter != null) {
+      this.adapter.close();
+    }
     this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     int numEntries = LISTING_PAGE_SIZE;
     LinkedList<FileStatus> statuses = new LinkedList<>();
@@ -600,6 +614,9 @@ public class BasicOFileSystem extends FileSystem {
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
     LOG.trace("mkdir() path:{} ", f);
+    if (this.adapter != null) {
+      this.adapter.close();
+    }
     this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     String key = pathToKey(f);
     if (isEmpty(key)) {
@@ -613,6 +630,9 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
+    if (this.adapter != null) {
+      this.adapter.close();
+    }
     this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     Path qualifiedPath = f.makeQualified(uri, workingDir);
     String key = pathToKey(qualifiedPath);
