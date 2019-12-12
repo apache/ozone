@@ -42,6 +42,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
@@ -83,8 +84,6 @@ import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.STATUS_CODE;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -185,8 +184,8 @@ public final class OzoneManagerRatisServer {
         omResponse.setCmdType(omRequest.getCmdType());
         omResponse.setSuccess(false);
         omResponse.setMessage(stateMachineException.getCause().getMessage());
-        omResponse.setStatus(parseErrorStatus(
-            stateMachineException.getCause().getMessage()));
+        omResponse.setStatus(
+            exceptionToResponseStatus(stateMachineException.getCause()));
         if (LOG.isDebugEnabled()) {
           LOG.debug("Error while executing ratis request. " +
               "stateMachineException: ", stateMachineException);
@@ -210,23 +209,24 @@ public final class OzoneManagerRatisServer {
   }
 
   /**
-   * Parse errorMessage received from the exception and convert to
-   * {@link OzoneManagerProtocolProtos.Status}.
-   * @param errorMessage
-   * @return OzoneManagerProtocolProtos.Status
+   * Convert exception to {@link OzoneManagerProtocolProtos.Status}.
+   * @param cause - Cause from stateMachine exception
+   * @return {@link OzoneManagerProtocolProtos.Status}
    */
-  private OzoneManagerProtocolProtos.Status parseErrorStatus(
-      String errorMessage) {
-    if (errorMessage.contains(STATUS_CODE)) {
-      String errorCode = errorMessage.substring(
-          errorMessage.indexOf(STATUS_CODE) + STATUS_CODE.length());
-      LOG.debug("Parsing error message for error code " +
-          errorCode);
-      return OzoneManagerProtocolProtos.Status.valueOf(errorCode.trim());
-    } else {
+  private OzoneManagerProtocolProtos.Status exceptionToResponseStatus(
+      Throwable cause) {
+    if (cause == null) {
+      // Current Ratis is setting cause, this is an safer side check.
+      LOG.error("StateMachine exception cause is not set");
       return OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
     }
-
+    if (cause instanceof OMException) {
+      return OzoneManagerProtocolProtos.Status.values()[
+          ((OMException) cause).getResult().ordinal()];
+    } else {
+      LOG.error("Unknown error occurs", cause);
+      return OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
+    }
   }
 
 
