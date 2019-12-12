@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,5 +15,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CORE-SITE.xml_fs.AbstractFileSystem.o3fs.impl=org.apache.hadoop.fs.ozone.OzFs
-MAPRED-SITE.XML_mapreduce.application.classpath=/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-legacy-@project.version@.jar
+COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+export COMPOSE_DIR
+
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../../testlib.sh"
+
+start_docker_env
+
+execute_robot_test scm createmrenv.robot
+
+# reinitialize the directories to use
+export OZONE_DIR=/opt/ozone
+
+# shellcheck source=/dev/null
+source "$COMPOSE_DIR/../../testlib.sh"
+
+execute_robot_test rm ozonefs/hadoopo3fs.robot
+
+execute_robot_test rm -v hadoop.version:3.3.0-SNAPSHOT mapreduce.robot
+
+stop_docker_env
+
+generate_report
