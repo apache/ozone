@@ -212,6 +212,14 @@
     </description>
   </property>
   <property>
+    <name>dfs.container.ratis.leader.pending.bytes.limit</name>
+    <value>1GB</value>
+    <tag>OZONE, RATIS, PERFORMANCE</tag>
+    <description>Limit on the total bytes of pending requests after which
+      leader starts rejecting requests from client.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ratis.replication.level</name>
     <value>MAJORITY</value>
     <tag>OZONE, RATIS</tag>
@@ -317,15 +325,6 @@
     <description>Time interval of the datanode to send container report. Each
       datanode periodically send container report to SCM. Unit could be
       defined with postfix (ns,ms,s,m,h,d)</description>
-  </property>
-  <property>
-    <name>hdds.command.status.report.interval</name>
-    <value>60000ms</value>
-    <tag>OZONE, CONTAINER, MANAGEMENT</tag>
-    <description>Time interval of the datanode to send status of command
-      execution. Each datanode periodically the execution status of commands
-      received from SCM to SCM. Unit could be defined with postfix
-      (ns,ms,s,m,h,d)</description>
   </property>
   <property>
     <name>hdds.pipeline.report.interval</name>
@@ -1270,7 +1269,14 @@
       create pipelines.
     </description>
   </property>
-
+  <property>
+    <name>ozone.scm.pipeline.creation.auto.factor.one</name>
+    <value>true</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      If enabled, SCM will auto create RATIS factor ONE pipeline.
+    </description>
+  </property>
   <property>
     <name>hdds.scm.safemode.threshold.pct</name>
     <value>0.99</value>
@@ -1309,7 +1315,7 @@
 
   <property>
     <name>hdds.scm.safemode.pipeline-availability.check</name>
-    <value>false</value>
+    <value>true</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description>
       Boolean value to enable pipeline availability check during SCM safe mode.
@@ -1317,7 +1323,7 @@
   </property>
 
   <property>
-    <name>hdds.scm.safemode.healthy.pipelie.pct</name>
+    <name>hdds.scm.safemode.healthy.pipeline.pct</name>
     <value>0.10</value>
     <tag>HDDS,SCM,OPERATION</tag>
     <description>
@@ -1391,6 +1397,15 @@
     <description>Temporary which is used during the container replication
       betweeen datanodes. Should have enough space to store multiple container
       (in compressed format), but doesn't require fast io access such as SSD.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.scm.safemode.pipeline.creation</name>
+    <value>true</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description>
+      Boolean value to enable background pipeline creation in SCM safe mode.
     </description>
   </property>
 
@@ -1585,15 +1600,6 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
-    <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
-    <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on OM.(16 KB by default)
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.ratis.log.appender.queue.num-elements</name>
     <value>1024</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
@@ -1644,27 +1650,6 @@
     <value>1s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for OM's Ratis server rpc.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.ratis.client.request.timeout.duration</name>
-    <value>3s</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for OM Ratis client request.
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.ratis.client.request.max.retries</name>
-    <value>180</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>Number of retries for OM client request.</description>
-  </property>
-  <property>
-    <name>ozone.om.ratis.client.request.retry.interval</name>
-    <value>100ms</value>
-    <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
-    <description>Interval between successive retries for a OM client request.
     </description>
   </property>
 

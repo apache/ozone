@@ -67,6 +67,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -167,14 +168,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final RpcType rpc = setRpcType(properties);
 
     // set raft segment size
-    setRaftSegmentSize(properties);
+    setRaftSegmentAndWriteBufferSize(properties);
 
     // set raft segment pre-allocated size
     final int raftSegmentPreallocatedSize =
         setRaftSegmentPreallocatedSize(properties);
 
-    // Set max write buffer size, which is the scm chunk size
-    final int maxChunkSize = setMaxWriteBuffer(properties);
     TimeUnit timeUnit;
     long duration;
 
@@ -214,7 +213,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // For grpc set the maximum message size
     GrpcConfigKeys.setMessageSizeMax(properties,
-        SizeInBytes.valueOf(maxChunkSize + raftSegmentPreallocatedSize));
+        SizeInBytes.valueOf(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE
+                + raftSegmentPreallocatedSize));
 
     // Set the ratis port number
     if (rpc == SupportedRpcType.GRPC) {
@@ -230,11 +230,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       setAutoTriggerEnabled(properties, true);
     RaftServerConfigKeys.Snapshot.
       setAutoTriggerThreshold(properties, snapshotThreshold);
-    int maxPendingRequets = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
-    );
-    RaftServerConfigKeys.Write.setElementLimit(properties, maxPendingRequets);
+
+    // Set the limit on num/ bytes of pending requests a Ratis leader can hold
+    setPendingRequestsLimits(properties);
+
     int logQueueNumElements =
         conf.getInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS,
             OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT);
@@ -345,13 +344,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .setRequestTimeout(properties, serverRequestTimeout);
   }
 
-  private int setMaxWriteBuffer(RaftProperties properties) {
-    final int maxChunkSize = OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
-    RaftServerConfigKeys.Log.setWriteBufferSize(properties,
-        SizeInBytes.valueOf(maxChunkSize));
-    return maxChunkSize;
-  }
-
   private int setRaftSegmentPreallocatedSize(RaftProperties properties) {
     final int raftSegmentPreallocatedSize = (int) conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
@@ -375,13 +367,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return raftSegmentPreallocatedSize;
   }
 
-  private void setRaftSegmentSize(RaftProperties properties) {
+  private void setRaftSegmentAndWriteBufferSize(RaftProperties properties) {
     final int raftSegmentSize = (int)conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
+    RaftServerConfigKeys.Log.setWriteBufferSize(properties,
+            SizeInBytes.valueOf(raftSegmentSize));
   }
 
   private RpcType setRpcType(RaftProperties properties) {
@@ -391,6 +385,21 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final RpcType rpc = SupportedRpcType.valueOfIgnoreCase(rpcType);
     RaftConfigKeys.Rpc.setType(properties, rpc);
     return rpc;
+  }
+
+  private void setPendingRequestsLimits(RaftProperties properties) {
+    final int maxPendingRequests = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
+    );
+    RaftServerConfigKeys.Write.setElementLimit(properties, maxPendingRequests);
+
+    final int pendingRequestsByteLimit = (int)conf.getStorageSize(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    RaftServerConfigKeys.Write.setByteLimit(properties,
+        pendingRequestsByteLimit);
   }
 
   public static XceiverServerRatis newXceiverServerRatis(
@@ -618,6 +627,41 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       LOG.info("pipeline id {}", PipelineID.valueOf(groupId.getUuid()));
     }
     return pipelineIDs;
+  }
+
+  @Override
+  public void addGroup(HddsProtos.PipelineID pipelineId,
+      Collection<DatanodeDetails> peers) throws IOException {
+    final PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineId);
+    final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
+    final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers);
+    GroupManagementRequest request = GroupManagementRequest.newAdd(
+        clientId, server.getId(), nextCallId(), group);
+
+    RaftClientReply reply;
+    try {
+      reply = server.groupManagement(request);
+    } catch (Exception e) {
+      throw new IOException(e.getMessage(), e);
+    }
+    processReply(reply);
+  }
+
+  @Override
+  public void removeGroup(HddsProtos.PipelineID pipelineId)
+      throws IOException {
+    GroupManagementRequest request = GroupManagementRequest.newRemove(
+        clientId, server.getId(), nextCallId(),
+        RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()),
+        true);
+
+    RaftClientReply reply;
+    try {
+      reply = server.groupManagement(request);
+    } catch (Exception e) {
+      throw new IOException(e.getMessage(), e);
+    }
+    processReply(reply);
   }
 
   void handleNodeSlowness(RaftGroupId groupId, RoleInfoProto roleInfoProto) {

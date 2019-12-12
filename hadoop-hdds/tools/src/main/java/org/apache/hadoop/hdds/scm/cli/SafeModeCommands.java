@@ -38,6 +38,7 @@ import picocli.CommandLine.ParentCommand;
     subcommands = {
         SafeModeCheckSubcommand.class,
         SafeModeExitSubcommand.class,
+        SafeModeWaitSubcommand.class
     })
 public class SafeModeCommands implements Callable<Void> {
 

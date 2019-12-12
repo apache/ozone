@@ -26,11 +26,6 @@ import java.util.Map;
 
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -129,28 +124,6 @@ public final class KeyValueContainerUtil {
 
     //Delete Container directory
     FileUtils.deleteDirectory(containerMetaDataPath.getParentFile());
-  }
-
-  /**
-   * Returns a ReadContainer Response.
-   *
-   * @param request Request
-   * @param containerData - data
-   * @return Response.
-   */
-  public static ContainerCommandResponseProto getReadContainerResponse(
-      ContainerCommandRequestProto request,
-      KeyValueContainerData containerData) {
-    Preconditions.checkNotNull(containerData);
-
-    ContainerProtos.ReadContainerResponseProto.Builder response =
-        ContainerProtos.ReadContainerResponseProto.newBuilder();
-    response.setContainerData(containerData.getProtoBufMessage());
-
-    ContainerCommandResponseProto.Builder builder =
-        ContainerUtils.getSuccessResponseBuilder(request);
-    builder.setReadContainer(response);
-    return builder.build();
   }
 
   /**

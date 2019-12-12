@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.protocol;
 
+import org.apache.ratis.server.protocol.TermIndex;
+
 import java.io.IOException;
 
 /**
@@ -29,9 +31,9 @@ public interface OzoneManagerHAProtocol {
   /**
    * Store the snapshot index i.e. the raft log index, corresponding to the
    * last transaction applied to the OM RocksDB, in OM metadata dir on disk.
-   * @return the snapshot index
+   * @return the snapshot term index which has both term and index.
    * @throws IOException
    */
-  long saveRatisSnapshot() throws IOException;
+  TermIndex saveRatisSnapshot() throws IOException;
 
 }

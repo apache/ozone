@@ -253,6 +253,7 @@ public class ContainerStateManager {
       // TODO: #CLUTIL remove creation logic when all replication types and
       // factors are handled by pipeline creator job.
       pipeline = pipelineManager.createPipeline(type, replicationFactor);
+      pipelineManager.waitPipelineReady(pipeline.getId(), 0);
     } catch (IOException e) {
       final List<Pipeline> pipelines = pipelineManager
           .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);

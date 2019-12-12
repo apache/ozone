@@ -81,7 +81,7 @@ public class ReplicationSupervisor {
    */
   public void addTask(ReplicationTask task) {
     if (containersInFlight.add(task.getContainerId())) {
-      executor.submit(new TaskRunner(task));
+      executor.execute(new TaskRunner(task));
     }
   }
 

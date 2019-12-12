@@ -25,14 +25,19 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
  * Utility class to facilitate network topology functions.
  */
 public final class NetUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(NetUtils.class);
-  
+
+  private static final Logger LOG = LoggerFactory.getLogger(NetUtils.class);
+
+  private static final Pattern TRAILING_PATH_SEPARATOR =
+      Pattern.compile(NetConstants.PATH_SEPARATOR_STR + "+$");
+
   private NetUtils() {
     // Prevent instantiation
   }
@@ -56,7 +61,7 @@ public final class NetUtils {
 
     // Remove any trailing NetConstants.PATH_SEPARATOR
     return path.length() == 1 ? path :
-        path.replaceAll(NetConstants.PATH_SEPARATOR_STR + "+$", "");
+        TRAILING_PATH_SEPARATOR.matcher(path).replaceAll("");
   }
 
   /**
@@ -88,8 +93,8 @@ public final class NetUtils {
       Node node = iterator.next();
       Node ancestor = topology.getAncestor(node, ancestorGen);
       if (ancestor == null) {
-        LOG.warn("Fail to get ancestor generation " + ancestorGen +
-            " of node :" + node);
+        LOG.warn("Fail to get ancestor generation {} of node :{}",
+            ancestorGen, node);
         continue;
       }
       // excludedScope is child of ancestor
@@ -128,8 +133,8 @@ public final class NetUtils {
       Node node = iterator.next();
       Node ancestor = topology.getAncestor(node, generation);
       if (ancestor == null) {
-        LOG.warn("Fail to get ancestor generation " + generation +
-            " of node :" + node);
+        LOG.warn("Fail to get ancestor generation {} of node :{}",
+            generation, node);
         continue;
       }
       if (!ancestorList.contains(ancestor)) {

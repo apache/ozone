@@ -28,8 +28,6 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -67,7 +65,6 @@ import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState
@@ -98,7 +95,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private final List<HddsDatanodeService> hddsDatanodes;
 
   // Timeout for the cluster to be ready
-  private int waitForClusterToBeReadyTimeout = 60000; // 1 min
+  private int waitForClusterToBeReadyTimeout = 120000; // 2 min
   private CertificateClient caClient;
 
   /**
@@ -106,7 +103,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    *
    * @throws IOException if there is an I/O error
    */
-  MiniOzoneClusterImpl(OzoneConfiguration conf,
+  protected MiniOzoneClusterImpl(OzoneConfiguration conf,
                        OzoneManager ozoneManager,
                        StorageContainerManager scm,
                        List<HddsDatanodeService> hddsDatanodes) {
@@ -147,32 +144,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       final int healthy = scm.getNodeCount(HEALTHY);
-      boolean isReady = healthy == hddsDatanodes.size();
-      boolean printIsReadyMsg = true;
-      List<Pipeline> pipelines = scm.getPipelineManager().getPipelines();
-      if (!pipelines.isEmpty()) {
-        List<Pipeline> raftPipelines = pipelines.stream().filter(p ->
-            p.getType() == HddsProtos.ReplicationType.RATIS).collect(
-                Collectors.toList());
-        if (!raftPipelines.isEmpty()) {
-          List<Pipeline> notOpenPipelines = raftPipelines.stream().filter(p ->
-              p.getPipelineState() != Pipeline.PipelineState.OPEN &&
-                  p.getPipelineState() != Pipeline.PipelineState.CLOSED)
-              .collect(Collectors.toList());
-          if (notOpenPipelines.size() > 0) {
-            LOG.info("Waiting for {} number of pipelines out of {}, to report "
-                + "a leader.", notOpenPipelines.size(), raftPipelines.size());
-            isReady = false;
-            printIsReadyMsg = false;
-          }
-        }
-      }
-      if (printIsReadyMsg) {
-        LOG.info("{}. Got {} of {} DN Heartbeats.",
-            isReady ? "Cluster is ready" : "Waiting for cluster to be ready",
-            healthy, hddsDatanodes.size());
-      }
-      return isReady;
+      final boolean isNodeReady = healthy == hddsDatanodes.size();
+      final boolean exitSafeMode = !scm.isInSafeMode();
+
+      LOG.info("{}. Got {} of {} DN Heartbeats.",
+          isNodeReady? "Nodes are ready" : "Waiting for nodes to be ready",
+          healthy, hddsDatanodes.size());
+      LOG.info(exitSafeMode? "Cluster exits safe mode" :
+              "Waiting for cluster to exit safe mode",
+          healthy, hddsDatanodes.size());
+
+      return isNodeReady && exitSafeMode;
     }, 1000, waitForClusterToBeReadyTimeout);
   }
 
@@ -502,7 +484,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      *
      * @throws IOException
      */
-    void initializeConfiguration() throws IOException {
+    protected void initializeConfiguration() throws IOException {
       Path metaDir = Paths.get(path, "ozone-meta");
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
@@ -545,7 +527,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      *
      * @throws IOException
      */
-    StorageContainerManager createSCM()
+    protected StorageContainerManager createSCM()
         throws IOException, AuthenticationException {
       configureSCM();
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
@@ -595,7 +577,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      *
      * @throws IOException
      */
-    OzoneManager createOM()
+    protected OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
       OMStorage omStore = new OMStorage(conf);
@@ -610,7 +592,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      *
      * @throws IOException
      */
-    List<HddsDatanodeService> createHddsDatanodes(
+    protected List<HddsDatanodeService> createHddsDatanodes(
         StorageContainerManager scm) throws IOException {
       configureHddsDatanodes();
       String scmAddress =  scm.getDatanodeRpcAddress().getHostString() +
@@ -660,7 +642,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       if (hbInterval.isPresent()) {
         conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
             hbInterval.get(), TimeUnit.MILLISECONDS);
-
       } else {
         conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
             DEFAULT_HB_INTERVAL_MS,

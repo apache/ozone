@@ -230,7 +230,8 @@ public class BlockOutputStream extends OutputStream {
       // Allocate a buffer if needed. The buffer will be allocated only
       // once as needed and will be reused again for multiple blockOutputStream
       // entries.
-      final ChunkBuffer currentBuffer = bufferPool.allocateBufferIfNeeded();
+      final ChunkBuffer currentBuffer = bufferPool.allocateBufferIfNeeded(
+          bytesPerChecksum);
       int pos = currentBuffer.position();
       writeLen =
           Math.min(chunkSize - pos % chunkSize, len);
