@@ -78,9 +78,10 @@ public class BasicOFileSystem extends FileSystem {
   private URI uri;
   private String userName;
   private Path workingDir;
-  private String volumeStr;
-  private String bucketStr;
-  private String mountStr;
+  private String omHost;
+  private int omPort;
+  private Configuration conf;
+  private boolean isolatedClassloader;
 
   private OzoneClientAdapter adapter;
 
@@ -104,8 +105,9 @@ public class BasicOFileSystem extends FileSystem {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
-    String omHost = null;
-    int omPort = -1;
+    this.conf = conf;
+    omHost = null;
+    omPort = -1;
     // Parse hostname and port
     String[] parts = authority.split(":");
     if (parts.length > 2) {
@@ -118,22 +120,6 @@ public class BasicOFileSystem extends FileSystem {
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
       }
-    }
-
-    // Parse volume and bucket, or special path (/tmp)
-    volumeStr = null;
-    bucketStr = null;
-    mountStr = null;  // TODO: Might not need this for /tmp ?
-    String path = name.getPath();
-    // TODO: handle case where path is empty (e.g. -ls /)
-    StringTokenizer token = new StringTokenizer(path, "/");
-    if (token.countTokens() >= 2) {
-      volumeStr = token.nextToken();
-      bucketStr = token.nextToken();
-    } else if (token.countTokens() == 1) {
-      mountStr = token.nextToken();
-    } else {
-      throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
     try {
@@ -150,11 +136,14 @@ public class BasicOFileSystem extends FileSystem {
 
       //Use string here instead of the constant as constant may not be available
       //on the classpath of a hadoop 2.7
-      boolean isolatedClassloader =
+      isolatedClassloader =
           conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
 
-      this.adapter = createAdapter(conf, bucketStr, volumeStr, omHost, omPort,
-          isolatedClassloader);
+      // Note: adapter will be initialized in operations.
+      // TODO: adapter shouldn't be global now.
+      this.adapter = null;
+//      this.adapter = createAdapter(conf, bucketStr, volumeStr, omHost, omPort,
+//          isolatedClassloader);
 
       try {
         this.userName =
@@ -162,6 +151,7 @@ public class BasicOFileSystem extends FileSystem {
       } catch (IOException e) {
         this.userName = OZONE_DEFAULT_USER;
       }
+      // TODO: Might need to change.
       this.workingDir = new Path(OZONE_USER_DIR, this.userName)
           .makeQualified(this.uri, this.workingDir);
     } catch (URISyntaxException ue) {
@@ -172,17 +162,12 @@ public class BasicOFileSystem extends FileSystem {
   }
 
   protected OzoneClientAdapter createAdapter(Configuration conf,
-      String bucketStr,
-      String volumeStr, String omHost, int omPort,
+      String bucketStr, String volumeStr, String omHost, int omPort,
       boolean isolatedClassloader) throws IOException {
 
     if (isolatedClassloader) {
-
-      return OzoneClientAdapterFactory
-          .createAdapter(volumeStr, bucketStr);
-
+      return OzoneClientAdapterFactory.createAdapter(volumeStr, bucketStr);
     } else {
-
       return new BasicOzoneClientAdapterImpl(omHost, omPort, conf,
           volumeStr, bucketStr);
     }
@@ -529,9 +514,25 @@ public class BasicOFileSystem extends FileSystem {
     List<FileStatus> tmpStatusList;
     String startKey = "";
 
+    // TODO: Modularize this snippet.
+    String volumeStr = "";
+    String bucketStr = "";
+    // TODO: handle case where path is empty (e.g. -ls /)
+    StringTokenizer token = new StringTokenizer(f.toUri().getPath(), "/");
+    if (token.countTokens() >= 2) {
+      volumeStr = token.nextToken();
+      bucketStr = token.nextToken();
+    } else if (token.countTokens() == 1) {
+      // TODO: /tmp case
+    } else {
+      throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
+    }
+    this.adapter = createAdapter(conf, bucketStr, volumeStr, omHost, omPort,
+        isolatedClassloader);
+
     do {
       tmpStatusList =
-          adapter.listStatus(pathToKey(f), false, startKey, numEntries, uri,
+          adapter.listStatus(pathToKey(f, volumeStr, bucketStr), false, startKey, numEntries, uri,
               workingDir, getUsername())
               .stream()
               .map(this::convertFileStatus)
@@ -642,12 +643,23 @@ public class BasicOFileSystem extends FileSystem {
     }
     // removing leading '/' char
     String key = path.toUri().getPath().substring(1);
+    LOG.trace("path for key:{} is:{}", key, path);
+    return key;
+  }
+
+  public String pathToKey(Path path, String volumeStr, String bucketStr) {
+    Objects.requireNonNull(path, "Path can't be null!");
+    if (!path.isAbsolute()) {
+      path = new Path(workingDir, path);
+    }
+    // removing leading '/' char
+    String key = path.toUri().getPath().substring(1);
     if (volumeStr != null && bucketStr != null) {
       // Note: length plus 1 for '/'
       int volbucketlen = volumeStr.length() + 1 + bucketStr.length() + 1;
       // path could end with bucket name without '/', hence the <=
       key = key.length() <= volbucketlen ? "" : key.substring(volbucketlen);
-    } else if (mountStr != null) {
+    } else if (false) {
       // TODO: /tmp case
     }
     LOG.trace("path for key:{} is:{}", key, path);
