@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -59,7 +60,6 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,10 +161,10 @@ public final class ContainerTestHelper {
    * @param len - Number of bytes.
    * @return byte array with valid data.
    */
-  public static ByteBuffer getData(int len) {
+  public static ChunkBuffer getData(int len) {
     byte[] data = new byte[len];
     r.nextBytes(data);
-    return ByteBuffer.wrap(data);
+    return ChunkBuffer.wrap(ByteBuffer.wrap(data));
   }
 
   /**
@@ -173,10 +173,11 @@ public final class ContainerTestHelper {
    * @param info - chunk info.
    * @param data - data array
    */
-  public static void setDataChecksum(ChunkInfo info, ByteBuffer data)
+  public static void setDataChecksum(ChunkInfo info, ChunkBuffer data)
       throws OzoneChecksumException {
     Checksum checksum = new Checksum();
     info.setChecksumData(checksum.computeChecksum(data));
+    data.rewind();
   }
 
   /**
@@ -216,12 +217,12 @@ public final class ContainerTestHelper {
 
     writeRequest.setBlockID(blockID.getDatanodeBlockIDProtobuf());
 
-    ByteBuffer data = getData(datalen);
+    ChunkBuffer data = getData(datalen);
     ChunkInfo info = getChunk(blockID.getLocalID(), seq, 0, datalen);
     setDataChecksum(info, data);
 
     writeRequest.setChunkData(info.getProtoBufMessage());
-    writeRequest.setData(ByteString.copyFrom(data));
+    writeRequest.setData(data.toByteString());
 
     Builder request =
         ContainerCommandRequestProto.newBuilder();
@@ -249,7 +250,7 @@ public final class ContainerTestHelper {
       throws Exception {
     ContainerProtos.PutSmallFileRequestProto.Builder smallFileRequest =
         ContainerProtos.PutSmallFileRequestProto.newBuilder();
-    ByteBuffer data = getData(dataLen);
+    ChunkBuffer data = getData(dataLen);
     ChunkInfo info = getChunk(blockID.getLocalID(), 0, 0, dataLen);
     setDataChecksum(info, data);
 
@@ -264,7 +265,7 @@ public final class ContainerTestHelper {
     putRequest.setBlockData(blockData.getProtoBufMessage());
 
     smallFileRequest.setChunkInfo(info.getProtoBufMessage());
-    smallFileRequest.setData(ByteString.copyFrom(data));
+    smallFileRequest.setData(data.toByteString());
     smallFileRequest.setBlock(putRequest);
 
     Builder request =

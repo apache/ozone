@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.GatheringByteChannel;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.function.Function;
@@ -43,6 +45,17 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
+  public int limit() {
+    return buffer.limit();
+  }
+
+  @Override
+  public ChunkBuffer rewind() {
+    buffer.rewind();
+    return this;
+  }
+
+  @Override
   public Iterable<ByteBuffer> iterate(int bufferSize) {
     return () -> new Iterator<ByteBuffer>() {
       @Override
@@ -63,6 +76,11 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
+  public long writeTo(GatheringByteChannel channel) throws IOException {
+    return channel.write(buffer);
+  }
+
+  @Override
   public ChunkBuffer duplicate(int newPosition, int newLimit) {
     final ByteBuffer duplicated = buffer.duplicate();
     duplicated.position(newPosition).limit(newLimit);
@@ -70,13 +88,15 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
-  public void put(ByteBuffer b) {
+  public ChunkBuffer put(ByteBuffer b) {
     buffer.put(b);
+    return this;
   }
 
   @Override
-  public void clear() {
+  public ChunkBuffer clear() {
     buffer.clear();
+    return this;
   }
 
   @Override
