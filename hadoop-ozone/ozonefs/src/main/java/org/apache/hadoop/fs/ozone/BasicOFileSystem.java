@@ -63,7 +63,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
  * This is a basic version which doesn't extend
  * KeyProviderTokenIssuer and doesn't include statistics. It can be used
  * from older hadoop version. For newer hadoop version use the full featured
- * OzoneFileSystem.
+ * OFileSystem.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -670,7 +670,7 @@ public class BasicOFileSystem extends FileSystem {
 
   @Override
   public String toString() {
-    return "OzoneFileSystem{URI=" + uri + ", "
+    return "OFileSystem{URI=" + uri + ", "
         + "workingDir=" + workingDir + ", "
         + "userName=" + userName + ", "
         + "statistics=" + statistics
