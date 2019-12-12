@@ -390,6 +390,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           .setTraceID(TracingUtil.exportCurrentSpan())
           .build();
 
+      // TODO: For debugging. Remove this.
+      FAILOVER_PROXY_PROVIDER_LOG.warn("OMRequest payload = \n" + payload);
       OMResponse omResponse =
           rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
 

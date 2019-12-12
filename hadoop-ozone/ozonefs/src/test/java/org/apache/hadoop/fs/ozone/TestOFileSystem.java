@@ -58,7 +58,7 @@ public class TestOFileSystem {
   private static MiniOzoneCluster cluster = null;
 
   private static FileSystem fs;
-  private static OzoneFileSystem ofs;
+  private static OFileSystem ofs;
 
   private String volumeName;
   private String bucketName;
@@ -73,18 +73,28 @@ public class TestOFileSystem {
         .build();
     cluster.waitForClusterToBeReady();
 
-    // create a volume and a bucket to be used by OzoneFileSystem
+    // create a volume and a bucket to be used by OFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
+//    volumeName = "vol1";
+//    bucketName = "buc1";
 
-    rootPath = String.format("%s:///%s/%s/",
-        OzoneConsts.OZONE_OFS_URI_SCHEME, bucket.getVolumeName(), bucket.getName());
+    // For now:
+//    rootPath = String.format("%s://%s/", OzoneConsts.OZONE_OFS_URI_SCHEME,
+//        conf.get("ozone.om.http-address"));
+    rootPath = String.format("%s://%s/%s/%s/", OzoneConsts.OZONE_OFS_URI_SCHEME,
+        conf.get("ozone.om.http-address"),  // TODO: OZONE_OM_HTTP_ADDRESS_KEY
+        volumeName, bucketName);
 
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    // TODO: FileSystem#loadFileSystems is not loading ofs:// class by default
+    //  hence this workaround. Might need to add some config in hadoop source.
+    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.OFileSystem");
+//    GenericTestUtils.setRootLogLevel(Level.TRACE);
     fs = FileSystem.get(conf);
-    ofs = (OzoneFileSystem) fs;
+    ofs = (OFileSystem) fs;
   }
 
   @After
@@ -98,8 +108,8 @@ public class TestOFileSystem {
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
     assertEquals(
-        FileSystem.getFileSystemClass(OzoneConsts.OZONE_URI_SCHEME, null),
-        OzoneFileSystem.class);
+        FileSystem.getFileSystemClass(OzoneConsts.OZONE_OFS_URI_SCHEME,
+            null), OFileSystem.class);
   }
 
   @Test
