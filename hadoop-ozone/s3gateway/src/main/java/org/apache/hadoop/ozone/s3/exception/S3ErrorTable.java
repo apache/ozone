@@ -47,7 +47,7 @@ public final class S3ErrorTable {
           " this request is not supported.", HTTP_BAD_REQUEST);
 
   public static final OS3Exception S3_AUTHINFO_CREATION_ERROR =
-      new OS3Exception("InvalidRequest", "Error creating s3 auth info creation.",
+      new OS3Exception("InvalidRequest", "Error creating s3 auth info.",
           HTTP_BAD_REQUEST);
 
   public static final OS3Exception BUCKET_NOT_EMPTY = new OS3Exception(
