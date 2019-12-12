@@ -50,7 +50,7 @@ public class LoadBucket {
   private final OzoneFileSystem fs;
 
   public LoadBucket(OzoneBucket bucket, OzoneConfiguration conf)
-    throws Exception {
+      throws Exception {
     this.bucket = bucket;
     this.fs = (OzoneFileSystem)FileSystem.get(getFSUri(bucket), conf);
   }

@@ -83,7 +83,7 @@ public class TestMiniChaosOzoneCluster implements Runnable {
     List<LoadBucket> ozoneBuckets = new ArrayList<>(numClients);
     for (int i = 0; i < numClients; i++) {
       ozoneBuckets.add(new LoadBucket(volume.getBucket(bucketName),
-        configuration));
+          configuration));
     }
 
     String agedBucketName =
@@ -94,11 +94,11 @@ public class TestMiniChaosOzoneCluster implements Runnable {
             new LoadBucket(volume.getBucket(agedBucketName), configuration);
 
     String fsBucketName =
-      RandomStringUtils.randomAlphabetic(10).toLowerCase();
+        RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
     volume.createBucket(fsBucketName);
     LoadBucket fsBucket =
-      new LoadBucket(volume.getBucket(fsBucketName), configuration);
+        new LoadBucket(volume.getBucket(fsBucketName), configuration);
 
 
     loadGenerator =

@@ -96,9 +96,9 @@ public class MiniOzoneLoadGenerator {
   }
 
   private ThreadPoolExecutor createExecutor() {
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(numThreads, numThreads, 100,
-      TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
-      new ThreadPoolExecutor.CallerRunsPolicy());
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(numThreads, numThreads,
+        100, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
+        new ThreadPoolExecutor.CallerRunsPolicy());
     executor.prestartAllCoreThreads();
     return executor;
 
@@ -218,14 +218,14 @@ public class MiniOzoneLoadGenerator {
 
       for (int i = 0; i < numThreads; i++) {
         writeFutures.add(
-          CompletableFuture.runAsync(() -> startAgedLoad(timeUnit.toMillis(time)),
-            agedFileExecutor));
+            CompletableFuture.runAsync(() -> startAgedLoad(
+                timeUnit.toMillis(time)), agedFileExecutor));
       }
 
       for (int i = 0; i < numThreads; i++) {
         writeFutures.add(
-          CompletableFuture.runAsync(() -> startFsLoad(timeUnit.toMillis(time)),
-            fsExecutor));
+            CompletableFuture.runAsync(() -> startFsLoad(
+              timeUnit.toMillis(time)), fsExecutor));
       }
 
       // Wait for IO to complete
