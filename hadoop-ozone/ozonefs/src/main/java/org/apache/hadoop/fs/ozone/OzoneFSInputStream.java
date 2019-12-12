@@ -89,11 +89,12 @@ public final class OzoneFSInputStream extends FSInputStream
   public int read(ByteBuffer buf) throws IOException {
 
     int bufInitPos = buf.position();
-    while (buf.hasRemaining() && (inputStream.available() > 0)) {
-      buf.put((byte) inputStream.read());
-    }
-    int bufPosAfterRead = buf.position();
+    int readLen = Math.min(buf.remaining(), inputStream.available());
 
-    return (bufPosAfterRead - bufInitPos);
+    byte[] readData = new byte[readLen];
+    inputStream.read(readData, bufInitPos, readLen);
+    buf.put(readData);
+
+    return readLen;
   }
 }
