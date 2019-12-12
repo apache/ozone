@@ -13,13 +13,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
 
-version: "3"
-services:
-   freon:
-      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
-      volumes:
-         - ../..:/opt/hadoop
-      env_file:
-         - ./docker-config
-      command: ["ozone","freon","ockg","-n100000"]
+scrape_configs:
+  - job_name: ozone
+    metrics_path: /prom
+    static_configs:
+     - targets:
+        - "scm:9876"
+        - "om:9874"
+        - "ozone_datanode_1:9882"
+        - "ozone_datanode_2:9882"
+        - "ozone_datanode_3:9882"
+        - "ozone_datanode_4:9882"
+        - "ozone_datanode_5:9882"
+        - "ozone_datanode_6:9882"
+        - "ozone_datanode_7:9882"
+        - "ozone_datanode_8:9882"
+        - "ozone_datanode_9:9882"
+        - "ozone_datanode_10:9882"
