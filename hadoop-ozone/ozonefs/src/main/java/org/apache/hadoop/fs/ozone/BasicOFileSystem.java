@@ -84,6 +84,7 @@ public class BasicOFileSystem extends FileSystem {
   private boolean isolatedClassloader;
 
   private OzoneClientAdapter adapter;
+  private String adapterPath;
 
   private static final String URI_EXCEPTION_TEXT =
       "Ozone file system URL should be one of the following formats: " +
@@ -139,9 +140,9 @@ public class BasicOFileSystem extends FileSystem {
       isolatedClassloader =
           conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
 
-      // Note: adapter will be initialized in operations.
-      // TODO: adapter shouldn't be global now.
+      // adapter should be initialized in operations.
       this.adapter = null;
+      this.adapterPath = null;
 
       try {
         this.userName =
@@ -162,6 +163,7 @@ public class BasicOFileSystem extends FileSystem {
   protected OzoneClientAdapter createAdapter(OFSPath ofsPath)
       throws IOException {
 
+    adapterPath = ofsPath.getNonKeyParts();
     return createAdapter(this.conf, ofsPath.getBucketName(),
         ofsPath.getVolumeName(), this.omHost, this.omPort,
         this.isolatedClassloader);
@@ -534,7 +536,8 @@ public class BasicOFileSystem extends FileSystem {
     if (this.adapter != null) {
       this.adapter.close();
     }
-    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
+    OFSPath ofsPath = new OFSPath(f.toUri().getPath());
+    this.adapter = createAdapter(ofsPath);
     int numEntries = LISTING_PAGE_SIZE;
     LinkedList<FileStatus> statuses = new LinkedList<>();
     List<FileStatus> tmpStatusList;
@@ -542,7 +545,8 @@ public class BasicOFileSystem extends FileSystem {
 
     do {
       tmpStatusList =
-          adapter.listStatus(pathToKey(f), false, startKey, numEntries, uri,
+          adapter.listStatus(pathToKey(f), false, startKey, numEntries,
+              ofsPath.getNonKeyPartsURI(uri),
               workingDir, getUsername())
               .stream()
               .map(this::convertFileStatus)
@@ -608,16 +612,16 @@ public class BasicOFileSystem extends FileSystem {
    * @throws IOException
    */
   private boolean mkdir(Path path) throws IOException {
+    if (this.adapter != null) {
+      this.adapter.close();
+    }
+    this.adapter = createAdapter(new OFSPath(path.toUri().getPath()));
     return adapter.createDirectory(pathToKey(path));
   }
 
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
     LOG.trace("mkdir() path:{} ", f);
-    if (this.adapter != null) {
-      this.adapter.close();
-    }
-    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     String key = pathToKey(f);
     if (isEmpty(key)) {
       return false;
@@ -696,7 +700,7 @@ public class BasicOFileSystem extends FileSystem {
 
       // Compose key name.
       if (token.hasMoreTokens()) {
-        keyName = token.nextToken("");
+        keyName = token.nextToken("").substring(1);
       } else {
         keyName = "";  // Assign empty String, shouldn't be null.
       }
@@ -716,6 +720,28 @@ public class BasicOFileSystem extends FileSystem {
 
     public String getKeyName() {
       return keyName;
+    }
+
+    public String getNonKeyParts() {
+      if (isMount()) {
+        return OZONE_URI_DELIMITER + mountName;
+      } else {
+        return OZONE_URI_DELIMITER + volumeName +
+            OZONE_URI_DELIMITER + bucketName;
+      }
+    }
+
+    public URI getNonKeyPartsURI(URI baseURI) {
+      try {
+        URI uri = new URIBuilder().setScheme(baseURI.getScheme())
+            .setHost(baseURI.getAuthority())
+            .setPath(getNonKeyParts())
+            .build();
+        return uri;
+      } catch (URISyntaxException e) {
+        // TODO: Handle.
+        return baseURI;
+      }
     }
 
     public boolean isMount() {
@@ -837,14 +863,23 @@ public class BasicOFileSystem extends FileSystem {
     return true;
   }
 
-  private FileStatus convertFileStatus(
-      FileStatusAdapter fileStatusAdapter) {
+  private FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
 
     Path symLink = null;
     try {
       fileStatusAdapter.getSymlink();
     } catch (Exception ex) {
       //NOOP: If not symlink symlink remains null.
+    }
+
+    // Process path. TODO: do this in a better way?
+    URI uri = fileStatusAdapter.getPath().toUri();
+    try {
+      uri = new URIBuilder().setScheme(uri.getScheme())
+          .setHost(uri.getAuthority())
+          .setPath(adapterPath + uri.getPath())
+          .build();
+    } catch (URISyntaxException e) {
     }
 
     return new FileStatus(
@@ -858,7 +893,8 @@ public class BasicOFileSystem extends FileSystem {
         fileStatusAdapter.getOwner(),
         fileStatusAdapter.getGroup(),
         symLink,
-        fileStatusAdapter.getPath()
+        // Without this, the path would look like: ofs://localhost:51625/dir1
+        new Path(uri)
     );
 
   }
