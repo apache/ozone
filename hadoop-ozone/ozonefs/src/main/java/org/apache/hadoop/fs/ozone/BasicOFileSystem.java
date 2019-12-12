@@ -269,16 +269,23 @@ public class BasicOFileSystem extends FileSystem {
     RenameIterator(Path srcPath, Path dstPath)
         throws IOException {
       super(srcPath);
+      // src and dst must share the same adapter.
+      // Sanity check should have been done in caller.
+      OFSPath ofsPath = new OFSPath(srcPath.toString());
+      if (adapter != null) adapter.close();
+      adapter = createAdapter(ofsPath);
+      adapterPath = ofsPath.getNonKeyParts();
       srcKey = pathToKey(srcPath);
       dstKey = pathToKey(dstPath);
-      LOG.trace("rename from:{} to:{}", srcKey, dstKey);
+      LOG.trace("rename from:{} to:{}, in:{}", srcKey, dstKey, adapterPath);
     }
 
     @Override
     boolean processKey(String key) throws IOException {
       String newKeyName = dstKey.concat(key.substring(srcKey.length()));
       // TODO: Double check.
-      adapter = createAdapter(new OFSPath(key));
+      assert(adapter != null);
+      assert(adapterPath != null);
       adapter.renameKey(key, newKeyName);
       return true;
     }
@@ -642,7 +649,7 @@ public class BasicOFileSystem extends FileSystem {
     String key = pathToKey(qualifiedPath);
     FileStatus fileStatus = null;
     try {
-      fileStatus = convertFileStatus(
+      fileStatus = convertFileStatusNoAppend(
           adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
     } catch (OMException ex) {
       if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND)) {
@@ -718,10 +725,12 @@ public class BasicOFileSystem extends FileSystem {
       return mountName;
     }
 
+    // Shouldn't have a delimiter at beginning e.g. dir1/dir12
     public String getKeyName() {
       return keyName;
     }
 
+    // Have a delimiter at beginning. e.g. /vol1/buc1
     public String getNonKeyParts() {
       if (isMount()) {
         return OZONE_URI_DELIMITER + mountName;
@@ -863,8 +872,33 @@ public class BasicOFileSystem extends FileSystem {
     return true;
   }
 
-  private FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
+  private FileStatus convertFileStatusNoAppend(
+      FileStatusAdapter fileStatusAdapter) {
 
+    Path symLink = null;
+    try {
+      fileStatusAdapter.getSymlink();
+    } catch (Exception ex) {
+      //NOOP: If not symlink symlink remains null.
+    }
+
+    return new FileStatus(
+        fileStatusAdapter.getLength(),
+        fileStatusAdapter.isDir(),
+        fileStatusAdapter.getBlockReplication(),
+        fileStatusAdapter.getBlocksize(),
+        fileStatusAdapter.getModificationTime(),
+        fileStatusAdapter.getAccessTime(),
+        new FsPermission(fileStatusAdapter.getPermission()),
+        fileStatusAdapter.getOwner(),
+        fileStatusAdapter.getGroup(),
+        symLink,
+        // Without this, the path would look incorrect: ofs://localhost:51625/dir1
+        fileStatusAdapter.getPath()
+    );
+  }
+
+  private FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
     Path symLink = null;
     try {
       fileStatusAdapter.getSymlink();
@@ -893,9 +927,8 @@ public class BasicOFileSystem extends FileSystem {
         fileStatusAdapter.getOwner(),
         fileStatusAdapter.getGroup(),
         symLink,
-        // Without this, the path would look like: ofs://localhost:51625/dir1
+        // Without this, the path would look incorrect: ofs://localhost:51625/dir1
         new Path(uri)
     );
-
   }
 }
