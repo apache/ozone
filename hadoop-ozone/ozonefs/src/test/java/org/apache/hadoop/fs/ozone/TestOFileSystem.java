@@ -170,7 +170,7 @@ public class TestOFileSystem {
 
     FileStatus[] fileStatuses = ofs.listStatus(rootBucket);
     assertEquals("Should be empty", 0, fileStatuses.length);
-    /*
+
     ContractTestUtils.touch(fs, file1);
     ContractTestUtils.touch(fs, file2);
 
@@ -188,7 +188,6 @@ public class TestOFileSystem {
     fileStatuses = ofs.listStatus(parent);
     assertEquals("FileStatus did not return all children of the directory",
         3, fileStatuses.length);
-     */
   }
 
   /**
