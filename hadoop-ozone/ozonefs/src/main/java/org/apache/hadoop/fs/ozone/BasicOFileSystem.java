@@ -159,6 +159,14 @@ public class BasicOFileSystem extends FileSystem {
     }
   }
 
+  protected OzoneClientAdapter createAdapter(OFSPath ofsPath)
+      throws IOException {
+
+    return createAdapter(this.conf, ofsPath.getBucketName(),
+        ofsPath.getVolumeName(), this.omHost, this.omPort,
+        this.isolatedClassloader);
+  }
+
   protected OzoneClientAdapter createAdapter(Configuration conf,
       String bucketStr, String volumeStr, String omHost, int omPort,
       boolean isolatedClassloader) throws IOException {
@@ -195,6 +203,7 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_OPEN);
     statistics.incrementWriteOps(1);
     LOG.trace("open() path:{}", f);
+    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     final String key = pathToKey(f);
     return new FSDataInputStream(new OzoneFSInputStream(adapter.readFile(key)));
   }
@@ -209,6 +218,7 @@ public class BasicOFileSystem extends FileSystem {
       short replication, long blockSize,
       Progressable progress) throws IOException {
     LOG.trace("create() path:{}", f);
+    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     incrementCounter(Statistic.INVOCATION_CREATE);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
@@ -257,6 +267,8 @@ public class BasicOFileSystem extends FileSystem {
     @Override
     boolean processKey(String key) throws IOException {
       String newKeyName = dstKey.concat(key.substring(srcKey.length()));
+      // TODO: Double check.
+      adapter = createAdapter(new OFSPath(key));
       adapter.renameKey(key, newKeyName);
       return true;
     }
@@ -421,6 +433,7 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_DELETE);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
+    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     FileStatus status;
     try {
       status = getFileStatus(f);
@@ -507,14 +520,11 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
+    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     int numEntries = LISTING_PAGE_SIZE;
     LinkedList<FileStatus> statuses = new LinkedList<>();
     List<FileStatus> tmpStatusList;
     String startKey = "";
-
-    OFSPath ofsPath = new OFSPath(f.toUri().getPath());
-    this.adapter = createAdapter(conf, ofsPath.getBucketName(),
-        ofsPath.getVolumeName(), omHost, omPort, isolatedClassloader);
 
     do {
       tmpStatusList =
@@ -590,6 +600,7 @@ public class BasicOFileSystem extends FileSystem {
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
     LOG.trace("mkdir() path:{} ", f);
+    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     String key = pathToKey(f);
     if (isEmpty(key)) {
       return false;
@@ -602,6 +613,7 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
+    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
     Path qualifiedPath = f.makeQualified(uri, workingDir);
     String key = pathToKey(qualifiedPath);
     FileStatus fileStatus = null;
