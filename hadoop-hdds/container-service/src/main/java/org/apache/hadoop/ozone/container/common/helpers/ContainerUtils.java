@@ -71,9 +71,10 @@ public final class ContainerUtils {
   public static ContainerCommandResponseProto logAndReturnError(
       Logger log, StorageContainerException ex,
       ContainerCommandRequestProto request) {
-    log.info("Operation: {} , Trace ID: {} , Message: {} , Result: {}",
-        request.getCmdType().name(), request.getTraceID(),
-        ex.getMessage(), ex.getResult().getValueDescriptor().getName());
+    String logInfo = "Operation: {} , Trace ID: {} , Message: {} , " +
+        "Result: {} , StorageContainerException Occurred.";
+    log.info(logInfo, request.getCmdType().name(), request.getTraceID(),
+        ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
     return getContainerCommandResponse(request, ex.getResult(), ex.getMessage())
         .build();
   }
