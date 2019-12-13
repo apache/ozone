@@ -25,10 +25,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Handler of list datanodes info command.
@@ -43,13 +43,13 @@ public class ListInfoSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private DatanodeCommands parent;
 
-  @CommandLine.Option(names = {"-ip", "--byIp"},
+  @CommandLine.Option(names = {"--ip"},
       description = "Show info by ip address.",
       defaultValue = "",
       required = false)
   private String ipaddress;
 
-  @CommandLine.Option(names = {"-id", "--byUuid"},
+  @CommandLine.Option(names = {"--id"},
       description = "Show info by datanode UUID.",
       defaultValue = "",
       required = false)
@@ -65,12 +65,15 @@ public class ListInfoSubcommand implements Callable<Void> {
       if (isNullOrEmpty(ipaddress) && isNullOrEmpty(uuid)) {
         getAllNodes(scmClient).stream().forEach(p -> printDatanodeInfo(p));
       } else {
-        getAllNodes(scmClient).stream().filter(
-            p -> ((isNullOrEmpty(ipaddress) ||
-            (p.getIpAddress().compareToIgnoreCase(ipaddress) == 0))
-            && (isNullOrEmpty(uuid) ||
-            (p.getUuid().equals(uuid)))))
-            .forEach(p -> printDatanodeInfo(p));
+        Stream<DatanodeDetails> allNodes = getAllNodes(scmClient).stream();
+        if (!isNullOrEmpty(ipaddress)) {
+          allNodes = allNodes.filter(p -> p.getIpAddress()
+              .compareToIgnoreCase(ipaddress) == 0);
+        }
+        if (!isNullOrEmpty(uuid)) {
+          allNodes = allNodes.filter(p -> p.getUuid().toString().equals(uuid));
+        }
+        allNodes.forEach(p -> printDatanodeInfo(p));
       }
       return null;
     }
@@ -80,35 +83,39 @@ public class ListInfoSubcommand implements Callable<Void> {
       throws IOException {
     List<HddsProtos.Node> nodes = scmClient.queryNode(
         HddsProtos.NodeState.HEALTHY, HddsProtos.QueryScope.CLUSTER, "");
-    List<DatanodeDetails> datanodes = new ArrayList<>(nodes.size());
-    nodes.stream().forEach(
-        p -> datanodes.add(DatanodeDetails.getFromProtoBuf(p.getNodeID())));
-    return datanodes;
+
+    return nodes.stream()
+        .map(p -> DatanodeDetails.getFromProtoBuf(p.getNodeID()))
+        .collect(Collectors.toList());
   }
 
   private void printDatanodeInfo(DatanodeDetails datanode) {
-    if (pipelines.isEmpty()) {
-      System.out.println("Datanode: " + datanode.getUuid().toString() +
-          " (" + datanode.getIpAddress() + "/"
-          + datanode.getHostName() + "). \n No pipeline created.");
-      return;
+    StringBuilder pipelineListInfo = new StringBuilder();
+    int relatedPipelineNum = 0;
+    if (!pipelines.isEmpty()) {
+      List<Pipeline> relatedPipelines = pipelines.stream().filter(
+          p -> p.getNodes().contains(datanode)).collect(Collectors.toList());
+      if (relatedPipelines.isEmpty()) {
+        pipelineListInfo.append("No related pipelines" +
+            " or the node is not in Healthy state.");
+      } else {
+        relatedPipelineNum = relatedPipelines.size();
+        relatedPipelines.stream().forEach(
+            p -> pipelineListInfo.append(p.getId().getId().toString())
+                .append("/").append(p.getFactor().toString()).append("/")
+                .append(p.getType().toString()).append("/")
+                .append(p.getPipelineState().toString()).append("/")
+                .append(datanode.getUuid().equals(p.getLeaderId()) ?
+                    "Leader" : "Follower")
+                .append(System.getProperty("line.separator")));
+      }
+    } else {
+      pipelineListInfo.append("No pipelines in cluster.");
     }
-    List<Pipeline> relatedPipelines = pipelines.stream().filter(
-        p -> p.getNodes().contains(datanode)).collect(Collectors.toList());
-    StringBuilder pipelineList = new StringBuilder()
-        .append("Related pipelines:\n");
-    relatedPipelines.stream().forEach(
-        p -> pipelineList.append(p.getId().getId().toString())
-            .append("/").append(p.getFactor().toString()).append("/")
-            .append(p.getType().toString()).append("/")
-            .append(p.getPipelineState().toString()).append("/")
-            .append(datanode.getUuid().equals(p.getLeaderId()) ?
-                "Leader" : "Follower")
-            .append(System.getProperty("line.separator")));
     System.out.println("Datanode: " + datanode.getUuid().toString() +
         " (" + datanode.getIpAddress() + "/"
-        + datanode.getHostName() + "/" + relatedPipelines.size() +
-        " pipelines). \n" + pipelineList);
+        + datanode.getHostName() + "/" + relatedPipelineNum +
+        " pipelines) \n" + "Related pipelines: \n" + pipelineListInfo);
   }
 
   protected static boolean isNullOrEmpty(String str) {
