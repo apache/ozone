@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -134,7 +135,7 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testNodesCanBeDecommissionedAndRecommissioned()
-      throws InvalidHostStringException {
+      throws InvalidHostStringException, NodeNotFoundException {
     List<DatanodeDetails> dns = generateDatanodes();
 
     // Decommission 2 valid nodes
@@ -173,7 +174,7 @@ public class TestNodeDecommissionManager {
 
   @Test
   public void testNodesCanBePutIntoMaintenanceAndRecommissioned()
-      throws InvalidHostStringException {
+      throws InvalidHostStringException, NodeNotFoundException {
     List<DatanodeDetails> dns = generateDatanodes();
 
     // Put 2 valid nodes into maintenance

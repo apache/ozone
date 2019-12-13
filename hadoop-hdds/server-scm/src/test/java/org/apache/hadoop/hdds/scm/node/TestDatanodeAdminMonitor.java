@@ -98,7 +98,8 @@ public class TestDatanodeAdminMonitor {
    * must wait until the pipelines have closed before completing the flow.
    */
   @Test
-  public void testClosePipelinesEventFiredWhenAdminStarted() {
+  public void testClosePipelinesEventFiredWhenAdminStarted()
+      throws NodeNotFoundException{
     DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -136,7 +137,8 @@ public class TestDatanodeAdminMonitor {
    * state.
    */
   @Test
-  public void testDecommissionNodeTransitionsToCompleteWhenNoContainers() {
+  public void testDecommissionNodeTransitionsToCompleteWhenNoContainers()
+      throws NodeNotFoundException {
     DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -280,7 +282,8 @@ public class TestDatanodeAdminMonitor {
   }
 
   @Test
-  public void testMaintenanceWaitsForMaintenanceToComplete() {
+  public void testMaintenanceWaitsForMaintenanceToComplete()
+      throws NodeNotFoundException {
     DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
@@ -310,7 +313,8 @@ public class TestDatanodeAdminMonitor {
   }
 
   @Test
-  public void testMaintenanceEndsClosingPipelines() {
+  public void testMaintenanceEndsClosingPipelines()
+      throws NodeNotFoundException {
     DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
@@ -366,7 +370,8 @@ public class TestDatanodeAdminMonitor {
   }
 
   @Test
-  public void testDeadMaintenanceNodeDoesNotAbortWorkflow() {
+  public void testDeadMaintenanceNodeDoesNotAbortWorkflow()
+      throws NodeNotFoundException {
     DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
@@ -393,7 +398,8 @@ public class TestDatanodeAdminMonitor {
   }
 
   @Test
-  public void testCancelledNodesMovedToInService() {
+  public void testCancelledNodesMovedToInService()
+      throws NodeNotFoundException {
     DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
     nodeManager.register(dn1,
         new NodeStatus(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,

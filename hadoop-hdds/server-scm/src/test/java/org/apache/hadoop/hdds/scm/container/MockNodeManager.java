@@ -263,7 +263,8 @@ public class MockNodeManager implements NodeManager {
    * @return Healthy/Stale/Dead.
    */
   @Override
-  public NodeStatus getNodeStatus(DatanodeDetails dd) {
+  public NodeStatus getNodeStatus(DatanodeDetails dd)
+      throws NodeNotFoundException {
     return null;
   }
 
