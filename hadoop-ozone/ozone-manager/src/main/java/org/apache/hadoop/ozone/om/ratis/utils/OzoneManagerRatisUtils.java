@@ -198,7 +198,7 @@ public final class OzoneManagerRatisUtils {
   public static Status exceptionToResponseStatus(IOException exception) {
     if (exception instanceof OMException) {
       return Status.values()[((OMException) exception).getResult().ordinal()];
-    } else if (exception instanceof IOException) {
+    } else {
       // Doing this here, because when DB error happens we need to return
       // correct error code, so that in applyTransaction we can
       // completeExceptionally for DB errors.
@@ -213,8 +213,6 @@ public final class OzoneManagerRatisUtils {
       } else {
         return Status.INTERNAL_ERROR;
       }
-    } else {
-      return Status.INTERNAL_ERROR;
     }
   }
 }

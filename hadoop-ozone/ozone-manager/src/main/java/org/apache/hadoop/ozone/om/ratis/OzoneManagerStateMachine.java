@@ -403,8 +403,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @throws ServiceException
    */
   private OMResponse runCommand(OMRequest request, long trxLogIndex) {
-    return handler.handleWriteRequest(request,
-        trxLogIndex).getOMResponse();
+    try {
+      return handler.handleWriteRequest(request,
+          trxLogIndex).getOMResponse();
+    } catch (Throwable e) {
+      // For any Runtime exceptions, terminate OM.
+      String errorMessage = "Request " + request + "failed with exception";
+      ExitUtils.terminate(1, errorMessage, e, LOG);
+    }
+    return null;
   }
 
   /**
