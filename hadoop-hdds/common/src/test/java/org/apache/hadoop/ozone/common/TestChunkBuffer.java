@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.common;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -131,6 +133,8 @@ public class TestChunkBuffer {
       }
     }
     Assert.assertEquals(n, count);
+    Assert.assertFalse(i.hasNext());
+    Assertions.assertThrows(NoSuchElementException.class, i::next);
   }
 
   private static void assertToByteString(
