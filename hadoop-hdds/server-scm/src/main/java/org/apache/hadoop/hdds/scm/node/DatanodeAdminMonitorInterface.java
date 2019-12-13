@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
@@ -32,6 +33,7 @@ public interface DatanodeAdminMonitorInterface extends Runnable {
   void setEventQueue(EventPublisher scm);
   void setNodeManager(NodeManager nm);
   void setPipelineManager(PipelineManager pm);
+  void setReplicationManager(ReplicationManager rm);
   void startMonitoring(DatanodeDetails dn, int endInHours);
   void stopMonitoring(DatanodeDetails dn);
 

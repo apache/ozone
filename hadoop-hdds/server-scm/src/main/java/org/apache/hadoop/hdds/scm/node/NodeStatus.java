@@ -130,6 +130,26 @@ public class NodeStatus {
     return health == HddsProtos.NodeState.HEALTHY;
   }
 
+  /**
+   * Returns true if the nodeStatus is either healthy or stale and false
+   * otherwise.
+   *
+   * @return True is the node is Healthy or Stale, false otherwise.
+   */
+  public boolean isAlive() {
+    return health == HddsProtos.NodeState.HEALTHY
+        || health == HddsProtos.NodeState.STALE;
+  }
+
+  /**
+   * Returns true if the nodeStatus is dead and false otherwise.
+   *
+   * @return True is the node is Dead, false otherwise.
+   */
+  public boolean isDead() {
+    return health == HddsProtos.NodeState.DEAD;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (this == obj) {

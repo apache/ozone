@@ -55,7 +55,8 @@ public class TestNodeDecommissionManager {
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     nodeManager = createNodeManager(conf);
-    decom = new NodeDecommissionManager(conf, nodeManager, null, null, null);
+    decom = new NodeDecommissionManager(
+        conf, nodeManager, null, null, null, null);
   }
 
   @Test
@@ -161,6 +162,7 @@ public class TestNodeDecommissionManager {
     // Recommission all 3 hosts
     decom.recommissionNodes(Arrays.asList(
         multiAddr, dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+    decom.getMonitor().run();
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
@@ -199,6 +201,7 @@ public class TestNodeDecommissionManager {
     // Recommission all 3 hosts
     decom.recommissionNodes(Arrays.asList(
         multiAddr, dns.get(1).getIpAddress(), dns.get(2).getIpAddress()));
+    decom.getMonitor().run();
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE,

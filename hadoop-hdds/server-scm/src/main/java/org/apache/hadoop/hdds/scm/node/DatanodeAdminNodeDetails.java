@@ -19,9 +19,6 @@ package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +31,10 @@ import org.slf4j.LoggerFactory;
 public class DatanodeAdminNodeDetails {
   private DatanodeDetails datanodeDetails;
   private long maintenanceEndTime;
-  private DatanodeAdminMonitor.States currentState;
   private long enteredStateAt = 0;
+  private int unHealthyContainers = 0;
+  private int underReplicatedContainers = 0;
+  private int sufficientlyReplicatedContainers = 0;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminNodeDetails.class);
@@ -48,11 +47,9 @@ public class DatanodeAdminNodeDetails {
    *                       should end automatically. Passing zero indicates
    *                       indicates maintenance will never end automatically.
    */
-  DatanodeAdminNodeDetails(DatanodeDetails dn,
-      DatanodeAdminMonitor.States initialState, long maintenanceEnd) {
+  DatanodeAdminNodeDetails(DatanodeDetails dn, long maintenanceEnd) {
     datanodeDetails = dn;
     setMaintenanceEnd(maintenanceEnd);
-    currentState = initialState;
     enteredStateAt = System.currentTimeMillis();
   }
 
@@ -67,12 +64,28 @@ public class DatanodeAdminNodeDetails {
     return datanodeDetails;
   }
 
-  /**
-   * Get the current admin workflow state for this node.
-   * @return The current Admin workflow state for this node
-   */
-  public DatanodeAdminMonitor.States getCurrentState() {
-    return currentState;
+  public void setUnHealthyContainers(int val) {
+    this.unHealthyContainers = val;
+  }
+
+  public void setUnderReplicatedContainers(int val) {
+    this.underReplicatedContainers = val;
+  }
+
+  public void setSufficientlyReplicatedContainers(int val) {
+    this.sufficientlyReplicatedContainers = val;
+  }
+
+  public int getUnHealthyContainers()  {
+    return unHealthyContainers;
+  }
+
+  public int getUnderReplicatedContainers() {
+    return underReplicatedContainers;
+  }
+
+  public int getSufficientlyReplicatedContainers() {
+    return sufficientlyReplicatedContainers;
   }
 
   /**
@@ -91,47 +104,6 @@ public class DatanodeAdminNodeDetails {
     // Convert hours to ms
     long msFromNow = hoursFromNow * 60L * 60L * 1000L;
     maintenanceEndTime = System.currentTimeMillis() + msFromNow;
-  }
-
-  /**
-   * Given the workflow stateMachine and the current node status
-   * (DECOMMISSIONING or ENTERING_MAINTENANCE) move the node to the next
-   * admin workflow state.
-   * @param sm The stateMachine which controls the state flow
-   * @param nodeOperationalState The current operational state for the node, eg
-   *                             decommissioning or entering_maintenance
-   * @return
-   * @throws InvalidStateTransitionException
-   */
-  public DatanodeAdminMonitor.States transitionState(
-      StateMachine<DatanodeAdminMonitor.States,
-          DatanodeAdminMonitor.Transitions> sm,
-      NodeOperationalState nodeOperationalState)
-      throws InvalidStateTransitionException {
-
-    DatanodeAdminMonitor.States newState = sm.getNextState(currentState,
-        getTransition(nodeOperationalState));
-    long currentTime = System.currentTimeMillis();
-    LOG.info("Datanode {} moved from admin workflow state {} to {} after {} "+
-        "seconds", datanodeDetails, currentState, newState,
-        (currentTime - enteredStateAt)/1000L);
-    currentState = newState;
-    enteredStateAt = currentTime;
-    return currentState;
-  }
-
-  private DatanodeAdminMonitor.Transitions getTransition(
-      NodeOperationalState nodeState) {
-    if (nodeState == NodeOperationalState.DECOMMISSIONED ||
-        nodeState == NodeOperationalState.DECOMMISSIONING) {
-      return DatanodeAdminMonitor.Transitions.COMPLETE_DECOM_STAGE;
-    } else if (nodeState ==
-        NodeOperationalState.ENTERING_MAINTENANCE ||
-        nodeState == NodeOperationalState.IN_MAINTENANCE) {
-      return DatanodeAdminMonitor.Transitions.COMPLETE_MAINT_STAGE;
-    } else {
-      return DatanodeAdminMonitor.Transitions.UNEXPECTED_NODE_STATE;
-    }
   }
 
   /**
