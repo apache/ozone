@@ -58,10 +58,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
 import org.mockito.Mockito;
 
 /**
@@ -111,6 +108,7 @@ public class TestDeadNodeHandler {
   }
 
   @Test
+  @Ignore("Tracked by HDDS-2508.")
   public void testOnMessage() throws IOException, NodeNotFoundException {
     //GIVEN
     DatanodeDetails datanode1 = TestUtils.randomDatanodeDetails();
