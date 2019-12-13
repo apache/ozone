@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -63,7 +64,7 @@ public class TestNodeReportHandler implements EventPublisher {
 
   @Test
   public void testNodeReport() throws IOException {
-    DatanodeDetails dn = TestUtils.randomDatanodeDetails();
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     StorageReportProto storageOne = TestUtils
         .createStorageReport(dn.getUuid(), storagePath, 100, 10, 90, null);
 

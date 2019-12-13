@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .IncrementalContainerReportFromDatanode;
@@ -40,6 +39,7 @@ import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.Set;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
 
@@ -93,9 +93,9 @@ public class TestIncrementalContainerReportHandler {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(nodeManager, containerManager);
     final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
-    final DatanodeDetails datanodeOne = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeTwo = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeThree = TestUtils.randomDatanodeDetails();
+    final DatanodeDetails datanodeOne = randomDatanodeDetails();
+    final DatanodeDetails datanodeTwo = randomDatanodeDetails();
+    final DatanodeDetails datanodeThree = randomDatanodeDetails();
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -127,9 +127,9 @@ public class TestIncrementalContainerReportHandler {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(nodeManager, containerManager);
     final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
-    final DatanodeDetails datanodeOne = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeTwo = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeThree = TestUtils.randomDatanodeDetails();
+    final DatanodeDetails datanodeOne = randomDatanodeDetails();
+    final DatanodeDetails datanodeTwo = randomDatanodeDetails();
+    final DatanodeDetails datanodeThree = randomDatanodeDetails();
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -162,9 +162,9 @@ public class TestIncrementalContainerReportHandler {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(nodeManager, containerManager);
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
-    final DatanodeDetails datanodeOne = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeTwo = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails datanodeThree = TestUtils.randomDatanodeDetails();
+    final DatanodeDetails datanodeOne = randomDatanodeDetails();
+    final DatanodeDetails datanodeTwo = randomDatanodeDetails();
+    final DatanodeDetails datanodeThree = randomDatanodeDetails();
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
