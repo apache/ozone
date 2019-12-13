@@ -1,3 +1,9 @@
+---
+title: "Datanodes"
+date: "2017-09-14"
+weight: 4
+summary: TODO translated summary
+---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -14,24 +20,5 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-{{ partial "header.html" . }}
 
-  <body>
-
-{{ partial "navbar.html" . }}
-
-    <div class="container-fluid">
-      <div class="row">
-        {{ partial "sidebar.html" . }}
-        <div class="col-sm-10 col-sm-offset-2 col-md-10 col-md-offset-2 main">
-            {{ partial "languages.html" .}}
-
-            {{ .Content }}
-        </div>
-      </div>
-    </div>
-
-{{ partial "footer.html" . }}
-
-  </body>
-</html>
+TODO: content translations

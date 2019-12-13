@@ -25,8 +25,12 @@
         {{ partial "sidebar.html" . }}
         <div class="col-sm-10 col-sm-offset-2 col-md-10 col-md-offset-2 main">
             <div class="col-md-9">
+
+                {{ partial "languages.html" .}}
+
                 <h1>{{ .Title }}</h1>
             </div>
+
             <div class="col-md-9">
                 {{ .Content }}
                 {{.Params.card}}
