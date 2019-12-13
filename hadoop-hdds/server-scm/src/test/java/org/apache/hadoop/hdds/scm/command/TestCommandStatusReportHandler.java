@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.command;
 
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.proto
@@ -83,7 +84,7 @@ public class TestCommandStatusReportHandler implements EventPublisher {
       List<CommandStatus> reports) {
     CommandStatusReportsProto report = TestUtils.createCommandStatusReport(
         reports);
-    DatanodeDetails dn = TestUtils.randomDatanodeDetails();
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     return new SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode(
         dn, report);
   }

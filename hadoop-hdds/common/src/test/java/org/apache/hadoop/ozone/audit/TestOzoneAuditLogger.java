@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.audit;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +40,10 @@ public class TestOzoneAuditLogger {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneAuditLogger.class.getName());
+
+  static {
+    System.setProperty("log4j.configurationFile", "auditlog.properties");
+  }
 
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.OMLOGGER);
@@ -86,11 +89,6 @@ public class TestOzoneAuditLogger {
           .withParams(PARAMS)
           .withResult(SUCCESS)
           .withException(null).build();
-
-  @BeforeClass
-  public static void setUp(){
-    System.setProperty("log4j.configurationFile", "log4j2.properties");
-  }
 
   @AfterClass
   public static void tearDown() {

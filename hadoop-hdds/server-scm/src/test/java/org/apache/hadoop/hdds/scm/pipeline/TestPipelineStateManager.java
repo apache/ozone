@@ -21,8 +21,8 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.junit.Assert;
 import org.junit.Before;
@@ -56,7 +56,7 @@ public class TestPipelineStateManager {
       HddsProtos.ReplicationFactor factor, int numNodes) {
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < numNodes; i++) {
-      nodes.add(TestUtils.randomDatanodeDetails());
+      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
     return Pipeline.newBuilder()
         .setType(type)

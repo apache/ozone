@@ -22,15 +22,16 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -135,9 +136,9 @@ public class TestOzoneContainerWithTLS {
     long containerID = ContainerTestHelper.getTestContainerID();
     OzoneContainer container = null;
     System.out.println(System.getProperties().getProperty("java.library.path"));
-    DatanodeDetails dn = TestUtils.randomDatanodeDetails();
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     try {
-      Pipeline pipeline = ContainerTestHelper.createSingleNodePipeline();
+      Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       conf.set(HDDS_DATANODE_DIR_KEY, tempFolder.getRoot().getPath());
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode().getPort(DatanodeDetails.Port.Name.STANDALONE)

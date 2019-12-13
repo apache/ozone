@@ -35,10 +35,10 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -322,13 +322,13 @@ public class TestKeyManagerUnit {
             containerClient), metadataManager, configuration, "test-om",
         Mockito.mock(OzoneBlockTokenSecretManager.class), null, null);
 
-    final DatanodeDetails dnOne = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails dnTwo = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails dnThree = TestUtils.randomDatanodeDetails();
+    final DatanodeDetails dnOne = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dnTwo = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dnThree = MockDatanodeDetails.randomDatanodeDetails();
 
-    final DatanodeDetails dnFour = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails dnFive = TestUtils.randomDatanodeDetails();
-    final DatanodeDetails dnSix = TestUtils.randomDatanodeDetails();
+    final DatanodeDetails dnFour = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dnFive = MockDatanodeDetails.randomDatanodeDetails();
+    final DatanodeDetails dnSix = MockDatanodeDetails.randomDatanodeDetails();
 
     final Pipeline pipelineOne = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
