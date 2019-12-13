@@ -331,7 +331,7 @@ public class ReplicationManager implements MetricsSource {
        but it may be "unhealthy", which means it has one or more replica which
        are not in the same state as the container itself.
        */
-      if (!isContainerHealthy(container, replicas)) {
+      if (!replicaSet.isHealthy()) {
         handleUnstableContainer(container, replicas);
       }
 
@@ -365,27 +365,6 @@ public class ReplicationManager implements MetricsSource {
   }
 
   /**
-   * Returns true if the container is healthy according to ReplicationMonitor.
-   *
-   * According to ReplicationMonitor container is considered healthy if
-   * all replica which are not in a decommission or maintenance state are in
-   * the same state as the container and in QUASI_CLOSED or in CLOSED state.
-   *
-   * @param container Container to check
-   * @param replicas Set of ContainerReplicas
-   * @return true if the container is healthy, false otherwise
-   */
-  private boolean isContainerHealthy(final ContainerInfo container,
-                                     final Set<ContainerReplica> replicas) {
-    return (container.getState() == LifeCycleState.CLOSED
-        || container.getState() == LifeCycleState.QUASI_CLOSED)
-        && replicas.stream()
-        .filter(r -> r.getState() != State.DECOMMISSIONED)
-        .filter(r -> r.getState() != State.MAINTENANCE)
-        .allMatch(r -> compareState(container.getState(), r.getState()));
-  }
-
-  /**
    * Returns the number replica which are pending creation for the given
    * container ID.
    * @param id The ContainerID for which to check the pending replica
@@ -403,6 +382,19 @@ public class ReplicationManager implements MetricsSource {
    */
   private int getInflightDel(final ContainerID id) {
     return inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
+  }
+
+  /**
+   * Given a ContainerID, lookup the ContainerInfo and then return a
+   * ContainerReplicaCount object for the container.
+   * @param containerID The ID of the container
+   * @return ContainerReplicaCount for the given container
+   * @throws ContainerNotFoundException
+   */
+  public ContainerReplicaCount getContainerReplicaCount(ContainerID containerID)
+      throws ContainerNotFoundException {
+    ContainerInfo container = containerManager.getContainer(containerID);
+    return getContainerReplicaCount(container);
   }
 
   /**
@@ -442,6 +434,7 @@ public class ReplicationManager implements MetricsSource {
   private ContainerReplicaCount getContainerReplicaCount(
       ContainerInfo container, Set<ContainerReplica> replica) {
     return new ContainerReplicaCount(
+        container,
         replica,
         getInflightAdd(container.containerID()),
         getInflightDel(container.containerID()),
@@ -799,7 +792,7 @@ public class ReplicationManager implements MetricsSource {
    * @param replicaState ReplicaState
    * @return true if the state matches, false otherwise
    */
-  private static boolean compareState(final LifeCycleState containerState,
+  public static boolean compareState(final LifeCycleState containerState,
                                       final State replicaState) {
     switch (containerState) {
     case OPEN:

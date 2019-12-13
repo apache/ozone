@@ -315,7 +315,8 @@ public class TestBlockManager {
 
     // create pipelines
     for (int i = 0;
-         i < nodeManager.getNodes(NodeStatus.inServiceHealthy()).size(); i++) {
+         i < nodeManager.getNodes(NodeStatus.inServiceHealthy()).size()
+             / factor.getNumber(); i++) {
       pipelineManager.createPipeline(type, factor);
     }
     TestUtils.openAllRatisPipelines(pipelineManager);
