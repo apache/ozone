@@ -35,12 +35,10 @@ import static org.junit.Assert.assertNotEquals;
 public class TestDatanodeAdminNodeDetails {
 
   private OzoneConfiguration conf;
-  private DatanodeAdminMonitor monitor;
 
   @Before
   public void setup() {
     conf = new OzoneConfiguration();
-    monitor = new DatanodeAdminMonitor(conf);
   }
 
   @After
