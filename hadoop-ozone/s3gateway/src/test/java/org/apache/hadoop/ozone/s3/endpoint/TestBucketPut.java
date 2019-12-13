@@ -100,7 +100,7 @@ public class TestBucketPut {
 
   /**
    * Generate dummy auth header.
-   * @return
+   * @return auth header.
    */
   private String generateAuthHeader() {
     LocalDate now = LocalDate.now();
