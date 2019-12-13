@@ -1,25 +1,16 @@
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
-import java.security.cert.CRLException;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509CRL;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -59,7 +50,7 @@ public class TestCRLCodec {
     public void init() throws NoSuchProviderException,
         NoSuchAlgorithmException, IOException,
         CertificateException, OperatorCreationException {
-        
+
         conf.set(OZONE_METADATA_DIRS, temporaryFolder.newFolder().toString());
         securityConfig = new SecurityConfig(conf);
         writeTempCert();
@@ -81,7 +72,8 @@ public class TestCRLCodec {
 
         contentSignerBuilder.setProvider("BC");
         PrivateKey privateKey = keyPair.getPrivate();
-        X509CRLHolder cRLHolder = builder.build(contentSignerBuilder.build(privateKey));
+        X509CRLHolder cRLHolder =
+            builder.build(contentSignerBuilder.build(privateKey));
 
         CRLCodec crlCodec = new CRLCodec(securityConfig);
         crlCodec.writeCRL(cRLHolder,"pemcertificate.crl", true);
@@ -96,10 +88,9 @@ public class TestCRLCodec {
      * @throws NoSuchProviderException
      * @throws NoSuchAlgorithmException
      * @throws IOException
-     * @throws CertificateException
      */
     private void writeTempCert() throws NoSuchProviderException,
-        NoSuchAlgorithmException, IOException, CertificateException, OperatorCreationException {
+        NoSuchAlgorithmException, IOException {
         HDDSKeyGenerator keyGenerator =
             new HDDSKeyGenerator(conf);
         keyPair = keyGenerator.generateKey();
@@ -115,7 +106,9 @@ public class TestCRLCodec {
                 .setKey(keyPair)
                 .makeCA()
                 .build();
-        CertificateCodec codec = new CertificateCodec(securityConfig, COMPONENT);
+        CertificateCodec codec =
+            new CertificateCodec(securityConfig, COMPONENT);
+
         String pemString = codec.getPEMEncodedString(cert);
         basePath = new File(
             String.valueOf(
