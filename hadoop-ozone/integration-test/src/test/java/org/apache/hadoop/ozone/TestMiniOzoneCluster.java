@@ -103,10 +103,6 @@ public class TestMiniOzoneCluster {
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
-    // add few keys in OM
-    // start recon for reprocess -- full Snapshot
-    // add more keys
-    // fetch delta updates
   }
 
 

@@ -18,12 +18,11 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,6 +104,9 @@ public class ReconServer extends GenericCli {
     OzoneManagerServiceProvider ozoneManagerServiceProvider = injector
         .getInstance(OzoneManagerServiceProvider.class);
     ozoneManagerServiceProvider.stop();
+    ContainerDBServiceProvider containerDBServiceProvider =
+        injector.getInstance(ContainerDBServiceProviderImpl.class);
+    containerDBServiceProvider.stop();
   }
 
   public Injector getInjector() {

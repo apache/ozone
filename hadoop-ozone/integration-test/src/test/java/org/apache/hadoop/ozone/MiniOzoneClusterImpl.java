@@ -55,7 +55,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 
-import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,8 +80,16 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys
     .DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.*;
-
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.OZONE_RECON_SQL_DB_JDBC_URL;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
  * running tests.  The cluster consists of a OzoneManager,
@@ -301,7 +308,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       reconServer.stop();
       reconServer.run(new String[]{});
     } catch (Exception e) {
-      LOG.info("Exception while stopping Recon",e);
+      LOG.info("Exception while stopping Recon", e);
     }
   }
 
@@ -761,13 +768,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
           .getAbsolutePath());
 
-      //RECON_OM_SNAPSHOT_DB ??
-
       conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:"+
           tempNewFolder.getAbsolutePath()+"/ozone_recon_sqlite.db");
 
-      //RECON_OM_SNAPSHOT_DB should be set ?
-
+      conf.set(RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT, "2s");
+      conf.set(RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT, "10s");
     }
   }
 }

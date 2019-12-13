@@ -16,27 +16,32 @@
  */
 package org.apache.hadoop.ozone.recon;
 
+import com.google.gson.Gson;
+import com.google.gson.internal.LinkedTreeMap;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.KeyManagerImpl;
+
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.*;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.Time;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -46,22 +51,54 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static java.net.HttpURLConnection.HTTP_CREATED;
+import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
 
+/**
+ * Test Ozone Recon.
+ */
 public class TestRecon {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
-  private static ReconOmMetadataManagerImpl reconOmMetadataManager;
   private static File dir;
-  private static KeyManagerImpl keyManager;
   private static UserGroupInformation ugi;
+  private static CloseableHttpClient httpClient;
+  private static ReconUtils reconUtils;
+  private static long pauseInterval;
+  private String reconHTTPAddress = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
+  private String containerKeyServiceURL = "http://" + reconHTTPAddress
+      + "/api/containers";
+  private String fileSizeCountURL = "http://" + reconHTTPAddress
+      + "/api/utilization";
+  private String taskStatusURL = "http://" + reconHTTPAddress
+      + "/api/task/status";
 
   @BeforeClass
   public static void init() throws Exception {
@@ -70,13 +107,39 @@ public class TestRecon {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     ugi = UserGroupInformation.getCurrentUser();
 
+
+    int socketTimeout = (int) conf.getTimeDuration(
+        RECON_OM_SOCKET_TIMEOUT, RECON_OM_SOCKET_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    int connectionTimeout = (int) conf.getTimeDuration(
+        RECON_OM_CONNECTION_TIMEOUT,
+        RECON_OM_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+    int connectionRequestTimeout = (int)conf.getTimeDuration(
+        RECON_OM_CONNECTION_REQUEST_TIMEOUT,
+        RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+    RequestConfig config = RequestConfig.custom()
+        .setConnectTimeout(socketTimeout)
+        .setConnectionRequestTimeout(connectionTimeout)
+        .setSocketTimeout(connectionRequestTimeout).build();
+
     cluster =  MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     metadataManager = cluster.getOzoneManager().getMetadataManager();
 
     cluster.getStorageContainerManager().exitSafeMode();
+    reconUtils = cluster.getReconServer().getInjector().getInstance(
+        ReconUtils.class);
 
-    //override initial delay and delay configs
+    // initialize HTTPClient
+    httpClient = HttpClientBuilder
+        .create()
+        .setDefaultRequestConfig(config)
+        .build();
+
+    pauseInterval = conf.getTimeDuration(
+        conf.get(RECON_OM_SNAPSHOT_TASK_INTERVAL),
+        conf.get(RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
+        TimeUnit.MILLISECONDS);
   }
 
   @AfterClass
@@ -86,129 +149,237 @@ public class TestRecon {
     }
   }
 
+  /**
+   * Returns a {@link CloseableHttpClient} configured by given configuration.
+   * If conf is null, returns a default instance.
+   *
+   * @param url        URL
+   * @return a JSON String Response.
+   */
+  private String makeHttpCall(String url)
+      throws IOException {
+    HttpGet httpGet = new HttpGet(url);
+    HttpResponse response = httpClient.execute(httpGet);
+    int errorCode = response.getStatusLine().getStatusCode();
+    HttpEntity entity = response.getEntity();
+
+    if ((errorCode == HTTP_OK) || (errorCode == HTTP_CREATED)) {
+      return EntityUtils.toString(entity);
+    }
+
+    if (entity != null) {
+      throw new IOException("Unexpected exception when trying to reach Ozone " +
+          "Manager, " + EntityUtils.toString(entity));
+    } else {
+      throw new IOException("Unexpected null in http payload," +
+          " while processing request");
+    }
+  }
+
   @Test
   public void testReconServer() throws Exception {
-    String dbDir = cluster.getReconServer().getInjector()
-        .getInstance(OzoneConfiguration.class).get(OZONE_RECON_DB_DIR);
-
     //add a vol, bucket and key
-    createVolume("vol1");
-    createBucket("vol1", "bucket1");
-    createKey("vol1", "bucket1", "key1");
+    addKeys(0, 1);
 
-    //check if ommetadata has vol1/bucket1/key1 info
+    //check if OM metadata has vol0/bucket0/key0 info
     String ozoneKey = metadataManager.getOzoneKey(
-        "vol1", "bucket1", "key1");
+        "vol0", "bucket0", "key0");
     OmKeyInfo keyInfo1 = metadataManager.getKeyTable().get(ozoneKey);
-
-    String buckName = keyInfo1.getBucketName();
-    String volName = keyInfo1.getVolumeName();
 
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
 
     long omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
-    Assert.assertEquals("vol1", volName);
-    Assert.assertEquals("bucket1", buckName);
-
-
-    reconOmMetadataManager = cluster.getReconServer()
-        .getInjector().getInstance(ReconOmMetadataManagerImpl.class);
+    //verify if OM has /vol0/bucket0/key0
+    Assert.assertEquals("vol0", keyInfo1.getVolumeName());
+    Assert.assertEquals("bucket0", keyInfo1.getBucketName());
 
     //pause to get the next snapshot from om
-    Thread.sleep(15000);
+    Thread.sleep(pauseInterval);
 
-    //verify if recon metadata captures vol1/bucket1/key1 info
-    Assert.assertEquals(volName,reconOmMetadataManager.getKeyTable()
-        .get(ozoneKey).getVolumeName());
+    // HTTP call to /api/containers
+    String containerResponse = makeHttpCall(containerKeyServiceURL);
+    Map map = new Gson().fromJson(containerResponse, HashMap.class);
+    LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
+    long reconMetadataKeyCount = (long)(double)linkedTreeMap.get("totalCount");
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        reconKeyValueTableIterator = reconOmMetadataManager.
-        getKeyTable().iterator();
-    long reconMetadataKeyCount = getTableKeyCount(reconKeyValueTableIterator);
-
-    //verify if recon has the full snapshot
+    //verify count of keys after full snapshot
     Assert.assertEquals(omMetadataKeyCount, reconMetadataKeyCount);
 
-    //add 5 keys to check for delta updates
-    addKeys();
+    //verify if Recon Metadata captures vol0/bucket0/key0 info in container0
+    ArrayList containers = (ArrayList) linkedTreeMap.get("containers");
+    LinkedTreeMap nestedContainerMap = (LinkedTreeMap)containers.get(0);
+    Assert.assertEquals(1.0, nestedContainerMap.get("NumberOfKeys"));
+
+    // HTTP call to /api/task/status
+    long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
+        .getDb().getLatestSequenceNumber();
+
+    String taskStatusResponse = makeHttpCall(taskStatusURL);
+    long reconLatestSeqNumber = getReconMetadataKeyCount(taskStatusResponse, 3);
+
+    //verify sequence number after full snapshot
+    Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+
+    //add 4 keys to check for delta updates
+    addKeys(1, 5);
     omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
+
+    //verify OM Metadata has all 5 keys
     Assert.assertEquals(5, omMetadataKeyCount);
 
     //pause to get the next snapshot from om to verify delta updates
-    Thread.sleep(15000);
+    Thread.sleep(pauseInterval);
 
-    reconKeyValueTableIterator = reconOmMetadataManager.
-        getKeyTable().iterator();
+    // HTTP call to /api/containers
+    containerResponse = makeHttpCall(containerKeyServiceURL);
+    map = new Gson().fromJson(containerResponse, HashMap.class);
+    linkedTreeMap = (LinkedTreeMap) map.get("data");
+    reconMetadataKeyCount = (long)(double)linkedTreeMap.get("totalCount");
 
-    reconMetadataKeyCount = getTableKeyCount(reconKeyValueTableIterator);
-
-    ozoneKey = metadataManager.getOzoneKey(
-        "vol3", "bucket3", "key3");
-
-    //verify if recon stores vol3/bucket3/key3 info from om delta updates
-    Assert.assertEquals("vol3",reconOmMetadataManager.getKeyTable()
-        .get(ozoneKey).getVolumeName());
-
-    // verify if delta updates were applied.
+    //verify count of keys
     Assert.assertEquals(omMetadataKeyCount, reconMetadataKeyCount);
 
+    //verify if Recon Metadata captures vol3/bucket3/key3 info in container3
+    containers = (ArrayList) linkedTreeMap.get("containers");
+    nestedContainerMap = (LinkedTreeMap)containers.get(3);
+    Assert.assertEquals(1.0, nestedContainerMap.get("NumberOfKeys"));
+
+    // HTTP call to /api/task/status
+    omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
+        .getDb().getLatestSequenceNumber();
+
+    taskStatusResponse = makeHttpCall(taskStatusURL);
+    reconLatestSeqNumber = getReconMetadataKeyCount(taskStatusResponse, 2);
+
+    //verify sequence number after Delta Updates
+    Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+
+    File reconDbDir =
+        reconUtils.getReconDbDir(conf, OZONE_RECON_OM_SNAPSHOT_DB_DIR);
+    File lastKnownOMSnapshotBeforeRestart =
+        reconUtils.getLastKnownDB(reconDbDir, RECON_OM_SNAPSHOT_DB);
 
 
+    //restart Recon
+    cluster.restartReconServer();
+
+    //add 5 more keys to OM
+    addKeys(5, 10);
+    omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
+    omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
+
+    //verify 10 keys in OM
+    Assert.assertEquals(10, omMetadataKeyCount);
+
+    //pause to get the next snapshot from om
+    Thread.sleep(pauseInterval);
+
+    // HTTP call to /api/containers
+    containerResponse = makeHttpCall(containerKeyServiceURL);
+    map = new Gson().fromJson(containerResponse, HashMap.class);
+    linkedTreeMap = (LinkedTreeMap) map.get("data");
+    reconMetadataKeyCount = (long)(double)linkedTreeMap.get("totalCount");
+
+    //verify count of keys
+    Assert.assertEquals(omMetadataKeyCount, reconMetadataKeyCount);
+
+    //verify if Recon Metadata captures vol7/bucket7/key7 info in container7
+    containers = (ArrayList) linkedTreeMap.get("containers");
+    nestedContainerMap = (LinkedTreeMap)containers.get(7);
+    Assert.assertEquals(1.0, nestedContainerMap.get("NumberOfKeys"));
+
+    // HTTP call to /api/task/status
+    omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
+        .getDb().getLatestSequenceNumber();
+
+    taskStatusResponse = makeHttpCall(taskStatusURL);
+    reconLatestSeqNumber = getReconMetadataKeyCount(taskStatusResponse, 2);
+
+    //verify sequence number after Delta Updates
+    Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+
+    //verify Snapshot directory
+    reconDbDir =
+        reconUtils.getReconDbDir(conf, OZONE_RECON_OM_SNAPSHOT_DB_DIR);
+    File lastKnownOMSnapshotAfterRestart =
+        reconUtils.getLastKnownDB(reconDbDir, RECON_OM_SNAPSHOT_DB);
+
+    Assert.assertNotNull(lastKnownOMSnapshotAfterRestart);
+    Assert.assertEquals(lastKnownOMSnapshotBeforeRestart.getAbsolutePath(),
+        lastKnownOMSnapshotAfterRestart.getAbsolutePath());
   }
 
-  @Test
-  public void testReconRestart() {
-    System.out.println();
-    ;
+  private long getReconMetadataKeyCount(String taskStatusResponse,
+      int taskIndex) {
+    ArrayList taskStatusList = new Gson().fromJson(
+        taskStatusResponse, ArrayList.class);
+    LinkedTreeMap deltaUpdatesEntity =
+        (LinkedTreeMap)taskStatusList.get(taskIndex);
+    return (long)(double) deltaUpdatesEntity.get("lastUpdatedSeqNumber");
   }
 
-  private void addKeys() throws Exception {
-    for(int i=0; i < 5; i++) {
-      createVolume("vol" + i);
-      createBucket("vol" + i, "bucket" + i);
-      createKey("vol" + i, "bucket" + i, "key" + i);
+  private void addKeys(int start, int end) throws Exception {
+    for(int i=start; i < end; i++) {
+      Pipeline pipeline = getRandomPipeline();
+      List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
+      BlockID blockID1 = new BlockID(i, 1);
+      OmKeyLocationInfo omKeyLocationInfo1 = getOmKeyLocationInfo(blockID1,
+          pipeline);
+      omKeyLocationInfoList.add(omKeyLocationInfo1);
+      OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
+          OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+      writeDataToOm("key"+i, "bucket"+i, "vol"+i,
+          Collections.singletonList(omKeyLocationInfoGroup));
     }
   }
-
 
   private long getTableKeyCount(TableIterator<String, ? extends
       Table.KeyValue<String, OmKeyInfo>> iterator) {
     long keyCount = 0;
     while(iterator.hasNext()) {
-      keyCount ++;
+      keyCount++;
       iterator.next();
     }
     return keyCount;
   }
 
-  private static void createVolume(String volumeName) throws IOException {
-    OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
-        .setVolume(volumeName)
-        .setAdminName("bilbo")
-        .setOwnerName("bilbo")
+  private static Pipeline getRandomPipeline() {
+    return Pipeline.newBuilder()
+        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setId(PipelineID.randomId())
+        .setNodes(Collections.EMPTY_LIST)
+        .setState(Pipeline.PipelineState.OPEN)
+        .setType(HddsProtos.ReplicationType.STAND_ALONE)
         .build();
-    TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
   }
 
-  private static void createBucket(String volumeName, String bucketName)
+  private static OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,
+      Pipeline pipeline) {
+    return new OmKeyLocationInfo.Builder()
+        .setBlockID(blockID)
+        .setPipeline(pipeline)
+        .build();
+  }
+
+  private static void writeDataToOm(String key, String bucket, String volume,
+      List<OmKeyLocationInfoGroup>
+          omKeyLocationInfoGroupList)
       throws IOException {
-    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .build();
 
-    TestOMRequestUtils.addBucketToOM(metadataManager, bucketInfo);
-  }
+    String omKey = metadataManager.getOzoneKey(volume,
+        bucket, key);
 
-  private static void createKey(String volume, String bucket, String keyName)
-      throws Exception {
-    TestOMRequestUtils.addKeyToTable(false, volume, bucket, keyName, 1,
-        HddsProtos.ReplicationType.STAND_ALONE,
-        HddsProtos.ReplicationFactor.ONE, metadataManager);
-
-    //TestOMRequestUtils.addKeyToTableCache() ??
+    metadataManager.getKeyTable().put(omKey,
+        new OmKeyInfo.Builder()
+            .setBucketName(bucket)
+            .setVolumeName(volume)
+            .setKeyName(key)
+            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+            .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
+            .build());
   }
 }
