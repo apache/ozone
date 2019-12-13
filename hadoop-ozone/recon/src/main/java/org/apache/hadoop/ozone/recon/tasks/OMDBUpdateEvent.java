@@ -21,21 +21,21 @@ package org.apache.hadoop.ozone.recon.tasks;
 /**
  * A class used to encapsulate a single OM DB update event.
  * Currently only PUT and DELETE are supported.
- * @param <KEY> Type of Key.
- * @param <VALUE> Type of Value.
+ * @param <K> Type of Key.
+ * @param <V> Type of Value.
  */
-public final class OMDBUpdateEvent<KEY, VALUE> {
+public final class OMDBUpdateEvent<K, V> {
 
   private final OMDBUpdateAction action;
   private final String table;
-  private final KEY updatedKey;
-  private final VALUE updatedValue;
+  private final K updatedKey;
+  private final V updatedValue;
   private final long sequenceNumber;
 
   private OMDBUpdateEvent(OMDBUpdateAction action,
                           String table,
-                          KEY updatedKey,
-                          VALUE updatedValue,
+                          K updatedKey,
+                          V updatedValue,
                           long sequenceNumber) {
     this.action = action;
     this.table = table;
@@ -52,11 +52,11 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
     return table;
   }
 
-  public KEY getKey() {
+  public K getKey() {
     return updatedKey;
   }
 
-  public VALUE getValue() {
+  public V getValue() {
     return updatedValue;
   }
 
@@ -66,15 +66,15 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
 
   /**
    * Builder used to construct an OM DB Update event.
-   * @param <KEY> Key type.
-   * @param <VALUE> Value type.
+   * @param <K1> Key type.
+   * @param <V1> Value type.
    */
-  public static class OMUpdateEventBuilder<KEY, VALUE> {
+  public static class OMUpdateEventBuilder<K1, V1> {
 
     private OMDBUpdateAction action;
     private String table;
-    private KEY updatedKey;
-    private VALUE updatedValue;
+    private K1 updatedKey;
+    private V1 updatedValue;
     private long lastSequenceNumber;
 
     OMUpdateEventBuilder setAction(OMDBUpdateAction omdbUpdateAction) {
@@ -87,12 +87,12 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
       return this;
     }
 
-    OMUpdateEventBuilder setKey(KEY key) {
+    OMUpdateEventBuilder setKey(K1 key) {
       this.updatedKey = key;
       return this;
     }
 
-    OMUpdateEventBuilder setValue(VALUE value) {
+    OMUpdateEventBuilder setValue(V1 value) {
       this.updatedValue = value;
       return this;
     }
@@ -107,7 +107,7 @@ public final class OMDBUpdateEvent<KEY, VALUE> {
      * @return OMDBUpdateEvent
      */
     public OMDBUpdateEvent build() {
-      return new OMDBUpdateEvent<KEY, VALUE>(
+      return new OMDBUpdateEvent<K1, V1>(
           action,
           table,
           updatedKey,
