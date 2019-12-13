@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -115,9 +116,9 @@ public class TestDeadNodeHandler {
   @Ignore("Tracked by HDDS-2508.")
   public void testOnMessage() throws IOException, NodeNotFoundException {
     //GIVEN
-    DatanodeDetails datanode1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails datanode2 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails datanode3 = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode3 = MockDatanodeDetails.randomDatanodeDetails();
 
     String storagePath = GenericTestUtils.getRandomizedTempPath()
         .concat("/" + datanode1.getUuidString());
@@ -136,18 +137,18 @@ public class TestDeadNodeHandler {
     nodeManager.register(datanode3,
         TestUtils.createNodeReport(storageOne), null);
 
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
 
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
 
     TestUtils.openAllRatisPipelines(pipelineManager);

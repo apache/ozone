@@ -21,6 +21,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.nio.ByteBuffer;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -52,6 +53,9 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
       @Override
       public ByteBuffer next() {
+        if (!buffer.hasRemaining()) {
+          throw new NoSuchElementException();
+        }
         final ByteBuffer duplicated = buffer.duplicate();
         final int min = Math.min(
             buffer.position() + bufferSize, buffer.limit());
