@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.slf4j.Logger;
@@ -47,10 +46,9 @@ import java.util.concurrent.TimeUnit;
 public class NodeDecommissionManager {
 
   private ScheduledExecutorService executor;
-  private DatanodeAdminMonitorInterface monitor;
+  private DatanodeAdminMonitor monitor;
 
   private NodeManager nodeManager;
-  private PipelineManager pipelineManager;
   //private ContainerManager containerManager;
   private EventPublisher eventQueue;
   private ReplicationManager replicationManager;
@@ -168,11 +166,10 @@ public class NodeDecommissionManager {
   }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
-      PipelineManager pm, ContainerManager containerManager,
+      ContainerManager containerManager,
       EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
     conf = config;
-    this.pipelineManager = pm;
     //this.containerManager = containerManager;
     this.eventQueue = eventQueue;
     this.replicationManager = rm;
@@ -201,19 +198,15 @@ public class NodeDecommissionManager {
           TimeUnit.SECONDS);
     }
 
-    monitor = new DatanodeAdminMonitor(conf);
-    monitor.setConf(conf);
-    monitor.setEventQueue(this.eventQueue);
-    monitor.setNodeManager(nodeManager);
-    monitor.setPipelineManager(pipelineManager);
-    monitor.setReplicationManager(replicationManager);
+    monitor = new DatanodeAdminMonitorImpl(conf, eventQueue, nodeManager,
+        replicationManager);
 
     executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
         TimeUnit.SECONDS);
   }
 
   @VisibleForTesting
-  public DatanodeAdminMonitorInterface getMonitor() {
+  public DatanodeAdminMonitor getMonitor() {
     return monitor;
   }
 

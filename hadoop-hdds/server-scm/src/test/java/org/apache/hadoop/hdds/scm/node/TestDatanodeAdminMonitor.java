@@ -52,7 +52,7 @@ public class TestDatanodeAdminMonitor {
 
   private SimpleMockNodeManager nodeManager;
   private OzoneConfiguration conf;
-  private DatanodeAdminMonitor monitor;
+  private DatanodeAdminMonitorImpl monitor;
   private DatanodeAdminHandler startAdminHandler;
   private ReplicationManager repManager;
   private EventQueue eventQueue;
@@ -69,10 +69,8 @@ public class TestDatanodeAdminMonitor {
 
     repManager = Mockito.mock(ReplicationManager.class);
 
-    monitor = new DatanodeAdminMonitor(conf);
-    monitor.setEventQueue(eventQueue);
-    monitor.setNodeManager(nodeManager);
-    monitor.setReplicationManager(repManager);
+    monitor =
+        new DatanodeAdminMonitorImpl(conf, eventQueue, nodeManager, repManager);
   }
 
   @After
