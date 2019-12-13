@@ -37,7 +37,7 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 execute_robot_test rm kinit-hadoop.robot
 
-execute_robot_test rm mapreduce.robot
+execute_robot_test rm -v hadoop.version:3.3.0-SNAPSHOT mapreduce.robot
 
 stop_docker_env
 

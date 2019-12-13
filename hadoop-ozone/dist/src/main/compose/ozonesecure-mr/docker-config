@@ -126,7 +126,6 @@ KEYTAB_DIR=/etc/security/keytabs
 KERBEROS_KEYTABS=dn om scm HTTP testuser s3g rm nm yarn jhs hadoop spark
 KERBEROS_KEYSTORES=hadoop
 KERBEROS_SERVER=kdc
-JAVA_HOME=/usr/lib/jvm/jre
 JSVC_HOME=/usr/bin
 SLEEP_SECONDS=5
 KERBEROS_ENABLED=true
