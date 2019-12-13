@@ -546,4 +546,17 @@ public interface OzoneManagerProtocol
   List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
+  /**
+   * Recover trash allows the user to recover keys that were marked as deleted,
+   * but not actually deleted by Ozone Manager.
+   * @param volumeName - The volume name.
+   * @param bucketName - The bucket name.
+   * @param keyName - The key user want to recover.
+   * @param destinationBucket - The bucket user want to recover to.
+   * @return The recoverTrash
+   * @throws IOException
+   */
+  boolean recoverTrash(String volumeName, String bucketName, String keyName,
+      String destinationBucket) throws IOException;
+
 }
