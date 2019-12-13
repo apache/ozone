@@ -115,14 +115,15 @@ public class SCMDatanodeProtocolServer implements
    */
   private final RPC.Server datanodeRpcServer;
 
-  private final StorageContainerManager scm;
+  private final StorageContainerManagerInterface scm;
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
   private final ProtocolMessageMetrics protocolMessageMetrics;
 
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
-      StorageContainerManager scm, EventPublisher eventPublisher)
+                                   StorageContainerManagerInterface scm,
+                                   EventPublisher eventPublisher)
       throws IOException {
 
     Preconditions.checkNotNull(scm, "SCM cannot be null");
