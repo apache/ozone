@@ -202,6 +202,58 @@ public class TestNodeStateManager {
         newStatus.getHealth());
   }
 
+  @Test
+  public void testHealthEventsFiredWhenOpStateChanged()
+      throws NodeAlreadyExistsException, NodeNotFoundException {
+    DatanodeDetails dn = generateDatanode();
+    nsm.addNode(dn);
+
+    // First set the node to decommissioned, then run through all op states in
+    // order and ensure the non_healthy_to_healthy event gets fired
+    nsm.setNodeOperationalState(dn,
+        HddsProtos.NodeOperationalState.DECOMMISSIONED);
+    for (HddsProtos.NodeOperationalState s :
+        HddsProtos.NodeOperationalState.values()) {
+      eventPublisher.clearEvents();
+      nsm.setNodeOperationalState(dn, s);
+      assertEquals("NON_HEALTHY_TO_HEALTHY_NODE",
+          eventPublisher.getLastEvent().getName());
+    }
+
+    // Now make the node stale and run through all states again ensuring the
+    // stale event gets fired
+    long now = Time.monotonicNow();
+    long staleLimit = HddsServerUtil.getStaleNodeInterval(conf) + 1000;
+    long deadLimit = HddsServerUtil.getDeadNodeInterval(conf) + 1000;
+    DatanodeInfo dni = nsm.getNode(dn);
+    dni.updateLastHeartbeatTime(now - staleLimit);
+    nsm.checkNodesHealth();
+    assertEquals(NodeState.STALE, nsm.getNodeStatus(dn).getHealth());
+    nsm.setNodeOperationalState(dn,
+        HddsProtos.NodeOperationalState.DECOMMISSIONED);
+    for (HddsProtos.NodeOperationalState s :
+        HddsProtos.NodeOperationalState.values()) {
+      eventPublisher.clearEvents();
+      nsm.setNodeOperationalState(dn, s);
+      assertEquals("Stale_Node",
+          eventPublisher.getLastEvent().getName());
+    }
+
+    // Finally make the node dead and run through all the op states again
+    dni.updateLastHeartbeatTime(now - deadLimit);
+    nsm.checkNodesHealth();
+    assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
+    nsm.setNodeOperationalState(dn,
+        HddsProtos.NodeOperationalState.DECOMMISSIONED);
+    for (HddsProtos.NodeOperationalState s :
+        HddsProtos.NodeOperationalState.values()) {
+      eventPublisher.clearEvents();
+      nsm.setNodeOperationalState(dn, s);
+      assertEquals("Dead_Node",
+          eventPublisher.getLastEvent().getName());
+    }
+  }
+
   private DatanodeDetails generateDatanode() {
     String uuid = UUID.randomUUID().toString();
     return DatanodeDetails.newBuilder().setUuid(uuid).build();
