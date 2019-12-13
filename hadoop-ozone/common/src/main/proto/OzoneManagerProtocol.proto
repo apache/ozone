@@ -94,6 +94,7 @@ enum Type {
   ListMultipartUploads = 82;
 
   ListTrash = 91;
+  RecoverTrash = 92;
 }
 
 message OMRequest {
@@ -165,6 +166,7 @@ message OMRequest {
   optional ListMultipartUploadsRequest      listMultipartUploadsRequest    = 83;
 
   optional ListTrashRequest                 listTrashRequest               = 91;
+  optional RecoverTrashRequest              RecoverTrashRequest            = 92;
 }
 
 message OMResponse {
@@ -236,6 +238,7 @@ message OMResponse {
   optional ListMultipartUploadsResponse listMultipartUploadsResponse = 82;
 
   optional ListTrashResponse                  listTrashResponse            = 91;
+  optional RecoverTrashResponse               RecoverTrashResponse         = 92;
 }
 
 enum Status {
@@ -324,6 +327,22 @@ message ListTrashRequest {
 
 message ListTrashResponse {
   repeated RepeatedKeyInfo deletedKeys = 1;
+}
+
+/**
+    This command acts as a recover command for deleted keys that are still
+    in deleted table on Ozone Manager.
+*/
+
+message RecoverTrashRequest {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    required string keyName = 3;
+    required string destinationBucket = 4;
+}
+
+message RecoverTrashResponse {
+    required bool response = 1;
 }
 
 message VolumeInfo {

@@ -14,5 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HDDS_VERSION=${hdds.version}
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
+version: "3.4"
+
+x-profiling-config:
+  &profiling-config
+  privileged: true
+  environment:
+    - OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
+    - ASYNC_PROFILER_HOME=/opt/profiler
+
+services:
+  datanode:
+    <<: *profiling-config
+  om:
+    <<: *profiling-config
+  scm:
+    <<: *profiling-config
+  s3g:
+    <<: *profiling-config
+  recon:
+    <<: *profiling-config

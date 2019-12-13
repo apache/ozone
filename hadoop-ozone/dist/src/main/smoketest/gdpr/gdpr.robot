@@ -47,43 +47,43 @@ Test GDPR(disabled) without explicit options
     [arguments]     ${volume}
                     Execute             ozone sh volume create /${volume} --quota 100TB
                     Execute             ozone sh bucket create /${volume}/mybucket1
-    ${result} =     Execute             ozone sh bucket info /${volume}/mybucket1 | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="mybucket1") | .metadata | .gdprEnabled'
+    ${result} =     Execute             ozone sh bucket info /${volume}/mybucket1 | jq -r '. | select(.name=="mybucket1") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       null
                     Execute             ozone sh key put /${volume}/mybucket1/mykey /opt/hadoop/NOTICE.txt
                     Execute             rm -f NOTICE.txt.1
-    ${result} =     Execute             ozone sh key info /${volume}/mybucket1/mykey | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="mykey") | .metadata | .gdprEnabled'
+    ${result} =     Execute             ozone sh key info /${volume}/mybucket1/mykey | jq -r '. | select(.name=="mykey") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       null
                     Execute             ozone sh key delete /${volume}/mybucket1/mykey
 
 Test GDPR with --enforcegdpr=true
     [arguments]     ${volume}
                     Execute             ozone sh bucket create --enforcegdpr=true /${volume}/mybucket2
-    ${result} =     Execute             ozone sh bucket info /${volume}/mybucket2 | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="mybucket2") | .metadata | .gdprEnabled'
+    ${result} =     Execute             ozone sh bucket info /${volume}/mybucket2 | jq -r '. | select(.name=="mybucket2") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       true
                     Execute             ozone sh key put /${volume}/mybucket2/mykey /opt/hadoop/NOTICE.txt
                     Execute             rm -f NOTICE.txt.1
-    ${result} =     Execute             ozone sh key info /${volume}/mybucket2/mykey | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="mykey") | .metadata | .gdprEnabled'
+    ${result} =     Execute             ozone sh key info /${volume}/mybucket2/mykey | jq -r '. | select(.name=="mykey") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       true
                     Execute             ozone sh key delete /${volume}/mybucket2/mykey
 
 Test GDPR with -g=true
     [arguments]     ${volume}
                     Execute             ozone sh bucket create -g=true /${volume}/mybucket3
-    ${result} =     Execute             ozone sh bucket info /${volume}/mybucket3 | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="mybucket3") | .metadata | .gdprEnabled'
+    ${result} =     Execute             ozone sh bucket info /${volume}/mybucket3 | jq -r '. | select(.name=="mybucket3") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       true
                     Execute             ozone sh key put /${volume}/mybucket3/mykey /opt/hadoop/NOTICE.txt
                     Execute             rm -f NOTICE.txt.1
-    ${result} =     Execute             ozone sh key info /${volume}/mybucket3/mykey | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="mykey") | .metadata | .gdprEnabled'
+    ${result} =     Execute             ozone sh key info /${volume}/mybucket3/mykey | jq -r '. | select(.name=="mykey") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       true
                     Execute             ozone sh key delete /${volume}/mybucket3/mykey
 
 Test GDPR with -g=false
     [arguments]     ${volume}
                     Execute             ozone sh bucket create /${volume}/mybucket4
-    ${result} =     Execute             ozone sh bucket info /${volume}/mybucket4 | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="mybucket4") | .metadata | .gdprEnabled'
+    ${result} =     Execute             ozone sh bucket info /${volume}/mybucket4 | jq -r '. | select(.name=="mybucket4") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       null
                     Execute             ozone sh key put /${volume}/mybucket4/mykey /opt/hadoop/NOTICE.txt
                     Execute             rm -f NOTICE.txt.1
-    ${result} =     Execute             ozone sh key info /${volume}/mybucket4/mykey | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="mykey") | .metadata | .gdprEnabled'
+    ${result} =     Execute             ozone sh key info /${volume}/mybucket4/mykey | jq -r '. | select(.name=="mykey") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       null
                     Execute             ozone sh key delete /${volume}/mybucket4/mykey

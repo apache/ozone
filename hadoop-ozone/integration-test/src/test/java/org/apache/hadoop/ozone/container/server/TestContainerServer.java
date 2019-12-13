@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.server;
 import com.google.common.collect.Maps;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClient;
@@ -43,7 +44,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerCommandResponseProto;
 
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.RatisTestHelper;
@@ -73,6 +73,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import static org.apache.ratis.rpc.SupportedRpcType.NETTY;
 import static org.mockito.Mockito.mock;
@@ -101,7 +102,7 @@ public class TestContainerServer {
 
   @Test
   public void testClientServer() throws Exception {
-    DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
     ContainerSet containerSet = new ContainerSet();
     ContainerController controller = new ContainerController(
         containerSet, null);
@@ -169,7 +170,7 @@ public class TestContainerServer {
     String containerName = OzoneUtils.getRequestID();
     try {
       final Pipeline pipeline =
-          ContainerTestHelper.createPipeline(numDatanodes);
+          MockPipeline.createPipeline(numDatanodes);
       initConf.accept(pipeline, CONF);
 
       for (DatanodeDetails dn : pipeline.getNodes()) {
@@ -203,7 +204,7 @@ public class TestContainerServer {
     XceiverClientGrpc client = null;
     UUID scmId = UUID.randomUUID();
     try {
-      Pipeline pipeline = ContainerTestHelper.createSingleNodePipeline();
+      Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
@@ -213,7 +214,7 @@ public class TestContainerServer {
       VolumeSet volumeSet = mock(VolumeSet.class);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
-      DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
       DatanodeStateMachine stateMachine = Mockito.mock(
           DatanodeStateMachine.class);
       StateContext context = Mockito.mock(StateContext.class);

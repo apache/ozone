@@ -70,10 +70,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume
     .RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.SmallFileUtils;
 import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
@@ -88,6 +84,18 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
     Result.*;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -212,7 +220,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Create Container request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
     // Create Container request should be passed a null container as the
     // container would be created here.
@@ -251,7 +259,7 @@ public class KeyValueHandler extends Handler {
         return ContainerUtils.logAndReturnError(LOG, ex, request);
       }
     }
-    return ContainerUtils.getSuccessResponse(request);
+    return getSuccessResponse(request);
   }
 
   public void populateContainerPathFields(KeyValueContainer container,
@@ -277,7 +285,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Read Container request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     // The container can become unhealthy after the lock is released.
@@ -289,8 +297,8 @@ public class KeyValueHandler extends Handler {
     }
 
     KeyValueContainerData containerData = kvContainer.getContainerData();
-    return KeyValueContainerUtil.getReadContainerResponse(
-        request, containerData);
+    return getReadContainerResponse(
+        request, containerData.getProtoBufMessage());
   }
 
 
@@ -306,7 +314,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Update Container request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     boolean forceUpdate = request.getUpdateContainer().getForceUpdate();
@@ -324,7 +332,7 @@ public class KeyValueHandler extends Handler {
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     }
-    return ContainerUtils.getSuccessResponse(request);
+    return getSuccessResponse(request);
   }
 
   /**
@@ -342,7 +350,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Delete container request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     boolean forceDelete = request.getDeleteContainer().getForceDelete();
@@ -351,7 +359,7 @@ public class KeyValueHandler extends Handler {
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     }
-    return ContainerUtils.getSuccessResponse(request);
+    return getSuccessResponse(request);
   }
 
   /**
@@ -366,7 +374,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Update Container request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
     try {
       markContainerForClose(kvContainer);
@@ -379,7 +387,7 @@ public class KeyValueHandler extends Handler {
               IO_EXCEPTION), request);
     }
 
-    return ContainerUtils.getSuccessResponse(request);
+    return getSuccessResponse(request);
   }
 
   /**
@@ -394,21 +402,24 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Put Key request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
-    BlockData blockData;
+    final ContainerProtos.BlockData blockDataProto;
     try {
       checkContainerOpen(kvContainer);
 
-      blockData = BlockData.getFromProtoBuf(
+      BlockData blockData = BlockData.getFromProtoBuf(
           request.getPutBlock().getBlockData());
       Preconditions.checkNotNull(blockData);
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
-      final long numBytes = blockData.getSerializedSize();
       blockManager.putBlock(kvContainer, blockData);
+
+      blockDataProto = blockData.getProtoBufMessage();
+
+      final long numBytes = blockDataProto.getSerializedSize();
       metrics.incContainerBytesStats(Type.PutBlock, numBytes);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -418,7 +429,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return BlockUtils.putBlockResponseSuccess(request, blockData);
+    return putBlockResponseSuccess(request, blockDataProto);
   }
 
   /**
@@ -432,7 +443,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Get Key request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     // The container can become unhealthy after the lock is released.
@@ -443,11 +454,12 @@ public class KeyValueHandler extends Handler {
       return ContainerUtils.logAndReturnError(LOG, sce, request);
     }
 
-    BlockData responseData;
+    ContainerProtos.BlockData responseData;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
-      responseData = blockManager.getBlock(kvContainer, blockID);
+      responseData = blockManager.getBlock(kvContainer, blockID)
+          .getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
       metrics.incContainerBytesStats(Type.GetBlock, numBytes);
 
@@ -459,7 +471,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return BlockUtils.getBlockDataResponse(request, responseData);
+    return getBlockDataResponse(request, responseData);
   }
 
   /**
@@ -473,7 +485,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Get Key request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     // The container can become unhealthy after the lock is released.
@@ -497,7 +509,7 @@ public class KeyValueHandler extends Handler {
               IO_EXCEPTION), request);
     }
 
-    return BlockUtils.getBlockLengthResponse(request, blockLength);
+    return getBlockLengthResponse(request, blockLength);
   }
 
   /**
@@ -511,7 +523,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Delete Key request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     try {
@@ -529,7 +541,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return BlockUtils.getBlockResponseSuccess(request);
+    return getBlockResponseSuccess(request);
   }
 
   /**
@@ -544,7 +556,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Read Chunk request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     // The container can become unhealthy after the lock is released.
@@ -555,12 +567,11 @@ public class KeyValueHandler extends Handler {
       return ContainerUtils.logAndReturnError(LOG, sce, request);
     }
 
-    ChunkInfo chunkInfo;
     ByteBuffer data;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getReadChunk().getBlockID());
-      chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
+      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
           .getChunkData());
       Preconditions.checkNotNull(chunkInfo);
 
@@ -581,16 +592,7 @@ public class KeyValueHandler extends Handler {
 
     Preconditions.checkNotNull(data, "Chunk data is null");
 
-    ContainerProtos.ReadChunkResponseProto.Builder response =
-        ContainerProtos.ReadChunkResponseProto.newBuilder();
-    response.setChunkData(chunkInfo.getProtoBufMessage());
-    response.setData(byteBufferToByteString.apply(data));
-    response.setBlockID(request.getReadChunk().getBlockID());
-
-    ContainerCommandResponseProto.Builder builder =
-        ContainerUtils.getSuccessResponseBuilder(request);
-    builder.setReadChunk(response);
-    return builder.build();
+    return getReadChunkResponse(request, byteBufferToByteString.apply(data));
   }
 
   /**
@@ -625,7 +627,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Delete Chunk request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     // The container can become unhealthy after the lock is released.
@@ -655,7 +657,7 @@ public class KeyValueHandler extends Handler {
               IO_EXCEPTION), request);
     }
 
-    return ChunkUtils.getChunkResponseSuccess(request);
+    return getSuccessResponse(request);
   }
 
   /**
@@ -670,7 +672,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Write Chunk request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     try {
@@ -710,7 +712,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    return ChunkUtils.getChunkResponseSuccess(request);
+    return getSuccessResponse(request);
   }
 
   /**
@@ -727,28 +729,28 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Put Small File request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
-    PutSmallFileRequestProto putSmallFileReq =
-        request.getPutSmallFile();
-    BlockData blockData;
 
+    PutSmallFileRequestProto putSmallFileReq = request.getPutSmallFile();
+    final ContainerProtos.BlockData blockDataProto;
     try {
       checkContainerOpen(kvContainer);
 
-      BlockID blockID = BlockID.getFromProtobuf(putSmallFileReq.getBlock()
-          .getBlockData().getBlockID());
-      blockData = BlockData.getFromProtoBuf(
+      BlockData blockData = BlockData.getFromProtoBuf(
           putSmallFileReq.getBlock().getBlockData());
       Preconditions.checkNotNull(blockData);
 
-      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(
-          putSmallFileReq.getChunkInfo());
+      ContainerProtos.ChunkInfo chunkInfoProto = putSmallFileReq.getChunkInfo();
+      ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
       Preconditions.checkNotNull(chunkInfo);
+
       ByteBuffer data = putSmallFileReq.getData().asReadOnlyByteBuffer();
       if (dispatcherContext == null) {
         dispatcherContext = new DispatcherContext.Builder().build();
       }
+
+      BlockID blockID = blockData.getBlockID();
 
       // chunks will be committed as a part of handling putSmallFile
       // here. There is no need to maintain this info in openContainerBlockMap.
@@ -756,13 +758,14 @@ public class KeyValueHandler extends Handler {
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();
-      chunks.add(chunkInfo.getProtoBufMessage());
+      chunks.add(chunkInfoProto);
       blockData.setChunks(chunks);
       blockData.setBlockCommitSequenceId(dispatcherContext.getLogIndex());
 
       blockManager.putBlock(kvContainer, blockData);
-      metrics.incContainerBytesStats(Type.PutSmallFile, data.capacity());
 
+      blockDataProto = blockData.getProtoBufMessage();
+      metrics.incContainerBytesStats(Type.PutSmallFile, data.capacity());
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -771,7 +774,7 @@ public class KeyValueHandler extends Handler {
               PUT_SMALL_FILE_ERROR), request);
     }
 
-    return SmallFileUtils.getPutFileResponseSuccess(request, blockData);
+    return getPutFileResponseSuccess(request, blockDataProto);
   }
 
   /**
@@ -787,7 +790,7 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Malformed Get Small File request. trace ID: {}",
             request.getTraceID());
       }
-      return ContainerUtils.malformedRequest(request);
+      return malformedRequest(request);
     }
 
     // The container can become unhealthy after the lock is released.
@@ -819,8 +822,7 @@ public class KeyValueHandler extends Handler {
         chunkInfo = chunk;
       }
       metrics.incContainerBytesStats(Type.GetSmallFile, dataBuf.size());
-      return SmallFileUtils.getGetSmallFileResponseSuccess(request, dataBuf,
-          ChunkInfo.getFromProtoBuf(chunkInfo));
+      return getGetSmallFileResponseSuccess(request, dataBuf, chunkInfo);
     } catch (StorageContainerException e) {
       return ContainerUtils.logAndReturnError(LOG, e, request);
     } catch (IOException ex) {
@@ -836,7 +838,7 @@ public class KeyValueHandler extends Handler {
   ContainerCommandResponseProto handleUnsupportedOp(
       ContainerCommandRequestProto request) {
     // TODO : remove all unsupported operations or handle them.
-    return ContainerUtils.unsupportedRequest(request);
+    return unsupportedRequest(request);
   }
 
   /**

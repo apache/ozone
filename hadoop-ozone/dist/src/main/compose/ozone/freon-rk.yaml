@@ -14,23 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-OZONE-SITE.XML_ozone.om.address=om
-OZONE-SITE.XML_ozone.om.http-address=om:9874
-OZONE-SITE.XML_ozone.scm.names=scm
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
-OZONE-SITE.XML_ozone.scm.block.client.address=scm
-OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
-OZONE-SITE.XML_ozone.scm.client.address=scm
-OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
-OZONE-SITE.XML_ozone.replication=3
-OZONE-SITE.XML_hdds.prometheus.endpoint.enabled=true
-OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
-
-ASYNC_PROFILER_HOME=/opt/profiler
-
-HDFS-SITE.XML_rpc.metrics.quantile.enable=true
-HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
-
-JAEGER_SAMPLER_PARAM=1
-JAEGER_SAMPLER_TYPE=const
-JAEGER_AGENT_HOST=jaeger
+version: "3.4"
+services:
+  freon:
+    image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
+    volumes:
+      - ../..:/opt/hadoop
+    env_file:
+      - docker-config
+      - monitoring.conf
+    environment:
+      - "OZONE-SITE.XML_ozone.replication=${OZONE_REPLICATION_FACTOR:-1}"
+    command: ["ozone","freon","rk"]
