@@ -21,7 +21,7 @@ languages:
     languageName: English
     weight: 1
   zh:
-    languageName: Mandarin
+    languageName: 中文
     weight: 2
 title: "Ozone"
 theme: "ozonedoc"
