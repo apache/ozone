@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -46,9 +45,7 @@ public class TestRatisPipelineProvider {
   @Before
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-    stateManager = new PipelineStateManager(conf);
+    stateManager = new PipelineStateManager();
     provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, new OzoneConfiguration());
   }
@@ -145,7 +142,7 @@ public class TestRatisPipelineProvider {
     // We need 9 Healthy DNs in MockNodeManager.
     NodeManager mockNodeManager = new MockNodeManager(true, 12);
     PipelineStateManager stateManagerMock =
-        new PipelineStateManager(new OzoneConfiguration());
+        new PipelineStateManager();
     PipelineProvider providerMock = new MockRatisPipelineProvider(
         mockNodeManager, stateManagerMock, new OzoneConfiguration());
 
