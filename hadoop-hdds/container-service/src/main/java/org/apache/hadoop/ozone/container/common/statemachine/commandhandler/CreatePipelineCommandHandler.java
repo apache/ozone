@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -16,12 +16,17 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.CreatePipelineCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -31,7 +36,13 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.protocol.NotLeaderException;
+import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.retry.RetryPolicy;
+import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,13 +59,25 @@ public class CreatePipelineCommandHandler implements CommandHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(CreatePipelineCommandHandler.class);
 
-  private AtomicLong invocationCount = new AtomicLong(0);
+  private final AtomicLong invocationCount = new AtomicLong(0);
+  private final String rpcType;
+  private final RetryPolicy retryPolicy;
+  private final TimeDuration requestTimeout;
+  private final int maxOutstandingRequest;
+
   private long totalTime;
 
   /**
    * Constructs a createPipelineCommand handler.
    */
-  public CreatePipelineCommandHandler() {
+  public CreatePipelineCommandHandler(Configuration conf) {
+    this.rpcType = conf
+        .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
+            ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
+    this.maxOutstandingRequest = HddsClientUtils
+        .getMaxOutstandingRequests(conf);
+    this.retryPolicy = RatisHelper.createRetryPolicy(conf);
+    this.requestTimeout = RatisHelper.getClientRequestTimeout(conf);
   }
 
   /**
@@ -75,22 +98,35 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     final CreatePipelineCommandProto createCommand =
         ((CreatePipelineCommand)command).getProto();
     final HddsProtos.PipelineID pipelineID = createCommand.getPipelineID();
-    Collection<DatanodeDetails> peers =
+    final Collection<DatanodeDetails> peers =
         createCommand.getDatanodeList().stream()
             .map(DatanodeDetails::getFromProtoBuf)
             .collect(Collectors.toList());
 
     try {
       XceiverServerSpi server = ozoneContainer.getWriteChannel();
-      server.addGroup(pipelineID, peers);
-      LOG.info("Create Pipeline {} {} #{} command succeed on datanode {}.",
-          createCommand.getType(), createCommand.getFactor(), pipelineID,
-          dn.getUuidString());
-      // Trigger heartbeat report
-      context.addReport(context.getParent().getContainer().getPipelineReport());
-      context.getParent().triggerHeartbeat();
-    } catch (NotLeaderException e) {
-      LOG.debug("Follower cannot create pipeline #{}.", pipelineID);
+      if (!server.isExist(pipelineID)) {
+        final RaftGroupId groupId = RaftGroupId.valueOf(
+            PipelineID.getFromProtobuf(pipelineID).getId());
+        final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers);
+        server.addGroup(pipelineID, peers);
+        createCommand.getDatanodeList().stream().filter(
+            d -> !d.getUuid().equals(dn.getUuidString()))
+            .forEach(d -> {
+              final RaftPeer p = RatisHelper.toRaftPeer(
+                  DatanodeDetails.getFromProtoBuf(d));
+              try (RaftClient client = RatisHelper
+                  .newRaftClient(SupportedRpcType.valueOfIgnoreCase(rpcType),
+                      p, retryPolicy, maxOutstandingRequest,
+                      requestTimeout)) {
+                client.groupAdd(group, p.getId());
+              } catch (IOException ioe) {
+                LOG.warn("Add group failed for {}", d, ioe);
+              }
+            });
+        LOG.info("Created Pipeline {} {} #{}.",
+            createCommand.getType(), createCommand.getFactor(), pipelineID);
+      }
     } catch (IOException e) {
       LOG.error("Can't create pipeline {} {} #{}", createCommand.getType(),
           createCommand.getFactor(), pipelineID, e);
