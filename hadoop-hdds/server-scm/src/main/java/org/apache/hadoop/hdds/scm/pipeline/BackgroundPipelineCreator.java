@@ -119,7 +119,7 @@ class BackgroundPipelineCreator {
         } catch (IOException ioe) {
           break;
         } catch (Throwable t) {
-          LOG.error("Error while creating pipelines {}", t);
+          LOG.error("Error while creating pipelines", t);
           break;
         }
       }

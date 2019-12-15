@@ -316,7 +316,7 @@ public class ContainerStateMap {
         // Just flush both old and new data sets from the result cache.
         flushCache(currentInfo);
       } catch (SCMException ex) {
-        LOG.error("Unable to update the container state. {}", ex);
+        LOG.error("Unable to update the container state.", ex);
         // we need to revert the change in this attribute since we are not
         // able to update the hash table.
         LOG.info("Reverting the update to lifecycle state. Moving back to " +
