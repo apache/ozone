@@ -238,8 +238,7 @@ public final class Pipeline {
         }
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Serialize pipeline {} with nodesInOrder{ }", id.toString(),
-            nodes);
+        LOG.debug("Serialize pipeline {} with nodesInOrder {}", id, nodes);
       }
     }
     return builder.build();
@@ -399,7 +398,7 @@ public final class Pipeline {
         }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Deserialize nodesInOrder {} in pipeline {}",
-              nodesWithOrder, id.toString());
+              nodesWithOrder, id);
         }
         pipeline.setNodesInOrder(nodesWithOrder);
       } else if (nodesInOrder != null){
