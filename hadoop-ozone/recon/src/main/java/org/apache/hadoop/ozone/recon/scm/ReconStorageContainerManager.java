@@ -59,6 +59,15 @@ public class ReconStorageContainerManager
         conf, this, eventQueue);
   }
 
+  /**
+   *  For every config key which is prefixed by 'recon.scm', create a new
+   *  config key without the prefix keeping the same value.
+   *  For example, if recon.scm.a.b. = xyz, we add a new config like
+   *  a.b.c = xyz. This is done to override Recon's passive SCM configs if
+   *  needed.
+   * @param configuration configuration object.
+   * @return same configuration object with possible added elements.
+   */
   private OzoneConfiguration getReconScmConfiguration(
       OzoneConfiguration configuration) {
     Map<String, String> reconScmConfigs =
