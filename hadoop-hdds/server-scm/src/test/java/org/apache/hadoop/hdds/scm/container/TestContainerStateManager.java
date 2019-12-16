@@ -23,10 +23,10 @@ import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
 
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -58,9 +58,9 @@ public class TestContainerStateManager {
     //GIVEN
     ContainerInfo c1 = allocateContainer();
 
-    DatanodeDetails d1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails d2 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails d3 = TestUtils.randomDatanodeDetails();
+    DatanodeDetails d1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails d2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails d3 = MockDatanodeDetails.randomDatanodeDetails();
 
     addReplica(c1, d1);
     addReplica(c1, d2);
@@ -80,8 +80,8 @@ public class TestContainerStateManager {
 
     ContainerInfo c1 = allocateContainer();
 
-    DatanodeDetails d1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails d2 = TestUtils.randomDatanodeDetails();
+    DatanodeDetails d1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails d2 = MockDatanodeDetails.randomDatanodeDetails();
 
     addReplica(c1, d1);
     addReplica(c1, d2);

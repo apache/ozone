@@ -101,11 +101,11 @@ public class TestOzoneConfiguration {
   @Test
   public void getConfigurationObject() {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
-    ozoneConfig.set("ozone.scm.client.address", "address");
-    ozoneConfig.set("ozone.scm.client.bind.host", "host");
-    ozoneConfig.setBoolean("ozone.scm.client.enabled", true);
-    ozoneConfig.setInt("ozone.scm.client.port", 5555);
-    ozoneConfig.setTimeDuration("ozone.scm.client.wait", 10, TimeUnit.MINUTES);
+    ozoneConfig.set("test.scm.client.address", "address");
+    ozoneConfig.set("test.scm.client.bind.host", "host");
+    ozoneConfig.setBoolean("test.scm.client.enabled", true);
+    ozoneConfig.setInt("test.scm.client.port", 5555);
+    ozoneConfig.setTimeDuration("test.scm.client.wait", 10, TimeUnit.MINUTES);
 
     SimpleConfiguration configuration =
         ozoneConfig.getObject(SimpleConfiguration.class);

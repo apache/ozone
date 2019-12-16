@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.scm.node;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -82,7 +83,7 @@ public class TestSCMNodeMetrics {
         SCMNodeMetrics.class.getSimpleName());
     long hbProcessedFailed = getLongCounter("NumHBProcessingFailed", metrics);
     cluster.getStorageContainerManager().getScmNodeManager()
-        .processHeartbeat(TestUtils.randomDatanodeDetails());
+        .processHeartbeat(MockDatanodeDetails.randomDatanodeDetails());
     assertCounter("NumHBProcessingFailed", hbProcessedFailed + 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
   }
@@ -119,7 +120,7 @@ public class TestSCMNodeMetrics {
         SCMNodeMetrics.class.getSimpleName());
     long nrProcessed = getLongCounter("NumNodeReportProcessingFailed",
         metrics);
-    DatanodeDetails datanode = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
     StorageReportProto storageReport = TestUtils.createStorageReport(
         datanode.getUuid(), "/tmp", 100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()

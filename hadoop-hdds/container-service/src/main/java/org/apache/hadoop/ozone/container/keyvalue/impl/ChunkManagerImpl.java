@@ -164,16 +164,16 @@ public class ChunkManagerImpl implements ChunkManager {
     } catch (StorageContainerException ex) {
       throw ex;
     } catch (NoSuchAlgorithmException ex) {
-      LOG.error("write data failed. error: {}", ex);
+      LOG.error("write data failed.", ex);
       throw new StorageContainerException("Internal error: ", ex,
           NO_SUCH_ALGORITHM);
     } catch (ExecutionException  | IOException ex) {
-      LOG.error("write data failed. error: {}", ex);
+      LOG.error("write data failed.", ex);
       throw new StorageContainerException("Internal error: ", ex,
           CONTAINER_INTERNAL_ERROR);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      LOG.error("write data failed. error: {}", e);
+      LOG.error("write data failed.", e);
       throw new StorageContainerException("Internal error: ", e,
           CONTAINER_INTERNAL_ERROR);
     }
