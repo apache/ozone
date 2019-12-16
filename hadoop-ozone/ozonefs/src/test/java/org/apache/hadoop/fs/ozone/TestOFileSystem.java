@@ -77,15 +77,10 @@ public class TestOFileSystem {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
-//    volumeName = "vol1";
-//    bucketName = "buc1";
 
     // For now:
     rootPath = String.format("%s://%s/", OzoneConsts.OZONE_OFS_URI_SCHEME,
         conf.get("ozone.om.address"));  // TODO: OZONE_OM_ADDRESS_KEY
-//    rootPath = String.format("%s://%s/%s/%s/", OzoneConsts.OZONE_OFS_URI_SCHEME,
-//        conf.get("ozone.om.address"),  // TODO: OZONE_OM_ADDRESS_KEY
-//        volumeName, bucketName);
 
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
@@ -117,7 +112,8 @@ public class TestOFileSystem {
   @Test
   public void testCreateDoesNotAddParentDirKeys() throws Exception {
     Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path grandparent = new Path(rootBucket, "testCreateDoesNotAddParentDirKeys");
+    Path grandparent = new Path(rootBucket,
+        "testCreateDoesNotAddParentDirKeys");
     Path parent = new Path(grandparent, "parent");
     Path child = new Path(parent, "child");
     ContractTestUtils.touch(fs, child);
