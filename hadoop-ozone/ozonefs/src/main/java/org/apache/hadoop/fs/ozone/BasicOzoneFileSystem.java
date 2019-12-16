@@ -22,7 +22,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -32,7 +31,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -47,12 +45,7 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -89,7 +82,6 @@ public class BasicOzoneFileSystem extends FileSystem {
   private URI uri;
   private String userName;
   private Path workingDir;
-  private int configuredDnPort;
 
   private OzoneClientAdapter adapter;
 
@@ -174,9 +166,6 @@ public class BasicOzoneFileSystem extends FileSystem {
       this.workingDir = new Path(OZONE_USER_DIR, this.userName)
           .makeQualified(this.uri, this.workingDir);
 
-      this.configuredDnPort = conf.getInt(
-          OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-          OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
     } catch (URISyntaxException ue) {
       final String msg = "Invalid Ozone endpoint " + name;
       LOG.error(msg, ue);
@@ -808,54 +797,11 @@ public class BasicOzoneFileSystem extends FileSystem {
         fileStatusAdapter.getPath()
     );
 
-    OmKeyInfo keyInfo = fileStatusAdapter.getKeyInfo();
-    if (keyInfo == null ||
-        CollectionUtils.isEmpty(keyInfo.getKeyLocationVersions())) {
+    BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
+    if (blockLocations == null || blockLocations.length == 0) {
       return fileStatus;
     }
-
-    BlockLocation[] blockLocations =
-        getBlockLocationsFromOmKeyInfo(keyInfo.getKeyLocationVersions(),
-            fileStatusAdapter);
     return new LocatedFileStatus(fileStatus, blockLocations);
   }
 
-  /**
-   * Helper method to get List of BlockLocation from OM Key info.
-   * @param omKeyLocationInfoGroups OM Key locations.
-   * @param fileStatusAdapter fileStatusAdapter
-   * @return list of block locations.
-   */
-  private BlockLocation[] getBlockLocationsFromOmKeyInfo(
-      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups,
-      FileStatusAdapter fileStatusAdapter) {
-    OmKeyLocationInfoGroup omKeyLocationInfoGroup =
-        omKeyLocationInfoGroups.iterator().next();
-    BlockLocation[] blockLocations = new BlockLocation[
-        omKeyLocationInfoGroup.getBlocksLatestVersionOnly().size()];
-
-    int i = 0;
-    for (OmKeyLocationInfo omKeyLocationInfo :
-        omKeyLocationInfoGroup.getBlocksLatestVersionOnly()) {
-      List<String> hostList = new ArrayList<>();
-      List<String> nameList = new ArrayList<>();
-      omKeyLocationInfo.getPipeline().getNodes()
-          .forEach(dn -> {
-            hostList.add(dn.getHostName());
-            int port = dn.getPort(
-                DatanodeDetails.Port.Name.STANDALONE).getValue();
-            if (port == 0) {
-              port = configuredDnPort;
-            }
-            nameList.add(dn.getHostName() + ":" + port);
-          });
-
-      String[] hosts = hostList.toArray(new String[hostList.size()]);
-      String[] names = nameList.toArray(new String[nameList.size()]);
-      BlockLocation blockLocation = new BlockLocation(
-          names, hosts, 0, fileStatusAdapter.getLength());
-      blockLocations[i++] = blockLocation;
-    }
-    return blockLocations;
-  }
 }
