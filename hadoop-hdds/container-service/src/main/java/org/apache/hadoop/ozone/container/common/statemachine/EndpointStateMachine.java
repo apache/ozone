@@ -208,7 +208,7 @@ public class EndpointStateMachine
               this.getMissedCount() * getScmHeartbeatInterval(this.conf)), ex);
     }
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Incrementing the Missed count. Ex : {}", ex);
+      LOG.trace("Incrementing the Missed count.", ex);
     }
     this.incMissed();
   }
