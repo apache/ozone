@@ -131,7 +131,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_
  */
 @InterfaceAudience.LimitedPrivate({"HDFS", "CBLOCK", "OZONE", "HBASE"})
 public final class StorageContainerManager extends ServiceRuntimeInfoImpl
-    implements SCMMXBean {
+    implements SCMMXBean, OzoneStorageContainerManager {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(StorageContainerManager.class);
