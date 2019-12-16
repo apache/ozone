@@ -20,6 +20,8 @@ package org.apache.hadoop.fs.ozone;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.Path;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 /**
  * Class to hold the internal information of a FileStatus.
  * <p>
@@ -61,7 +63,7 @@ public final class FileStatusAdapter {
     this.owner = owner;
     this.group = group;
     this.symlink = symlink;
-    this.blockLocations = locations;
+    this.blockLocations = locations.clone();
   }
 
   public Path getPath() {
@@ -108,6 +110,7 @@ public final class FileStatusAdapter {
     return length;
   }
 
+  @SuppressFBWarnings("EI_EXPOSE_REP")
   public BlockLocation[] getBlockLocations() {
     return blockLocations;
   }
