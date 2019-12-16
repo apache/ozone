@@ -138,17 +138,17 @@ public class TestOzoneFSInputStream {
 
   @Test
   public void testO3FSByteBufferRead() throws IOException {
-    FSDataInputStream inputStream = fs.open(filePath);
-    ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
-    int byteRead = inputStream.read(buffer);
+    try (FSDataInputStream inputStream = fs.open(filePath)) {
 
-    Assert.assertEquals(byteRead, 1024 * 1024);
+      ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
+      int byteRead = inputStream.read(buffer);
 
-    byte[] value = new byte[1024 * 1024];
-    System.arraycopy(data, 0, value, 0, value.length);
+      Assert.assertEquals(byteRead, 1024 * 1024);
 
-    Assert.assertArrayEquals(value, buffer.array());
+      byte[] value = new byte[1024 * 1024];
+      System.arraycopy(data, 0, value, 0, value.length);
 
-    inputStream.close();
+      Assert.assertArrayEquals(value, buffer.array());
+    }
   }
 }
