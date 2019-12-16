@@ -115,14 +115,14 @@ public class SCMDatanodeProtocolServer implements
    */
   private final RPC.Server datanodeRpcServer;
 
-  private final StorageContainerManagerInterface scm;
+  private final OzoneStorageContainerManager scm;
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
   private final ProtocolMessageMetrics protocolMessageMetrics;
 
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
-                                   StorageContainerManagerInterface scm,
+                                   OzoneStorageContainerManager scm,
                                    EventPublisher eventPublisher)
       throws IOException {
 

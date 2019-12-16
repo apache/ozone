@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManagerInterface;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
 /**
@@ -40,7 +40,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
 
   public ReconDatanodeProtocolServer(OzoneConfiguration conf,
-                                     StorageContainerManagerInterface scm,
+                                     OzoneStorageContainerManager scm,
                                      EventPublisher eventPublisher)
       throws IOException {
     super(conf, scm, eventPublisher);

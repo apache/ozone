@@ -104,11 +104,11 @@ public class ReconServer extends GenericCli {
     ozoneManagerServiceProvider.stop();
   }
 
-  OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
+  private OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
     return injector.getInstance(OzoneManagerServiceProvider.class);
   }
 
-  ReconStorageContainerManager getReconStorageContainerManager() {
+  private ReconStorageContainerManager getReconStorageContainerManager() {
     return injector.getInstance(ReconStorageContainerManager.class);
   }
 

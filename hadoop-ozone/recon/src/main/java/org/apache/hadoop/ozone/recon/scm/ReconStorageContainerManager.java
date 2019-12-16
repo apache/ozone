@@ -27,9 +27,12 @@ import javax.inject.Inject;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManagerInterface;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * Recon's 'lite' version of SCM.
  */
 public class ReconStorageContainerManager
-    implements StorageContainerManagerInterface {
+    implements OzoneStorageContainerManager {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerManager.class);
@@ -109,6 +112,21 @@ public class ReconStorageContainerManager
 
   @Override
   public BlockManager getScmBlockManager() {
+    return null;
+  }
+
+  @Override
+  public PipelineManager getPipelineManager() {
+    return null;
+  }
+
+  @Override
+  public ContainerManager getContainerManager() {
+    return null;
+  }
+
+  @Override
+  public ReplicationManager getReplicationManager() {
     return null;
   }
 }
