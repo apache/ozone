@@ -19,7 +19,6 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -99,39 +98,39 @@ public class TestOzoneFSInputStream {
 
   @Test
   public void testO3FSSingleByteRead() throws IOException {
-    FSDataInputStream inputStream = fs.open(filePath);
-    byte[] value = new byte[data.length];
-    int i = 0;
-    while(true) {
-      int val = inputStream.read();
-      if (val == -1) {
-        break;
+    try (FSDataInputStream inputStream = fs.open(filePath)) {
+      byte[] value = new byte[data.length];
+      int i = 0;
+      while (true) {
+        int val = inputStream.read();
+        if (val == -1) {
+          break;
+        }
+        value[i] = (byte) val;
+        Assert.assertEquals("value mismatch at:" + i, value[i], data[i]);
+        i++;
       }
-      value[i] = (byte)val;
-      Assert.assertEquals("value mismatch at:" + i, value[i], data[i]);
-      i++;
+      Assert.assertEquals(i, data.length);
+      Assert.assertArrayEquals(value, data);
     }
-    Assert.assertEquals(i, data.length);
-    Assert.assertTrue(Arrays.equals(value, data));
-    inputStream.close();
   }
 
   @Test
   public void testO3FSMultiByteRead() throws IOException {
-    FSDataInputStream inputStream = fs.open(filePath);
-    byte[] value = new byte[data.length];
-    byte[] tmp = new byte[1* 1024 *1024];
-    int i = 0;
-    while(true) {
-      int val = inputStream.read(tmp);
-      if (val == -1) {
-        break;
+    try (FSDataInputStream inputStream = fs.open(filePath)) {
+      byte[] value = new byte[data.length];
+      byte[] tmp = new byte[1 * 1024 * 1024];
+      int i = 0;
+      while (true) {
+        int val = inputStream.read(tmp);
+        if (val == -1) {
+          break;
+        }
+        System.arraycopy(tmp, 0, value, i * tmp.length, tmp.length);
+        i++;
       }
-      System.arraycopy(tmp, 0, value, i * tmp.length, tmp.length);
-      i++;
+      Assert.assertEquals(i * tmp.length, data.length);
+      Assert.assertArrayEquals(value, data);
     }
-    Assert.assertEquals(i * tmp.length, data.length);
-    Assert.assertTrue(Arrays.equals(value, data));
-    inputStream.close();
   }
 }
