@@ -51,6 +51,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Test cases to verify CreatePipelineCommandHandler.
+ */
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(RaftClient.class)
 public class TestCreatePipelineCommandHandler {

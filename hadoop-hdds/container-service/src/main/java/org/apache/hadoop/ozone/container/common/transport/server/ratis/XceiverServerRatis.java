@@ -746,7 +746,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     groupLeaderMap.put(groupMemberId.getGroupId(), leaderForGroup);
     if (context != null && leaderForGroup) {
       // Publish new report from leader
-     sendPipelineReport();
+      sendPipelineReport();
     }
   }
 

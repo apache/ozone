@@ -158,8 +158,8 @@ public class RatisPipelineProvider implements PipelineProvider {
             factor, dns);
 
     dns.forEach(node -> {
-      LOG.info("Send pipeline:{} create command to datanode {}",
-          pipeline.getId(), node);
+      LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
+          pipeline.getId(), node.getUuidString());
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
           new CommandForDatanode<>(node.getUuid(), createCommand));
     });

@@ -113,13 +113,13 @@ public class CreatePipelineCommandHandler implements CommandHandler {
         createCommand.getDatanodeList().stream().filter(
             d -> !d.getUuid().equals(dn.getUuidString()))
             .forEach(d -> {
-              final RaftPeer p = RatisHelper.toRaftPeer(
+              final RaftPeer peer = RatisHelper.toRaftPeer(
                   DatanodeDetails.getFromProtoBuf(d));
               try (RaftClient client = RatisHelper
                   .newRaftClient(SupportedRpcType.valueOfIgnoreCase(rpcType),
-                      p, retryPolicy, maxOutstandingRequest,
+                      peer, retryPolicy, maxOutstandingRequest,
                       requestTimeout)) {
-                client.groupAdd(group, p.getId());
+                client.groupAdd(group, peer.getId());
               } catch (IOException ioe) {
                 LOG.warn("Add group failed for {}", d, ioe);
               }
