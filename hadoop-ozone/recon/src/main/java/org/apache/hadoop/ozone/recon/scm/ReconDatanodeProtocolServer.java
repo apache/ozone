@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
@@ -30,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.scm.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -65,5 +67,10 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
       ContainerReportsProto containerReportsRequestProto,
       PipelineReportsProto pipelineReports) throws IOException {
     return null;
+  }
+
+  @Override
+  public InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
+    return HddsServerUtil.getReconDataNodeBindAddress(conf);
   }
 }

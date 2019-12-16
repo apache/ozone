@@ -152,8 +152,7 @@ public class SCMDatanodeProtocolServer implements
                 new StorageContainerDatanodeProtocolServerSideTranslatorPB(
                     this, protocolMessageMetrics));
 
-    InetSocketAddress datanodeRpcAddr =
-        HddsServerUtil.getScmDataNodeBindAddress(conf);
+    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
 
     datanodeRpcServer =
         startRpcServer(
@@ -406,6 +405,10 @@ public class SCMDatanodeProtocolServer implements
         .replaceAll(System.lineSeparator(), " ")
         .trim()
         .replaceAll(" +", " ");
+  }
+
+  protected InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
+    return HddsServerUtil.getScmDataNodeBindAddress(conf);
   }
 
   /**
