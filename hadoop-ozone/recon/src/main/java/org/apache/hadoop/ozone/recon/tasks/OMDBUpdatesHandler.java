@@ -62,7 +62,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       processEvent(cfIndex, keyBytes, valueBytes,
           OMDBUpdateEvent.OMDBUpdateAction.PUT);
     } catch (IOException ioEx) {
-      LOG.error("Exception when reading key : " + ioEx);
+      LOG.error("Exception when reading key : ", ioEx);
     }
   }
 
@@ -72,7 +72,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       processEvent(cfIndex, keyBytes, null,
           OMDBUpdateEvent.OMDBUpdateAction.DELETE);
     } catch (IOException ioEx) {
-      LOG.error("Exception when reading key : " + ioEx);
+      LOG.error("Exception when reading key : ", ioEx);
     }
   }
 
@@ -88,7 +88,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
     String tableName = tablesNames.get(cfIndex);
-    Class keyType = getKeyType(tableName);
+    Class keyType = getKeyType();
     Class valueType = getValueType(tableName);
     if (valueType != null) {
       OMDBUpdateEvent.OMUpdateEventBuilder builder =
@@ -116,78 +116,127 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
     }
   }
 
-  // There are no use cases yet for the remaining methods in Recon. These
-  // will be implemented as and when need arises.
-
   @Override
   public void put(byte[] bytes, byte[] bytes1) {
-
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void merge(int i, byte[] bytes, byte[] bytes1)
       throws RocksDBException {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void merge(byte[] bytes, byte[] bytes1) {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void delete(byte[] bytes) {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void singleDelete(int i, byte[] bytes) throws RocksDBException {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void singleDelete(byte[] bytes) {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void deleteRange(int i, byte[] bytes, byte[] bytes1)
       throws RocksDBException {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void deleteRange(byte[] bytes, byte[] bytes1) {
-
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void logData(byte[] bytes) {
-
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void putBlobIndex(int i, byte[] bytes, byte[] bytes1)
       throws RocksDBException {
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void markBeginPrepare() throws RocksDBException {
-
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void markEndPrepare(byte[] bytes) throws RocksDBException {
-
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void markNoop(boolean b) throws RocksDBException {
-
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void markRollback(byte[] bytes) throws RocksDBException {
-
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   @Override
   public void markCommit(byte[] bytes) throws RocksDBException {
-
+    /**
+     * There are no use cases yet for this method in Recon. These will be
+     * implemented as and when need arises.
+     */
   }
 
   /**
@@ -195,7 +244,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
    * @param name table name.
    * @return String.class by default.
    */
-  private Class getKeyType(String name) {
+  private Class getKeyType() {
     return String.class;
   }
 
