@@ -230,8 +230,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public static final Logger LOG =
       LoggerFactory.getLogger(OzoneManager.class);
 
-  private static final AuditLogger AUDIT = new AuditLogger(
-      AuditLoggerType.OMLOGGER);
+  private static AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMLOGGER);
 
   private static final String OM_DAEMON = "om";
   private static boolean securityEnabled = false;
@@ -2309,6 +2308,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public AuditLogger getAuditLogger() {
     return AUDIT;
+  }
+
+  @VisibleForTesting
+  public void setAuditLogger(AuditLogger auditLoggerForTesting) {
+    AUDIT = auditLoggerForTesting;
   }
 
   @Override

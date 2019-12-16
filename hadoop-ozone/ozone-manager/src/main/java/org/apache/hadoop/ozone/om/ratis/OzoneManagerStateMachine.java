@@ -425,6 +425,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   }
 
+  @VisibleForTesting
+  public void forceSetLastAppliedTermIndex(TermIndex termIndex) {
+    setLastAppliedTermIndex(termIndex);
+  }
   /**
    * Submits read request to OM and returns the response Message.
    * @param request OMRequest
