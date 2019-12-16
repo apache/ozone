@@ -816,9 +816,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     if (StringUtil.isBlank(userName)) {
       // null userName represents listing all volumes in cluster.
-      for (String user : getAllUsers()) {
-        volumes.add(getVolumesByUser(user));
-      }
+      return listAllVolumes(maxKeys);
     } else {
       volumes.add(getVolumesByUser(userName));
     }
@@ -859,25 +857,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return result;
   }
 
-  private List<String> getAllUsers() throws IOException {
-    TableIterator<String, ? extends KeyValue<String, UserVolumeInfo>> dbIterator
-        = getUserTable().iterator();
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<UserVolumeInfo>>>
-        cacheIterator = getUserTable().cacheIterator();
-    List<String> allUsers = Lists.newArrayList();
+    /**
+     * @return list of all volumes.
+     * @throws IOException
+     */
+  private List<OmVolumeArgs> listAllVolumes(int maxKeys) throws IOException {
+    List<OmVolumeArgs> result = Lists.newArrayList();
 
-    // Get users from DB.
-    while (dbIterator.hasNext()) {
-      allUsers.add(dbIterator.next().getKey());
-    }
-    // Get users from Cache.
-    while (cacheIterator.hasNext()) {
-      Map.Entry<CacheKey<String>, CacheValue<UserVolumeInfo>> entry =
+    /* volumeTable is full-cache, so we use cacheIterator. */
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+        cacheIterator = getVolumeTable().cacheIterator();
+
+    while (cacheIterator.hasNext() && result.size() < maxKeys) {
+      Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry =
           cacheIterator.next();
-      allUsers.add(entry.getKey().getCacheKey());
+      result.add(entry.getValue().getCacheValue());
     }
 
-    return  allUsers;
+    return result;
   }
 
   private UserVolumeInfo getVolumesByUser(String userNameKey)

@@ -108,10 +108,9 @@ public class TestOmMetadataManager {
     String startKey = "";
 
     // Test list all volumes
-    List<OmVolumeArgs> volListA = omMetadataManager.listVolumes(null,
+    List<OmVolumeArgs> volList = omMetadataManager.listVolumes(null,
             prefix, startKey, 1000);
-    Assert.assertEquals(volListA.size(), 50);
-
+    Assert.assertEquals(volList.size(), 50);
   }
 
   @Test
