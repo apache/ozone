@@ -78,10 +78,10 @@ public class BasicOFileSystem extends FileSystem {
   private URI uri;
   private String userName;
   private Path workingDir;
-  private String omHost;
-  private int omPort;
-  private Configuration conf;
-  private boolean isolatedClassloader;
+  private String gOmHost;
+  private int gOmPort;
+  private Configuration gConf;
+  private boolean gIsolatedClassloader;
 
   private OzoneClientAdapter adapter;
   private String adapterPath;
@@ -106,18 +106,18 @@ public class BasicOFileSystem extends FileSystem {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
-    this.conf = conf;
-    omHost = null;
-    omPort = -1;
+    this.gConf = conf;
+    gOmHost = null;
+    gOmPort = -1;
     // Parse hostname and port
     String[] parts = authority.split(":");
     if (parts.length > 2) {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
-    omHost = parts[0];
+    gOmHost = parts[0];
     if (parts.length == 2) {
       try {
-        omPort = Integer.parseInt(parts[1]);
+        gOmPort = Integer.parseInt(parts[1]);
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
       }
@@ -137,7 +137,7 @@ public class BasicOFileSystem extends FileSystem {
 
       //Use string here instead of the constant as constant may not be available
       //on the classpath of a hadoop 2.7
-      isolatedClassloader =
+      gIsolatedClassloader =
           conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
 
       // adapter should be initialized in operations.
@@ -164,9 +164,9 @@ public class BasicOFileSystem extends FileSystem {
       throws IOException {
 
     adapterPath = ofsPath.getNonKeyParts();
-    return createAdapter(this.conf, ofsPath.getBucketName(),
-        ofsPath.getVolumeName(), this.omHost, this.omPort,
-        this.isolatedClassloader);
+    return createAdapter(this.gConf, ofsPath.getBucketName(),
+        ofsPath.getVolumeName(), this.gOmHost, this.gOmPort,
+        this.gIsolatedClassloader);
   }
 
   protected OzoneClientAdapter createAdapter(Configuration conf,
@@ -272,7 +272,9 @@ public class BasicOFileSystem extends FileSystem {
       // src and dst must share the same adapter.
       // Sanity check should have been done in caller.
       OFSPath ofsPath = new OFSPath(srcPath.toString());
-      if (adapter != null) adapter.close();
+      if (adapter != null) {
+        adapter.close();
+      }
       adapter = createAdapter(ofsPath);
       adapterPath = ofsPath.getNonKeyParts();
       srcKey = pathToKey(srcPath);
@@ -685,7 +687,7 @@ public class BasicOFileSystem extends FileSystem {
     private String mountName;
     private String keyName;
 
-    public OFSPath(String pathStr) {
+    OFSPath(String pathStr) {
       StringTokenizer token = new StringTokenizer(pathStr, OZONE_URI_DELIMITER);
       int numToken = token.countTokens();
       if (numToken > 0) {
@@ -701,9 +703,10 @@ public class BasicOFileSystem extends FileSystem {
           // Volume only.
           volumeName = firstToken;
         }
-      } else {
-        // TODO: Root.
       }
+//      else {
+//        // TODO: Root.
+//      }
 
       // Compose key name.
       if (token.hasMoreTokens()) {
@@ -893,7 +896,7 @@ public class BasicOFileSystem extends FileSystem {
         fileStatusAdapter.getOwner(),
         fileStatusAdapter.getGroup(),
         symLink,
-        // Without this, the path would look incorrect: ofs://localhost:51625/dir1
+        // Without this, the path would be incorrect: ofs://localhost:51625/dir1
         fileStatusAdapter.getPath()
     );
   }
@@ -907,11 +910,11 @@ public class BasicOFileSystem extends FileSystem {
     }
 
     // Process path. TODO: do this in a better way?
-    URI uri = fileStatusAdapter.getPath().toUri();
+    URI newUri = fileStatusAdapter.getPath().toUri();
     try {
-      uri = new URIBuilder().setScheme(uri.getScheme())
-          .setHost(uri.getAuthority())
-          .setPath(adapterPath + uri.getPath())
+      newUri = new URIBuilder().setScheme(newUri.getScheme())
+          .setHost(newUri.getAuthority())
+          .setPath(adapterPath + newUri.getPath())
           .build();
     } catch (URISyntaxException e) {
     }
@@ -927,8 +930,8 @@ public class BasicOFileSystem extends FileSystem {
         fileStatusAdapter.getOwner(),
         fileStatusAdapter.getGroup(),
         symLink,
-        // Without this, the path would look incorrect: ofs://localhost:51625/dir1
-        new Path(uri)
+        // Without this, the path would be incorrect: ofs://localhost:51625/dir1
+        new Path(newUri)
     );
   }
 }
