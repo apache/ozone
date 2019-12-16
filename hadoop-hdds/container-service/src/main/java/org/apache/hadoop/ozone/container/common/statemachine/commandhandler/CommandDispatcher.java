@@ -70,7 +70,7 @@ public final class CommandDispatcher {
     for (CommandHandler h : handlers) {
       if(handlerMap.containsKey(h.getCommandType())){
         LOG.error("Duplicate handler for the same command. Exiting. Handle " +
-            "key : { }", h.getCommandType().getDescriptorForType().getName());
+            "key : {}", h.getCommandType().getDescriptorForType().getName());
         throw new IllegalArgumentException("Duplicate handler for the same " +
             "command.");
       }

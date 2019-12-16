@@ -128,7 +128,7 @@ public class AuthorizationHeaderV4 {
     if (signature.startsWith(SIGNATURE)) {
       signature = signature.substring(SIGNATURE.length());
       if (!isNoneEmpty(signature)) {
-        LOG.error("Signature can't be empty.", signature);
+        LOG.error("Signature can't be empty: {}", signature);
         throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
       }
       try {
@@ -139,7 +139,7 @@ public class AuthorizationHeaderV4 {
         throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
       }
     } else {
-      LOG.error("Signature can't be empty.", signature);
+      LOG.error("No signature found: {}", signature);
       throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
     }
   }
@@ -170,7 +170,7 @@ public class AuthorizationHeaderV4 {
       throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
     }
     if (credentialObj.getAwsService().isEmpty()) {
-      LOG.error("AWS service:{} shouldn't be empty. credential:{}",
+      LOG.error("AWS service shouldn't be empty. credential:{}",
           credential);
       throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
     }
