@@ -80,11 +80,6 @@ public class NodeStateManager implements Runnable, Closeable {
     TIMEOUT, RESTORE, RESURRECT
   }
 
-  private enum NodeOperationStateEvent {
-    START_DECOMMISSION, COMPLETE_DECOMMISSION, START_MAINTENANCE,
-    ENTER_MAINTENANCE, RETURN_TO_SERVICE
-  }
-
   private static final Logger LOG = LoggerFactory
       .getLogger(NodeStateManager.class);
 
@@ -92,11 +87,6 @@ public class NodeStateManager implements Runnable, Closeable {
    * StateMachine for node lifecycle.
    */
   private final StateMachine<NodeState, NodeLifeCycleEvent> nodeHealthSM;
-  /**
-   * StateMachine for node operational state.
-   */
-  private final StateMachine<HddsProtos.NodeOperationalState,
-      NodeOperationStateEvent> nodeOpStateSM;
   /**
    * This is the map which maintains the current state of all datanodes.
    */
@@ -112,7 +102,7 @@ public class NodeStateManager implements Runnable, Closeable {
   /**
    * Maps the event to be triggered when a node state us updated.
    */
-  private final Map<NodeStatus, Event<DatanodeDetails>> state2EventMap;
+  private final Map<NodeState, Event<DatanodeDetails>> state2EventMap;
   /**
    * ExecutorService used for scheduling heartbeat processing thread.
    */
@@ -162,10 +152,7 @@ public class NodeStateManager implements Runnable, Closeable {
     this.state2EventMap = new HashMap<>();
     initialiseState2EventMap();
     Set<NodeState> finalStates = new HashSet<>();
-    Set<HddsProtos.NodeOperationalState> opStateFinalStates = new HashSet<>();
     this.nodeHealthSM = new StateMachine<>(NodeState.HEALTHY, finalStates);
-    this.nodeOpStateSM = new StateMachine<>(
-        NodeOperationalState.IN_SERVICE, opStateFinalStates);
     initializeStateMachines();
     heartbeatCheckerIntervalMs = HddsServerUtil
         .getScmheartbeatCheckerInterval(conf);
@@ -190,12 +177,10 @@ public class NodeStateManager implements Runnable, Closeable {
    * Populates state2event map.
    */
   private void initialiseState2EventMap() {
-    state2EventMap.put(NodeStatus.inServiceStale(), SCMEvents.STALE_NODE);
-    state2EventMap.put(NodeStatus.inServiceDead(), SCMEvents.DEAD_NODE);
-    state2EventMap.put(NodeStatus.inServiceHealthy(),
+    state2EventMap.put(NodeState.STALE, SCMEvents.STALE_NODE);
+    state2EventMap.put(NodeState.DEAD, SCMEvents.DEAD_NODE);
+    state2EventMap.put(NodeState.HEALTHY,
         SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE);
-    // TODO - add whatever events are needed for decomm / maint to stale, dead,
-    //        healthy
   }
 
   /*
@@ -238,36 +223,6 @@ public class NodeStateManager implements Runnable, Closeable {
         NodeState.STALE, NodeState.HEALTHY, NodeLifeCycleEvent.RESTORE);
     nodeHealthSM.addTransition(
         NodeState.DEAD, NodeState.HEALTHY, NodeLifeCycleEvent.RESURRECT);
-
-    nodeOpStateSM.addTransition(
-        NodeOperationalState.IN_SERVICE, NodeOperationalState.DECOMMISSIONING,
-        NodeOperationStateEvent.START_DECOMMISSION);
-    nodeOpStateSM.addTransition(
-        NodeOperationalState.DECOMMISSIONING, NodeOperationalState.IN_SERVICE,
-        NodeOperationStateEvent.RETURN_TO_SERVICE);
-    nodeOpStateSM.addTransition(
-        NodeOperationalState.DECOMMISSIONING,
-        NodeOperationalState.DECOMMISSIONED,
-        NodeOperationStateEvent.COMPLETE_DECOMMISSION);
-    nodeOpStateSM.addTransition(
-        NodeOperationalState.DECOMMISSIONED, NodeOperationalState.IN_SERVICE,
-        NodeOperationStateEvent.RETURN_TO_SERVICE);
-
-    nodeOpStateSM.addTransition(
-        NodeOperationalState.IN_SERVICE,
-        NodeOperationalState.ENTERING_MAINTENANCE,
-        NodeOperationStateEvent.START_MAINTENANCE);
-    nodeOpStateSM.addTransition(
-        NodeOperationalState.ENTERING_MAINTENANCE,
-        NodeOperationalState.IN_SERVICE,
-        NodeOperationStateEvent.RETURN_TO_SERVICE);
-    nodeOpStateSM.addTransition(
-        NodeOperationalState.ENTERING_MAINTENANCE,
-        NodeOperationalState.IN_MAINTENANCE,
-        NodeOperationStateEvent.ENTER_MAINTENANCE);
-    nodeOpStateSM.addTransition(
-        NodeOperationalState.IN_MAINTENANCE, NodeOperationalState.IN_SERVICE,
-        NodeOperationStateEvent.RETURN_TO_SERVICE);
   }
 
   /**
@@ -280,7 +235,7 @@ public class NodeStateManager implements Runnable, Closeable {
   public void addNode(DatanodeDetails datanodeDetails)
       throws NodeAlreadyExistsException {
     nodeStateMap.addNode(datanodeDetails, new NodeStatus(
-        nodeOpStateSM.getInitialState(), nodeHealthSM.getInitialState()));
+        NodeOperationalState.IN_SERVICE, nodeHealthSM.getInitialState()));
     eventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
   }
 
@@ -404,8 +359,18 @@ public class NodeStateManager implements Runnable, Closeable {
   public void setNodeOperationalState(DatanodeDetails dn,
       NodeOperationalState newState)  throws NodeNotFoundException {
     DatanodeInfo dni = nodeStateMap.getNodeInfo(dn.getUuid());
-    if (dni.getNodeStatus().getOperationalState() != newState) {
+    NodeStatus oldStatus = dni.getNodeStatus();
+    if (oldStatus.getOperationalState() != newState) {
       nodeStateMap.updateNodeOperationalState(dn.getUuid(), newState);
+      // This will trigger an event based on the nodes health when the
+      // operational state changes. Eg a node that was IN_MAINTENANCE goes
+      // to IN_SERVICE + HEALTHY. This will trigger the HEALTHY node event to
+      // create new pipelines. OTH, if the nodes goes IN_MAINTENANCE to
+      // IN_SERVICE + DEAD, it will trigger the dead node handler to remove its
+      // container replicas. Sometimes the event will do nothing, but it will
+      // not do any harm either. Eg DECOMMISSIONING -> DECOMMISSIONED + HEALTHY
+      // but the pipeline creation logic will ignore decommissioning nodes.
+      fireHealthStateEvent(oldStatus.getHealth(), dn);
     }
   }
 
@@ -706,14 +671,20 @@ public class NodeStateManager implements Runnable, Closeable {
             getNextState(status.getHealth(), lifeCycleEvent);
         NodeStatus newStatus =
             nodeStateMap.updateNodeHealthState(node.getUuid(), newHealthState);
-        if (state2EventMap.containsKey(newStatus)) {
-          eventPublisher.fireEvent(state2EventMap.get(newStatus), node);
-        }
+        fireHealthStateEvent(newStatus.getHealth(), node);
       }
     } catch (InvalidStateTransitionException e) {
       LOG.warn("Invalid state transition of node {}." +
               " Current state: {}, life cycle event: {}",
           node, status.getHealth(), lifeCycleEvent);
+    }
+  }
+
+  private void fireHealthStateEvent(HddsProtos.NodeState health,
+      DatanodeDetails node) {
+    Event<DatanodeDetails> event = state2EventMap.get(health);
+    if (event != null) {
+      eventPublisher.fireEvent(event, node);
     }
   }
 

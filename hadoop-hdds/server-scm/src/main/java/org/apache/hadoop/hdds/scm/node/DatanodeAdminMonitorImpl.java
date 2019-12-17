@@ -170,7 +170,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         LOG.warn("Failed processing the cancel admin request for {}",
             dn.getDatanodeDetails(), e);
       }
-      // TODO - fire event to bring node back into service?
     }
   }
 
@@ -320,8 +319,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       throws NodeNotFoundException {
     // The end state of Maintenance is to put the node back IN_SERVICE, whether
     // it is dead or not.
-    // TODO - if the node is dead do we trigger a dead node event here or leave
-    //        it to the heartbeat manager?
     LOG.info("Datanode {} has ended maintenance automatically",
         dn.getDatanodeDetails());
     putNodeBackInService(dn);
