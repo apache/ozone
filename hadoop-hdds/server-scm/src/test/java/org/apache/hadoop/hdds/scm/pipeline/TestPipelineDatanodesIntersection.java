@@ -28,6 +28,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -41,6 +43,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_C
  */
 @RunWith(Parameterized.class)
 public class TestPipelineDatanodesIntersection {
+  private static final Logger LOG = LoggerFactory
+      .getLogger(TestPipelineDatanodesIntersection.class.getName());
+
   private int nodeCount;
   private int nodeHeaviness;
   private OzoneConfiguration conf;
@@ -91,7 +96,7 @@ public class TestPipelineDatanodesIntersection {
             .checkPipelineContainSameDatanodes(stateManager, pipeline);
         if (overlapPipeline != null){
           intersectionCount++;
-          System.out.println("This pipeline: " + pipeline.getId().toString() +
+          LOG.info("This pipeline: " + pipeline.getId().toString() +
               " overlaps with previous pipeline: " + overlapPipeline.getId() +
               ". They share same set of datanodes as: " +
               pipeline.getNodesInOrder().get(0).getUuid() + "/" +
@@ -114,7 +119,7 @@ public class TestPipelineDatanodesIntersection {
 
     end = false;
 
-    System.out.println("Among total " +
+    LOG.info("Among total " +
         stateManager.getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE).size() + " created pipelines" +
         " with " + healthyNodeCount + " healthy datanodes and " +
