@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -79,7 +80,7 @@ public class ChunkManagerImpl implements ChunkManager {
    * @throws StorageContainerException
    */
   public void writeChunk(Container container, BlockID blockID, ChunkInfo info,
-      ByteBuffer data, DispatcherContext dispatcherContext)
+      ChunkBuffer data, DispatcherContext dispatcherContext)
       throws StorageContainerException {
     Preconditions.checkNotNull(dispatcherContext);
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
@@ -203,7 +204,7 @@ public class ChunkManagerImpl implements ChunkManager {
    * TODO: Right now we do not support partial reads and writes of chunks.
    * TODO: Explore if we need to do that for ozone.
    */
-  public ByteBuffer readChunk(Container container, BlockID blockID,
+  public ChunkBuffer readChunk(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
     KeyValueContainerData containerData = (KeyValueContainerData) container
@@ -234,7 +235,7 @@ public class ChunkManagerImpl implements ChunkManager {
           containerData.incrReadCount();
           long length = info.getLen();
           containerData.incrReadBytes(length);
-          return data;
+          return ChunkBuffer.wrap(data);
         } catch (StorageContainerException ex) {
           //UNABLE TO FIND chunk is not a problem as we will try with the
           //next possible location
