@@ -225,6 +225,20 @@ public class TestRatisPipelineCreateAndDestroy {
         count -> Assert.assertEquals(maxPipelinePerNode - 1, count.get()));
   }
 
+  @Test(timeout = 30000)
+  public void testMultiRaftPipelineWithSingleStorageDir() throws Exception {
+    int datanodeNum = 3;
+    // Create 3 RATIS THREE pipeline
+    init(datanodeNum);
+    // make sure a pipelines is created
+    waitForPipelines(datanodeNum);
+    List<Pipeline> pipelines =
+        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
+    Assert.assertEquals((datanodeNum * (maxPipelinePerNode - 1) /
+        HddsProtos.ReplicationFactor.THREE.getNumber()), pipelines.size());
+  }
+
   private void waitForPipelines(int numPipelines)
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
