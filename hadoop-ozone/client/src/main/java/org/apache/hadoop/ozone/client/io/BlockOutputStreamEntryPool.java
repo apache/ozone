@@ -18,8 +18,11 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ListIterator;
+
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -27,16 +30,18 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.ListIterator;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 /**
  * This class manages the stream entries list and handles block allocation
@@ -63,7 +68,7 @@ public class BlockOutputStreamEntryPool {
   private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
-  private ExcludeList excludeList;
+  private final ExcludeList excludeList;
 
   @SuppressWarnings("parameternumber")
   public BlockOutputStreamEntryPool(OzoneManagerProtocol omClient,
@@ -129,6 +134,7 @@ public class BlockOutputStreamEntryPool {
         .OZONE_CLIENT_BYTES_PER_CHECKSUM_DEFAULT_BYTES; // Default is 1MB
     currentStreamIndex = 0;
     openID = -1;
+    excludeList = new ExcludeList();
   }
 
   /**
@@ -254,7 +260,9 @@ public class BlockOutputStreamEntryPool {
    * @throws IOException
    */
   private void allocateNewBlock() throws IOException {
-    LOG.info("Allocating block with {}", excludeList);
+    if (!excludeList.isEmpty()) {
+      LOG.info("Allocating block with {}", excludeList);
+    }
     OmKeyLocationInfo subKeyInfo =
         omClient.allocateBlock(keyArgs, openID, excludeList);
     addKeyLocationInfo(subKeyInfo);
@@ -326,7 +334,6 @@ public class BlockOutputStreamEntryPool {
   void cleanup() {
     if (excludeList != null) {
       excludeList.clear();
-      excludeList = null;
     }
     if (bufferPool != null) {
       bufferPool.clearBufferPool();
