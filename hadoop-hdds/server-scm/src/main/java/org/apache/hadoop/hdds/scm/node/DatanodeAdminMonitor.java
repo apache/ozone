@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 public interface DatanodeAdminMonitor extends Runnable {
 
   void startMonitoring(DatanodeDetails dn, int endInHours);
-
   void stopMonitoring(DatanodeDetails dn);
 
 }

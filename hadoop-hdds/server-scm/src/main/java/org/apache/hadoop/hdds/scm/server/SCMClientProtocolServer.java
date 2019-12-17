@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -357,15 +358,19 @@ public class SCMClientProtocolServer implements
     }
 
     List<HddsProtos.Node> result = new ArrayList<>();
-    queryNode(opState, state)
-        .forEach(node -> {
-          NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-          result.add(HddsProtos.Node.newBuilder()
-              .setNodeID(node.getProtoBufMessage())
-              .addNodeStates(ns.getHealth())
-              .addNodeOperationalStates(ns.getOperationalState())
-              .build());
-        });
+    for (DatanodeDetails node : queryNode(opState, state)) {
+      try {
+        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
+        result.add(HddsProtos.Node.newBuilder()
+            .setNodeID(node.getProtoBufMessage())
+            .addNodeStates(ns.getHealth())
+            .addNodeOperationalStates(ns.getOperationalState())
+            .build());
+      } catch (NodeNotFoundException e) {
+        throw new IOException(
+            "An unexpected error occurred querying the NodeStatus", e);
+      }
+    }
     return result;
   }
 

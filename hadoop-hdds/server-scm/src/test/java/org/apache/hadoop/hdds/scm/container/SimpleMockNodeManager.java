@@ -87,7 +87,8 @@ public class SimpleMockNodeManager implements NodeManager {
    *         Inservice and Healthy NodeStatus.
    */
   @Override
-  public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails) {
+  public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
     DatanodeInfo dni = nodeMap.get(datanodeDetails.getUuid());
     if (dni != null) {
       return dni.getNodeStatus();

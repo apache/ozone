@@ -331,11 +331,7 @@ public class NodeDecommissionManager {
 
   private NodeStatus getNodeStatus(DatanodeDetails dn)
       throws NodeNotFoundException {
-    NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
-    if (nodeStatus == null) {
-      throw new NodeNotFoundException();
-    }
-    return nodeStatus;
+    return nodeManager.getNodeStatus(dn);
   }
 
 }
