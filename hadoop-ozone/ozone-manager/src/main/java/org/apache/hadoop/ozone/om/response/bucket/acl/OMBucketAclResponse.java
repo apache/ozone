@@ -47,9 +47,8 @@ public class OMBucketAclResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // If response status is OK and success is true, add to DB batch.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK &&
-        getOMResponse().getSuccess()) {
+    // If response is a success, add to DB batch.
+    if (getOMResponse().getSuccess()) {
       String dbBucketKey =
           omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
               omBucketInfo.getBucketName());

@@ -59,19 +59,15 @@ public class S3BucketCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      if (omVolumeCreateResponse != null) {
-        omVolumeCreateResponse.checkAndUpdateDB(omMetadataManager,
-            batchOperation);
-      }
-
-      Preconditions.checkState(omBucketCreateResponse != null);
-      omBucketCreateResponse.checkAndUpdateDB(omMetadataManager,
-          batchOperation);
-
-      omMetadataManager.getS3Table().putWithBatch(batchOperation, s3Bucket,
-          s3Mapping);
+    if (omVolumeCreateResponse != null) {
+      omVolumeCreateResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
     }
+
+    Preconditions.checkState(omBucketCreateResponse != null);
+    omBucketCreateResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+
+    omMetadataManager.getS3Table().putWithBatch(batchOperation, s3Bucket,
+        s3Mapping);
   }
 
   @VisibleForTesting

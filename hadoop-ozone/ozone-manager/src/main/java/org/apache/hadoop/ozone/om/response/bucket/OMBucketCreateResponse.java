@@ -48,15 +48,11 @@ public final class OMBucketCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String dbBucketKey =
-          omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
-              omBucketInfo.getBucketName());
-      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-          dbBucketKey, omBucketInfo);
-    }
+    String dbBucketKey =
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+            omBucketInfo.getBucketName());
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        dbBucketKey, omBucketInfo);
   }
 
   @Nullable

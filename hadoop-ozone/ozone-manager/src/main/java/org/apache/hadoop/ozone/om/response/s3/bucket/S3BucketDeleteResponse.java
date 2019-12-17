@@ -45,11 +45,9 @@ public class S3BucketDeleteResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      omMetadataManager.getBucketTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getBucketKey(volumeName, s3BucketName));
-      omMetadataManager.getS3Table().deleteWithBatch(batchOperation,
-          s3BucketName);
-    }
+    omMetadataManager.getBucketTable().deleteWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(volumeName, s3BucketName));
+    omMetadataManager.getS3Table().deleteWithBatch(batchOperation,
+        s3BucketName);
   }
 }
