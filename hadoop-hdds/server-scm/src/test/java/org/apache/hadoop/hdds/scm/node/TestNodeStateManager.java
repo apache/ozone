@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.Event;
@@ -145,7 +146,7 @@ public class TestNodeStateManager {
 
     DatanodeDetails dn = generateDatanode();
     nsm.addNode(dn);
-    assertEquals("New_Node", eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.NEW_NODE, eventPublisher.getLastEvent());
     DatanodeInfo dni = nsm.getNode(dn);
     dni.updateLastHeartbeatTime();
 
@@ -159,31 +160,31 @@ public class TestNodeStateManager {
     dni.updateLastHeartbeatTime(now - staleLimit);
     nsm.checkNodesHealth();
     assertEquals(NodeState.STALE, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("Stale_Node", eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.STALE_NODE, eventPublisher.getLastEvent());
 
     // Now make it dead
     dni.updateLastHeartbeatTime(now - deadLimit);
     nsm.checkNodesHealth();
     assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("Dead_Node", eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
 
     // Transition back to healthy from dead
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("NON_HEALTHY_TO_HEALTHY_NODE",
-        eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
+        eventPublisher.getLastEvent());
 
     // Make the node stale again, and transition to healthy.
     dni.updateLastHeartbeatTime(now - staleLimit);
     nsm.checkNodesHealth();
     assertEquals(NodeState.STALE, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("Stale_Node", eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.STALE_NODE, eventPublisher.getLastEvent());
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("NON_HEALTHY_TO_HEALTHY_NODE",
-        eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
+        eventPublisher.getLastEvent());
   }
 
   @Test
@@ -200,6 +201,56 @@ public class TestNodeStateManager {
         newStatus.getOperationalState());
     assertEquals(NodeState.HEALTHY,
         newStatus.getHealth());
+  }
+
+  @Test
+  public void testHealthEventsFiredWhenOpStateChanged()
+      throws NodeAlreadyExistsException, NodeNotFoundException {
+    DatanodeDetails dn = generateDatanode();
+    nsm.addNode(dn);
+
+    // First set the node to decommissioned, then run through all op states in
+    // order and ensure the non_healthy_to_healthy event gets fired
+    nsm.setNodeOperationalState(dn,
+        HddsProtos.NodeOperationalState.DECOMMISSIONED);
+    for (HddsProtos.NodeOperationalState s :
+        HddsProtos.NodeOperationalState.values()) {
+      eventPublisher.clearEvents();
+      nsm.setNodeOperationalState(dn, s);
+      assertEquals(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
+          eventPublisher.getLastEvent());
+    }
+
+    // Now make the node stale and run through all states again ensuring the
+    // stale event gets fired
+    long now = Time.monotonicNow();
+    long staleLimit = HddsServerUtil.getStaleNodeInterval(conf) + 1000;
+    long deadLimit = HddsServerUtil.getDeadNodeInterval(conf) + 1000;
+    DatanodeInfo dni = nsm.getNode(dn);
+    dni.updateLastHeartbeatTime(now - staleLimit);
+    nsm.checkNodesHealth();
+    assertEquals(NodeState.STALE, nsm.getNodeStatus(dn).getHealth());
+    nsm.setNodeOperationalState(dn,
+        HddsProtos.NodeOperationalState.DECOMMISSIONED);
+    for (HddsProtos.NodeOperationalState s :
+        HddsProtos.NodeOperationalState.values()) {
+      eventPublisher.clearEvents();
+      nsm.setNodeOperationalState(dn, s);
+      assertEquals(SCMEvents.STALE_NODE, eventPublisher.getLastEvent());
+    }
+
+    // Finally make the node dead and run through all the op states again
+    dni.updateLastHeartbeatTime(now - deadLimit);
+    nsm.checkNodesHealth();
+    assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
+    nsm.setNodeOperationalState(dn,
+        HddsProtos.NodeOperationalState.DECOMMISSIONED);
+    for (HddsProtos.NodeOperationalState s :
+        HddsProtos.NodeOperationalState.values()) {
+      eventPublisher.clearEvents();
+      nsm.setNodeOperationalState(dn, s);
+      assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
+    }
   }
 
   private DatanodeDetails generateDatanode() {
