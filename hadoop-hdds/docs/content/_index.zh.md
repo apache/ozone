@@ -22,7 +22,7 @@ weight: -10
 
 # Apache Hadoop Ozone
 
-<img src="ozone-usage.png" style="max-width: 60%;"/>
+{{<figure src="/ozone-usage.png" width="60%">}}
 
 *_Ozone 是 Hadoop 的分布式对象存储系统，具有易扩展和冗余存储的特点。<p>
 Ozone 不仅能存储数十亿个不同大小的对象，还支持在容器化环境（比如 Kubernetes）中运行。_* <p>
