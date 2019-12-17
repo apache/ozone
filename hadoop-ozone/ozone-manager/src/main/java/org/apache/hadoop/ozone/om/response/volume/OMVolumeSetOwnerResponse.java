@@ -56,26 +56,22 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String oldOwnerKey = omMetadataManager.getUserKey(oldOwner);
-      String newOwnerKey =
-          omMetadataManager.getUserKey(newOwnerVolumeArgs.getOwnerName());
-      if (oldOwnerVolumeList.getVolumeNamesList().size() == 0) {
-        omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
-            oldOwnerKey);
-      } else {
-        omMetadataManager.getUserTable().putWithBatch(batchOperation,
-            oldOwnerKey, oldOwnerVolumeList);
-      }
-      omMetadataManager.getUserTable().putWithBatch(batchOperation, newOwnerKey,
-          newOwnerVolumeList);
-
-      String dbVolumeKey =
-          omMetadataManager.getVolumeKey(newOwnerVolumeArgs.getVolume());
-      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          dbVolumeKey, newOwnerVolumeArgs);
+    String oldOwnerKey = omMetadataManager.getUserKey(oldOwner);
+    String newOwnerKey =
+        omMetadataManager.getUserKey(newOwnerVolumeArgs.getOwnerName());
+    if (oldOwnerVolumeList.getVolumeNamesList().size() == 0) {
+      omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
+          oldOwnerKey);
+    } else {
+      omMetadataManager.getUserTable().putWithBatch(batchOperation,
+          oldOwnerKey, oldOwnerVolumeList);
     }
+    omMetadataManager.getUserTable().putWithBatch(batchOperation, newOwnerKey,
+        newOwnerVolumeList);
+
+    String dbVolumeKey =
+        omMetadataManager.getVolumeKey(newOwnerVolumeArgs.getVolume());
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        dbVolumeKey, newOwnerVolumeArgs);
   }
 }

@@ -51,19 +51,15 @@ public class OMVolumeCreateResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String dbVolumeKey =
-          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume());
-      String dbUserKey =
-          omMetadataManager.getUserKey(omVolumeArgs.getOwnerName());
+    String dbVolumeKey =
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume());
+    String dbUserKey =
+        omMetadataManager.getUserKey(omVolumeArgs.getOwnerName());
 
-      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          dbVolumeKey, omVolumeArgs);
-      omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
-          userVolumeInfo);
-    }
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        dbVolumeKey, omVolumeArgs);
+    omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
+        userVolumeInfo);
   }
 
   @VisibleForTesting

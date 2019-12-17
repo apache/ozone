@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -38,6 +39,21 @@ public abstract class OMClientResponse {
   public OMClientResponse(OMResponse omResponse) {
     Preconditions.checkNotNull(omResponse);
     this.omResponse = omResponse;
+  }
+
+  /**
+   * Check if omResponse status is OK. If yes, add to DB.
+   * For OmResponse with failure, this should do nothing. This method is not
+   * called in failure scenario in OM code.
+   * @param omMetadataManager
+   * @param batchOperation
+   * @throws IOException
+   */
+  public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    if (omResponse.getStatus() == OzoneManagerProtocolProtos.Status.OK) {
+      addToDBBatch(omMetadataManager, batchOperation);
+    }
   }
 
   /**
