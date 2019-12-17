@@ -22,7 +22,9 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Function;
@@ -77,6 +79,11 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
         return duplicated;
       }
     };
+  }
+
+  @Override
+  public List<ByteBuffer> asByteBufferList() {
+    return Collections.singletonList(buffer);
   }
 
   @Override
