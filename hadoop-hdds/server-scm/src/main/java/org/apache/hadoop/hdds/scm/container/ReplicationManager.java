@@ -42,6 +42,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -544,7 +546,7 @@ public class ReplicationManager implements MetricsSource {
           // maintenance nodes, as the replicas will remain present in the
           // container manager, even when they go dead.
           .filter(r ->
-              nodeManager.getNodeStatus(r.getDatanodeDetails()).isHealthy())
+              getNodeStatus(r.getDatanodeDetails()).isHealthy())
           .filter(r -> !deletionInFlight.contains(r.getDatanodeDetails()))
           .sorted((r1, r2) -> r2.getSequenceId().compareTo(r1.getSequenceId()))
           .map(ContainerReplica::getDatanodeDetails)
@@ -574,7 +576,7 @@ public class ReplicationManager implements MetricsSource {
         LOG.warn("Cannot replicate container {}, no healthy replica found.",
             container.containerID());
       }
-    } catch (IOException ex) {
+    } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while replicating container {}.",
           container.getContainerID(), ex);
     }
@@ -783,6 +785,20 @@ public class ReplicationManager implements MetricsSource {
         new CommandForDatanode<>(datanode.getUuid(), command);
     eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
     tracker.accept(new InflightAction(datanode, Time.monotonicNow()));
+  }
+
+  /**
+   * Wrap the call to nodeManager.getNodeStatus, catching any
+   * NodeNotFoundException and instead throwing an IllegalStateException.
+   * @param dn The datanodeDetails to obtain the NodeStatus for
+   * @return NodeStatus corresponding to the given Datanode.
+   */
+  private NodeStatus getNodeStatus(DatanodeDetails dn) {
+    try {
+      return nodeManager.getNodeStatus(dn);
+    } catch (NodeNotFoundException e) {
+      throw new IllegalStateException("Unable to find NodeStatus for "+dn, e);
+    }
   }
 
   /**

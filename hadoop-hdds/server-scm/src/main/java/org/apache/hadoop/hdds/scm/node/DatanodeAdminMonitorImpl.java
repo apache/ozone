@@ -360,16 +360,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     nodeManager.setNodeOperationalState(dn.getDatanodeDetails(), state);
   }
 
-  // TODO - The nodeManager.getNodeStatus call should really throw
-  //        NodeNotFoundException rather than having to handle it here as all
-  //        registered nodes must have a status.
   private NodeStatus getNodeStatus(DatanodeDetails dnd)
       throws NodeNotFoundException {
-    NodeStatus nodeStatus = nodeManager.getNodeStatus(dnd);
-    if (nodeStatus == null) {
-      throw new NodeNotFoundException("Unable to retrieve the nodeStatus");
-    }
-    return nodeStatus;
+    return nodeManager.getNodeStatus(dnd);
   }
 
 }

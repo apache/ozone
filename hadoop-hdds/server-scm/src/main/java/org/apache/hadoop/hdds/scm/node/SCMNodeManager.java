@@ -218,13 +218,9 @@ public class SCMNodeManager implements NodeManager {
    * @return NodeStatus for the node
    */
   @Override
-  public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails) {
-    try {
-      return nodeStateManager.getNodeStatus(datanodeDetails);
-    } catch (NodeNotFoundException e) {
-      // TODO: should we throw NodeNotFoundException?
-      return null;
-    }
+  public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    return nodeStateManager.getNodeStatus(datanodeDetails);
   }
 
   /**

@@ -128,8 +128,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * Returns the node status of a specific node.
    * @param datanodeDetails DatanodeDetails
    * @return NodeStatus for the node
+   * @throws NodeNotFoundException if the node does not exist
    */
-  NodeStatus getNodeStatus(DatanodeDetails datanodeDetails);
+  NodeStatus getNodeStatus(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException;
 
   /**
    * Set the operation state of a node.
