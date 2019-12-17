@@ -92,13 +92,10 @@ public class TestRecon {
   private static CloseableHttpClient httpClient;
   private static ReconUtils reconUtils;
   private static long pauseInterval;
-  private String reconHTTPAddress = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
-  private String containerKeyServiceURL = "http://" + reconHTTPAddress
-      + "/api/containers";
-  private String fileSizeCountURL = "http://" + reconHTTPAddress
-      + "/api/utilization";
-  private String taskStatusURL = "http://" + reconHTTPAddress
-      + "/api/task/status";
+  private static String reconHTTPAddress;
+  private static String containerKeyServiceURL;
+  private static String fileSizeCountURL;
+  private static String taskStatusURL;
 
   @BeforeClass
   public static void init() throws Exception {
@@ -122,13 +119,20 @@ public class TestRecon {
         .setConnectionRequestTimeout(connectionTimeout)
         .setSocketTimeout(connectionRequestTimeout).build();
 
+    reconHTTPAddress = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
+    containerKeyServiceURL = "http://" + reconHTTPAddress
+        + "/api/containers";
+    fileSizeCountURL = "http://" + reconHTTPAddress
+        + "/api/utilization";
+    taskStatusURL = "http://" + reconHTTPAddress
+        + "/api/task/status";
+
     cluster =  MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     metadataManager = cluster.getOzoneManager().getMetadataManager();
 
     cluster.getStorageContainerManager().exitSafeMode();
-    reconUtils = cluster.getReconServer().getInjector().getInstance(
-        ReconUtils.class);
+    reconUtils = new ReconUtils();
 
     // initialize HTTPClient
     httpClient = HttpClientBuilder
@@ -137,8 +141,8 @@ public class TestRecon {
         .build();
 
     pauseInterval = conf.getTimeDuration(
-        conf.get(RECON_OM_SNAPSHOT_TASK_INTERVAL),
-        conf.get(RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
+        RECON_OM_SNAPSHOT_TASK_INTERVAL,
+        RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
   }
 
@@ -211,6 +215,8 @@ public class TestRecon {
     ArrayList containers = (ArrayList) linkedTreeMap.get("containers");
     LinkedTreeMap nestedContainerMap = (LinkedTreeMap)containers.get(0);
     Assert.assertEquals(1.0, nestedContainerMap.get("NumberOfKeys"));
+    Assert.assertEquals(0, (long)(double)
+        nestedContainerMap.get("ContainerID"));
 
     // HTTP call to /api/task/status
     long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
@@ -246,6 +252,8 @@ public class TestRecon {
     containers = (ArrayList) linkedTreeMap.get("containers");
     nestedContainerMap = (LinkedTreeMap)containers.get(3);
     Assert.assertEquals(1.0, nestedContainerMap.get("NumberOfKeys"));
+    Assert.assertEquals(3, (long)(double)
+        nestedContainerMap.get("ContainerID"));
 
     // HTTP call to /api/task/status
     omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
@@ -290,6 +298,8 @@ public class TestRecon {
     containers = (ArrayList) linkedTreeMap.get("containers");
     nestedContainerMap = (LinkedTreeMap)containers.get(7);
     Assert.assertEquals(1.0, nestedContainerMap.get("NumberOfKeys"));
+    Assert.assertEquals(7, (long)(double)
+        nestedContainerMap.get("ContainerID"));
 
     // HTTP call to /api/task/status
     omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
@@ -322,7 +332,7 @@ public class TestRecon {
   }
 
   private void addKeys(int start, int end) throws Exception {
-    for(int i=start; i < end; i++) {
+    for(int i = start; i < end; i++) {
       Pipeline pipeline = getRandomPipeline();
       List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
       BlockID blockID1 = new BlockID(i, 1);

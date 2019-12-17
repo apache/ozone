@@ -87,9 +87,10 @@ import static org.apache.hadoop.ozone.recon.
 import static org.apache.hadoop.ozone.recon.
     ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL;
 import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
+    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY;
+
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
  * running tests.  The cluster consists of a OzoneManager,
@@ -127,7 +128,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   /**
-   * Creates a new MiniOzoneCluster.
+   * Creates a new MiniOzoneCluster with Recon.
    *
    * @throws IOException if there is an I/O error
    */
@@ -516,7 +517,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         reconServer = new ReconServer();
 
         hddsDatanodes = createHddsDatanodes(scm);
-        //reconServer.run(new String[]{});
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf, om, scm,
             hddsDatanodes, reconServer);
@@ -771,8 +771,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:"+
           tempNewFolder.getAbsolutePath()+"/ozone_recon_sqlite.db");
 
-      conf.set(RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT, "2s");
-      conf.set(RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT, "10s");
+      conf.set(RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY, "2s");
+      conf.set(RECON_OM_SNAPSHOT_TASK_INTERVAL, "10s");
     }
   }
 }

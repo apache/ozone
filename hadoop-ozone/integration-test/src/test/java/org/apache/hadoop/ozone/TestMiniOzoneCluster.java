@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
@@ -95,17 +94,6 @@ public class TestMiniOzoneCluster {
     FileUtils.deleteQuietly(WRITE_TMP);
     FileUtils.deleteQuietly(READ_TMP);
   }
-
-  @Test
-  public void testUpdatesFromOzoneManagerForRecon()
-      throws IOException, TimeoutException, InterruptedException {
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1)
-        .build();
-    cluster.waitForClusterToBeReady();
-  }
-
-
 
   @Test(timeout = 30000)
   public void testStartMultipleDatanodes() throws Exception {

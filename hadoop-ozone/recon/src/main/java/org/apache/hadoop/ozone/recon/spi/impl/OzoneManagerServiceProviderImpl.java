@@ -205,12 +205,12 @@ public class OzoneManagerServiceProviderImpl
       LOG.error("Error staring Recon OM Metadata Manager.", ioEx);
     }
     long initialDelay = configuration.getTimeDuration(
-        configuration.get(RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY),
-        configuration.get(RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT),
+        RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
+        RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
         TimeUnit.MILLISECONDS);
     long interval = configuration.getTimeDuration(
-        configuration.get(RECON_OM_SNAPSHOT_TASK_INTERVAL),
-        configuration.get(RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
+        RECON_OM_SNAPSHOT_TASK_INTERVAL,
+        RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     scheduler.scheduleWithFixedDelay(this::syncDataFromOM,
         initialDelay,
