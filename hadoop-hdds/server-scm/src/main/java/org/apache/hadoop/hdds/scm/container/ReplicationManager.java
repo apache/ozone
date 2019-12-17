@@ -576,7 +576,7 @@ public class ReplicationManager implements MetricsSource {
         LOG.warn("Cannot replicate container {}, no healthy replica found.",
             container.containerID());
       }
-    } catch (IOException | RuntimeException ex) {
+    } catch (IOException | IllegalStateException ex) {
       LOG.warn("Exception while replicating container {}.",
           container.getContainerID(), ex);
     }
@@ -789,7 +789,7 @@ public class ReplicationManager implements MetricsSource {
 
   /**
    * Wrap the call to nodeManager.getNodeStatus, catching any
-   * NodeNotFoundException and instead throwing a RuntimeException.
+   * NodeNotFoundException and instead throwing an IllegalStateException.
    * @param dn The datanodeDetails to obtain the NodeStatus for
    * @return NodeStatus corresponding to the given Datanode.
    */
@@ -797,7 +797,7 @@ public class ReplicationManager implements MetricsSource {
     try {
       return nodeManager.getNodeStatus(dn);
     } catch (NodeNotFoundException e) {
-      throw new RuntimeException("Unable to find NodeStatus for "+dn, e);
+      throw new IllegalStateException("Unable to find NodeStatus for "+dn, e);
     }
   }
 
