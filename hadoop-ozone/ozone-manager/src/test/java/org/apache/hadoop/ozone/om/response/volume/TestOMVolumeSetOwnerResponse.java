@@ -140,7 +140,7 @@ public class TestOMVolumeSetOwnerResponse {
         .build();
 
     OMVolumeSetOwnerResponse omVolumeSetOwnerResponse =
-        new OMVolumeSetOwnerResponse(null, null, null, null, omResponse);
+        new OMVolumeSetOwnerResponse(omResponse);
 
     try {
       omVolumeSetOwnerResponse.addToDBBatch(omMetadataManager, batchOperation);

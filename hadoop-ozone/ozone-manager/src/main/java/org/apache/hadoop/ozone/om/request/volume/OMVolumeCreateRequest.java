@@ -132,7 +132,10 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         }
       }
 
-      UserVolumeInfo volumeList = null;
+      // A replay transaction for CreateVolume can reach here only if the
+      // volume has been deleted in later transactions. Hence, we can
+      // continue with this request irrespective of whether it is a replay or
+      // not.
 
       // acquire lock.
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
@@ -146,6 +149,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       OmVolumeArgs dbVolumeArgs =
           omMetadataManager.getVolumeTable().get(dbVolumeKey);
 
+      UserVolumeInfo volumeList = null;
       if (dbVolumeArgs == null) {
         String dbUserKey = omMetadataManager.getUserKey(owner);
         volumeList = omMetadataManager.getUserTable().get(dbUserKey);

@@ -36,10 +36,14 @@ import javax.annotation.Nonnull;
 public class OMVolumeSetQuotaResponse extends OMClientResponse {
   private OmVolumeArgs omVolumeArgs;
 
-  public OMVolumeSetQuotaResponse(OmVolumeArgs omVolumeArgs,
-      @Nonnull OMResponse omResponse) {
+  public OMVolumeSetQuotaResponse(@Nonnull OMResponse omResponse,
+      OmVolumeArgs omVolumeArgs) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
+  }
+
+  public OMVolumeSetQuotaResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
   }
 
   @Override

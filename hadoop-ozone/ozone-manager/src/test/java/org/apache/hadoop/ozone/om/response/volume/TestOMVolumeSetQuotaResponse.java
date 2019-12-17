@@ -79,7 +79,7 @@ public class TestOMVolumeSetQuotaResponse {
         .setOwnerName(userName).setAdminName(userName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
     OMVolumeSetQuotaResponse omVolumeSetQuotaResponse =
-        new OMVolumeSetQuotaResponse(omVolumeArgs, omResponse);
+        new OMVolumeSetQuotaResponse(omResponse, omVolumeArgs);
 
     omVolumeSetQuotaResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -109,7 +109,7 @@ public class TestOMVolumeSetQuotaResponse {
         .build();
 
     OMVolumeSetQuotaResponse omVolumeSetQuotaResponse =
-        new OMVolumeSetQuotaResponse(null, omResponse);
+        new OMVolumeSetQuotaResponse(omResponse);
 
     try {
       omVolumeSetQuotaResponse.addToDBBatch(omMetadataManager, batchOperation);

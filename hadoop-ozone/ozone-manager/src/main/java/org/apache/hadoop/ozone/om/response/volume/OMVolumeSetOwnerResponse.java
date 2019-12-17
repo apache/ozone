@@ -53,6 +53,10 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
     this.newOwnerVolumeArgs = newOwnerVolumeArgs;
   }
 
+  public OMVolumeSetOwnerResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+  }
+
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 

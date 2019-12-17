@@ -39,12 +39,16 @@ public class OMVolumeDeleteResponse extends OMClientResponse {
   private String owner;
   private UserVolumeInfo updatedVolumeList;
 
-  public OMVolumeDeleteResponse(String volume, String owner,
-      UserVolumeInfo updatedVolumeList, @Nonnull OMResponse omResponse) {
+  public OMVolumeDeleteResponse(@Nonnull OMResponse omResponse,
+      String volume, String owner, UserVolumeInfo updatedVolumeList) {
     super(omResponse);
     this.volume = volume;
     this.owner = owner;
     this.updatedVolumeList = updatedVolumeList;
+  }
+
+  public OMVolumeDeleteResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
   }
 
   @Override
