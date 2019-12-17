@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import java.io.IOException;
 
 import javax.annotation.Nonnull;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Response for set quota request.
@@ -42,8 +43,14 @@ public class OMVolumeSetQuotaResponse extends OMClientResponse {
     this.omVolumeArgs = omVolumeArgs;
   }
 
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
   public OMVolumeSetQuotaResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
+    Preconditions.assertTrue(!omResponse.getStatus().equals(
+        OzoneManagerProtocolProtos.Status.OK));
   }
 
   @Override

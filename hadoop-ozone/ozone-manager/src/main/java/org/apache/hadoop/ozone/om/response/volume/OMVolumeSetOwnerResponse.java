@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Response for set owner request.
@@ -53,8 +54,14 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
     this.newOwnerVolumeArgs = newOwnerVolumeArgs;
   }
 
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
   public OMVolumeSetOwnerResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
+    Preconditions.assertTrue(!omResponse.getStatus().equals(
+        OzoneManagerProtocolProtos.Status.OK));
   }
 
   public void addToDBBatch(OMMetadataManager omMetadataManager,
