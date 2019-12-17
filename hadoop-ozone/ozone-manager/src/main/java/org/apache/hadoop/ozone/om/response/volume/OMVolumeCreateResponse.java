@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVol
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Response for CreateBucket request.
@@ -47,6 +48,17 @@ public class OMVolumeCreateResponse extends OMClientResponse {
     this.omVolumeArgs = omVolumeArgs;
     this.userVolumeInfo = userVolumeInfo;
   }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMVolumeCreateResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    Preconditions.assertTrue(!omResponse.getStatus().equals(
+        OzoneManagerProtocolProtos.Status.OK));
+  }
+
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {

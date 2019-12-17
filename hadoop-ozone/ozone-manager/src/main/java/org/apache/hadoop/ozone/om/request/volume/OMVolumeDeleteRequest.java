@@ -104,6 +104,8 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       // the client. So take no further action and return a dummy
       // OMClientResponse.
       if (isReplay(omVolumeArgs.getUpdateID(), transactionLogIndex)) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}",
+            transactionLogIndex, deleteVolumeRequest);
         return new OMVolumeDeleteResponse(createReplayOMResponse(omResponse));
       }
 

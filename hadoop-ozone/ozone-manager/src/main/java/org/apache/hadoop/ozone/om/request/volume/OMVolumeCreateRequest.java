@@ -164,9 +164,19 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
             omResponse.build());
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
       } else {
-        LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
-        throw new OMException("Volume already exists",
-            OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
+        // Check if this transaction is a replay of ratis logs.
+        if (isReplay(dbVolumeArgs.getUpdateID(), transactionLogIndex)) {
+          // Replay implies the response has already been returned to
+          // the client. So take no further action and return a dummy
+          // OMClientResponse.
+          LOG.debug("Replayed Transaction {} ignored. Request: {}",
+              transactionLogIndex, createVolumeRequest);
+          return new OMVolumeCreateResponse(createReplayOMResponse(omResponse));
+        } else {
+          LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
+          throw new OMException("Volume already exists",
+              OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
+        }
       }
 
     } catch (IOException ex) {

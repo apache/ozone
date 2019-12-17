@@ -125,6 +125,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       // the client. So take no further action and return a dummy
       // OMClientResponse.
       if (isReplay(omVolumeArgs.getUpdateID(), transactionLogIndex)) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}",
+            transactionLogIndex, setVolumePropertyRequest);
         return new OMVolumeSetQuotaResponse(createReplayOMResponse(omResponse));
       }
 
