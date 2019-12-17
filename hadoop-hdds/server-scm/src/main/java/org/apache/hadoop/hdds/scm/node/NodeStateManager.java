@@ -80,11 +80,6 @@ public class NodeStateManager implements Runnable, Closeable {
     TIMEOUT, RESTORE, RESURRECT
   }
 
-  private enum NodeOperationStateEvent {
-    START_DECOMMISSION, COMPLETE_DECOMMISSION, START_MAINTENANCE,
-    ENTER_MAINTENANCE, RETURN_TO_SERVICE
-  }
-
   private static final Logger LOG = LoggerFactory
       .getLogger(NodeStateManager.class);
 

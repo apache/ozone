@@ -58,7 +58,11 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.*;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Test;
+import org.junit.Assert;
+import org.junit.After;
 import org.mockito.Mockito;
 
 /**

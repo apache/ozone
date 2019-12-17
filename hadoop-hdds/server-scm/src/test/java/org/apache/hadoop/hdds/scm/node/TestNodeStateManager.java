@@ -23,6 +23,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.Event;
@@ -145,7 +146,7 @@ public class TestNodeStateManager {
 
     DatanodeDetails dn = generateDatanode();
     nsm.addNode(dn);
-    assertEquals("New_Node", eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.NEW_NODE, eventPublisher.getLastEvent());
     DatanodeInfo dni = nsm.getNode(dn);
     dni.updateLastHeartbeatTime();
 
@@ -159,31 +160,31 @@ public class TestNodeStateManager {
     dni.updateLastHeartbeatTime(now - staleLimit);
     nsm.checkNodesHealth();
     assertEquals(NodeState.STALE, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("Stale_Node", eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.STALE_NODE, eventPublisher.getLastEvent());
 
     // Now make it dead
     dni.updateLastHeartbeatTime(now - deadLimit);
     nsm.checkNodesHealth();
     assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("Dead_Node", eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
 
     // Transition back to healthy from dead
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("NON_HEALTHY_TO_HEALTHY_NODE",
-        eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
+        eventPublisher.getLastEvent());
 
     // Make the node stale again, and transition to healthy.
     dni.updateLastHeartbeatTime(now - staleLimit);
     nsm.checkNodesHealth();
     assertEquals(NodeState.STALE, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("Stale_Node", eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.STALE_NODE, eventPublisher.getLastEvent());
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals("NON_HEALTHY_TO_HEALTHY_NODE",
-        eventPublisher.getLastEvent().getName());
+    assertEquals(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
+        eventPublisher.getLastEvent());
   }
 
   @Test
@@ -216,8 +217,8 @@ public class TestNodeStateManager {
         HddsProtos.NodeOperationalState.values()) {
       eventPublisher.clearEvents();
       nsm.setNodeOperationalState(dn, s);
-      assertEquals("NON_HEALTHY_TO_HEALTHY_NODE",
-          eventPublisher.getLastEvent().getName());
+      assertEquals(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
+          eventPublisher.getLastEvent());
     }
 
     // Now make the node stale and run through all states again ensuring the
@@ -235,8 +236,7 @@ public class TestNodeStateManager {
         HddsProtos.NodeOperationalState.values()) {
       eventPublisher.clearEvents();
       nsm.setNodeOperationalState(dn, s);
-      assertEquals("Stale_Node",
-          eventPublisher.getLastEvent().getName());
+      assertEquals(SCMEvents.STALE_NODE, eventPublisher.getLastEvent());
     }
 
     // Finally make the node dead and run through all the op states again
@@ -249,8 +249,7 @@ public class TestNodeStateManager {
         HddsProtos.NodeOperationalState.values()) {
       eventPublisher.clearEvents();
       nsm.setNodeOperationalState(dn, s);
-      assertEquals("Dead_Node",
-          eventPublisher.getLastEvent().getName());
+      assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
     }
   }
 
