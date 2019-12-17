@@ -60,6 +60,15 @@ public class ContainerController {
     return containerSet.getContainer(containerId);
   }
 
+  public String getContainerLocation(final long containerId) {
+    Container cont = containerSet.getContainer(containerId);
+    if (cont != null) {
+      return cont.getContainerData().getContainerPath();
+    } else {
+      return "nonexistent";
+    }
+  }
+
   /**
    * Marks the container for closing. Moves the container to CLOSING state.
    *

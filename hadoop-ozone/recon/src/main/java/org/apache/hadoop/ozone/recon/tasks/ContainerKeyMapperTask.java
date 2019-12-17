@@ -89,8 +89,8 @@ public class ContainerKeyMapperTask implements ReconDBUpdateTask {
       LOG.info("Completed 'reprocess' of ContainerKeyMapperTask.");
       Instant end = Instant.now();
       long duration = Duration.between(start, end).toMillis();
-      LOG.info("It took me " + (double) duration / 1000.0 + " seconds to " +
-          "process " + omKeyCount + " keys.");
+      LOG.info("It took me {} seconds to process {} keys.",
+          (double) duration / 1000.0, omKeyCount);
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Key Prefix data in Recon DB. ",
           ioEx);
@@ -127,8 +127,8 @@ public class ContainerKeyMapperTask implements ReconDBUpdateTask {
           deleteOMKeyFromContainerDB(updatedKey);
           break;
 
-        default: LOG.debug("Skipping DB update event : " + omdbUpdateEvent
-            .getAction());
+        default: LOG.debug("Skipping DB update event : {}",
+            omdbUpdateEvent.getAction());
         }
         eventCount++;
       } catch (IOException e) {

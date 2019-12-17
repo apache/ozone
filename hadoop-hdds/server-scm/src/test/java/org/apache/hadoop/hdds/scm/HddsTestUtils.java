@@ -24,6 +24,7 @@ import java.util.UUID;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -51,7 +52,7 @@ public final class HddsTestUtils {
   public static NodeRegistrationContainerReport
       createNodeRegistrationContainerReport(int numOfContainers) {
     return new NodeRegistrationContainerReport(
-        TestUtils.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.getRandomContainerReports(numOfContainers));
   }
 
@@ -69,7 +70,7 @@ public final class HddsTestUtils {
       containers.add(TestUtils.getRandomContainerInfo(c.getContainerID()));
     });
     return new NodeRegistrationContainerReport(
-        TestUtils.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.getContainerReports(containers));
   }
 

@@ -31,7 +31,6 @@ import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 
 import org.apache.hadoop.util.DiskChecker;
@@ -265,7 +264,7 @@ public class HddsVolume
   private void createVersionFile() throws IOException {
     this.storageID = HddsVolumeUtil.generateUuid();
     this.cTime = Time.now();
-    this.layoutVersion = ChunkLayOutVersion.getLatestVersion().getVersion();
+    this.layoutVersion = DataNodeLayoutVersion.getLatestVersion().getVersion();
 
     if (this.clusterID == null || datanodeUuid == null) {
       // HddsDatanodeService does not have the cluster information yet. Wait

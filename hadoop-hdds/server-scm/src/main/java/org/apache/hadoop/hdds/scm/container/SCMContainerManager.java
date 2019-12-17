@@ -25,14 +25,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataStore;
@@ -64,8 +62,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_CONTAINER_DB;
  * looking up a key.
  */
 public class SCMContainerManager implements ContainerManager {
-  private static final Logger LOG = LoggerFactory.getLogger(SCMContainerManager
-      .class);
+  private static final Logger LOG = LoggerFactory.getLogger(
+      SCMContainerManager.class);
 
   private final Lock lock;
   private final MetadataStore containerStore;
@@ -79,19 +77,15 @@ public class SCMContainerManager implements ContainerManager {
    * Constructs a mapping class that creates mapping between container names
    * and pipelines.
    *
-   * @param nodeManager - NodeManager so that we can get the nodes that are
-   * healthy to place new
-   * containers.
    * passed to LevelDB and this memory is allocated in Native code space.
    * CacheSize is specified
    * in MB.
-   * @param pipelineManager - PipelineManager
+   * @param conf - {@link Configuration}
+   * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
-  @SuppressWarnings("unchecked")
   public SCMContainerManager(final Configuration conf,
-      final NodeManager nodeManager, PipelineManager pipelineManager,
-      final EventPublisher eventPublisher) throws IOException {
+      PipelineManager pipelineManager) throws IOException {
 
     final File metaDir = ServerUtils.getScmDbDir(conf);
     final File containerDBPath = new File(metaDir, SCM_CONTAINER_DB);
@@ -399,29 +393,23 @@ public class SCMContainerManager implements ContainerManager {
         .emptyList());
   }
 
+  @SuppressWarnings("squid:S2445")
   public ContainerInfo getMatchingContainer(final long sizeRequired,
       String owner, Pipeline pipeline, List<ContainerID> excludedContainers) {
     NavigableSet<ContainerID> containerIDs;
     try {
       synchronized (pipeline) {
-        //TODO: #CLUTIL See if lock is required here
-        containerIDs =
-            pipelineManager.getContainersInPipeline(pipeline.getId());
+        containerIDs = getContainersForOwner(pipeline, owner);
 
-        containerIDs = getContainersForOwner(containerIDs, owner);
         if (containerIDs.size() < numContainerPerOwnerInPipeline) {
-          // TODO: #CLUTIL Maybe we can add selection logic inside synchronized
-          // as well
-          if (containerIDs.size() < numContainerPerOwnerInPipeline) {
-            ContainerInfo containerInfo =
-                containerStateManager.allocateContainer(pipelineManager, owner,
-                    pipeline);
-            // Add to DB
-            addContainerToDB(containerInfo);
-            containerStateManager.updateLastUsedMap(pipeline.getId(),
-                containerInfo.containerID(), owner);
-            return containerInfo;
-          }
+          ContainerInfo containerInfo =
+              containerStateManager.allocateContainer(pipelineManager, owner,
+                  pipeline);
+          // Add to DB
+          addContainerToDB(containerInfo);
+          containerStateManager.updateLastUsedMap(pipeline.getId(),
+              containerInfo.containerID(), owner);
+          return containerInfo;
         }
       }
 
@@ -485,12 +473,14 @@ public class SCMContainerManager implements ContainerManager {
 
   /**
    * Returns the container ID's matching with specified owner.
-   * @param containerIDs
+   * @param pipeline
    * @param owner
    * @return NavigableSet<ContainerID>
    */
   private NavigableSet<ContainerID> getContainersForOwner(
-      NavigableSet<ContainerID> containerIDs, String owner) {
+      Pipeline pipeline, String owner) throws IOException {
+    NavigableSet<ContainerID> containerIDs =
+        pipelineManager.getContainersInPipeline(pipeline.getId());
     Iterator<ContainerID> containerIDIterator = containerIDs.iterator();
     while (containerIDIterator.hasNext()) {
       ContainerID cid = containerIDIterator.next();

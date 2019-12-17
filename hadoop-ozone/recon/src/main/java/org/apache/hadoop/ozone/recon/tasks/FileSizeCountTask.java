@@ -162,10 +162,10 @@ public class FileSizeCountTask implements ReconDBUpdateTask {
           updateUpperBoundCount(omKeyInfo, DELETE);
           break;
 
-        default: LOG.trace("Skipping DB update event : " + omdbUpdateEvent
-                  .getAction());
+        default: LOG.trace("Skipping DB update event : {}",
+            omdbUpdateEvent.getAction());
         }
-      } catch (IOException e) {
+      } catch (Exception e) {
         LOG.error("Unexpected exception while updating key data : {} {}",
                 updatedKey, e.getMessage());
         return new ImmutablePair<>(getTaskName(), false);
@@ -233,7 +233,7 @@ public class FileSizeCountTask implements ReconDBUpdateTask {
    * @param operation (PUT, DELETE)
    */
   void updateUpperBoundCount(OmKeyInfo omKeyInfo,
-      OMDBUpdateEvent.OMDBUpdateAction operation) throws IOException {
+      OMDBUpdateEvent.OMDBUpdateAction operation) {
     int binIndex = calculateBinIndex(omKeyInfo.getDataSize());
     if (operation == PUT) {
       upperBoundCount[binIndex]++;
@@ -243,8 +243,8 @@ public class FileSizeCountTask implements ReconDBUpdateTask {
         upperBoundCount[binIndex]--;
       } else {
         LOG.warn("Unexpected error while updating bin count. Found 0 count " +
-            "for index : " + binIndex + " while processing DELETE event for "
-            + omKeyInfo.getKeyName());
+            "for index : {} while processing DELETE event for {}", binIndex,
+            omKeyInfo.getKeyName());
       }
     }
   }
