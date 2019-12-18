@@ -128,6 +128,19 @@ public class SCMPipelineManager implements PipelineManager {
     pipelineFactory.setProvider(replicationType, provider);
   }
 
+  private int computeNodeIdHash(Pipeline pipeline) {
+    if (pipeline.getType() != ReplicationType.RATIS) {
+      return 0;
+    }
+
+    if (pipeline.getFactor() != ReplicationFactor.THREE) {
+      return 0;
+    }
+
+    return RatisPipelineUtils.
+        encodeNodeIdsOfFactorThreePipeline(pipeline.getNodes());
+  }
+
   private void initializePipelineState() throws IOException {
     if (pipelineStore.isEmpty()) {
       LOG.info("No pipeline exists in current db");
@@ -143,6 +156,7 @@ public class SCMPipelineManager implements PipelineManager {
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.setState(
           HddsProtos.PipelineState.PIPELINE_ALLOCATED).build());
       Preconditions.checkNotNull(pipeline);
+      pipeline.setNodeIdsHash(computeNodeIdHash(pipeline));
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
     }
@@ -162,6 +176,18 @@ public class SCMPipelineManager implements PipelineManager {
       if (pipeline.isOpen()) {
         metrics.incNumPipelineCreated();
         metrics.createPerPipelineMetrics(pipeline);
+      }
+      Pipeline overlapPipeline = RatisPipelineUtils
+          .checkPipelineContainSameDatanodes(stateManager, pipeline);
+      if (overlapPipeline != null) {
+        metrics.incNumPipelineContainSameDatanodes();
+        //TODO remove until pipeline allocation is proved equally distributed.
+        LOG.info("Pipeline: " + pipeline.getId().toString() +
+            " contains same datanodes as previous pipeline: " +
+            overlapPipeline.getId().toString() + " nodeIds: " +
+            pipeline.getNodes().get(0).getUuid().toString() +
+            ", " + pipeline.getNodes().get(1).getUuid().toString() +
+            ", " + pipeline.getNodes().get(2).getUuid().toString());
       }
       return pipeline;
     } catch (IOException ex) {

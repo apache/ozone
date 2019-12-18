@@ -162,7 +162,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // filter nodes that meet the size and pipeline engagement criteria.
     // Pipeline placement doesn't take node space left into account.
     List<DatanodeDetails> healthyList = healthyNodes.stream()
-        .filter(d -> meetCriteria(d, nodesRequired)).limit(nodesRequired)
+        .filter(d -> meetCriteria(d, nodesRequired))
         .collect(Collectors.toList());
 
     if (healthyList.size() < nodesRequired) {
@@ -308,6 +308,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     }
     // the pick is decided and it should be removed from candidates.
     healthyNodes.remove(datanodeDetails);
+
     return datanodeDetails;
   }
 

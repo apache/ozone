@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
@@ -34,9 +35,14 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -50,12 +56,13 @@ public class TestRatisPipelineProvider {
   private NodeManager nodeManager;
   private PipelineProvider provider;
   private PipelineStateManager stateManager;
+  private OzoneConfiguration conf;
 
   @Before
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 1);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 2);
     stateManager = new PipelineStateManager();
     provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, conf);
@@ -75,8 +82,12 @@ public class TestRatisPipelineProvider {
     // New pipeline should not overlap with the previous created pipeline
     assertTrue(
         intersection(pipeline.getNodes(), pipeline1.getNodes())
-            .isEmpty());
+            .size() < factor.getNumber());
+    if (pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE) {
+      assertNotEquals(pipeline.getNodeIdsHash(), pipeline1.getNodeIdsHash());
+    }
     stateManager.addPipeline(pipeline1);
+    nodeManager.addPipeline(pipeline1);
   }
 
   @Test
@@ -92,10 +103,9 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     stateManager.addPipeline(pipeline1);
-    // New pipeline should overlap with the previous created pipeline,
-    // and one datanode should overlap between the two types.
-    assertEquals(1,
-        intersection(pipeline.getNodes(), pipeline1.getNodes()).size());
+    // With enough pipeline quote on datanodes, they should not share
+    // the same set of datanodes.
+    assertNotEquals(pipeline.getNodeIdsHash(), pipeline1.getNodeIdsHash());
   }
 
   @Test
@@ -131,6 +141,49 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
+  public void testComputeNodeIdsHash() {
+    int total = HddsProtos.ReplicationFactor.THREE.getNumber();
+    List<DatanodeDetails> nodes1 = new ArrayList<>();
+    for (int i = 0; i < total; i++) {
+      nodes1.add(MockDatanodeDetails.createDatanodeDetails(
+          UUID.fromString("00000-11000-00000-00000-0000" + (i + 1))));
+    }
+
+    Assert.assertEquals(total, nodes1.size());
+    Assert.assertNotEquals(0,
+        RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(nodes1));
+
+    List<DatanodeDetails> nodes2 = new ArrayList<>();
+    for (int i = 0; i < total; i++) {
+      nodes2.add(MockDatanodeDetails.createDatanodeDetails(
+          UUID.fromString("00000-11000-00000-00000-0000" + (total - i))));
+    }
+    Assert.assertEquals(total, nodes2.size());
+    Assert.assertNotEquals(0,
+        RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(nodes2));
+
+    Assert.assertEquals(
+        RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(nodes1),
+        RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(nodes2));
+  }
+
+  @Test
+  public void testCreateFactorTHREEPipelineWithSameDatanodes() {
+    List<DatanodeDetails> healthyNodes = nodeManager
+        .getNodes(HddsProtos.NodeState.HEALTHY).stream()
+        .limit(3).collect(Collectors.toList());
+
+    Pipeline pipeline1 = provider.create(
+        HddsProtos.ReplicationFactor.THREE, healthyNodes);
+    Pipeline pipeline2 = provider.create(
+        HddsProtos.ReplicationFactor.THREE, healthyNodes);
+
+    Assert.assertTrue(pipeline1.getNodes().parallelStream()
+        .allMatch(pipeline2.getNodes()::contains));
+    Assert.assertEquals(pipeline1.getNodeIdsHash(), pipeline2.getNodeIdsHash());
+  }
+
+  @Test
   public void testCreatePipelinesDnExclude() throws IOException {
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
@@ -141,7 +194,11 @@ public class TestRatisPipelineProvider {
 
     // Use up first 3 DNs for an open pipeline.
     List<DatanodeDetails> dns = healthyNodes.subList(0, 3);
-    addPipeline(dns, factor, Pipeline.PipelineState.OPEN, REPLICATION_TYPE);
+    for (int i = 0; i < conf.getInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT,
+        OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT); i++) {
+      // Saturate pipeline counts on all the 1st 3 DNs.
+      addPipeline(dns, factor, Pipeline.PipelineState.OPEN, REPLICATION_TYPE);
+    }
     Set<DatanodeDetails> membersOfOpenPipelines = new HashSet<>(dns);
 
     // Use up next 3 DNs for a closed pipeline.
@@ -160,7 +217,7 @@ public class TestRatisPipelineProvider {
     List<DatanodeDetails> nodes = pipeline.getNodes();
 
     assertTrue(
-        "nodes of new pipeline cannot be from open pipelines",
+        "nodes of new pipeline cannot be all from open pipelines",
         nodes.stream().noneMatch(membersOfOpenPipelines::contains));
 
     assertTrue(
