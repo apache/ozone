@@ -87,9 +87,10 @@ public class BasicOFileSystem extends FileSystem {
   private String adapterPath;
 
   private static final String URI_EXCEPTION_TEXT =
-      "Ozone file system URL should be one of the following formats: " +
-      "ofs://om-host.example.com/volume/bucket/[key]  OR " +
-      "ofs://om-host.example.com:5678/volume/bucket/[key]";
+      "URL should be one of the following formats: " +
+      "ofs://om-service-id/  OR " +
+      "ofs://om-host.example.com/  OR " +
+      "ofs://om-host.example.com:5678/";
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
