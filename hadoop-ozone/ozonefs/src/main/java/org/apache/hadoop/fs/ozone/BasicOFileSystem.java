@@ -159,11 +159,25 @@ public class BasicOFileSystem extends FileSystem {
     }
   }
 
-  protected OzoneClientAdapter createAdapter(OFSPath ofsPath)
+  /**
+   * Check path and create client adapter accordingly.
+   * @param ofsPath
+   * @throws IOException
+   */
+  protected void checkAndCreateAdapter(OFSPath ofsPath)
       throws IOException {
-
-    adapterPath = ofsPath.getNonKeyParts();
-    return createAdapter(this.gConf, ofsPath.getBucketName(),
+    // Check if an adapter is already initialized.
+    if (this.adapter != null) {
+      // Sanity check.
+      assert(this.adapterPath != null);
+      // Close the existing adapter.
+      // TODO: do so only when volume/bucket changed from previous op for perf.
+      this.adapter.close();
+      this.adapter = null;
+      this.adapterPath = null;
+    }
+    this.adapterPath = ofsPath.getNonKeyParts();
+    this.adapter = createAdapter(this.gConf, ofsPath.getBucketName(),
         ofsPath.getVolumeName(), this.gOmHost, this.gOmPort,
         this.gIsolatedClassloader);
   }
@@ -206,10 +220,7 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_OPEN);
     statistics.incrementWriteOps(1);
     LOG.trace("open() path:{}", f);
-    if (this.adapter != null) {
-      this.adapter.close();
-    }
-    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
+    checkAndCreateAdapter(new OFSPath(f.toUri().getPath()));
     final String key = pathToKey(f);
     return new FSDataInputStream(new OzoneFSInputStream(adapter.readFile(key)));
   }
@@ -224,10 +235,7 @@ public class BasicOFileSystem extends FileSystem {
       short replication, long blockSize,
       Progressable progress) throws IOException {
     LOG.trace("create() path:{}", f);
-    if (this.adapter != null) {
-      this.adapter.close();
-    }
-    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
+    checkAndCreateAdapter(new OFSPath(f.toUri().getPath()));
     incrementCounter(Statistic.INVOCATION_CREATE);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
@@ -271,11 +279,7 @@ public class BasicOFileSystem extends FileSystem {
       // src and dst must share the same adapter.
       // Sanity check should have been done in caller.
       OFSPath ofsPath = new OFSPath(srcPath.toString());
-      if (adapter != null) {
-        adapter.close();
-      }
-      adapter = createAdapter(ofsPath);
-      adapterPath = ofsPath.getNonKeyParts();
+      checkAndCreateAdapter(ofsPath);
       srcKey = pathToKey(srcPath);
       dstKey = pathToKey(dstPath);
       LOG.trace("rename from:{} to:{}, in:{}", srcKey, dstKey, adapterPath);
@@ -448,10 +452,7 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_DELETE);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
-    if (this.adapter != null) {
-      this.adapter.close();
-    }
-    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
+    checkAndCreateAdapter(new OFSPath(f.toUri().getPath()));
     FileStatus status;
     try {
       status = getFileStatus(f);
@@ -542,7 +543,7 @@ public class BasicOFileSystem extends FileSystem {
       this.adapter.close();
     }
     OFSPath ofsPath = new OFSPath(f.toUri().getPath());
-    this.adapter = createAdapter(ofsPath);
+    checkAndCreateAdapter(ofsPath);
     int numEntries = LISTING_PAGE_SIZE;
     LinkedList<FileStatus> statuses = new LinkedList<>();
     List<FileStatus> tmpStatusList;
@@ -617,10 +618,7 @@ public class BasicOFileSystem extends FileSystem {
    * @throws IOException
    */
   private boolean mkdir(Path path) throws IOException {
-    if (this.adapter != null) {
-      this.adapter.close();
-    }
-    this.adapter = createAdapter(new OFSPath(path.toUri().getPath()));
+    checkAndCreateAdapter(new OFSPath(path.toUri().getPath()));
     return adapter.createDirectory(pathToKey(path));
   }
 
@@ -639,10 +637,7 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
-    if (this.adapter != null) {
-      this.adapter.close();
-    }
-    this.adapter = createAdapter(new OFSPath(f.toUri().getPath()));
+    checkAndCreateAdapter(new OFSPath(f.toUri().getPath()));
     Path qualifiedPath = f.makeQualified(uri, workingDir);
     String key = pathToKey(qualifiedPath);
     FileStatus fileStatus = null;
