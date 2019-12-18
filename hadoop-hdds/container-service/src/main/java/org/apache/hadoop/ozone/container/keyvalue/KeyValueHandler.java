@@ -694,7 +694,8 @@ public class KeyValueHandler extends Handler {
       WriteChunkStage stage = dispatcherContext.getStage();
       if (stage == WriteChunkStage.WRITE_DATA ||
           stage == WriteChunkStage.COMBINED) {
-        data = ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBuffer());
+        data =
+            ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
       }
 
       chunkManager
@@ -748,7 +749,7 @@ public class KeyValueHandler extends Handler {
       Preconditions.checkNotNull(chunkInfo);
 
       ChunkBuffer data = ChunkBuffer.wrap(
-          putSmallFileReq.getData().asReadOnlyByteBuffer());
+          putSmallFileReq.getData().asReadOnlyByteBufferList());
       if (dispatcherContext == null) {
         dispatcherContext = new DispatcherContext.Builder().build();
       }
