@@ -150,7 +150,6 @@ public class BasicOFileSystem extends FileSystem {
       } catch (IOException e) {
         this.userName = OZONE_DEFAULT_USER;
       }
-      // TODO: Might need to change.
       this.workingDir = new Path(OZONE_USER_DIR, this.userName)
           .makeQualified(this.uri, this.workingDir);
     } catch (URISyntaxException ue) {
@@ -285,9 +284,6 @@ public class BasicOFileSystem extends FileSystem {
     @Override
     boolean processKey(String key) throws IOException {
       String newKeyName = dstKey.concat(key.substring(srcKey.length()));
-      // TODO: Double check.
-      assert(adapter != null);
-      assert(adapterPath != null);
       adapter.renameKey(key, newKeyName);
       return true;
     }
@@ -674,12 +670,13 @@ public class BasicOFileSystem extends FileSystem {
     }
     // removing leading '/' char
     String key = path.toUri().getPath().substring(1);
-    // TODO: Clean up code.
-    key = new OFSPath(key).getKeyName();
+    OFSPath ofsPath = new OFSPath(key);
+    key = ofsPath.getKeyName();
     LOG.trace("path for key:{} is:{}", key, path);
     return key;
   }
 
+  // TODO: Consider renaming and moving this class to a new file.
   static class OFSPath {
     // Note: static class variables are defaulted to null / 0.
     private String volumeName;
