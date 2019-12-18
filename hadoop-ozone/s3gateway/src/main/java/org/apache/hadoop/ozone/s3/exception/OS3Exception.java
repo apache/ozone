@@ -142,7 +142,7 @@ public class OS3Exception extends  Exception {
           + val;
       return xmlLine;
     } catch (Exception ex) {
-      LOG.error("Exception occurred {}", ex);
+      LOG.error("Exception occurred", ex);
     }
 
     //When we get exception log it, and return exception as xml from actual

@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.common;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -172,12 +174,24 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   }
 
   @Override
-  public void clear() {
-    buffers.forEach(ByteBuffer::clear);
+  public int limit() {
+    return limit;
   }
 
   @Override
-  public void put(ByteBuffer that) {
+  public ChunkBuffer rewind() {
+    buffers.forEach(ByteBuffer::rewind);
+    return this;
+  }
+
+  @Override
+  public ChunkBuffer clear() {
+    buffers.forEach(ByteBuffer::clear);
+    return this;
+  }
+
+  @Override
+  public ChunkBuffer put(ByteBuffer that) {
     if (that.remaining() > this.remaining()) {
       final BufferOverflowException boe = new BufferOverflowException();
       boe.initCause(new IllegalArgumentException(
@@ -194,6 +208,7 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
       b.put(that);
       p += min;
     }
+    return this;
   }
 
   @Override
@@ -235,6 +250,11 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
           + " but increment = " + increment);
     }
     return Collections.unmodifiableList(buffers);
+  }
+
+  @Override
+  public long writeTo(GatheringByteChannel channel) throws IOException {
+    return channel.write(buffers.toArray(new ByteBuffer[0]));
   }
 
   @Override

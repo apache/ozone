@@ -160,7 +160,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
    */
   @Override
   public String getCertificate(String certSerialId) throws IOException {
-    LOGGER.debug("Getting certificate with certificate serial id",
+    LOGGER.debug("Getting certificate with certificate serial id {}",
         certSerialId);
     try {
       X509Certificate certificate =

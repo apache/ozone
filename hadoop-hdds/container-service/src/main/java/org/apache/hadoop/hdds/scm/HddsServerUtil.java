@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -183,6 +184,27 @@ public final class HddsServerUtil {
             port.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
   }
 
+
+  /**
+   * Retrieve the socket address that should be used by DataNodes to connect
+   * to Recon.
+   *
+   * @param conf
+   * @return Target {@code InetSocketAddress} for the SCM service endpoint.
+   */
+  public static InetSocketAddress getReconDataNodeBindAddress(
+      Configuration conf) {
+    final Optional<String> host = getHostNameFromConfigKeys(conf,
+        ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY);
+
+    final OptionalInt port = getPortNumberFromConfigKeys(conf,
+        ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY);
+
+    return NetUtils.createSocketAddr(
+        host.orElse(
+            ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_DEFAULT) + ":" +
+            port.orElse(ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT));
+  }
 
   /**
    * Returns the interval in which the heartbeat processor thread runs.
