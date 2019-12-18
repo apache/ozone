@@ -34,11 +34,21 @@ public class S3BucketDeleteResponse extends OMClientResponse {
 
   private String s3BucketName;
   private String volumeName;
-  public S3BucketDeleteResponse(@Nullable String s3BucketName,
-      @Nullable String volumeName, @Nonnull OMResponse omResponse) {
+
+  public S3BucketDeleteResponse(@Nonnull OMResponse omResponse,
+      @Nonnull String s3BucketName, @Nonnull String volumeName) {
     super(omResponse);
     this.s3BucketName = s3BucketName;
     this.volumeName = volumeName;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public S3BucketDeleteResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override

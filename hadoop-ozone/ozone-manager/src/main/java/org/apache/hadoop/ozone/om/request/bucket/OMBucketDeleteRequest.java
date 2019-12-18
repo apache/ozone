@@ -41,6 +41,8 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .DeleteBucketRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .DeleteBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
@@ -72,8 +74,10 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     OMRequest omRequest = getOmRequest();
-    String volumeName = omRequest.getDeleteBucketRequest().getVolumeName();
-    String bucketName = omRequest.getDeleteBucketRequest().getBucketName();
+    DeleteBucketRequest deleteBucketRequest =
+        omRequest.getDeleteBucketRequest();
+    String volumeName = deleteBucketRequest.getVolumeName();
+    String bucketName = deleteBucketRequest.getBucketName();
 
     // Generate end user response
     OMResponse.Builder omResponse = OMResponse.newBuilder()
@@ -111,13 +115,25 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // with out volume creation.
       //Check if bucket exists
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo omBucketInfo =
-          omMetadataManager.getBucketTable().get(bucketKey);
+      OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
+          .get(bucketKey);
       if (omBucketInfo == null) {
         LOG.debug("bucket: {} not found ", bucketName);
         throw new OMException("Bucket doesn't exist",
             OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
+
+      // Check if this transaction is a replay of ratis logs.
+      // If this is a replay, then the response has already been returned to
+      // the client. So take no further action and return a dummy
+      // OMClientResponse.
+      if (isReplay(ozoneManager, omBucketInfo.getUpdateID(),
+          transactionLogIndex)) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}",
+            transactionLogIndex, deleteBucketRequest);
+        return new OMBucketDeleteResponse(createReplayOMResponse(omResponse));
+      }
+
       //Check if bucket is empty
       if (!omMetadataManager.isBucketEmpty(volumeName, bucketName)) {
         LOG.debug("bucket: {} is not empty ", bucketName);
@@ -135,12 +151,12 @@ public class OMBucketDeleteRequest extends OMClientRequest {
           DeleteBucketResponse.newBuilder().build());
 
       // Add to double buffer.
-      omClientResponse = new OMBucketDeleteResponse(volumeName, bucketName,
-          omResponse.build());
+      omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
+          volumeName, bucketName);
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMBucketDeleteResponse(volumeName, bucketName,
-          createErrorOMResponse(omResponse, exception));
+      omClientResponse = new OMBucketDeleteResponse(
+          createErrorOMResponse(omResponse, exception), volumeName, bucketName);
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(

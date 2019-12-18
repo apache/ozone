@@ -73,7 +73,7 @@ public final class TestOMResponseUtils {
     OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
         volumeName, s3BucketName);
     OMBucketCreateResponse omBucketCreateResponse =
-        new OMBucketCreateResponse(omBucketInfo, omResponse);
+        new OMBucketCreateResponse(omResponse, omBucketInfo);
 
     String s3Mapping = S3BucketCreateRequest.formatS3MappingName(volumeName,
         s3BucketName);

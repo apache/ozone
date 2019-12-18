@@ -22,7 +22,8 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
@@ -35,12 +36,20 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
   private String volumeName;
   private String bucketName;
 
-  public OMBucketDeleteResponse(
-      String volumeName, String bucketName,
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse) {
+  public OMBucketDeleteResponse(@Nonnull OMResponse omResponse,
+      String volumeName, String bucketName) {
     super(omResponse);
     this.volumeName = volumeName;
     this.bucketName = bucketName;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMBucketDeleteResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override

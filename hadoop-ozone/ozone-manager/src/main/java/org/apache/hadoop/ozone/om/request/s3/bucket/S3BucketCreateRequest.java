@@ -214,7 +214,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
               transactionLogIndex));
 
       OMBucketCreateResponse omBucketCreateResponse =
-          new OMBucketCreateResponse(omBucketInfo, omResponse.build());
+          new OMBucketCreateResponse(omResponse.build(), omBucketInfo);
 
       omClientResponse = new S3BucketCreateResponse(omVolumeCreateResponse,
           omBucketCreateResponse, s3BucketName,

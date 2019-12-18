@@ -36,10 +36,19 @@ import javax.annotation.Nonnull;
 public class OMBucketSetPropertyResponse extends OMClientResponse {
   private OmBucketInfo omBucketInfo;
 
-  public OMBucketSetPropertyResponse(@Nullable OmBucketInfo omBucketInfo,
-      @Nonnull OMResponse omResponse) {
+  public OMBucketSetPropertyResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omBucketInfo = omBucketInfo;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMBucketSetPropertyResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override

@@ -37,10 +37,20 @@ public class OMBucketAclResponse extends OMClientResponse {
 
   private final OmBucketInfo omBucketInfo;
 
-  public OMBucketAclResponse(@Nullable OmBucketInfo omBucketInfo,
-      @Nonnull OMResponse omResponse) {
+  public OMBucketAclResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omBucketInfo = omBucketInfo;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMBucketAclResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
+    this.omBucketInfo = null;
   }
 
   @Override

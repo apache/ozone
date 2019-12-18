@@ -487,6 +487,8 @@ message BucketInfo {
     optional uint64 creationTime = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional BucketEncryptionInfoProto beinfo = 8;
+    optional uint64 objectID = 9;
+    optional uint64 updateID = 10;
 }
 
 enum StorageTypeProto {
