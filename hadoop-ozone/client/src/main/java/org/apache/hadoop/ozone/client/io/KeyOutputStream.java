@@ -455,19 +455,19 @@ public class KeyOutputStream extends OutputStream {
           failedServers);
     }
     switch (op) {
-      case CLOSE:
+    case CLOSE:
+      entry.close();
+      break;
+    case FULL:
+      if (entry.getRemaining() == 0) {
         entry.close();
-        break;
-      case FULL:
-        if (entry.getRemaining() == 0) {
-          entry.close();
-        }
-        break;
-      case FLUSH:
-        entry.flush();
-        break;
-      default:
-        throw new IOException("Invalid Operation");
+      }
+      break;
+    case FLUSH:
+      entry.flush();
+      break;
+    default:
+      throw new IOException("Invalid Operation");
     }
   }
 
