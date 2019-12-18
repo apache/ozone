@@ -457,8 +457,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   /**
    * Helper method to get List of BlockLocation from OM Key info.
-   * @param omKeyLocationInfoGroups OM Key locations.
-   * @param fileStatusAdapter fileStatusAdapter
+   * @param fileStatus Ozone key file status.
    * @return list of block locations.
    */
   private BlockLocation[] getBlockLocations(OzoneFileStatus fileStatus) {
