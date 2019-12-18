@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.file;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -48,7 +47,7 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   }
 
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     if (dirKeyInfo != null) {

@@ -65,12 +65,13 @@ public abstract class OMClientResponse {
   }
 
   /**
-   * Implement logic to add the response to batch.
+   * Implement logic to add the response to batch. This function should be
+   * called from checkAndUpdateDB only.
    * @param omMetadataManager
    * @param batchOperation
    * @throws IOException
    */
-  public abstract void addToDBBatch(OMMetadataManager omMetadataManager,
+  protected abstract void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException;
 
   /**

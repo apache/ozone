@@ -143,7 +143,7 @@ public class TestOMVolumeSetOwnerResponse {
         new OMVolumeSetOwnerResponse(omResponse);
 
     try {
-      omVolumeSetOwnerResponse.addToDBBatch(omMetadataManager, batchOperation);
+      omVolumeSetOwnerResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
       Assert.assertTrue(omMetadataManager.countRowsInTable(
           omMetadataManager.getVolumeTable()) == 0);
     } catch (IOException ex) {

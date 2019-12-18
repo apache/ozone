@@ -112,7 +112,8 @@ public class TestOMVolumeSetQuotaResponse {
         new OMVolumeSetQuotaResponse(omResponse);
 
     try {
-      omVolumeSetQuotaResponse.addToDBBatch(omMetadataManager, batchOperation);
+      omVolumeSetQuotaResponse.checkAndUpdateDB(omMetadataManager,
+          batchOperation);
       Assert.assertTrue(omMetadataManager.countRowsInTable(
           omMetadataManager.getVolumeTable()) == 0);
     } catch (IOException ex) {

@@ -62,7 +62,8 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
     checkStatusNotOK();
   }
 
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  @Override
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     String oldOwnerKey = omMetadataManager.getUserKey(oldOwner);

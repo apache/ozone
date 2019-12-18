@@ -58,7 +58,7 @@ public class OMVolumeCreateResponse extends OMClientResponse {
   }
 
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     String dbVolumeKey =

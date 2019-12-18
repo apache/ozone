@@ -51,7 +51,7 @@ public class OMVolumeSetQuotaResponse extends OMClientResponse {
   }
 
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
