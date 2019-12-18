@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.cli.SCMCLI;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
@@ -29,13 +30,13 @@ import java.util.concurrent.Callable;
  * Handler of createPipeline command.
  */
 @CommandLine.Command(
-    name = "create",
+    name = "createPipeline",
     description = "create pipeline",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class CreatePipelineSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
-  private PipelineCommands parent;
+  private SCMCLI parent;
 
   @CommandLine.Option(
       names = {"-t", "--replicationType"},
@@ -59,7 +60,7 @@ public class CreatePipelineSubcommand implements Callable<Void> {
       throw new IllegalArgumentException(type.name()
           + " is not supported yet.");
     }
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
+    try (ScmClient scmClient = parent.createScmClient()) {
       scmClient.createReplicationPipeline(
           type,
           factor,
