@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -130,7 +131,7 @@ public class BlockInputStream extends InputStream implements Seekable {
     List<ChunkInfo> chunks = null;
     try {
       chunks = getChunkInfos();
-    } catch (IOException ioEx) {
+    } catch (ContainerNotFoundException ioEx) {
       LOG.error("Unable to read block information from pipeline.");
       if (refreshPipelineFunction != null) {
         LOG.debug("Re-fetching pipeline for block {}", blockID);

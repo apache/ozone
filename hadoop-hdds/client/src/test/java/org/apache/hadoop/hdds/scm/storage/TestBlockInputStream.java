@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumTy
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
@@ -283,7 +284,7 @@ public class TestBlockInputStream {
     protected List<ChunkInfo> getChunkInfos() throws IOException {
       if (getChunkInfoCount == 0) {
         getChunkInfoCount++;
-        throw new IOException("Exception encountered");
+        throw new ContainerNotFoundException("Exception encountered");
       } else {
         return super.getChunkInfos();
       }
