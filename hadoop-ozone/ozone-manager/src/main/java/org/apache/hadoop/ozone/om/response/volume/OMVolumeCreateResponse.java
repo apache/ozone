@@ -24,7 +24,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
@@ -32,7 +31,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVol
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
-import org.apache.ratis.util.Preconditions;
 
 /**
  * Response for CreateBucket request.
@@ -42,8 +40,9 @@ public class OMVolumeCreateResponse extends OMClientResponse {
   private UserVolumeInfo userVolumeInfo;
   private OmVolumeArgs omVolumeArgs;
 
-  public OMVolumeCreateResponse(OmVolumeArgs omVolumeArgs,
-      UserVolumeInfo userVolumeInfo, @Nonnull OMResponse omResponse) {
+  public OMVolumeCreateResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmVolumeArgs omVolumeArgs,
+      @Nonnull UserVolumeInfo userVolumeInfo) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
     this.userVolumeInfo = userVolumeInfo;
@@ -55,8 +54,7 @@ public class OMVolumeCreateResponse extends OMClientResponse {
    */
   public OMVolumeCreateResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    Preconditions.assertTrue(!omResponse.getStatus().equals(
-        OzoneManagerProtocolProtos.Status.OK));
+    checkStatusNotOK();
   }
 
   @Override

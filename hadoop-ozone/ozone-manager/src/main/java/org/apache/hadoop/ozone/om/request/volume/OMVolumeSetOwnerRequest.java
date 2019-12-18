@@ -135,7 +135,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       // If this is a replay, then the response has already been returned to
       // the client. So take no further action and return a dummy
       // OMClientResponse.
-      if (isReplay(omVolumeArgs.getUpdateID(), transactionLogIndex)) {
+      if (isReplay(ozoneManager, omVolumeArgs.getUpdateID(),
+          transactionLogIndex)) {
         LOG.debug("Replayed Transaction {} ignored. Request: {}",
             transactionLogIndex, setVolumePropertyRequest);
         return new OMVolumeSetOwnerResponse(createReplayOMResponse(omResponse));
@@ -176,9 +177,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
       omResponse.setSetVolumePropertyResponse(
           SetVolumePropertyResponse.newBuilder().build());
-      omClientResponse = new OMVolumeSetOwnerResponse(oldOwner,
-          oldOwnerVolumeList, newOwnerVolumeList, omVolumeArgs,
-          omResponse.build());
+      omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build(),
+          oldOwner, oldOwnerVolumeList, newOwnerVolumeList, omVolumeArgs);
 
     } catch (IOException ex) {
       exception = ex;

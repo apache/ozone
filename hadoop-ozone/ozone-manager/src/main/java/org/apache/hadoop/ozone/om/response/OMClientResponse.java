@@ -42,6 +42,14 @@ public abstract class OMClientResponse {
   }
 
   /**
+   * For error or replay cases, check that the status of omResponse is not OK.
+   */
+  public void checkStatusNotOK() {
+    Preconditions.checkArgument(!omResponse.getStatus().equals(
+        OzoneManagerProtocolProtos.Status.OK));
+  }
+
+  /**
    * Check if omResponse status is OK. If yes, add to DB.
    * For OmResponse with failure, this should do nothing. This method is not
    * called in failure scenario in OM code.

@@ -132,11 +132,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         }
       }
 
-      // A replay transaction for CreateVolume can reach here only if the
-      // volume has been deleted in later transactions. Hence, we can
-      // continue with this request irrespective of whether it is a replay or
-      // not.
-
       // acquire lock.
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
@@ -160,12 +155,13 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
         omResponse.setCreateVolumeResponse(CreateVolumeResponse.newBuilder()
             .build());
-        omClientResponse = new OMVolumeCreateResponse(omVolumeArgs, volumeList,
-            omResponse.build());
+        omClientResponse = new OMVolumeCreateResponse(omResponse.build(),
+            omVolumeArgs, volumeList);
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
       } else {
         // Check if this transaction is a replay of ratis logs.
-        if (isReplay(dbVolumeArgs.getUpdateID(), transactionLogIndex)) {
+        if (isReplay(ozoneManager, dbVolumeArgs.getUpdateID(),
+            transactionLogIndex)) {
           // Replay implies the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.
@@ -181,7 +177,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMVolumeCreateResponse(null, null,
+      omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {

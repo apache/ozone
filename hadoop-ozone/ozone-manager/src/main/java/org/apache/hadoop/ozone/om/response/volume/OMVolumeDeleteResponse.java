@@ -22,7 +22,6 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -30,7 +29,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
-import org.apache.ratis.util.Preconditions;
 
 /**
  * Response for CreateVolume request.
@@ -41,7 +39,8 @@ public class OMVolumeDeleteResponse extends OMClientResponse {
   private UserVolumeInfo updatedVolumeList;
 
   public OMVolumeDeleteResponse(@Nonnull OMResponse omResponse,
-      String volume, String owner, UserVolumeInfo updatedVolumeList) {
+      @Nonnull String volume, @Nonnull String owner,
+      @Nonnull UserVolumeInfo updatedVolumeList) {
     super(omResponse);
     this.volume = volume;
     this.owner = owner;
@@ -54,8 +53,7 @@ public class OMVolumeDeleteResponse extends OMClientResponse {
    */
   public OMVolumeDeleteResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    Preconditions.assertTrue(!omResponse.getStatus().equals(
-        OzoneManagerProtocolProtos.Status.OK));
+    checkStatusNotOK();
   }
 
   @Override

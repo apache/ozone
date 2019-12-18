@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.volume;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -29,7 +28,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import java.io.IOException;
 
 import javax.annotation.Nonnull;
-import org.apache.ratis.util.Preconditions;
 
 /**
  * Response for set quota request.
@@ -38,7 +36,7 @@ public class OMVolumeSetQuotaResponse extends OMClientResponse {
   private OmVolumeArgs omVolumeArgs;
 
   public OMVolumeSetQuotaResponse(@Nonnull OMResponse omResponse,
-      OmVolumeArgs omVolumeArgs) {
+      @Nonnull OmVolumeArgs omVolumeArgs) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
   }
@@ -49,8 +47,7 @@ public class OMVolumeSetQuotaResponse extends OMClientResponse {
    */
   public OMVolumeSetQuotaResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    Preconditions.assertTrue(!omResponse.getStatus().equals(
-        OzoneManagerProtocolProtos.Status.OK));
+    checkStatusNotOK();
   }
 
   @Override

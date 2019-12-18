@@ -188,8 +188,8 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
           createVolume(omMetadataManager, omVolumeArgs, volumeList, volumeKey,
               omMetadataManager.getUserKey(userName), transactionLogIndex);
           volumeCreated = true;
-          omVolumeCreateResponse = new OMVolumeCreateResponse(omVolumeArgs,
-              volumeList, omResponse.build());
+          omVolumeCreateResponse = new OMVolumeCreateResponse(
+              omResponse.build(), omVolumeArgs, volumeList);
         }
       } finally {
         if (acquiredUserLock) {

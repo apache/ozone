@@ -84,7 +84,7 @@ public class TestOMVolumeDeleteResponse {
         .setOwnerName(userName).setAdminName(userName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
     OMVolumeCreateResponse omVolumeCreateResponse =
-        new OMVolumeCreateResponse(omVolumeArgs, volumeList, omResponse);
+        new OMVolumeCreateResponse(omResponse, omVolumeArgs, volumeList);
 
     // As we are deleting updated volume list should be empty.
     UserVolumeInfo updatedVolumeList = UserVolumeInfo.newBuilder()

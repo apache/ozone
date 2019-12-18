@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserVolumeInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -32,7 +31,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
-import org.apache.ratis.util.Preconditions;
 
 /**
  * Response for set owner request.
@@ -44,9 +42,10 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
   private UserVolumeInfo newOwnerVolumeList;
   private OmVolumeArgs newOwnerVolumeArgs;
 
-  public OMVolumeSetOwnerResponse(String oldOwner,
-      UserVolumeInfo oldOwnerVolumeList, UserVolumeInfo newOwnerVolumeList,
-      OmVolumeArgs newOwnerVolumeArgs, @Nonnull OMResponse omResponse) {
+  public OMVolumeSetOwnerResponse(@Nonnull OMResponse omResponse,
+      @Nonnull String oldOwner, @Nonnull UserVolumeInfo oldOwnerVolumeList,
+      @Nonnull UserVolumeInfo newOwnerVolumeList,
+      @Nonnull OmVolumeArgs newOwnerVolumeArgs) {
     super(omResponse);
     this.oldOwner = oldOwner;
     this.oldOwnerVolumeList = oldOwnerVolumeList;
@@ -60,8 +59,7 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
    */
   public OMVolumeSetOwnerResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    Preconditions.assertTrue(!omResponse.getStatus().equals(
-        OzoneManagerProtocolProtos.Status.OK));
+    checkStatusNotOK();
   }
 
   public void addToDBBatch(OMMetadataManager omMetadataManager,
