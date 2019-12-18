@@ -17,7 +17,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
@@ -93,7 +93,8 @@ public class MockNodeManager implements NodeManager {
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
 
-  public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
+  public MockNodeManager(NetworkTopologyImpl clusterMap,
+                         boolean initializeFakeNodes, int nodeCount) {
     this.healthyNodes = new LinkedList<>();
     this.staleNodes = new LinkedList<>();
     this.deadNodes = new LinkedList<>();
@@ -101,8 +102,8 @@ public class MockNodeManager implements NodeManager {
     this.node2PipelineMap = new Node2PipelineMap();
     this.node2ContainerMap = new Node2ContainerMap();
     this.dnsToUuidMap = new ConcurrentHashMap<>();
-    aggregateStat = new SCMNodeStat();
-    clusterMap = new NetworkTopologyImpl(new Configuration());
+    this.aggregateStat = new SCMNodeStat();
+    this.clusterMap = clusterMap;
     if (initializeFakeNodes) {
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
@@ -112,6 +113,11 @@ public class MockNodeManager implements NodeManager {
     }
     safemode = false;
     this.commandMap = new HashMap<>();
+  }
+
+  public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
+    this(new NetworkTopologyImpl(new OzoneConfiguration()),
+        initializeFakeNodes, nodeCount);
   }
 
   /**

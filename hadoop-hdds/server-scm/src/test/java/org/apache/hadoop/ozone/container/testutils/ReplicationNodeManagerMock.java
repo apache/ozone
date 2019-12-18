@@ -168,11 +168,11 @@ public class ReplicationNodeManagerMock implements NodeManager {
 
   /**
    * Get the count of pipelines a datanodes is associated with.
-   * @param dnId DatanodeDetails
+   * @param dn DatanodeDetails
    * @return The number of pipelines
    */
   @Override
-  public int getPipelinesCount(DatanodeDetails dnId) {
+  public int getPipelinesCount(DatanodeDetails dn) {
     throw new UnsupportedOperationException("Not yet implemented");
   }
 

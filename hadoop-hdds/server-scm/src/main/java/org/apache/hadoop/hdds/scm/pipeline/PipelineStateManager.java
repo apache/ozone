@@ -132,6 +132,13 @@ public class PipelineStateManager {
       pipeline = pipelineStateMap
           .updatePipelineState(pipelineId, PipelineState.OPEN);
     }
+    // Amend nodeIdsHash if needed.
+    if (pipeline.getType() == ReplicationType.RATIS &&
+        pipeline.getFactor() == ReplicationFactor.THREE &&
+        pipeline.getNodeIdsHash() == 0) {
+      pipeline.setNodeIdsHash(RatisPipelineUtils
+          .encodeNodeIdsOfFactorThreePipeline(pipeline.getNodes()));
+    }
     return pipeline;
   }
 

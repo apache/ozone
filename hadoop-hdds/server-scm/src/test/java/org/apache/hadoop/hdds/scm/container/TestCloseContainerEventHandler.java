@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
@@ -67,13 +68,14 @@ public class TestCloseContainerEventHandler {
         .getTestDir(TestCloseContainerEventHandler.class.getSimpleName());
     configuration
         .set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    configuration.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_NUMBER_LIMIT, 16);
     nodeManager = new MockNodeManager(true, 10);
     eventQueue = new EventQueue();
     pipelineManager =
         new SCMPipelineManager(configuration, nodeManager, eventQueue);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
-            pipelineManager.getStateManager(), configuration);
+            pipelineManager.getStateManager(), configuration, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     containerManager = new SCMContainerManager(configuration, pipelineManager);
@@ -90,6 +92,9 @@ public class TestCloseContainerEventHandler {
   public static void tearDown() throws Exception {
     if (containerManager != null) {
       containerManager.close();
+    }
+    if (pipelineManager != null) {
+      pipelineManager.close();
     }
     FileUtil.fullyDelete(testDir);
   }

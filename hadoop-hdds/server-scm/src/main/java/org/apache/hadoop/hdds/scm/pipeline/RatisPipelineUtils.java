@@ -18,9 +18,12 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.ratis.client.RaftClient;
@@ -32,7 +35,6 @@ import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Utility class for Ratis pipelines. Contains methods to create and destroy
@@ -91,6 +93,40 @@ public final class RatisPipelineUtils {
             retryPolicy, grpcTlsConfig, ozoneConf)) {
       client.groupRemove(RaftGroupId.valueOf(pipelineID.getId()),
           true, p.getId());
+    }
+  }
+
+  static int encodeNodeIdsOfFactorThreePipeline(List<DatanodeDetails> nodes) {
+    if (nodes.size() != HddsProtos.ReplicationFactor.THREE.getNumber()) {
+      return 0;
+    }
+    return nodes.get(0).getUuid().hashCode() ^
+        nodes.get(1).getUuid().hashCode() ^
+        nodes.get(2).getUuid().hashCode();
+  }
+
+  /**
+   * Return first existed pipeline which share the same set of datanodes
+   * with the input pipeline.
+   * @param stateManager PipelineStateManager
+   * @param pipeline input pipeline
+   * @return first matched pipeline
+   */
+  static Pipeline checkPipelineContainSameDatanodes(
+      PipelineStateManager stateManager, Pipeline pipeline) {
+    List<Pipeline> matchedPipelines = stateManager.getPipelines(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE)
+        .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
+            (// For all OPEN or ALLOCATED pipelines
+                p.getPipelineState() == Pipeline.PipelineState.OPEN ||
+                p.getPipelineState() == Pipeline.PipelineState.ALLOCATED) &&
+                p.getNodeIdsHash() == pipeline.getNodeIdsHash())
+        .collect(Collectors.toList());
+    if (matchedPipelines.size() == 0) {
+      return null;
+    } else {
+      return matchedPipelines.stream().findFirst().get();
     }
   }
 }
