@@ -132,6 +132,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       }
 
       omVolumeArgs.setQuotaInBytes(setVolumePropertyRequest.getQuotaInBytes());
+      omVolumeArgs.setUpdateID(transactionLogIndex);
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
