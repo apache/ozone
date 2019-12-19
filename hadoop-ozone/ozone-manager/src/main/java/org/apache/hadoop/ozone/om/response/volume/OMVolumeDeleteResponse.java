@@ -22,7 +22,6 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -39,34 +38,39 @@ public class OMVolumeDeleteResponse extends OMClientResponse {
   private String owner;
   private UserVolumeInfo updatedVolumeList;
 
-  public OMVolumeDeleteResponse(String volume, String owner,
-      UserVolumeInfo updatedVolumeList, @Nonnull OMResponse omResponse) {
+  public OMVolumeDeleteResponse(@Nonnull OMResponse omResponse,
+      @Nonnull String volume, @Nonnull String owner,
+      @Nonnull UserVolumeInfo updatedVolumeList) {
     super(omResponse);
     this.volume = volume;
     this.owner = owner;
     this.updatedVolumeList = updatedVolumeList;
   }
 
-  @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
-
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String dbUserKey = omMetadataManager.getUserKey(owner);
-      UserVolumeInfo volumeList = updatedVolumeList;
-      if (updatedVolumeList.getVolumeNamesList().size() == 0) {
-        omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
-            dbUserKey);
-      } else {
-        omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
-            volumeList);
-      }
-      omMetadataManager.getVolumeTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getVolumeKey(volume));
-    }
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMVolumeDeleteResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
+  @Override
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+
+    String dbUserKey = omMetadataManager.getUserKey(owner);
+    UserVolumeInfo volumeList = updatedVolumeList;
+    if (updatedVolumeList.getVolumeNamesList().size() == 0) {
+      omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
+          dbUserKey);
+    } else {
+      omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
+          volumeList);
+    }
+    omMetadataManager.getVolumeTable().deleteWithBatch(batchOperation,
+        omMetadataManager.getVolumeKey(volume));
+  }
 }
 

@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserVolumeInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -43,9 +42,10 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
   private UserVolumeInfo newOwnerVolumeList;
   private OmVolumeArgs newOwnerVolumeArgs;
 
-  public OMVolumeSetOwnerResponse(String oldOwner,
-      UserVolumeInfo oldOwnerVolumeList, UserVolumeInfo newOwnerVolumeList,
-      OmVolumeArgs newOwnerVolumeArgs, @Nonnull OMResponse omResponse) {
+  public OMVolumeSetOwnerResponse(@Nonnull OMResponse omResponse,
+      @Nonnull String oldOwner, @Nonnull UserVolumeInfo oldOwnerVolumeList,
+      @Nonnull UserVolumeInfo newOwnerVolumeList,
+      @Nonnull OmVolumeArgs newOwnerVolumeArgs) {
     super(omResponse);
     this.oldOwner = oldOwner;
     this.oldOwnerVolumeList = oldOwnerVolumeList;
@@ -53,29 +53,35 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
     this.newOwnerVolumeArgs = newOwnerVolumeArgs;
   }
 
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMVolumeSetOwnerResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
+  }
+
+  @Override
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String oldOwnerKey = omMetadataManager.getUserKey(oldOwner);
-      String newOwnerKey =
-          omMetadataManager.getUserKey(newOwnerVolumeArgs.getOwnerName());
-      if (oldOwnerVolumeList.getVolumeNamesList().size() == 0) {
-        omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
-            oldOwnerKey);
-      } else {
-        omMetadataManager.getUserTable().putWithBatch(batchOperation,
-            oldOwnerKey, oldOwnerVolumeList);
-      }
-      omMetadataManager.getUserTable().putWithBatch(batchOperation, newOwnerKey,
-          newOwnerVolumeList);
-
-      String dbVolumeKey =
-          omMetadataManager.getVolumeKey(newOwnerVolumeArgs.getVolume());
-      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          dbVolumeKey, newOwnerVolumeArgs);
+    String oldOwnerKey = omMetadataManager.getUserKey(oldOwner);
+    String newOwnerKey =
+        omMetadataManager.getUserKey(newOwnerVolumeArgs.getOwnerName());
+    if (oldOwnerVolumeList.getVolumeNamesList().size() == 0) {
+      omMetadataManager.getUserTable().deleteWithBatch(batchOperation,
+          oldOwnerKey);
+    } else {
+      omMetadataManager.getUserTable().putWithBatch(batchOperation,
+          oldOwnerKey, oldOwnerVolumeList);
     }
+    omMetadataManager.getUserTable().putWithBatch(batchOperation, newOwnerKey,
+        newOwnerVolumeList);
+
+    String dbVolumeKey =
+        omMetadataManager.getVolumeKey(newOwnerVolumeArgs.getVolume());
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        dbVolumeKey, newOwnerVolumeArgs);
   }
 }
