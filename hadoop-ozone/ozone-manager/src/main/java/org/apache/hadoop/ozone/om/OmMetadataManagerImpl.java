@@ -815,7 +815,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     if (StringUtil.isBlank(userName)) {
       // null userName represents listing all volumes in cluster.
-      return listAllVolumes(maxKeys);
+      return listAllVolumes(prefix, startKey, maxKeys);
     }
 
     final List<OmVolumeArgs> result = Lists.newArrayList();
@@ -858,17 +858,36 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     /**
      * @return list of all volumes.
      */
-  private List<OmVolumeArgs> listAllVolumes(int maxKeys) {
+  private List<OmVolumeArgs> listAllVolumes(String prefix, String startKey,
+      int maxKeys) {
     List<OmVolumeArgs> result = Lists.newArrayList();
 
     /* volumeTable is full-cache, so we use cacheIterator. */
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
         cacheIterator = getVolumeTable().cacheIterator();
 
+    String volumeName;
+    OmVolumeArgs omVolumeArgs;
+    boolean prefixIsEmpty = Strings.isNullOrEmpty(prefix);
+    boolean startKeyFound = Strings.isNullOrEmpty(startKey);
     while (cacheIterator.hasNext() && result.size() < maxKeys) {
       Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry =
           cacheIterator.next();
-      result.add(entry.getValue().getCacheValue());
+      omVolumeArgs = entry.getValue().getCacheValue();
+      volumeName = omVolumeArgs.getVolume();
+
+      if (!prefixIsEmpty) {
+        if (!volumeName.startsWith(prefix)) {
+          continue;
+        }
+      }
+      if (!startKeyFound && volumeName.equals(startKey)) {
+        result.add(0, omVolumeArgs);
+        startKeyFound = true;
+        continue;
+      }
+
+      result.add(omVolumeArgs);
     }
 
     return result;
