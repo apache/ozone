@@ -250,16 +250,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
           } else if (omResponse.getStatus() == METADATA_ERROR) {
             terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
-          } else {
-            // For all other errors which are not critical, we can complete
-            // future normally.
-            ratisFuture.complete(OMRatisHelper.convertResponseToMessage(
-                omResponse));
           }
-        } else {
-          ratisFuture.complete(OMRatisHelper.convertResponseToMessage(
-              omResponse));
         }
+
+        // For successful response and for all other errors which are not
+        // critical, we can complete future normally.
+        ratisFuture.complete(OMRatisHelper.convertResponseToMessage(
+            omResponse));
         return ratisFuture;
       });
       return ratisFuture;
@@ -277,8 +274,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       OMException.ResultCodes resultCode) {
     OMException exception = new OMException(omResponse.getMessage(),
         resultCode);
-    String errorMessage = "OM Response has received unrecoverable " +
-        "error, terminating OM. Error Response is" + omResponse;
+    String errorMessage = "OM Ratis Server has received unrecoverable " +
+        "error, to avoid further DB corruption, terminating OM. Error " +
+        "Response received is:" + omResponse;
     ExitUtils.terminate(1, errorMessage, exception, LOG);
   }
 

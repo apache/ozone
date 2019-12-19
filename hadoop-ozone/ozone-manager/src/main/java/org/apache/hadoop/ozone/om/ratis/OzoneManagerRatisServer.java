@@ -183,9 +183,16 @@ public final class OzoneManagerRatisServer {
         OMResponse.Builder omResponse = OMResponse.newBuilder();
         omResponse.setCmdType(omRequest.getCmdType());
         omResponse.setSuccess(false);
-        omResponse.setMessage(stateMachineException.getCause().getMessage());
-        omResponse.setStatus(
-            exceptionToResponseStatus(stateMachineException.getCause()));
+        if (stateMachineException.getCause() != null) {
+          omResponse.setMessage(stateMachineException.getCause().getMessage());
+          omResponse.setStatus(
+              exceptionToResponseStatus(stateMachineException.getCause()));
+        } else {
+          // Current Ratis is setting cause, this is an safer side check.
+          LOG.error("StateMachine exception cause is not set");
+          omResponse.setStatus(OzoneManagerProtocolProtos.Status.INTERNAL_ERROR);
+        }
+
         if (LOG.isDebugEnabled()) {
           LOG.debug("Error while executing ratis request. " +
               "stateMachineException: ", stateMachineException);
@@ -215,11 +222,6 @@ public final class OzoneManagerRatisServer {
    */
   private OzoneManagerProtocolProtos.Status exceptionToResponseStatus(
       Throwable cause) {
-    if (cause == null) {
-      // Current Ratis is setting cause, this is an safer side check.
-      LOG.error("StateMachine exception cause is not set");
-      return OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
-    }
     if (cause instanceof OMException) {
       return OzoneManagerProtocolProtos.Status.values()[
           ((OMException) cause).getResult().ordinal()];
