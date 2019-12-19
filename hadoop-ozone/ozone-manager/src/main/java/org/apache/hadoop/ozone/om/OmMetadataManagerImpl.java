@@ -806,19 +806,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   /**
    * @param userName volume owner, null for listing all volumes.
-   * @throws IOException
    */
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
-    List<OmVolumeArgs> result = Lists.newArrayList();
-    List<UserVolumeInfo> volumes = Lists.newArrayList();
+
+    UserVolumeInfo volumes;
 
     if (StringUtil.isBlank(userName)) {
       // null userName represents listing all volumes in cluster.
       return listAllVolumes(maxKeys);
-    } else {
-      volumes.add(getVolumesByUser(userName));
     }
 
     final List<OmVolumeArgs> result = Lists.newArrayList();
@@ -850,6 +847,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           throw new OMException("Volume info not found for " + volumeName,
               ResultCodes.VOLUME_NOT_FOUND);
         }
+        result.add(volumeArgs);
       }
       index++;
     }
@@ -859,9 +857,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     /**
      * @return list of all volumes.
-     * @throws IOException
      */
-  private List<OmVolumeArgs> listAllVolumes(int maxKeys) throws IOException {
+  private List<OmVolumeArgs> listAllVolumes(int maxKeys) {
     List<OmVolumeArgs> result = Lists.newArrayList();
 
     /* volumeTable is full-cache, so we use cacheIterator. */
