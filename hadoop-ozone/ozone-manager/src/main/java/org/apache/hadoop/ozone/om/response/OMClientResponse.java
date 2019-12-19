@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -41,12 +42,36 @@ public abstract class OMClientResponse {
   }
 
   /**
-   * Implement logic to add the response to batch.
+   * For error or replay cases, check that the status of omResponse is not OK.
+   */
+  public void checkStatusNotOK() {
+    Preconditions.checkArgument(!omResponse.getStatus().equals(
+        OzoneManagerProtocolProtos.Status.OK));
+  }
+
+  /**
+   * Check if omResponse status is OK. If yes, add to DB.
+   * For OmResponse with failure, this should do nothing. This method is not
+   * called in failure scenario in OM code.
    * @param omMetadataManager
    * @param batchOperation
    * @throws IOException
    */
-  public abstract void addToDBBatch(OMMetadataManager omMetadataManager,
+  public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    if (omResponse.getStatus() == OzoneManagerProtocolProtos.Status.OK) {
+      addToDBBatch(omMetadataManager, batchOperation);
+    }
+  }
+
+  /**
+   * Implement logic to add the response to batch. This function should be
+   * called from checkAndUpdateDB only.
+   * @param omMetadataManager
+   * @param batchOperation
+   * @throws IOException
+   */
+  protected abstract void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException;
 
   /**
