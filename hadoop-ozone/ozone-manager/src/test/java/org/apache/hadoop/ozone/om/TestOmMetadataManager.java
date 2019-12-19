@@ -97,7 +97,15 @@ public class TestOmMetadataManager {
     String ownerName;
     for (int i = 0; i < 50; i++) {
       ownerName = "owner" + i;
-      volName = "vol" + i;
+      volName = "vola" + i;
+      OmVolumeArgs omVolumeArgs = argsBuilder.
+          setOwnerName(ownerName).setVolume(volName).build();
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+    for (int i = 0; i < 50; i++) {
+      ownerName = "owner" + i;
+      volName = "volb" + i;
       OmVolumeArgs omVolumeArgs = argsBuilder.
           setOwnerName(ownerName).setVolume(volName).build();
       TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
@@ -108,9 +116,22 @@ public class TestOmMetadataManager {
     String startKey = "";
 
     // Test list all volumes
-    List<OmVolumeArgs> volList = omMetadataManager.listVolumes(null,
-            prefix, startKey, 1000);
-    Assert.assertEquals(volList.size(), 50);
+    List<OmVolumeArgs> volListA = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListA.size(), 100);
+
+    // Test list all volumes with prefix
+    prefix = "volb";
+    List<OmVolumeArgs> volListB = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListB.size(), 50);
+
+    // Test list all volumes with startKey
+    prefix = "";
+    startKey = "vola1";
+    List<OmVolumeArgs> volListC = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListC.size(), 100);
   }
 
   @Test
