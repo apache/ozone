@@ -23,12 +23,10 @@ source "$COMPOSE_DIR/../../testlib.sh"
 
 start_docker_env
 
-execute_robot_test scm createmrenv.robot
-
-
 #rm is the container name (resource manager) and not the rm command
-execute_command_in_container rm sudo apk add --update py-pip
-execute_command_in_container rm sudo pip install robotframework
+execute_command_in_container rm bash -c "if test -e /sbin/apk; then sudo apk add --update py-pip; sudo pip install robotframework; fi"
+
+execute_robot_test scm createmrenv.robot
 
 # reinitialize the directories to use
 export OZONE_DIR=/opt/ozone

@@ -117,7 +117,7 @@ execute_robot_test(){
 execute_command_in_container(){
   set -e
   # shellcheck disable=SC2068
-  docker-compose -f "$COMPOSE_FILE" exec -T $@
+  docker-compose -f "$COMPOSE_FILE" exec -T "$@"
   set +e
 }
 
