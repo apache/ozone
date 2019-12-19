@@ -122,7 +122,8 @@ public class TestOMVolumeDeleteResponse {
         omResponse);
 
     try {
-      omVolumeDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omVolumeDeleteResponse.checkAndUpdateDB(omMetadataManager,
+          batchOperation);
     } catch (IOException ex) {
       fail("testAddToDBBatchFailure failed");
     }

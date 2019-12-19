@@ -233,7 +233,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String adminName = "user1";
     String ownerName = "user1";
-    OMRequest originalRequest = createVolumeRequest(volumeName,adminName,
+    OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
         ownerName);
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(originalRequest);
