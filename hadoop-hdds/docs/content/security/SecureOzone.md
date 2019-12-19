@@ -63,7 +63,7 @@ modifications to the block.
 ### S3AuthInfo ###
 
 S3 uses a very different shared secret security scheme. Ozone supports the AWS Signature Version 4 protocol,
-and from the end users perspective Ozone's s3 feels exactly like AWS S3.
+and from the end users perspective Ozone's S3 feels exactly like AWS S3.
 
 The S3 credential tokens are called S3 auth info in the code. These tokens are
 also enabled by default when security is enabled.
