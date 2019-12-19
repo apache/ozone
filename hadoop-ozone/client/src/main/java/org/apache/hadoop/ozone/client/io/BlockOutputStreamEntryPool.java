@@ -70,7 +70,7 @@ public class BlockOutputStreamEntryPool {
   private final long openID;
   private final ExcludeList excludeList;
 
-  @SuppressWarnings("parameternumber")
+  @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(OzoneManagerProtocol omClient,
       int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType type, long bufferFlushSize, long bufferMaxSize,
@@ -227,9 +227,9 @@ public class BlockOutputStreamEntryPool {
       while (streamEntryIterator.hasNext()) {
         BlockOutputStreamEntry streamEntry = streamEntryIterator.next();
         Preconditions.checkArgument(streamEntry.getCurrentPosition() == 0);
-        if ((pipelineId != null && streamEntry.getPipeline().getId()
-            .equals(pipelineId)) || (containerID != -1
-            && streamEntry.getBlockID().getContainerID() == containerID)) {
+        if ((streamEntry.getPipeline().getId().equals(pipelineId)) ||
+            (containerID != -1 &&
+                streamEntry.getBlockID().getContainerID() == containerID)) {
           streamEntryIterator.remove();
         }
       }
@@ -249,7 +249,8 @@ public class BlockOutputStreamEntryPool {
   }
 
   long getKeyLength() {
-    return streamEntries.stream().mapToLong(e -> e.getCurrentPosition()).sum();
+    return streamEntries.stream().mapToLong(
+        BlockOutputStreamEntry::getCurrentPosition).sum();
   }
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
@@ -310,21 +311,12 @@ public class BlockOutputStreamEntryPool {
       Preconditions.checkNotNull(omClient);
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
-      int succeededAllocates = 0;
-      try {
-        allocateNewBlock();
-        succeededAllocates += 1;
-      } catch (IOException ioe) {
-        LOG.error("Try to allocate more blocks for write failed, already "
-            + "allocated {} blocks for this write.", succeededAllocates, ioe);
-        throw ioe;
-      }
+      allocateNewBlock();
     }
     // in theory, this condition should never violate due the check above
     // still do a sanity check.
     Preconditions.checkArgument(currentStreamIndex < streamEntries.size());
-    BlockOutputStreamEntry current = streamEntries.get(currentStreamIndex);
-    return current;
+    return streamEntries.get(currentStreamIndex);
   }
 
   long computeBufferData() {
