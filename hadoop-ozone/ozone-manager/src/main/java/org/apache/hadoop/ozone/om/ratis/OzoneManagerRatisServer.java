@@ -190,7 +190,8 @@ public final class OzoneManagerRatisServer {
         } else {
           // Current Ratis is setting cause, this is an safer side check.
           LOG.error("StateMachine exception cause is not set");
-          omResponse.setStatus(OzoneManagerProtocolProtos.Status.INTERNAL_ERROR);
+          omResponse.setStatus(
+              OzoneManagerProtocolProtos.Status.INTERNAL_ERROR);
         }
 
         if (LOG.isDebugEnabled()) {
