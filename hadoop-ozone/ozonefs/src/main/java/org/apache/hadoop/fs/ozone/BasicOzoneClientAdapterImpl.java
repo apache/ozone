@@ -478,7 +478,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     }
 
     OmKeyLocationInfoGroup omKeyLocationInfoGroup =
-        omKeyLocationInfoGroups.iterator().next();
+        keyInfo.getLatestVersionLocations();
     BlockLocation[] blockLocations = new BlockLocation[
         omKeyLocationInfoGroup.getBlocksLatestVersionOnly().size()];
 
@@ -501,7 +501,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       String[] hosts = hostList.toArray(new String[hostList.size()]);
       String[] names = nameList.toArray(new String[nameList.size()]);
       BlockLocation blockLocation = new BlockLocation(
-          names, hosts, 0, fileStatus.getLen());
+          names, hosts, omKeyLocationInfo.getOffset(),
+          omKeyLocationInfo.getLength());
       blockLocations[i++] = blockLocation;
     }
     return blockLocations;
