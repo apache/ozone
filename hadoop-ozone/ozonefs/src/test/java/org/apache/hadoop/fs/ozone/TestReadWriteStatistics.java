@@ -37,6 +37,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 import java.util.Arrays;
 import java.util.EnumSet;
 
@@ -234,6 +236,33 @@ public class TestReadWriteStatistics {
 
       assertBytesWrittenAndWriteNumOps(0, i);
     }
+  }
+
+  @Test
+  public void testBufferReadCallsIncreaseStatistics()
+      throws Exception {
+    setupFakeInputStreamToReadNumBytesOnMultiByteRead(128);
+    ByteBuffer buffer = ByteBuffer.wrap(buff);
+    FSDataInputStream stream = fs.open(aPath);
+
+    stream.read(buffer);
+
+    assertBytesReadAndReadNumOps(128, 1);
+  }
+
+  @Test
+  public void testReadToReadOnlyBufferDoesNotChangeStats() throws Exception {
+    setupFakeInputStreamToReadNumBytesOnMultiByteRead(128);
+    ByteBuffer buffer = ByteBuffer.wrap(buff).asReadOnlyBuffer();
+    FSDataInputStream stream = fs.open(aPath);
+
+    try {
+      stream.read(buffer);
+    } catch (ReadOnlyBufferException e) {
+      // Expected
+    }
+
+    assertBytesReadAndReadNumOps(0, 1);
   }
 
   @Test

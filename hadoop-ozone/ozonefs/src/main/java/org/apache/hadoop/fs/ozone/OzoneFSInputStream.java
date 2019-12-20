@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.ozone;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -99,12 +100,15 @@ public final class OzoneFSInputStream extends FSInputStream
    */
   @Override
   public int read(ByteBuffer buf) throws IOException {
+    if (buf.isReadOnly()){
+      throw new ReadOnlyBufferException();
+    }
 
     int bufInitPos = buf.position();
-    int readLen = Math.min(buf.remaining(), inputStream.available());
+    int readLen = Math.min(buf.remaining(), available());
 
     byte[] readData = new byte[readLen];
-    int bytesRead = inputStream.read(readData, bufInitPos, readLen);
+    int bytesRead = read(readData, bufInitPos, readLen);
     buf.put(readData);
 
     return bytesRead;
