@@ -62,7 +62,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
-
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_VOLUME_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.S3_BUCKET_MAX_LENGTH;
 import static org.apache.hadoop.ozone.OzoneConsts.S3_BUCKET_MIN_LENGTH;
@@ -128,14 +127,11 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
         OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
-    omMetrics.incNumS3BucketCreates();
 
     // When s3 Bucket is created, we internally create ozone volume/ozone
     // bucket.
-
     // ozone volume name is generated from userName by calling
     // formatOzoneVolumeName.
-
     // ozone bucket name is same as s3 bucket name.
     // In S3 buckets are unique, so we create a mapping like s3BucketName ->
     // ozoneVolume/ozoneBucket and add it to s3 mapping table. If
@@ -156,8 +152,30 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
       acquiredS3Lock = omMetadataManager.getLock().acquireWriteLock(
           S3_BUCKET_LOCK, s3BucketName);
 
-      // First check if this s3Bucket exists
+      // First check if this s3Bucket exists in S3 table
       if (omMetadataManager.getS3Table().isExist(s3BucketName)) {
+        // Check if Bucket exists in Bucket Table
+        String omBucketKey = omMetadataManager.getBucketKey(volumeName,
+            s3BucketName);
+        OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable()
+            .get(omBucketKey);
+        if (dbBucketInfo != null) {
+          // Check if this transaction is a replay of ratis logs.
+          if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
+              transactionLogIndex)) {
+            // Replay implies the response has already been returned to
+            // the client. So take no further action and return a dummy
+            // OMClientResponse.
+            LOG.debug("Replayed Transaction {} ignored. Request: {}",
+                transactionLogIndex, s3CreateBucketRequest);
+            return new S3BucketCreateResponse(
+                createReplayOMResponse(omResponse));
+          }
+        } else {
+          throw new OMException("S3Bucket " + s3BucketName + " mapping " +
+              "already exists in S3 table but Bucket does not exist.",
+              OMException.ResultCodes.S3_BUCKET_ALREADY_EXISTS);
+        }
         throw new OMException("S3Bucket " + s3BucketName + " already exists",
             OMException.ResultCodes.S3_BUCKET_ALREADY_EXISTS);
       }
@@ -225,7 +243,20 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
           omVolumeCreateResponse,
           omBucketCreateResponse, s3BucketName,
           formatS3MappingName(volumeName, s3BucketName));
+
+      // Update metrics
+      if (volumeCreated) {
+        omMetrics.incNumVolumes();
+      }
+      omMetrics.incNumBuckets();
+      omMetrics.incNumS3Buckets();
+      omMetrics.incNumS3BucketCreates();
+      LOG.debug("S3Bucket is successfully created for userName: {}, " +
+          "s3BucketName {}, volumeName {}", userName, s3BucketName, volumeName);
     } catch (IOException ex) {
+      LOG.error("S3Bucket Creation Failed for userName: {}, s3BucketName {}, " +
+          "VolumeName {}", userName, s3BucketName, volumeName);
+      omMetrics.incNumS3BucketCreateFails();
       exception = ex;
       omClientResponse = new S3BucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
@@ -247,25 +278,8 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
             buildAuditMap(userName, s3BucketName), exception,
             getOmRequest().getUserInfo()));
 
-    if (exception == null) {
-      LOG.debug("S3Bucket is successfully created for userName: {}, " +
-          "s3BucketName {}, volumeName {}", userName, s3BucketName, volumeName);
-      OMVolumeCreateResponse omVolumeCreateResponse = null;
-      if (volumeCreated) {
-        omMetrics.incNumVolumes();
-      }
-      omMetrics.incNumBuckets();
-      omMetrics.incNumS3Buckets();
-
-      return omClientResponse;
-    } else {
-      LOG.error("S3Bucket Creation Failed for userName: {}, s3BucketName {}, " +
-          "VolumeName {}", userName, s3BucketName, volumeName);
-      omMetrics.incNumS3BucketCreateFails();
-      return omClientResponse;
-    }
+    return omClientResponse;
   }
-
 
   private OmBucketInfo createBucket(OzoneManager ozoneManager,
       String volumeName, String s3BucketName, String userName,
@@ -293,18 +307,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
             new CacheValue<>(Optional.of(omBucketInfo), transactionLogIndex));
       } else {
         // This can happen when a ozone bucket exists already in the
-        // volume, but this is not a s3 bucket or when the transaction is a
-        // replay.
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
-            transactionLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          LOG.debug("Replayed Transaction {} ignored. Request: {}",
-              transactionLogIndex, s3CreateBucketRequest);
-          return null;
-        }
+        // volume, but this is not a s3 bucket
         throw new OMException("Bucket " + s3BucketName + " already exists",
             OMException.ResultCodes.BUCKET_ALREADY_EXISTS);
       }
