@@ -78,7 +78,7 @@ public final class TestOMResponseUtils {
     String s3Mapping = S3BucketCreateRequest.formatS3MappingName(volumeName,
         s3BucketName);
     return
-        new S3BucketCreateResponse(omVolumeCreateResponse,
-            omBucketCreateResponse, s3BucketName, s3Mapping, omResponse);
+        new S3BucketCreateResponse(omResponse, omVolumeCreateResponse,
+            omBucketCreateResponse, s3BucketName, s3Mapping);
   }
 }

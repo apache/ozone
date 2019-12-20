@@ -25,7 +25,6 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,26 +125,34 @@ public class S3BucketDeleteRequest extends OMVolumeRequest {
         String bucketKey = omMetadataManager.getBucketKey(volumeName,
             s3BucketName);
 
-        // Check if this transaction is a replay of ratis logs.
-        // If this is a replay, then the response has already been returned to
-        // the client. So take no further action and return a dummy
-        // OMClientResponse.
+        // Check if Bucket exists in DB.
         OmBucketInfo dbBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
-        if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
-            transactionLogIndex)) {
-          LOG.debug("Replayed Transaction {} ignored. Request: {}",
-              transactionLogIndex, s3DeleteBucketRequest);
-          return new S3BucketDeleteResponse(createReplayOMResponse(omResponse));
-        }
+        if (dbBucketInfo != null) {
+          // Check if this transaction is a replay of ratis logs.
+          // If this is a replay, then the response has already been returned to
+          // the client. So take no further action and return a dummy
+          // OMClientResponse.
+          if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
+              transactionLogIndex)) {
+            LOG.debug("Replayed Transaction {} ignored. Request: {}",
+                transactionLogIndex, s3DeleteBucketRequest);
+            return new S3BucketDeleteResponse(
+                createReplayOMResponse(omResponse));
+          }
 
-        // Update bucket table cache and s3 table cache.
-        omMetadataManager.getBucketTable().addCacheEntry(
-            new CacheKey<>(bucketKey),
-            new CacheValue<>(Optional.absent(), transactionLogIndex));
-        omMetadataManager.getS3Table().addCacheEntry(
-            new CacheKey<>(s3BucketName),
-            new CacheValue<>(Optional.absent(), transactionLogIndex));
+          // Update bucket table cache and s3 table cache.
+          omMetadataManager.getBucketTable().addCacheEntry(
+              new CacheKey<>(bucketKey),
+              new CacheValue<>(Optional.absent(), transactionLogIndex));
+          omMetadataManager.getS3Table().addCacheEntry(
+              new CacheKey<>(s3BucketName),
+              new CacheValue<>(Optional.absent(), transactionLogIndex));
+        } else {
+          LOG.debug("bucket: {} not found ", bucketKey);
+          throw new OMException("Bucket doesn't exist",
+              OMException.ResultCodes.BUCKET_NOT_FOUND);
+        }
       }
 
       omResponse.setDeleteS3BucketResponse(

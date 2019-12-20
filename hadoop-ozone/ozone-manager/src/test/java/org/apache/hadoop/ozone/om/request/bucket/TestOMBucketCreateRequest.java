@@ -153,14 +153,26 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
     // As now after validateAndUpdateCache it should add entry to cache, get
     // should return non null value.
-    OmBucketInfo omBucketInfo =
+    OmBucketInfo dbBucketInfo =
         omMetadataManager.getBucketTable().get(bucketKey);
     Assert.assertNotNull(omMetadataManager.getBucketTable().get(bucketKey));
 
     // verify table data with actual request data.
-    Assert.assertEquals(OmBucketInfo.getFromProtobuf(
-        modifiedRequest.getCreateBucketRequest().getBucketInfo()),
-        omBucketInfo);
+    OmBucketInfo bucketInfoFromProto = OmBucketInfo.getFromProtobuf(
+        modifiedRequest.getCreateBucketRequest().getBucketInfo());
+
+    Assert.assertEquals(bucketInfoFromProto.getCreationTime(),
+        dbBucketInfo.getCreationTime());
+    Assert.assertEquals(bucketInfoFromProto.getAcls(),
+        dbBucketInfo.getAcls());
+    Assert.assertEquals(bucketInfoFromProto.getIsVersionEnabled(),
+        dbBucketInfo.getIsVersionEnabled());
+    Assert.assertEquals(bucketInfoFromProto.getStorageType(),
+        dbBucketInfo.getStorageType());
+    Assert.assertEquals(bucketInfoFromProto.getMetadata(),
+        dbBucketInfo.getMetadata());
+    Assert.assertEquals(bucketInfoFromProto.getEncryptionKeyInfo(),
+        dbBucketInfo.getEncryptionKeyInfo());
 
     // verify OMResponse.
     verifySuccessCreateBucketResponse(omClientResponse.getOMResponse());

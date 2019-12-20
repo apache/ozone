@@ -40,7 +40,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithMetadata implements Auditable{
+public final class OmBucketInfo extends WithMetadata implements Auditable {
   /**
    * Name of the volume in which the bucket belongs to.
    */
@@ -220,7 +220,7 @@ public final class OmBucketInfo extends WithMetadata implements Auditable{
 
   /**
    * Set the Object ID. If this value is already set then this function throws.
-   * There is a reason why we cannot use the final here. The OmVolumeArgs is
+   * There is a reason why we cannot use the final here. The OMBucketInfo is
    * deserialized from the protobuf in many places in code. We need to set
    * this object ID, after it is deserialized.
    *
