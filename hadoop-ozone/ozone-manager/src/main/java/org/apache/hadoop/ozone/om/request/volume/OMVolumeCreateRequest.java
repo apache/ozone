@@ -132,8 +132,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         }
       }
 
-      UserVolumeInfo volumeList = null;
-
       // acquire lock.
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
@@ -146,6 +144,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       OmVolumeArgs dbVolumeArgs =
           omMetadataManager.getVolumeTable().get(dbVolumeKey);
 
+      UserVolumeInfo volumeList = null;
       if (dbVolumeArgs == null) {
         String dbUserKey = omMetadataManager.getUserKey(owner);
         volumeList = omMetadataManager.getUserTable().get(dbUserKey);
@@ -156,18 +155,29 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
         omResponse.setCreateVolumeResponse(CreateVolumeResponse.newBuilder()
             .build());
-        omClientResponse = new OMVolumeCreateResponse(omVolumeArgs, volumeList,
-            omResponse.build());
+        omClientResponse = new OMVolumeCreateResponse(omResponse.build(),
+            omVolumeArgs, volumeList);
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
       } else {
-        LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
-        throw new OMException("Volume already exists",
-            OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
+        // Check if this transaction is a replay of ratis logs.
+        if (isReplay(ozoneManager, dbVolumeArgs.getUpdateID(),
+            transactionLogIndex)) {
+          // Replay implies the response has already been returned to
+          // the client. So take no further action and return a dummy
+          // OMClientResponse.
+          LOG.debug("Replayed Transaction {} ignored. Request: {}",
+              transactionLogIndex, createVolumeRequest);
+          return new OMVolumeCreateResponse(createReplayOMResponse(omResponse));
+        } else {
+          LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
+          throw new OMException("Volume already exists",
+              OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
+        }
       }
 
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMVolumeCreateResponse(null, null,
+      omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {

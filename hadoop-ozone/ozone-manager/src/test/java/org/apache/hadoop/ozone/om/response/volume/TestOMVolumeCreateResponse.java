@@ -83,7 +83,7 @@ public class TestOMVolumeCreateResponse {
         .setOwnerName(userName).setAdminName(userName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
     OMVolumeCreateResponse omVolumeCreateResponse =
-        new OMVolumeCreateResponse(omVolumeArgs, volumeList, omResponse);
+        new OMVolumeCreateResponse(omResponse, omVolumeArgs, volumeList);
 
     omVolumeCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -112,10 +112,11 @@ public class TestOMVolumeCreateResponse {
         .build();
 
     OMVolumeCreateResponse omVolumeCreateResponse =
-        new OMVolumeCreateResponse(null, null, omResponse);
+        new OMVolumeCreateResponse(omResponse);
 
     try {
-      omVolumeCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
+      omVolumeCreateResponse.checkAndUpdateDB(omMetadataManager,
+          batchOperation);
       Assert.assertTrue(omMetadataManager.countRowsInTable(
           omMetadataManager.getVolumeTable()) == 0);
     } catch (IOException ex) {

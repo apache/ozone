@@ -173,9 +173,13 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
         // ozone volume.
         String volumeKey = omMetadataManager.getVolumeKey(volumeName);
         if (!omMetadataManager.getVolumeTable().isExist(volumeKey)) {
+          // A replay transaction for S3BucketCreate can reach here only if the
+          // volume has been deleted in later transactions. Hence, we can
+          // continue with this request irrespective of whether it is a
+          // replay or not.
           OmVolumeArgs omVolumeArgs = createOmVolumeArgs(volumeName, userName,
-              s3CreateBucketRequest.getS3CreateVolumeInfo()
-                  .getCreationTime());
+              s3CreateBucketRequest.getS3CreateVolumeInfo().getCreationTime(),
+              transactionLogIndex);
           UserVolumeInfo volumeList = omMetadataManager.getUserTable().get(
               omMetadataManager.getUserKey(userName));
           volumeList = addVolumeToOwnerList(volumeList,
@@ -184,8 +188,8 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
           createVolume(omMetadataManager, omVolumeArgs, volumeList, volumeKey,
               omMetadataManager.getUserKey(userName), transactionLogIndex);
           volumeCreated = true;
-          omVolumeCreateResponse = new OMVolumeCreateResponse(omVolumeArgs,
-              volumeList, omResponse.build());
+          omVolumeCreateResponse = new OMVolumeCreateResponse(
+              omResponse.build(), omVolumeArgs, volumeList);
         }
       } finally {
         if (acquiredUserLock) {
@@ -327,12 +331,14 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
    * @return {@link OmVolumeArgs}
    */
   private OmVolumeArgs createOmVolumeArgs(String volumeName, String userName,
-      long creationTime) throws IOException {
+      long creationTime, long transactionLogIndex) throws IOException {
     OmVolumeArgs.Builder builder = OmVolumeArgs.newBuilder()
         .setAdminName(S3_ADMIN_NAME).setVolume(volumeName)
         .setQuotaInBytes(OzoneConsts.MAX_QUOTA_IN_BYTES)
         .setOwnerName(userName)
-        .setCreationTime(creationTime);
+        .setCreationTime(creationTime)
+        .setObjectID(transactionLogIndex)
+        .setUpdateID(transactionLogIndex);
 
     // Set default acls.
     for (OzoneAcl acl : getDefaultAcls(userName)) {

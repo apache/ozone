@@ -33,6 +33,7 @@
     <module>ozone-manager</module>
     <module>tools</module>
     <module>integration-test</module>
+    <module>ozonefs</module>
     <module>datanode</module>
     <module>s3gateway</module>
     <module>dist</module>
@@ -358,7 +359,6 @@
         </property>
       </activation>
       <modules>
-        <module>ozonefs</module>
         <module>ozonefs-lib-current</module>
         <module>ozonefs-lib-legacy</module>
       </modules>

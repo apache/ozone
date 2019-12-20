@@ -92,12 +92,6 @@ jobs:
   acceptance:
     name: acceptance
     runs-on: ubuntu-18.04
-    needs:
-       - build
-       - rat
-       - checkstyle
-       - unit
-       - findbugs
     steps:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv

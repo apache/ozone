@@ -85,7 +85,7 @@ public class TestOMVolumeSetOwnerResponse {
         .setOwnerName(oldOwner).setAdminName(oldOwner)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
     OMVolumeCreateResponse omVolumeCreateResponse =
-        new OMVolumeCreateResponse(omVolumeArgs, volumeList, omResponse);
+        new OMVolumeCreateResponse(omResponse, omVolumeArgs, volumeList);
 
 
 
@@ -104,8 +104,8 @@ public class TestOMVolumeSetOwnerResponse {
         .build();
 
     OMVolumeSetOwnerResponse omVolumeSetOwnerResponse =
-        new OMVolumeSetOwnerResponse(oldOwner,  oldOwnerVolumeList,
-            newOwnerVolumeList, newOwnerVolumeArgs, omResponse);
+        new OMVolumeSetOwnerResponse(omResponse, oldOwner,  oldOwnerVolumeList,
+            newOwnerVolumeList, newOwnerVolumeArgs);
 
     omVolumeCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
     omVolumeSetOwnerResponse.addToDBBatch(omMetadataManager, batchOperation);
@@ -140,10 +140,11 @@ public class TestOMVolumeSetOwnerResponse {
         .build();
 
     OMVolumeSetOwnerResponse omVolumeSetOwnerResponse =
-        new OMVolumeSetOwnerResponse(null, null, null, null, omResponse);
+        new OMVolumeSetOwnerResponse(omResponse);
 
     try {
-      omVolumeSetOwnerResponse.addToDBBatch(omMetadataManager, batchOperation);
+      omVolumeSetOwnerResponse.checkAndUpdateDB(omMetadataManager,
+          batchOperation);
       Assert.assertTrue(omMetadataManager.countRowsInTable(
           omMetadataManager.getVolumeTable()) == 0);
     } catch (IOException ex) {
