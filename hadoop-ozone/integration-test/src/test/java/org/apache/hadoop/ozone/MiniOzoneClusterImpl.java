@@ -72,6 +72,8 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState
     .HEALTHY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.
+    OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
@@ -773,6 +775,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       conf.set(RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY, "2s");
       conf.set(RECON_OM_SNAPSHOT_TASK_INTERVAL, "10s");
+      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
     }
   }
 }

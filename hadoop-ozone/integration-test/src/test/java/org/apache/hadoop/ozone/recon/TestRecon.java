@@ -206,10 +206,11 @@ public class TestRecon {
     String containerResponse = makeHttpCall(containerKeyServiceURL);
     Map map = new Gson().fromJson(containerResponse, HashMap.class);
     LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
-    long reconMetadataKeyCount = (long)(double)linkedTreeMap.get("totalCount");
+    long reconMetadataContainerCount = (long)(double)
+        linkedTreeMap.get("totalCount");
 
     //verify count of keys after full snapshot
-    Assert.assertEquals(omMetadataKeyCount, reconMetadataKeyCount);
+    Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
 
     //verify if Recon Metadata captures vol0/bucket0/key0 info in container0
     ArrayList containers = (ArrayList) linkedTreeMap.get("containers");
@@ -243,10 +244,10 @@ public class TestRecon {
     containerResponse = makeHttpCall(containerKeyServiceURL);
     map = new Gson().fromJson(containerResponse, HashMap.class);
     linkedTreeMap = (LinkedTreeMap) map.get("data");
-    reconMetadataKeyCount = (long)(double)linkedTreeMap.get("totalCount");
+    reconMetadataContainerCount = (long)(double)linkedTreeMap.get("totalCount");
 
     //verify count of keys
-    Assert.assertEquals(omMetadataKeyCount, reconMetadataKeyCount);
+    Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
 
     //verify if Recon Metadata captures vol3/bucket3/key3 info in container3
     containers = (ArrayList) linkedTreeMap.get("containers");
@@ -289,10 +290,10 @@ public class TestRecon {
     containerResponse = makeHttpCall(containerKeyServiceURL);
     map = new Gson().fromJson(containerResponse, HashMap.class);
     linkedTreeMap = (LinkedTreeMap) map.get("data");
-    reconMetadataKeyCount = (long)(double)linkedTreeMap.get("totalCount");
+    reconMetadataContainerCount = (long)(double)linkedTreeMap.get("totalCount");
 
     //verify count of keys
-    Assert.assertEquals(omMetadataKeyCount, reconMetadataKeyCount);
+    Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
 
     //verify if Recon Metadata captures vol7/bucket7/key7 info in container7
     containers = (ArrayList) linkedTreeMap.get("containers");
@@ -331,12 +332,16 @@ public class TestRecon {
     return (long)(double) deltaUpdatesEntity.get("lastUpdatedSeqNumber");
   }
 
+  /**
+   * Helper function to add voli/bucketi/keyi to containeri to OM Metadata.
+   * For test purpose each container will have only one key.
+   */
   private void addKeys(int start, int end) throws Exception {
     for(int i = start; i < end; i++) {
       Pipeline pipeline = getRandomPipeline();
       List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
-      BlockID blockID1 = new BlockID(i, 1);
-      OmKeyLocationInfo omKeyLocationInfo1 = getOmKeyLocationInfo(blockID1,
+      BlockID blockID = new BlockID(i, 1);
+      OmKeyLocationInfo omKeyLocationInfo1 = getOmKeyLocationInfo(blockID,
           pipeline);
       omKeyLocationInfoList.add(omKeyLocationInfo1);
       OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
