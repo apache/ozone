@@ -18,7 +18,7 @@ cd "$DIR/../../.." || exit 1
 
 export MAVEN_OPTS="-Xmx4096m"
 mvn -B install -DskipTests
-mvn -B -fn test -pl :hadoop-ozone-integration-test,:hadoop-ozone-filesystem,:hadoop-ozone-tools "$@"
+mvn -B -fn test -pl :hadoop-ozone-integration-test "$@"
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/integration"}
 mkdir -p "$REPORT_DIR"
