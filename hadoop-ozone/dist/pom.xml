@@ -388,6 +388,45 @@
       </dependencies>
 
     </profile>
+
+    <profile>
+      <id>src</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <inherited>false</inherited>
+            <executions>
+              <execution>
+                <id>src-dist</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>single</goal>
+                </goals>
+                <configuration>
+                  <archiveBaseDirectory>../..</archiveBaseDirectory>
+                  <appendAssemblyId>false</appendAssemblyId>
+                  <attach>false</attach>
+                  <finalName>hadoop-ozone-${project.version}-src</finalName>
+                  <outputDirectory>target</outputDirectory>
+                  <basedir>${project.basedir}/../..</basedir>
+                  <!-- Not using descriptorRef and hadoop-assembly dependency -->
+                  <!-- to avoid making hadoop-main to depend on a module      -->
+                  <descriptors>
+                    <descriptor>${project.basedir}/src/main/assemblies/ozone-src.xml</descriptor>
+                  </descriptors>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
     <profile>
       <id>docker-build</id>
       <build>
