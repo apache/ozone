@@ -266,8 +266,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
     auditMap.put(OzoneConsts.STORAGE_TYPE,
         (this.storageType != null) ? this.storageType.name() : null);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
-    auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.getObjectID()));
-    auditMap.put(OzoneConsts.UPDATE_ID, String.valueOf(this.getUpdateID()));
     return auditMap;
   }
 
