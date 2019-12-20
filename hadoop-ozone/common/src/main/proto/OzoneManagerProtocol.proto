@@ -311,6 +311,9 @@ enum Status {
     INVALID_PART_ORDER = 56;
     SCM_GET_PIPELINE_EXCEPTION = 57;
     INVALID_BUCKET_NAME = 58;
+
+    // When transactions are replayed
+    REPLAY = 100;
 }
 
 /**

@@ -53,7 +53,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
-
 /**
  * Handles set Quota request for volume.
  */
@@ -79,15 +78,12 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         OzoneManagerProtocolProtos.Type.SetVolumeProperty).setStatus(
         OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
 
-
-
     // In production this will never happen, this request will be called only
     // when we have quota in bytes is set in setVolumePropertyRequest.
     if (!setVolumePropertyRequest.hasQuotaInBytes()) {
       omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
           .setSuccess(false);
-      return new OMVolumeSetQuotaResponse(null,
-          omResponse.build());
+      return new OMVolumeSetQuotaResponse(omResponse.build());
     }
 
     String volume = setVolumePropertyRequest.getVolumeName();
@@ -124,7 +120,19 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
         throw new OMException(OMException.ResultCodes.VOLUME_NOT_FOUND);
       }
 
+      // Check if this transaction is a replay of ratis logs.
+      // If this is a replay, then the response has already been returned to
+      // the client. So take no further action and return a dummy
+      // OMClientResponse.
+      if (isReplay(ozoneManager, omVolumeArgs.getUpdateID(),
+          transactionLogIndex)) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}",
+            transactionLogIndex, setVolumePropertyRequest);
+        return new OMVolumeSetQuotaResponse(createReplayOMResponse(omResponse));
+      }
+
       omVolumeArgs.setQuotaInBytes(setVolumePropertyRequest.getQuotaInBytes());
+      omVolumeArgs.setUpdateID(transactionLogIndex);
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
@@ -133,11 +141,11 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
       omResponse.setSetVolumePropertyResponse(
           SetVolumePropertyResponse.newBuilder().build());
-      omClientResponse = new OMVolumeSetQuotaResponse(omVolumeArgs,
-        omResponse.build());
+      omClientResponse = new OMVolumeSetQuotaResponse(omResponse.build(),
+          omVolumeArgs);
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMVolumeSetQuotaResponse(null,
+      omClientResponse = new OMVolumeSetQuotaResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {

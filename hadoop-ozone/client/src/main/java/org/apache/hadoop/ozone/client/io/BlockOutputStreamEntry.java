@@ -34,6 +34,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
 import java.util.Collection;
+import java.util.Collections;
 
 /**
  * Helper class used inside {@link BlockOutputStream}.
@@ -59,7 +60,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
   private final long watchTimeout;
   private BufferPool bufferPool;
 
-  @SuppressWarnings("parameternumber")
+  @SuppressWarnings({"parameternumber", "squid:S00107"})
   private BlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientManager xceiverClientManager,
       Pipeline pipeline, String requestId, int chunkSize,
@@ -167,15 +168,15 @@ public final class BlockOutputStreamEntry extends OutputStream {
     }
   }
 
-  Collection<DatanodeDetails> getFailedServers() throws IOException {
+  Collection<DatanodeDetails> getFailedServers() {
     if (outputStream != null) {
       BlockOutputStream out = (BlockOutputStream) this.outputStream;
       return out.getFailedServers();
     }
-    return null;
+    return Collections.emptyList();
   }
 
-  long getWrittenDataLength() throws IOException {
+  long getWrittenDataLength() {
     if (outputStream != null) {
       BlockOutputStream out = (BlockOutputStream) this.outputStream;
       return out.getWrittenDataLength();

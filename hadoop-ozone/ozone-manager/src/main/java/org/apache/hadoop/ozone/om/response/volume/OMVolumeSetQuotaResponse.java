@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.volume;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -36,22 +35,27 @@ import javax.annotation.Nonnull;
 public class OMVolumeSetQuotaResponse extends OMClientResponse {
   private OmVolumeArgs omVolumeArgs;
 
-  public OMVolumeSetQuotaResponse(OmVolumeArgs omVolumeArgs,
-      @Nonnull OMResponse omResponse) {
+  public OMVolumeSetQuotaResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmVolumeArgs omVolumeArgs) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
   }
 
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMVolumeSetQuotaResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
+  }
+
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
-          omVolumeArgs);
-    }
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+        omVolumeArgs);
   }
 }
