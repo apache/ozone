@@ -81,6 +81,7 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.SizeInBytes;
+import org.apache.ratis.util.StringUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -192,6 +193,8 @@ public final class OzoneManagerRatisServer {
           LOG.error("StateMachine exception cause is not set");
           omResponse.setStatus(
               OzoneManagerProtocolProtos.Status.INTERNAL_ERROR);
+          omResponse.setMessage(
+              StringUtils.stringifyException(stateMachineException));
         }
 
         if (LOG.isDebugEnabled()) {
