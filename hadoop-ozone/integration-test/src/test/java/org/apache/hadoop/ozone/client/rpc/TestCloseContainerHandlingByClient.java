@@ -62,6 +62,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * Tests Close Container Exception handling by Ozone Client.
  */
+@Ignore
 public class TestCloseContainerHandlingByClient {
 
   private static MiniOzoneCluster cluster;
