@@ -58,9 +58,6 @@ import java.util.concurrent.TimeUnit;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.
     ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.
@@ -90,7 +87,6 @@ public class TestRecon {
   private static File dir;
   private static UserGroupInformation ugi;
   private static CloseableHttpClient httpClient;
-  private static ReconUtils reconUtils;
   private static long pauseInterval;
   private static String reconHTTPAddress;
   private static String containerKeyServiceURL;
@@ -132,7 +128,6 @@ public class TestRecon {
     metadataManager = cluster.getOzoneManager().getMetadataManager();
 
     cluster.getStorageContainerManager().exitSafeMode();
-    reconUtils = new ReconUtils();
 
     // initialize HTTPClient
     httpClient = HttpClientBuilder
@@ -204,27 +199,27 @@ public class TestRecon {
 
     // HTTP call to /api/containers
     String containerResponse = makeHttpCall(containerKeyServiceURL);
-    Map map = new Gson().fromJson(containerResponse, HashMap.class);
-    LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
-    long reconMetadataContainerCount = (long)(double)
-        linkedTreeMap.get("totalCount");
-
+    long reconMetadataContainerCount =
+        getReconContainerCount(containerResponse);
     //verify count of keys after full snapshot
     Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
 
     //verify if Recon Metadata captures vol0/bucket0/key0 info in container0
-    ArrayList containers = (ArrayList) linkedTreeMap.get("containers");
-    LinkedTreeMap nestedContainerMap = (LinkedTreeMap)containers.get(0);
-    Assert.assertEquals(1.0, nestedContainerMap.get("NumberOfKeys"));
-    Assert.assertEquals(0, (long)(double)
-        nestedContainerMap.get("ContainerID"));
+    LinkedTreeMap containerResponseMap = getContainerResponseMap(
+        containerResponse, 0);
+    Assert.assertEquals(0,
+        (long)(double) containerResponseMap.get("ContainerID"));
+    Assert.assertEquals(1,
+        (long)(double) containerResponseMap.get("NumberOfKeys"));
+
 
     // HTTP call to /api/task/status
     long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
         .getDb().getLatestSequenceNumber();
 
     String taskStatusResponse = makeHttpCall(taskStatusURL);
-    long reconLatestSeqNumber = getReconMetadataKeyCount(taskStatusResponse, 3);
+    long reconLatestSeqNumber = getReconTaskLastUpdatedSeqNumber(
+        taskStatusResponse, 3);
 
     //verify sequence number after full snapshot
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
@@ -234,43 +229,37 @@ public class TestRecon {
     omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
-    //verify OM Metadata has all 5 keys
-    Assert.assertEquals(5, omMetadataKeyCount);
-
     //pause to get the next snapshot from om to verify delta updates
     Thread.sleep(pauseInterval);
 
     // HTTP call to /api/containers
     containerResponse = makeHttpCall(containerKeyServiceURL);
-    map = new Gson().fromJson(containerResponse, HashMap.class);
-    linkedTreeMap = (LinkedTreeMap) map.get("data");
-    reconMetadataContainerCount = (long)(double)linkedTreeMap.get("totalCount");
+    reconMetadataContainerCount = getReconContainerCount(containerResponse);
 
     //verify count of keys
     Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
 
     //verify if Recon Metadata captures vol3/bucket3/key3 info in container3
-    containers = (ArrayList) linkedTreeMap.get("containers");
-    nestedContainerMap = (LinkedTreeMap)containers.get(3);
-    Assert.assertEquals(1.0, nestedContainerMap.get("NumberOfKeys"));
-    Assert.assertEquals(3, (long)(double)
-        nestedContainerMap.get("ContainerID"));
+    containerResponseMap = getContainerResponseMap(
+        containerResponse, 3);
+    Assert.assertEquals(3,
+        (long)(double) containerResponseMap.get("ContainerID"));
+    Assert.assertEquals(1,
+        (long)(double) containerResponseMap.get("NumberOfKeys"));
 
     // HTTP call to /api/task/status
     omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
         .getDb().getLatestSequenceNumber();
 
     taskStatusResponse = makeHttpCall(taskStatusURL);
-    reconLatestSeqNumber = getReconMetadataKeyCount(taskStatusResponse, 2);
+    reconLatestSeqNumber = getReconTaskLastUpdatedSeqNumber(
+        taskStatusResponse, 2);
 
     //verify sequence number after Delta Updates
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
 
-    File reconDbDir =
-        reconUtils.getReconDbDir(conf, OZONE_RECON_OM_SNAPSHOT_DB_DIR);
-    File lastKnownOMSnapshotBeforeRestart =
-        reconUtils.getLastKnownDB(reconDbDir, RECON_OM_SNAPSHOT_DB);
-
+    long beforeRestartSnapShotTimeStamp =
+        getReconTaskLastUpdatedTimeStamp(taskStatusResponse, 3);
 
     //restart Recon
     cluster.restartReconServer();
@@ -280,56 +269,75 @@ public class TestRecon {
     omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
-    //verify 10 keys in OM
-    Assert.assertEquals(10, omMetadataKeyCount);
-
     //pause to get the next snapshot from om
     Thread.sleep(pauseInterval);
 
     // HTTP call to /api/containers
     containerResponse = makeHttpCall(containerKeyServiceURL);
-    map = new Gson().fromJson(containerResponse, HashMap.class);
-    linkedTreeMap = (LinkedTreeMap) map.get("data");
-    reconMetadataContainerCount = (long)(double)linkedTreeMap.get("totalCount");
+    reconMetadataContainerCount = getReconContainerCount(containerResponse);
 
     //verify count of keys
     Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
 
     //verify if Recon Metadata captures vol7/bucket7/key7 info in container7
-    containers = (ArrayList) linkedTreeMap.get("containers");
-    nestedContainerMap = (LinkedTreeMap)containers.get(7);
-    Assert.assertEquals(1.0, nestedContainerMap.get("NumberOfKeys"));
-    Assert.assertEquals(7, (long)(double)
-        nestedContainerMap.get("ContainerID"));
+    containerResponseMap = getContainerResponseMap(
+        containerResponse, 7);
+    Assert.assertEquals(7,
+        (long)(double) containerResponseMap.get("ContainerID"));
+    Assert.assertEquals(1,
+        (long)(double) containerResponseMap.get("NumberOfKeys"));
 
     // HTTP call to /api/task/status
     omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
         .getDb().getLatestSequenceNumber();
 
     taskStatusResponse = makeHttpCall(taskStatusURL);
-    reconLatestSeqNumber = getReconMetadataKeyCount(taskStatusResponse, 2);
+    reconLatestSeqNumber = getReconTaskLastUpdatedSeqNumber(
+        taskStatusResponse, 2);
+
+
+    long afterRestartSnapShotTimeStamp =
+        getReconTaskLastUpdatedTimeStamp(taskStatusResponse, 3);
+
+    // verify only Delta updates were added to recon after restart.
+    Assert.assertEquals(beforeRestartSnapShotTimeStamp,
+        afterRestartSnapShotTimeStamp);
 
     //verify sequence number after Delta Updates
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-
-    //verify Snapshot directory
-    reconDbDir =
-        reconUtils.getReconDbDir(conf, OZONE_RECON_OM_SNAPSHOT_DB_DIR);
-    File lastKnownOMSnapshotAfterRestart =
-        reconUtils.getLastKnownDB(reconDbDir, RECON_OM_SNAPSHOT_DB);
-
-    Assert.assertNotNull(lastKnownOMSnapshotAfterRestart);
-    Assert.assertEquals(lastKnownOMSnapshotBeforeRestart.getAbsolutePath(),
-        lastKnownOMSnapshotAfterRestart.getAbsolutePath());
   }
 
-  private long getReconMetadataKeyCount(String taskStatusResponse,
+  private long getReconTaskLastUpdatedSeqNumber(String taskStatusResponse,
       int taskIndex) {
     ArrayList taskStatusList = new Gson().fromJson(
         taskStatusResponse, ArrayList.class);
     LinkedTreeMap deltaUpdatesEntity =
         (LinkedTreeMap)taskStatusList.get(taskIndex);
     return (long)(double) deltaUpdatesEntity.get("lastUpdatedSeqNumber");
+  }
+
+  private long getReconTaskLastUpdatedTimeStamp(String taskStatusResponse,
+      int taskIndex) {
+    ArrayList taskStatusList = new Gson().fromJson(
+        taskStatusResponse, ArrayList.class);
+    LinkedTreeMap deltaUpdatesEntity =
+        (LinkedTreeMap)taskStatusList.get(taskIndex);
+    return (long)(double) deltaUpdatesEntity.get("lastUpdatedTimestamp");
+  }
+
+  private long getReconContainerCount(String containerResponse) {
+    Map map = new Gson().fromJson(containerResponse, HashMap.class);
+    LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
+    return (long)(double)
+        linkedTreeMap.get("totalCount");
+  }
+
+  private LinkedTreeMap getContainerResponseMap(String containerResponse,
+      int expectedContainerID) {
+    Map map = new Gson().fromJson(containerResponse, HashMap.class);
+    LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
+    ArrayList containers = (ArrayList) linkedTreeMap.get("containers");
+    return (LinkedTreeMap)containers.get(expectedContainerID);
   }
 
   /**
