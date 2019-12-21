@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -55,6 +56,36 @@ public class TestOmMetadataManager {
         folder.getRoot().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
   }
+
+  @Test
+  public void testListVolumes() throws Exception {
+    String ownerName = "owner";
+    OmVolumeArgs.Builder argsBuilder = OmVolumeArgs.newBuilder()
+        .setAdminName("admin")
+        .setOwnerName(ownerName);
+
+    String volName;
+    char postfix = 'a';
+    OmVolumeArgs omVolumeArgs;
+    for (int i = 0; i < 26; i++) {
+      volName = "vol" + (char)(postfix + i);
+      omVolumeArgs = argsBuilder
+          .setVolume(volName)
+          .build();
+
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+
+    // Test list volumes with setting startVolume.
+    String prefix = "";
+    String startVolume = "volz";
+    List<OmVolumeArgs> volumeList = omMetadataManager.listVolumes(ownerName,
+        prefix, startVolume, 100);
+    Assert.assertEquals(volumeList.get(0).getVolume(), startVolume);
+    Assert.assertEquals(volumeList.size(), 26);
+  }
+
   @Test
   public void testListBuckets() throws Exception {
 

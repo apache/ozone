@@ -302,13 +302,22 @@ public final class TestOMRequestUtils {
    */
   public static void addUserToDB(String volumeName, String ownerName,
       OMMetadataManager omMetadataManager) throws Exception {
-    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo =
-        OzoneManagerProtocolProtos.UserVolumeInfo
-            .newBuilder()
-            .addVolumeNames(volumeName)
-            .setObjectID(1)
-            .setUpdateID(1)
-            .build();
+
+    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo = omMetadataManager
+        .getUserTable().get(omMetadataManager.getUserKey(ownerName));
+    if (userVolumeInfo == null) {
+      userVolumeInfo = OzoneManagerProtocolProtos.UserVolumeInfo
+          .newBuilder()
+          .addVolumeNames(volumeName)
+          .setObjectID(1)
+          .setUpdateID(1)
+          .build();
+    } else {
+      userVolumeInfo = userVolumeInfo.toBuilder()
+          .addVolumeNames(volumeName)
+          .build();
+    }
+
     omMetadataManager.getUserTable().put(
         omMetadataManager.getUserKey(ownerName), userVolumeInfo);
   }
