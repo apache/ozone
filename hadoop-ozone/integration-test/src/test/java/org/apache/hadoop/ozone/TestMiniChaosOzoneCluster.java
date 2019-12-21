@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -38,6 +39,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
+@Ignore
 public class TestMiniChaosOzoneCluster implements Runnable {
 
   @Option(names = {"-d", "--numDatanodes"},
