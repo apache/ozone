@@ -21,11 +21,13 @@ package org.apache.hadoop.fs.ozone;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.FSInputStream;
+import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Seekable;
 
 /**
@@ -40,19 +42,29 @@ public final class OzoneFSInputStream extends FSInputStream
     implements ByteBufferReadable {
 
   private final InputStream inputStream;
+  private final Statistics statistics;
 
-  public OzoneFSInputStream(InputStream inputStream) {
+  public OzoneFSInputStream(InputStream inputStream, Statistics statistics) {
     this.inputStream = inputStream;
+    this.statistics = statistics;
   }
 
   @Override
   public int read() throws IOException {
-    return inputStream.read();
+    int byteRead = inputStream.read();
+    if (statistics != null && byteRead >= 0) {
+      statistics.incrementBytesRead(1);
+    }
+    return byteRead;
   }
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
-    return inputStream.read(b, off, len);
+    int bytesRead = inputStream.read(b, off, len);
+    if (statistics != null && bytesRead >= 0) {
+      statistics.incrementBytesRead(bytesRead);
+    }
+    return bytesRead;
   }
 
   @Override
@@ -88,12 +100,15 @@ public final class OzoneFSInputStream extends FSInputStream
    */
   @Override
   public int read(ByteBuffer buf) throws IOException {
+    if (buf.isReadOnly()){
+      throw new ReadOnlyBufferException();
+    }
 
     int bufInitPos = buf.position();
-    int readLen = Math.min(buf.remaining(), inputStream.available());
+    int readLen = Math.min(buf.remaining(), available());
 
     byte[] readData = new byte[readLen];
-    int bytesRead = inputStream.read(readData, bufInitPos, readLen);
+    int bytesRead = read(readData, bufInitPos, readLen);
     buf.put(readData);
 
     return bytesRead;
