@@ -164,7 +164,6 @@ public class CommitWatcher {
     }
   }
 
-
   private void adjustBuffers(long commitIndex) {
     List<Long> keyList = commitIndex2flushedDataMap.keySet().stream()
         .filter(p -> p <= commitIndex).collect(Collectors.toList());
@@ -179,7 +178,6 @@ public class CommitWatcher {
   void releaseBuffersOnException() {
     adjustBuffers(xceiverClient.getReplicatedMinCommitIndex());
   }
-
 
   /**
    * calls watchForCommit API of the Ratis Client. For Standalone client,
@@ -201,13 +199,22 @@ public class CommitWatcher {
       }
       adjustBuffers(index);
       return reply;
-    } catch (TimeoutException | InterruptedException | ExecutionException e) {
-      LOG.warn("watchForCommit failed for index " + commitIndex, e);
-      IOException ioException = new IOException(
-          "Unexpected Storage Container Exception: " + e.toString(), e);
-      releaseBuffersOnException();
-      throw ioException;
+    } catch (InterruptedException e) {
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
+      throw getIOExceptionForWatchForCommit(commitIndex, e);
+    } catch (TimeoutException | ExecutionException e) {
+      throw getIOExceptionForWatchForCommit(commitIndex, e);
     }
+  }
+
+  private IOException getIOExceptionForWatchForCommit(long commitIndex,
+                                                       Exception e) {
+    LOG.warn("watchForCommit failed for index {}", commitIndex, e);
+    IOException ioException = new IOException(
+        "Unexpected Storage Container Exception: " + e.toString(), e);
+    releaseBuffersOnException();
+    return ioException;
   }
 
   @VisibleForTesting
