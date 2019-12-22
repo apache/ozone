@@ -50,11 +50,11 @@ public class Scheduler {
   public Scheduler(String threadName, boolean isDaemon, int numCoreThreads) {
     scheduledExecutorService = Executors.newScheduledThreadPool(numCoreThreads,
         r -> {
-      Thread t = new Thread(r);
-      t.setName(threadName);
-      t.setDaemon(isDaemon);
-      return t;
-    });
+        Thread t = new Thread(r);
+        t.setName(threadName);
+        t.setDaemon(isDaemon);
+        return t;
+      });
     this.threadName = threadName;
     isClosed = false;
   }
