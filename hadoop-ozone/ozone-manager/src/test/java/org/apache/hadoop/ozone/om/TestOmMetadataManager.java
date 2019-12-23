@@ -65,10 +65,9 @@ public class TestOmMetadataManager {
         .setOwnerName(ownerName);
 
     String volName;
-    char postfix = 'a';
     OmVolumeArgs omVolumeArgs;
-    for (int i = 0; i < 26; i++) {
-      volName = "vol" + (char)(postfix + i);
+    for (int i = 0; i < 50; i++) {
+      volName = "vol" + i;
       omVolumeArgs = argsBuilder
           .setVolume(volName)
           .build();
@@ -79,11 +78,11 @@ public class TestOmMetadataManager {
 
     // Test list volumes with setting startVolume.
     String prefix = "";
-    String startVolume = "volz";
+    String startVolume = "vol25";
     List<OmVolumeArgs> volumeList = omMetadataManager.listVolumes(ownerName,
         prefix, startVolume, 100);
     Assert.assertEquals(volumeList.get(0).getVolume(), startVolume);
-    Assert.assertEquals(volumeList.size(), 26);
+    Assert.assertEquals(volumeList.size(), 25);
   }
 
   @Test
