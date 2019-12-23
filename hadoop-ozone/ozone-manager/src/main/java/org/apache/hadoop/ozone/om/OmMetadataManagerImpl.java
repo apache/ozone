@@ -815,55 +815,34 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     }
     volumes = getVolumesByUser(userName);
 
-    if (volumes.getVolumeNamesCount() == 0) {
+    if (volumes == null || volumes.getVolumeNamesCount() == 0) {
       return result;
     }
 
-    /* Process listing volumes with startVolume. */
     boolean startKeyFound = Strings.isNullOrEmpty(startKey);
-    if (!startKeyFound) {
-      OmVolumeArgs startVolArgs = getVolumeTable()
-          .get(this.getVolumeKey(startKey));
-
-      if (startVolArgs == null) {
-        throw new OMException("StartVolume info not found for " + startKey,
-            ResultCodes.VOLUME_NOT_FOUND);
-      } else if (!startKey.startsWith(prefix)) {
-        throw new OMException("StartVolume " + startKey + " not found" +
-            " for prefix " + prefix, ResultCodes.VOLUME_NOT_FOUND);
-      }
-
-      result.add(startVolArgs);
-    }
-
-    OmVolumeArgs volumeArgs;
     for (String volumeName : volumes.getVolumeNamesList()) {
-
       if (!Strings.isNullOrEmpty(prefix)) {
         if (!volumeName.startsWith(prefix)) {
           continue;
         }
       }
 
-      volumeArgs = getVolumeTable().get(this.getVolumeKey(volumeName));
-      if (volumeArgs == null) {
-        // Could not get volume info by given volume name,
-        // since the volume name is loaded from db,
-        // this probably means om db is corrupted or some entries are
-        // accidentally removed.
-        throw new OMException("Volume info not found for " + volumeName,
-            ResultCodes.VOLUME_NOT_FOUND);
-      }
-
       if (!startKeyFound && volumeName.equals(startKey)) {
         startKeyFound = true;
         continue;
       }
-
-      if (result.size() < maxKeys) {
+      if (startKeyFound && result.size() < maxKeys) {
+        OmVolumeArgs volumeArgs =
+            getVolumeTable().get(this.getVolumeKey(volumeName));
+        if (volumeArgs == null) {
+          // Could not get volume info by given volume name,
+          // since the volume name is loaded from db,
+          // this probably means om db is corrupted or some entries are
+          // accidentally removed.
+          throw new OMException("Volume info not found for " + volumeName,
+              ResultCodes.VOLUME_NOT_FOUND);
+        }
         result.add(volumeArgs);
-      } else {
-        break;
       }
     }
 
