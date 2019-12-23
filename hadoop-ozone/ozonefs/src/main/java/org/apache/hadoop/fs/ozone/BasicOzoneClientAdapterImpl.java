@@ -203,10 +203,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public OzoneFSOutputStream createFile(String key, boolean overWrite,
       boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED);
-    try {
-      OzoneOutputStream ozoneOutputStream = bucket
-          .createFile(key, 0, replicationType, replicationFactor, overWrite,
-              recursive);
+    try (OzoneOutputStream ozoneOutputStream = bucket
+        .createFile(key, 0, replicationType, replicationFactor, overWrite,
+            recursive)) {
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
@@ -254,13 +253,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
    */
   @Override
   public boolean deleteObject(String keyName) {
-    LOG.trace("issuing delete for key" + keyName);
+    LOG.trace("issuing delete for key {}", keyName);
     try {
       incrementCounter(Statistic.OBJECTS_DELETED);
       bucket.deleteKey(keyName);
       return true;
     } catch (IOException ioe) {
-      LOG.error("delete key failed " + ioe.getMessage());
+      LOG.error("delete key failed {}", ioe.getMessage());
       return false;
     }
   }

@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -84,10 +85,9 @@ public final class OzoneClientAdapterFactory {
 
     findConfigDirUrl(urls, currentClassLoader);
 
-    ClassLoader classLoader =
-        new FilteredClassLoader(urls.toArray(new URL[0]), currentClassLoader);
-
-    try {
+    try (URLClassLoader classLoader =
+             new FilteredClassLoader(urls.toArray(new URL[0]),
+                 currentClassLoader)) {
 
       ClassLoader contextClassLoader =
           Thread.currentThread().getContextClassLoader();
@@ -123,7 +123,6 @@ public final class OzoneClientAdapterFactory {
       throw new IOException(
           "Can't initialize the OzoneClientAdapter implementation", e);
     }
-
   }
 
   private static void findConfigDirUrl(List<URL> urls,
