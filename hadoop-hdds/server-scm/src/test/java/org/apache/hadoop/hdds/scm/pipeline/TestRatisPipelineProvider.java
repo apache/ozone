@@ -39,8 +39,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
@@ -57,12 +55,14 @@ public class TestRatisPipelineProvider {
   private PipelineProvider provider;
   private PipelineStateManager stateManager;
   private OzoneConfiguration conf;
+  private int maxPipelinePerNode = 2;
 
   @Before
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 2);
+    conf = new OzoneConfiguration();
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT,
+        maxPipelinePerNode);
     stateManager = new PipelineStateManager();
     provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, conf);
@@ -194,8 +194,7 @@ public class TestRatisPipelineProvider {
 
     // Use up first 3 DNs for an open pipeline.
     List<DatanodeDetails> dns = healthyNodes.subList(0, 3);
-    for (int i = 0; i < conf.getInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT,
-        OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT); i++) {
+    for (int i = 0; i < maxPipelinePerNode; i++) {
       // Saturate pipeline counts on all the 1st 3 DNs.
       addPipeline(dns, factor, Pipeline.PipelineState.OPEN, REPLICATION_TYPE);
     }

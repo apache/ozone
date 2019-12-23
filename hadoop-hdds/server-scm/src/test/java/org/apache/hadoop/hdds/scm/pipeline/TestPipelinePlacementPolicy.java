@@ -52,7 +52,7 @@ public class TestPipelinePlacementPolicy {
     conf = new OzoneConfiguration();
     conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 5);
     placementPolicy = new PipelinePlacementPolicy(
-        nodeManager, new PipelineStateManager(conf), conf);
+        nodeManager, new PipelineStateManager(), conf);
   }
 
   @Test
