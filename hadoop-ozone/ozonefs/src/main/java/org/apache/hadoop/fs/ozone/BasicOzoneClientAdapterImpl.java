@@ -205,7 +205,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     incrementCounter(Statistic.OBJECTS_CREATED);
     try {
       OzoneOutputStream ozoneOutputStream = bucket
-          .createFile(key, 0, replicationType, replicationFactor,overWrite,
+          .createFile(key, 0, replicationType, replicationFactor, overWrite,
               recursive);
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {

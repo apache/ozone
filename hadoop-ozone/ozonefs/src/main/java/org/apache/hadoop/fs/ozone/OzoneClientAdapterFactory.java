@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -87,7 +86,7 @@ public final class OzoneClientAdapterFactory {
 
     ClassLoader classLoader =
         new FilteredClassLoader(urls.toArray(new URL[0]), currentClassLoader);
-    
+
     try {
 
       ClassLoader contextClassLoader =
