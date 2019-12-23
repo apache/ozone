@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.client.ContainerOperationClient;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.List;
@@ -56,6 +57,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * Test Query Node Operation.
  */
+@Ignore
 public class TestQueryNode {
   private static int numOfDatanodes = 5;
   private MiniOzoneCluster cluster;
