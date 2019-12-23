@@ -85,9 +85,10 @@ public final class OzoneClientAdapterFactory {
 
     findConfigDirUrl(urls, currentClassLoader);
 
-    try (URLClassLoader classLoader =
-             new FilteredClassLoader(urls.toArray(new URL[0]),
-                 currentClassLoader)) {
+    ClassLoader classLoader =
+        new FilteredClassLoader(urls.toArray(new URL[0]), currentClassLoader);
+    
+    try {
 
       ClassLoader contextClassLoader =
           Thread.currentThread().getContextClassLoader();
