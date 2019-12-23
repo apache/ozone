@@ -282,6 +282,7 @@ public class ObjectStore {
 
     private Iterator<OzoneVolume> currentIterator;
     private OzoneVolume currentValue;
+    private OzoneVolume repeatedVolume;
 
     /**
      * Creates an Iterator to iterate over all volumes after
@@ -294,6 +295,7 @@ public class ObjectStore {
       this.user = user;
       this.volPrefix = volPrefix;
       this.currentValue = null;
+      this.repeatedVolume = getNextListOfVolumes(prevVolume).iterator().next();
       this.currentIterator = getNextListOfVolumes(prevVolume).iterator();
     }
 
@@ -303,7 +305,16 @@ public class ObjectStore {
         currentIterator = getNextListOfVolumes(
             currentValue != null ? currentValue.getName() : null)
             .iterator();
+
+        /* Cause getNextListOfVolumes never return empty-list,
+         * we should check whether the volume is fetched or not.
+         * */
+        if (currentIterator.hasNext() &&
+            currentIterator.next().equals(repeatedVolume)) {
+          return false;
+        }
       }
+
       return currentIterator.hasNext();
     }
 
