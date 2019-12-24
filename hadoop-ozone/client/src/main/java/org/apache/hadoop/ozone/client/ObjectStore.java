@@ -290,11 +290,11 @@ public class ObjectStore {
      * @param user user name
      * @param volPrefix volume prefix to match
      */
-    VolumeIterator(String user, String volPrefix, String prevVolume) {
+    VolumeIterator(String user, String volPrefix, String initVolume) {
       this.user = user;
       this.volPrefix = volPrefix;
       this.currentValue = null;
-      this.currentIterator = getNextListOfVolumes(prevVolume).iterator();
+      this.currentIterator = getInitListOfVolumes(initVolume).iterator();
     }
 
     @Override
@@ -317,20 +317,43 @@ public class ObjectStore {
     }
 
     /**
+     * Returns the initial set of volume list using proxy.
+     * @return {@code List<OzoneVolume>}
+     */
+    private List<OzoneVolume> getInitListOfVolumes(String initVolume) {
+      try {
+        //if user is null, we do list of all volumes.
+        if(user != null) {
+          return proxy.listVolumes(user, volPrefix, initVolume, listCacheSize);
+        }
+        return proxy.listVolumes(volPrefix, initVolume, listCacheSize);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    /**
      * Returns the next set of volume list using proxy.
      * @param prevVolume previous volume, this will be excluded from the result
      * @return {@code List<OzoneVolume>}
      */
     private List<OzoneVolume> getNextListOfVolumes(String prevVolume) {
+      List<OzoneVolume> volumeList;
       try {
         //if user is null, we do list of all volumes.
         if(user != null) {
-          return proxy.listVolumes(user, volPrefix, prevVolume, listCacheSize);
+          volumeList = proxy
+              .listVolumes(user, volPrefix, prevVolume, listCacheSize);
+        } else {
+          volumeList = proxy
+              .listVolumes(volPrefix, prevVolume, listCacheSize);
         }
-        return proxy.listVolumes(volPrefix, prevVolume, listCacheSize);
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
+
+      volumeList.remove(0);
+      return  volumeList;
     }
   }
 
