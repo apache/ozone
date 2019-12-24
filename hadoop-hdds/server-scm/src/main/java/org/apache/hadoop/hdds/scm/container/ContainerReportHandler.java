@@ -31,10 +31,13 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -91,18 +94,23 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
           .map(ContainerReplicaProto::getContainerID)
           .map(ContainerID::valueof).collect(Collectors.toSet());
 
+      List<ContainerReplicaProto> containersForUpdate =
+          processContainerReplicas(datanodeDetails, replicas, publisher);
+
       final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
       missingReplicas.removeAll(containersInDn);
 
-      processContainerReplicas(datanodeDetails, replicas);
       processMissingReplicas(datanodeDetails, missingReplicas);
-      updateDeleteTransaction(datanodeDetails, replicas, publisher);
+      updateDeleteTransaction(datanodeDetails, containersForUpdate, publisher);
 
       /*
        * Update the latest set of containers for this datanode in
        * NodeManager
        */
-      nodeManager.setContainers(datanodeDetails, containersInDn);
+      nodeManager.setContainers(
+          datanodeDetails, containersForUpdate.parallelStream()
+          .map(ContainerReplicaProto::getContainerID)
+          .map(ContainerID::valueof).collect(Collectors.toSet()));
 
       containerManager.notifyContainerReportProcessing(true, true);
     } catch (NodeNotFoundException ex) {
@@ -119,21 +127,33 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    * @param datanodeDetails Datanode from which this report was received
    * @param replicas list of ContainerReplicaProto
    */
-  private void processContainerReplicas(final DatanodeDetails datanodeDetails,
-      final List<ContainerReplicaProto> replicas) {
+  private List<ContainerReplicaProto> processContainerReplicas(
+      final DatanodeDetails datanodeDetails,
+      final List<ContainerReplicaProto> replicas,
+      final EventPublisher publisher) {
+    List<ContainerReplicaProto> containers = new ArrayList<>();  
     for (ContainerReplicaProto replicaProto : replicas) {
       try {
         processContainerReplica(datanodeDetails, replicaProto);
+        containers.add(replicaProto);
       } catch (ContainerNotFoundException e) {
-        LOG.error("Received container report for an unknown container" +
-                " {} from datanode {}.", replicaProto.getContainerID(),
-            datanodeDetails, e);
+        LOG.info("Received container report for an unknown container" +
+                " {} from datanode {},delete it.",
+            replicaProto.getContainerID(),
+            datanodeDetails);
+        publisher.fireEvent(
+            SCMEvents.DATANODE_COMMAND, new CommandForDatanode<>(
+            datanodeDetails.getUuid(),
+            new DeleteContainerCommand(replicaProto.getContainerID(),
+            true)));
+
       } catch (IOException e) {
         LOG.error("Exception while processing container report for container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
             datanodeDetails, e);
       }
     }
+    return containers;
   }
 
   /**

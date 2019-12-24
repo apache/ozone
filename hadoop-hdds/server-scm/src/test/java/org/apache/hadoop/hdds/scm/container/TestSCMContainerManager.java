@@ -97,7 +97,8 @@ public class TestSCMContainerManager {
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
-    containerManager = new SCMContainerManager(conf, pipelineManager);
+    containerManager = new SCMContainerManager(
+        conf, nodeManager, pipelineManager);
     xceiverClientManager = new XceiverClientManager(conf);
     replicationFactor = SCMTestUtils.getReplicationFactor(conf);
     replicationType = SCMTestUtils.getReplicationType(conf);

@@ -333,6 +333,19 @@ public class MockNodeManager implements NodeManager {
     return node2ContainerMap.getContainers(uuid.getUuid());
   }
 
+  /**
+   * Remove set of containers available on a datanode.
+   *
+   * @param datanodeDetails - DatanodeID
+   * @param containerIds    - Set of containerIDs
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                               use addDatanodeInContainerMap call.
+   */
+  public void removeContainers(DatanodeDetails datanodeDetails,
+      Set<ContainerID> containerIds) throws NodeNotFoundException{
+
+  }
+
   // Returns the number of commands that is queued to this node manager.
   public int getCommandCount(DatanodeDetails dd) {
     List<SCMCommand> list = commandMap.get(dd.getUuid());

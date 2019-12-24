@@ -214,6 +214,20 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   /**
+   * Remove set of containers available on a datanode.
+   *
+   * @param datanodeDetails - DatanodeID
+   * @param containerIds    - Set of containerIDs
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                               use addDatanodeInContainerMap call.
+   */
+  @Override
+  public void removeContainers(DatanodeDetails datanodeDetails,
+      Set<ContainerID> containerIds) throws NodeNotFoundException {
+    throw new UnsupportedOperationException("Not yet implemented");
+  }
+
+  /**
    * Closes this stream and releases any system resources associated
    * with it. If the stream is already closed then invoking this
    * method has no effect.

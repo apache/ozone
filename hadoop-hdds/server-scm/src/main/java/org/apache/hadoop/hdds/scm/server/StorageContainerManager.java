@@ -406,7 +406,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();
     } else {
-      containerManager = new SCMContainerManager(conf, pipelineManager);
+      containerManager = new SCMContainerManager(
+          conf, scmNodeManager, pipelineManager);
     }
 
     if (configurator.getScmBlockManager() != null) {

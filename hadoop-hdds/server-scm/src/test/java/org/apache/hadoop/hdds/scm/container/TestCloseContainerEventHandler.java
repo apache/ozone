@@ -76,7 +76,8 @@ public class TestCloseContainerEventHandler {
             pipelineManager.getStateManager(), configuration);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    containerManager = new SCMContainerManager(configuration, pipelineManager);
+    containerManager = new SCMContainerManager(
+        configuration, nodeManager, pipelineManager);
     pipelineManager.triggerPipelineCreation();
     eventQueue.addHandler(CLOSE_CONTAINER,
         new CloseContainerEventHandler(pipelineManager, containerManager));

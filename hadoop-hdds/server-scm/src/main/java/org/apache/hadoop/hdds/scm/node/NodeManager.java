@@ -159,6 +159,16 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       throws NodeNotFoundException;
 
   /**
+   * Remove set of containers from the NodeManager.
+   * @param datanodeDetails - DatanodeDetails
+   * @param containerIds - Set of containerIDs
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                        use addDatanodeInContainerMap call.
+   */
+  void removeContainers(DatanodeDetails datanodeDetails,
+      Set<ContainerID> containerIds) throws NodeNotFoundException;
+
+  /**
    * Add a {@link SCMCommand} to the command queue, which are
    * handled by HB thread asynchronously.
    * @param dnId datanode uuid

@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -51,6 +53,7 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
@@ -72,6 +75,7 @@ public class SCMContainerManager implements ContainerManager {
   private final int numContainerPerOwnerInPipeline;
 
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
+  private final NodeManager nodeManager;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -81,10 +85,13 @@ public class SCMContainerManager implements ContainerManager {
    * CacheSize is specified
    * in MB.
    * @param conf - {@link Configuration}
+   * @param nodeManager - NodeManager so that we can get the nodes that are
+   *                      healthy to place new containers.
    * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
   public SCMContainerManager(final Configuration conf,
+      final NodeManager nodeManager,
       PipelineManager pipelineManager) throws IOException {
 
     final File metaDir = ServerUtils.getScmDbDir(conf);
@@ -108,6 +115,7 @@ public class SCMContainerManager implements ContainerManager {
     loadExistingContainers();
 
     scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
+    this.nodeManager = nodeManager;
   }
 
   private void loadExistingContainers() throws IOException {
@@ -282,6 +290,12 @@ public class SCMContainerManager implements ContainerManager {
   public void deleteContainer(ContainerID containerID) throws IOException {
     lock.lock();
     try {
+      Set<ContainerReplica> replicas =
+          containerStateManager.getContainerReplicas(containerID);
+      for(ContainerReplica replica : replicas){
+        nodeManager.removeContainers(replica.getDatanodeDetails(), Stream.of(
+            containerID).collect(Collectors.toSet()));
+      }
       containerStateManager.removeContainer(containerID);
       final byte[] dbKey = Longs.toByteArray(containerID.getId());
       final byte[] containerBytes = containerStore.get(dbKey);
@@ -293,6 +307,12 @@ public class SCMContainerManager implements ContainerManager {
                 " it's missing!", containerID);
       }
       scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
+    } catch (NodeNotFoundException nnfe) {
+      scmContainerManagerMetrics.incNumFailureDeleteContainers();
+      throw new SCMException(
+          "Failed to delete container " + containerID + ", reason : " +
+              "node doesn't exist.",
+          SCMException.ResultCodes.FAILED_TO_FIND_NODE_IN_POOL);
     } catch (ContainerNotFoundException cnfe) {
       scmContainerManagerMetrics.incNumFailureDeleteContainers();
       throw new SCMException(

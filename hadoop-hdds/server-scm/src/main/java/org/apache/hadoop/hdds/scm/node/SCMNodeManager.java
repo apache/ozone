@@ -563,6 +563,20 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getContainers(datanodeDetails.getUuid());
   }
 
+  /**
+   * Remove set of containers available on a datanode.
+   *
+   * @param datanodeDetails - DatanodeID
+   * @param containerIds    - Set of containerIDs
+   * @throws NodeNotFoundException - if datanode is not known. For new datanode
+   *                               use addDatanodeInContainerMap call.
+   */
+  @Override
+  public void removeContainers(DatanodeDetails datanodeDetails,
+      Set<ContainerID> containerIds) throws NodeNotFoundException {
+    nodeStateManager.removeContainers(datanodeDetails.getUuid(), containerIds);
+  }
+
   // TODO:
   // Since datanode commands are added through event queue, onMessage method
   // should take care of adding commands to command queue.

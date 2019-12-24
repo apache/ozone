@@ -493,6 +493,20 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * remove set of containers available on a datanode.
+   * @param uuid - DatanodeID
+   * @param containerIds - Set of containerIDs
+   * @throws NodeNotFoundException - if datanode is not known.
+   */
+  public void removeContainers(UUID uuid, Set<ContainerID> containerIds)
+      throws NodeNotFoundException{
+    for (ContainerID containerID : containerIds){
+      nodeStateMap.removeContainer(uuid, containerID);
+    }
+  }
+
+
+  /**
    * Move Stale or Dead node to healthy if we got a heartbeat from them.
    * Move healthy nodes to stale nodes if it is needed.
    * Move Stales node to dead if needed.
