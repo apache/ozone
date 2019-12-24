@@ -117,20 +117,22 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
         LOG.info("Using pipeline {}", pipeline.getId());
       }
 
-      xceiverClientSpi =
-          new XceiverClientManager(ozoneConf).acquireClient(pipeline);
+      try (XceiverClientManager xceiverClientManager =
+               new XceiverClientManager(ozoneConf)) {
+        xceiverClientSpi = xceiverClientManager.acquireClient(pipeline);
 
-      timer = getMetrics().timer("chunk-write");
+        timer = getMetrics().timer("chunk-write");
 
-      byte[] data = RandomStringUtils.randomAscii(chunkSize)
-          .getBytes(StandardCharsets.UTF_8);
+        byte[] data = RandomStringUtils.randomAscii(chunkSize)
+            .getBytes(StandardCharsets.UTF_8);
 
-      dataToWrite = ByteString.copyFrom(data);
+        dataToWrite = ByteString.copyFrom(data);
 
-      Checksum checksum = new Checksum(ChecksumType.CRC32, chunkSize);
-      checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();
+        Checksum checksum = new Checksum(ChecksumType.CRC32, chunkSize);
+        checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();
 
-      runTests(this::writeChunk);
+        runTests(this::writeChunk);
+      }
     } finally {
       if (xceiverClientSpi != null) {
         xceiverClientSpi.close();
