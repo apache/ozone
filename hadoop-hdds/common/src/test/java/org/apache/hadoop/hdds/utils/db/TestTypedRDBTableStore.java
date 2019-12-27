@@ -374,7 +374,7 @@ public class TestTypedRDBTableStore {
 
   @Test
   public void testByteArrayTypedTable() throws Exception {
-    try (Table<byte[], byte[]> testTable = new TypedTable<> (
+    try (Table<byte[], byte[]> testTable = new TypedTable<>(
             rdbStore.getTable("Ten"),
             codecRegistry,
             byte[].class, byte[].class)) {
