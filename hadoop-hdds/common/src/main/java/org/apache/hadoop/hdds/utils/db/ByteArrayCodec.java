@@ -28,7 +28,7 @@ public class ByteArrayCodec implements Codec<byte[]> {
     return bytes;
   }
 
-    @Override
+  @Override
   public byte[] fromPersistedFormat(byte[] bytes) {
     return bytes;
   }
