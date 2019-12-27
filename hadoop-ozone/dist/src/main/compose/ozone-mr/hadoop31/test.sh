@@ -24,7 +24,7 @@ source "$COMPOSE_DIR/../../testlib.sh"
 start_docker_env
 
 #rm is the container name (resource manager) and not the rm command
-execute_command_in_container rm bash -c "if test -e /sbin/apk; then sudo apk add --update py-pip; sudo pip install robotframework; fi"
+execute_command_in_container rm bash -c "if test -e /sbin/apk; then sudo -E apk add --update py-pip; sudo -E pip install robotframework; fi"
 
 execute_robot_test scm createmrenv.robot
 

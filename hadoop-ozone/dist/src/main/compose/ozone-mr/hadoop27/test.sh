@@ -27,8 +27,8 @@ execute_robot_test scm createmrenv.robot
 
 
 #rm is the container name (resource manager) and not the rm command
-execute_command_in_container rm sudo apk add --update py-pip
-execute_command_in_container rm sudo pip install robotframework
+execute_command_in_container rm sudo -E apk add --update py-pip
+execute_command_in_container rm sudo -E pip install robotframework
 
 # reinitialize the directories to use
 export OZONE_DIR=/opt/ozone
