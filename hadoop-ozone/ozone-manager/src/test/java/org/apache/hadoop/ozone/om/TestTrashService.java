@@ -86,11 +86,10 @@ public class TestTrashService {
     String destinationBucket = "destBucket";
     createAndDeleteKey(keyName);
 
-    /* TODO:HDDS-2424. */
-    // boolean recoverOperation =
-    //     ozoneManager.recoverTrash(
-    //         volumeName, bucketName, keyName, destinationBucket);
-    // Assert.assertTrue(recoverOperation);
+    boolean recoverOperation =
+        keyManager.recoverTrash(
+            volumeName, bucketName, keyName, destinationBucket);
+    Assert.assertTrue(recoverOperation);
   }
 
   private void createAndDeleteKey(String keyName) throws IOException {
