@@ -2319,13 +2319,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  // TODO: HDDS-2424. recover-trash command server side handling.
   @Override
   public boolean recoverTrash(String volumeName, String bucketName,
       String keyName, String destinationBucket) throws IOException {
 
-    boolean recoverOperation = true;
-    return recoverOperation;
+    if (isAclEnabled) {
+      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.DELETE,
+          volumeName, bucketName, keyName);
+    }
+
+    //TODO: audit log and metric would be updated in later patch.
+    try {
+      return keyManager.recoverTrash(volumeName, bucketName, keyName,
+          destinationBucket);
+    } catch (IOException ex) {
+      throw ex;
+    }
   }
 
   /**
