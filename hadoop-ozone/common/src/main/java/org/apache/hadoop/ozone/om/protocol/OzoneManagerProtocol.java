@@ -500,7 +500,7 @@ public interface OzoneManagerProtocol
    * @param bucketName - The bucket name.
    * @param keyName - The key user want to recover.
    * @param destinationBucket - The bucket user want to recover to.
-   * @return The recoverTrash
+   * @return The result of recovering operation is success or not.
    * @throws IOException
    */
   boolean recoverTrash(String volumeName, String bucketName, String keyName,
