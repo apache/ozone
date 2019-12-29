@@ -43,7 +43,7 @@ public class TestMiniChaosOzoneCluster implements Runnable {
 
   @Option(names = {"-d", "--numDatanodes"},
       description = "num of datanodes")
-  private static int numDatanodes = 20;
+  private static int numDatanodes = 5;
 
   @Option(names = {"-t", "--numThreads"},
       description = "num of IO threads")

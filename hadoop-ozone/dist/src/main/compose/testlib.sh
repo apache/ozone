@@ -39,9 +39,14 @@ wait_for_safemode_exit(){
 
   #Reset the timer
   SECONDS=0
+  timeout_threshold=90
+  if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+     timeout_threshold=600
+  fi
 
-  #Don't give it up until 180 seconds
-  while [[ $SECONDS -lt 180 ]]; do
+  #Don't give it up until timeout
+  while [[ $SECONDS -lt $timeout_threshold ]]; do
+
 
      #This line checks the safemode status in scm
      local command="ozone scmcli safemode status"
