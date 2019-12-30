@@ -52,20 +52,7 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
             + ")");
     System.out.println();
 
-    Type type;
-    switch (insightName.split("\\.")[0]) {
-    case "scm":
-      type = Type.SCM;
-      break;
-    case "om":
-      type = Type.OM;
-      break;
-    case "datanode":
-      type = Type.DATANODE;
-      break;
-    default:
-      throw new RuntimeException("No such component " + insightName);
-    }
+    Type type = Type.valueOf(insightName.split("\\.")[0].toUpperCase());
 
     for (Class clazz : insight.getConfigurationClasses()) {
       showConfig(clazz, type);
