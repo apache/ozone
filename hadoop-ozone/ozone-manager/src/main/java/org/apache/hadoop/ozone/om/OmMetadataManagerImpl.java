@@ -811,7 +811,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public boolean recoverTrash(String volumeName, String bucketName,
       String keyName, String destinationBucket) throws IOException {
 
-    // TODO: core logic stub would be added in later patch.
+    /* TODO: HDDS-2425 and HDDS-2426
+        core logic stub would be added in later patch.
+     */
 
     boolean recoverOperation = true;
     return recoverOperation;
