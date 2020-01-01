@@ -35,6 +35,8 @@ import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Preconditions;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -43,6 +45,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -64,6 +67,8 @@ import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
 
 import com.google.common.net.HostAndPort;
+
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.*;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY;
@@ -285,6 +290,27 @@ public final class HddsUtils {
       addresses.add(addr);
     }
     return addresses;
+  }
+
+  /**
+   * Retrieve the socket addresses of recon.
+   *
+   * @return A collection of Recon addresses
+   * @throws IllegalArgumentException If the configuration is invalid
+   */
+  public static InetSocketAddress getReconAddresses(
+      Configuration conf) {
+    String name = conf.get(OZONE_RECON_ADDRESS_KEY);
+    if (StringUtils.isEmpty(name)) {
+      return null;
+    }
+    Optional<String> hostname = getHostName(name);
+    if (!hostname.isPresent()) {
+      throw new IllegalArgumentException("Invalid hostname for Recon: "
+          + name);
+    }
+    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
+    return NetUtils.createSocketAddr(hostname.get(), port);
   }
 
   /**

@@ -50,6 +50,7 @@ public class EndpointStateMachine
   private EndPointStates state;
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
+  private boolean isPassiveScm;
 
   /**
    * Constructs RPC Endpoints.
@@ -200,17 +201,36 @@ public class EndpointStateMachine
    *  @param ex         - Exception
    */
   public void logIfNeeded(Exception ex) {
-    if (this.getMissedCount() % getLogWarnInterval(conf) == 0) {
-      LOG.error(
-          "Unable to communicate to SCM server at {} for past {} seconds.",
-          this.getAddress().getHostString() + ":" + this.getAddress().getPort(),
-          TimeUnit.MILLISECONDS.toSeconds(
-              this.getMissedCount() * getScmHeartbeatInterval(this.conf)), ex);
+    if (isPassiveScm) {
+      if (this.getMissedCount() % (10 * getLogWarnInterval(conf)) == 0) {
+        LOG.warn(
+            "Unable to communicate to Recon server at {} for past {} seconds.",
+            getAddress().getHostString() + ":" + getAddress().getPort(),
+            TimeUnit.MILLISECONDS.toSeconds(
+                this.getMissedCount() * 10 *
+                    getScmHeartbeatInterval(this.conf)), ex);
+      }
+    } else {
+      if (this.getMissedCount() % getLogWarnInterval(conf) == 0) {
+        LOG.error(
+            "Unable to communicate to SCM server at {} for past {} seconds.",
+            getAddress().getHostString() + ":" + getAddress().getPort(),
+            TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() *
+                getScmHeartbeatInterval(this.conf)), ex);
+      }
     }
     if (LOG.isTraceEnabled()) {
       LOG.trace("Incrementing the Missed count.", ex);
     }
     this.incMissed();
+  }
+
+  public boolean isPassiveScm() {
+    return isPassiveScm;
+  }
+
+  public void setPassiveScm(boolean passiveScm) {
+    isPassiveScm = passiveScm;
   }
 
 

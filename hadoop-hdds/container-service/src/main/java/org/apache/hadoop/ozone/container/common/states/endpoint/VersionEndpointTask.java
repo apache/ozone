@@ -63,7 +63,15 @@ public class VersionEndpointTask implements
   @Override
   public EndpointStateMachine.EndPointStates call() throws Exception {
     rpcEndPoint.lock();
-    try{
+
+    if (rpcEndPoint.isPassiveScm()) {
+      EndpointStateMachine.EndPointStates nextState =
+          rpcEndPoint.getState().getNextState();
+      rpcEndPoint.setState(nextState);
+      rpcEndPoint.zeroMissedCount();
+      return rpcEndPoint.getState();
+    }
+    try {
       if (rpcEndPoint.getState().equals(
           EndpointStateMachine.EndPointStates.GETVERSION)) {
         SCMVersionResponseProto versionResponse =

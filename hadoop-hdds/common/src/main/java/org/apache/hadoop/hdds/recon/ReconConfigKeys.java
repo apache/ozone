@@ -32,6 +32,8 @@ public final class ReconConfigKeys {
 
   public static final String OZONE_RECON_DATANODE_ADDRESS_KEY =
       "ozone.recon.datanode.address";
+  public static final String OZONE_RECON_ADDRESS_KEY =
+      "ozone.recon.address";
   public static final String OZONE_RECON_DATANODE_BIND_HOST_KEY =
       "ozone.recon.datanode.bind.host";
   public static final String OZONE_RECON_DATANODE_BIND_HOST_DEFAULT =
