@@ -18,7 +18,7 @@ version: "3.5"
 services:
   kdc:
     build:
-      context: docker-image/docker-krb5
+      context: ../common/docker-image/docker-krb5
       dockerfile: Dockerfile-krb5
       args:
         buildno: 1
