@@ -20,6 +20,7 @@ services:
     build:
       context: ../common/docker-image/docker-krb5
       dockerfile: Dockerfile-krb5
+    image: ozone-insecure-krb5
     hostname: kdc
     networks:
       - ozone
