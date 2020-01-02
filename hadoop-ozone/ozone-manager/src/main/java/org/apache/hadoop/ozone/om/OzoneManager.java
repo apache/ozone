@@ -2226,13 +2226,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (IOException ex) {
       metrics.incNumTrashKeyListFails();
       auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_TRASH_KEYS,
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_TRASH,
           auditMap, ex));
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-            OMAction.LIST_TRASH_KEYS,
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_TRASH,
             auditMap));
       }
     }
