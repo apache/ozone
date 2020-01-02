@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import java.util.Collections;
+
+import org.apache.commons.collections.MapUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManager;
@@ -70,6 +73,7 @@ public class ReconServer extends GenericCli {
 
       ContainerDBServiceProvider containerDBServiceProvider =
           getContainerDBServiceProvider();
+      containerDBServiceProvider.initNewContainerDB(Collections.emptyMap());
 
       LOG.info("Creating Recon Schema.");
       ReconSchemaManager reconSchemaManager = injector.getInstance(

@@ -84,7 +84,6 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
                             ReconUtils reconUtils, String dbName) {
     DBStore dbStore = null;
     try {
-      LOG.info("getDBStore called.");
       Path metaDir = reconUtils.getReconDbDir(
           configuration, OZONE_RECON_DB_DIR).toPath();
       dbStore = DBStoreBuilder.newBuilder(configuration)
