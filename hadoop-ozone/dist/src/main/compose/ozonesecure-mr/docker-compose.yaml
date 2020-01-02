@@ -20,8 +20,6 @@ services:
     build:
       context: ../common/docker-image/docker-krb5
       dockerfile: Dockerfile-krb5
-      args:
-        buildno: 1
     hostname: kdc
     networks:
       - ozone
