@@ -129,8 +129,7 @@ public interface MiniOzoneCluster {
   List<HddsDatanodeService> getHddsDatanodes();
 
   /**
-   * Returns the list of {@link ReconServer} which are part of this
-   * {@link ReconServer} instance.
+   * Returns a {@link ReconServer} instance.
    *
    * @return List of {@link ReconServer}
    */
