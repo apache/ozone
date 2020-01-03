@@ -16,12 +16,17 @@
  * limitations under the License.
  */
 
-interface IBreadcrumbNameMap {
-  [path: string]: string;
-}
+import React from 'react';
 
-export const breadcrumbNameMap: IBreadcrumbNameMap = {
-  '/Overview': 'Overview',
-  '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines'
+export const Datanodes: React.FC = () => {
+  return (
+      <div>
+        <div className="page-header">
+          Datanodes
+        </div>
+        <div className="content-div">
+          Datanodes content
+        </div>
+      </div>
+  );
 };
