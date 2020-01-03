@@ -107,10 +107,13 @@ public abstract class XceiverClientSpi implements Closeable {
     try {
       XceiverClientReply reply;
       reply = sendCommandAsync(request);
-      ContainerCommandResponseProto responseProto = reply.getResponse().get();
-      return responseProto;
-    } catch (ExecutionException | InterruptedException e) {
-      throw new IOException("Failed to command " + request, e);
+      return reply.getResponse().get();
+    } catch (InterruptedException e) {
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
+      throw getIOExceptionForSendCommand(request, e);
+    } catch (ExecutionException e) {
+      throw getIOExceptionForSendCommand(request, e);
     }
   }
 
@@ -133,11 +136,19 @@ public abstract class XceiverClientSpi implements Closeable {
         function.apply(request, responseProto);
       }
       return responseProto;
-    } catch (ExecutionException | InterruptedException e) {
-      throw new IOException("Failed to command " + request, e);
+    } catch (InterruptedException e) {
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
+      throw getIOExceptionForSendCommand(request, e);
+    } catch (ExecutionException e) {
+      throw getIOExceptionForSendCommand(request, e);
     }
   }
 
+  private IOException getIOExceptionForSendCommand(
+      ContainerCommandRequestProto request, Exception e) {
+    return new IOException("Failed to execute command " + request, e);
+  }
   /**
    * Sends a given command to server gets a waitable future back.
    *
