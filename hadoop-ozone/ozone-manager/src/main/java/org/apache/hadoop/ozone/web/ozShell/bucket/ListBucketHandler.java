@@ -51,7 +51,7 @@ public class ListBucketHandler extends Handler {
   private int maxBuckets;
 
   @Option(names = {"--start", "-s"},
-      description = "The first bucket to start the listing")
+      description = "The listing will start from bucket after the startBucket.")
   private String startBucket;
 
   @Option(names = {"--prefix", "-p"},
