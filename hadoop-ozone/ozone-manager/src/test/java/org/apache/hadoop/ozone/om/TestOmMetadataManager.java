@@ -76,13 +76,17 @@ public class TestOmMetadataManager {
       TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
     }
 
-    // Test list volumes with setting startVolume.
+    // Test list volumes with setting startVolume that
+    // was not part of the result.
     String prefix = "";
-    String startVolume = "vol25";
+    int totalVol = omMetadataManager
+        .listVolumes(ownerName, prefix, null, 100)
+        .size();
+    int startOrder = 10;
+    String startVolume = "vol" + startOrder;
     List<OmVolumeArgs> volumeList = omMetadataManager.listVolumes(ownerName,
         prefix, startVolume, 100);
-    Assert.assertEquals(volumeList.get(0).getVolume(), startVolume);
-    Assert.assertEquals(volumeList.size(), 25);
+    Assert.assertEquals(volumeList.size(), totalVol - startOrder - 1);
   }
 
   @Test
