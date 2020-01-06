@@ -212,10 +212,11 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
     incrementCounter(Statistic.INVOCATION_OPEN);
-    statistics.incrementWriteOps(1);
+    statistics.incrementReadOps(1);
     LOG.trace("open() path:{}", f);
     final String key = pathToKey(f);
-    return new FSDataInputStream(new OzoneFSInputStream(adapter.readFile(key)));
+    return new FSDataInputStream(
+        new OzoneFSInputStream(adapter.readFile(key), statistics));
   }
 
   protected void incrementCounter(Statistic statistic) {
@@ -298,7 +299,12 @@ public class BasicOzoneFileSystem extends FileSystem {
   public boolean rename(Path src, Path dst) throws IOException {
     incrementCounter(Statistic.INVOCATION_RENAME);
     statistics.incrementWriteOps(1);
-    if (src.equals(dst)) {
+    super.checkPath(src);
+    super.checkPath(dst);
+
+    String srcPath = src.toUri().getPath();
+    String dstPath = dst.toUri().getPath();
+    if (srcPath.equals(dstPath)) {
       return true;
     }
 
@@ -309,13 +315,6 @@ public class BasicOzoneFileSystem extends FileSystem {
       return false;
     }
 
-    // Cannot rename a directory to its own subdirectory
-    Path dstParent = dst.getParent();
-    while (dstParent != null && !src.equals(dstParent)) {
-      dstParent = dstParent.getParent();
-    }
-    Preconditions.checkArgument(dstParent == null,
-        "Cannot rename a directory to its own subdirectory");
     // Check if the source exists
     FileStatus srcStatus;
     try {
@@ -325,6 +324,15 @@ public class BasicOzoneFileSystem extends FileSystem {
       return false;
     }
 
+    // Cannot rename a directory to its own subdirectory
+    if (srcStatus.isDirectory()) {
+      Path dstParent = dst.getParent();
+      while (dstParent != null && !src.equals(dstParent)) {
+        dstParent = dstParent.getParent();
+      }
+      Preconditions.checkArgument(dstParent == null,
+          "Cannot rename a directory to its own subdirectory");
+    }
     // Check if the destination exists
     FileStatus dstStatus;
     try {
@@ -351,6 +359,7 @@ public class BasicOzoneFileSystem extends FileSystem {
         // If dst is a directory, rename source as subpath of it.
         // for example rename /source to /dst will lead to /dst/source
         dst = new Path(dst, src.getName());
+        dstPath = dst.toUri().getPath();
         FileStatus[] statuses;
         try {
           statuses = listStatus(dst);
@@ -372,7 +381,8 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
 
     if (srcStatus.isDirectory()) {
-      if (dst.toString().startsWith(src.toString() + OZONE_URI_DELIMITER)) {
+      if (dstPath.toString()
+          .startsWith(srcPath.toString() + OZONE_URI_DELIMITER)) {
         LOG.trace("Cannot rename a directory to a subdirectory of self");
         return false;
       }
@@ -468,7 +478,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
     if (result) {
       // If this delete operation removes all files/directories from the
-      // parent direcotry, then an empty parent directory must be created.
+      // parent directory, then an empty parent directory must be created.
       createFakeParentDirectory(f);
     }
 
@@ -649,7 +659,7 @@ public class BasicOzoneFileSystem extends FileSystem {
    * @return the key of the object that represents the file.
    */
   public String pathToKey(Path path) {
-    Objects.requireNonNull(path, "Path canf not be null!");
+    Objects.requireNonNull(path, "Path can not be null!");
     if (!path.isAbsolute()) {
       path = new Path(workingDir, path);
     }

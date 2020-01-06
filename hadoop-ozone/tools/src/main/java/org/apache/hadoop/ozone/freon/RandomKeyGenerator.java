@@ -280,7 +280,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     totalBucketCount = numOfVolumes * numOfBuckets;
     totalKeyCount = totalBucketCount * numOfKeys;
 
-    LOG.info("Number of Threads: " + numOfThreads);
+    LOG.info("Number of Threads: {}", numOfThreads);
     threadPoolSize = numOfThreads;
     executor = Executors.newFixedThreadPool(threadPoolSize);
     addShutdownHook();
@@ -464,9 +464,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       String jsonName =
           new SimpleDateFormat("yyyyMMddHHmmss").format(Time.now()) + ".json";
       String jsonPath = jsonDir + "/" + jsonName;
-      FileOutputStream os = null;
-      try {
-        os = new FileOutputStream(jsonPath);
+      try (FileOutputStream os = new FileOutputStream(jsonPath)) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.setVisibility(PropertyAccessor.FIELD,
             JsonAutoDetect.Visibility.ANY);
@@ -478,14 +476,6 @@ public final class RandomKeyGenerator implements Callable<Void> {
       } catch (IOException e) {
         out.println("Json object could not be created");
         out.println(e);
-      } finally {
-        try {
-          if (os != null) {
-            os.close();
-          }
-        } catch (IOException e) {
-          LOG.warn("Could not close the output stream for json", e);
-        }
       }
     }
   }
@@ -694,29 +684,29 @@ public final class RandomKeyGenerator implements Callable<Void> {
       try (Scope scope = GlobalTracer.get().buildSpan("createKey")
           .startActive(true)) {
         long keyCreateStart = System.nanoTime();
-        OzoneOutputStream os = bucket.createKey(keyName, keySize, type,
-            factor, new HashMap<>());
-        long keyCreationDuration = System.nanoTime() - keyCreateStart;
-        histograms.get(FreonOps.KEY_CREATE.ordinal())
-            .update(keyCreationDuration);
-        keyCreationTime.getAndAdd(keyCreationDuration);
+        try (OzoneOutputStream os = bucket.createKey(keyName, keySize, type,
+            factor, new HashMap<>())) {
+          long keyCreationDuration = System.nanoTime() - keyCreateStart;
+          histograms.get(FreonOps.KEY_CREATE.ordinal())
+              .update(keyCreationDuration);
+          keyCreationTime.getAndAdd(keyCreationDuration);
 
-        try (Scope writeScope = GlobalTracer.get().buildSpan("writeKeyData")
-            .startActive(true)) {
-          long keyWriteStart = System.nanoTime();
-          for (long nrRemaining = keySize;
-               nrRemaining > 0; nrRemaining -= bufferSize) {
-            int curSize = (int) Math.min(bufferSize, nrRemaining);
-            os.write(keyValueBuffer, 0, curSize);
+          try (Scope writeScope = GlobalTracer.get().buildSpan("writeKeyData")
+              .startActive(true)) {
+            long keyWriteStart = System.nanoTime();
+            for (long nrRemaining = keySize;
+                 nrRemaining > 0; nrRemaining -= bufferSize) {
+              int curSize = (int) Math.min(bufferSize, nrRemaining);
+              os.write(keyValueBuffer, 0, curSize);
+            }
+
+            long keyWriteDuration = System.nanoTime() - keyWriteStart;
+            histograms.get(FreonOps.KEY_WRITE.ordinal())
+                .update(keyWriteDuration);
+            keyWriteTime.getAndAdd(keyWriteDuration);
+            totalBytesWritten.getAndAdd(keySize);
+            numberOfKeysAdded.getAndIncrement();
           }
-          os.close();
-
-          long keyWriteDuration = System.nanoTime() - keyWriteStart;
-          histograms.get(FreonOps.KEY_WRITE.ordinal())
-              .update(keyWriteDuration);
-          keyWriteTime.getAndAdd(keyWriteDuration);
-          totalBytesWritten.getAndAdd(keySize);
-          numberOfKeysAdded.getAndIncrement();
         }
       }
 

@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -158,6 +159,18 @@ public interface RatisHelper {
         OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT
             .getDuration(), timeUnit);
     return TimeDuration.valueOf(duration, timeUnit);
+  }
+
+  static RpcType getRpcType(Configuration conf) {
+    return SupportedRpcType.valueOfIgnoreCase(conf.get(
+        ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
+        ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
+  }
+
+  static RaftClient newRaftClient(RaftPeer leader, Configuration conf) {
+    return newRaftClient(getRpcType(conf), leader, RetryPolicies.noRetry(),
+        GrpcConfigKeys.OutputStream.OUTSTANDING_APPENDS_MAX_DEFAULT,
+        getClientRequestTimeout(conf));
   }
 
   static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,

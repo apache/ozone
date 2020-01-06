@@ -55,9 +55,13 @@ import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 
 /**
  * The OM StateMachine is the state machine for OM Ratis server. It is
@@ -221,14 +225,59 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
       // Add the term index and transaction log index to applyTransaction map
       // . This map will be used to update lastAppliedIndex.
+
+      CompletableFuture<Message> ratisFuture =
+          new CompletableFuture<>();
+
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
-      CompletableFuture<Message> future = CompletableFuture.supplyAsync(
-          () -> runCommand(request, trxLogIndex),
-          executorService);
-      return future;
-    } catch (IOException e) {
+      CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
+          () -> runCommand(request, trxLogIndex), executorService);
+      future.thenApply(omResponse -> {
+        if(!omResponse.getSuccess()) {
+          // When INTERNAL_ERROR or METADATA_ERROR it is considered as
+          // critical error and terminate the OM. Considering INTERNAL_ERROR
+          // also for now because INTERNAL_ERROR is thrown for any error
+          // which is not type OMException.
+
+          // Not done future with completeExceptionally because if we do
+          // that OM will still continue applying transaction until next
+          // snapshot. So in OM case if a transaction failed with un
+          // recoverable error and if we wait till snapshot to terminate
+          // OM, then if some client requested the read transaction of the
+          // failed request, there is a chance we shall give wrong result.
+          // So, to avoid these kind of issue, we should terminate OM here.
+          if (omResponse.getStatus() == INTERNAL_ERROR) {
+            terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
+          } else if (omResponse.getStatus() == METADATA_ERROR) {
+            terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
+          }
+        }
+
+        // For successful response and for all other errors which are not
+        // critical, we can complete future normally.
+        ratisFuture.complete(OMRatisHelper.convertResponseToMessage(
+            omResponse));
+        return ratisFuture;
+      });
+      return ratisFuture;
+    } catch (Exception e) {
       return completeExceptionally(e);
     }
+  }
+
+  /**
+   * Terminate OM.
+   * @param omResponse
+   * @param resultCode
+   */
+  private void terminate(OMResponse omResponse,
+      OMException.ResultCodes resultCode) {
+    OMException exception = new OMException(omResponse.getMessage(),
+        resultCode);
+    String errorMessage = "OM Ratis Server has received unrecoverable " +
+        "error, to avoid further DB corruption, terminating OM. Error " +
+        "Response received is:" + omResponse;
+    ExitUtils.terminate(1, errorMessage, exception, LOG);
   }
 
   /**
@@ -351,10 +400,16 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    * @throws ServiceException
    */
-  private Message runCommand(OMRequest request, long trxLogIndex) {
-    OMResponse response = handler.handleWriteRequest(request,
-        trxLogIndex).getOMResponse();
-    return OMRatisHelper.convertResponseToMessage(response);
+  private OMResponse runCommand(OMRequest request, long trxLogIndex) {
+    try {
+      return handler.handleWriteRequest(request,
+          trxLogIndex).getOMResponse();
+    } catch (Throwable e) {
+      // For any Runtime exceptions, terminate OM.
+      String errorMessage = "Request " + request + "failed with exception";
+      ExitUtils.terminate(1, errorMessage, e, LOG);
+    }
+    return null;
   }
 
   /**
