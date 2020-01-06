@@ -45,6 +45,11 @@ public abstract class AbstractSpaceUsageSource implements SpaceUsageSource {
     }
   }
 
+  /**
+   * Measures execution time of {@code supplier#getAsLong} and logs it via the
+   * given {@code logger}.
+   * @return the same value as returned by {@code supplier#getAsLong}
+   */
   protected static long time(LongSupplier supplier, Logger logger) {
     long start = Time.monotonicNow();
 
