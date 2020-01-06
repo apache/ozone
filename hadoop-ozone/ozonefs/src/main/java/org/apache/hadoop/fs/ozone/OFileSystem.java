@@ -95,11 +95,14 @@ public class OFileSystem extends BasicOFileSystem
                 OzoneFSStorageStatistics::new);
 
     if (isolatedClassloader) {
+      // TODO: Check if this code path need any change as well.
+      //  Similar to BasicOFileSystem#createAdapter
       return OzoneClientAdapterFactory.createAdapter(volumeStr, bucketStr,
           storageStatistics);
 
     } else {
-      return new OzoneClientAdapterImpl(omHost, omPort, conf,
+      // Using OFS adapter.
+      return new OzoneClientOFSAdapterImpl(omHost, omPort, conf,
           volumeStr, bucketStr, storageStatistics);
     }
   }

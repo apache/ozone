@@ -70,7 +70,9 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
   private OzoneVolume volume;
+  private String volumeStr;
   private OzoneBucket bucket;
+  private String bucketStr;
   private ReplicationType replicationType;
   private ReplicationFactor replicationFactor;
   private boolean securityEnabled;
@@ -164,14 +166,69 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
             OzoneClientFactory.getRpcClient(conf);
       }
       objectStore = ozoneClient.getObjectStore();
-      this.volume = objectStore.getVolume(volumeStr);
-      this.bucket = volume.getBucket(bucketStr);
+      this.volumeStr = volumeStr;
+      this.bucketStr = bucketStr;
       this.replicationType = ReplicationType.valueOf(replicationTypeConf);
       this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
+  }
 
+  public void setVolume(String volumeStr) throws IOException {
+    this.volume = objectStore.getVolume(volumeStr);
+  }
+
+  public void setBucket(String bucketStr) throws IOException {
+    this.bucket = volume.getBucket(bucketStr);
+  }
+
+  // TODO: Remove if unused.
+  public void setVolumeStr(String volumeStr) throws IOException {
+    this.volumeStr = volumeStr;
+  }
+
+  // TODO: Remove if unused.
+  public void setBucketStr(String bucketStr) throws IOException {
+    this.bucketStr = bucketStr;
+  }
+
+  /**
+   * Apply volumeStr and bucketStr stored in the object instance before
+   * executing a FileSystem operation.
+   *
+   * @param createIfNotExist Set this to true if the caller is a write operation
+   *                         in order to create the volume and bucket.
+   * @throws IOException
+   */
+  private void getVolumeAndBucket(boolean createIfNotExist) throws IOException {
+    // TODO: I didn't find an existing API to check volume existence, will use
+    //  that instead of try-catch if there is, or we might want to add one.
+    try {
+      setVolume(this.volumeStr);
+    } catch (OMException e) {
+      if (createIfNotExist) {
+        // Try to create volume.
+        objectStore.createVolume(this.volumeStr);
+        // Try setVolume again.
+        setVolume(this.volumeStr);
+      } else {
+        throw e;
+      }
+    }
+
+    try {
+      setBucket(this.bucketStr);
+    } catch (OMException e) {
+      if (createIfNotExist) {
+        // Try to create bucket.
+        volume.createBucket(this.bucketStr);
+        // Try setBucket again.
+        setBucket(this.bucketStr);
+      } else {
+        throw e;
+      }
+    }
   }
 
   @Override
@@ -234,6 +291,7 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
   @Override
   public boolean createDirectory(String keyName) throws IOException {
     LOG.trace("creating dir for key:{}", keyName);
+    getVolumeAndBucket(true);
     incrementCounter(Statistic.OBJECTS_CREATED);
     try {
       bucket.createDirectory(keyName);

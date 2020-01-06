@@ -188,9 +188,11 @@ public class BasicOFileSystem extends FileSystem {
       boolean isolatedClassloader) throws IOException {
 
     if (isolatedClassloader) {
+      // TODO: Check if this code path need any change.
       return OzoneClientAdapterFactory.createAdapter(volumeStr, bucketStr);
     } else {
-      return new BasicOzoneClientAdapterImpl(omHost, omPort, conf,
+      // Using OFS adapter.
+      return new BasicOzoneClientOFSAdapterImpl(omHost, omPort, conf,
           volumeStr, bucketStr);
     }
   }

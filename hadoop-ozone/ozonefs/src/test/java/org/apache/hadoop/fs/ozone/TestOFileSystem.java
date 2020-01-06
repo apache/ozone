@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -28,9 +29,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -39,6 +42,7 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -60,6 +64,8 @@ public class TestOFileSystem {
   private static FileSystem fs;
   private static OFileSystem ofs;
 
+  private static ObjectStore objectStore;
+
   private String volumeName;
   private String bucketName;
 
@@ -72,6 +78,7 @@ public class TestOFileSystem {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
+    objectStore = cluster.getClient().getObjectStore();
 
     // create a volume and a bucket to be used by OFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
@@ -188,6 +195,47 @@ public class TestOFileSystem {
     fileStatuses = ofs.listStatus(parent);
     assertEquals("FileStatus did not return all children of the directory",
         3, fileStatuses.length);
+  }
+
+  private String getRandomNonExistVolumeName() throws Exception {
+    final int numDigit = 5;
+    long retriesLeft = Math.round(Math.pow(10, 5));
+    String name = null;
+    while (name == null && retriesLeft-- > 0) {
+      name = "volume-" + RandomStringUtils.randomNumeric(numDigit);
+      // Check volume existence.
+      Iterator<? extends OzoneVolume> iter =
+          objectStore.listVolumesByUser(null, name, null);
+      if (iter.hasNext()) {
+        // If the volume already exists, try again.
+        name = null;
+      }
+    }
+    if (retriesLeft <= 0) {
+      throw new Exception(
+          "Failed to generate random volume name that doesn't exist already.");
+    }
+    return name;
+  }
+
+  /**
+   * Tests Mkdir operation on a volume that doesn't exist.
+   * Expect Mkdir to create the volume and bucket, provided that
+   * user has appropriate permissions.
+   */
+  @Test
+  public void testMkdirOnNonExistentVolumeAndBucket() throws Exception {
+    String volumeNameLocal = getRandomNonExistVolumeName();
+    String bucketNameLocal = "bucket-" + RandomStringUtils.randomNumeric(5);
+    Path root = new Path("/" + volumeNameLocal + "/" + bucketNameLocal);
+    Path dir1 = new Path(root, "dir1");
+    Path dir12 = new Path(dir1, "dir12");
+    Path dir2 = new Path(root, "dir2");
+    fs.mkdirs(dir12);
+    fs.mkdirs(dir2);
+
+    // TODO: Check volume and bucket existence, they should both be created.
+    // TODO: Verify that dir is created.
   }
 
   /**
