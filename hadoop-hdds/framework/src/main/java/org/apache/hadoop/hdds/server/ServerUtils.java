@@ -172,7 +172,7 @@ public final class ServerUtils {
 
     if (metadirs.size() == 1) {
       final File dbDirPath = new File(metadirs.iterator().next());
-      if (!dbDirPath.exists() && !dbDirPath.mkdirs()) {
+      if (!dbDirPath.mkdirs() && !dbDirPath.exists()) {
         throw new IllegalArgumentException("Unable to create directory " +
             dbDirPath + " specified in configuration setting " +
             key);
