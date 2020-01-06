@@ -543,9 +543,6 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
-    if (this.adapter != null) {
-      this.adapter.close();
-    }
     OFSPath ofsPath = new OFSPath(f.toUri().getPath());
     checkAndCreateAdapter(ofsPath);
     int numEntries = LISTING_PAGE_SIZE;

@@ -291,9 +291,9 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
   @Override
   public boolean createDirectory(String keyName) throws IOException {
     LOG.trace("creating dir for key:{}", keyName);
-    getVolumeAndBucket(true);
     incrementCounter(Statistic.OBJECTS_CREATED);
     try {
+      getVolumeAndBucket(true);
       bucket.createDirectory(keyName);
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS) {
