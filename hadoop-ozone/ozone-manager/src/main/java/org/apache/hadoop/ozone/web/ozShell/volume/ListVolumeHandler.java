@@ -51,7 +51,8 @@ public class ListVolumeHandler extends Handler {
   private int maxVolumes;
 
   @Option(names = {"--start", "-s"},
-      description = "The listing will start from volume after the startVolume")
+      description = "The volume to start the listing from.\n" +
+          "This will be excluded from the result.")
   private String startVolume;
 
   @Option(names = {"--prefix", "-p"},
