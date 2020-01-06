@@ -24,7 +24,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
@@ -41,29 +40,36 @@ public class OMVolumeCreateResponse extends OMClientResponse {
   private UserVolumeInfo userVolumeInfo;
   private OmVolumeArgs omVolumeArgs;
 
-  public OMVolumeCreateResponse(OmVolumeArgs omVolumeArgs,
-      UserVolumeInfo userVolumeInfo, @Nonnull OMResponse omResponse) {
+  public OMVolumeCreateResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmVolumeArgs omVolumeArgs,
+      @Nonnull UserVolumeInfo userVolumeInfo) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
     this.userVolumeInfo = userVolumeInfo;
   }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMVolumeCreateResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
+  }
+
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String dbVolumeKey =
-          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume());
-      String dbUserKey =
-          omMetadataManager.getUserKey(omVolumeArgs.getOwnerName());
+    String dbVolumeKey =
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume());
+    String dbUserKey =
+        omMetadataManager.getUserKey(omVolumeArgs.getOwnerName());
 
-      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          dbVolumeKey, omVolumeArgs);
-      omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
-          userVolumeInfo);
-    }
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        dbVolumeKey, omVolumeArgs);
+    omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
+        userVolumeInfo);
   }
 
   @VisibleForTesting

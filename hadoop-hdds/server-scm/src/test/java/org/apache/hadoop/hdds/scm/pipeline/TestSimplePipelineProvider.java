@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -44,7 +43,7 @@ public class TestSimplePipelineProvider {
   @Before
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
-    stateManager = new PipelineStateManager(new OzoneConfiguration());
+    stateManager = new PipelineStateManager();
     provider = new SimplePipelineProvider(nodeManager);
   }
 

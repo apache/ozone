@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
+import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -28,6 +29,14 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .CreateVolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .VolumeInfo;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -67,6 +76,7 @@ public class TestOMVolumeRequest {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
+    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
@@ -76,5 +86,25 @@ public class TestOMVolumeRequest {
   public void stop() {
     omMetrics.unRegister();
     Mockito.framework().clearInlineMocks();
+  }
+
+  /**
+   * Create OMRequest for create volume.
+   * @param volumeName
+   * @param adminName
+   * @param ownerName
+   * @return OMRequest
+   */
+  static OMRequest createVolumeRequest(String volumeName,
+      String adminName,
+      String ownerName) {
+    VolumeInfo volumeInfo = VolumeInfo.newBuilder().setVolume(volumeName)
+        .setAdminName(adminName).setOwnerName(ownerName).build();
+    CreateVolumeRequest createVolumeRequest =
+        CreateVolumeRequest.newBuilder().setVolumeInfo(volumeInfo).build();
+
+    return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
+        .setCreateVolumeRequest(createVolumeRequest).build();
   }
 }

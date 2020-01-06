@@ -67,7 +67,7 @@ public class PipelineActionHandler
               action, pipelineID, ioe);
         }
       } else {
-        LOG.error("unknown pipeline action:{}" + action.getAction());
+        LOG.error("unknown pipeline action:{}", action.getAction());
       }
     }
   }

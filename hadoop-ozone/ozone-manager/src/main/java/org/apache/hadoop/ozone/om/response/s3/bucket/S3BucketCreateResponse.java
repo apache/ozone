@@ -61,11 +61,13 @@ public class S3BucketCreateResponse extends OMClientResponse {
 
     if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
       if (omVolumeCreateResponse != null) {
-        omVolumeCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
+        omVolumeCreateResponse.checkAndUpdateDB(omMetadataManager,
+            batchOperation);
       }
 
       Preconditions.checkState(omBucketCreateResponse != null);
-      omBucketCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
+      omBucketCreateResponse.checkAndUpdateDB(omMetadataManager,
+          batchOperation);
 
       omMetadataManager.getS3Table().putWithBatch(batchOperation, s3Bucket,
           s3Mapping);

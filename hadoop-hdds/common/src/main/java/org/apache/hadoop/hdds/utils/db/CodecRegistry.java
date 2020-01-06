@@ -35,6 +35,7 @@ public class CodecRegistry {
     valueCodecs = new HashMap<>();
     valueCodecs.put(String.class, new StringCodec());
     valueCodecs.put(Long.class, new LongCodec());
+    valueCodecs.put(byte[].class, new ByteArrayCodec());
   }
 
   /**

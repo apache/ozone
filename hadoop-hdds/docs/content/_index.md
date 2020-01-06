@@ -29,10 +29,7 @@ Apart from scaling to billions of objects of varying sizes,
 Ozone can function effectively in containerized environments
 like Kubernetes._* <p>
 
-Applications like Apache Spark, Hive and YARN, work without any modifications when using Ozone. Ozone comes with a [Java client library]({{<
-ref "JavaApi.md"
->}}), [S3 protocol support] ({{< ref "S3.md" >}}), and a [command line interface]
-({{< ref "shell/_index.md" >}})  which makes it easy to use Ozone.
+Applications like Apache Spark, Hive and YARN, work without any modifications when using Ozone. Ozone comes with a [Java client library]({{<ref "JavaApi.md">}}), [S3 protocol support]({{< ref "S3.md" >}}), and a [command line interface]({{< ref "shell/_index.md" >}})  which makes it easy to use Ozone.
 
 Ozone consists of volumes, buckets, and keys:
 
@@ -40,6 +37,3 @@ Ozone consists of volumes, buckets, and keys:
 * Buckets are similar to directories. A bucket can contain any number of keys, but buckets cannot contain other buckets.
 * Keys are similar to files.
 
- <a href="{{< ref "start/_index.md" >}}"> <button type="button"
- class="btn  btn-success btn-lg">Next >></button>
-</div>

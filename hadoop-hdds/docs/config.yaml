@@ -16,6 +16,13 @@
 
 languageCode: "en-us"
 DefaultContentLanguage: "en"
+languages:
+  en:
+    languageName: English
+    weight: 1
+  zh:
+    languageName: 中文
+    weight: 2
 title: "Ozone"
 theme: "ozonedoc"
 pygmentsCodeFences: true
