@@ -221,11 +221,12 @@ public class BasicOFileSystem extends FileSystem {
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
     incrementCounter(Statistic.INVOCATION_OPEN);
-    statistics.incrementWriteOps(1);
+    statistics.incrementReadOps(1);
     LOG.trace("open() path:{}", f);
     checkAndCreateAdapter(new OFSPath(f.toUri().getPath()));
     final String key = pathToKey(f);
-    return new FSDataInputStream(new OzoneFSInputStream(adapter.readFile(key)));
+    return new FSDataInputStream(
+        new OzoneFSInputStream(adapter.readFile(key), statistics));
   }
 
   protected void incrementCounter(Statistic statistic) {
