@@ -35,7 +35,7 @@ You will also see any lint errors in the console.
 
 ### `yarn run mock:api`
 
-Runs a mock json server in port 4000. During development, always run the mock api server to see mock response in the frontend. 
+Runs a mock json server in port 9888. During development, always run the mock api server to see mock response in the frontend. 
 
 ### `yarn test`
 
