@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
@@ -35,15 +37,6 @@ public class DatanodeConfiguration {
    * The maximum number of replication commands a single datanode can execute
    * simultaneously.
    */
-  private final int replicationMaxStreamsDefault = 10;
-  private int replicationMaxStreams = replicationMaxStreamsDefault;
-  /**
-   * The maximum number of threads used to delete containers on a datanode
-   * simultaneously.
-   */
-  private final int containerDeleteThreadsDefault = 2;
-  private int containerDeleteThreads = containerDeleteThreadsDefault;
-
   @Config(key = "replication.streams.limit",
       type = ConfigType.INT,
       defaultValue = "10",
@@ -51,21 +44,13 @@ public class DatanodeConfiguration {
       description = "The maximum number of replication commands a single " +
           "datanode can execute simultaneously"
   )
-  public void setReplicationMaxStreams(int val) {
-    if (val < 1) {
-      LOG.warn("hdds.datanode.replication.streams.limit must be greater than" +
-          "zero and was set to {}. Defaulting to {}",
-          val, replicationMaxStreamsDefault);
-      replicationMaxStreams = replicationMaxStreamsDefault;
-    } else {
-      this.replicationMaxStreams = val;
-    }
-  }
+  private final int replicationMaxStreamsDefault = 10;
 
-  public int getReplicationMaxStreams() {
-    return replicationMaxStreams;
-  }
-
+  private int replicationMaxStreams = replicationMaxStreamsDefault;
+  /**
+   * The maximum number of threads used to delete containers on a datanode
+   * simultaneously.
+   */
   @Config(key = "container.delete.threads.max",
       type = ConfigType.INT,
       defaultValue = "2",
@@ -73,15 +58,37 @@ public class DatanodeConfiguration {
       description = "The maximum number of threads used to delete containers " +
           "on a datanode"
   )
-  public void setContainerDeleteThreads(int val) {
-    if (val < 1) {
-      LOG.warn("hdds.datanode.container.delete.threads.max must be greater " +
-          "than zero and was set to {}. Defaulting to {}",
-          val, containerDeleteThreadsDefault);
-      containerDeleteThreads = containerDeleteThreadsDefault;
-    } else {
-      this.containerDeleteThreads = val;
+  private final int containerDeleteThreadsDefault = 2;
+
+  private int containerDeleteThreads = containerDeleteThreadsDefault;
+
+  @PostConstruct
+  public void validate() {
+    if (replicationMaxStreamsDefault < 1) {
+      LOG.warn("hdds.datanode.replication.streams.limit must be greater than" +
+          "zero and was set to {}. Defaulting to {}",
+          replicationMaxStreamsDefault, replicationMaxStreamsDefault);
+      replicationMaxStreams = replicationMaxStreamsDefault;
     }
+
+    if (containerDeleteThreads < 1) {
+      LOG.warn("hdds.datanode.container.delete.threads.max must be greater " +
+              "than zero and was set to {}. Defaulting to {}",
+          containerDeleteThreads, containerDeleteThreadsDefault);
+      containerDeleteThreads = containerDeleteThreadsDefault;
+    }
+  }
+
+  public void setReplicationMaxStreams(int replicationMaxStreams) {
+    this.replicationMaxStreams = replicationMaxStreams;
+  }
+
+  public void setContainerDeleteThreads(int containerDeleteThreads) {
+    this.containerDeleteThreads = containerDeleteThreads;
+  }
+
+  public int getReplicationMaxStreams() {
+    return replicationMaxStreams;
   }
 
   public int getContainerDeleteThreads() {
