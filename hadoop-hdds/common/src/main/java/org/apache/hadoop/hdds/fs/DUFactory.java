@@ -65,8 +65,6 @@ public class DUFactory implements SpaceUsageCheckFactory {
 
     private static final String REFRESH_PERIOD = "refresh.period";
 
-    private Duration refreshPeriod;
-
     @Config(
         key = REFRESH_PERIOD,
         defaultValue = "1h",
@@ -75,6 +73,8 @@ public class DUFactory implements SpaceUsageCheckFactory {
         description = "Disk space usage information will be refreshed with the"
             + "specified period following the completion of the last check."
     )
+    private Duration refreshPeriod;
+
     public void setRefreshPeriod(long millis) {
       refreshPeriod = Duration.ofMillis(millis);
     }

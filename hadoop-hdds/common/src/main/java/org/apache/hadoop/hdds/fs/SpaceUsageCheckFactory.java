@@ -116,8 +116,6 @@ public interface SpaceUsageCheckFactory {
 
     private static final String CLASSNAME_KEY = "classname";
 
-    private String className;
-
     @Config(
         key = CLASSNAME_KEY,
         defaultValue = "",
@@ -126,6 +124,8 @@ public interface SpaceUsageCheckFactory {
             + "creates objects for providing disk space usage information.  It "
             + "should implement the SpaceUsageCheckFactory interface."
     )
+    private String className;
+
     public void setClassName(String className) {
       this.className = className;
     }
