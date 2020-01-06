@@ -262,6 +262,8 @@ public class TestOmMetrics {
     Mockito.doNothing().when(mockKm).deleteKey(null);
     Mockito.doReturn(null).when(mockKm).lookupKey(null, "");
     Mockito.doReturn(null).when(mockKm).listKeys(null, null, null, null, 0);
+    Mockito.doReturn(null).when(mockKm).listTrash(
+        null, null, null, null, 0);
     Mockito.doNothing().when(mockKm).commitKey(any(OmKeyArgs.class), anyLong());
     Mockito.doReturn(null).when(mockKm).initiateMultipartUpload(
         any(OmKeyArgs.class));
@@ -271,11 +273,12 @@ public class TestOmMetrics {
     doKeyOps();
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumKeyOps", 6L, omMetrics);
+    assertCounter("NumKeyOps", 7L, omMetrics);
     assertCounter("NumKeyAllocate", 1L, omMetrics);
     assertCounter("NumKeyLookup", 1L, omMetrics);
     assertCounter("NumKeyDeletes", 1L, omMetrics);
     assertCounter("NumKeyLists", 1L, omMetrics);
+    assertCounter("NumTrashKeyLists", 1L, omMetrics);
     assertCounter("NumKeys", 0L, omMetrics);
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
 
@@ -298,6 +301,8 @@ public class TestOmMetrics {
     Mockito.doThrow(exception).when(mockKm).lookupKey(null, "");
     Mockito.doThrow(exception).when(mockKm).listKeys(
         null, null, null, null, 0);
+    Mockito.doThrow(exception).when(mockKm).listTrash(
+        null, null, null, null, 0);
     Mockito.doThrow(exception).when(mockKm).commitKey(any(OmKeyArgs.class),
         anyLong());
     Mockito.doThrow(exception).when(mockKm).initiateMultipartUpload(
@@ -308,17 +313,19 @@ public class TestOmMetrics {
     doKeyOps();
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumKeyOps", 19L, omMetrics);
+    assertCounter("NumKeyOps", 21L, omMetrics);
     assertCounter("NumKeyAllocate", 5L, omMetrics);
     assertCounter("NumKeyLookup", 2L, omMetrics);
     assertCounter("NumKeyDeletes", 3L, omMetrics);
     assertCounter("NumKeyLists", 2L, omMetrics);
+    assertCounter("NumTrashKeyLists", 2L, omMetrics);
     assertCounter("NumInitiateMultipartUploads", 2L, omMetrics);
 
     assertCounter("NumKeyAllocateFails", 1L, omMetrics);
     assertCounter("NumKeyLookupFails", 1L, omMetrics);
     assertCounter("NumKeyDeleteFails", 1L, omMetrics);
     assertCounter("NumKeyListFails", 1L, omMetrics);
+    assertCounter("NumTrashKeyListFails", 1L, omMetrics);
     assertCounter("NumInitiateMultipartUploadFails", 1L, omMetrics);
 
 
@@ -415,6 +422,11 @@ public class TestOmMetrics {
 
     try {
       ozoneManager.listKeys(null, null, null, null, 0);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      ozoneManager.listTrash(null, null, null, null, 0);
     } catch (IOException ignored) {
     }
 

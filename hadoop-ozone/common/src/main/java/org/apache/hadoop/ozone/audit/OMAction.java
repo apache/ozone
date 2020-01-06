@@ -48,6 +48,7 @@ public enum OMAction implements AuditAction {
   LIST_BUCKETS,
   LIST_VOLUMES,
   LIST_KEYS,
+  LIST_TRASH,
   READ_VOLUME,
   READ_BUCKET,
   READ_KEY,
