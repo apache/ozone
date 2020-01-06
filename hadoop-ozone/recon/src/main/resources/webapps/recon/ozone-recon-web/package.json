@@ -30,7 +30,7 @@
     "build": "react-app-rewired build",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject",
-    "mock:api": "json-server --watch api/db.json --routes api/routes.json --port 4000",
+    "mock:api": "json-server --watch api/db.json --routes api/routes.json --port 9888",
     "dev": "npm-run-all --parallel mock:api start"
   },
   "eslintConfig": {
@@ -52,5 +52,5 @@
     "json-server": "^0.15.1",
     "npm-run-all": "^4.1.5"
   },
-  "proxy": "http://localhost:4000"
+  "proxy": "http://localhost:9888"
 }
