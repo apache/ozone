@@ -149,7 +149,9 @@ public class TestOmMetadataManager {
 
     TreeSet<String> volumeABucketsPrefixWithOzoneOwner = new TreeSet<>();
     TreeSet<String> volumeABucketsPrefixWithHadoopOwner = new TreeSet<>();
-    for (int i=1; i<= 100; i++) {
+    volumeABucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
+    addBucketsToCache(volumeName1, prefixBucketNameWithOzoneOwner);
+    for (int i = 1; i < 100; i++) {
       if (i % 2 == 0) {
         volumeABucketsPrefixWithOzoneOwner.add(
             prefixBucketNameWithOzoneOwner + i);
@@ -165,7 +167,9 @@ public class TestOmMetadataManager {
     TreeSet<String> volumeBBucketsPrefixWithOzoneOwner = new TreeSet<>();
     TreeSet<String> volumeBBucketsPrefixWithHadoopOwner = new TreeSet<>();
     TestOMRequestUtils.addVolumeToDB(volumeName2, omMetadataManager);
-    for (int i=1; i<= 100; i++) {
+    volumeABucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
+    addBucketsToCache(volumeName2, prefixBucketNameWithOzoneOwner);
+    for (int i = 1; i < 100; i++) {
       if (i % 2 == 0) {
         volumeBBucketsPrefixWithOzoneOwner.add(
             prefixBucketNameWithOzoneOwner + i);
