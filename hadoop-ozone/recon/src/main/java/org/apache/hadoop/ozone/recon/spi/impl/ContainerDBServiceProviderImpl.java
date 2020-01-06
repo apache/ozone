@@ -84,6 +84,12 @@ public class ContainerDBServiceProviderImpl
     initializeTables(dbStore);
   }
 
+  @Override
+  public void start() {
+    // Makes sure the ContainerDBServiceProvider is injected and
+    // available. Nothing else to do here.
+  }
+
   /**
    * Initialize a new container DB instance, getting rid of the old instance
    * and then storing the passed in container prefix counts into the created

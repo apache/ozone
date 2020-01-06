@@ -33,6 +33,11 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 public interface ContainerDBServiceProvider {
 
   /**
+   * Start the Recon container DB provider service.
+   */
+  void start();
+
+  /**
    * Create new container DB and bulk Store the container to Key prefix
    * mapping.
    * @param containerKeyPrefixCounts Map of containerId, key-prefix tuple to

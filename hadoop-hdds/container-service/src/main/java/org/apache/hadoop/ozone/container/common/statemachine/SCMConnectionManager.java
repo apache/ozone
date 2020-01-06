@@ -179,7 +179,7 @@ public class SCMConnectionManager
 
       EndpointStateMachine endPoint =
           new EndpointStateMachine(address, rpcClient, conf);
-      endPoint.setPassiveScm(passiveScm);
+      endPoint.setPassive(passiveScm);
       scmMachines.put(address, endPoint);
     } finally {
       writeUnlock();

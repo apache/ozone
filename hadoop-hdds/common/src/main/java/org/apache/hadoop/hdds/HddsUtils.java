@@ -294,7 +294,7 @@ public final class HddsUtils {
   /**
    * Retrieve the socket addresses of recon.
    *
-   * @return A collection of Recon addresses
+   * @return Recon address
    * @throws IllegalArgumentException If the configuration is invalid
    */
   public static InetSocketAddress getReconAddresses(

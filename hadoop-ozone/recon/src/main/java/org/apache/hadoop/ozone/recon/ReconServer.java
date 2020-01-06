@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import java.util.Collections;
-
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManager;
@@ -70,9 +68,9 @@ public class ReconServer extends GenericCli {
     LOG.info("Initializing Recon server...");
     try {
 
-      ContainerDBServiceProvider containerDBServiceProvider =
-          getContainerDBServiceProvider();
-      containerDBServiceProvider.initNewContainerDB(Collections.emptyMap());
+      // Initialize the Container DB Service provider first since it creates
+      // the ozone.recon.db.dir which is needed by SQL schema.
+      getContainerDBServiceProvider().start();
 
       LOG.info("Creating Recon Schema.");
       ReconSchemaManager reconSchemaManager = injector.getInstance(
