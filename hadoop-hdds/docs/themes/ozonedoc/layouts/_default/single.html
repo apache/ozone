@@ -36,15 +36,19 @@
                 </ol>
               </nav>
 
+          {{ partial "languages.html" .}}
+
+
           <div class="col-md-9">
             <h1>{{.Title}}</h1>
-          </div>
 
-          {{ .Content }}
+            {{ .Content }}
 
           {{ with .PrevInSection }}
           <a class="btn  btn-success btn-lg" href="{{ .Permalink }}">Next >></a>
           {{ end }}
+          </div>
+
         </div>
       </div>
     </div>

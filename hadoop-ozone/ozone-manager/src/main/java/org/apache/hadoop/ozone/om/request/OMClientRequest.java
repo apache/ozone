@@ -205,6 +205,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     return omResponse.build();
   }
 
+
   private String exceptionErrorMessage(IOException ex) {
     if (ex instanceof OMException) {
       return ex.getMessage();
@@ -242,5 +243,27 @@ public abstract class OMClientRequest implements RequestAuditor {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volume);
     return auditMap;
+  }
+
+  /**
+   * Check if the transaction is a replay.
+   * @param updateID last updateID of the entity in the DB
+   * @param transactionID the current transaction ID
+   * @return true if transactionID is less than or equal to updateID, false
+   * otherwise.
+   */
+  public boolean isReplay(OzoneManager om, long updateID, long transactionID) {
+    return om.isRatisEnabled() && transactionID <= updateID;
+  }
+
+  /**
+   * Return a dummy OMClientResponse for when the transactions are replayed.
+   */
+  protected OMResponse createReplayOMResponse(
+      @Nonnull OMResponse.Builder omResponse) {
+
+    omResponse.setSuccess(false);
+    omResponse.setStatus(OzoneManagerProtocolProtos.Status.REPLAY);
+    return omResponse.build();
   }
 }

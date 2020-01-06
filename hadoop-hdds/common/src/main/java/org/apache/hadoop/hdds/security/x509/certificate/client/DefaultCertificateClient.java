@@ -742,7 +742,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
         publicKey = pubKey;
       } else {
         getLogger().error("Can't recover public key " +
-            "corresponding to private key.", BOOTSTRAP_ERROR);
+            "corresponding to private key.");
         return false;
       }
     } catch (IOException e) {

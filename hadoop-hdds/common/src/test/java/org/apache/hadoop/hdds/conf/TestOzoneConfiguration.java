@@ -128,6 +128,15 @@ public class TestOzoneConfiguration {
     Assert.assertEquals(9878, configuration.getPort());
   }
 
+  @Test(expected = NumberFormatException.class)
+  public void postConstructValidation() {
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.setInt("test.scm.client.port", -3);
+
+    SimpleConfiguration configuration =
+        ozoneConfiguration.getObject(SimpleConfiguration.class);
+  }
+
 
   private void appendProperty(BufferedWriter out, String name, String val)
       throws IOException {

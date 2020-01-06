@@ -29,7 +29,7 @@ scale to billions of objects.
 Ozone separates namespace management and block space management; this helps
 ozone to scale much better. The namespace is managed by a daemon called
 [Ozone Manager ]({{< ref "OzoneManager.md" >}}) (OM),  and block space is
-managed by [Storage Container Manager] ({{< ref "Hdds.md" >}}) (SCM).
+managed by [Storage Container Manager]({{< ref "Hdds.md" >}}) (SCM).
 
 
 Ozone consists of volumes, buckets, and keys.

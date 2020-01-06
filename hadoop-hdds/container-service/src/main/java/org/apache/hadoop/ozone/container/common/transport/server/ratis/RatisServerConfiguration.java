@@ -29,14 +29,14 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hdds.ratis.server")
 public class RatisServerConfiguration {
 
-  private int numSnapshotsRetained;
-
   @Config(key = "num.snapshots.retained",
       type = ConfigType.INT,
       defaultValue = "5",
       tags = {ConfigTag.STORAGE},
       description = "Config parameter to specify number of old snapshots " +
           "retained at the Ratis leader.")
+  private int numSnapshotsRetained;
+
   public void setNumSnapshotsRetained(int numSnapshotsRetained) {
     this.numSnapshotsRetained = numSnapshotsRetained;
   }

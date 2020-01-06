@@ -68,6 +68,8 @@ public final class GenesisUtil {
 
   private static final int DB_FILE_LEN = 7;
   private static final String TMP_DIR = "java.io.tmpdir";
+  private static final Random RANDOM = new Random();
+  private static final String RANDOM_LOCAL_ADDRESS = "127.0.0.1:0";
 
   public static Path getTempPath() {
     return Paths.get(System.getProperty(TMP_DIR));
@@ -100,10 +102,9 @@ public final class GenesisUtil {
   }
 
   public static DatanodeDetails createDatanodeDetails(String uuid) {
-    Random random = new Random();
     String ipAddress =
-        random.nextInt(256) + "." + random.nextInt(256) + "." + random
-            .nextInt(256) + "." + random.nextInt(256);
+        RANDOM.nextInt(256) + "." + RANDOM.nextInt(256) + "." + RANDOM
+            .nextInt(256) + "." + RANDOM.nextInt(256);
 
     DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.STANDALONE, 0);
@@ -137,10 +138,14 @@ public final class GenesisUtil {
   }
 
   static void configureSCM(Configuration conf, int numHandlers) {
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
-    conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "127.0.0.1:0");
-    conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
+        RANDOM_LOCAL_ADDRESS);
+    conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+        RANDOM_LOCAL_ADDRESS);
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
+        RANDOM_LOCAL_ADDRESS);
+    conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
+        RANDOM_LOCAL_ADDRESS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY, numHandlers);
   }
 
@@ -190,7 +195,8 @@ public final class GenesisUtil {
   }
 
   static void configureOM(Configuration conf, int numHandlers) {
-    conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
+    conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY,
+        RANDOM_LOCAL_ADDRESS);
     conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numHandlers);
   }
 }

@@ -84,14 +84,14 @@ public class TestOMVolumeDeleteResponse {
         .setOwnerName(userName).setAdminName(userName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
     OMVolumeCreateResponse omVolumeCreateResponse =
-        new OMVolumeCreateResponse(omVolumeArgs, volumeList, omResponse);
+        new OMVolumeCreateResponse(omResponse, omVolumeArgs, volumeList);
 
     // As we are deleting updated volume list should be empty.
     UserVolumeInfo updatedVolumeList = UserVolumeInfo.newBuilder()
         .setObjectID(1).setUpdateID(1).build();
     OMVolumeDeleteResponse omVolumeDeleteResponse =
-        new OMVolumeDeleteResponse(volumeName, userName, updatedVolumeList,
-            omResponse);
+        new OMVolumeDeleteResponse(omResponse, volumeName, userName,
+            updatedVolumeList);
 
     omVolumeCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
     omVolumeDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
@@ -118,11 +118,12 @@ public class TestOMVolumeDeleteResponse {
         .setCreateVolumeResponse(CreateVolumeResponse.getDefaultInstance())
         .build();
 
-    OMVolumeDeleteResponse omVolumeDeleteResponse =
-        new OMVolumeDeleteResponse(null, null, null, omResponse);
+    OMVolumeDeleteResponse omVolumeDeleteResponse = new OMVolumeDeleteResponse(
+        omResponse);
 
     try {
-      omVolumeDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
+      omVolumeDeleteResponse.checkAndUpdateDB(omMetadataManager,
+          batchOperation);
     } catch (IOException ex) {
       fail("testAddToDBBatchFailure failed");
     }

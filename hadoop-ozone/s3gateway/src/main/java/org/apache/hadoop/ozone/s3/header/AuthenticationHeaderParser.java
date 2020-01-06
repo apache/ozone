@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.s3.header;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +38,9 @@ public class AuthenticationHeaderParser {
   private String accessKeyID;
 
   public void parse() throws OS3Exception {
+    if (authHeader == null) {
+      throw S3ErrorTable.MALFORMED_HEADER;
+    }
     if (authHeader.startsWith("AWS4")) {
       LOG.debug("V4 Header {}", authHeader);
       AuthorizationHeaderV4 authorizationHeader = new AuthorizationHeaderV4(

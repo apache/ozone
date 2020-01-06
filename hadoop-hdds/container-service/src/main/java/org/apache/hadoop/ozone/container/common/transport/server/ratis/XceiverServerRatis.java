@@ -734,6 +734,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   void notifyGroupAdd(RaftGroupId gid) {
     raftGids.add(gid);
+    sendPipelineReport();
   }
 
   void handleLeaderChangedNotification(RaftGroupMemberId groupMemberId,
@@ -745,9 +746,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     groupLeaderMap.put(groupMemberId.getGroupId(), leaderForGroup);
     if (context != null && leaderForGroup) {
       // Publish new report from leader
-      context.addReport(context.getParent().getContainer().getPipelineReport());
-      // Trigger HB immediately
-      context.getParent().triggerHeartbeat();
+      sendPipelineReport();
     }
+  }
+
+  private void sendPipelineReport() {
+    // TODO: Send IncrementalPipelineReport instead of full PipelineReport
+    context.addReport(context.getParent().getContainer().getPipelineReport());
+    context.getParent().triggerHeartbeat();
   }
 }
