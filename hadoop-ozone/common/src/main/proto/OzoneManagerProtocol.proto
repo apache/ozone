@@ -860,7 +860,7 @@ message PurgeKeysResponse {
 message OMTokenProto {
     enum Type {
       DELEGATION_TOKEN = 1;
-      S3TOKEN = 2;
+      S3AUTHINFO = 2;
     };
     required Type   type           = 1;
     optional uint32 version        = 2;
