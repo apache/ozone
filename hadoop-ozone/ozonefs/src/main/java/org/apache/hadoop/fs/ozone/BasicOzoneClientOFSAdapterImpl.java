@@ -326,6 +326,7 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
   public FileStatusAdapter getFileStatus(String key, URI uri,
       Path qualifiedPath, String userName)
       throws IOException {
+    getVolumeAndBucket(false);
     try {
       incrementCounter(Statistic.OBJECTS_QUERY);
       OzoneFileStatus status = bucket.getFileStatus(key);
