@@ -86,12 +86,10 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   public void start() {
     if (executor != null) {
       long initialDelay = cachedValue.get() > 0 ? refresh.toMillis() : 0;
-      synchronized (this) {
-        if (!running) {
-          scheduledFuture = executor.scheduleWithFixedDelay(
-              this::refresh, initialDelay, refresh.toMillis(), MILLISECONDS);
-          running = true;
-        }
+      if (!running) {
+        scheduledFuture = executor.scheduleWithFixedDelay(
+            this::refresh, initialDelay, refresh.toMillis(), MILLISECONDS);
+        running = true;
       }
     } else {
       refresh();
@@ -99,17 +97,15 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
   }
 
   public void shutdown() {
-    synchronized (this) {
-      persistence.save(this); // save cached value
+    persistence.save(this); // save cached value
 
-      if (executor != null) {
-        if (running && scheduledFuture != null) {
-          scheduledFuture.cancel(true);
-        }
-        running = false;
-
-        executor.shutdown();
+    if (executor != null) {
+      if (running && scheduledFuture != null) {
+        scheduledFuture.cancel(true);
       }
+      running = false;
+
+      executor.shutdown();
     }
   }
 
