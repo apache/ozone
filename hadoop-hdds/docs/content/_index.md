@@ -22,7 +22,7 @@ weight: -10
 
 # Apache Hadoop Ozone
 
-<img src="ozone-usage.png" style="max-width: 60%;"/>
+{{<figure src="/ozone-usage.png" width="60%">}}
 
 *_Ozone is a scalable, redundant, and distributed object store for Hadoop. <p>
 Apart from scaling to billions of objects of varying sizes,
