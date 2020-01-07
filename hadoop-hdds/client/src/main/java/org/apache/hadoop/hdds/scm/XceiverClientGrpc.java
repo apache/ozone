@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.HashMap;
@@ -235,7 +236,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throw new IOException("Failed to execute command " + request, e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw (IOException) new InterruptedException(
+      throw (IOException) new InterruptedIOException(
           "Command " + request + " was interrupted.")
           .initCause(e);
     }
@@ -253,7 +254,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       throw new IOException("Failed to execute command " + request, e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw (IOException) new InterruptedException(
+      throw (IOException) new InterruptedIOException(
           "Command " + request + " was interrupted.")
           .initCause(e);
     }
