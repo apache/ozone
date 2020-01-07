@@ -185,10 +185,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <configuration>
               <includes>
                 <include>org.apache.hadoop.hdds.**</include>
+                <include>org.apache.hadoop.ozone.client.**</include>
               </includes>
-              <excludes>
-                <exclude>org.apache.hadoop.ozone.client.**</exclude>
-              </excludes>
             </configuration>
           </plugin>
         </plugins>
