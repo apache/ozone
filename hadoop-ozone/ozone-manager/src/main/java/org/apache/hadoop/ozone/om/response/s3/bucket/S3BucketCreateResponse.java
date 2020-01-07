@@ -23,6 +23,7 @@ import java.io.IOException;
 import com.google.common.base.Preconditions;
 import com.google.common.annotations.VisibleForTesting;
 
+import javax.annotation.Nullable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
@@ -42,7 +43,7 @@ public class S3BucketCreateResponse extends OMClientResponse {
   private String s3Mapping;
 
   public S3BucketCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OMVolumeCreateResponse omVolumeCreateResponse,
+      @Nullable OMVolumeCreateResponse omVolumeCreateResponse,
       @Nonnull OMBucketCreateResponse omBucketCreateResponse,
       @Nonnull String s3BucketName,
       @Nonnull String s3Mapping) {
