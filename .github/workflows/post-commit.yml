@@ -116,6 +116,8 @@ jobs:
   it-freon:
     name: it-freon
     runs-on: ubuntu-18.04
+    needs:
+        - build
     steps:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv
@@ -129,6 +131,8 @@ jobs:
   it-filesystem:
     name: it-filesystem
     runs-on: ubuntu-18.04
+    needs:
+        - build
     steps:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv
@@ -142,6 +146,8 @@ jobs:
   it-filesystem-contract:
     name: it-filesystem-contract
     runs-on: ubuntu-18.04
+    needs:
+        - build
     steps:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv
@@ -155,6 +161,8 @@ jobs:
   it-client-and-hdds:
     name: it-client-and-hdds
     runs-on: ubuntu-18.04
+    needs:
+        - build
     steps:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv
@@ -168,6 +176,8 @@ jobs:
   it-om:
     name: it-om
     runs-on: ubuntu-18.04
+    needs:
+        - build
     steps:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv
@@ -181,6 +191,8 @@ jobs:
   it-ozone:
     name: it-ozone
     runs-on: ubuntu-18.04
+    needs:
+        - build
     steps:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv
