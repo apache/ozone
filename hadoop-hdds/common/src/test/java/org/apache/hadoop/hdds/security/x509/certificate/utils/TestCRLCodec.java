@@ -55,7 +55,7 @@ import org.junit.rules.TemporaryFolder;
 
 
 /**
- * Tests fopr the CRLCodec.
+ * Tests for the CRLCodec.
  */
 public class TestCRLCodec {
 
@@ -64,6 +64,9 @@ public class TestCRLCodec {
   private SecurityConfig securityConfig;
   private X509CertificateHolder x509CertificateHolder;
   private KeyPair keyPair;
+  private static final String CRL_FILE_NAME = "RevocationList.crl";
+  private static final String TMP_CERT_FILE_NAME = "pemcertificate.crt";
+
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
   private File basePath;
@@ -98,7 +101,7 @@ public class TestCRLCodec {
         builder.build(contentSignerBuilder.build(privateKey));
 
     CRLCodec crlCodec = new CRLCodec(securityConfig);
-    crlCodec.writeCRL(cRLHolder, "pemcertificate.crl", true);
+    crlCodec.writeCRL(cRLHolder, CRL_FILE_NAME, true);
 
     X509CRLEntryHolder entryHolder =
         cRLHolder.getRevokedCertificate(BigInteger.ONE);
@@ -140,7 +143,7 @@ public class TestCRLCodec {
     if (!basePath.exists()) {
       Assert.assertTrue(basePath.mkdirs());
     }
-    codec.writeCertificate(basePath.toPath(), "pemcertificate.crt",
+    codec.writeCertificate(basePath.toPath(), TMP_CERT_FILE_NAME,
                            pemString, false);
   }
 
@@ -151,7 +154,7 @@ public class TestCRLCodec {
         new CertificateCodec(securityConfig, COMPONENT);
 
     X509CertificateHolder x509CertHolder =
-        codec.readCertificate(basePath.toPath(), "pemcertificate.crt");
+        codec.readCertificate(basePath.toPath(), TMP_CERT_FILE_NAME);
 
     assertNotNull(x509CertHolder);
 
