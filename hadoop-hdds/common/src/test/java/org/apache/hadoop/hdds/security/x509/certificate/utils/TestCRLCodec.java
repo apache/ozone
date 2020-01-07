@@ -93,9 +93,9 @@ public class TestCRLCodec {
                         CRLReason.cACompromise);
 
     JcaContentSignerBuilder contentSignerBuilder =
-        new JcaContentSignerBuilder("SHA256WithRSAEncryption");
+        new JcaContentSignerBuilder(securityConfig.getSignatureAlgo());
 
-    contentSignerBuilder.setProvider("BC");
+    contentSignerBuilder.setProvider(securityConfig.getProvider());
     PrivateKey privateKey = keyPair.getPrivate();
     X509CRLHolder cRLHolder =
         builder.build(contentSignerBuilder.build(privateKey));
