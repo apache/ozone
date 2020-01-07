@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
@@ -77,10 +78,9 @@ public class ReconServer extends GenericCli {
       LOG.info("Starting Recon server");
       httpServer.start();
 
-      //Start Ozone Manager Service that pulls data from OM.
-      OzoneManagerServiceProvider ozoneManagerServiceProvider = injector
-          .getInstance(OzoneManagerServiceProvider.class);
-      ozoneManagerServiceProvider.start();
+      getOzoneManagerServiceProvider().start();
+      getReconStorageContainerManager().start();
+
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
       stop();
@@ -98,9 +98,20 @@ public class ReconServer extends GenericCli {
 
   void stop() throws Exception {
     LOG.info("Stopping Recon server");
-    httpServer.stop();
+    if (httpServer != null) {
+      httpServer.stop();
+    }
     OzoneManagerServiceProvider ozoneManagerServiceProvider = injector
         .getInstance(OzoneManagerServiceProvider.class);
     ozoneManagerServiceProvider.stop();
   }
+
+  private OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
+    return injector.getInstance(OzoneManagerServiceProvider.class);
+  }
+
+  private ReconStorageContainerManager getReconStorageContainerManager() {
+    return injector.getInstance(ReconStorageContainerManager.class);
+  }
+
 }

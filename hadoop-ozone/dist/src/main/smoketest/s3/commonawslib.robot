@@ -39,10 +39,10 @@ Execute AWSS3Cli
     [return]          ${output}
 
 Install aws cli s3 centos
-    Execute            sudo yum install -y awscli
+    Execute            sudo -E yum install -y awscli
 
 Install aws cli s3 debian
-    Execute            sudo apt-get install -y awscli
+    Execute            sudo -E apt-get install -y awscli
 
 Setup v2 headers
                         Set Environment Variable   AWS_ACCESS_KEY_ID       ANYID

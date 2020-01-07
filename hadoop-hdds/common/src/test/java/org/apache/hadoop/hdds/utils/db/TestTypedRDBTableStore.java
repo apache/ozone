@@ -57,7 +57,7 @@ public class TestTypedRDBTableStore {
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth", "Seven", "Eighth",
-          "Ninth");
+          "Ninth", "Ten");
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
   private RDBStore rdbStore = null;
@@ -369,6 +369,24 @@ public class TestTypedRDBTableStore {
       long keyCount = testTable.getEstimatedKeyCount();
       // The result should be larger than zero but not exceed(?) numKeys
       Assert.assertTrue(keyCount > 0 && keyCount <= numKeys);
+    }
+  }
+
+  @Test
+  public void testByteArrayTypedTable() throws Exception {
+    try (Table<byte[], byte[]> testTable = new TypedTable<>(
+            rdbStore.getTable("Ten"),
+            codecRegistry,
+            byte[].class, byte[].class)) {
+      byte[] key = new byte[] {1, 2, 3};
+      byte[] value = new byte[] {4, 5, 6};
+      testTable.put(key, value);
+      byte[] actualValue = testTable.get(key);
+      Assert.assertArrayEquals(value, testTable.get(key));
+      Assert.assertNotSame(value, actualValue);
+      testTable.addCacheEntry(new CacheKey<>(key),
+              new CacheValue<>(Optional.of(value), 1L));
+      Assert.assertSame(value, testTable.get(key));
     }
   }
 }

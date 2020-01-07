@@ -1,0 +1,54 @@
+{
+  "stats": {
+    "datanodes": {
+      "total": 10,
+      "healthy": 9
+    },
+    "pipelines": 3,
+    "capacity": {
+      "total": 1099511627778,
+      "used": 681826058240,
+      "remaining": 391915765760
+    },
+    "containers": 54,
+    "volumes": 5,
+    "buckets": 100,
+    "keys": 253000
+  },
+  "datanodes": [
+    {
+      "hostname": "localhost1",
+      "state": "healthy",
+      "lastHeartbeat": 1574728876059,
+      "storageReport": [
+        {
+          "storageLocation": "/disk/1",
+          "total": "512GB",
+          "used": "400GB",
+          "remaining": "112GB"
+        }
+      ],
+      "pipelineIDs": [
+        "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+      ],
+      "containers": 80
+    },
+    {
+      "hostname": "localhost2",
+      "state": "healthy",
+      "lastHeartbeat": 1574724876059,
+      "storageReport": [
+        {
+          "storageLocation": "/disk/1",
+          "total": "128TB",
+          "used": "40TB",
+          "remaining": "88TB"
+        }
+      ],
+      "pipelineIDs": [
+        "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+      ],
+      "containers": 8192
+    }
+  ]
+}

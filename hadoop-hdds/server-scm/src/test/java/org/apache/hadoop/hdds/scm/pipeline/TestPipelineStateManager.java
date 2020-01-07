@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -43,8 +41,7 @@ public class TestPipelineStateManager {
 
   @Before
   public void init() throws Exception {
-    Configuration conf = new OzoneConfiguration();
-    stateManager = new PipelineStateManager(conf);
+    stateManager = new PipelineStateManager();
   }
 
   private Pipeline createDummyPipeline(int numNodes) {

@@ -129,3 +129,5 @@ KERBEROS_SERVER=kdc
 JSVC_HOME=/usr/bin
 SLEEP_SECONDS=5
 KERBEROS_ENABLED=true
+
+no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1

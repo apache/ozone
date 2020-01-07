@@ -17,12 +17,16 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import org.apache.hadoop.hdds.utils.MockGatheringChannel;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ThreadLocalRandom;
@@ -75,10 +79,12 @@ public class TestChunkBuffer {
     // check position, remaining
     Assert.assertEquals(0, impl.position());
     Assert.assertEquals(n, impl.remaining());
+    Assert.assertEquals(n, impl.limit());
 
-    impl.put(expected, 0, expected.length);
+    impl.put(expected);
     Assert.assertEquals(n, impl.position());
     Assert.assertEquals(0, impl.remaining());
+    Assert.assertEquals(n, impl.limit());
 
     // duplicate
     assertDuplicate(expected, impl);
@@ -98,6 +104,8 @@ public class TestChunkBuffer {
         assertIterate(expected, impl, bytesPerChecksum);
       }
     }
+
+    assertWrite(expected, impl);
   }
 
   private static void assertDuplicate(byte[] expected, ChunkBuffer impl) {
@@ -152,5 +160,20 @@ public class TestChunkBuffer {
     Assert.assertEquals(length, duplicated.remaining());
     Assert.assertEquals("offset=" + offset + ", length=" + length,
         ByteString.copyFrom(expected, offset, length), computed);
+  }
+
+  private static void assertWrite(byte[] expected, ChunkBuffer impl) {
+    impl.rewind();
+    Assert.assertEquals(0, impl.position());
+
+    ByteArrayOutputStream output = new ByteArrayOutputStream(expected.length);
+
+    try {
+      impl.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
+    } catch (IOException e) {
+      Assert.fail("Unexpected error: " + e);
+    }
+
+    Assert.assertArrayEquals(expected, output.toByteArray());
   }
 }

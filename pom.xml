@@ -78,7 +78,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>0.5.0-ce699ba3-SNAPSHOT</ratis.version>
+    <ratis.version>0.5.0-1c07496-SNAPSHOT</ratis.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
     <distMgmtSnapshotsUrl>https://repository.apache.org/content/repositories/snapshots</distMgmtSnapshotsUrl>

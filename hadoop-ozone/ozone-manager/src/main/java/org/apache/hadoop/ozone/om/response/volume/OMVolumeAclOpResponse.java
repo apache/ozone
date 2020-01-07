@@ -45,8 +45,6 @@ public class OMVolumeAclOpResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
     if (getOMResponse().getSuccess()) {
       if ((getOMResponse().hasAddAclResponse() &&
           getOMResponse().getAddAclResponse().getResponse()) ||
