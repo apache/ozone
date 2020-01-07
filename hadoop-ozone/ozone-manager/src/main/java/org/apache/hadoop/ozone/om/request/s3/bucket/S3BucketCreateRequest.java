@@ -231,8 +231,8 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
               S3CreateBucketResponse.newBuilder()).build(),
           omVolumeCreateResponse, omBucketCreateResponse, s3BucketName,
           formatS3MappingName(volumeName, s3BucketName));
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException e) {
+      exception = e;
       omClientResponse = new S3BucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {

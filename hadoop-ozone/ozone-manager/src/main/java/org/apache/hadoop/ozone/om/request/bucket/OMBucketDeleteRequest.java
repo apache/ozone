@@ -153,8 +153,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
           volumeName, bucketName);
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException e) {
+      exception = e;
       omClientResponse = new OMBucketDeleteResponse(
           createErrorOMResponse(omResponse, exception), volumeName, bucketName);
     } finally {

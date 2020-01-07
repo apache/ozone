@@ -75,24 +75,19 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
-
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
-
     Preconditions.checkNotNull(setBucketPropertyRequest);
 
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketUpdates();
-
-
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     BucketArgs bucketArgs = setBucketPropertyRequest.getBucketArgs();
     OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
 
     String volumeName = bucketArgs.getVolumeName();
     String bucketName = bucketArgs.getBucketName();
-
 
     OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
         OzoneManagerProtocolProtos.Type.CreateBucket).setStatus(
@@ -127,9 +122,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       }
 
       // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
+      // If a replay, then the response has already been returned to the
+      // client. So take no further action and return a dummy OMClientResponse.
       if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
           transactionLogIndex)) {
         LOG.debug("Replayed Transaction {} ignored. Request: {}",
@@ -193,15 +187,14 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           SetBucketPropertyResponse.newBuilder().build());
       omClientResponse = new OMBucketSetPropertyResponse(
           omResponse.build(), omBucketInfo);
-    } catch (IOException ex) {
-      exception = ex;
+    } catch (IOException e) {
+      exception = e;
       omClientResponse = new OMBucketSetPropertyResponse(
           createErrorOMResponse(omResponse, exception), omBucketInfo);
     } finally {
       if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper.add(
+            omClientResponse, transactionLogIndex));
       }
       if (acquiredBucketLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
