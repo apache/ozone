@@ -38,13 +38,12 @@ import static org.junit.Assert.assertEquals;
  */
 public class TestOzoneFSInputStream {
 
+  private static final List<IntFunction<ByteBuffer>> BUFFER_CONSTRUCTORS =
+      ImmutableList.of(ByteBuffer::allocate, ByteBuffer::allocateDirect);
+
   @Test
   public void readToByteBuffer() throws IOException {
-    List<IntFunction<ByteBuffer>> bufferConstructors = ImmutableList.of(
-        ByteBuffer::allocate,
-        ByteBuffer::allocateDirect
-    );
-    for (IntFunction<ByteBuffer> constructor : bufferConstructors) {
+    for (IntFunction<ByteBuffer> constructor : BUFFER_CONSTRUCTORS) {
       for (int streamLength = 1; streamLength <= 10; streamLength++) {
         for (int bufferCapacity = 0; bufferCapacity <= 10; bufferCapacity++) {
           testReadToByteBuffer(constructor, streamLength, bufferCapacity, 0);
@@ -68,7 +67,7 @@ public class TestOzoneFSInputStream {
       int bufferPosition) throws IOException {
     final byte[] source = RandomUtils.nextBytes(streamLength);
     final InputStream input = new ByteArrayInputStream(source);
-    final OzoneFSInputStream subject = createStream(input);
+    final OzoneFSInputStream subject = createTestSubject(input);
 
     final int expectedReadLength = Math.min(bufferCapacity - bufferPosition,
         input.available());
@@ -90,22 +89,51 @@ public class TestOzoneFSInputStream {
 
   @Test
   public void readEmptyStreamToByteBuffer() throws IOException {
-    final OzoneFSInputStream subject = emptyStream();
-    final ByteBuffer buf = ByteBuffer.allocate(1);
+    for (IntFunction<ByteBuffer> constructor : BUFFER_CONSTRUCTORS) {
+      final OzoneFSInputStream subject = createTestSubject(emptyStream());
+      final ByteBuffer buf = constructor.apply(1);
 
-    final int bytesRead = subject.read(buf);
+      final int bytesRead = subject.read(buf);
 
-    assertEquals(-1, bytesRead);
-    assertEquals(0, buf.position());
+      assertEquals(-1, bytesRead);
+      assertEquals(0, buf.position());
+    }
   }
 
-  private static OzoneFSInputStream createStream(InputStream input) {
+  @Test
+  public void bufferPositionUnchangedOnEOF() throws IOException {
+    for (IntFunction<ByteBuffer> constructor : BUFFER_CONSTRUCTORS) {
+      final OzoneFSInputStream subject = createTestSubject(eofStream());
+      final ByteBuffer buf = constructor.apply(123);
+
+      final int bytesRead = subject.read(buf);
+
+      assertEquals(-1, bytesRead);
+      assertEquals(0, buf.position());
+    }
+  }
+
+  private static OzoneFSInputStream createTestSubject(InputStream input) {
     return new OzoneFSInputStream(input,
         new FileSystem.Statistics("test"));
   }
 
-  private static OzoneFSInputStream emptyStream() {
-    return createStream(new ByteArrayInputStream(new byte[0]));
+  private static InputStream emptyStream() {
+    return new ByteArrayInputStream(new byte[0]);
+  }
+
+  private static InputStream eofStream() {
+    return new InputStream() {
+      @Override
+      public int available() {
+        return 123;
+      }
+
+      @Override
+      public int read() {
+        return -1;
+      }
+    };
   }
 
 }
