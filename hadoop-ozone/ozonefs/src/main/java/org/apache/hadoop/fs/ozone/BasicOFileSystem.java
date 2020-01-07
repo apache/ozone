@@ -165,8 +165,7 @@ public class BasicOFileSystem extends FileSystem {
    * @param ofsPath
    * @throws IOException
    */
-  protected void checkAndCreateAdapter(OFSPath ofsPath)
-      throws IOException {
+  protected void checkAndCreateAdapter(OFSPath ofsPath) throws IOException {
     // Check if an adapter is already initialized.
     if (this.adapter != null) {
       // Sanity check.
@@ -178,22 +177,22 @@ public class BasicOFileSystem extends FileSystem {
       this.adapterPath = null;
     }
     this.adapterPath = ofsPath.getNonKeyParts();
-    this.adapter = createAdapter(this.gConf, ofsPath.getBucketName(),
-        ofsPath.getVolumeName(), this.gOmHost, this.gOmPort,
+    this.adapter = createAdapter(this.gConf, this.gOmHost, this.gOmPort,
         this.gIsolatedClassloader);
   }
 
   protected OzoneClientAdapter createAdapter(Configuration conf,
-      String bucketStr, String volumeStr, String omHost, int omPort,
-      boolean isolatedClassloader) throws IOException {
+      String omHost, int omPort, boolean isolatedClassloader)
+      throws IOException {
 
     if (isolatedClassloader) {
-      // TODO: Check if this code path need any change.
-      return OzoneClientAdapterFactory.createAdapter(volumeStr, bucketStr);
+      // TODO: Check how this code path need to be changed, for legacy Hadoop?
+      //  Set volume and bucket to null for the time being. May need to copy
+      //  OzoneClientAdapterFactory class and modify as well?
+      return OzoneClientAdapterFactory.createAdapter(null, null);
     } else {
       // Using OFS adapter.
-      return new BasicOzoneClientOFSAdapterImpl(omHost, omPort, conf,
-          volumeStr, bucketStr);
+      return new BasicOzoneClientOFSAdapterImpl(omHost, omPort, conf);
     }
   }
 

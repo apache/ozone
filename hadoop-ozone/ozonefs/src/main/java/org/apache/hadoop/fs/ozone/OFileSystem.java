@@ -85,9 +85,8 @@ public class OFileSystem extends BasicOFileSystem
 
   @Override
   protected OzoneClientAdapter createAdapter(Configuration conf,
-      String bucketStr,
-      String volumeStr, String omHost, int omPort,
-      boolean isolatedClassloader) throws IOException {
+      String omHost, int omPort, boolean isolatedClassloader)
+      throws IOException {
 
     this.storageStatistics =
         (OzoneFSStorageStatistics) GlobalStorageStatistics.INSTANCE
@@ -95,15 +94,17 @@ public class OFileSystem extends BasicOFileSystem
                 OzoneFSStorageStatistics::new);
 
     if (isolatedClassloader) {
-      // TODO: Check if this code path need any change as well.
+      // TODO: Check how this code path need to be changed, for legacy Hadoop?
+      //  Set volume and bucket to null for the time being. May need to copy
+      //  OzoneClientAdapterFactory class and modify as well?
       //  Similar to BasicOFileSystem#createAdapter
-      return OzoneClientAdapterFactory.createAdapter(volumeStr, bucketStr,
-          storageStatistics);
+      return OzoneClientAdapterFactory.createAdapter(
+          null, null, storageStatistics);
 
     } else {
       // Using OFS adapter.
       return new OzoneClientOFSAdapterImpl(omHost, omPort, conf,
-          volumeStr, bucketStr, storageStatistics);
+          storageStatistics);
     }
   }
 }

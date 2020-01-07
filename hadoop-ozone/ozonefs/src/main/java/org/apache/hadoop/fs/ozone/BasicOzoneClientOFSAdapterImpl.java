@@ -80,13 +80,10 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
   /**
    * Create new OzoneClientAdapter implementation.
    *
-   * @param volumeStr Name of the volume to use.
-   * @param bucketStr Name of the bucket to use
    * @throws IOException In case of a problem.
    */
-  public BasicOzoneClientOFSAdapterImpl(String volumeStr, String bucketStr)
-      throws IOException {
-    this(createConf(), volumeStr, bucketStr);
+  public BasicOzoneClientOFSAdapterImpl() throws IOException {
+    this(createConf());
   }
 
   private static OzoneConfiguration createConf() {
@@ -100,15 +97,13 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
     }
   }
 
-  public BasicOzoneClientOFSAdapterImpl(OzoneConfiguration conf, String volumeStr,
-      String bucketStr)
+  public BasicOzoneClientOFSAdapterImpl(OzoneConfiguration conf)
       throws IOException {
-    this(null, -1, conf, volumeStr, bucketStr);
+    this(null, -1, conf);
   }
 
   public BasicOzoneClientOFSAdapterImpl(String omHost, int omPort,
-      Configuration hadoopConf, String volumeStr, String bucketStr)
-      throws IOException {
+      Configuration hadoopConf) throws IOException {
 
     ClassLoader contextClassLoader =
         Thread.currentThread().getContextClassLoader();
@@ -166,8 +161,8 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
             OzoneClientFactory.getRpcClient(conf);
       }
       objectStore = ozoneClient.getObjectStore();
-      this.volumeStr = volumeStr;
-      this.bucketStr = bucketStr;
+      this.volumeStr = null;
+      this.bucketStr = null;
       this.replicationType = ReplicationType.valueOf(replicationTypeConf);
       this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);
     } finally {

@@ -207,7 +207,9 @@ public class TestOFileSystem {
       Iterator<? extends OzoneVolume> iter =
           objectStore.listVolumesByUser(null, name, null);
       if (iter.hasNext()) {
-        // If the volume already exists, try again.
+        // If there is a match, try again.
+        // Note that volume name prefix match doesn't equal volume existence
+        //  but the check is sufficient for this test.
         name = null;
       }
     }

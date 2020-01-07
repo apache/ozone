@@ -28,26 +28,23 @@ public class OzoneClientOFSAdapterImpl extends BasicOzoneClientOFSAdapterImpl {
 
   private OzoneFSStorageStatistics storageStatistics;
 
-  public OzoneClientOFSAdapterImpl(String volumeStr, String bucketStr,
-      OzoneFSStorageStatistics storageStatistics)
+  public OzoneClientOFSAdapterImpl(OzoneFSStorageStatistics storageStatistics)
       throws IOException {
-    super(volumeStr, bucketStr);
+    super();
     this.storageStatistics = storageStatistics;
   }
 
   public OzoneClientOFSAdapterImpl(
-      OzoneConfiguration conf, String volumeStr, String bucketStr,
-      OzoneFSStorageStatistics storageStatistics)
+      OzoneConfiguration conf, OzoneFSStorageStatistics storageStatistics)
       throws IOException {
-    super(conf, volumeStr, bucketStr);
+    super(conf);
     this.storageStatistics = storageStatistics;
   }
 
   public OzoneClientOFSAdapterImpl(String omHost, int omPort,
-      Configuration hadoopConf, String volumeStr, String bucketStr,
-      OzoneFSStorageStatistics storageStatistics)
+      Configuration hadoopConf, OzoneFSStorageStatistics storageStatistics)
       throws IOException {
-    super(omHost, omPort, hadoopConf, volumeStr, bucketStr);
+    super(omHost, omPort, hadoopConf);
     this.storageStatistics = storageStatistics;
   }
 
