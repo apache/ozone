@@ -1,5 +1,5 @@
 ---
-title: Simple Single Ozone
+title: 简易 Ozone
 weight: 10
 
 ---
@@ -21,91 +21,76 @@ weight: 10
 -->
 
 {{< requirements >}}
- * Working docker setup
- * AWS CLI (optional)
+ * docker
+ * AWS CLI（可选）
 {{< /requirements >}}
 
-# Ozone in a Single Container
+# 单容器 Ozone
 
-The easiest way to start up an all-in-one ozone container is to use the latest
-docker image from docker hub:
+启动一个 all-in-one 的 ozone 容器最简单的方法就是使用 Docker Hub 最新的 docker 镜像：
 
 ```bash
 docker run -p 9878:9878 -p 9876:9876 apache/ozone
 ```
-This command will pull down the ozone image from docker hub and start all
-ozone services in a single container. <br>
-This container will run the required metadata servers (Ozone Manager, Storage
-Container Manager) one data node  and the S3 compatible REST server
-(S3 Gateway).
+这个命令会从 Docker Hub 拉取 ozone 镜像并在一个容器中启动所有 ozone 服务，包括必要的元数据服务（Ozone Manager，Storage Container Manager）、一个数据节点和兼容 S3
+ 的 REST 服务（S3 网关）。
 
-# Local multi-container cluster
+# 本地多容器集群
 
-If you would like to use a more realistic pseudo-cluster where each components
-run in own containers, you can start it with a docker-compose file.
+如果你想要一个更符合实际的伪集群，以便让各个组件运行在单独的容器中，可以使用 docker-compose 配置文件来启动。
 
-We have shipped a docker-compose and an enviorment file as part of the
-container image  that is uploaded to docker hub.
+docker-compose 配置文件和一个 environment 文件已经包含在 Docker Hub 的镜像中。
 
-The following commands can be used to extract these files from the image in the docker hub.
+下面的命令可以从镜像中获取到这两个文件：
 ```bash
 docker run apache/ozone cat docker-compose.yaml > docker-compose.yaml
 docker run apache/ozone cat docker-config > docker-config
 ```
 
- Now you can start the cluster with docker-compose:
+现在你可以用 docker-compose 命令来启动集群：
 
 ```bash
 docker-compose up -d
 ```
 
-If you need multiple datanodes, we can just scale it up:
+如果你需要多个数据节点，可以通过下面的命令增加：
 
 ```bash
  docker-compose scale datanode=3
  ```
-# Running S3 Clients
+# 运行 S3 客户端
 
-Once the cluster is booted up and ready, you can verify its status by
-connecting to the SCM's UI at [http://localhost:9876](http://localhost:9876).
+集群启动就绪后，你可以连接 SCM 的 UI 来验证它的状态，地址为（[http://localhost:9876](http://localhost:9876)）。
 
-The S3 gateway endpoint will be exposed at port 9878. You can use Ozone's S3
-support as if you are working against the real S3.
+S3 网关的端口为 9878，如果你在用 S3 工作，可以考虑使用 Ozone 的 S3 功能。
 
 
-Here is how you create buckets from command line:
+从命令行创建桶的命令为：
 
 ```bash
 aws s3api --endpoint http://localhost:9878/ create-bucket --bucket=bucket1
 ```
 
-Only notable difference in the above command line is the fact that you have
-to tell the _endpoint_ address to the aws s3api command.
+唯一的区别在于你需要把 endpoint 的地址告诉 aws s3api 命令。
 
-Now let us put a simple file into the S3 Bucket hosted by Ozone. We will
-start by creating a temporary file that we can upload to Ozone via S3 support.
+下面我们来把一个简单的文件存入 Ozone 的 S3 桶中，首先创建一个用来上传的临时文件：
 ```bash
 ls -1 > /tmp/testfile
  ```
- This command creates a temporary file that
- we can upload to Ozone. The next command actually uploads to Ozone's S3
- bucket using the standard aws s3 command line interface.
+ 这个命令创建了一个用来上传到 Ozone 的临时文件，下面的命令用标准的 aws s3 命令行接口把这个文件上传到了 Ozone 的 S3 桶中：
 
 ```bash
 aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /tmp/testfile  s3://bucket1/testfile
 ```
 <div class="alert alert-info" role="alert">
-Note: REDUCED_REDUNDANCY is required for the single container ozone, since it
- has a single datanode. </div>
-We can now verify that file got uploaded by running the list command against
-our bucket.
+注意：对于单容器 ozone 来说，REDUCED_REDUNDANCY 参数是必需的，因为它只有一个数据节点。</div>
+我们可以对桶运行 list 命令来验证文件是否上传成功：
 
 ```bash
 aws s3 --endpoint http://localhost:9878 ls s3://bucket1/testfile
 ```
 
-<div class="alert alert-info" role="alert"> You can also check the internal
-bucket browser supported by Ozone S3 interface by clicking on the below link.
+<div class="alert alert-info" role="alert"> 你也可以点击下面的链接，查看 Ozone 的 S3 接口内置的桶浏览器。
 <br>
 </div>
 http://localhost:9878/bucket1?browser
