@@ -120,11 +120,13 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
         .getCreateS3BucketRequest();
     String userName = s3CreateBucketRequest.getUserName();
     String s3BucketName = s3CreateBucketRequest.getS3Bucketname();
-    OMMetrics omMetrics = ozoneManager.getMetrics();
 
     OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
         OzoneManagerProtocolProtos.Type.CreateS3Bucket).setStatus(
         OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
+
+    OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumS3BucketCreates();
 
     // When s3 Bucket is created, we internally create ozone volume/ozone
     // bucket. Ozone volume name is generated from userName by calling
@@ -176,13 +178,11 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
 
       OMVolumeCreateResponse omVolumeCreateResponse = null;
       try {
-        acquiredVolumeLock =
-            omMetadataManager.getLock().acquireWriteLock(VOLUME_LOCK,
-                volumeName);
+        acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
+            VOLUME_LOCK, volumeName);
         acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(
             USER_LOCK, userName);
-        // Check if volume exists, if it does not exist create
-        // ozone volume.
+        // Check if volume exists, if it does not exist create ozone volume.
         String volumeKey = omMetadataManager.getVolumeKey(volumeName);
         if (!omMetadataManager.getVolumeTable().isExist(volumeKey)) {
           // A replay transaction can reach here only if the volume has been
@@ -231,22 +231,14 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
               S3CreateBucketResponse.newBuilder()).build(),
           omVolumeCreateResponse, omBucketCreateResponse, s3BucketName,
           formatS3MappingName(volumeName, s3BucketName));
-
-      updateMetrics(omMetrics, volumeCreated);
-      LOG.debug("S3Bucket is successfully created for userName: {}, " +
-          "s3BucketName {}, volumeName {}", userName, s3BucketName, volumeName);
     } catch (IOException ex) {
-      LOG.error("S3Bucket Creation Failed for userName: {}, s3BucketName {}, " +
-          "VolumeName {}", userName, s3BucketName, volumeName);
-      omMetrics.incNumS3BucketCreateFails();
       exception = ex;
       omClientResponse = new S3BucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper.add(
+            omClientResponse, transactionLogIndex));
       }
       if (acquiredS3Lock) {
         omMetadataManager.getLock().releaseWriteLock(
@@ -259,6 +251,15 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
         OMAction.CREATE_S3_BUCKET, buildAuditMap(userName, s3BucketName),
         exception, getOmRequest().getUserInfo()));
 
+    if (exception == null) {
+      LOG.debug("S3Bucket is successfully created for userName: {}, " +
+          "s3BucketName {}, volumeName {}", userName, s3BucketName, volumeName);
+      updateMetrics(omMetrics, volumeCreated);
+    } else {
+      LOG.error("S3Bucket Creation Failed for userName: {}, s3BucketName {}, " +
+          "VolumeName {}", userName, s3BucketName, volumeName);
+      omMetrics.incNumS3BucketCreateFails();
+    }
     return omClientResponse;
   }
 
@@ -308,7 +309,6 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
     }
     omMetrics.incNumBuckets();
     omMetrics.incNumS3Buckets();
-    omMetrics.incNumS3BucketCreates();
   }
 
   /**

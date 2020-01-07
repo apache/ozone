@@ -153,11 +153,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
           volumeName, bucketName);
-      LOG.debug("Deleted bucket:{} in volume:{}", bucketName, volumeName);
     } catch (IOException ex) {
-      omMetrics.incNumBucketDeleteFails();
-      LOG.error("Delete bucket failed for bucket:{} in volume:{}", bucketName,
-          volumeName, exception);
       exception = ex;
       omClientResponse = new OMBucketDeleteResponse(
           createErrorOMResponse(omResponse, exception), volumeName, bucketName);
@@ -180,6 +176,15 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_BUCKET,
         auditMap, exception, userInfo));
 
-    return omClientResponse;
+    // return response.
+    if (exception == null) {
+      LOG.debug("Deleted bucket:{} in volume:{}", bucketName, volumeName);
+      return omClientResponse;
+    } else {
+      omMetrics.incNumBucketDeleteFails();
+      LOG.error("Delete bucket failed for bucket:{} in volume:{}", bucketName,
+          volumeName, exception);
+      return omClientResponse;
+    }
   }
 }

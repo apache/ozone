@@ -193,12 +193,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           SetBucketPropertyResponse.newBuilder().build());
       omClientResponse = new OMBucketSetPropertyResponse(
           omResponse.build(), omBucketInfo);
-      LOG.debug("Setting bucket property for bucket:{} in volume:{}",
-          bucketName, volumeName);
     } catch (IOException ex) {
-      LOG.error("Setting bucket property failed for bucket:{} in volume:{}",
-          bucketName, volumeName, exception);
-      omMetrics.incNumBucketUpdateFails();
       exception = ex;
       omClientResponse = new OMBucketSetPropertyResponse(
           createErrorOMResponse(omResponse, exception), omBucketInfo);
@@ -219,6 +214,15 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         omBucketArgs.toAuditMap(), exception, userInfo));
 
     // return response.
-    return omClientResponse;
+    if (exception == null) {
+      LOG.debug("Setting bucket property for bucket:{} in volume:{}",
+          bucketName, volumeName);
+      return omClientResponse;
+    } else {
+      LOG.error("Setting bucket property failed for bucket:{} in volume:{}",
+          bucketName, volumeName, exception);
+      omMetrics.incNumBucketUpdateFails();
+      return omClientResponse;
+    }
   }
 }
