@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.insight.LoggerSource;
  */
 public class RatisInsight extends BaseInsightPoint implements InsightPoint {
 
+  public static final String PIPELINE_FILTER = "pipeline";
   private OzoneConfiguration conf;
 
   public RatisInsight(OzoneConfiguration conf) {
@@ -46,24 +47,35 @@ public class RatisInsight extends BaseInsightPoint implements InsightPoint {
   }
 
   @Override
-  public List<LoggerSource> getRelatedLoggers(boolean verbose) {
+  public List<LoggerSource> getRelatedLoggers(boolean verbose,
+      Map<String, String> filters) {
+    if (filters == null || !filters.containsKey(PIPELINE_FILTER)) {
+      throw new IllegalArgumentException(PIPELINE_FILTER
+          + " filter should be specified (-f " + PIPELINE_FILTER
+          + "=<pipelineid)");
+    }
+
+    String pipelineId = filters.get(PIPELINE_FILTER);
     List<LoggerSource> result = new ArrayList<>();
-    try {
-      Optional<Pipeline> pipeline;
-      try (ScmClient scmClient = createScmClient(conf)) {
-        pipeline = scmClient.listPipelines()
-            .stream()
-            .filter(d -> d.getNodes().size() > 1)
-            .findFirst();
+
+    try (ScmClient scmClient = createScmClient(conf)) {
+      Optional<Pipeline> pipelineSelection = scmClient.listPipelines()
+          .stream()
+          .filter(
+              pipline -> pipline.getId().getId().toString().equals(pipelineId))
+          .findFirst();
+
+      if (!pipelineSelection.isPresent()) {
+        throw new IllegalArgumentException("No such multi-node pipeline.");
       }
-      if (pipeline.isPresent()) {
-        for (DatanodeDetails datanode : pipeline.get().getNodes()) {
-          Component dn = new Component(
-              Type.DATANODE, datanode.getUuid().toString(),
-              datanode.getHostName(), 9882);
-          result.add(new LoggerSource(dn, "org.apache.ratis.server.impl",
-              defaultLevel(verbose)));
-        }
+      Pipeline pipeline = pipelineSelection.get();
+      for (DatanodeDetails datanode : pipeline.getNodes()) {
+        Component dn =
+            new Component(Type.DATANODE, datanode.getUuid().toString(),
+                datanode.getHostName(), 9882);
+        result
+            .add(new LoggerSource(dn, "org.apache.ratis.server.impl",
+                defaultLevel(verbose)));
       }
     } catch (IOException e) {
       throw new UncheckedIOException("Can't enumerate required logs", e);

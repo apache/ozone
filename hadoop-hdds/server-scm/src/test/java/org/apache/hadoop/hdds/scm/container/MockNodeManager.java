@@ -16,9 +16,9 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -102,7 +102,7 @@ public class MockNodeManager implements NodeManager {
     aggregateStat = new SCMNodeStat();
     if (initializeFakeNodes) {
       for (int x = 0; x < nodeCount; x++) {
-        DatanodeDetails dd = TestUtils.randomDatanodeDetails();
+        DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
         register(dd, null, null);
         populateNodeMetric(dd, x);
       }

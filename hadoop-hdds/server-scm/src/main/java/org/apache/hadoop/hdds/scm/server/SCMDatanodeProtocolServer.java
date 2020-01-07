@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license
  * agreements. See the NOTICE file distributed with this work for additional
@@ -93,6 +93,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_K
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
+import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,14 +115,15 @@ public class SCMDatanodeProtocolServer implements
    */
   private final RPC.Server datanodeRpcServer;
 
-  private final StorageContainerManager scm;
+  private final OzoneStorageContainerManager scm;
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
   private final ProtocolMessageMetrics protocolMessageMetrics;
 
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
-      StorageContainerManager scm, EventPublisher eventPublisher)
+                                   OzoneStorageContainerManager scm,
+                                   EventPublisher eventPublisher)
       throws IOException {
 
     Preconditions.checkNotNull(scm, "SCM cannot be null");
@@ -150,8 +152,7 @@ public class SCMDatanodeProtocolServer implements
                 new StorageContainerDatanodeProtocolServerSideTranslatorPB(
                     this, protocolMessageMetrics));
 
-    InetSocketAddress datanodeRpcAddr =
-        HddsServerUtil.getScmDataNodeBindAddress(conf);
+    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
 
     datanodeRpcServer =
         startRpcServer(
@@ -375,29 +376,26 @@ public class SCMDatanodeProtocolServer implements
   @Override
   public AuditMessage buildAuditMessageForSuccess(
       AuditAction op, Map<String, String> auditMap) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.SUCCESS.toString())
-        .withException(null)
+        .withResult(AuditEventStatus.SUCCESS)
         .build();
   }
 
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op, Map<String,
       String> auditMap, Throwable throwable) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.FAILURE.toString())
+        .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
   }
@@ -407,6 +405,10 @@ public class SCMDatanodeProtocolServer implements
         .replaceAll(System.lineSeparator(), " ")
         .trim()
         .replaceAll(" +", " ");
+  }
+
+  protected InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
+    return HddsServerUtil.getScmDataNodeBindAddress(conf);
   }
 
   /**

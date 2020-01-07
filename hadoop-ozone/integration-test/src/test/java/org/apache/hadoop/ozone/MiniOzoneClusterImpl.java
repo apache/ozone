@@ -103,7 +103,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    *
    * @throws IOException if there is an I/O error
    */
-  MiniOzoneClusterImpl(OzoneConfiguration conf,
+  protected MiniOzoneClusterImpl(OzoneConfiguration conf,
                        OzoneManager ozoneManager,
                        StorageContainerManager scm,
                        List<HddsDatanodeService> hddsDatanodes) {
@@ -484,7 +484,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      *
      * @throws IOException
      */
-    void initializeConfiguration() throws IOException {
+    protected void initializeConfiguration() throws IOException {
       Path metaDir = Paths.get(path, "ozone-meta");
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
@@ -527,7 +527,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      *
      * @throws IOException
      */
-    StorageContainerManager createSCM()
+    protected StorageContainerManager createSCM()
         throws IOException, AuthenticationException {
       configureSCM();
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
@@ -577,7 +577,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      *
      * @throws IOException
      */
-    OzoneManager createOM()
+    protected OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
       OMStorage omStore = new OMStorage(conf);
@@ -592,7 +592,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      *
      * @throws IOException
      */
-    List<HddsDatanodeService> createHddsDatanodes(
+    protected List<HddsDatanodeService> createHddsDatanodes(
         StorageContainerManager scm) throws IOException {
       configureHddsDatanodes();
       String scmAddress =  scm.getDatanodeRpcAddress().getHostString() +

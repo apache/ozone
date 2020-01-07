@@ -224,7 +224,7 @@ public class OMFailoverProxyProvider implements
    * In {@link OzoneManagerProtocolClientSideTranslatorPB}, we first
    * manually failover and then call the RetryAction FAILOVER_AND_RETRY. This
    * is done because we do not want to always failover to the next proxy. If we
-   * get a NotLeaderException with a suggested leader, then we want to
+   * get a OMNotLeaderException with a suggested leader, then we want to
    * failover to that OM proxy instead. Hence, we failover manually and the
    * {@link FailoverProxyProvider#performFailover(Object)} call should not do
    * failover again.

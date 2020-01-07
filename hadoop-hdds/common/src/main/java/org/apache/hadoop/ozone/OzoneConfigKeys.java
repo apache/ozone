@@ -331,6 +331,11 @@ public final class OzoneConfigKeys {
   public static final int
       DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT =
       ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT;
+  public static final String DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
+      ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT;
+  public static final String
+      DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT =
+      ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT;
   public static final String DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_KEY =
       ScmConfigKeys.DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_KEY;
   public static final TimeDuration
@@ -399,9 +404,9 @@ public final class OzoneConfigKeys {
       "ozone.acl.enabled";
   public static final boolean OZONE_ACL_ENABLED_DEFAULT =
       false;
-  public static final String OZONE_S3_TOKEN_MAX_LIFETIME_KEY =
+  public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY =
       "ozone.s3.token.max.lifetime";
-  public static final String OZONE_S3_TOKEN_MAX_LIFETIME_KEY_DEFAULT = "3m";
+  public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT = "3m";
   //For technical reasons this is unused and hardcoded to the
   // OzoneFileSystem.initialize.
   public static final String OZONE_FS_ISOLATED_CLASSLOADER =

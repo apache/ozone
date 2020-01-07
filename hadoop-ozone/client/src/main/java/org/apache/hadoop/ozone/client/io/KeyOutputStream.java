@@ -113,7 +113,7 @@ public class KeyOutputStream extends OutputStream {
     return retryCount;
   }
 
-  @SuppressWarnings("parameternumber")
+  @SuppressWarnings({"parameternumber", "squid:S00107"})
   public KeyOutputStream(OpenKeySession handler,
       XceiverClientManager xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
@@ -201,32 +201,7 @@ public class KeyOutputStream extends OutputStream {
         // comes via Exception path.
         int writeLen = Math.min((int) len, (int) current.getRemaining());
         long currentPos = current.getWrittenDataLength();
-        try {
-          if (retry) {
-            current.writeOnRetry(len);
-          } else {
-            current.write(b, off, writeLen);
-            offset += writeLen;
-          }
-        } catch (IOException ioe) {
-          // for the current iteration, totalDataWritten - currentPos gives the
-          // amount of data already written to the buffer
-
-          // In the retryPath, the total data to be written will always be equal
-          // to or less than the max length of the buffer allocated.
-          // The len specified here is the combined sum of the data length of
-          // the buffers
-          Preconditions.checkState(!retry || len <= blockOutputStreamEntryPool
-              .getStreamBufferMaxSize());
-          int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
-          writeLen = retry ? (int) len : dataWritten;
-          // In retry path, the data written is already accounted in offset.
-          if (!retry) {
-            offset += writeLen;
-          }
-          LOG.debug("writeLen {}, total len {}", writeLen, len);
-          handleException(current, ioe);
-        }
+        writeToOutputStream(current, retry, len, b, writeLen, off, currentPos);
         if (current.getRemaining() <= 0) {
           // since the current block is already written close the stream.
           handleFlushOrClose(StreamAction.FULL);
@@ -235,8 +210,39 @@ public class KeyOutputStream extends OutputStream {
         off += writeLen;
       } catch (Exception e) {
         markStreamClosed();
-        throw e;
+        throw new IOException("Allocate any more blocks for write failed", e);
       }
+    }
+  }
+
+  private void writeToOutputStream(BlockOutputStreamEntry current,
+      boolean retry, long len, byte[] b, int writeLen, int off, long currentPos)
+      throws IOException {
+    try {
+      if (retry) {
+        current.writeOnRetry(len);
+      } else {
+        current.write(b, off, writeLen);
+        offset += writeLen;
+      }
+    } catch (IOException ioe) {
+      // for the current iteration, totalDataWritten - currentPos gives the
+      // amount of data already written to the buffer
+
+      // In the retryPath, the total data to be written will always be equal
+      // to or less than the max length of the buffer allocated.
+      // The len specified here is the combined sum of the data length of
+      // the buffers
+      Preconditions.checkState(!retry || len <= blockOutputStreamEntryPool
+          .getStreamBufferMaxSize());
+      int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
+      writeLen = retry ? (int) len : dataWritten;
+      // In retry path, the data written is already accounted in offset.
+      if (!retry) {
+        offset += writeLen;
+      }
+      LOG.debug("writeLen {}, total len {}", writeLen, len);
+      handleException(current, ioe);
     }
   }
 
@@ -342,7 +348,7 @@ public class KeyOutputStream extends OutputStream {
     try {
       action = retryPolicy.shouldRetry(exception, retryCount, 0, true);
     } catch (Exception e) {
-      throw e instanceof IOException ? (IOException) e : new IOException(e);
+      throw new IOException(e);
     }
     if (action.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
       String msg = "";
@@ -364,14 +370,17 @@ public class KeyOutputStream extends OutputStream {
       try {
         Thread.sleep(action.delayMillis);
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw (IOException) new InterruptedIOException(
             "Interrupted: action=" + action + ", retry policy=" + retryPolicy)
             .initCause(e);
       }
     }
     retryCount++;
-    LOG.trace("Retrying Write request. Already tried " + retryCount
-        + " time(s); retry policy is " + retryPolicy);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Retrying Write request. Already tried {} time(s); " +
+          "retry policy is {} ", retryCount, retryPolicy);
+    }
     handleWrite(null, 0, len, true);
   }
 
@@ -412,49 +421,53 @@ public class KeyOutputStream extends OutputStream {
    *           outputStream.
    * @throws IOException In case, flush or close fails with exception.
    */
+  @SuppressWarnings("squid:S1141")
   private void handleFlushOrClose(StreamAction op) throws IOException {
-    if (blockOutputStreamEntryPool.isEmpty()) {
-      return;
-    }
-    while (true) {
-      try {
-        BlockOutputStreamEntry entry =
-            blockOutputStreamEntryPool.getCurrentStreamEntry();
-        if (entry != null) {
-          try {
-            Collection<DatanodeDetails> failedServers =
-                entry.getFailedServers();
-            // failed servers can be null in case there is no data written in
-            // the stream
-            if (failedServers != null && !failedServers.isEmpty()) {
-              blockOutputStreamEntryPool.getExcludeList()
-                  .addDatanodes(failedServers);
+    if (!blockOutputStreamEntryPool.isEmpty()) {
+      while (true) {
+        try {
+          BlockOutputStreamEntry entry =
+              blockOutputStreamEntryPool.getCurrentStreamEntry();
+          if (entry != null) {
+            try {
+              handleStreamAction(entry, op);
+            } catch (IOException ioe) {
+              handleException(entry, ioe);
+              continue;
             }
-            switch (op) {
-            case CLOSE:
-              entry.close();
-              break;
-            case FULL:
-              if (entry.getRemaining() == 0) {
-                entry.close();
-              }
-              break;
-            case FLUSH:
-              entry.flush();
-              break;
-            default:
-              throw new IOException("Invalid Operation");
-            }
-          } catch (IOException ioe) {
-            handleException(entry, ioe);
-            continue;
           }
+          return;
+        } catch (Exception e) {
+          markStreamClosed();
+          throw e;
         }
-        break;
-      } catch (Exception e) {
-        markStreamClosed();
-        throw e;
       }
+    }
+  }
+
+  private void handleStreamAction(BlockOutputStreamEntry entry,
+                                  StreamAction op) throws IOException {
+    Collection<DatanodeDetails> failedServers = entry.getFailedServers();
+    // failed servers can be null in case there is no data written in
+    // the stream
+    if (!failedServers.isEmpty()) {
+      blockOutputStreamEntryPool.getExcludeList().addDatanodes(
+          failedServers);
+    }
+    switch (op) {
+    case CLOSE:
+      entry.close();
+      break;
+    case FULL:
+      if (entry.getRemaining() == 0) {
+        entry.close();
+      }
+      break;
+    case FLUSH:
+      entry.flush();
+      break;
+    default:
+      throw new IOException("Invalid Operation");
     }
   }
 
@@ -472,8 +485,6 @@ public class KeyOutputStream extends OutputStream {
     try {
       handleFlushOrClose(StreamAction.CLOSE);
       blockOutputStreamEntryPool.commitKey(offset);
-    } catch (IOException ioe) {
-      throw ioe;
     } finally {
       blockOutputStreamEntryPool.cleanup();
     }

@@ -28,6 +28,7 @@ import javax.inject.Inject;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -106,6 +107,16 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       }
     }
     initializeNewRdbStore(newDbLocation);
+  }
+
+  @Override
+  public long getLastSequenceNumberFromDB() {
+    RDBStore rocksDBStore = (RDBStore) getStore();
+    if (null == rocksDBStore) {
+      return 0;
+    } else {
+      return rocksDBStore.getDb().getLatestSequenceNumber();
+    }
   }
 
 }

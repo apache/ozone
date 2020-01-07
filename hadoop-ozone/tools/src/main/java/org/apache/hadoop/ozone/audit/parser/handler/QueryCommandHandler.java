@@ -33,7 +33,9 @@ import picocli.CommandLine.ParentCommand;
  */
 @Command(name = "query",
     aliases = "q",
-    description = "Execute custom query",
+    description = "Execute custom query.\n\n" +
+        "To run a custom read-only query:\n" +
+        "ozone auditparser <path to db file> query <query>\n",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class QueryCommandHandler implements Callable<Void> {

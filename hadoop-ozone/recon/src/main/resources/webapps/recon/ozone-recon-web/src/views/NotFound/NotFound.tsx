@@ -18,7 +18,7 @@
 
 import React from 'react';
 
-export const NotFound:React.FC= () => {
+export const NotFound: React.FC = () => {
   return (
       <div>
         <div className="page-header">

@@ -19,34 +19,28 @@
 package org.apache.hadoop.ozone.container;
 
 import java.io.IOException;
-import java.net.ServerSocket;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Random;
-import java.util.UUID;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto.Builder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -59,7 +53,6 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,65 +75,6 @@ public final class ContainerTestHelper {
   }
 
   // TODO: mock multi-node pipeline
-  /**
-   * Create a pipeline with single node replica.
-   *
-   * @return Pipeline with single node in it.
-   */
-  public static Pipeline createSingleNodePipeline() throws
-      IOException {
-    return createPipeline(1);
-  }
-
-  public static DatanodeDetails createDatanodeDetails() throws IOException {
-    ServerSocket socket = new ServerSocket(0);
-    int port = socket.getLocalPort();
-    DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE, port);
-    DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.RATIS, port);
-    DatanodeDetails.Port restPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.REST, port);
-    DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID().toString())
-        .setIpAddress(socket.getInetAddress().getHostAddress())
-        .setHostName(socket.getInetAddress().getHostName())
-        .addPort(containerPort)
-        .addPort(ratisPort)
-        .addPort(restPort)
-        .build();
-
-    socket.close();
-    return datanodeDetails;
-  }
-
-  /**
-   * Create a pipeline with single node replica.
-   *
-   * @return Pipeline with single node in it.
-   */
-  public static Pipeline createPipeline(int numNodes) throws IOException {
-    Preconditions.checkArgument(numNodes >= 1);
-    final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
-    for(int i = 0; i < numNodes; i++) {
-      ids.add(createDatanodeDetails());
-    }
-    return createPipeline(ids);
-  }
-
-  public static Pipeline createPipeline(Iterable<DatanodeDetails> ids) {
-    Objects.requireNonNull(ids, "ids == null");
-    Preconditions.checkArgument(ids.iterator().hasNext());
-    List<DatanodeDetails> dns = new ArrayList<>();
-    ids.forEach(dns::add);
-    return Pipeline.newBuilder()
-        .setState(Pipeline.PipelineState.OPEN)
-        .setId(PipelineID.randomId())
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(ReplicationFactor.ONE)
-        .setNodes(dns)
-        .build();
-  }
 
   /**
    * Creates a ChunkInfo for testing.
@@ -161,10 +95,10 @@ public final class ContainerTestHelper {
    * @param len - Number of bytes.
    * @return byte array with valid data.
    */
-  public static ByteBuffer getData(int len) {
+  public static ChunkBuffer getData(int len) {
     byte[] data = new byte[len];
     r.nextBytes(data);
-    return ByteBuffer.wrap(data);
+    return ChunkBuffer.wrap(ByteBuffer.wrap(data));
   }
 
   /**
@@ -173,10 +107,11 @@ public final class ContainerTestHelper {
    * @param info - chunk info.
    * @param data - data array
    */
-  public static void setDataChecksum(ChunkInfo info, ByteBuffer data)
+  public static void setDataChecksum(ChunkInfo info, ChunkBuffer data)
       throws OzoneChecksumException {
     Checksum checksum = new Checksum();
     info.setChecksumData(checksum.computeChecksum(data));
+    data.rewind();
   }
 
   /**
@@ -216,12 +151,12 @@ public final class ContainerTestHelper {
 
     writeRequest.setBlockID(blockID.getDatanodeBlockIDProtobuf());
 
-    ByteBuffer data = getData(datalen);
+    ChunkBuffer data = getData(datalen);
     ChunkInfo info = getChunk(blockID.getLocalID(), seq, 0, datalen);
     setDataChecksum(info, data);
 
     writeRequest.setChunkData(info.getProtoBufMessage());
-    writeRequest.setData(ByteString.copyFrom(data));
+    writeRequest.setData(data.toByteString());
 
     Builder request =
         ContainerCommandRequestProto.newBuilder();
@@ -249,7 +184,7 @@ public final class ContainerTestHelper {
       throws Exception {
     ContainerProtos.PutSmallFileRequestProto.Builder smallFileRequest =
         ContainerProtos.PutSmallFileRequestProto.newBuilder();
-    ByteBuffer data = getData(dataLen);
+    ChunkBuffer data = getData(dataLen);
     ChunkInfo info = getChunk(blockID.getLocalID(), 0, 0, dataLen);
     setDataChecksum(info, data);
 
@@ -264,7 +199,7 @@ public final class ContainerTestHelper {
     putRequest.setBlockData(blockData.getProtoBufMessage());
 
     smallFileRequest.setChunkInfo(info.getProtoBufMessage());
-    smallFileRequest.setData(ByteString.copyFrom(data));
+    smallFileRequest.setData(data.toByteString());
     smallFileRequest.setBlock(putRequest);
 
     Builder request =
@@ -424,7 +359,7 @@ public final class ContainerTestHelper {
       updateRequestBuilder.addMetadata(kvBuilder.build());
     }
     Pipeline pipeline =
-        ContainerTestHelper.createSingleNodePipeline();
+        MockPipeline.createSingleNodePipeline();
 
     Builder request =
         ContainerCommandRequestProto.newBuilder();

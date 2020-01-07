@@ -91,7 +91,7 @@ public class SCMPipelineManager implements PipelineManager {
       throws IOException {
     this.lock = new ReentrantReadWriteLock();
     this.conf = conf;
-    this.stateManager = new PipelineStateManager(conf);
+    this.stateManager = new PipelineStateManager();
     this.pipelineFactory = new PipelineFactory(nodeManager, stateManager,
         conf, eventPublisher);
     // TODO: See if thread priority needs to be set for these threads
@@ -426,6 +426,7 @@ public class SCMPipelineManager implements PipelineManager {
         try {
           Thread.sleep((long)100);
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
         }
       }
     } while (!ready && Time.monotonicNow() - st < timeout);

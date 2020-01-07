@@ -254,13 +254,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
    */
   @Override
   public boolean deleteObject(String keyName) {
-    LOG.trace("issuing delete for key" + keyName);
+    LOG.trace("issuing delete for key {}", keyName);
     try {
       incrementCounter(Statistic.OBJECTS_DELETED);
       bucket.deleteKey(keyName);
       return true;
     } catch (IOException ioe) {
-      LOG.error("delete key failed " + ioe.getMessage());
+      LOG.error("delete key failed {}", ioe.getMessage());
       return false;
     }
   }
@@ -421,7 +421,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       } else {
         return new BasicKeyInfo(
             next.getName(),
-            next.getModificationTime(),
+            next.getModificationTime().toEpochMilli(),
             next.getDataSize()
         );
       }

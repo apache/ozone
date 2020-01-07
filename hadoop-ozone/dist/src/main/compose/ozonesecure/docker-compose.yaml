@@ -18,10 +18,9 @@ version: "3"
 services:
   kdc:
     build:
-      context: docker-image/docker-krb5
+      context: ../common/docker-image/docker-krb5
       dockerfile: Dockerfile-krb5
-      args:
-        buildno: 1
+    image: ozone-insecure-krb5
     hostname: kdc
     volumes:
       - ../..:/opt/hadoop
@@ -88,4 +87,5 @@ services:
       - docker-config
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
     command: ["/opt/hadoop/bin/ozone","scm"]

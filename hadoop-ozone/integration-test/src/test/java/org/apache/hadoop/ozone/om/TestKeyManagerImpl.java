@@ -33,6 +33,8 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
+import com.google.common.base.Optional;
+import com.google.common.collect.Sets;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -40,6 +42,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -59,6 +62,8 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -106,6 +111,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import static org.mockito.Matchers.anyLong;
@@ -782,6 +788,235 @@ public class TestKeyManagerImpl {
         "/d=default-drack/127.0.0.1");
     Assert.assertEquals(leader, key4.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
+  }
+
+  @Test
+  public void testListStatusWithTableCache() throws Exception {
+    // Inspired by TestOmMetadataManager#testListKeys
+    String prefixKeyInDB = "key-d";
+    String prefixKeyInCache = "key-c";
+
+    // Add a total of 100 key entries to DB and TableCache (50 entries each)
+    for (int i = 1; i <= 100; i++) {
+      if (i % 2 == 0) {  // Add to DB
+        TestOMRequestUtils.addKeyToTable(false,
+            VOLUME_NAME, BUCKET_NAME, prefixKeyInDB + i,
+            1000L, HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, metadataManager);
+      } else {  // Add to TableCache
+        TestOMRequestUtils.addKeyToTableCache(
+            VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i,
+            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            metadataManager);
+      }
+    }
+
+    OmKeyArgs rootDirArgs = createKeyArgs("");
+    // Get entries in both TableCache and DB
+    List<OzoneFileStatus> fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, "", 1000);
+    Assert.assertEquals(100, fileStatuses.size());
+
+    // Get entries with startKey=prefixKeyInDB
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, prefixKeyInDB, 1000);
+    Assert.assertEquals(50, fileStatuses.size());
+
+    // Get entries with startKey=prefixKeyInCache
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, prefixKeyInCache, 1000);
+    Assert.assertEquals(100, fileStatuses.size());
+
+    // Clean up cache by marking those keys in cache as deleted
+    for (int i = 1; i <= 100; i += 2) {
+      String key = metadataManager.getOzoneKey(
+          VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i);
+      metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
+          new CacheValue<>(Optional.absent(), 2L));
+    }
+  }
+
+  @Test
+  public void testListStatusWithTableCacheRecursive() throws Exception {
+    String keyNameDir1 = "dir1";
+    OmKeyArgs keyArgsDir1 =
+        createBuilder().setKeyName(keyNameDir1).build();
+    keyManager.createDirectory(keyArgsDir1);
+
+    String keyNameDir1Subdir1 = "dir1" + OZONE_URI_DELIMITER + "subdir1";
+    OmKeyArgs keyArgsDir1Subdir1 =
+        createBuilder().setKeyName(keyNameDir1Subdir1).build();
+    keyManager.createDirectory(keyArgsDir1Subdir1);
+
+    String keyNameDir2 = "dir2";
+    OmKeyArgs keyArgsDir2 =
+        createBuilder().setKeyName(keyNameDir2).build();
+    keyManager.createDirectory(keyArgsDir2);
+
+    OmKeyArgs rootDirArgs = createKeyArgs("");
+    // Test listStatus with recursive=false, should only have dirs under root
+    List<OzoneFileStatus> fileStatuses =
+        keyManager.listStatus(rootDirArgs, false, "", 1000);
+    Assert.assertEquals(2, fileStatuses.size());
+
+    // Test listStatus with recursive=true, should have dirs under root and
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, "", 1000);
+    Assert.assertEquals(3, fileStatuses.size());
+
+    // Add a total of 10 key entries to DB and TableCache under dir1
+    String prefixKeyInDB = "key-d";
+    String prefixKeyInCache = "key-c";
+    for (int i = 1; i <= 10; i++) {
+      if (i % 2 == 0) {  // Add to DB
+        TestOMRequestUtils.addKeyToTable(false,
+            VOLUME_NAME, BUCKET_NAME,
+            keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInDB + i,
+            1000L, HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, metadataManager);
+      } else {  // Add to TableCache
+        TestOMRequestUtils.addKeyToTableCache(
+            VOLUME_NAME, BUCKET_NAME,
+            keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i,
+            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            metadataManager);
+      }
+    }
+
+    // Test non-recursive, should return the dir under root
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, false, "", 1000);
+    Assert.assertEquals(2, fileStatuses.size());
+
+    // Test recursive, should return the dir and the keys in it
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, "", 1000);
+    Assert.assertEquals(10 + 3, fileStatuses.size());
+
+    // Clean up
+    for (int i = 1; i <= 10; i += 2) {
+      // Mark TableCache entries as deleted
+      // Note that DB entry clean up is handled by cleanupTest()
+      String key = metadataManager.getOzoneKey(
+          VOLUME_NAME, BUCKET_NAME,
+          keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i);
+      metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
+          new CacheValue<>(Optional.absent(), 2L));
+    }
+  }
+
+  @Test
+  public void testListStatusWithDeletedEntriesInCache() throws Exception {
+    String prefixKey = "key-";
+    TreeSet<String> existKeySet = new TreeSet<>();
+    TreeSet<String> deletedKeySet = new TreeSet<>();
+
+    for (int i = 1; i <= 100; i++) {
+      if (i % 2 == 0) {
+        TestOMRequestUtils.addKeyToTable(false,
+            VOLUME_NAME, BUCKET_NAME, prefixKey + i,
+            1000L, HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE, metadataManager);
+        existKeySet.add(prefixKey + i);
+      } else {
+        TestOMRequestUtils.addKeyToTableCache(
+            VOLUME_NAME, BUCKET_NAME, prefixKey + i,
+            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            metadataManager);
+
+        String key = metadataManager.getOzoneKey(
+            VOLUME_NAME, BUCKET_NAME, prefixKey + i);
+        // Mark as deleted in cache.
+        metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(key),
+            new CacheValue<>(Optional.absent(), 2L));
+        deletedKeySet.add(key);
+      }
+    }
+
+    OmKeyArgs rootDirArgs = createKeyArgs("");
+    List<OzoneFileStatus> fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, "", 1000);
+    // Should only get entries that are not marked as deleted.
+    Assert.assertEquals(50, fileStatuses.size());
+    // Test startKey
+    fileStatuses =
+        keyManager.listStatus(rootDirArgs, true, prefixKey, 1000);
+    // Should only get entries that are not marked as deleted.
+    Assert.assertEquals(50, fileStatuses.size());
+    // Verify result
+    TreeSet<String> expectedKeys = new TreeSet<>();
+    for (OzoneFileStatus fileStatus : fileStatuses) {
+      String keyName = fileStatus.getKeyInfo().getKeyName();
+      expectedKeys.add(keyName);
+      Assert.assertTrue(keyName.startsWith(prefixKey));
+    }
+    Assert.assertEquals(expectedKeys, existKeySet);
+
+    // Sanity check, existKeySet should not intersect with deletedKeySet.
+    Assert.assertEquals(0,
+        Sets.intersection(existKeySet, deletedKeySet).size());
+
+    // Next, mark half of the entries left as deleted
+    boolean doDelete = false;
+    for (String key : existKeySet) {
+      if (doDelete) {
+        String ozoneKey = metadataManager.getOzoneKey(
+            VOLUME_NAME, BUCKET_NAME, key);
+        metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+            new CacheValue<>(Optional.absent(), 2L));
+        deletedKeySet.add(key);
+      }
+      doDelete = !doDelete;
+    }
+    // Update existKeySet
+    existKeySet.removeAll(deletedKeySet);
+
+    fileStatuses = keyManager.listStatus(
+        rootDirArgs, true, "", 1000);
+    // Should only get entries that are not marked as deleted.
+    Assert.assertEquals(50 / 2, fileStatuses.size());
+
+    // Verify result
+    expectedKeys.clear();
+    for (OzoneFileStatus fileStatus : fileStatuses) {
+      String keyName = fileStatus.getKeyInfo().getKeyName();
+      expectedKeys.add(keyName);
+      Assert.assertTrue(keyName.startsWith(prefixKey));
+    }
+    Assert.assertEquals(expectedKeys, existKeySet);
+
+    // Test pagination
+    final int batchSize = 5;
+    String startKey = "";
+    expectedKeys.clear();
+    do {
+      fileStatuses = keyManager.listStatus(
+          rootDirArgs, true, startKey, batchSize);
+      // Note fileStatuses will never be empty since we are using the last
+      // keyName as the startKey of next batch,
+      // the startKey itself will show up in the next batch of results.
+      // This is fine as we are using a set to store results.
+      for (OzoneFileStatus fileStatus : fileStatuses) {
+        startKey = fileStatus.getKeyInfo().getKeyName();
+        expectedKeys.add(startKey);
+        Assert.assertTrue(startKey.startsWith(prefixKey));
+      }
+      // fileStatuses.size() == batchSize indicates there might be another batch
+      // fileStatuses.size() < batchSize indicates it is the last batch
+    } while (fileStatuses.size() == batchSize);
+    Assert.assertEquals(expectedKeys, existKeySet);
+
+    // Clean up by marking remaining entries as deleted
+    for (String key : existKeySet) {
+      String ozoneKey = metadataManager.getOzoneKey(
+          VOLUME_NAME, BUCKET_NAME, key);
+      metadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+          new CacheValue<>(Optional.absent(), 2L));
+      deletedKeySet.add(key);
+    }
+    // Update existKeySet
+    existKeySet.removeAll(deletedKeySet);
+    Assert.assertTrue(existKeySet.isEmpty());
   }
 
   @Test

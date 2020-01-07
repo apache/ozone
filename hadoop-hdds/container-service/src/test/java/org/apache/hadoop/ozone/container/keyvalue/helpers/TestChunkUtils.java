@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -63,11 +64,11 @@ public class TestChunkUtils {
   public void concurrentReadOfSameFile() throws Exception {
     String s = "Hello World";
     byte[] array = s.getBytes();
-    ByteBuffer data = ByteBuffer.wrap(array);
+    ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "concurrent");
     try {
       ChunkInfo chunkInfo = new ChunkInfo(tempFile.toString(),
-          0, data.capacity());
+          0, data.limit());
       File file = tempFile.toFile();
       VolumeIOStats stats = new VolumeIOStats();
       ChunkUtils.writeData(file, chunkInfo, data, stats, true);
@@ -78,7 +79,7 @@ public class TestChunkUtils {
       AtomicBoolean failed = new AtomicBoolean();
       for (int i = 0; i < threads; i++) {
         final int threadNumber = i;
-        executor.submit(() -> {
+        executor.execute(() -> {
           try {
             ByteBuffer readBuffer = ChunkUtils.readData(file, chunkInfo, stats);
             LOG.info("Read data ({}): {}", threadNumber,
@@ -120,7 +121,7 @@ public class TestChunkUtils {
       for (int i = 0; i < threads; i++) {
         Path path = Files.createTempFile(PREFIX, String.valueOf(i));
         paths.add(path);
-        executor.submit(() -> {
+        executor.execute(() -> {
           ChunkUtils.processFileExclusively(path, () -> {
             try {
               Thread.sleep(perThreadWait);
@@ -149,11 +150,11 @@ public class TestChunkUtils {
   public void serialRead() throws Exception {
     String s = "Hello World";
     byte[] array = s.getBytes();
-    ByteBuffer data = ByteBuffer.wrap(array);
+    ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "serial");
     try {
       ChunkInfo chunkInfo = new ChunkInfo(tempFile.toString(),
-          0, data.capacity());
+          0, data.limit());
       File file = tempFile.toFile();
       VolumeIOStats stats = new VolumeIOStats();
       ChunkUtils.writeData(file, chunkInfo, data, stats, true);

@@ -26,10 +26,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -40,9 +38,8 @@ import static org.junit.Assert.fail;
  * Class tests partial table cache.
  */
 @RunWith(value = Parameterized.class)
-@Ignore("HDDS-2639")
 public class TestTableCacheImpl {
-  private TableCache<CacheKey<String>, CacheValue<String>> tableCache;
+  private TableCacheImpl<CacheKey<String>, CacheValue<String>> tableCache;
 
   private final TableCacheImpl.CacheCleanupPolicy cacheCleanupPolicy;
 
@@ -89,7 +86,7 @@ public class TestTableCacheImpl {
     epochs.add(3L);
     epochs.add(4L);
     // On a full table cache if some one calls cleanup it is a no-op.
-    tableCache.cleanup(epochs);
+    tableCache.evictCache(epochs);
 
     for (int i=5; i < 10; i++) {
       Assert.assertEquals(Integer.toString(i),
@@ -117,15 +114,13 @@ public class TestTableCacheImpl {
 
     Assert.assertEquals(totalCount, tableCache.size());
 
-    tableCache.cleanup(epochs);
+    tableCache.evictCache(epochs);
 
     final int count = totalCount;
 
     // If cleanup policy is manual entries should have been removed.
     if (cacheCleanupPolicy == TableCacheImpl.CacheCleanupPolicy.MANUAL) {
-      GenericTestUtils.waitFor(() -> {
-        return count - epochs.size() == tableCache.size();
-      }, 100, 10000);
+      Assert.assertEquals(count - epochs.size(), tableCache.size());
 
       // Check remaining entries exist or not and deleted entries does not
       // exist.
@@ -184,11 +179,10 @@ public class TestTableCacheImpl {
     epochs.add(4L);
 
     if (cacheCleanupPolicy == cacheCleanupPolicy.MANUAL) {
-      tableCache.cleanup(epochs);
 
-      GenericTestUtils.waitFor(() -> {
-        return 0 == tableCache.size();
-      }, 100, 10000);
+      tableCache.evictCache(epochs);
+
+      Assert.assertEquals(0, tableCache.size());
 
       // Epoch entries which are overrided still exist.
       Assert.assertEquals(2, tableCache.getEpochEntrySet().size());
@@ -201,11 +195,9 @@ public class TestTableCacheImpl {
     epochs = new ArrayList<>();
     epochs.add(5L);
     if (cacheCleanupPolicy == cacheCleanupPolicy.MANUAL) {
-      tableCache.cleanup(epochs);
+      tableCache.evictCache(epochs);
 
-      GenericTestUtils.waitFor(() -> {
-        return 0 == tableCache.size();
-      }, 100, 10000);
+      Assert.assertEquals(0, tableCache.size());
 
       // Overrided entries would have been deleted.
       Assert.assertEquals(0, tableCache.getEpochEntrySet().size());
@@ -261,20 +253,16 @@ public class TestTableCacheImpl {
 
 
     if (cacheCleanupPolicy == cacheCleanupPolicy.MANUAL) {
-      tableCache.cleanup(epochs);
+      tableCache.evictCache(epochs);
 
-      GenericTestUtils.waitFor(() -> {
-        return 0 == tableCache.size();
-      }, 100, 10000);
+      Assert.assertEquals(0, tableCache.size());
 
       // Epoch entries which are overrided still exist.
       Assert.assertEquals(4, tableCache.getEpochEntrySet().size());
     } else {
-      tableCache.cleanup(epochs);
+      tableCache.evictCache(epochs);
 
-      GenericTestUtils.waitFor(() -> {
-        return 1 == tableCache.size();
-      }, 100, 10000);
+      Assert.assertEquals(1, tableCache.size());
 
       // Epoch entries which are overrided still exist and one not deleted As
       // this cache clean up policy is NEVER.
@@ -289,21 +277,17 @@ public class TestTableCacheImpl {
     epochs.add(7L);
 
     if (cacheCleanupPolicy == cacheCleanupPolicy.MANUAL) {
-      tableCache.cleanup(epochs);
+      tableCache.evictCache(epochs);
 
-      GenericTestUtils.waitFor(() -> {
-        return 0 == tableCache.size();
-      }, 100, 10000);
+      Assert.assertEquals(0, tableCache.size());
 
       // Epoch entries which are overrided now would have been deleted.
       Assert.assertEquals(0, tableCache.getEpochEntrySet().size());
     } else {
-      tableCache.cleanup(epochs);
+      tableCache.evictCache(epochs);
 
       // 2 entries will be in cache, as 2 are not deleted.
-      GenericTestUtils.waitFor(() -> {
-        return 2 == tableCache.size();
-      }, 100, 10000);
+      Assert.assertEquals(2, tableCache.size());
 
       // Epoch entries which are not marked for delete will exist override
       // entries will be cleaned up.
@@ -364,12 +348,11 @@ public class TestTableCacheImpl {
       epochs.add(3L);
       epochs.add(4L);
       epochs.add(5L);
-      tableCache.cleanup(epochs);
+      tableCache.evictCache(epochs);
 
       // We should totalCount - deleted entries in cache.
       final int tc = totalCount;
-      GenericTestUtils.waitFor(() -> (tc - deleted == tableCache.size()), 100,
-          5000);
+      Assert.assertEquals(tc - deleted, tableCache.size());
       // Check if we have remaining entries.
       for (int i=6; i <= totalCount; i++) {
         Assert.assertEquals(Integer.toString(i), tableCache.get(
@@ -381,17 +364,16 @@ public class TestTableCacheImpl {
         epochs.add(i);
       }
 
-      tableCache.cleanup(epochs);
+      tableCache.evictCache(epochs);
 
       // Cleaned up all entries, so cache size should be zero.
-      GenericTestUtils.waitFor(() -> (0 == tableCache.size()), 100,
-          5000);
+      Assert.assertEquals(0, tableCache.size());
     } else {
       ArrayList<Long> epochs = new ArrayList<>();
       for (long i=0; i<= totalCount; i++) {
         epochs.add(i);
       }
-      tableCache.cleanup(epochs);
+      tableCache.evictCache(epochs);
       Assert.assertEquals(totalCount, tableCache.size());
     }
 

@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_INDEX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_TERM;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_REQUEST_TIMEOUT_KEY;
@@ -176,6 +177,14 @@ public class OzoneManagerSnapshotProvider {
 
         long snapshotIndex = Long.parseLong(header.getValue());
 
+        header = response.getFirstHeader(OM_RATIS_SNAPSHOT_TERM);
+        if (header == null) {
+          throw new IOException("The HTTP response header " +
+              OM_RATIS_SNAPSHOT_TERM + " is missing.");
+        }
+
+        long snapshotTerm = Long.parseLong(header.getValue());
+
         try (InputStream inputStream = entity.getContent()) {
           FileUtils.copyInputStreamToFile(inputStream, targetFile);
         }
@@ -191,6 +200,7 @@ public class OzoneManagerSnapshotProvider {
 
         RocksDBCheckpoint omCheckpoint = new RocksDBCheckpoint(untarredDbDir);
         omCheckpoint.setRatisSnapshotIndex(snapshotIndex);
+        omCheckpoint.setRatisSnapshotTerm(snapshotTerm);
         return omCheckpoint;
       }
 

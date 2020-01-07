@@ -49,7 +49,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.apache.hadoop.util.Time;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -58,6 +57,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.UUID;
@@ -139,7 +139,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
   public void testPutKeySuccessWithBlockToken() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    long currentTime = Time.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -168,8 +168,8 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
           keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime() >= currentTime);
-      Assert.assertTrue(key.getModificationTime() >= currentTime);
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 

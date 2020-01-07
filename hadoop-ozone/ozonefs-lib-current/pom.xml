@@ -74,21 +74,6 @@
               <goal>shade</goal>
             </goals>
             <configuration>
-              <filters>
-                <filter>
-                <artifact>org.apache.hadoop:hadoop-hdds-server-framework</artifact>
-                <excludes>
-                  <exclude>webapps/datanode/**</exclude>
-                  <exclude>webapps/static/**</exclude>
-                </excludes>
-                </filter>
-                <filter>
-                  <artifact>org.apache.hadoop:hadoop-hdds-container-service</artifact>
-                  <excludes>
-                    <exclude>webapps/hddsDatanode/**</exclude>
-                  </excludes>
-              </filter>
-              </filters>
               <transformers>
                 <transformer
                         implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">

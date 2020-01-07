@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.web.ozShell.OzoneShell;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
@@ -47,7 +48,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -203,23 +203,13 @@ public class TestOzoneShellHA {
 
   /**
    * @return the leader OM's Node ID in the MiniOzoneHACluster.
-   *
-   * TODO: This should be put into MiniOzoneHAClusterImpl in the future.
-   * This helper function is similar to the one in TestOzoneFsHAURLs.
    */
   private String getLeaderOMNodeId() {
-    Collection<String> omNodeIds = OmUtils.getOMNodeIds(conf, omServiceId);
-    assert(omNodeIds.size() == numOfOMs);
     MiniOzoneHAClusterImpl haCluster = (MiniOzoneHAClusterImpl) cluster;
-    // Note: this loop may be implemented inside MiniOzoneHAClusterImpl
-    for (String omNodeId : omNodeIds) {
-      // Find the leader OM
-      if (!haCluster.getOzoneManager(omNodeId).isLeader()) {
-        continue;
-      }
-      return omNodeId;
-    }
-    return null;
+    OzoneManager omLeader = haCluster.getOMLeader();
+    Assert.assertNotNull("There should be a leader OM at this point.",
+        omLeader);
+    return omLeader.getOMNodeId();
   }
 
   private String getSetConfStringFromConf(String key) {

@@ -22,8 +22,6 @@ import javax.inject.Inject;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.jooq.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -38,9 +36,6 @@ import java.util.List;
 @Path("/utilization")
 @Produces(MediaType.APPLICATION_JSON)
 public class UtilizationService {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(UtilizationService.class);
-
   private FileCountBySizeDao fileCountBySizeDao;
 
   @Inject

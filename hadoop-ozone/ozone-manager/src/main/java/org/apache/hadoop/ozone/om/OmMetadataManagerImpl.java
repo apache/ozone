@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
@@ -243,7 +242,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     // We need to create the DB here, as when during restart, stop closes the
     // db, so we need to create the store object and initialize DB.
     if (store == null) {
-      File metaDir = OmUtils.getOmDbDir(configuration);
+      File metaDir = OMStorage.getOmDbDir(configuration);
 
       RocksDBConfiguration rocksDBConfiguration =
           configuration.getObject(RocksDBConfiguration.class);
@@ -931,21 +930,43 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<String> getMultipartUploadKeys(
+  public Set<String> getMultipartUploadKeys(
       String volumeName, String bucketName, String prefix) throws IOException {
-    List<String> response = new ArrayList<>();
 
-    TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator();
+    Set<String> response = new TreeSet<>();
+    Set<String> aborted = new TreeSet<>();
+
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
+        cacheIterator = getMultipartInfoTable().cacheIterator();
 
     String prefixKey =
         OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
+
+    // First iterate all the entries in cache.
+    while (cacheIterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>> cacheEntry =
+          cacheIterator.next();
+      if (cacheEntry.getKey().getCacheKey().startsWith(prefixKey)) {
+        // Check if it is marked for delete, due to abort mpu
+        if (cacheEntry.getValue().getCacheValue() != null) {
+          response.add(cacheEntry.getKey().getCacheKey());
+        } else {
+          aborted.add(cacheEntry.getKey().getCacheKey());
+        }
+      }
+    }
+
+    TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
+        iterator = getMultipartInfoTable().iterator();
     iterator.seek(prefixKey);
 
     while (iterator.hasNext()) {
       KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
       if (entry.getKey().startsWith(prefixKey)) {
-        response.add(entry.getKey());
+        // If it is marked for abort, skip it.
+        if (!aborted.contains(entry.getKey())) {
+          response.add(entry.getKey());
+        }
       } else {
         break;
       }

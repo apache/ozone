@@ -82,7 +82,7 @@ public class HealthyPipelineSafeModeRule
     healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
         (int) Math.ceil(healthyPipelinesPercent * pipelineCount));
 
-    LOG.info(" Total pipeline count is {}, healthy pipeline " +
+    LOG.info("Total pipeline count is {}, healthy pipeline " +
         "threshold count is {}", pipelineCount, healthyPipelineThresholdCount);
 
     getSafeModeMetrics().setNumHealthyPipelinesThreshold(

@@ -101,12 +101,15 @@ public class BaseFreonGenerator {
   private MetricRegistry metrics = new MetricRegistry();
 
   private AtomicLong successCounter;
-
   private AtomicLong failureCounter;
+  private AtomicLong attemptCounter;
 
   private long startTime;
 
   private PathSchema pathSchema;
+  private String spanName;
+  private ExecutorService executor;
+  private ProgressBar progressBar;
 
   /**
    * The main logic to execute a test generator.
@@ -114,58 +117,86 @@ public class BaseFreonGenerator {
    * @param provider creates the new steps to execute.
    */
   public void runTests(TaskProvider provider) {
+    setup(provider);
+    startTaskRunners(provider);
+    waitForCompletion();
+    shutdown();
+    reportAnyFailure();
+  }
 
-    ExecutorService executor = Executors.newFixedThreadPool(threadNo);
+  /**
+   * Performs {@code provider}-specific initialization.
+   */
+  private void setup(TaskProvider provider) {
+    //provider is usually a lambda, print out only the owner class name:
+    spanName = provider.getClass().getSimpleName().split("\\$")[0];
+  }
 
-    ProgressBar progressBar =
-        new ProgressBar(System.out, testNo, successCounter::get);
-    progressBar.start();
-
-    startTime = System.currentTimeMillis();
-    //schedule the execution of all the tasks.
-
-    for (long i = 0; i < testNo; i++) {
-
-      final long counter = i;
-
-      //provider is usually a lambda, print out only the owner class name:
-      String spanName = provider.getClass().getSimpleName().split("\\$")[0];
-
-      executor.execute(() -> {
-        Scope scope =
-            GlobalTracer.get().buildSpan(spanName)
-                .startActive(true);
-        try {
-
-          //in case of an other failed test, we shouldn't execute more tasks.
-          if (!failAtEnd && failureCounter.get() > 0) {
-            return;
-          }
-
-          provider.executeNextTask(counter);
-          successCounter.incrementAndGet();
-        } catch (Exception e) {
-          scope.span().setTag("failure", true);
-          failureCounter.incrementAndGet();
-          LOG.error("Error on executing task", e);
-        } finally {
-          scope.close();
-        }
-      });
+  /**
+   * Launches {@code threadNo} task runners in executor.  Each one executes test
+   * tasks in a loop until completion or failure.
+   */
+  private void startTaskRunners(TaskProvider provider) {
+    for (int i = 0; i < threadNo; i++) {
+      executor.execute(() -> taskLoop(provider));
     }
+  }
 
-    // wait until all tasks are executed
+  /**
+   * Runs test tasks in a loop until completion or failure.  This is executed
+   * concurrently in {@code executor}.
+   */
+  private void taskLoop(TaskProvider provider) {
+    while (true) {
+      long counter = attemptCounter.getAndIncrement();
 
+      //in case of an other failed test, we shouldn't execute more tasks.
+      if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
+        return;
+      }
+
+      tryNextTask(provider, counter);
+    }
+  }
+
+  /**
+   * Runs a single test task (eg. key creation).
+   * @param taskId unique ID of the task
+   */
+  private void tryNextTask(TaskProvider provider, long taskId) {
+    Scope scope =
+        GlobalTracer.get().buildSpan(spanName)
+            .startActive(true);
+    try {
+      provider.executeNextTask(taskId);
+      successCounter.incrementAndGet();
+    } catch (Exception e) {
+      scope.span().setTag("failure", true);
+      failureCounter.incrementAndGet();
+      LOG.error("Error on executing task {}", taskId, e);
+    } finally {
+      scope.close();
+    }
+  }
+
+  /**
+   * Waits until the requested number of tests are executed, or until any
+   * failure in early failure mode (the default).  This is run in the main
+   * thread.
+   */
+  private void waitForCompletion() {
     while (successCounter.get() + failureCounter.get() < testNo && (
         failureCounter.get() == 0 || failAtEnd)) {
       try {
         Thread.sleep(CHECK_INTERVAL_MILLIS);
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new RuntimeException(e);
       }
     }
+  }
 
-    //shutdown everything
+  private void shutdown() {
     if (failureCounter.get() > 0 && !failAtEnd) {
       progressBar.terminate();
     } else {
@@ -177,7 +208,12 @@ public class BaseFreonGenerator {
     } catch (Exception ex) {
       ex.printStackTrace();
     }
+  }
 
+  /**
+   * @throws RuntimeException if any tests failed
+   */
+  private void reportAnyFailure() {
     if (failureCounter.get() > 0) {
       throw new RuntimeException("One ore more freon test is failed.");
     }
@@ -192,6 +228,7 @@ public class BaseFreonGenerator {
 
     successCounter = new AtomicLong(0);
     failureCounter = new AtomicLong(0);
+    attemptCounter = new AtomicLong(0);
 
     if (prefix.length() == 0) {
       prefix = RandomStringUtils.randomAlphanumeric(10);
@@ -212,6 +249,13 @@ public class BaseFreonGenerator {
           }
           printReport();
         }));
+
+    executor = Executors.newFixedThreadPool(threadNo);
+
+    progressBar = new ProgressBar(System.out, testNo, successCounter::get);
+    progressBar.start();
+
+    startTime = System.currentTimeMillis();
   }
 
   /**

@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,12 +35,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.base.Strings;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -58,6 +63,7 @@ import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
+import org.apache.ratis.protocol.LeaderNotReadyException;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.NotLeaderException;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -71,14 +77,14 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.SizeInBytes;
+import org.apache.ratis.util.StringUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.STATUS_CODE;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -156,24 +162,47 @@ public final class OzoneManagerRatisServer {
     // NotLeader exception is thrown only when the raft server to which the
     // request is submitted is not the leader. This can happen first time
     // when client is submitting request to OM.
-    NotLeaderException notLeaderException = reply.getNotLeaderException();
-    if (notLeaderException != null) {
-      throw new ServiceException(notLeaderException);
-    }
-    StateMachineException stateMachineException =
-        reply.getStateMachineException();
-    if (stateMachineException != null) {
-      OMResponse.Builder omResponse = OMResponse.newBuilder();
-      omResponse.setCmdType(omRequest.getCmdType());
-      omResponse.setSuccess(false);
-      omResponse.setMessage(stateMachineException.getCause().getMessage());
-      omResponse.setStatus(parseErrorStatus(
-          stateMachineException.getCause().getMessage()));
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error while executing ratis request. " +
-            "stateMachineException: ", stateMachineException);
+
+    if (!reply.isSuccess()) {
+      NotLeaderException notLeaderException = reply.getNotLeaderException();
+      if (notLeaderException != null) {
+        throw new ServiceException(
+            OMNotLeaderException.convertToOMNotLeaderException(
+                  notLeaderException, getRaftPeerId()));
       }
-      return omResponse.build();
+
+      LeaderNotReadyException leaderNotReadyException =
+          reply.getLeaderNotReadyException();
+      if (leaderNotReadyException != null) {
+        throw new ServiceException(new OMLeaderNotReadyException(
+            leaderNotReadyException.getMessage()));
+      }
+
+      StateMachineException stateMachineException =
+          reply.getStateMachineException();
+      if (stateMachineException != null) {
+        OMResponse.Builder omResponse = OMResponse.newBuilder();
+        omResponse.setCmdType(omRequest.getCmdType());
+        omResponse.setSuccess(false);
+        if (stateMachineException.getCause() != null) {
+          omResponse.setMessage(stateMachineException.getCause().getMessage());
+          omResponse.setStatus(
+              exceptionToResponseStatus(stateMachineException.getCause()));
+        } else {
+          // Current Ratis is setting cause, this is an safer side check.
+          LOG.error("StateMachine exception cause is not set");
+          omResponse.setStatus(
+              OzoneManagerProtocolProtos.Status.INTERNAL_ERROR);
+          omResponse.setMessage(
+              StringUtils.stringifyException(stateMachineException));
+        }
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Error while executing ratis request. " +
+              "stateMachineException: ", stateMachineException);
+        }
+        return omResponse.build();
+      }
     }
 
     try {
@@ -191,23 +220,19 @@ public final class OzoneManagerRatisServer {
   }
 
   /**
-   * Parse errorMessage received from the exception and convert to
-   * {@link OzoneManagerProtocolProtos.Status}.
-   * @param errorMessage
-   * @return OzoneManagerProtocolProtos.Status
+   * Convert exception to {@link OzoneManagerProtocolProtos.Status}.
+   * @param cause - Cause from stateMachine exception
+   * @return {@link OzoneManagerProtocolProtos.Status}
    */
-  private OzoneManagerProtocolProtos.Status parseErrorStatus(
-      String errorMessage) {
-    if (errorMessage.contains(STATUS_CODE)) {
-      String errorCode = errorMessage.substring(
-          errorMessage.indexOf(STATUS_CODE) + STATUS_CODE.length());
-      LOG.debug("Parsing error message for error code " +
-          errorCode);
-      return OzoneManagerProtocolProtos.Status.valueOf(errorCode.trim());
+  private OzoneManagerProtocolProtos.Status exceptionToResponseStatus(
+      Throwable cause) {
+    if (cause instanceof OMException) {
+      return OzoneManagerProtocolProtos.Status.values()[
+          ((OMException) cause).getResult().ordinal()];
     } else {
+      LOG.error("Unknown error occurs", cause);
       return OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
     }
-
   }
 
 
@@ -364,7 +389,7 @@ public final class OzoneManagerRatisServer {
     }
 
     // Set Ratis storage directory
-    String storageDir = OmUtils.getOMRatisDirectory(conf);
+    String storageDir = OzoneManagerRatisServer.getOMRatisDirectory(conf);
     RaftServerConfigKeys.setStorageDirs(properties,
         Collections.singletonList(new File(storageDir)));
 
@@ -642,7 +667,29 @@ public final class OzoneManagerRatisServer {
     return UUID.nameUUIDFromBytes(omServiceId.getBytes(StandardCharsets.UTF_8));
   }
 
-  public long getStateMachineLastAppliedIndex() {
-    return omStateMachine.getLastAppliedIndex();
+  /**
+   * Get the local directory where ratis logs will be stored.
+   */
+  public static String getOMRatisDirectory(Configuration conf) {
+    String storageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
+
+    if (Strings.isNullOrEmpty(storageDir)) {
+      storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+    }
+    return storageDir;
+  }
+
+  public static String getOMRatisSnapshotDirectory(Configuration conf) {
+    String snapshotDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+
+    if (Strings.isNullOrEmpty(snapshotDir)) {
+      snapshotDir = Paths.get(getOMRatisDirectory(conf),
+          "snapshot").toString();
+    }
+    return snapshotDir;
+  }
+
+  public TermIndex getLastAppliedTermIndex() {
+    return omStateMachine.getLastAppliedTermIndex();
   }
 }

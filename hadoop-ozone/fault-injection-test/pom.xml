@@ -30,6 +30,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <modules>
     <module>network-tests</module>
+    <module>mini-chaos-tests</module>
   </modules>
 
 </project>

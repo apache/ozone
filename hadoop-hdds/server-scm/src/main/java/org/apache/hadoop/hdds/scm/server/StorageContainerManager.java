@@ -131,7 +131,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_
  */
 @InterfaceAudience.LimitedPrivate({"HDFS", "CBLOCK", "OZONE", "HBASE"})
 public final class StorageContainerManager extends ServiceRuntimeInfoImpl
-    implements SCMMXBean {
+    implements SCMMXBean, OzoneStorageContainerManager {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(StorageContainerManager.class);
@@ -191,6 +191,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final OzoneConfiguration configuration;
   private final SafeModeHandler safeModeHandler;
   private SCMContainerMetrics scmContainerMetrics;
+  private SCMContainerPlacementMetrics placementMetrics;
   private MetricsSystem ms;
 
   /**
@@ -390,8 +391,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           conf, scmStorageConfig, eventQueue, clusterMap);
     }
 
-    SCMContainerPlacementMetrics placementMetrics =
-        SCMContainerPlacementMetrics.create();
+    placementMetrics = SCMContainerPlacementMetrics.create();
     ContainerPlacementPolicy containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
@@ -406,8 +406,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();
     } else {
-      containerManager = new SCMContainerManager(
-          conf, scmNodeManager, pipelineManager, eventQueue);
+      containerManager = new SCMContainerManager(conf, pipelineManager);
     }
 
     if (configurator.getScmBlockManager() != null) {
@@ -863,6 +862,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     unregisterMXBean();
     if (scmContainerMetrics != null) {
       scmContainerMetrics.unRegister();
+    }
+    if (placementMetrics != null) {
+      placementMetrics.unRegister();
     }
 
     // Event queue must be stopped before the DB store is closed at the end.

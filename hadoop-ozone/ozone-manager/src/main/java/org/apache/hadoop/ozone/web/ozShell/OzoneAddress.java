@@ -103,7 +103,8 @@ public class OzoneAddress {
           }
           client = OzoneClientFactory.getRpcClient(ozoneURI.getHost(), conf);
         } else if (ozoneURI.getPort() == -1) {
-          client = OzoneClientFactory.getRpcClient(ozoneURI.getHost());
+          client = OzoneClientFactory.getRpcClient(ozoneURI.getHost(),
+              OmUtils.getOmRpcPort(conf), conf);
         } else {
           client = OzoneClientFactory
               .getRpcClient(ozoneURI.getHost(), ozoneURI.getPort(), conf);

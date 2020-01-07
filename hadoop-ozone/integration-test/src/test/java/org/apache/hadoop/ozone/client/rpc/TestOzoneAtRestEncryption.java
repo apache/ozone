@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.util.Time;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -59,6 +58,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -164,7 +164,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
   public void testPutKeyWithEncryption() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    long currentTime = Time.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -198,8 +198,8 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
           keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent, "UTF-8"));
-      Assert.assertTrue(key.getCreationTime() >= currentTime);
-      Assert.assertTrue(key.getModificationTime() >= currentTime);
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 
@@ -215,7 +215,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     //Step 1
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    long currentTime = Time.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -256,8 +256,8 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
         keyName, ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE));
     Assert.assertEquals(value, new String(fileContent, "UTF-8"));
-    Assert.assertTrue(key.getCreationTime() >= currentTime);
-    Assert.assertTrue(key.getModificationTime() >= currentTime);
+    Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     Assert.assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
     //As TDE is enabled, the TDE encryption details should not be null.
     Assert.assertNotNull(key.getFileEncryptionInfo());

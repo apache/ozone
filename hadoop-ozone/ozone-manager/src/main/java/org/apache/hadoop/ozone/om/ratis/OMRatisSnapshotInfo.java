@@ -60,10 +60,6 @@ public class OMRatisSnapshotInfo implements SnapshotInfo {
     term = newTerm;
   }
 
-  private void updateSnapshotIndex(long newSnapshotIndex) {
-    snapshotIndex = newSnapshotIndex;
-  }
-
   private void updateTermIndex(long newTerm, long newIndex) {
     this.term = newTerm;
     this.snapshotIndex = newIndex;
@@ -98,13 +94,16 @@ public class OMRatisSnapshotInfo implements SnapshotInfo {
 
   /**
    * Update and persist the snapshot index and term to disk.
-   * @param index new snapshot index to be persisted to disk.
+   * @param lastAppliedTermIndex new snapshot index to be persisted to disk.
    * @throws IOException
    */
-  public void saveRatisSnapshotToDisk(long index) throws IOException {
-    updateSnapshotIndex(index);
+  public void saveRatisSnapshotToDisk(TermIndex lastAppliedTermIndex)
+      throws IOException {
+    updateTermIndex(lastAppliedTermIndex.getTerm(),
+        lastAppliedTermIndex.getIndex());
     writeRatisSnapshotYaml();
-    LOG.info("Saved Ratis Snapshot on the OM with snapshotIndex {}", index);
+    LOG.info("Saved Ratis Snapshot on the OM with snapshotIndex {}",
+        lastAppliedTermIndex);
   }
 
   /**

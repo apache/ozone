@@ -152,7 +152,7 @@ public class TestCommitWatcher {
           ContainerTestHelper
               .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
       // add the data to the buffer pool
-      final ChunkBuffer byteBuffer = bufferPool.allocateBufferIfNeeded();
+      final ChunkBuffer byteBuffer = bufferPool.allocateBufferIfNeeded(0);
       byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
       ratisClient.sendCommandAsync(writeChunkRequest);
       ContainerProtos.ContainerCommandRequestProto putBlockRequest =
@@ -226,7 +226,7 @@ public class TestCommitWatcher {
           ContainerTestHelper
               .getWriteChunkRequest(pipeline, blockID, chunkSize, null);
       // add the data to the buffer pool
-      final ChunkBuffer byteBuffer = bufferPool.allocateBufferIfNeeded();
+      final ChunkBuffer byteBuffer = bufferPool.allocateBufferIfNeeded(0);
       byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
       ratisClient.sendCommandAsync(writeChunkRequest);
       ContainerProtos.ContainerCommandRequestProto putBlockRequest =

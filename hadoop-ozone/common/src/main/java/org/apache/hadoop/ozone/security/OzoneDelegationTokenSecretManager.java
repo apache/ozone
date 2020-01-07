@@ -47,7 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3TOKEN;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 /**
  * SecretManager for Ozone Master. Responsible for signing identifiers with
@@ -345,8 +345,8 @@ public class OzoneDelegationTokenSecretManager
   @Override
   public byte[] retrievePassword(OzoneTokenIdentifier identifier)
       throws InvalidToken {
-    if(identifier.getTokenType().equals(S3TOKEN)) {
-      return validateS3Token(identifier);
+    if(identifier.getTokenType().equals(S3AUTHINFO)) {
+      return validateS3AuthInfo(identifier);
     }
     return validateToken(identifier).getPassword();
   }
@@ -393,9 +393,9 @@ public class OzoneDelegationTokenSecretManager
   /**
    * Validates if a S3 identifier is valid or not.
    * */
-  private byte[] validateS3Token(OzoneTokenIdentifier identifier)
+  private byte[] validateS3AuthInfo(OzoneTokenIdentifier identifier)
       throws InvalidToken {
-    LOG.trace("Validating S3Token for identifier:{}", identifier);
+    LOG.trace("Validating S3AuthInfo for identifier:{}", identifier);
     String awsSecret;
     try {
       awsSecret = s3SecretManager.getS3UserSecretString(identifier

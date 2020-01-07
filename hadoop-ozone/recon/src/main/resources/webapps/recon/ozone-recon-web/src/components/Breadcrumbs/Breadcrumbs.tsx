@@ -17,10 +17,10 @@
  */
 
 import React from 'react';
-import { Breadcrumb } from 'antd';
-import { withRouter, Link } from 'react-router-dom';
-import { RouteComponentProps } from 'react-router';
-import { breadcrumbNameMap } from '../../constants/breadcrumbs.constants';
+import {Breadcrumb, Icon} from 'antd';
+import {withRouter, Link} from 'react-router-dom';
+import {RouteComponentProps} from 'react-router';
+import {breadcrumbNameMap} from '../../constants/breadcrumbs.constants';
 
 interface Props extends RouteComponentProps<any> {
   collapsed: boolean;
@@ -30,7 +30,7 @@ interface Props extends RouteComponentProps<any> {
 class Breadcrumbs extends React.Component<RouteComponentProps> {
 
   render() {
-    const { location } = this.props;
+    const {location} = this.props;
     const pathSnippets = location.pathname.split('/').filter(i => i);
     const extraBreadcrumbItems = pathSnippets.map((_, index) => {
       const url = `/${pathSnippets.slice(0, index + 1).join('/')}`;
@@ -44,7 +44,7 @@ class Breadcrumbs extends React.Component<RouteComponentProps> {
     });
     const breadcrumbItems = [(
         <Breadcrumb.Item key="home">
-          <Link to="/">Home</Link>
+          <Link to="/"><Icon type="home"/></Link>
         </Breadcrumb.Item>
     )].concat(extraBreadcrumbItems);
     return (

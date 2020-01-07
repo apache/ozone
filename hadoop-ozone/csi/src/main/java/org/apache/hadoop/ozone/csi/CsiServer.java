@@ -94,18 +94,28 @@ public class CsiServer extends GenericCli implements Callable<Void> {
    */
   @ConfigGroup(prefix = "ozone.csi")
   public static class CsiConfig {
+
+    @Config(key = "socket",
+        defaultValue = "/var/lib/csi.sock",
+        description =
+            "The socket where all the CSI services will listen (file name).",
+        tags = ConfigTag.STORAGE)
     private String socketPath;
+
+    @Config(key = "default-volume-size",
+        defaultValue = "1000000000",
+        description =
+            "The default size of the create volumes (if not specified).",
+        tags = ConfigTag.STORAGE)
     private long defaultVolumeSize;
+
+    @Config(key = "s3g.address",
+        defaultValue = "http://localhost:9878",
+        description =
+            "The defaul t size of the created volumes (if not specified in the"
+                + " requests).",
+        tags = ConfigTag.STORAGE)
     private String s3gAddress;
-    private String volumeOwner;
-
-    public String getSocketPath() {
-      return socketPath;
-    }
-
-    public String getVolumeOwner() {
-      return volumeOwner;
-    }
 
     @Config(key = "owner",
         defaultValue = "",
@@ -117,15 +127,22 @@ public class CsiServer extends GenericCli implements Callable<Void> {
                 + "ALL the users can request the mount of a specific bucket "
                 + "via the CSI interface.",
         tags = ConfigTag.STORAGE)
+    private String volumeOwner;
+
+    public String getSocketPath() {
+      return socketPath;
+    }
+
+    public String getVolumeOwner() {
+      return volumeOwner;
+    }
+
+
     public void setVolumeOwner(String volumeOwner) {
       this.volumeOwner = volumeOwner;
     }
 
-    @Config(key = "socket",
-        defaultValue = "/var/lib/csi.sock",
-        description =
-            "The socket where all the CSI services will listen (file name).",
-        tags = ConfigTag.STORAGE)
+
     public void setSocketPath(String socketPath) {
       this.socketPath = socketPath;
     }
@@ -134,11 +151,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
       return defaultVolumeSize;
     }
 
-    @Config(key = "default-volume-size",
-        defaultValue = "1000000000",
-        description =
-            "The default size of the create volumes (if not specified).",
-        tags = ConfigTag.STORAGE)
+
     public void setDefaultVolumeSize(long defaultVolumeSize) {
       this.defaultVolumeSize = defaultVolumeSize;
     }
@@ -147,12 +160,6 @@ public class CsiServer extends GenericCli implements Callable<Void> {
       return s3gAddress;
     }
 
-    @Config(key = "s3g.address",
-        defaultValue = "http://localhost:9878",
-        description =
-            "The default size of the created volumes (if not specified in the"
-                + " requests).",
-        tags = ConfigTag.STORAGE)
     public void setS3gAddress(String s3gAddress) {
       this.s3gAddress = s3gAddress;
     }

@@ -133,7 +133,7 @@ public class TestPrometheusMetricsSink {
   public void testNamingRocksDB() {
     //RocksDB metrics are handled differently.
     PrometheusMetricsSink sink = new PrometheusMetricsSink();
-    Assert.assertEquals("rocksdb_om.db_num_open_connections",
+    Assert.assertEquals("rocksdb_om_db_num_open_connections",
         sink.prometheusName("Rocksdb_om.db", "num_open_connections"));
   }
 

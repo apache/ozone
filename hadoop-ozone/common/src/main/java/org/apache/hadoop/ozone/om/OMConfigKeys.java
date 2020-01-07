@@ -160,15 +160,6 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT
       = TimeDuration.valueOf(3000, TimeUnit.MILLISECONDS);
-  public static final String OZONE_OM_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY
-      = "ozone.om.ratis.client.request.max.retries";
-  public static final int OZONE_OM_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT
-      = 180;
-  public static final String OZONE_OM_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY
-      = "ozone.om.ratis.client.request.retry.interval";
-  public static final TimeDuration
-      OZONE_OM_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT
-      = TimeDuration.valueOf(100, TimeUnit.MILLISECONDS);
 
   // OM Ratis Leader Election configurations
   public static final String

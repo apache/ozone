@@ -16,12 +16,10 @@
  */
 package org.apache.hadoop.ozone.protocolPB;
 
-import com.google.common.base.Preconditions;
-
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.NotLeaderException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -73,8 +71,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       ProtocolMessageMetrics metrics,
       boolean enableRatis) {
     this.ozoneManager = impl;
-    handler = new OzoneManagerRequestHandler(impl);
-    this.omRatisServer = ratisServer;
     this.isRatisEnabled = enableRatis;
     this.ozoneManagerDoubleBuffer =
         new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(), (i) -> {
@@ -82,7 +78,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
           // For OM NON-HA code, there is no need to save transaction index.
           // As we wait until the double buffer flushes DB to disk.
         }, isRatisEnabled);
-
+    handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
+    this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG);
 
@@ -162,8 +159,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    */
   private OMResponse submitRequestToRatis(OMRequest request)
       throws ServiceException {
-    //TODO: Need to remove OzoneManagerRatisClient, as now we are using
-    // RatisServer Api's.
     return omRatisServer.submitRequest(request);
   }
 
@@ -171,7 +166,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       throws ServiceException {
     // Check if this OM is the leader.
     if (omRatisServer.isLeader()) {
-      return handler.handle(request);
+      return handler.handleReadRequest(request);
     } else {
       throw createNotLeaderException();
     }
@@ -182,12 +177,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     Optional<RaftPeerId> leaderRaftPeerId = omRatisServer
         .getCachedLeaderPeerId();
 
-    NotLeaderException notLeaderException;
+    OMNotLeaderException notLeaderException;
     if (leaderRaftPeerId.isPresent()) {
-      notLeaderException = new NotLeaderException(
+      notLeaderException = new OMNotLeaderException(
           raftPeerId, leaderRaftPeerId.get());
     } else {
-      notLeaderException = new NotLeaderException(raftPeerId);
+      notLeaderException = new OMNotLeaderException(raftPeerId);
     }
 
     if (LOG.isDebugEnabled()) {
@@ -205,17 +200,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     long index = 0L;
     try {
       if (OmUtils.isReadOnly(request)) {
-        return handler.handle(request);
+        return handler.handleReadRequest(request);
       } else {
         OMClientRequest omClientRequest =
             OzoneManagerRatisUtils.createClientRequest(request);
-        Preconditions.checkState(omClientRequest != null,
-            "Unrecognized write command type request: %s", request);
         request = omClientRequest.preExecute(ozoneManager);
         index = transactionIndex.incrementAndGet();
-        omClientRequest = OzoneManagerRatisUtils.createClientRequest(request);
-        omClientResponse = omClientRequest.validateAndUpdateCache(
-            ozoneManager, index, ozoneManagerDoubleBuffer::add);
+        omClientResponse = handler.handleWriteRequest(request, index);
       }
     } catch(IOException ex) {
       // As some of the preExecute returns error. So handle here.

@@ -34,7 +34,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Instant;
 import java.util.Iterator;
 
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -348,8 +347,7 @@ public class BucketEndpoint extends EndpointBase {
     } else {
       keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
     }
-    keyMetadata.setLastModified(Instant.ofEpochMilli(
-        next.getModificationTime()));
+    keyMetadata.setLastModified(next.getModificationTime());
     response.addKey(keyMetadata);
   }
 }

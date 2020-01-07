@@ -127,61 +127,51 @@ public class ContainerKeyService {
 
         // Directly calling get() on the Key table instead of iterating since
         // only full keys are supported now. When we change to using a prefix
-        // of the key, this needs to change to prefix seek (TODO).
+        // of the key, this needs to change to prefix seek.
         OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(
             containerKeyPrefix.getKeyPrefix());
-        if (null == omKeyInfo) {
-          continue;
-        }
-
-        // Filter keys by version.
-        List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo
-            .getKeyLocationVersions()
-            .stream()
-            .filter(k -> (k.getVersion() == containerKeyPrefix.getKeyVersion()))
-            .collect(Collectors.toList());
-
-        List<ContainerBlockMetadata> blockIds = new ArrayList<>();
-        for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : matchedKeys) {
-          List<OmKeyLocationInfo> omKeyLocationInfos = omKeyLocationInfoGroup
-              .getLocationList()
+        if (null != omKeyInfo) {
+          // Filter keys by version.
+          List<OmKeyLocationInfoGroup> matchedKeys = omKeyInfo
+              .getKeyLocationVersions()
               .stream()
-              .filter(c -> c.getContainerID() == containerID)
+              .filter(k -> (k.getVersion() ==
+                  containerKeyPrefix.getKeyVersion()))
               .collect(Collectors.toList());
-          for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfos) {
-            blockIds.add(new ContainerBlockMetadata(omKeyLocationInfo
-                .getContainerID(), omKeyLocationInfo.getLocalID()));
-          }
-        }
 
-        String ozoneKey = omMetadataManager.getOzoneKey(
-            omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName(),
-            omKeyInfo.getKeyName());
-        if (keyMetadataMap.containsKey(ozoneKey)) {
-          keyMetadataMap.get(ozoneKey).getVersions()
-              .add(containerKeyPrefix.getKeyVersion());
+          List<ContainerBlockMetadata> blockIds =
+              getBlocks(matchedKeys, containerID);
 
-          keyMetadataMap.get(ozoneKey).getBlockIds()
-              .put(containerKeyPrefix.getKeyVersion(), blockIds);
-        } else {
-          // break the for loop if limit has been reached
-          if (keyMetadataMap.size() == limit) {
-            break;
+          String ozoneKey = omMetadataManager.getOzoneKey(
+              omKeyInfo.getVolumeName(),
+              omKeyInfo.getBucketName(),
+              omKeyInfo.getKeyName());
+          if (keyMetadataMap.containsKey(ozoneKey)) {
+            keyMetadataMap.get(ozoneKey).getVersions()
+                .add(containerKeyPrefix.getKeyVersion());
+
+            keyMetadataMap.get(ozoneKey).getBlockIds()
+                .put(containerKeyPrefix.getKeyVersion(), blockIds);
+          } else {
+            // break the for loop if limit has been reached
+            if (keyMetadataMap.size() == limit) {
+              break;
+            }
+            KeyMetadata keyMetadata = new KeyMetadata();
+            keyMetadata.setBucket(omKeyInfo.getBucketName());
+            keyMetadata.setVolume(omKeyInfo.getVolumeName());
+            keyMetadata.setKey(omKeyInfo.getKeyName());
+            keyMetadata.setCreationTime(
+                Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
+            keyMetadata.setModificationTime(
+                Instant.ofEpochMilli(omKeyInfo.getModificationTime()));
+            keyMetadata.setDataSize(omKeyInfo.getDataSize());
+            keyMetadata.getVersions().add(containerKeyPrefix.getKeyVersion());
+            keyMetadataMap.put(ozoneKey, keyMetadata);
+            keyMetadata.getBlockIds().put(containerKeyPrefix.getKeyVersion(),
+                blockIds);
           }
-          KeyMetadata keyMetadata = new KeyMetadata();
-          keyMetadata.setBucket(omKeyInfo.getBucketName());
-          keyMetadata.setVolume(omKeyInfo.getVolumeName());
-          keyMetadata.setKey(omKeyInfo.getKeyName());
-          keyMetadata.setCreationTime(
-              Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
-          keyMetadata.setModificationTime(
-              Instant.ofEpochMilli(omKeyInfo.getModificationTime()));
-          keyMetadata.setDataSize(omKeyInfo.getDataSize());
-          keyMetadata.getVersions().add(containerKeyPrefix.getKeyVersion());
-          keyMetadataMap.put(ozoneKey, keyMetadata);
-          keyMetadata.getBlockIds().put(containerKeyPrefix.getKeyVersion(),
-              blockIds);
+
         }
       }
 
@@ -194,5 +184,29 @@ public class ContainerKeyService {
     KeysResponse keysResponse =
         new KeysResponse(totalCount, keyMetadataMap.values());
     return Response.ok(keysResponse).build();
+  }
+
+  /**
+   * Helper function to extract the blocks for a given container from a given
+   * OM Key.
+   * @param matchedKeys List of OM Key Info locations
+   * @param containerID containerId.
+   * @return List of blocks.
+   */
+  private List<ContainerBlockMetadata> getBlocks(
+      List<OmKeyLocationInfoGroup> matchedKeys, long containerID) {
+    List<ContainerBlockMetadata> blockIds = new ArrayList<>();
+    for (OmKeyLocationInfoGroup omKeyLocationInfoGroup : matchedKeys) {
+      List<OmKeyLocationInfo> omKeyLocationInfos = omKeyLocationInfoGroup
+          .getLocationList()
+          .stream()
+          .filter(c -> c.getContainerID() == containerID)
+          .collect(Collectors.toList());
+      for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfos) {
+        blockIds.add(new ContainerBlockMetadata(omKeyLocationInfo
+            .getContainerID(), omKeyLocationInfo.getLocalID()));
+      }
+    }
+    return blockIds;
   }
 }

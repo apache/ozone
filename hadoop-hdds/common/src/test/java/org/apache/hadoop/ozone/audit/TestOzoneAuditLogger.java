@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.audit;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +28,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
+import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -39,11 +41,12 @@ public class TestOzoneAuditLogger {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneAuditLogger.class.getName());
 
+  static {
+    System.setProperty("log4j.configurationFile", "auditlog.properties");
+  }
+
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.OMLOGGER);
-
-  private static final String SUCCESS = AuditEventStatus.SUCCESS.name();
-  private static final String FAILURE = AuditEventStatus.FAILURE.name();
 
   private static final Map<String, String> PARAMS =
       new DummyEntity().toAuditMap();
@@ -55,7 +58,7 @@ public class TestOzoneAuditLogger {
       new AuditMessage.Builder()
           .setUser(USER)
           .atIp(IP_ADDRESS)
-          .forOperation(DummyAction.CREATE_VOLUME.name())
+          .forOperation(DummyAction.CREATE_VOLUME)
           .withParams(PARAMS)
           .withResult(FAILURE)
           .withException(null).build();
@@ -64,7 +67,7 @@ public class TestOzoneAuditLogger {
       new AuditMessage.Builder()
           .setUser(USER)
           .atIp(IP_ADDRESS)
-          .forOperation(DummyAction.CREATE_VOLUME.name())
+          .forOperation(DummyAction.CREATE_VOLUME)
           .withParams(PARAMS)
           .withResult(SUCCESS)
           .withException(null).build();
@@ -73,7 +76,7 @@ public class TestOzoneAuditLogger {
       new AuditMessage.Builder()
           .setUser(USER)
           .atIp(IP_ADDRESS)
-          .forOperation(DummyAction.READ_VOLUME.name())
+          .forOperation(DummyAction.READ_VOLUME)
           .withParams(PARAMS)
           .withResult(FAILURE)
           .withException(null).build();
@@ -82,15 +85,10 @@ public class TestOzoneAuditLogger {
       new AuditMessage.Builder()
           .setUser(USER)
           .atIp(IP_ADDRESS)
-          .forOperation(DummyAction.READ_VOLUME.name())
+          .forOperation(DummyAction.READ_VOLUME)
           .withParams(PARAMS)
           .withResult(SUCCESS)
           .withException(null).build();
-
-  @BeforeClass
-  public static void setUp(){
-    System.setProperty("log4j.configurationFile", "log4j2.properties");
-  }
 
   @AfterClass
   public static void tearDown() {
@@ -127,12 +125,12 @@ public class TestOzoneAuditLogger {
 
   @Test
   public void messageIncludesAllParts() {
-    String message = WRITE_FAIL_MSG.getMessage();
+    String message = WRITE_FAIL_MSG.getFormattedMessage();
     assertTrue(message, message.contains(USER));
     assertTrue(message, message.contains(IP_ADDRESS));
     assertTrue(message, message.contains(DummyAction.CREATE_VOLUME.name()));
     assertTrue(message, message.contains(PARAMS.toString()));
-    assertTrue(message, message.contains(FAILURE));
+    assertTrue(message, message.contains(FAILURE.getStatus()));
   }
 
   /**
@@ -174,6 +172,6 @@ public class TestOzoneAuditLogger {
     File file = new File("audit.log");
     List<String> lines = FileUtils.readLines(file, (String)null);
     // When no log entry is expected, the log file must be empty
-    assertTrue(lines.size() == 0);
+    assertEquals(0, lines.size());
   }
 }
