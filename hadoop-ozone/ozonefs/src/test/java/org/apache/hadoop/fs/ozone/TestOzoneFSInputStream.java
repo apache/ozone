@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.Test;
@@ -26,6 +27,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.List;
+import java.util.function.IntFunction;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -37,22 +40,31 @@ public class TestOzoneFSInputStream {
 
   @Test
   public void readToByteBuffer() throws IOException {
-    for (int streamLength = 1; streamLength <= 10; streamLength++) {
-      for (int bufferCapacity = 0; bufferCapacity <= 10; bufferCapacity++) {
-        testReadToByteBuffer(streamLength, bufferCapacity, 0);
-        if (bufferCapacity > 1) {
-          testReadToByteBuffer(streamLength, bufferCapacity, 1);
-          if (bufferCapacity > 2) {
-            testReadToByteBuffer(streamLength, bufferCapacity,
-                bufferCapacity - 1);
+    List<IntFunction<ByteBuffer>> bufferConstructors = ImmutableList.of(
+        ByteBuffer::allocate,
+        ByteBuffer::allocateDirect
+    );
+    for (IntFunction<ByteBuffer> constructor : bufferConstructors) {
+      for (int streamLength = 1; streamLength <= 10; streamLength++) {
+        for (int bufferCapacity = 0; bufferCapacity <= 10; bufferCapacity++) {
+          testReadToByteBuffer(constructor, streamLength, bufferCapacity, 0);
+          if (bufferCapacity > 1) {
+            testReadToByteBuffer(constructor, streamLength, bufferCapacity, 1);
+            if (bufferCapacity > 2) {
+              testReadToByteBuffer(constructor, streamLength, bufferCapacity,
+                  bufferCapacity - 1);
+            }
           }
+          testReadToByteBuffer(constructor, streamLength, bufferCapacity,
+              bufferCapacity);
         }
-        testReadToByteBuffer(streamLength, bufferCapacity, bufferCapacity);
       }
     }
   }
 
-  private static void testReadToByteBuffer(int streamLength, int bufferCapacity,
+  private static void testReadToByteBuffer(
+      IntFunction<ByteBuffer> bufferConstructor,
+      int streamLength, int bufferCapacity,
       int bufferPosition) throws IOException {
     final byte[] source = RandomUtils.nextBytes(streamLength);
     final InputStream input = new ByteArrayInputStream(source);
@@ -63,7 +75,7 @@ public class TestOzoneFSInputStream {
     final byte[] expectedContent = Arrays.copyOfRange(source, 0,
         expectedReadLength);
 
-    final ByteBuffer buf = ByteBuffer.allocate(bufferCapacity);
+    final ByteBuffer buf = bufferConstructor.apply(bufferCapacity);
     buf.position(bufferPosition);
 
     final int bytesRead = subject.read(buf);
