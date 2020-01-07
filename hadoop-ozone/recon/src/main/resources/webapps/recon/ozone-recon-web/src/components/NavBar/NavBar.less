@@ -33,9 +33,22 @@
   display: none;
 }
 
-.ant-menu-inline-collapsed {
-  width: @sidebar-collapsed-width;
-  .ant-menu-item {
-    padding-left: 17px !important;
+.ant-menu {
+  &.ant-menu-inline-collapsed {
+    width: @sidebar-collapsed-width;
+    .ant-menu-item {
+      padding-left: 17px !important;
+    }
+  }
+  &.ant-menu-inline {
+    .ant-menu-item {
+      &.ant-menu-item-selected {
+        background-color: #0a2542;
+        &::after {
+          border-right: 5px solid #1DA57A;
+        }
+      }
+    }
   }
 }
+
