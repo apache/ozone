@@ -15,11 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.ozone.contract;
+package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.ozone.OzoneFSInputStream;
 import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
@@ -31,11 +30,10 @@ import java.util.Arrays;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
-// TODO rename to TestOzoneFSInputStream after HDDS-2785
 /**
  * Tests for {@link OzoneFSInputStream}.
  */
-public class TestOzoneFSInputStreamUnit {
+public class TestOzoneFSInputStream {
 
   @Test
   public void readToByteBuffer() throws IOException {
