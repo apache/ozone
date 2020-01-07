@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -54,6 +55,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests MultiBlock Writes with Dn failures by Ozone Client.
  */
+@Ignore
 public class TestMultiBlockWritesWithDnFailures {
 
   private MiniOzoneCluster cluster;
