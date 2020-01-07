@@ -198,8 +198,8 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
           keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent, "UTF-8"));
-      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
-      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
+      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
   }
 
@@ -256,8 +256,8 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
         keyName, ReplicationType.STAND_ALONE,
         ReplicationFactor.ONE));
     Assert.assertEquals(value, new String(fileContent, "UTF-8"));
-    Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
-    Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
+    Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+    Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     Assert.assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
     //As TDE is enabled, the TDE encryption details should not be null.
     Assert.assertNotNull(key.getFileEncryptionInfo());
