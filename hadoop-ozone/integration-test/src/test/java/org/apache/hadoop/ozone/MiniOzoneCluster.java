@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.hdds.scm.protocolPB
     .StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -128,6 +129,13 @@ public interface MiniOzoneCluster {
   List<HddsDatanodeService> getHddsDatanodes();
 
   /**
+   * Returns a {@link ReconServer} instance.
+   *
+   * @return List of {@link ReconServer}
+   */
+  ReconServer getReconServer();
+
+  /**
    * Returns an {@link OzoneClient} to access the {@link MiniOzoneCluster}.
    *
    * @return {@link OzoneClient}
@@ -172,6 +180,11 @@ public interface MiniOzoneCluster {
    * @throws IOException
    */
   void restartOzoneManager() throws IOException;
+
+  /**
+   * Restarts Recon instance.
+   */
+  void restartReconServer() throws Exception;
 
   /**
    * Restart a particular HddsDatanode.

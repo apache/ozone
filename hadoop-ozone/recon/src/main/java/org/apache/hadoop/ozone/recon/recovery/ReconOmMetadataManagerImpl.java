@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,6 +42,7 @@ import org.slf4j.LoggerFactory;
  * relying on the OmMetadataManagerImpl, we can make sure all changes made to
  * schema in OM will be automatically picked up by Recon.
  */
+@Singleton
 public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     implements ReconOMMetadataManager {
 
