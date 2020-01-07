@@ -32,3 +32,5 @@ HDFS-SITE.XML_dfs.namenode.name.dir=/data/namenode
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 HDFS-SITE.XML_dfs.datanode.plugins=org.apache.hadoop.ozone.HddsDatanodeService
+
+no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1

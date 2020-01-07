@@ -32,27 +32,28 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hdds.scm.http")
 public class SCMHTTPServerConfig {
 
-  private String principal = "";
-  private String keytab = "";
-
   @Config(key = "kerberos.principal",
       type = ConfigType.STRING,
       defaultValue = "",
-      tags = { ConfigTag.SECURITY },
+      tags = {ConfigTag.SECURITY},
       description = "This Kerberos principal is used when communicating to " +
-        "the HTTP server of SCM.The protocol used is SPNEGO."
+          "the HTTP server of SCM.The protocol used is SPNEGO."
   )
-  public void setKerberosPrincipal(String kerberosPrincipal) {
-    this.principal = kerberosPrincipal;
-  }
+  private String principal = "";
 
   @Config(key = "kerberos.keytab",
       type = ConfigType.STRING,
       defaultValue = "",
-      tags = { ConfigTag.SECURITY },
+      tags = {ConfigTag.SECURITY},
       description = "The keytab file used by SCM http server to login" +
-        " as its service principal."
+          " as its service principal."
   )
+  private String keytab = "";
+
+  public void setKerberosPrincipal(String kerberosPrincipal) {
+    this.principal = kerberosPrincipal;
+  }
+
   public void setKerberosKeytab(String kerberosKeytab) {
     this.keytab = kerberosKeytab;
   }

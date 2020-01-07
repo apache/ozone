@@ -31,3 +31,7 @@ relativeURLs: true
 disableKinds:
 - taxonomy
 - taxonomyTerm
+markup:
+  goldmark:
+    renderer:
+      unsafe: true

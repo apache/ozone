@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.ozone.recon;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Provider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
 
 /**
  * Ozone Configuration Provider.
@@ -32,8 +32,11 @@ public class ConfigurationProvider implements
 
   private static OzoneConfiguration configuration;
 
-  static void setConfiguration(OzoneConfiguration conf) {
-    ConfigurationProvider.configuration = conf;
+  @VisibleForTesting
+  public static void setConfiguration(OzoneConfiguration conf) {
+    if (configuration == null) {
+      ConfigurationProvider.configuration = conf;
+    }
   }
 
   @Override

@@ -101,7 +101,7 @@ public class ReconServer extends GenericCli {
     return null;
   }
 
-  void stop() throws Exception {
+  public void stop() throws Exception {
     LOG.info("Stopping Recon server");
     if (httpServer != null) {
       httpServer.stop();
@@ -109,6 +109,7 @@ public class ReconServer extends GenericCli {
 
     getReconStorageContainerManager().stop();
     getOzoneManagerServiceProvider().stop();
+    getContainerDBServiceProvider().stop();
   }
 
   private OzoneManagerServiceProvider getOzoneManagerServiceProvider() {

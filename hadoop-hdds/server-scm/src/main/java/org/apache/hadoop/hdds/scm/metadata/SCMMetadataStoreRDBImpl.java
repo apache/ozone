@@ -98,7 +98,6 @@ public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
           .addTable(REVOKED_CERTS_TABLE)
           .addCodec(DeletedBlocksTransaction.class,
               new DeletedBlocksTransactionCodec())
-          .addCodec(Long.class, new LongCodec())
           .addCodec(BigInteger.class, new BigIntegerCodec())
           .addCodec(X509Certificate.class, new X509CertificateCodec())
           .build();

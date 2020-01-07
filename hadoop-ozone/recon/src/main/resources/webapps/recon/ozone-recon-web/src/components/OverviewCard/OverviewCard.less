@@ -16,18 +16,23 @@
  * limitations under the License.
  */
 
-import React from 'react';
-
-export const ContainerBrowser:React.FC= () => {
-  return (
-
-      <div>
-        <div className="page-header">
-          Container Browser
-        </div>
-        <div className="content-div">
-          Container Browser content
-        </div>
-      </div>
-  );
-};
+.overview-card {
+  .ant-card-meta-detail {
+    .ant-card-meta-title {
+      margin-bottom: 0;
+      font-size: 24px;
+    }
+  }
+  .ant-card-percentage {
+    .capacity-bar {
+      position: absolute;
+      top: 18px;
+      .ant-progress-inner {
+        background-color: #d0d0d0;
+      }
+    }
+    .ant-progress {
+      margin-bottom: 0;
+    }
+  }
+}

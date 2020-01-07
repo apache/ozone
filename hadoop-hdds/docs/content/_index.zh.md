@@ -1,5 +1,5 @@
 ---
-title: Overview
+title: 概述
 menu: main
 weight: -10
 ---
@@ -20,5 +20,19 @@ weight: -10
   limitations under the License.
 -->
 
+# Apache Hadoop Ozone
 
-Ozone page translation.
+{{<figure src="/ozone-usage.png" width="60%">}}
+
+*_Ozone 是 Hadoop 的分布式对象存储系统，具有易扩展和冗余存储的特点。<p>
+Ozone 不仅能存储数十亿个不同大小的对象，还支持在容器化环境（比如 Kubernetes）中运行。_* <p>
+
+Apache Spark、Hive 和 YARN 等应用无需任何修改即可使用 Ozone。Ozone 提供了 [Java API]({{<
+ref "JavaApi.zh.md" >}})、[S3 接口]({{< ref "S3.zh.md" >}})和[命令行接口]({{< ref "shell/_index.zh.md" >}})，极大地方便了 Ozone
+ 在不同应用场景下的的使用。
+
+Ozone 的管理由卷、桶和键组成：
+
+* 卷的概念和用户账号类似，只有管理员可以创建和删除卷。
+* 桶的概念和目录类似，用户可以在自己的卷下创建任意数量的桶，每个桶可以包含任意数量的键，但是不可以包含其它的桶。
+* 键的概念和文件类似，用户通过键来读写数据。

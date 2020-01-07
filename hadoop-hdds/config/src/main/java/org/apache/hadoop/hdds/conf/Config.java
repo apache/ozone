@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  * Mark field to be configurable from ozone-site.xml.
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
+@Target({ElementType.FIELD})
 public @interface Config {
 
   /**

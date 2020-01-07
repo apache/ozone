@@ -249,6 +249,11 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
           "Buffer size and increment mismatched: bufferSize = " + bufferSize
           + " but increment = " + increment);
     }
+    return asByteBufferList();
+  }
+
+  @Override
+  public List<ByteBuffer> asByteBufferList() {
     return Collections.unmodifiableList(buffers);
   }
 

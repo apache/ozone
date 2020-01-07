@@ -90,6 +90,13 @@ public class ContainerDBServiceProviderImpl
     // available. Nothing else to do here.
   }
 
+  @Override
+  public void stop() throws Exception {
+    if (containerDbStore != null) {
+      containerDbStore.close();
+    }
+  }
+
   /**
    * Initialize a new container DB instance, getting rid of the old instance
    * and then storing the passed in container prefix counts into the created

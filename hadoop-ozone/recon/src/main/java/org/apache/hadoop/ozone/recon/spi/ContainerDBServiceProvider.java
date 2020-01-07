@@ -37,6 +37,11 @@ public interface ContainerDBServiceProvider {
    */
   void start();
 
+  /*
+   * Close the container DB
+   */
+  void stop() throws Exception;
+
   /**
    * Create new container DB and bulk Store the container to Key prefix
    * mapping.

@@ -23,6 +23,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -52,6 +53,11 @@ public interface ChunkBuffer {
   /** Wrap the given {@link ByteBuffer} as a {@link ChunkBuffer}. */
   static ChunkBuffer wrap(ByteBuffer buffer) {
     return new ChunkBufferImplWithByteBuffer(buffer);
+  }
+
+  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
+  static ChunkBuffer wrap(List<ByteBuffer> buffers) {
+    return new ChunkBufferImplWithByteBufferList(buffers);
   }
 
   /** Similar to {@link ByteBuffer#position()}. */
@@ -109,6 +115,8 @@ public interface ChunkBuffer {
    * @param bufferSize the size of each buffer in the iteration.
    */
   Iterable<ByteBuffer> iterate(int bufferSize);
+
+  List<ByteBuffer> asByteBufferList();
 
   /**
    * Write the contents of the buffer from the current position to the limit

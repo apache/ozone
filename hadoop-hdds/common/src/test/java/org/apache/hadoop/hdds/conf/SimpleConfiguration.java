@@ -17,51 +17,60 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import javax.annotation.PostConstruct;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Example configuration to test the configuration injection.
  */
 @ConfigGroup(prefix = "test.scm.client")
-public class SimpleConfiguration {
+public class SimpleConfiguration extends SimpleConfigurationParent {
 
+  @Config(key = "address", defaultValue = "localhost", description = "Client "
+      + "addres (To test string injection).", tags = ConfigTag.MANAGEMENT)
   private String clientAddress;
 
+  @Config(key = "bind.host", defaultValue = "0.0.0.0", description = "Bind "
+      + "host(To test string injection).", tags = ConfigTag.MANAGEMENT)
   private String bindHost;
 
-  private boolean enabled;
+  @Config(key = "compression.enabled", defaultValue = "true", description =
+      "Compression enabled. (Just to test boolean flag)", tags =
+      ConfigTag.MANAGEMENT)
+  private boolean compressionEnabled;
 
-  private int port = 1234;
+  @Config(key = "port", defaultValue = "9878", description = "Port number "
+      + "config (To test in injection)", tags = ConfigTag.MANAGEMENT)
+  private int port;
 
+  @Config(key = "wait", type = ConfigType.TIME, timeUnit =
+      TimeUnit.SECONDS, defaultValue = "30m", description = "Wait time (To "
+      + "test TIME config type)", tags = ConfigTag.MANAGEMENT)
   private long waitTime = 1;
 
-  @Config(key = "address", defaultValue = "localhost", description = "Just "
-      + "for testing", tags = ConfigTag.MANAGEMENT)
+  @PostConstruct
+  public void validate() {
+    if (port < 0) {
+      throw new NumberFormatException("Please use a postitive port number");
+    }
+  }
+
   public void setClientAddress(String clientAddress) {
     this.clientAddress = clientAddress;
   }
 
-  @Config(key = "bind.host", defaultValue = "0.0.0.0", description = "Just "
-      + "for testing", tags = ConfigTag.MANAGEMENT)
   public void setBindHost(String bindHost) {
     this.bindHost = bindHost;
   }
 
-  @Config(key = "enabled", defaultValue = "true", description = "Just for "
-      + "testing", tags = ConfigTag.MANAGEMENT)
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
+  public void setCompressionEnabled(boolean compressionEnabled) {
+    this.compressionEnabled = compressionEnabled;
   }
 
-  @Config(key = "port", defaultValue = "9878", description = "Just for "
-      + "testing", tags = ConfigTag.MANAGEMENT)
   public void setPort(int port) {
     this.port = port;
   }
 
-  @Config(key = "wait", type = ConfigType.TIME, timeUnit =
-      TimeUnit.SECONDS, defaultValue = "10m", description = "Just for "
-      + "testing", tags = ConfigTag.MANAGEMENT)
   public void setWaitTime(long waitTime) {
     this.waitTime = waitTime;
   }
@@ -74,8 +83,8 @@ public class SimpleConfiguration {
     return bindHost;
   }
 
-  public boolean isEnabled() {
-    return enabled;
+  public boolean isCompressionEnabled() {
+    return compressionEnabled;
   }
 
   public int getPort() {

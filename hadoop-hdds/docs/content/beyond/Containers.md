@@ -174,8 +174,8 @@ adjust base image, umask, security settings, user settings according to your own
 
 You can use the source of our development images as an example:
 
- * [Base image] (https://github.com/apache/hadoop/blob/docker-hadoop-runner-jdk11/Dockerfile)
- * [Docker image] (https://github.com/apache/hadoop/blob/trunk/hadoop-ozone/dist/src/main/docker/Dockerfile)
+ * [Base image](https://github.com/apache/hadoop/blob/docker-hadoop-runner-jdk11/Dockerfile)
+ * [Docker image](https://github.com/apache/hadoop/blob/trunk/hadoop-ozone/dist/src/main/docker/Dockerfile)
 
  Most of the elements are optional and just helper function but to use the provided example
  kubernetes resources you may need the scripts from
