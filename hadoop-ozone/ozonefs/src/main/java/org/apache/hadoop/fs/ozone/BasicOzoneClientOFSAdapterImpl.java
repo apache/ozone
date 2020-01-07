@@ -207,7 +207,8 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
     try {
       setVolume(this.volumeStr);
     } catch (OMException e) {
-      if (createIfNotExist) {
+      if (createIfNotExist && e.getResult().equals(
+          OMException.ResultCodes.VOLUME_NOT_FOUND)) {
         // Try to create volume.
         objectStore.createVolume(this.volumeStr);
         // Try setVolume again.
@@ -220,7 +221,8 @@ public class BasicOzoneClientOFSAdapterImpl implements OzoneClientAdapter {
     try {
       setBucket(this.bucketStr);
     } catch (OMException e) {
-      if (createIfNotExist) {
+      if (createIfNotExist && e.getResult().equals(
+          OMException.ResultCodes.BUCKET_NOT_FOUND)) {
         // Try to create bucket.
         volume.createBucket(this.bucketStr);
         // Try setBucket again.
