@@ -185,8 +185,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <configuration>
               <includes>
                 <include>org.apache.hadoop.hdds.**</include>
-                <exclude>org.apache.hadoop.ozone.client.**</exclude>
               </includes>
+              <excludes>
+                <exclude>org.apache.hadoop.ozone.client.**</exclude>
+              </excludes>
             </configuration>
           </plugin>
         </plugins>
@@ -220,8 +222,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <configuration>
               <includes>
                 <include>org.apache.hadoop.fs.ozone.**</include>
-                <exclude>org.apache.hadoop.fs.ozone.contract.**</exclude>
               </includes>
+              <excludes>
+                <exclude>org.apache.hadoop.fs.ozone.contract.**</exclude>
+              </excludes>
             </configuration>
           </plugin>
         </plugins>
@@ -255,10 +259,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <configuration>
               <includes>
                 <include>org.apache.hadoop.ozone.**</include>
+              </includes>
+              <excludes>
                 <exclude>org.apache.hadoop.ozone.client.**</exclude>
                 <exclude>org.apache.hadoop.ozone.freon.**</exclude>
                 <exclude>org.apache.hadoop.ozone.om.**</exclude>
-              </includes>
+              </excludes>
             </configuration>
           </plugin>
         </plugins>
