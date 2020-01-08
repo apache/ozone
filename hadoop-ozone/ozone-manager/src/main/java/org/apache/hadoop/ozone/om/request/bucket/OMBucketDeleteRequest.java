@@ -92,8 +92,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     IOException exception = null;
 
-    boolean acquiredBucketLock = false;
-    boolean acquiredVolumeLock = false;
+    boolean acquiredBucketLock = false, acquiredVolumeLock = false;
+    boolean success = true;
     OMClientResponse omClientResponse = null;
     try {
       // check Acl
@@ -153,8 +153,9 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
           volumeName, bucketName);
-    } catch (IOException e) {
-      exception = e;
+    } catch (IOException ex) {
+      success = false;
+      exception = ex;
       omClientResponse = new OMBucketDeleteResponse(
           createErrorOMResponse(omResponse, exception), volumeName, bucketName);
     } finally {
@@ -177,7 +178,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         auditMap, exception, userInfo));
 
     // return response.
-    if (exception == null) {
+    if (success) {
       LOG.debug("Deleted bucket:{} in volume:{}", bucketName, volumeName);
       return omClientResponse;
     } else {

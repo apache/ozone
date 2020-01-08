@@ -97,7 +97,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     IOException exception = null;
-    boolean acquiredBucketLock = false;
+    boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
       // check Acl
@@ -187,8 +187,9 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           SetBucketPropertyResponse.newBuilder().build());
       omClientResponse = new OMBucketSetPropertyResponse(
           omResponse.build(), omBucketInfo);
-    } catch (IOException e) {
-      exception = e;
+    } catch (IOException ex) {
+      success = false;
+      exception = ex;
       omClientResponse = new OMBucketSetPropertyResponse(
           createErrorOMResponse(omResponse, exception), omBucketInfo);
     } finally {
@@ -207,7 +208,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         omBucketArgs.toAuditMap(), exception, userInfo));
 
     // return response.
-    if (exception == null) {
+    if (success) {
       LOG.debug("Setting bucket property for bucket:{} in volume:{}",
           bucketName, volumeName);
       return omClientResponse;
