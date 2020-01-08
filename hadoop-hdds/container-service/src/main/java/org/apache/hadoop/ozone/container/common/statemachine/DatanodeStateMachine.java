@@ -381,7 +381,9 @@ public class DatanodeStateMachine implements Closeable {
    * be sent by datanode.
    */
   public void triggerHeartbeat() {
-    stateMachineThread.interrupt();
+    if (stateMachineThread != null) {
+      stateMachineThread.interrupt();
+    }
   }
 
   /**
