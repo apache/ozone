@@ -22,9 +22,6 @@ chaossuffix="chaos.log"
 compilesuffix="compile.log"
 heapformat="dump.hprof"
 
-#TODO: add gc log file details as well
-export MAVEN_OPTS="-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=${heapdumpfile} -Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dio.netty.leakDetection.level=advanced -Dio.netty.leakDetectionLevel=advanced -Dio.netty.threadLocalDirectBufferSize=0 -Djdk.nio.maxCachedBufferSize=33554432 -XX:NativeMemoryTracking=detail"
-
 #log goes to something like /tmp/2019-12-04--00-01-26-IST/complete.log
 logfilename="${logfiledirectory}${completesuffix}"
 #log goes to something like /tmp/2019-12-04--00-01-26-IST/chaos.log
@@ -34,13 +31,22 @@ compilefilename="${logfiledirectory}${compilesuffix}"
 #log goes to something like /tmp/2019-12-04--00-01-26-IST/dump.hprof
 heapdumpfile="${logfiledirectory}${heapformat}"
 
+#TODO: add gc log file details as well
+MVN_OPTS="-XX:+HeapDumpOnOutOfMemoryError "
+MVN_OPTS+="-XX:HeapDumpPath=${heapdumpfile} "
+MVN_OPTS+="-XX:NativeMemoryTracking=detail"
+export MAVEN_OPTS=$MVN_OPTS
+
 mkdir -p ${logfiledirectory}
 echo "logging chaos logs and heapdump to ${logfiledirectory}"
 
-echo "Starting MiniOzoneChaosCluster with ${MAVEN_OPTS}"
+echo "Starting MiniOzoneChaosCluster with ${MVN_OPTS}"
 mvn clean install -DskipTests > "${compilefilename}" 2>&1
 mvn exec:java \
-  -Dexec.mainClass="org.apache.hadoop.ozone.chaos.TestMiniChaosOzoneCluster" \
+  -Dexec.mainClass="org.apache.hadoop.ozone.TestMiniChaosOzoneCluster" \
   -Dexec.classpathScope=test \
   -Dchaoslogfilename=${chaosfilename} \
+  -Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false \
+  -Dio.netty.leakDetection.level=advanced \
+  -Dio.netty.leakDetectionLevel=advanced \
   -Dexec.args="$*" > "${logfilename}" 2>&1

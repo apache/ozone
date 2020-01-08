@@ -46,7 +46,7 @@ public class TestMiniChaosOzoneCluster implements Runnable {
 
   @Option(names = {"-t", "--numThreads"},
       description = "num of IO threads")
-  private static int numThreads = 10;
+  private static int numThreads = 5;
 
   @Option(names = {"-b", "--numBuffers"},
       description = "num of IO buffers")
@@ -82,7 +82,8 @@ public class TestMiniChaosOzoneCluster implements Runnable {
     volume.createBucket(bucketName);
     List<LoadBucket> ozoneBuckets = new ArrayList<>(numClients);
     for (int i = 0; i < numClients; i++) {
-      ozoneBuckets.add(new LoadBucket(volume.getBucket(bucketName)));
+      ozoneBuckets.add(new LoadBucket(volume.getBucket(bucketName),
+          configuration));
     }
 
     String agedBucketName =
@@ -90,10 +91,19 @@ public class TestMiniChaosOzoneCluster implements Runnable {
 
     volume.createBucket(agedBucketName);
     LoadBucket agedLoadBucket =
-            new LoadBucket(volume.getBucket(agedBucketName));
+            new LoadBucket(volume.getBucket(agedBucketName), configuration);
+
+    String fsBucketName =
+        RandomStringUtils.randomAlphabetic(10).toLowerCase();
+
+    volume.createBucket(fsBucketName);
+    LoadBucket fsBucket =
+        new LoadBucket(volume.getBucket(fsBucketName), configuration);
+
+
     loadGenerator =
-        new MiniOzoneLoadGenerator(ozoneBuckets, agedLoadBucket, numThreads,
-            numBuffers);
+        new MiniOzoneLoadGenerator(ozoneBuckets, agedLoadBucket, fsBucket,
+          numThreads, numBuffers);
   }
 
   /**
