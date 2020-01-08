@@ -100,12 +100,13 @@ public class LoadBucket {
   abstract class Op {
     private final boolean fsOp;
     private final String opName;
-    protected final String keyName;
+    private final String keyName;
 
     Op(boolean fsOp, String keyName) {
       this.fsOp = fsOp;
       this.keyName = keyName;
-      this.opName = (fsOp ? "Filesystem" : "Bucket") + ":" + getClass().getSimpleName();
+      this.opName = (fsOp ? "Filesystem" : "Bucket") + ":"
+          + getClass().getSimpleName();
     }
 
     public void execute() throws Exception {
@@ -126,7 +127,7 @@ public class LoadBucket {
     }
 
     abstract void doFsOp(Path p) throws IOException;
-    abstract void doBucketOp(String keyName) throws IOException;
+    abstract void doBucketOp(String key) throws IOException;
     abstract void doPostOp() throws IOException;
 
     @Override
@@ -135,7 +136,9 @@ public class LoadBucket {
     }
   }
 
-  // Write file/key to bucket
+  /**
+   * Write file/key to bucket.
+   */
   public class WriteOp extends Op {
     private OutputStream os;
     private final ByteBuffer buffer;
@@ -151,8 +154,8 @@ public class LoadBucket {
     }
 
     @Override
-    void doBucketOp(String keyName) throws IOException {
-      os = bucket.createKey(keyName, 0, ReplicationType.RATIS,
+    void doBucketOp(String key) throws IOException {
+      os = bucket.createKey(key, 0, ReplicationType.RATIS,
           ReplicationFactor.THREE, new HashMap<>());
     }
 
@@ -166,7 +169,9 @@ public class LoadBucket {
     }
   }
 
-  // Read file/key from bucket
+  /**
+   * Read file/key from bucket.
+   */
   public class ReadOp extends Op {
     private InputStream is;
     private final ByteBuffer buffer;
@@ -183,8 +188,8 @@ public class LoadBucket {
     }
 
     @Override
-    void doBucketOp(String keyName) throws IOException {
-      is = bucket.readKey(keyName);
+    void doBucketOp(String key) throws IOException {
+      is = bucket.readKey(key);
     }
 
     @Override
@@ -195,13 +200,13 @@ public class LoadBucket {
         int readLen = is.read(readBuffer);
 
         if (readLen < bufferCapacity) {
-          throw new IOException("Read mismatch, key:" + keyName +
+          throw new IOException("Read mismatch, " +
               " read data length:" + readLen + " is smaller than excepted:"
               + bufferCapacity);
         }
 
         if (!Arrays.equals(readBuffer, buffer.array())) {
-          throw new IOException("Read mismatch, key:" + keyName +
+          throw new IOException("Read mismatch," +
               " read data does not match the written data");
         }
       } finally {
@@ -210,7 +215,9 @@ public class LoadBucket {
     }
   }
 
-  // Delete file/key from bucket
+  /**
+   * Delete file/key from bucket.
+   */
   public class DeleteOp extends Op {
     DeleteOp(boolean fsOp, String keyName) {
       super(fsOp, keyName);
@@ -222,8 +229,8 @@ public class LoadBucket {
     }
 
     @Override
-    void doBucketOp(String keyName) throws IOException {
-      bucket.deleteKey(keyName);
+    void doBucketOp(String key) throws IOException {
+      bucket.deleteKey(key);
     }
 
     @Override
