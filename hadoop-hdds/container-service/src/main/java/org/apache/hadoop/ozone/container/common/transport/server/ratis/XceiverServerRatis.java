@@ -127,10 +127,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final int numWriteChunkThreads = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
+    final int queueLimit = conf.getInt(
+            OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
+            OzoneConfigKeys.
+                    DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
+    );
     chunkExecutor =
         new ThreadPoolExecutor(numWriteChunkThreads, numWriteChunkThreads,
             100, TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(1024),
+            new ArrayBlockingQueue<>(queueLimit),
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.context = context;
     this.replicationLevel =
@@ -734,6 +739,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   void notifyGroupAdd(RaftGroupId gid) {
     raftGids.add(gid);
+    sendPipelineReport();
   }
 
   void handleLeaderChangedNotification(RaftGroupMemberId groupMemberId,
@@ -745,9 +751,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     groupLeaderMap.put(groupMemberId.getGroupId(), leaderForGroup);
     if (context != null && leaderForGroup) {
       // Publish new report from leader
-      context.addReport(context.getParent().getContainer().getPipelineReport());
-      // Trigger HB immediately
-      context.getParent().triggerHeartbeat();
+      sendPipelineReport();
     }
+  }
+
+  private void sendPipelineReport() {
+    // TODO: Send IncrementalPipelineReport instead of full PipelineReport
+    context.addReport(context.getParent().getContainer().getPipelineReport());
+    context.getParent().triggerHeartbeat();
   }
 }

@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -79,8 +80,8 @@ public class TestStatisticsUpdate {
   @Test
   public void testStatisticsUpdate() throws Exception {
     //GIVEN
-    DatanodeDetails datanode1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails datanode2 = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
 
     String storagePath1 = GenericTestUtils.getRandomizedTempPath()
         .concat("/" + datanode1.getUuidString());

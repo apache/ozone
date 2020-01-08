@@ -42,7 +42,12 @@ public class AuditParser extends GenericCli {
   <.db file path> template <template name>
   <.db file path> query <custom sql>
    */
-  @Parameters(arity = "1..1", description = "Existing or new .db file")
+  @Parameters(arity = "1..1", description = "Existing or new .db file.\n" +
+      "The database contains only one table called audit defined as:\n" +
+      "audit (datetime text, level varchar(7), logger varchar(7), " +
+      "user text, ip text, op text, params text, result varchar(7), " +
+      "exception text, " +
+      "UNIQUE(datetime,level,logger,user,ip,op,params,result))")
   private String database;
 
   public static void main(String[] argv) throws Exception {

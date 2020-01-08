@@ -38,11 +38,11 @@ import javax.ws.rs.core.Context;
 import java.io.IOException;
 import java.net.URISyntaxException;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3TOKEN;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.apache.hadoop.ozone.s3.AWSAuthParser.AUTHORIZATION_HEADER;
 import static org.apache.hadoop.ozone.s3.AWSAuthParser.UTF_8;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.AUTH_PROTOCOL_NOT_SUPPORTED;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_TOKEN_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 
 /**
  * This class creates the OzoneClient for the Rest endpoints.
@@ -74,14 +74,14 @@ public class OzoneClientProducer {
   private OzoneClient getClient(OzoneConfiguration config) throws IOException {
     try {
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
-        LOG.debug("Creating s3 token for client.");
+        LOG.debug("Creating s3 auth info for client.");
         if (context.getHeaderString(AUTHORIZATION_HEADER).startsWith("AWS4")) {
           try {
             AWSV4AuthParser v4RequestParser = new AWSV4AuthParser(context);
             v4RequestParser.parse();
 
             OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
-            identifier.setTokenType(S3TOKEN);
+            identifier.setTokenType(S3AUTHINFO);
             identifier.setStrToSign(v4RequestParser.getStringToSign());
             identifier.setSignature(v4RequestParser.getSignature());
             identifier.setAwsAccessId(v4RequestParser.getAwsAccessId());
@@ -99,8 +99,8 @@ public class OzoneClientProducer {
             remoteUser.addToken(token);
             UserGroupInformation.setLoginUser(remoteUser);
           } catch (OS3Exception | URISyntaxException ex) {
-            LOG.error("S3 token creation failed.");
-            throw S3_TOKEN_CREATION_ERROR;
+            LOG.error("S3 auth info creation failed.");
+            throw S3_AUTHINFO_CREATION_ERROR;
           }
         } else {
           throw AUTH_PROTOCOL_NOT_SUPPORTED;

@@ -83,8 +83,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
     if (!setVolumePropertyRequest.hasOwnerName()) {
       omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
           .setSuccess(false);
-      return new OMVolumeSetOwnerResponse(null, null, null, null,
-          omResponse.build());
+      return new OMVolumeSetOwnerResponse(omResponse.build());
     }
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
@@ -112,7 +111,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
             volume, null, null);
       }
 
-
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();
 
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
@@ -120,8 +118,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       OzoneManagerProtocolProtos.UserVolumeInfo oldOwnerVolumeList = null;
       OzoneManagerProtocolProtos.UserVolumeInfo newOwnerVolumeList = null;
       OmVolumeArgs omVolumeArgs = null;
-
-
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
@@ -133,6 +129,17 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
             newOwner, volume);
         throw new OMException("Volume " + volume + " is not found",
             OMException.ResultCodes.VOLUME_NOT_FOUND);
+      }
+
+      // Check if this transaction is a replay of ratis logs.
+      // If this is a replay, then the response has already been returned to
+      // the client. So take no further action and return a dummy
+      // OMClientResponse.
+      if (isReplay(ozoneManager, omVolumeArgs.getUpdateID(),
+          transactionLogIndex)) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}",
+            transactionLogIndex, setVolumePropertyRequest);
+        return new OMVolumeSetOwnerResponse(createReplayOMResponse(omResponse));
       }
 
       oldOwner = omVolumeArgs.getOwnerName();
@@ -170,13 +177,12 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
       omResponse.setSetVolumePropertyResponse(
           SetVolumePropertyResponse.newBuilder().build());
-      omClientResponse = new OMVolumeSetOwnerResponse(oldOwner,
-          oldOwnerVolumeList, newOwnerVolumeList, omVolumeArgs,
-          omResponse.build());
+      omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build(),
+          oldOwner, oldOwnerVolumeList, newOwnerVolumeList, omVolumeArgs);
 
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMVolumeSetOwnerResponse(null, null, null, null,
+      omClientResponse = new OMVolumeSetOwnerResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {

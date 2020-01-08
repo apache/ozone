@@ -108,6 +108,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeResponse;
@@ -1662,5 +1664,42 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .collect(Collectors.toList()));
 
     return deletedKeyList;
+  }
+
+  @Override
+  public boolean recoverTrash(String volumeName, String bucketName,
+      String keyName, String destinationBucket) throws IOException {
+
+    Preconditions.checkArgument(Strings.isNullOrEmpty(volumeName),
+        "The volume name cannot be null or empty. " +
+        "Please enter a valid volume name.");
+
+    Preconditions.checkArgument(Strings.isNullOrEmpty(bucketName),
+        "The bucket name cannot be null or empty. " +
+        "Please enter a valid bucket name.");
+
+    Preconditions.checkArgument(Strings.isNullOrEmpty(keyName),
+        "The key name cannot be null or empty. " +
+        "Please enter a valid key name.");
+
+    Preconditions.checkArgument(Strings.isNullOrEmpty(destinationBucket),
+        "The destination bucket name cannot be null or empty. " +
+        "Please enter a valid destination bucket name.");
+
+    RecoverTrashRequest recoverRequest = RecoverTrashRequest.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDestinationBucket(destinationBucket)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.RecoverTrash)
+        .setRecoverTrashRequest(recoverRequest)
+        .build();
+
+    RecoverTrashResponse recoverResponse =
+        handleError(submitRequest(omRequest)).getRecoverTrashResponse();
+
+    return recoverResponse.getResponse();
   }
 }

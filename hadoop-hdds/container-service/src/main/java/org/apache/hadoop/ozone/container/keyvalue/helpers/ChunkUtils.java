@@ -34,13 +34,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.util.Time;
@@ -53,6 +51,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
+
 import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,7 +94,7 @@ public final class ChunkUtils {
    * @param sync whether to do fsync or not
    */
   public static void writeData(File chunkFile, ChunkInfo chunkInfo,
-      ByteBuffer data, VolumeIOStats volumeIOStats, boolean sync)
+      ChunkBuffer data, VolumeIOStats volumeIOStats, boolean sync)
       throws StorageContainerException, ExecutionException,
       InterruptedException, NoSuchAlgorithmException {
 
@@ -108,9 +107,10 @@ public final class ChunkUtils {
       try {
         file = FileChannel.open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
 
-        int size;
+        long size;
         try (FileLock ignored = file.lock()) {
-          size = file.write(data, chunkInfo.getOffset());
+          file.position(chunkInfo.getOffset());
+          size = data.writeTo(file);
         }
 
         // Increment volumeIO stats here.
@@ -141,7 +141,7 @@ public final class ChunkUtils {
   }
 
   public static int validateBufferSize(
-      ChunkInfo chunkInfo, ByteBuffer data)
+      ChunkInfo chunkInfo, ChunkBuffer data)
       throws StorageContainerException {
     final int bufferSize = data.remaining();
     if (bufferSize != chunkInfo.getLen()) {
@@ -284,18 +284,6 @@ public final class ChunkUtils {
     return (overWrite != null) &&
         (!overWrite.isEmpty()) &&
         (Boolean.valueOf(overWrite));
-  }
-
-  /**
-   * Returns a CreateContainer Response. This call is used by create and delete
-   * containers which have null success responses.
-   *
-   * @param msg Request
-   * @return Response.
-   */
-  public static ContainerCommandResponseProto getChunkResponseSuccess(
-      ContainerCommandRequestProto msg) {
-    return ContainerUtils.getSuccessResponse(msg);
   }
 
   @VisibleForTesting

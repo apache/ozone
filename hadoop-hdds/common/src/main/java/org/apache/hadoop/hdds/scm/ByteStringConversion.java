@@ -41,7 +41,7 @@ public final class ByteStringConversion {
    * @param config the Ozone configuration
    * @return the conversion function defined by
    *          {@link OzoneConfigKeys#OZONE_UNSAFEBYTEOPERATIONS_ENABLED}
-   * @see <pre>ByteBuffer</pre>
+   * @see ByteBuffer
    */
   public static Function<ByteBuffer, ByteString> createByteBufferConversion(
       Configuration config){
@@ -50,13 +50,15 @@ public final class ByteStringConversion {
             OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
             OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED_DEFAULT);
     if (unsafeEnabled) {
-      return buffer -> UnsafeByteOperations.unsafeWrap(buffer);
+      return UnsafeByteOperations::unsafeWrap;
     } else {
-      return buffer -> {
-        ByteString retval = ByteString.copyFrom(buffer);
-        buffer.flip();
-        return retval;
-      };
+      return ByteStringConversion::safeWrap;
     }
+  }
+
+  public static ByteString safeWrap(ByteBuffer buffer) {
+    ByteString retval = ByteString.copyFrom(buffer);
+    buffer.flip();
+    return retval;
   }
 }

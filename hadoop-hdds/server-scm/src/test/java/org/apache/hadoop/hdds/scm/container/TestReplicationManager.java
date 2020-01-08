@@ -54,10 +54,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.apache.hadoop.hdds.scm.TestUtils.createDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
-import static org.apache.hadoop.hdds.scm.TestUtils.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 
 /**
  * Test cases to verify the functionality of ReplicationManager.

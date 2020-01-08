@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -552,5 +553,34 @@ public final class HddsUtils {
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
         "Path should be a descendant of %s", ancestor);
+  }
+
+  public static String writeChunkToString(WriteChunkRequestProto wc,
+                                          long contId, String location) {
+    Preconditions.checkNotNull(wc);
+    StringBuilder builder = new StringBuilder();
+
+    builder.append("cmd=");
+    builder.append(ContainerProtos.Type.WriteChunk.toString());
+
+    builder.append(", container id=");
+    builder.append(contId);
+
+    builder.append(", blockid=");
+    builder.append(wc.getBlockID().getContainerID());
+    builder.append(":localid=");
+    builder.append(wc.getBlockID().getLocalID());
+
+    builder.append(", chunk=");
+    builder.append(wc.getChunkData().getChunkName());
+    builder.append(":offset=");
+    builder.append(wc.getChunkData().getOffset());
+    builder.append(":length=");
+    builder.append(wc.getChunkData().getLen());
+
+    builder.append(", container path=");
+    builder.append(location);
+
+    return builder.toString();
   }
 }

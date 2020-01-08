@@ -34,7 +34,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 /**
  * Unit tests for {@link OmUtils}.
@@ -76,6 +79,38 @@ public class TestOmUtils {
       IOUtils.closeStream(fis);
       IOUtils.closeStream(fos);
     }
+  }
+
+  @Test
+  public void createOMDirCreatesDirectoryIfNecessary() throws IOException {
+    File parent = folder.newFolder();
+    File omDir = new File(new File(parent, "sub"), "dir");
+    assertFalse(omDir.exists());
+
+    OmUtils.createOMDir(omDir.getAbsolutePath());
+
+    assertTrue(omDir.exists());
+  }
+
+  @Test
+  public void createOMDirDoesNotThrowIfAlreadyExists() throws IOException {
+    File omDir = folder.newFolder();
+    assertTrue(omDir.exists());
+
+    OmUtils.createOMDir(omDir.getAbsolutePath());
+
+    assertTrue(omDir.exists());
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void createOMDirThrowsIfCannotCreate() throws IOException {
+    File parent = folder.newFolder();
+    File omDir = new File(new File(parent, "sub"), "dir");
+    assumeTrue(parent.setWritable(false, false));
+
+    OmUtils.createOMDir(omDir.getAbsolutePath());
+
+    // expecting exception
   }
 
 }

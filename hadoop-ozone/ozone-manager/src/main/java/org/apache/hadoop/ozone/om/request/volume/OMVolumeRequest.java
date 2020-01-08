@@ -140,4 +140,24 @@ public abstract class OMVolumeRequest extends OMClientRequest {
         new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
   }
 
+  /**
+   * Return volume info for the specified volume. This method should be
+   * called after acquiring volume lock.
+   * @param omMetadataManager
+   * @param volume
+   * @return OmVolumeArgs
+   * @throws IOException
+   */
+  protected OmVolumeArgs getVolumeInfo(OMMetadataManager omMetadataManager,
+      String volume) throws IOException {
+
+    String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
+    OmVolumeArgs volumeArgs =
+        omMetadataManager.getVolumeTable().get(dbVolumeKey);
+    if (volumeArgs == null) {
+      throw new OMException("Volume " + volume + " is not found",
+          OMException.ResultCodes.VOLUME_NOT_FOUND);
+    }
+    return volumeArgs;
+  }
 }

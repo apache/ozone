@@ -84,6 +84,11 @@ public class ContainerDBServiceProviderImpl
     initializeTables(dbStore);
   }
 
+  @Override
+  public void stop() throws Exception {
+    containerDbStore.close();
+  }
+
   /**
    * Initialize a new container DB instance, getting rid of the old instance
    * and then storing the passed in container prefix counts into the created

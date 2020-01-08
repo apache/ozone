@@ -78,6 +78,7 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.mockito.Mockito.mock;
 
 import java.io.File;
@@ -154,7 +155,7 @@ public class TestEndPoint {
     OzoneConfiguration conf = SCMTestUtils.getConf();
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, 1000)) {
-      DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(
           datanodeDetails, conf, getContext(datanodeDetails), null);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
@@ -183,7 +184,7 @@ public class TestEndPoint {
         serverAddress, 1000)) {
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
           .captureLogs(VersionEndpointTask.LOG);
-      DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(
           datanodeDetails, conf, getContext(datanodeDetails), null);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
@@ -237,7 +238,7 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         nonExistentServerAddress, 1000)) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-      DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(
           datanodeDetails, conf, getContext(datanodeDetails), null);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
@@ -265,7 +266,7 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, (int) rpcTimeout)) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-      DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
       OzoneContainer ozoneContainer = new OzoneContainer(
           datanodeDetails, conf, getContext(datanodeDetails), null);
       VersionEndpointTask versionTask = new VersionEndpointTask(rpcEndPoint,
@@ -284,7 +285,7 @@ public class TestEndPoint {
 
   @Test
   public void testRegister() throws Exception {
-    DatanodeDetails nodeToRegister = TestUtils.randomDatanodeDetails();
+    DatanodeDetails nodeToRegister = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint = createEndpoint(
         SCMTestUtils.getConf(), serverAddress, 1000)) {
       SCMRegisteredResponseProto responseProto = rpcEndPoint.getEndPoint()
@@ -328,7 +329,7 @@ public class TestEndPoint {
         new RegisterEndpointTask(rpcEndPoint, conf, ozoneContainer,
             mock(StateContext.class));
     if (!clearDatanodeDetails) {
-      DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+      DatanodeDetails datanodeDetails = randomDatanodeDetails();
       endpointTask.setDatanodeDetails(datanodeDetails);
     }
     endpointTask.call();
@@ -381,7 +382,7 @@ public class TestEndPoint {
 
   @Test
   public void testHeartbeat() throws Exception {
-    DatanodeDetails dataNode = TestUtils.randomDatanodeDetails();
+    DatanodeDetails dataNode = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint =
              createEndpoint(SCMTestUtils.getConf(),
                  serverAddress, 1000)) {
@@ -400,7 +401,7 @@ public class TestEndPoint {
 
   @Test
   public void testHeartbeatWithCommandStatusReport() throws Exception {
-    DatanodeDetails dataNode = TestUtils.randomDatanodeDetails();
+    DatanodeDetails dataNode = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint =
         createEndpoint(SCMTestUtils.getConf(),
             serverAddress, 1000)) {
@@ -482,11 +483,11 @@ public class TestEndPoint {
 
     // Create a datanode state machine for stateConext used by endpoint task
     try (DatanodeStateMachine stateMachine = new DatanodeStateMachine(
-        TestUtils.randomDatanodeDetails(), conf, null, null);
+        randomDatanodeDetails(), conf, null, null);
          EndpointStateMachine rpcEndPoint =
             createEndpoint(conf, scmAddress, rpcTimeout)) {
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto =
-          TestUtils.randomDatanodeDetails().getProtoBufMessage();
+          randomDatanodeDetails().getProtoBufMessage();
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
 
       final StateContext stateContext =

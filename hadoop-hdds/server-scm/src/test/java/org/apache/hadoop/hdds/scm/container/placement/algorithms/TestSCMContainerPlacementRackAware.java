@@ -24,8 +24,8 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
@@ -97,7 +97,7 @@ public class TestSCMContainerPlacementRackAware {
     String hostname = "node";
     for (int i = 0; i < datanodeCount; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeDetails node = TestUtils.createDatanodeDetails(
+      DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails(
           hostname + i, rack + (i / NODE_PER_RACK));
       datanodes.add(node);
       cluster.add(node);
@@ -354,7 +354,7 @@ public class TestSCMContainerPlacementRackAware {
         new NetworkTopologyImpl(NodeSchemaManager.getInstance());
     for (int i = 0; i < 15; i++) {
       // Totally 3 racks, each has 5 datanodes
-      DatanodeDetails node = TestUtils.createDatanodeDetails(
+      DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails(
           hostname + i, null);
       dataList.add(node);
       clusterMap.add(node);

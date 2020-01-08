@@ -74,6 +74,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
+
 /**
  * Ozone Container dispatcher takes a call from the netty server and routes it
  * to the right handler function.
@@ -273,7 +276,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       if (!msg.hasCreateContainer()) {
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception("MALFORMED_REQUEST"));
-        return ContainerUtils.malformedRequest(msg);
+        return malformedRequest(msg);
       }
       containerType = msg.getCreateContainer().getContainerType();
     }
@@ -359,7 +362,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       // log failure
       audit(action, eventType, params, AuditEventStatus.FAILURE,
           new Exception("UNSUPPORTED_REQUEST"));
-      return ContainerUtils.unsupportedRequest(msg);
+      return unsupportedRequest(msg);
     }
   }
 

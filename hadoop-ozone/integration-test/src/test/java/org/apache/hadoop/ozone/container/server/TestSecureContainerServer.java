@@ -27,13 +27,14 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
@@ -43,7 +44,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
@@ -123,7 +123,7 @@ public class TestSecureContainerServer {
 
   @Test
   public void testClientServer() throws Exception {
-    DatanodeDetails dd = TestUtils.randomDatanodeDetails();
+    DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
     ContainerSet containerSet = new ContainerSet();
     ContainerController controller = new ContainerController(
         containerSet, null);
@@ -215,7 +215,7 @@ public class TestSecureContainerServer {
     final List<XceiverServerSpi> servers = new ArrayList<>();
     XceiverClientSpi client = null;
     final Pipeline pipeline =
-        ContainerTestHelper.createPipeline(numDatanodes);
+        MockPipeline.createPipeline(numDatanodes);
     try {
       initConf.accept(pipeline, CONF);
 

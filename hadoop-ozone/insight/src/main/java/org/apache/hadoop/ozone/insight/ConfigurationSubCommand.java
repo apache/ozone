@@ -51,16 +51,18 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
         "Configuration for `" + insightName + "` (" + insight.getDescription()
             + ")");
     System.out.println();
-    for (Class clazz : insight.getConfigurationClasses()) {
-      showConfig(clazz);
 
+    Type type = Type.valueOf(insightName.split("\\.")[0].toUpperCase());
+
+    for (Class clazz : insight.getConfigurationClasses()) {
+      showConfig(clazz, type);
     }
     return null;
   }
 
-  private void showConfig(Class clazz) {
+  private void showConfig(Class clazz, Type type) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.addResource(getHost(conf, new Component(Type.SCM)) + "/conf");
+    conf.addResource(getHost(conf, new Component(type)) + "/conf");
     ConfigGroup configGroup =
         (ConfigGroup) clazz.getAnnotation(ConfigGroup.class);
     if (configGroup == null) {
