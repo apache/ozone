@@ -49,7 +49,11 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V1;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -57,6 +61,7 @@ import static org.mockito.Mockito.mock;
 /**
  * This class is used to test ChunkManager operations.
  */
+// TODO split: some tests specific to V1, some apply to both V1 and V2
 public class TestChunkManagerImpl {
 
   private OzoneConfiguration config;

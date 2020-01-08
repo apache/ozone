@@ -24,7 +24,9 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
@@ -91,4 +93,8 @@ public interface ChunkManager {
     // if applicable
   }
 
+  default void finishWriteChunk(KeyValueContainer kvContainer, String chunkName)
+      throws IOException {
+    // no-op
+  }
 }

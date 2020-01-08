@@ -406,12 +406,15 @@ public class KeyValueHandler extends Handler {
     try {
       checkContainerOpen(kvContainer);
 
-      BlockData blockData = BlockData.getFromProtoBuf(
-          request.getPutBlock().getBlockData());
+      ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
+      BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
+      for (ContainerProtos.ChunkInfo chunk : data.getChunksList()) {
+        chunkManager.finishWriteChunk(kvContainer, chunk.getChunkName());
+      }
       blockManager.putBlock(kvContainer, blockData);
 
       blockDataProto = blockData.getProtoBufMessage();
@@ -755,6 +758,7 @@ public class KeyValueHandler extends Handler {
       // here. There is no need to maintain this info in openContainerBlockMap.
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
+      chunkManager.finishWriteChunk(kvContainer, chunkInfo.getChunkName());
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();
       chunks.add(chunkInfoProto);

@@ -21,11 +21,11 @@ import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
@@ -37,20 +37,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.security.NoSuchAlgorithmException;
-import java.util.concurrent.ExecutionException;
+import java.nio.channels.FileChannel;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .Result.CONTAINER_INTERNAL_ERROR;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V2;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMBINED;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.WRITE_DATA;
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.writeData;
 
 /**
  * This class is for performing chunk related operations.
@@ -61,6 +62,7 @@ public class ChunkManagerV2 implements ChunkManager {
       LoggerFactory.getLogger(ChunkManagerV2.class);
 
   private final boolean doSyncWrite;
+  private final OpenFiles files = new OpenFiles();
 
   ChunkManagerV2(boolean sync) {
     doSyncWrite = sync;
@@ -86,35 +88,29 @@ public class ChunkManagerV2 implements ChunkManager {
       return;
     }
 
-    try {
-      KeyValueContainerData containerData = (KeyValueContainerData) container
-          .getContainerData();
+    KeyValueContainerData containerData = (KeyValueContainerData) container
+        .getContainerData();
 
-      long len = info.getLen();
-      if (stage == WRITE_DATA || stage == COMBINED) {
-        long offset = info.getOffset();
-        File chunkFile = getChunkFile(info, containerData);
-        validateChunkFileSize(info, chunkFile);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Writing chunk {} in stage {} to file {}",
-              info, stage, chunkFile);
-        }
-
-        HddsVolume volume = containerData.getVolume();
-        VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
-
-        writeData(chunkFile, data, offset, len, volumeIOStats, doSyncWrite);
+    long len = info.getLen();
+    if (stage == WRITE_DATA || stage == COMBINED) {
+      long offset = info.getOffset();
+      File chunkFile = getChunkFile(containerData, info.getChunkName());
+      validateChunkFileSize(info, chunkFile);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Writing chunk {} in stage {} to file {}",
+            info, stage, chunkFile);
       }
-      if (stage == COMMIT_DATA || stage == COMBINED) {
-        containerData.updateWriteStats(len, false);
-      }
-    } catch (NoSuchAlgorithmException ex) {
-      wrapInStorageContainerException(ex, NO_SUCH_ALGORITHM);
-    } catch (ExecutionException ex) {
-      wrapInStorageContainerException(ex, CONTAINER_INTERNAL_ERROR);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      wrapInStorageContainerException(e, CONTAINER_INTERNAL_ERROR);
+
+      HddsVolume volume = containerData.getVolume();
+      VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
+
+      FileChannel channel = files.getChannel(chunkFile, doSyncWrite);
+      ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, len,
+          volumeIOStats);
+    }
+
+    if (stage == COMMIT_DATA || stage == COMBINED) {
+      containerData.updateWriteStats(len, false);
     }
   }
 
@@ -150,7 +146,7 @@ public class ChunkManagerV2 implements ChunkManager {
     HddsVolume volume = containerData.getVolume();
     VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
-    File chunkFile = getChunkFile(info, containerData);
+    File chunkFile = getChunkFile(containerData, info.getChunkName());
 
     long len = info.getLen();
     long offset = info.getOffset();
@@ -170,7 +166,7 @@ public class ChunkManagerV2 implements ChunkManager {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
-    File chunkFile = getChunkFile(info, containerData);
+    File chunkFile = getChunkFile(containerData, info.getChunkName());
 
     // if the chunk file does not exist, it might have already been deleted.
     // The call might be because of reapply of transactions on datanode
@@ -192,14 +188,64 @@ public class ChunkManagerV2 implements ChunkManager {
     }
   }
 
-  private static File getChunkFile(
-      ChunkInfo info, KeyValueContainerData containerData) {
-    return new File(containerData.getChunksPath(), info.getChunkName());
+  @Override
+  public void finishWriteChunk(KeyValueContainer kvContainer,
+      String chunkName) throws IOException {
+    File chunkFile = getChunkFile(kvContainer.getContainerData(), chunkName);
+    files.close(chunkFile);
   }
 
-  private static void wrapInStorageContainerException(Exception ex,
-      ContainerProtos.Result result) throws StorageContainerException {
-    throw new StorageContainerException("Internal error: ", ex, result);
+  private static File getChunkFile(
+      KeyValueContainerData containerData, String chunkName) {
+    return new File(containerData.getChunksPath(), chunkName);
+  }
+
+  private static final class OpenFiles {
+
+    private final Map<String, OpenFile> files = new HashMap<>();
+
+    public FileChannel getChannel(File file, boolean sync) {
+      return files.computeIfAbsent(file.getAbsolutePath(),
+          any -> open(file, sync)).getChannel();
+    }
+
+    private static OpenFile open(File file, boolean sync) {
+      try {
+        return new OpenFile(file, sync);
+      } catch (FileNotFoundException e) {
+        throw new UncheckedIOException(e);
+      }
+    }
+
+    public void close(File chunkFile) throws IOException {
+      OpenFile openFile = files.remove(chunkFile.getAbsolutePath());
+      if (openFile != null) {
+        LOG.debug("Closing file {}", chunkFile);
+        openFile.close();
+      } else {
+        LOG.debug("File {} not open", chunkFile);
+      }
+    }
+  }
+
+  private static final class OpenFile {
+
+    private final RandomAccessFile file;
+    private final Instant openedAt;
+
+    private OpenFile(File file, boolean sync) throws FileNotFoundException {
+      String mode = sync ? "rws" : "rw";
+      this.file = new RandomAccessFile(file, mode);
+      this.openedAt = Instant.now();
+    }
+
+    public FileChannel getChannel() {
+      return file.getChannel();
+    }
+
+    public void close() throws IOException {
+      file.close();
+    }
   }
 
 }

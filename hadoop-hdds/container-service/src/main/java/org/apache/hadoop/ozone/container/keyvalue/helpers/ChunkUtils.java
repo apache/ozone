@@ -19,7 +19,9 @@
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -32,7 +34,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
+import java.util.function.Supplier;
+import java.util.function.ToLongFunction;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -51,10 +54,10 @@ import static java.util.Collections.unmodifiableSet;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_WRITE_SIZE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
 
-import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,42 +100,72 @@ public final class ChunkUtils {
    */
   public static void writeData(File file, ChunkBuffer data,
       long offset, long len, VolumeIOStats volumeIOStats, boolean sync)
-      throws StorageContainerException, ExecutionException,
-      InterruptedException, NoSuchAlgorithmException {
+      throws StorageContainerException {
+
+    writeData(data, file.getName(), offset, len, volumeIOStats,
+        d -> writeDataToFile(file, d, offset, sync));
+  }
+
+  public static void writeData(FileChannel file, String filename,
+      ChunkBuffer data, long offset, long len, VolumeIOStats volumeIOStats
+  ) throws StorageContainerException {
+
+    writeData(data, filename, offset, len, volumeIOStats,
+        d -> writeDataToChannel(file, d, offset));
+  }
+
+  private static void writeData(ChunkBuffer data, String filename,
+      long offset, long len, VolumeIOStats volumeIOStats,
+      ToLongFunction<ChunkBuffer> writer) throws StorageContainerException {
 
     validateBufferSize(len, data.remaining());
 
-    final Path path = file.toPath();
     final long startTime = Time.monotonicNow();
+    final long bytesWritten;
+    try {
+      bytesWritten = writer.applyAsLong(data);
+    } catch (UncheckedIOException e) {
+      throw wrapInStorageContainerException(e.getCause());
+    }
 
-    long bytesWritten = processFileExclusively(path, () -> {
-      FileChannel channel = null;
-      try {
-        channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
-
-        try (FileLock ignored = channel.lock()) {
-          channel.position(offset);
-          return data.writeTo(channel);
-        }
-      } catch (StorageContainerException ex) {
-        throw ex;
-      } catch (IOException e) {
-        throw new StorageContainerException(e, IO_EXCEPTION);
-      } finally {
-        closeFile(channel, sync);
-      }
-    });
-
-    // Increment volumeIO stats here.
-    long endTime = Time.monotonicNow();
+    final long endTime = Time.monotonicNow();
     volumeIOStats.incWriteTime(endTime - startTime);
     volumeIOStats.incWriteOpCount();
     volumeIOStats.incWriteBytes(bytesWritten);
 
     LOG.debug("Written {} bytes at offset {} to {}",
-        bytesWritten, offset, file);
+        bytesWritten, offset, filename);
 
     validateWriteSize(len, bytesWritten);
+  }
+
+  private static long writeDataToFile(File file, ChunkBuffer data,
+      long offset, boolean sync) {
+    final Path path = file.toPath();
+    return processFileExclusively(path, () -> {
+      FileChannel channel = null;
+      try {
+        channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
+
+        try (FileLock ignored = channel.lock()) {
+          return writeDataToChannel(channel, data, offset);
+        }
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      } finally {
+        closeFile(channel, sync);
+      }
+    });
+  }
+
+  private static long writeDataToChannel(FileChannel channel, ChunkBuffer data,
+      long offset) {
+    try {
+      channel.position(offset);
+      return data.writeTo(channel);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   /**
@@ -146,18 +179,21 @@ public final class ChunkUtils {
 
     final Path path = file.toPath();
     final long startTime = Time.monotonicNow();
+    final long bytesRead;
 
-    long bytesRead = processFileExclusively(path, () -> {
-      try (FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES);
-           FileLock ignored = channel.lock(offset, len, true)) {
+    try {
+      bytesRead = processFileExclusively(path, () -> {
+        try (FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES);
+             FileLock ignored = channel.lock(offset, len, true)) {
 
-        return channel.read(buf, offset);
-      } catch (NoSuchFileException e) {
-        throw new StorageContainerException(e, UNABLE_TO_FIND_CHUNK);
-      } catch (IOException e) {
-        throw new StorageContainerException(e, IO_EXCEPTION);
-      }
-    });
+          return channel.read(buf, offset);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      });
+    } catch (UncheckedIOException e) {
+      throw wrapInStorageContainerException(e.getCause());
+    }
 
     // Increment volumeIO stats here.
     long endTime = Time.monotonicNow();
@@ -257,9 +293,7 @@ public final class ChunkUtils {
   }
 
   @VisibleForTesting
-  static <T, E extends Exception> T processFileExclusively(
-      Path path, CheckedSupplier<T, E> op
-  ) throws E {
+  static <T> T processFileExclusively(Path path, Supplier<T> op) {
     for (;;) {
       if (LOCKS.add(path)) {
         break;
@@ -273,8 +307,7 @@ public final class ChunkUtils {
     }
   }
 
-  private static void closeFile(FileChannel file, boolean sync)
-      throws StorageContainerException {
+  private static void closeFile(FileChannel file, boolean sync) {
     if (file != null) {
       try {
         if (sync) {
@@ -283,8 +316,7 @@ public final class ChunkUtils {
         }
         file.close();
       } catch (IOException e) {
-        throw new StorageContainerException("Error closing chunk file",
-            e, CONTAINER_INTERNAL_ERROR);
+        throw new UncheckedIOException(e);
       }
     }
   }
@@ -314,4 +346,28 @@ public final class ChunkUtils {
       throw new StorageContainerException(err, code);
     }
   }
+
+  private static StorageContainerException wrapInStorageContainerException(
+      IOException e) {
+    ContainerProtos.Result result = translate(e);
+    return new StorageContainerException(e, result);
+  }
+
+  private static ContainerProtos.Result translate(Exception cause) {
+    if (cause instanceof FileNotFoundException ||
+        cause instanceof NoSuchFileException) {
+      return UNABLE_TO_FIND_CHUNK;
+    }
+
+    if (cause instanceof IOException) {
+      return IO_EXCEPTION;
+    }
+
+    if (cause instanceof NoSuchAlgorithmException) {
+      return NO_SUCH_ALGORITHM;
+    }
+
+    return CONTAINER_INTERNAL_ERROR;
+  }
+
 }
