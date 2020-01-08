@@ -25,7 +25,7 @@ weight: 10
  * AWS CLI（可选）
 {{< /requirements >}}
 
-# 单容器 Ozone
+# 单容器全家桶 Ozone
 
 启动一个 all-in-one 的 ozone 容器最简单的方法就是使用 Docker Hub 最新的 docker 镜像：
 
@@ -62,7 +62,7 @@ docker-compose up -d
 
 集群启动就绪后，你可以连接 SCM 的 UI 来验证它的状态，地址为（[http://localhost:9876](http://localhost:9876)）。
 
-S3 网关的端口为 9878，如果你在用 S3 工作，可以考虑使用 Ozone 的 S3 功能。
+S3 网关的端口为 9878，如果你正在使用 S3 作为存储方案，可以考虑 Ozone 的 S3 功能。
 
 
 从命令行创建桶的命令为：
