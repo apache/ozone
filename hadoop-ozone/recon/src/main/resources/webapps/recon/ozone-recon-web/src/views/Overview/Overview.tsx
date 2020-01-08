@@ -17,11 +17,12 @@
  */
 
 import React from 'react';
-import {Row, Col} from 'antd';
+import {Row, Col, Icon} from 'antd';
 import OverviewCard from 'components/OverviewCard/OverviewCard';
 import axios from 'axios';
 import prettyBytes from 'pretty-bytes';
 import './Overview.less';
+import {getCapacityPercent} from "../../utils/common";
 
 interface OverviewState {
   loading: boolean;
@@ -58,7 +59,7 @@ export class Overview extends React.Component<any, OverviewState> {
     });
     axios.get('/api/v1/stats').then(response => {
       const stats = response.data;
-      const clusterUsedPercent = Math.round((stats.capacity.used / stats.capacity.total) * 100);
+      const clusterUsedPercent = getCapacityPercent(stats.capacity.used, stats.capacity.total);
       this.setState({
         loading: false,
         datanodes: `${stats.datanodes.healthy}/${stats.datanodes.total}`,
@@ -75,11 +76,14 @@ export class Overview extends React.Component<any, OverviewState> {
 
   render() {
     const {loading, datanodes, pipelines, clusterCapacity, clusterUsedPercent, containers, volumes, buckets, keys} = this.state;
+    const datanodesElement = <span>
+      <Icon type="check-circle" theme="filled" className="icon-success icon-small"/> {datanodes} <span className="ant-card-meta-description meta">HEALTHY</span>
+    </span>;
     return (
         <div className="overview-content">
           <Row gutter={[25, 25]}>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-              <OverviewCard loading={loading} title={"Datanodes"} data={datanodes} icon={"cluster"} hoverable={true}
+              <OverviewCard loading={loading} title={"Datanodes"} data={datanodesElement} icon={"cluster"} hoverable={true}
                             linkToUrl="/Datanodes"/>
             </Col>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React from 'react';
+import React, {ReactElement} from 'react';
 import {Icon, Card, Row, Col, Progress} from 'antd';
 import {withRouter, Link} from 'react-router-dom';
 import {RouteComponentProps} from 'react-router';
@@ -26,7 +26,7 @@ const {Meta} = Card;
 
 interface OverviewCardProps extends RouteComponentProps<any> {
   icon: string;
-  data: string;
+  data: string | ReactElement;
   title: string;
   hoverable?: boolean;
   loading?: boolean;
