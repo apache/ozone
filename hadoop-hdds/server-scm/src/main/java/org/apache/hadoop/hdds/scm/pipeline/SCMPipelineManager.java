@@ -192,7 +192,6 @@ public class SCMPipelineManager implements PipelineManager {
       return pipeline;
     } catch (IOException ex) {
       metrics.incNumPipelineCreationFailed();
-      LOG.error("Pipeline creation failed.", ex);
       throw ex;
     } finally {
       lock.writeLock().unlock();
