@@ -140,7 +140,7 @@ public class SCMConnectionManager
    */
   public void addReconServer(InetSocketAddress address) throws IOException {
     LOG.info("Adding Recon Server : {}", address.toString());
-    addSCMServer(address, 10000, true);
+    addSCMServer(address, 60000, true);
   }
 
   /**
