@@ -16,46 +16,4 @@
  * limitations under the License.
  */
 
-@import "./components/NavBar/NavBar.less";
-
-.ant-layout-header {
-  padding: 0 20px;
-  height: 50px;
-  line-height: 50px;
-  background: #FFF;
-}
-
-.content-layout {
-  margin-left: 200px;
-  &.sidebar-collapsed {
-    margin-left: @sidebar-collapsed-width;
-  }
-}
-
-.page-header {
-  padding: 10px 0;
-  font-size: 20px;
-  font-weight: 500;
-}
-
-.content-div {
-  padding: 24px;
-  background-color: #FFF;
-  min-height: 80vh;
-}
-
-body {
-  font-family: 'Roboto', sans-serif;
-}
-
-.icon-warning {
-  color: #e49f00;
-}
-
-.icon-success {
-  color: #1da57a;
-}
-
-.icon-failure {
-  color: #f83437;
-}
+export const getCapacityPercent = (used: number, total: number) => Math.round((used / total) * 100);
