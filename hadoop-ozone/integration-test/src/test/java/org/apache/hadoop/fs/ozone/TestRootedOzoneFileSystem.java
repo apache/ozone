@@ -54,7 +54,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Ozone file system tests that are not covered by contract tests.
  */
-public class TestOFileSystem {
+public class TestRootedOzoneFileSystem {
 
   @Rule
   public Timeout globalTimeout = new Timeout(300_000);
@@ -62,7 +62,7 @@ public class TestOFileSystem {
   private static MiniOzoneCluster cluster = null;
 
   private static FileSystem fs;
-  private static OFileSystem ofs;
+  private static RootedOzoneFileSystem ofs;
 
   private static ObjectStore objectStore;
 
@@ -93,10 +93,10 @@ public class TestOFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // TODO: FileSystem#loadFileSystems is not loading ofs:// class by default
     //  hence this workaround. Might need to add some config in hadoop source.
-    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.OFileSystem");
+    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
 //    GenericTestUtils.setRootLogLevel(Level.TRACE);
     fs = FileSystem.get(conf);
-    ofs = (OFileSystem) fs;
+    ofs = (RootedOzoneFileSystem) fs;
   }
 
   @After
@@ -110,10 +110,10 @@ public class TestOFileSystem {
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.OFileSystem"); // TODO
+    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem"); // TODO
     assertEquals(
         FileSystem.getFileSystemClass(OzoneConsts.OZONE_OFS_URI_SCHEME,
-            conf), OFileSystem.class);
+            conf), RootedOzoneFileSystem.class);
   }
 
   @Test
@@ -226,7 +226,7 @@ public class TestOFileSystem {
    * user has appropriate permissions.
    */
   @Test
-  public void testMkdirOnNonExistentVolumeAndBucket() throws Exception {
+  public void testMkdirOnNonExistentVolumeBucket() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = "bucket-" + RandomStringUtils.randomNumeric(5);
     Path root = new Path("/" + volumeNameLocal + "/" + bucketNameLocal);

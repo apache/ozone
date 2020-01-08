@@ -67,9 +67,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class BasicOFileSystem extends FileSystem {
+public class BasicRootedOzoneFileSystem extends FileSystem {
   static final Logger LOG =
-      LoggerFactory.getLogger(BasicOFileSystem.class);
+      LoggerFactory.getLogger(BasicRootedOzoneFileSystem.class);
 
   /**
    * The Ozone client for connecting to Ozone server.
@@ -78,13 +78,13 @@ public class BasicOFileSystem extends FileSystem {
   private URI uri;
   private String userName;
   private Path workingDir;
-  private String gOmHost;
-  private int gOmPort;
-  private Configuration gConf;
-  private boolean gIsolatedClassloader;
+//  private String gOmHost;
+//  private int gOmPort;
+//  private Configuration gConf;
+//  private boolean gIsolatedClassloader;
 
-  private OzoneClientAdapter adapter;
-  private String adapterPath;
+  private RootedOzoneClientAdapter adapter;
+//  private String adapterPath;
 
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
@@ -107,18 +107,18 @@ public class BasicOFileSystem extends FileSystem {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
-    this.gConf = conf;
-    gOmHost = null;
-    gOmPort = -1;
+//    this.gConf = conf;
+    String omHost = null;
+    int omPort = -1;
     // Parse hostname and port
     String[] parts = authority.split(":");
     if (parts.length > 2) {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
-    gOmHost = parts[0];
+    omHost = parts[0];
     if (parts.length == 2) {
       try {
-        gOmPort = Integer.parseInt(parts[1]);
+        omPort = Integer.parseInt(parts[1]);
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
       }
@@ -133,17 +133,16 @@ public class BasicOFileSystem extends FileSystem {
       //isolated is the default for ozonefs-lib-legacy which includes the
       // /ozonefs.txt, otherwise the default is false. It could be overridden.
       boolean defaultValue =
-          BasicOFileSystem.class.getClassLoader()
+          BasicRootedOzoneFileSystem.class.getClassLoader()
               .getResource("ozonefs.txt") != null;
 
       //Use string here instead of the constant as constant may not be available
       //on the classpath of a hadoop 2.7
-      gIsolatedClassloader =
+      boolean isolatedClassloader =
           conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
 
       // adapter should be initialized in operations.
-      this.adapter = null;
-      this.adapterPath = null;
+      this.adapter = createAdapter(conf, omHost, omPort, isolatedClassloader);
 
       try {
         this.userName =
@@ -160,39 +159,37 @@ public class BasicOFileSystem extends FileSystem {
     }
   }
 
-  /**
-   * Check path and create client adapter accordingly.
-   * @param ofsPath
-   * @throws IOException
-   */
-  protected void checkAndCreateAdapter(OFSPath ofsPath) throws IOException {
-    // Check if an adapter is already initialized.
-    if (this.adapter != null) {
-      // Sanity check.
-      assert(this.adapterPath != null);
-      // Close the existing adapter.
-      // TODO: do so only when volume/bucket changed from previous op for perf.
-      this.adapter.close();
-      this.adapter = null;
-      this.adapterPath = null;
-    }
-    this.adapterPath = ofsPath.getNonKeyParts();
-    this.adapter = createAdapter(this.gConf, this.gOmHost, this.gOmPort,
-        this.gIsolatedClassloader);
-  }
+//  /**
+//   * Check path and create client adapter accordingly.
+//   * @param ofsPath
+//   * @throws IOException
+//   */
+//  protected void checkAndCreateAdapter(OFSPath ofsPath) throws IOException {
+//    // Check if an adapter is already initialized.
+//    if (this.adapter != null) {
+//      // Sanity check.
+//      assert(this.adapterPath != null);
+//      // Close the existing adapter.
+//      // TODO: do so only when volume/bucket changed from previous op for perf.
+//      this.adapter.close();
+//      this.adapter = null;
+//      this.adapterPath = null;
+//    }
+//    this.adapterPath = ofsPath.getNonKeyParts();
+//    this.adapter = createAdapter(this.gConf, this.gOmHost, this.gOmPort,
+//        this.gIsolatedClassloader);
+//  }
 
-  protected OzoneClientAdapter createAdapter(Configuration conf,
+  protected RootedOzoneClientAdapter createAdapter(Configuration conf,
       String omHost, int omPort, boolean isolatedClassloader)
       throws IOException {
 
     if (isolatedClassloader) {
       // TODO: Check how this code path need to be changed, for legacy Hadoop?
-      //  Set volume and bucket to null for the time being. May need to copy
-      //  OzoneClientAdapterFactory class and modify as well?
-      return OzoneClientAdapterFactory.createAdapter(null, null);
+      return RootedOzoneClientAdapterFactory.createAdapter();
     } else {
       // Using OFS adapter.
-      return new BasicOzoneClientOFSAdapterImpl(omHost, omPort, conf);
+      return new BasicRootedOzoneClientAdapterImpl(omHost, omPort, conf);
     }
   }
 
@@ -222,7 +219,7 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_OPEN);
     statistics.incrementReadOps(1);
     LOG.trace("open() path:{}", f);
-    checkAndCreateAdapter(new OFSPath(f.toUri().getPath()));
+//    checkAndCreateAdapter(new OFSPath(f));
     final String key = pathToKey(f);
     return new FSDataInputStream(
         new OzoneFSInputStream(adapter.readFile(key), statistics));
@@ -238,7 +235,7 @@ public class BasicOFileSystem extends FileSystem {
       short replication, long blockSize,
       Progressable progress) throws IOException {
     LOG.trace("create() path:{}", f);
-    checkAndCreateAdapter(new OFSPath(f.toUri().getPath()));
+//    checkAndCreateAdapter(new OFSPath(f));
     incrementCounter(Statistic.INVOCATION_CREATE);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
@@ -279,13 +276,11 @@ public class BasicOFileSystem extends FileSystem {
     RenameIterator(Path srcPath, Path dstPath)
         throws IOException {
       super(srcPath);
-      // src and dst must share the same adapter.
-      // Sanity check should have been done in caller.
-      OFSPath ofsPath = new OFSPath(srcPath.toString());
-      checkAndCreateAdapter(ofsPath);
+//      OFSPath ofsPath = new OFSPath(srcPath.toString());
+//      checkAndCreateAdapter(ofsPath);
       srcKey = pathToKey(srcPath);
       dstKey = pathToKey(dstPath);
-      LOG.trace("rename from:{} to:{}, in:{}", srcKey, dstKey, adapterPath);
+      LOG.trace("rename from:{} to:{}", srcKey, dstKey);
     }
 
     @Override
@@ -386,6 +381,8 @@ public class BasicOFileSystem extends FileSystem {
       }
     }
 
+    // Note: same bucket restriction check done in adapter implementation.
+
     if (srcStatus.isDirectory()) {
       if (dst.toString().startsWith(src.toString() + OZONE_URI_DELIMITER)) {
         LOG.trace("Cannot rename a directory to a subdirectory of self");
@@ -455,7 +452,7 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_DELETE);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
-    checkAndCreateAdapter(new OFSPath(f.toUri().getPath()));
+//    checkAndCreateAdapter(new OFSPath(f));
     FileStatus status;
     try {
       status = getFileStatus(f);
@@ -542,8 +539,8 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
-    OFSPath ofsPath = new OFSPath(f.toUri().getPath());
-    checkAndCreateAdapter(ofsPath);
+//    OFSPath ofsPath = new OFSPath(f);
+//    checkAndCreateAdapter(ofsPath);
     int numEntries = LISTING_PAGE_SIZE;
     LinkedList<FileStatus> statuses = new LinkedList<>();
     List<FileStatus> tmpStatusList;
@@ -552,7 +549,9 @@ public class BasicOFileSystem extends FileSystem {
     do {
       tmpStatusList =
           adapter.listStatus(pathToKey(f), false, startKey, numEntries,
-              ofsPath.getNonKeyPartsURI(uri),
+              uri,
+              // TODO: Double check, was:
+//              ofsPath.getNonKeyPartsURI(uri),
               workingDir, getUsername())
               .stream()
               .map(this::convertFileStatus)
@@ -618,7 +617,7 @@ public class BasicOFileSystem extends FileSystem {
    * @throws IOException
    */
   private boolean mkdir(Path path) throws IOException {
-    checkAndCreateAdapter(new OFSPath(path.toUri().getPath()));
+//    checkAndCreateAdapter(new OFSPath(path));
     return adapter.createDirectory(pathToKey(path));
   }
 
@@ -637,7 +636,7 @@ public class BasicOFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
-    checkAndCreateAdapter(new OFSPath(f.toUri().getPath()));
+//    checkAndCreateAdapter(new OFSPath(f));
     Path qualifiedPath = f.makeQualified(uri, workingDir);
     String key = pathToKey(qualifiedPath);
     FileStatus fileStatus = null;
@@ -665,92 +664,10 @@ public class BasicOFileSystem extends FileSystem {
     }
     // removing leading '/' char
     String key = path.toUri().getPath().substring(1);
-    OFSPath ofsPath = new OFSPath(key);
-    key = ofsPath.getKeyName();
+//    OFSPath ofsPath = new OFSPath(key);
+//    key = ofsPath.getKeyName();
     LOG.trace("path for key:{} is:{}", key, path);
     return key;
-  }
-
-  // TODO: Consider renaming and moving this class to a new file.
-  static class OFSPath {
-    // Note: static class variables are defaulted to null / 0.
-    private String volumeName;
-    private String bucketName;
-    private String mountName;
-    private String keyName;
-
-    OFSPath(String pathStr) {
-      StringTokenizer token = new StringTokenizer(pathStr, OZONE_URI_DELIMITER);
-      int numToken = token.countTokens();
-      if (numToken > 0) {
-        String firstToken = token.nextToken();
-        // TODO: Compare a "keyword" list later for expandability.
-        if (firstToken.equals("tmp")) {
-          mountName = firstToken;
-        } else if (numToken >= 2) {
-          // Regular volume and bucket path
-          volumeName = firstToken;
-          bucketName = token.nextToken();
-        } else {
-          // Volume only.
-          volumeName = firstToken;
-        }
-      }
-//      else {
-//        // TODO: Root.
-//      }
-
-      // Compose key name.
-      if (token.hasMoreTokens()) {
-        keyName = token.nextToken("").substring(1);
-      } else {
-        keyName = "";  // Assign empty String, shouldn't be null.
-      }
-    }
-
-    public String getVolumeName() {
-      return volumeName;
-    }
-
-    public String getBucketName() {
-      return bucketName;
-    }
-
-    public String getMountName() {
-      return mountName;
-    }
-
-    // Shouldn't have a delimiter at beginning e.g. dir1/dir12
-    public String getKeyName() {
-      return keyName;
-    }
-
-    // Have a delimiter at beginning. e.g. /vol1/buc1
-    public String getNonKeyParts() {
-      if (isMount()) {
-        return OZONE_URI_DELIMITER + mountName;
-      } else {
-        return OZONE_URI_DELIMITER + volumeName +
-            OZONE_URI_DELIMITER + bucketName;
-      }
-    }
-
-    public URI getNonKeyPartsURI(URI baseURI) {
-      try {
-        URI uri = new URIBuilder().setScheme(baseURI.getScheme())
-            .setHost(baseURI.getAuthority())
-            .setPath(getNonKeyParts())
-            .build();
-        return uri;
-      } catch (URISyntaxException e) {
-        // TODO: Handle.
-        return baseURI;
-      }
-    }
-
-    public boolean isMount() {
-      return mountName != null;
-    }
   }
 
   /**
@@ -769,7 +686,7 @@ public class BasicOFileSystem extends FileSystem {
 
   @Override
   public String toString() {
-    return "OFileSystem{URI=" + uri + ", "
+    return "RootedOzoneFileSystem{URI=" + uri + ", "
         + "workingDir=" + workingDir + ", "
         + "userName=" + userName + ", "
         + "statistics=" + statistics
@@ -850,7 +767,7 @@ public class BasicOFileSystem extends FileSystem {
     }
   }
 
-  public OzoneClientAdapter getAdapter() {
+  public RootedOzoneClientAdapter getAdapter() {
     return adapter;
   }
 
@@ -906,7 +823,9 @@ public class BasicOFileSystem extends FileSystem {
     try {
       newUri = new URIBuilder().setScheme(newUri.getScheme())
           .setHost(newUri.getAuthority())
-          .setPath(adapterPath + newUri.getPath())
+          .setPath(newUri.getPath())
+          // TODO: Double check, was:
+//          .setPath(adapterPath + newUri.getPath())
           .build();
     } catch (URISyntaxException e) {
     }

@@ -35,26 +35,29 @@ import org.apache.hadoop.security.token.Token;
  * It could be loaded by a different classloader because only the objects in
  * the method signatures should be shared between the classloader.
  */
-public interface OzoneClientAdapter {
+public interface RootedOzoneClientAdapter {
 
   void close() throws IOException;
 
-  InputStream readFile(String key) throws IOException;
+  InputStream readFile(String pathStr) throws IOException;
 
-  OzoneFSOutputStream createFile(String key, boolean overWrite,
+  OzoneFSOutputStream createFile(String pathStr, boolean overWrite,
       boolean recursive) throws IOException;
 
-  void renameKey(String key, String newKeyName) throws IOException;
+  void renameKey(String pathStr, String newPath) throws IOException;
 
-  boolean createDirectory(String keyName) throws IOException;
+  boolean createDirectory(String pathStr) throws IOException;
 
-  boolean deleteObject(String keyName);
+  boolean deleteObject(String pathStr);
 
-  Iterator<BasicKeyInfo> listKeys(String pathKey);
+  Iterator<BasicKeyInfo> listKeys(String pathStr);
 
-  List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
-      String startKey, long numEntries, URI uri,
+  List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
+      String startPath, long numEntries, URI uri,
       Path workingDir, String username) throws IOException;
+
+  FileStatusAdapter getFileStatus(String pathStr, URI uri,
+      Path qualifiedPath, String userName) throws IOException;
 
   Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException;
@@ -64,8 +67,5 @@ public interface OzoneClientAdapter {
   URI getKeyProviderUri() throws IOException;
 
   String getCanonicalServiceName();
-
-  FileStatusAdapter getFileStatus(String key, URI uri,
-      Path qualifiedPath, String userName) throws IOException;
 
 }

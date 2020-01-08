@@ -24,24 +24,25 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 /**
  * Implementation of the OzoneFileSystem calls.
  */
-public class OzoneClientOFSAdapterImpl extends BasicOzoneClientOFSAdapterImpl {
+public class RootedOzoneClientAdapterImpl
+    extends BasicRootedOzoneClientAdapterImpl {
 
   private OzoneFSStorageStatistics storageStatistics;
 
-  public OzoneClientOFSAdapterImpl(OzoneFSStorageStatistics storageStatistics)
+  public RootedOzoneClientAdapterImpl(OzoneFSStorageStatistics storageStatistics)
       throws IOException {
     super();
     this.storageStatistics = storageStatistics;
   }
 
-  public OzoneClientOFSAdapterImpl(
+  public RootedOzoneClientAdapterImpl(
       OzoneConfiguration conf, OzoneFSStorageStatistics storageStatistics)
       throws IOException {
     super(conf);
     this.storageStatistics = storageStatistics;
   }
 
-  public OzoneClientOFSAdapterImpl(String omHost, int omPort,
+  public RootedOzoneClientAdapterImpl(String omHost, int omPort,
       Configuration hadoopConf, OzoneFSStorageStatistics storageStatistics)
       throws IOException {
     super(omHost, omPort, hadoopConf);

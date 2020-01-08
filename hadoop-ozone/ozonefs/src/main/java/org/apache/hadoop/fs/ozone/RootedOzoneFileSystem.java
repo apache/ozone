@@ -36,12 +36,12 @@ import java.net.URI;
  * <p>
  * This subclass is marked as private as code should not be creating it
  * directly; use {@link FileSystem#get(Configuration)} and variants to create
- * one. If cast to {@link OFileSystem}, extra methods and features may be
+ * one. If cast to {@link RootedOzoneFileSystem}, extra methods and features may be
  * accessed. Consider those private and unstable.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public class OFileSystem extends BasicOFileSystem
+public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     implements KeyProviderTokenIssuer {
 
   private OzoneFSStorageStatistics storageStatistics;
@@ -84,7 +84,7 @@ public class OFileSystem extends BasicOFileSystem
   }
 
   @Override
-  protected OzoneClientAdapter createAdapter(Configuration conf,
+  protected RootedOzoneClientAdapter createAdapter(Configuration conf,
       String omHost, int omPort, boolean isolatedClassloader)
       throws IOException {
 
@@ -95,15 +95,12 @@ public class OFileSystem extends BasicOFileSystem
 
     if (isolatedClassloader) {
       // TODO: Check how this code path need to be changed, for legacy Hadoop?
-      //  Set volume and bucket to null for the time being. May need to copy
-      //  OzoneClientAdapterFactory class and modify as well?
       //  Similar to BasicOFileSystem#createAdapter
-      return OzoneClientAdapterFactory.createAdapter(
-          null, null, storageStatistics);
+      return RootedOzoneClientAdapterFactory.createAdapter(storageStatistics);
 
     } else {
       // Using OFS adapter.
-      return new OzoneClientOFSAdapterImpl(omHost, omPort, conf,
+      return new RootedOzoneClientAdapterImpl(omHost, omPort, conf,
           storageStatistics);
     }
   }
