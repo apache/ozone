@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
@@ -60,10 +61,16 @@ public class CreatePipelineSubcommand implements Callable<Void> {
           + " is not supported yet.");
     }
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      scmClient.createReplicationPipeline(
+      Pipeline pipeline = scmClient.createReplicationPipeline(
           type,
           factor,
           HddsProtos.NodePool.getDefaultInstance());
+
+      if (pipeline != null) {
+        System.out.println(pipeline.getId().toString() +
+            " is created. Factor: " + pipeline.getFactor() +
+            ", Type: " + pipeline.getType());
+      }
       return null;
     }
   }
