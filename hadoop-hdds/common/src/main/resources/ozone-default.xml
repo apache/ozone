@@ -204,15 +204,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.num.write.chunk.executor.queue.limit</name>
-    <value>60</value>
-    <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum limit of the number of tasks that can be pending
-      in the thread pool that Ratis will use for writing chunks
-      (1024 by default).
-    </description>
-  </property>
-  <property>
     <name>dfs.container.ratis.leader.num.pending.requests</name>
     <value>4096</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>

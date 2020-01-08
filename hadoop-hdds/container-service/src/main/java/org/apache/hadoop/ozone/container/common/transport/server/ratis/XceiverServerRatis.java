@@ -128,10 +128,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
     final int queueLimit = conf.getInt(
+            OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
             OzoneConfigKeys.
-                    DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_EXECUTOR_QUEUE_LIMIT,
-            OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_EXECUTOR_QUEUE_LIMIT_DEFAULT);
+                    DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
+    );
     chunkExecutor =
         new ThreadPoolExecutor(numWriteChunkThreads, numWriteChunkThreads,
             100, TimeUnit.SECONDS,
