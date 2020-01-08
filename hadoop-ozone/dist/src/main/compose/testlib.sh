@@ -53,7 +53,7 @@ wait_for_safemode_exit(){
 
      echo $status
      if [[ "$status" ]]; then
-       if [[ ${status} == *"SCM is out of safe mode." ]]; then
+       if [[ ${status} == "SCM is out of safe mode." ]]; then
          #Safemode exits. Let's return from the function.
          echo "Safe mode is off"
          return
