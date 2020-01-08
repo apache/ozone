@@ -53,6 +53,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -240,6 +241,11 @@ public class TestSCMNodeManager {
       Thread.sleep(4 * 1000);
       assertEquals(count, nodeManager.getNodeCount(
           NodeStatus.inServiceHealthy()));
+
+      Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
+      assertEquals(count,
+          nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
+              .get(HddsProtos.NodeState.HEALTHY.name()).intValue());
     }
   }
 
@@ -323,6 +329,11 @@ public class TestSCMNodeManager {
           .getUuid(), staleNodeList.get(0).getUuid());
       Thread.sleep(1000);
 
+      Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
+      assertEquals(1,
+          nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
+              .get(HddsProtos.NodeState.STALE.name()).intValue());
+
       // heartbeat good nodes again.
       for (DatanodeDetails dn : nodeList) {
         nodeManager.processHeartbeat(dn);
@@ -334,10 +345,14 @@ public class TestSCMNodeManager {
 
       // the stale node has been removed
       staleNodeList = nodeManager.getNodes(NodeStatus.inServiceStale());
+      nodeCounts = nodeManager.getNodeCount();
       assertEquals("Expected to find 1 stale node",
           0, nodeManager.getNodeCount(NodeStatus.inServiceStale()));
       assertEquals("Expected to find 1 stale node",
           0, staleNodeList.size());
+      assertEquals(0,
+          nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
+              .get(HddsProtos.NodeState.STALE.name()).intValue());
 
       // Check for the dead node now.
       List<DatanodeDetails> deadNodeList =
@@ -346,6 +361,9 @@ public class TestSCMNodeManager {
           nodeManager.getNodeCount(NodeStatus.inServiceDead()));
       assertEquals("Expected to find 1 dead node",
           1, deadNodeList.size());
+      assertEquals(1,
+          nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
+              .get(HddsProtos.NodeState.DEAD.name()).intValue());
       assertEquals("Dead node is not the expected ID", staleNode
           .getUuid(), deadNodeList.get(0).getUuid());
     }
