@@ -139,25 +139,35 @@ public final class SCMNodeMetrics implements MetricsSource {
       }
     }
 
-    registry.snapshot(metrics
-        .addGauge(Interns.info("DiskCapacity",
-            "Total disk capacity"),
-            nodeInfo.get("DISKCapacity"))
-        .addGauge(Interns.info("DiskUsed",
-            "Total disk capacity used"),
-            nodeInfo.get("DISKUsed"))
-        .addGauge(Interns.info("DiskRemaining",
-            "Total disk capacity remaining"),
-            nodeInfo.get("DISKRemaining"))
-        .addGauge(Interns.info("SSDCapacity",
-            "Total ssd capacity"),
-            nodeInfo.get("SSDCapacity"))
-        .addGauge(Interns.info("SSDUsed",
-            "Total ssd capacity used"),
-            nodeInfo.get("SSDUsed"))
-        .addGauge(Interns.info("SSDRemaining",
-            "Total disk capacity remaining"),
-            nodeInfo.get("SSDRemaining")),
-        all);
+    for (Map.Entry<String, Long> e : nodeInfo.entrySet()) {
+      metrics.addGauge(
+          Interns.info(e.getKey(), diskMetricDescription(e.getKey())),
+          e.getValue());
+    }
+    registry.snapshot(metrics, all);
+  }
+
+  private String diskMetricDescription(String metric) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Total");
+    if (metric.indexOf("Maintenance") >= 0) {
+      sb.append(" maintenance");
+    } else if (metric.indexOf("Decommissioned") >= 0) {
+      sb.append(" decommissioned");
+    }
+    if (metric.indexOf("DiskCapacity") >= 0) {
+      sb.append(" disk capacity");
+    } else if (metric.indexOf("DiskUsed") >= 0) {
+      sb.append(" disk capacity used");
+    } else if (metric.indexOf("DiskRemaining") >= 0) {
+      sb.append(" disk capacity remaining");
+    } else if (metric.indexOf("SSDCapacity") >= 0) {
+      sb.append(" SSD capacity");
+    } else if (metric.indexOf("SSDUsed") >= 0) {
+      sb.append(" SSD capacity used");
+    } else if (metric.indexOf("SSDRemaining") >= 0) {
+      sb.append(" SSD capacity remaining");
+    }
+    return sb.toString();
   }
 }
