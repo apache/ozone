@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,32 +15,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.recon;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.inject.Provider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
-/**
- * Ozone Configuration Provider.
- * <p>
- * As the OzoneConfiguration is created by the CLI application here we inject
- * it via a singleton instance to the Jax-RS/CDI instances.
- */
-public class ConfigurationProvider implements
-    Provider<OzoneConfiguration> {
-
-  private static OzoneConfiguration configuration;
-
-  @VisibleForTesting
-  public static void setConfiguration(OzoneConfiguration conf) {
-    if (configuration == null) {
-      ConfigurationProvider.configuration = conf;
+.datanodes-container {
+  .content-div {
+    .ant-table {
+      .ant-table-body {
+        table {
+          .ant-table-thead > tr > th {
+            background-color: #ececec;
+          }
+          .ant-table-tbody {
+            tr.ant-table-row:hover {
+              background: rgba(60, 90, 100, 0.04);
+              &>td {
+                background: rgba(60, 90, 100, 0.04);
+              }
+            }
+          }
+        }
+      }
     }
-  }
-
-  @Override
-  public OzoneConfiguration get() {
-    return configuration;
+    .storage-cell-container {
+      position: relative;
+      .capacity-bar {
+        .ant-progress-text {
+          font-size: 0.8em;
+        }
+        .ant-progress-inner {
+          background-color: #d0d0d0;
+        }
+        position: absolute;
+        bottom: -12px;
+      }
+    }
   }
 }

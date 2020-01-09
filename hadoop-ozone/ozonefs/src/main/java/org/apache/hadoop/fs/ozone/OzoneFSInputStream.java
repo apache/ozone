@@ -106,9 +106,20 @@ public final class OzoneFSInputStream extends FSInputStream
 
     int readLen = Math.min(buf.remaining(), available());
 
-    byte[] readData = new byte[readLen];
-    int bytesRead = read(readData, 0, readLen);
-    buf.put(readData);
+    int bytesRead;
+    if (buf.hasArray()) {
+      int pos = buf.position();
+      bytesRead = read(buf.array(), pos, readLen);
+      if (bytesRead > 0) {
+        buf.position(pos + bytesRead);
+      }
+    } else {
+      byte[] readData = new byte[readLen];
+      bytesRead = read(readData, 0, readLen);
+      if (bytesRead > 0) {
+        buf.put(readData);
+      }
+    }
 
     return bytesRead;
   }

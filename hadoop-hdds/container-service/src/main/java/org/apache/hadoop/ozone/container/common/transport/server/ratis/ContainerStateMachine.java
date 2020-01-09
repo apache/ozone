@@ -20,9 +20,8 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
@@ -30,6 +29,8 @@ import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.Cache;
+import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
@@ -75,7 +76,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -83,8 +83,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.concurrent.Executors;
@@ -158,7 +156,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
       ContainerController containerController, ThreadPoolExecutor chunkExecutor,
-      XceiverServerRatis ratisServer, long expiryInterval, Configuration conf) {
+      XceiverServerRatis ratisServer, Configuration conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -167,11 +165,17 @@ public class ContainerStateMachine extends BaseStateMachine {
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
-    stateMachineDataCache = CacheBuilder.newBuilder()
-        .expireAfterAccess(expiryInterval, TimeUnit.MILLISECONDS)
-        // set the limit on no of cached entries equal to no of max threads
-        // executing writeStateMachineData
-        .maximumSize(chunkExecutor.getCorePoolSize()).build();
+    int numPendingRequests = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
+    );
+    int pendingRequestsByteLimit = (int) conf.getStorageSize(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
+        (index, data) -> new int[] {1, data.size()}, numPendingRequests,
+        pendingRequestsByteLimit);
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
     final int numContainerOpExecutors = conf.getInt(
@@ -417,7 +421,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (((RaftServerProxy) server).getImpl(gid).isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
-    } catch (IOException ioe) {
+    } catch (IOException | InterruptedException ioe) {
       return completeExceptionally(ioe);
     }
     DispatcherContext context =
@@ -466,6 +470,9 @@ public class ContainerStateMachine extends BaseStateMachine {
             write.getChunkData().getChunkName() + " Error message: " +
             r.getMessage() + " Container Result: " + r.getResult());
         metrics.incNumWriteDataFails();
+        // If the write fails currently we mark the stateMachine as unhealthy.
+        // This leads to pipeline close. Any change in that behavior requires
+        // handling the entry for the write chunk in cache.
         stateMachineHealthy.set(false);
         raftFuture.completeExceptionally(sce);
       } else {
@@ -589,9 +596,13 @@ public class ContainerStateMachine extends BaseStateMachine {
    * Reads the Entry from the Cache or loads it back by reading from disk.
    */
   private ByteString getCachedStateMachineData(Long logIndex, long term,
-      ContainerCommandRequestProto requestProto) throws ExecutionException {
-    return stateMachineDataCache.get(logIndex,
-        () -> readStateMachineData(requestProto, term, logIndex));
+      ContainerCommandRequestProto requestProto)
+      throws IOException {
+    ByteString data = stateMachineDataCache.get(logIndex);
+    if (data == null) {
+      data = readStateMachineData(requestProto, term, logIndex);
+    }
+    return data;
   }
 
   /**
@@ -637,7 +648,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             future.complete(
                 getCachedStateMachineData(entry.getIndex(), entry.getTerm(),
                     requestProto));
-          } catch (ExecutionException e) {
+          } catch (IOException e) {
             metrics.incNumReadStateMachineFails();
             future.completeExceptionally(e);
           }
@@ -695,6 +706,10 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public CompletableFuture<Message> applyTransaction(TransactionContext trx) {
     long index = trx.getLogEntry().getIndex();
+    // Since leader and one of the followers has written the data, it can
+    // be removed from the stateMachineDataMap.
+    stateMachineDataCache.remove(index);
+
     DispatcherContext.Builder builder =
         new DispatcherContext.Builder()
             .setTerm(trx.getLogEntry().getTerm())
@@ -803,10 +818,15 @@ public class ContainerStateMachine extends BaseStateMachine {
     return future;
   }
 
+  @Override
+  public CompletableFuture<Void> truncateStateMachineData(long index) {
+    stateMachineDataCache.removeIf(k -> k >= index);
+    return CompletableFuture.completedFuture(null);
+  }
+
   @VisibleForTesting
   public void evictStateMachineCache() {
-    stateMachineDataCache.invalidateAll();
-    stateMachineDataCache.cleanUp();
+    stateMachineDataCache.clear();
   }
 
   @Override
@@ -817,12 +837,6 @@ public class ContainerStateMachine extends BaseStateMachine {
   @Override
   public void notifyExtendedNoLeader(RoleInfoProto roleInfoProto) {
     ratisServer.handleNoLeader(gid, roleInfoProto);
-  }
-
-  @Override
-  public void notifyNotLeader(Collection<TransactionContext> pendingEntries)
-      throws IOException {
-    evictStateMachineCache();
   }
 
   @Override

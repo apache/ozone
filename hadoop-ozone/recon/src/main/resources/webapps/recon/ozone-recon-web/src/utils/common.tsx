@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,32 +15,5 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.recon;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.inject.Provider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
-/**
- * Ozone Configuration Provider.
- * <p>
- * As the OzoneConfiguration is created by the CLI application here we inject
- * it via a singleton instance to the Jax-RS/CDI instances.
- */
-public class ConfigurationProvider implements
-    Provider<OzoneConfiguration> {
-
-  private static OzoneConfiguration configuration;
-
-  @VisibleForTesting
-  public static void setConfiguration(OzoneConfiguration conf) {
-    if (configuration == null) {
-      ConfigurationProvider.configuration = conf;
-    }
-  }
-
-  @Override
-  public OzoneConfiguration get() {
-    return configuration;
-  }
-}
+export const getCapacityPercent = (used: number, total: number) => Math.round((used / total) * 100);

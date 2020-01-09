@@ -15,32 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.recon;
+package org.apache.hadoop.hdds.utils;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.inject.Provider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import java.util.function.Predicate;
 
 /**
- * Ozone Configuration Provider.
- * <p>
- * As the OzoneConfiguration is created by the CLI application here we inject
- * it via a singleton instance to the Jax-RS/CDI instances.
+ * Cache interface.
  */
-public class ConfigurationProvider implements
-    Provider<OzoneConfiguration> {
+public interface Cache<K, V> {
 
-  private static OzoneConfiguration configuration;
+  V get(K key);
 
-  @VisibleForTesting
-  public static void setConfiguration(OzoneConfiguration conf) {
-    if (configuration == null) {
-      ConfigurationProvider.configuration = conf;
-    }
-  }
+  V put(K key, V value) throws InterruptedException;
 
-  @Override
-  public OzoneConfiguration get() {
-    return configuration;
-  }
+  V remove(K key);
+
+  void removeIf(Predicate<K> predicate);
+
+  void clear();
 }
