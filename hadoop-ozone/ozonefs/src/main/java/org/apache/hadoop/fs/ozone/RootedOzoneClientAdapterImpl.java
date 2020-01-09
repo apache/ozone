@@ -29,7 +29,8 @@ public class RootedOzoneClientAdapterImpl
 
   private OzoneFSStorageStatistics storageStatistics;
 
-  public RootedOzoneClientAdapterImpl(OzoneFSStorageStatistics storageStatistics)
+  public RootedOzoneClientAdapterImpl(
+      OzoneFSStorageStatistics storageStatistics)
       throws IOException {
     super();
     this.storageStatistics = storageStatistics;
