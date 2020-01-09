@@ -100,6 +100,7 @@ import java.security.InvalidKeyException;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -659,7 +660,7 @@ public class RpcClient implements ClientProtocol {
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .build();
     OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
-    return createInputStream(keyInfo);
+    return getInputStreamWithRetryFunction(keyInfo);
   }
 
   @Override
@@ -1032,7 +1033,33 @@ public class RpcClient implements ClientProtocol {
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .build();
     OmKeyInfo keyInfo = ozoneManagerClient.lookupFile(keyArgs);
-    return createInputStream(keyInfo);
+    return getInputStreamWithRetryFunction(keyInfo);
+  }
+
+  /**
+   * Create InputStream with Retry function to refresh pipeline information
+   * if reads fail.
+   * @param keyInfo
+   * @return
+   * @throws IOException
+   */
+  private OzoneInputStream getInputStreamWithRetryFunction(
+      OmKeyInfo keyInfo) throws IOException {
+    return createInputStream(keyInfo, omKeyInfo -> {
+      try {
+        OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(omKeyInfo.getVolumeName())
+            .setBucketName(omKeyInfo.getBucketName())
+            .setKeyName(omKeyInfo.getKeyName())
+            .setRefreshPipeline(true)
+            .setSortDatanodesInPipeline(topologyAwareReadEnabled)
+            .build();
+        return ozoneManagerClient.lookupKey(omKeyArgs);
+      } catch (IOException e) {
+        LOG.error("Unable to lookup key {} on retry.", keyInfo.getKeyName(), e);
+        return null;
+      }
+    });
   }
 
   @Override
@@ -1118,11 +1145,12 @@ public class RpcClient implements ClientProtocol {
     return ozoneManagerClient.getAcl(obj);
   }
 
-  private OzoneInputStream createInputStream(OmKeyInfo keyInfo)
+  private OzoneInputStream createInputStream(
+      OmKeyInfo keyInfo, Function<OmKeyInfo, OmKeyInfo> retryFunction)
       throws IOException {
     LengthInputStream lengthInputStream = KeyInputStream
         .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-            verifyChecksum);
+            verifyChecksum, retryFunction);
     FileEncryptionInfo feInfo = keyInfo.getFileEncryptionInfo();
     if (feInfo != null) {
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
