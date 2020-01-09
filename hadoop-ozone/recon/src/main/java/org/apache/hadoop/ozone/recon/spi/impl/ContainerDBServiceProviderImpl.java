@@ -85,8 +85,16 @@ public class ContainerDBServiceProviderImpl
   }
 
   @Override
+  public void start() {
+    // Makes sure the ContainerDBServiceProvider is injected and
+    // available. Nothing else to do here.
+  }
+
+  @Override
   public void stop() throws Exception {
-    containerDbStore.close();
+    if (containerDbStore != null) {
+      containerDbStore.close();
+    }
   }
 
   /**

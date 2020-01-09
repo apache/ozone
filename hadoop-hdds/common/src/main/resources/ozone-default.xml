@@ -2350,7 +2350,7 @@
   </property>
   <property>
     <name>ozone.recon.sql.db.jdbc.url</name>
-    <value>jdbc:sqlite:/${ozone.recon.db.dir}/ozone_recon_sqlite.db</value>
+    <value>jdbc:sqlite:${ozone.recon.db.dir}/ozone_recon_sqlite.db</value>
     <tag>OZONE, RECON</tag>
     <description>
       Ozone Recon SQL database jdbc url.

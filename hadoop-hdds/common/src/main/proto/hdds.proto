@@ -89,6 +89,7 @@ enum NodeType {
     OM = 1;         // Ozone Manager
     SCM = 2;        // Storage Container Manager
     DATANODE = 3;   // DataNode
+    RECON = 4;      // Recon
 }
 
 // Should we rename NodeState to DatanodeState?
