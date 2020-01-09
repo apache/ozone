@@ -110,7 +110,8 @@ public class TestRootedOzoneFileSystem {
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem"); // TODO
+    // TODO: Address this properly.
+    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
     assertEquals(
         FileSystem.getFileSystemClass(OzoneConsts.OZONE_OFS_URI_SCHEME,
             conf), RootedOzoneFileSystem.class);
