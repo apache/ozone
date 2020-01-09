@@ -36,6 +36,8 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
+
 /**
  * Recon's Datanode protocol server extended from SCM.
  */
@@ -67,6 +69,11 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
       ContainerReportsProto containerReportsRequestProto,
       PipelineReportsProto pipelineReports) throws IOException {
     return null;
+  }
+
+  @Override
+  protected String getScmDatanodeAddressKey() {
+    return OZONE_RECON_DATANODE_ADDRESS_KEY;
   }
 
   @Override
