@@ -161,7 +161,7 @@ public class TestRootedOzoneFileSystem {
     }
 
     // Delete the child key
-    fs.delete(child, false);
+    assertTrue(fs.delete(child, false));
 
     // Deleting the only child should create the parent dir key if it does
     // not exist
@@ -169,6 +169,9 @@ public class TestRootedOzoneFileSystem {
     String parentKey = parentOFSPath.getKeyName() + "/";
     OzoneKeyDetails parentKeyInfo = getKeyInBucket(parent, true);
     assertEquals(parentKey, parentKeyInfo.getName());
+
+    // Recursive delete with DeleteIterator
+    assertTrue(fs.delete(grandparent, true));
   }
 
   @Test
@@ -365,8 +368,9 @@ public class TestRootedOzoneFileSystem {
       key = key + "/";
     }
     OFSPath ofsPath = new OFSPath(key);
+    String keyInBucket = ofsPath.getKeyName();
     return cluster.getClient().getObjectStore().getVolume(volumeName)
-        .getBucket(bucketName).getKey(ofsPath.getKeyName());
+        .getBucket(bucketName).getKey(keyInBucket);
   }
 
   private void assertKeyNotFoundException(IOException ex) {

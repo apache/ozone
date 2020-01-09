@@ -414,7 +414,7 @@ public class BasicRootedOzoneClientAdapterImpl
       for (OzoneFileStatus status : statuses) {
         // Get raw path (without volume and bucket name) and remove leading '/'
         String rawPath = status.getPath().toString().substring(1);
-        Path appendedPath = new Path(ofsPath.getNonKeyParts(), rawPath);
+        Path appendedPath = new Path(ofsPath.getNonKeyPath(), rawPath);
         Path qualifiedPath = appendedPath.makeQualified(uri, workingDir);
         makeQualified(status, uri, qualifiedPath, username);
         result.add(toFileStatusAdapter(status));

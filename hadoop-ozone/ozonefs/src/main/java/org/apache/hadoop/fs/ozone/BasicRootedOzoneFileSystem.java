@@ -250,28 +250,15 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     RenameIterator(Path srcPath, Path dstPath)
         throws IOException {
       super(srcPath);
-//      OFSPath ofsPath = new OFSPath(srcPath.toString());
-//      checkAndCreateAdapter(ofsPath);
       this.srcPath = pathToKey(srcPath);
       this.dstPath = pathToKey(dstPath);
-      // TODO: Could also check same bucket policy here, not just in AdapterImpl
       LOG.trace("rename from:{} to:{}", this.srcPath, this.dstPath);
     }
 
     @Override
-    boolean processKey(String key) throws IOException {
-      // Note: key passed in is from OzoneBucket, thus it doesn't have the
-      //  volume and bucket path.
-      OFSPath srcOFSPath = new OFSPath(srcPath);
-      OFSPath dstOFSPath = new OFSPath(dstPath);
-      String srcKey = srcOFSPath.getKeyName();
-      String dstKey = dstOFSPath.getKeyName();
-      String newKeyName = dstKey.concat(key.substring(srcKey.length()));
-      // Concat the full path.
-      String path = srcOFSPath.getNonKeyParts() + OZONE_URI_DELIMITER + key;
-      String newPath =
-          dstOFSPath.getNonKeyParts() + OZONE_URI_DELIMITER + newKeyName;
-      adapter.renamePath(path, newPath);
+    boolean processKeyPath(String keyPath) throws IOException {
+      String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
+      adapter.renamePath(keyPath, newPath);
       return true;
     }
   }
@@ -297,7 +284,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return true;
     }
 
-    LOG.trace("rename() from:{} to:{}", src, dst);
+    LOG.trace("rename() from: {} to: {}", src, dst);
     if (src.isRoot()) {
       // Cannot rename root of file system
       LOG.trace("Cannot rename the root of a filesystem");
@@ -366,7 +353,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       }
     }
 
-    // Note: same bucket restriction check done in adapter implementation.
+    // TODO: Could also check same bucket rename restriction here,
+    //  not just in AdapterImpl
 
     if (srcStatus.isDirectory()) {
       if (dst.toString().startsWith(src.toString() + OZONE_URI_DELIMITER)) {
@@ -397,17 +385,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
 
     @Override
-    boolean processKey(String key) throws IOException {
-      // Note: key passed in is from OzoneBucket, thus it doesn't have the
-      //  volume and bucket path.
-      // TODO: Fix this. Need to prepend volume/bucket names, or:
-      //  Fix OzoneListingIterator.
-      if (key.equals("")) {
+    boolean processKeyPath(String keyPath) throws IOException {
+      if (keyPath.equals("")) {
         LOG.trace("Skipping deleting root directory");
         return true;
       } else {
-        LOG.trace("deleting key:" + key);
-        boolean succeed = adapter.deleteObject(key);
+        LOG.trace("deleting key path:" + keyPath);
+        boolean succeed = adapter.deleteObject(keyPath);
         // if recursive delete is requested ignore the return value of
         // deleteObject and issue deletes for other keys.
         return recursive || succeed;
@@ -441,7 +425,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_DELETE);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
-//    checkAndCreateAdapter(new OFSPath(f));
     FileStatus status;
     try {
       status = getFileStatus(f);
@@ -653,9 +636,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
     // removing leading '/' char
     String key = path.toUri().getPath().substring(1);
-//    OFSPath ofsPath = new OFSPath(key);
-//    key = ofsPath.getKeyName();
-    LOG.trace("path for key:{} is:{}", key, path);
+    LOG.trace("path for key: {} is: {}", key, path);
     return key;
   }
 
@@ -687,7 +668,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * bucket prefixed with the input path key and process them.
    * <p>
    * Each implementing class should define how the keys should be processed
-   * through the processKey() function.
+   * through the processKeyPath() function.
    */
   private abstract class OzoneListingIterator {
     private final Path path;
@@ -713,10 +694,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
      * @return true if we should continue iteration of keys, false otherwise.
      * @throws IOException
      */
-    abstract boolean processKey(String key) throws IOException;
+    abstract boolean processKeyPath(String keyPath) throws IOException;
 
     /**
-     * Iterates thorugh all the keys prefixed with the input path's key and
+     * Iterates through all the keys prefixed with the input path's key and
      * processes the key though processKey().
      * If for any key, the processKey() returns false, then the iteration is
      * stopped and returned with false indicating that all the keys could not
@@ -729,17 +710,20 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       LOG.trace("Iterating path: {}", path);
       if (status.isDirectory()) {
         LOG.trace("Iterating directory: {}", pathKey);
+        OFSPath ofsPath = new OFSPath(pathKey);
         while (keyIterator.hasNext()) {
           BasicKeyInfo key = keyIterator.next();
-          LOG.trace("iterating key: {}", key.getName());
-          if (!processKey(key.getName())) {
+          String keyPath = ofsPath.getNonKeyPathNoPrefixDelim() +
+              OZONE_URI_DELIMITER + key.getName();
+          LOG.trace("iterating key path: {}", keyPath);
+          if (!processKeyPath(keyPath)) {
             return false;
           }
         }
         return true;
       } else {
         LOG.trace("iterating file: {}", path);
-        return processKey(pathKey);
+        return processKeyPath(pathKey);
       }
     }
 

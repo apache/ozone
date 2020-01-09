@@ -100,16 +100,20 @@ class OFSPath {
   }
 
   /**
-   * Get the volume & bucket or mount name (non-key parts in path).
-   * @return String of non-key parts.
+   * Get the volume & bucket or mount name (non-key path).
+   * @return String of path excluding key in bucket.
    */
-  // Have a delimiter at beginning. e.g. /vol1/buc1
-  public String getNonKeyParts() {
+  // Prepend a delimiter at beginning. e.g. /vol1/buc1
+  public String getNonKeyPath() {
+    return OZONE_URI_DELIMITER + getNonKeyPathNoPrefixDelim();
+  }
+
+  // Don't prepend the delimiter. e.g. vol1/buc1
+  public String getNonKeyPathNoPrefixDelim() {
     if (isMount()) {
-      return OZONE_URI_DELIMITER + mountName;
+      return mountName;
     } else {
-      return OZONE_URI_DELIMITER + volumeName +
-          OZONE_URI_DELIMITER + bucketName;
+      return volumeName + OZONE_URI_DELIMITER + bucketName;
     }
   }
 
@@ -117,7 +121,7 @@ class OFSPath {
     try {
       URI uri = new URIBuilder().setScheme(baseURI.getScheme())
           .setHost(baseURI.getAuthority())
-          .setPath(getNonKeyParts())
+          .setPath(getNonKeyPath())
           .build();
       return uri;
     } catch (URISyntaxException e) {
