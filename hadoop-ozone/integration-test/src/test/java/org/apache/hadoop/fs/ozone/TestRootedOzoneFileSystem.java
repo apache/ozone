@@ -125,12 +125,13 @@ public class TestRootedOzoneFileSystem {
     Path child = new Path(parent, "child");
     ContractTestUtils.touch(fs, child);
 
-    OzoneKeyDetails key = getKey(child, false);
-    assertEquals(key.getName(), ofs.pathToKey(child));
+    OzoneKeyDetails key = getKeyInBucket(child, false);
+    OFSPath childOFSPath = new OFSPath(child);
+    assertEquals(key.getName(), childOFSPath.getKeyName());
 
     // Creating a child should not add parent keys to the bucket
     try {
-      getKey(parent, true);
+      getKeyInBucket(parent, true);
     } catch (IOException ex) {
       assertKeyNotFoundException(ex);
     }
@@ -153,7 +154,7 @@ public class TestRootedOzoneFileSystem {
     // Verify that parent dir key does not exist
     // Creating a child should not add parent keys to the bucket
     try {
-      getKey(parent, true);
+      getKeyInBucket(parent, true);
     } catch (IOException ex) {
       assertKeyNotFoundException(ex);
     }
@@ -163,8 +164,9 @@ public class TestRootedOzoneFileSystem {
 
     // Deleting the only child should create the parent dir key if it does
     // not exist
-    String parentKey = ofs.pathToKey(parent) + "/";
-    OzoneKeyDetails parentKeyInfo = getKey(parent, true);
+    OFSPath parentOFSPath = new OFSPath(parent);
+    String parentKey = parentOFSPath.getKeyName() + "/";
+    OzoneKeyDetails parentKeyInfo = getKeyInBucket(parent, true);
     assertEquals(parentKey, parentKeyInfo.getName());
   }
 
@@ -355,14 +357,15 @@ public class TestRootedOzoneFileSystem {
         interimPath.getName(), fileStatus.getPath().getName());
   }
 
-  private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
+  private OzoneKeyDetails getKeyInBucket(Path keyPath, boolean isDirectory)
       throws IOException, OzoneClientException {
     String key = ofs.pathToKey(keyPath);
     if (isDirectory) {
       key = key + "/";
     }
+    OFSPath ofsPath = new OFSPath(key);
     return cluster.getClient().getObjectStore().getVolume(volumeName)
-        .getBucket(bucketName).getKey(key);
+        .getBucket(bucketName).getKey(ofsPath.getKeyName());
   }
 
   private void assertKeyNotFoundException(IOException ex) {

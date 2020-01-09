@@ -1,0 +1,117 @@
+/* Apache header */
+
+package org.apache.hadoop.fs.ozone;
+
+import org.apache.hadoop.fs.Path;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.StringTokenizer;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
+/**
+ * Utility class for Rooted Ozone Filesystem (OFS) path processing.
+ */
+@InterfaceAudience.Private
+@InterfaceStability.Unstable
+class OFSPath {
+  private String volumeName;
+  private String bucketName;
+  private String mountName;
+  private String keyName;
+
+  OFSPath(Path path) {
+    String pathStr = path.toUri().getPath();
+    initOFSPath(pathStr);
+  }
+
+  OFSPath(String pathStr) {
+    initOFSPath(pathStr);
+  }
+
+  private void initOFSPath(String pathStr) {
+    StringTokenizer token = new StringTokenizer(pathStr, OZONE_URI_DELIMITER);
+    int numToken = token.countTokens();
+    if (numToken > 0) {
+      String firstToken = token.nextToken();
+      // TODO: Compare a "keyword" list later for expandability.
+      if (firstToken.equals("tmp")) {
+        volumeName = null;
+        bucketName = null;
+        mountName = firstToken;
+      } else if (numToken >= 2) {
+        // Regular volume and bucket path
+        volumeName = firstToken;
+        bucketName = token.nextToken();
+        mountName = null;
+      } else {
+        // Volume only.
+        volumeName = firstToken;
+        bucketName = null;
+        mountName = null;
+      }
+    }
+//      else {
+//        // TODO: Root.
+//      }
+
+    // Compose key name.
+    if (token.hasMoreTokens()) {
+      keyName = token.nextToken("").substring(1);
+    } else {
+      keyName = "";  // Assign empty String, shouldn't be null.
+    }
+  }
+
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public String getBucketName() {
+    return bucketName;
+  }
+
+  public String getMountName() {
+    return mountName;
+  }
+
+  // Shouldn't have a delimiter at beginning e.g. dir1/dir12
+  public String getKeyName() {
+    return keyName;
+  }
+
+  /**
+   * Get the volume & bucket or mount name (non-key parts in path).
+   * @return String of non-key parts.
+   */
+  // Have a delimiter at beginning. e.g. /vol1/buc1
+  public String getNonKeyParts() {
+    if (isMount()) {
+      return OZONE_URI_DELIMITER + mountName;
+    } else {
+      return OZONE_URI_DELIMITER + volumeName +
+          OZONE_URI_DELIMITER + bucketName;
+    }
+  }
+
+  public URI getNonKeyPartsURI(URI baseURI) {
+    try {
+      URI uri = new URIBuilder().setScheme(baseURI.getScheme())
+          .setHost(baseURI.getAuthority())
+          .setPath(getNonKeyParts())
+          .build();
+      return uri;
+    } catch (URISyntaxException e) {
+      // TODO: Handle.
+      return baseURI;
+    }
+  }
+
+  public boolean isMount() {
+    return mountName != null;
+  }
+}

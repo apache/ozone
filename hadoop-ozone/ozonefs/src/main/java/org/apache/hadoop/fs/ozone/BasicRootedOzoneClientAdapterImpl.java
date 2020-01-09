@@ -248,97 +248,6 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  // TODO: Consider renaming and moving this class to a new file.
-  static class OFSPath {
-    // Note: static class variables are defaulted to null / 0.
-    private String volumeName;
-    private String bucketName;
-    private String mountName;
-    private String keyName;
-
-    OFSPath(Path path) {
-      String pathStr = path.toUri().getPath();
-      initOFSPath(pathStr);
-    }
-
-    OFSPath(String pathStr) {
-      initOFSPath(pathStr);
-    }
-
-    private void initOFSPath(String pathStr) {
-      StringTokenizer token = new StringTokenizer(pathStr, OZONE_URI_DELIMITER);
-      int numToken = token.countTokens();
-      if (numToken > 0) {
-        String firstToken = token.nextToken();
-        // TODO: Compare a "keyword" list later for expandability.
-        if (firstToken.equals("tmp")) {
-          mountName = firstToken;
-        } else if (numToken >= 2) {
-          // Regular volume and bucket path
-          volumeName = firstToken;
-          bucketName = token.nextToken();
-        } else {
-          // Volume only.
-          volumeName = firstToken;
-        }
-      }
-      //      else {
-      //        // TODO: Root.
-      //      }
-
-      // Compose key name.
-      if (token.hasMoreTokens()) {
-        keyName = token.nextToken("").substring(1);
-      } else {
-        keyName = "";  // Assign empty String, shouldn't be null.
-      }
-    }
-
-    public String getVolumeName() {
-      return volumeName;
-    }
-
-    public String getBucketName() {
-      return bucketName;
-    }
-
-    public String getMountName() {
-      return mountName;
-    }
-
-    // Shouldn't have a delimiter at beginning e.g. dir1/dir12
-    public String getKeyName() {
-      return keyName;
-    }
-
-    // Have a delimiter at beginning. e.g. /vol1/buc1
-    public String getNonKeyParts() {
-      if (isMount()) {
-        return OZONE_URI_DELIMITER + mountName;
-      } else {
-        return OZONE_URI_DELIMITER + volumeName +
-            OZONE_URI_DELIMITER + bucketName;
-      }
-    }
-
-    public URI getNonKeyPartsURI(URI baseURI) {
-      try {
-        URI uri = new URIBuilder().setScheme(baseURI.getScheme())
-            .setHost(baseURI.getAuthority())
-            .setPath(getNonKeyParts())
-            .build();
-        return uri;
-      } catch (URISyntaxException e) {
-        // TODO: Handle.
-        return baseURI;
-      }
-    }
-
-    public boolean isMount() {
-      return mountName != null;
-    }
-  }
-
   @Override
   public void close() throws IOException {
     ozoneClient.close();
@@ -391,10 +300,10 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public void renameKey(String path, String newPath) throws IOException {
+  public void renamePath(String path, String newPath) throws IOException {
     incrementCounter(Statistic.OBJECTS_RENAMED);
     OFSPath ofsPath = new OFSPath(path);
-    OFSPath ofsNewPath = new OFSPath(path);
+    OFSPath ofsNewPath = new OFSPath(newPath);
     // Check path and newPathName are in the same volume and same bucket.
     if (!ofsPath.getVolumeName().equals(ofsNewPath.getVolumeName()) ||
         !ofsPath.getBucketName().equals(ofsNewPath.getBucketName())) {
@@ -462,6 +371,8 @@ public class BasicRootedOzoneClientAdapterImpl
       getVolumeAndBucket(ofsPath, false);
       incrementCounter(Statistic.OBJECTS_QUERY);
       OzoneFileStatus status = bucket.getFileStatus(key);
+      // Note: qualifiedPath passed in is good from
+      //  BasicRootedOzoneFileSystem#getFileStatus. No need to prepend here.
       makeQualified(status, uri, qualifiedPath, userName);
       return toFileStatusAdapter(status);
 
@@ -498,20 +409,27 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   public List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
-      String startKey, long numEntries, URI uri,
+      String startPath, long numEntries, URI uri,
       Path workingDir, String username) throws IOException {
 
     OFSPath ofsPath = new OFSPath(pathStr);
     String keyName = ofsPath.getKeyName();
+    OFSPath ofsStartPath = new OFSPath(startPath);
+    String startKey = ofsStartPath.getKeyName();
     try {
       getVolumeAndBucket(ofsPath, false);
       incrementCounter(Statistic.OBJECTS_LIST);
       List<OzoneFileStatus> statuses = bucket
           .listStatus(keyName, recursive, startKey, numEntries);
+      // Note: result in statuses above doesn't have volume/bucket path since
+      //  they are from the server.
 
       List<FileStatusAdapter> result = new ArrayList<>();
       for (OzoneFileStatus status : statuses) {
-        Path qualifiedPath = status.getPath().makeQualified(uri, workingDir);
+        // Get raw path (without volume and bucket name) and remove leading '/'
+        String rawPath = status.getPath().toString().substring(1);
+        Path appendedPath = new Path(ofsPath.getNonKeyParts(), rawPath);
+        Path qualifiedPath = appendedPath.makeQualified(uri, workingDir);
         makeQualified(status, uri, qualifiedPath, username);
         result.add(toFileStatusAdapter(status));
       }

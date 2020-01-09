@@ -44,7 +44,7 @@ public interface RootedOzoneClientAdapter {
   OzoneFSOutputStream createFile(String pathStr, boolean overWrite,
       boolean recursive) throws IOException;
 
-  void renameKey(String pathStr, String newPath) throws IOException;
+  void renamePath(String pathStr, String newPath) throws IOException;
 
   boolean createDirectory(String pathStr) throws IOException;
 

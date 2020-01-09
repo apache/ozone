@@ -48,7 +48,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
-import java.util.StringTokenizer;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
@@ -270,23 +269,34 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   private class RenameIterator extends OzoneListingIterator {
-    private final String srcKey;
-    private final String dstKey;
+    private final String srcPath;
+    private final String dstPath;
 
     RenameIterator(Path srcPath, Path dstPath)
         throws IOException {
       super(srcPath);
 //      OFSPath ofsPath = new OFSPath(srcPath.toString());
 //      checkAndCreateAdapter(ofsPath);
-      srcKey = pathToKey(srcPath);
-      dstKey = pathToKey(dstPath);
-      LOG.trace("rename from:{} to:{}", srcKey, dstKey);
+      this.srcPath = pathToKey(srcPath);
+      this.dstPath = pathToKey(dstPath);
+      // TODO: Could also check same bucket policy here, not just in AdapterImpl
+      LOG.trace("rename from:{} to:{}", this.srcPath, this.dstPath);
     }
 
     @Override
     boolean processKey(String key) throws IOException {
+      // Note: key passed in is from OzoneBucket, thus it doesn't have the
+      //  volume and bucket path.
+      OFSPath srcOFSPath = new OFSPath(srcPath);
+      OFSPath dstOFSPath = new OFSPath(dstPath);
+      String srcKey = srcOFSPath.getKeyName();
+      String dstKey = dstOFSPath.getKeyName();
       String newKeyName = dstKey.concat(key.substring(srcKey.length()));
-      adapter.renameKey(key, newKeyName);
+      // Concat the full path.
+      String path = srcOFSPath.getNonKeyParts() + OZONE_URI_DELIMITER + key;
+      String newPath =
+          dstOFSPath.getNonKeyParts() + OZONE_URI_DELIMITER + newKeyName;
+      adapter.renamePath(path, newPath);
       return true;
     }
   }
@@ -413,6 +423,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     @Override
     boolean processKey(String key) throws IOException {
+      // Note: key passed in is from OzoneBucket, thus it doesn't have the
+      //  volume and bucket path.
+      // TODO: Fix this. Need to prepend volume/bucket names, or:
+      //  Fix OzoneListingIterator.
       if (key.equals("")) {
         LOG.trace("Skipping deleting root directory");
         return true;
@@ -641,7 +655,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     String key = pathToKey(qualifiedPath);
     FileStatus fileStatus = null;
     try {
-      fileStatus = convertFileStatusNoAppend(
+      fileStatus = convertFileStatus(
           adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
     } catch (OMException ex) {
       if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND)) {
@@ -737,19 +751,19 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
      * @throws IOException
      */
     boolean iterate() throws IOException {
-      LOG.trace("Iterating path {}", path);
+      LOG.trace("Iterating path: {}", path);
       if (status.isDirectory()) {
-        LOG.trace("Iterating directory:{}", pathKey);
+        LOG.trace("Iterating directory: {}", pathKey);
         while (keyIterator.hasNext()) {
           BasicKeyInfo key = keyIterator.next();
-          LOG.trace("iterating key:{}", key.getName());
+          LOG.trace("iterating key: {}", key.getName());
           if (!processKey(key.getName())) {
             return false;
           }
         }
         return true;
       } else {
-        LOG.trace("iterating file:{}", path);
+        LOG.trace("iterating file: {}", path);
         return processKey(pathKey);
       }
     }
