@@ -36,5 +36,5 @@ public final class ReconConfigKeys {
       "ozone.recon.datanode.bind.host";
   public static final String OZONE_RECON_DATANODE_BIND_HOST_DEFAULT =
       "0.0.0.0";
-  public static final int OZONE_RECON_DATANODE_PORT_DEFAULT = 9865;
+  public static final int OZONE_RECON_DATANODE_PORT_DEFAULT = 9891;
 }
