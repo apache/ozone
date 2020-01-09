@@ -21,7 +21,9 @@ package org.apache.hadoop.ozone.recon;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManager;
+import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,12 +98,21 @@ public class ReconServer extends GenericCli {
     return null;
   }
 
-  void stop() throws Exception {
+  public void stop() throws Exception {
     LOG.info("Stopping Recon server");
-    httpServer.stop();
+    if (httpServer != null) {
+      httpServer.stop();
+    }
     OzoneManagerServiceProvider ozoneManagerServiceProvider = injector
         .getInstance(OzoneManagerServiceProvider.class);
     ozoneManagerServiceProvider.stop();
+    ContainerDBServiceProvider containerDBServiceProvider =
+        injector.getInstance(ContainerDBServiceProviderImpl.class);
+    containerDBServiceProvider.stop();
+  }
+
+  public Injector getInjector() {
+    return injector;
   }
 
   private OzoneManagerServiceProvider getOzoneManagerServiceProvider() {

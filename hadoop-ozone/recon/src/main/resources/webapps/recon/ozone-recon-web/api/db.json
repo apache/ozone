@@ -1,0 +1,231 @@
+{
+  "stats": {
+    "datanodes": {
+      "total": 10,
+      "healthy": 9
+    },
+    "pipelines": 3,
+    "capacity": {
+      "total": 1099511627778,
+      "used": 681826058240,
+      "remaining": 391915765760
+    },
+    "containers": 54,
+    "volumes": 5,
+    "buckets": 100,
+    "keys": 253000
+  },
+  "datanodes": {
+    "totalCount": 12,
+    "datanodes": [
+      {
+        "hostname": "localhost1.storage.enterprise.com",
+        "state": "HEALTHY",
+        "lastHeartbeat": 1574728876059,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 549755813888,
+            "used": 429496729600,
+            "remaining": 120259084288
+          },
+          {
+            "storageLocation": "/disk/2",
+            "total": 161061273600,
+            "used": 21474836480,
+            "remaining": 139586437120
+          }
+        ],
+        "pipelineIDs": [
+          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        ],
+        "containers": 80
+      },
+      {
+        "hostname": "localhost2.storage.enterprise.com",
+        "state": "HEALTHY",
+        "lastHeartbeat": 1574724876059,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 549755813888,
+            "used": 450971566080,
+            "remaining": 98784247808
+          }
+        ],
+        "pipelineIDs": [
+          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        ],
+        "containers": 8192
+      },
+      {
+        "hostname": "localhost3.storage.enterprise.com",
+        "state": "STALE",
+        "lastHeartbeat": 1343544879843,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 140737488355328,
+            "used": 43980465111040,
+            "remaining": 96757023244288
+          }
+        ],
+        "pipelineIDs": [
+          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        ],
+        "containers": 43
+      },
+      {
+        "hostname": "localhost4.storage.enterprise.com",
+        "state": "DEAD",
+        "lastHeartbeat": 1074724876059,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 140737488355328,
+            "used": 0,
+            "remaining": 140737488355328
+          }
+        ],
+        "pipelineIDs": [],
+        "containers": 0
+      },
+      {
+        "hostname": "localhost5.storage.enterprise.com",
+        "state": "DECOMMISSIONING",
+        "lastHeartbeat": 1574724876059,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 805306368000,
+            "used": 644245094400,
+            "remaining": 161061273600
+          }
+        ],
+        "pipelineIDs": [
+          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        ],
+        "containers": 643
+      },
+      {
+        "hostname": "localhost6.storage.enterprise.com",
+        "state": "HEALTHY",
+        "lastHeartbeat": 1574724876059,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 140737488355328,
+            "used": 43980465111040,
+            "remaining": 96757023244288
+          }
+        ],
+        "pipelineIDs": [
+          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        ],
+        "containers": 5
+      },
+      {
+        "hostname": "localhost7.storage.enterprise.com",
+        "state": "HEALTHY",
+        "lastHeartbeat": 1574724876059,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 549755813888,
+            "used": 450971566080,
+            "remaining": 98784247808
+          }
+        ],
+        "pipelineIDs": [
+          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        ],
+        "containers": 64
+      },
+      {
+        "hostname": "localhost8.storage.enterprise.com",
+        "state": "DECOMMISSIONED",
+        "lastHeartbeat": 1574724876059,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 140737488355328,
+            "used": 43980465111040,
+            "remaining": 96757023244288
+          }
+        ],
+        "pipelineIDs": [
+          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        ],
+        "containers": 21
+      },
+      {
+        "hostname": "localhost9.storage.enterprise.com",
+        "state": "HEALTHY",
+        "lastHeartbeat": 1574724874011,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 140737488355328,
+            "used": 43980465111040,
+            "remaining": 96757023244288
+          }
+        ],
+        "pipelineIDs": [
+          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        ],
+        "containers": 897
+      },
+      {
+        "hostname": "localhost10.storage.enterprise.com",
+        "state": "HEALTHY",
+        "lastHeartbeat": 1574723876959,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 140737488355328,
+            "used": 43980465111040,
+            "remaining": 96757023244288
+          }
+        ],
+        "pipelineIDs": [
+          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        ],
+        "containers": 6754
+      },
+      {
+        "hostname": "localhost11.storage.enterprise.com",
+        "state": "STALE",
+        "lastHeartbeat": 1474724876783,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 140737488355328,
+            "used": 43980465111040,
+            "remaining": 96757023244288
+          }
+        ],
+        "pipelineIDs": [
+          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        ],
+        "containers": 78
+      },
+      {
+        "hostname": "localhost12.storage.enterprise.com",
+        "state": "HEALTHY",
+        "lastHeartbeat": 1574724796532,
+        "storageReport": [
+          {
+            "storageLocation": "/disk/1",
+            "total": 140737488355328,
+            "used": 43980465111040,
+            "remaining": 96757023244288
+          }
+        ],
+        "pipelineIDs": [
+          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        ],
+        "containers": 543
+      }
+    ]
+  }
+}

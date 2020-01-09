@@ -18,15 +18,23 @@
 
 package org.apache.hadoop.ozone.utils;
 
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,61 +47,195 @@ public class LoadBucket {
             LoggerFactory.getLogger(LoadBucket.class);
 
   private final OzoneBucket bucket;
+  private final OzoneFileSystem fs;
 
-  public LoadBucket(OzoneBucket bucket) {
+  public LoadBucket(OzoneBucket bucket, OzoneConfiguration conf)
+      throws Exception {
     this.bucket = bucket;
+    this.fs = (OzoneFileSystem)FileSystem.get(getFSUri(bucket), conf);
   }
 
-  public void writeData(ByteBuffer buffer, String keyName) throws Exception {
-    int bufferCapacity = buffer.capacity();
-
-    LOG.debug("LOADGEN: Writing key {}", keyName);
-    try (OzoneOutputStream stream = bucket.createKey(keyName,
-        bufferCapacity, ReplicationType.RATIS, ReplicationFactor.THREE,
-            new HashMap<>())) {
-      stream.write(buffer.array());
-      LOG.trace("LOADGEN: Written key {}", keyName);
-    } catch (Throwable t) {
-      LOG.error("LOADGEN: Create key:{} failed with exception, skipping",
-              keyName, t);
-      throw t;
-    }
+  private boolean isFsOp() {
+    return RandomUtils.nextBoolean();
   }
 
-  public void readData(ByteBuffer buffer, String keyName) throws Exception {
-    LOG.debug("LOADGEN: Reading key {}", keyName);
-
-    int bufferCapacity = buffer.capacity();
-
-    try (OzoneInputStream stream = bucket.readKey(keyName)) {
-      byte[] readBuffer = new byte[bufferCapacity];
-      int readLen = stream.read(readBuffer);
-
-      if (readLen < bufferCapacity) {
-        throw new IOException("Read mismatch, key:" + keyName +
-                " read data length:" + readLen + " is smaller than excepted:"
-                + bufferCapacity);
-      }
-
-      if (!Arrays.equals(readBuffer, buffer.array())) {
-        throw new IOException("Read mismatch, key:" + keyName +
-                " read data does not match the written data");
-      }
-      LOG.trace("LOADGEN: Read key {}", keyName);
-    } catch (Throwable t) {
-      LOG.error("LOADGEN: Read key:{} failed with exception", keyName, t);
-      throw t;
-    }
+  // Write ops.
+  public void writeKey(ByteBuffer buffer,
+                       String keyName) throws Exception {
+    writeKey(isFsOp(), buffer, keyName);
   }
 
+  public void writeKey(boolean fsOp, ByteBuffer buffer,
+                       String keyName) throws Exception {
+    Op writeOp = new WriteOp(fsOp, keyName, buffer);
+    writeOp.execute();
+  }
+
+  // Read ops.
+  public void readKey(ByteBuffer buffer, String keyName) throws Exception {
+    readKey(isFsOp(), buffer, keyName);
+  }
+
+  public void readKey(boolean fsOp, ByteBuffer buffer,
+                      String keyName) throws Exception {
+    Op readOp = new ReadOp(fsOp, keyName, buffer);
+    readOp.execute();
+  }
+
+  // Delete ops.
   public void deleteKey(String keyName) throws Exception {
-    LOG.debug("LOADGEN: Deleting key {}", keyName);
-    try {
-      bucket.deleteKey(keyName);
-      LOG.trace("LOADGEN: Deleted key {}", keyName);
-    } catch (Throwable t) {
-      LOG.error("LOADGEN: Unable to delete key:{}", keyName, t);
-      throw t;
+    deleteKey(isFsOp(), keyName);
+  }
+
+  public void deleteKey(boolean fsOp, String keyName) throws Exception {
+    Op deleteOp = new DeleteOp(fsOp, keyName);
+    deleteOp.execute();
+  }
+
+  private static URI getFSUri(OzoneBucket bucket) throws URISyntaxException {
+    return new URI(String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
+      bucket.getName(), bucket.getVolumeName()));
+  }
+
+  abstract class Op {
+    private final boolean fsOp;
+    private final String opName;
+    private final String keyName;
+
+    Op(boolean fsOp, String keyName) {
+      this.fsOp = fsOp;
+      this.keyName = keyName;
+      this.opName = (fsOp ? "Filesystem" : "Bucket") + ":"
+          + getClass().getSimpleName();
+    }
+
+    public void execute() throws Exception {
+      LOG.info("Going to {} key {}", this.opName, keyName);
+      try {
+        if (fsOp) {
+          Path p = new Path("/", keyName);
+          doFsOp(p);
+        } else {
+          doBucketOp(keyName);
+        }
+        doPostOp();
+        LOG.trace("Done: {} key {}", this.opName, keyName);
+      } catch (Throwable t) {
+        LOG.error("Unable to {} key:{}", this.opName, keyName, t);
+        throw t;
+      }
+    }
+
+    abstract void doFsOp(Path p) throws IOException;
+    abstract void doBucketOp(String key) throws IOException;
+    abstract void doPostOp() throws IOException;
+
+    @Override
+    public String toString() {
+      return "opType=" + opName;
+    }
+  }
+
+  /**
+   * Write file/key to bucket.
+   */
+  public class WriteOp extends Op {
+    private OutputStream os;
+    private final ByteBuffer buffer;
+
+    WriteOp(boolean fsOp, String keyName, ByteBuffer buffer) {
+      super(fsOp, keyName);
+      this.buffer = buffer;
+    }
+
+    @Override
+    void doFsOp(Path p) throws IOException {
+      os = fs.create(p);
+    }
+
+    @Override
+    void doBucketOp(String key) throws IOException {
+      os = bucket.createKey(key, 0, ReplicationType.RATIS,
+          ReplicationFactor.THREE, new HashMap<>());
+    }
+
+    @Override
+    void doPostOp() throws IOException {
+      try {
+        os.write(buffer.array());
+      } finally {
+        os.close();
+      }
+    }
+  }
+
+  /**
+   * Read file/key from bucket.
+   */
+  public class ReadOp extends Op {
+    private InputStream is;
+    private final ByteBuffer buffer;
+
+    ReadOp(boolean fsOp, String keyName, ByteBuffer buffer) {
+      super(fsOp, keyName);
+      this.buffer = buffer;
+      this.is = null;
+    }
+
+    @Override
+    void doFsOp(Path p) throws IOException {
+      is = fs.open(p);
+    }
+
+    @Override
+    void doBucketOp(String key) throws IOException {
+      is = bucket.readKey(key);
+    }
+
+    @Override
+    void doPostOp() throws IOException {
+      int bufferCapacity = buffer.capacity();
+      try {
+        byte[] readBuffer = new byte[bufferCapacity];
+        int readLen = is.read(readBuffer);
+
+        if (readLen < bufferCapacity) {
+          throw new IOException("Read mismatch, " +
+              " read data length:" + readLen + " is smaller than excepted:"
+              + bufferCapacity);
+        }
+
+        if (!Arrays.equals(readBuffer, buffer.array())) {
+          throw new IOException("Read mismatch," +
+              " read data does not match the written data");
+        }
+      } finally {
+        is.close();
+      }
+    }
+  }
+
+  /**
+   * Delete file/key from bucket.
+   */
+  public class DeleteOp extends Op {
+    DeleteOp(boolean fsOp, String keyName) {
+      super(fsOp, keyName);
+    }
+
+    @Override
+    void doFsOp(Path p) throws IOException {
+      fs.delete(p, true);
+    }
+
+    @Override
+    void doBucketOp(String key) throws IOException {
+      bucket.deleteKey(key);
+    }
+
+    @Override
+    void doPostOp() {
+      // Nothing to do here
     }
   }
 }

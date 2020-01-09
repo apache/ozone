@@ -137,7 +137,7 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads()))
         .addHandler(new ClosePipelineCommandHandler())
-        .addHandler(new CreatePipelineCommandHandler())
+        .addHandler(new CreatePipelineCommandHandler(conf))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -381,7 +381,9 @@ public class DatanodeStateMachine implements Closeable {
    * be sent by datanode.
    */
   public void triggerHeartbeat() {
-    stateMachineThread.interrupt();
+    if (stateMachineThread != null) {
+      stateMachineThread.interrupt();
+    }
   }
 
   /**

@@ -123,7 +123,6 @@ public final class OzoneClientAdapterFactory {
       throw new IOException(
           "Can't initialize the OzoneClientAdapter implementation", e);
     }
-
   }
 
   private static void findConfigDirUrl(List<URL> urls,

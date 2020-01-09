@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
-import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +91,6 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
           .addTable(CONTAINER_KEY_TABLE)
           .addTable(CONTAINER_KEY_COUNT_TABLE)
           .addCodec(ContainerKeyPrefix.class, new ContainerKeyPrefixCodec())
-          .addCodec(Long.class, new LongCodec())
           .addCodec(Integer.class, new IntegerCodec())
           .build();
     } catch (Exception ex) {

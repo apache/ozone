@@ -34,7 +34,7 @@ public class Scheduler {
   private static final Logger LOG =
       LoggerFactory.getLogger(Scheduler.class);
 
-  private ScheduledExecutorService scheduler;
+  private ScheduledExecutorService scheduledExecutorService;
 
   private volatile boolean isClosed;
 
@@ -48,23 +48,24 @@ public class Scheduler {
    * @param numCoreThreads - number of core threads to maintain in the scheduler
    */
   public Scheduler(String threadName, boolean isDaemon, int numCoreThreads) {
-    scheduler = Executors.newScheduledThreadPool(numCoreThreads, r -> {
-      Thread t = new Thread(r);
-      t.setName(threadName);
-      t.setDaemon(isDaemon);
-      return t;
-    });
+    scheduledExecutorService = Executors.newScheduledThreadPool(numCoreThreads,
+        r -> {
+          Thread t = new Thread(r);
+          t.setName(threadName);
+          t.setDaemon(isDaemon);
+          return t;
+        });
     this.threadName = threadName;
     isClosed = false;
   }
 
   public void schedule(Runnable runnable, long delay, TimeUnit timeUnit) {
-    scheduler.schedule(runnable, delay, timeUnit);
+    scheduledExecutorService.schedule(runnable, delay, timeUnit);
   }
 
   public void schedule(CheckedRunnable runnable, long delay,
       TimeUnit timeUnit, Logger logger, String errMsg) {
-    scheduler.schedule(() -> {
+    scheduledExecutorService.schedule(() -> {
       try {
         runnable.run();
       } catch (Throwable throwable) {
@@ -75,7 +76,7 @@ public class Scheduler {
 
   public ScheduledFuture<?> scheduleWithFixedDelay(Runnable runnable,
       long initialDelay, long fixedDelay, TimeUnit timeUnit) {
-    return scheduler
+    return scheduledExecutorService
         .scheduleWithFixedDelay(runnable, initialDelay, fixedDelay, timeUnit);
   }
 
@@ -90,16 +91,18 @@ public class Scheduler {
    */
   public synchronized void close() {
     isClosed = true;
-    if (scheduler != null) {
-      scheduler.shutdownNow();
+    if (scheduledExecutorService != null) {
+      scheduledExecutorService.shutdownNow();
       try {
-        scheduler.awaitTermination(60, TimeUnit.SECONDS);
+        scheduledExecutorService.awaitTermination(60, TimeUnit.SECONDS);
       } catch (InterruptedException e) {
         LOG.info(
             threadName + " interrupted while waiting for task completion {}",
             e);
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
       }
     }
-    scheduler = null;
+    scheduledExecutorService = null;
   }
 }

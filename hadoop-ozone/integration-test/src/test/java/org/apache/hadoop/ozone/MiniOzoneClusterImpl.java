@@ -49,10 +49,13 @@ import org.apache.hadoop.hdds.scm.protocolPB
     .StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.recon.ConfigurationProvider;
+import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -69,6 +72,8 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState
     .HEALTHY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.
+    OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
@@ -77,6 +82,16 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys
     .DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.OZONE_RECON_SQL_DB_JDBC_URL;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL;
+import static org.apache.hadoop.ozone.recon.
+    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY;
 
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
@@ -93,6 +108,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private StorageContainerManager scm;
   private OzoneManager ozoneManager;
   private final List<HddsDatanodeService> hddsDatanodes;
+  private ReconServer reconServer;
 
   // Timeout for the cluster to be ready
   private int waitForClusterToBeReadyTimeout = 120000; // 2 min
@@ -111,6 +127,23 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.ozoneManager = ozoneManager;
     this.scm = scm;
     this.hddsDatanodes = hddsDatanodes;
+  }
+
+  /**
+   * Creates a new MiniOzoneCluster with Recon.
+   *
+   * @throws IOException if there is an I/O error
+   */
+  MiniOzoneClusterImpl(OzoneConfiguration conf,
+                       OzoneManager ozoneManager,
+                       StorageContainerManager scm,
+                       List<HddsDatanodeService> hddsDatanodes,
+                       ReconServer reconServer) {
+    this.conf = conf;
+    this.ozoneManager = ozoneManager;
+    this.scm = scm;
+    this.hddsDatanodes = hddsDatanodes;
+    this.reconServer = reconServer;
   }
 
   /**
@@ -204,6 +237,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
+  public ReconServer getReconServer() {
+    return this.reconServer;
+  }
+
+  @Override
   public int getHddsDatanodeIndex(DatanodeDetails dn) throws IOException {
     for (HddsDatanodeService service : hddsDatanodes) {
       if (service.getDatanodeDetails().equals(dn)) {
@@ -265,6 +303,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void restartOzoneManager() throws IOException {
     ozoneManager.stop();
     ozoneManager.restart();
+  }
+
+  @Override
+  public void restartReconServer() {
+    try {
+      reconServer.stop();
+      reconServer.run(new String[]{});
+    } catch (Exception e) {
+      LOG.info("Exception while stopping Recon", e);
+    }
   }
 
   private void waitForHddsDatanodesStop() throws TimeoutException,
@@ -351,6 +399,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopOM(ozoneManager);
     stopDatanodes(hddsDatanodes);
     stopSCM(scm);
+    try {
+      stopRecon(reconServer);
+    } catch (Exception e) {
+      LOG.error("Exception while shutting down Recon.", e);
+    }
   }
 
   /**
@@ -423,6 +476,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
   }
 
+  private static void stopRecon(ReconServer reconServer) throws Exception {
+    if (reconServer != null) {
+      LOG.info("Stopping Recon");
+      reconServer.stop();
+    }
+  }
+
   /**
    * Builder for configuring the MiniOzoneCluster to run.
    */
@@ -443,6 +503,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       initializeConfiguration();
       StorageContainerManager scm = null;
       OzoneManager om = null;
+      ReconServer reconServer = null;
       List<HddsDatanodeService> hddsDatanodes = Collections.emptyList();
       try {
         scm = createSCM();
@@ -453,16 +514,28 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
         om.start();
 
+        configureRecon();
+        ConfigurationProvider.setConfiguration(conf);
+        reconServer = new ReconServer();
+
         hddsDatanodes = createHddsDatanodes(scm);
+
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf, om, scm,
-            hddsDatanodes);
+            hddsDatanodes, reconServer);
+
         cluster.setCAClient(certClient);
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
+        reconServer.run(new String[]{});
         return cluster;
       } catch (Exception ex) {
         stopOM(om);
+        try {
+          stopRecon(reconServer);
+        } catch (Exception e) {
+          LOG.error("Exception while shutting down the Recon.", e);
+        }
         if (startDataNodes) {
           stopDatanodes(hddsDatanodes);
         }
@@ -684,6 +757,25 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         GenericTestUtils.setRootLogLevel(Level.TRACE);
       }
       GenericTestUtils.setRootLogLevel(Level.INFO);
+    }
+
+    private void configureRecon() throws IOException {
+      TemporaryFolder tempFolder = new TemporaryFolder();
+      tempFolder.create();
+      File tempNewFolder = tempFolder.newFolder();
+      conf.set(OZONE_RECON_DB_DIR,
+          tempNewFolder.getAbsolutePath());
+
+      File reconOmDbDir = tempFolder.newFolder();
+      conf.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
+          .getAbsolutePath());
+
+      conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:"+
+          tempNewFolder.getAbsolutePath()+"/ozone_recon_sqlite.db");
+
+      conf.set(RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY, "2s");
+      conf.set(RECON_OM_SNAPSHOT_TASK_INTERVAL, "10s");
+      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
     }
   }
 }

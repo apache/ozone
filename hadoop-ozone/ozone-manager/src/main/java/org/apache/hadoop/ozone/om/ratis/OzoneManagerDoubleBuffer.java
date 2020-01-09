@@ -136,7 +136,7 @@ public class OzoneManagerDoubleBuffer {
 
             readyBuffer.iterator().forEachRemaining((entry) -> {
               try {
-                entry.getResponse().addToDBBatch(omMetadataManager,
+                entry.getResponse().checkAndUpdateDB(omMetadataManager,
                     batchOperation);
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
