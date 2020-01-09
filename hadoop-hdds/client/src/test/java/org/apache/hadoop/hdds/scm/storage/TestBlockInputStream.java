@@ -56,7 +56,6 @@ public class TestBlockInputStream {
   private static Checksum checksum;
 
   private BlockInputStream blockStream;
-  private BlockInputStream blockStreamWithRefresh;
   private byte[] blockData;
   private int blockSize;
   private List<ChunkInfo> chunks;
@@ -71,8 +70,6 @@ public class TestBlockInputStream {
 
     blockStream = new DummyBlockInputStream(blockID, blockSize, null, null,
         false, null);
-    blockStreamWithRefresh = new DummyBlockInputStreamWithRetry(
-        blockID, blockSize, null, null, false, null);
   }
 
   /**

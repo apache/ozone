@@ -1056,7 +1056,7 @@ public class RpcClient implements ClientProtocol {
             .build();
         return ozoneManagerClient.lookupKey(omKeyArgs);
       } catch (IOException e) {
-        LOG.error("Unable to get key!");
+        LOG.error("Unable to lookup key {} on retry.", keyInfo.getKeyName(), e);
         return null;
       }
     });
