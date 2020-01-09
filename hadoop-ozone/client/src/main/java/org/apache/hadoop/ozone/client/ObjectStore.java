@@ -299,9 +299,8 @@ public class ObjectStore {
 
     @Override
     public boolean hasNext() {
-      if(!currentIterator.hasNext()) {
-        currentIterator = getNextListOfVolumes(
-            currentValue != null ? currentValue.getName() : null)
+      if (!currentIterator.hasNext() && currentValue != null) {
+        currentIterator = getNextListOfVolumes(currentValue.getName())
             .iterator();
       }
       return currentIterator.hasNext();
