@@ -25,7 +25,7 @@ weight: 10
  * AWS CLI（可选）
 {{< /requirements >}}
 
-# 单容器全家桶 Ozone
+# 所有 Ozone 服务在单个容器
 
 启动一个 all-in-one 的 ozone 容器最简单的方法就是使用 Docker Hub 最新的 docker 镜像：
 
@@ -35,9 +35,9 @@ docker run -p 9878:9878 -p 9876:9876 apache/ozone
 这个命令会从 Docker Hub 拉取 ozone 镜像并在一个容器中启动所有 ozone 服务，包括必要的元数据服务（Ozone Manager，Storage Container Manager）、一个数据节点和兼容 S3
  的 REST 服务（S3 网关）。
 
-# 本地多容器集群
+# Ozone 服务在多个独立的容器
 
-如果你想要一个更符合实际的伪集群，以便让各个组件运行在单独的容器中，可以使用 docker-compose 配置文件来启动。
+如果你需要一个更类似生产环境的集群，使用 Ozone 发行包自带的 docker-compose 配置文件可以让 Ozone 服务组件在各自独立的容器中运行。
 
 docker-compose 配置文件和一个 environment 文件已经包含在 Docker Hub 的镜像中。
 
@@ -71,7 +71,7 @@ S3 网关的端口为 9878，如果你正在使用 S3 作为存储方案，可�
 aws s3api --endpoint http://localhost:9878/ create-bucket --bucket=bucket1
 ```
 
-唯一的区别在于你需要把 endpoint 的地址告诉 aws s3api 命令。
+唯一的区别在于你需要在运行 aws s3api 命令的时候用 --endpoint 选项指定 ozone S3 网关的地址。
 
 下面我们来把一个简单的文件存入 Ozone 的 S3 桶中，首先创建一个用来上传的临时文件：
 ```bash
@@ -90,7 +90,7 @@ aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /
 aws s3 --endpoint http://localhost:9878 ls s3://bucket1/testfile
 ```
 
-<div class="alert alert-info" role="alert"> 你也可以点击下面的链接，查看 Ozone 的 S3 接口内置的桶浏览器。
+<div class="alert alert-info" role="alert"> 你也可以点击下面的链接，通过 Ozone S3 网关自带的浏览器去查看桶内的文件。
 <br>
 </div>
 http://localhost:9878/bucket1?browser
