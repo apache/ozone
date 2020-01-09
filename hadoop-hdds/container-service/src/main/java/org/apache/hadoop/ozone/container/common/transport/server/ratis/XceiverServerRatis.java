@@ -96,7 +96,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private int port;
   private final RaftServer server;
-  private ThreadPoolExecutor chunkExecutor;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private ClientId clientId = ClientId.randomId();
@@ -121,19 +120,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     datanodeDetails = dd;
     this.port = port;
     RaftProperties serverProperties = newRaftProperties();
-    final int numWriteChunkThreads = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
-    final int queueLimit = conf.getInt(
-            OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
-            OzoneConfigKeys.
-                    DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
-    );
-    chunkExecutor =
-        new ThreadPoolExecutor(numWriteChunkThreads, numWriteChunkThreads,
-            100, TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(queueLimit),
-            new ThreadPoolExecutor.CallerRunsPolicy());
     this.context = context;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -151,7 +137,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
     return new ContainerStateMachine(gid, dispatcher, containerController,
-        chunkExecutor, this, conf);
+        this, conf);
   }
 
   private RaftProperties newRaftProperties() {
@@ -422,7 +408,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     if (!isStarted) {
       LOG.info("Starting {} {} at port {}", getClass().getSimpleName(),
           server.getId(), getIPCPort());
-      chunkExecutor.prestartAllCoreThreads();
       server.start();
 
       int realPort =
@@ -451,7 +436,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         // shutdown server before the executors as while shutting down,
         // some of the tasks would be executed using the executors.
         server.close();
-        chunkExecutor.shutdown();
         isStarted = false;
       } catch (IOException e) {
         throw new RuntimeException(e);
