@@ -46,6 +46,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -87,14 +88,13 @@ public class TestRootedOzoneFileSystem {
 
     // For now:
     rootPath = String.format("%s://%s/", OzoneConsts.OZONE_OFS_URI_SCHEME,
-        conf.get("ozone.om.address"));  // TODO: OZONE_OM_ADDRESS_KEY
+        conf.get(OZONE_OM_ADDRESS_KEY));
 
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // TODO: FileSystem#loadFileSystems is not loading ofs:// class by default
     //  hence this workaround. Might need to add some config in hadoop source.
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
-//    GenericTestUtils.setRootLogLevel(Level.TRACE);
     fs = FileSystem.get(conf);
     ofs = (RootedOzoneFileSystem) fs;
   }
@@ -228,8 +228,7 @@ public class TestRootedOzoneFileSystem {
 
   /**
    * Tests Mkdir operation on a volume that doesn't exist.
-   * Expect Mkdir to create the volume and bucket, provided that
-   * user has appropriate permissions.
+   * Expect Mkdir to create the volume and bucket.
    */
   @Test
   public void testMkdirOnNonExistentVolumeBucket() throws Exception {
@@ -242,8 +241,25 @@ public class TestRootedOzoneFileSystem {
     fs.mkdirs(dir12);
     fs.mkdirs(dir2);
 
-    // TODO: Check volume and bucket existence, they should both be created.
-    // TODO: Verify that dir is created.
+    // Check volume and bucket existence, they should both be created.
+    OzoneVolume ozoneVolume = objectStore.getVolume(volumeNameLocal);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketNameLocal);
+    OFSPath ofsPathDir1 = new OFSPath(dir12);
+    String key = ofsPathDir1.getKeyName() + "/";
+    OzoneKeyDetails ozoneKeyDetails = ozoneBucket.getKey(key);
+    assertEquals(key, ozoneKeyDetails.getName());
+
+    // Verify that directories are created.
+    FileStatus[] fileStatuses = ofs.listStatus(root);
+    assertEquals(fileStatuses[0].getPath().toUri().getPath(), dir1.toString());
+    assertEquals(fileStatuses[1].getPath().toUri().getPath(), dir2.toString());
+
+    fileStatuses = ofs.listStatus(dir1);
+    assertEquals(fileStatuses[0].getPath().toUri().getPath(), dir12.toString());
+    fileStatuses = ofs.listStatus(dir12);
+    assertEquals(fileStatuses.length, 0);
+    fileStatuses = ofs.listStatus(dir2);
+    assertEquals(fileStatuses.length, 0);
   }
 
   /**
