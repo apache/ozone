@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.base.Preconditions;
@@ -106,8 +105,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
-//    this.gConf = conf;
-    String omHost = null;
+    String omHost;
     int omPort = -1;
     // Parse hostname and port
     String[] parts = authority.split(":");
@@ -127,7 +125,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       uri = new URIBuilder().setScheme(OZONE_OFS_URI_SCHEME)
           .setHost(authority)
           .build();
-      LOG.trace("Ozone URI for ozfs initialization is " + uri);
+      LOG.trace("Ozone URI for OFS initialization is " + uri);
 
       //isolated is the default for ozonefs-lib-legacy which includes the
       // /ozonefs.txt, otherwise the default is false. It could be overridden.
@@ -158,27 +156,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-//  /**
-//   * Check path and create client adapter accordingly.
-//   * @param ofsPath
-//   * @throws IOException
-//   */
-//  protected void checkAndCreateAdapter(OFSPath ofsPath) throws IOException {
-//    // Check if an adapter is already initialized.
-//    if (this.adapter != null) {
-//      // Sanity check.
-//      assert(this.adapterPath != null);
-//      // Close the existing adapter.
-//      // TODO: do so only when volume/bucket changed from previous op for perf.
-//      this.adapter.close();
-//      this.adapter = null;
-//      this.adapterPath = null;
-//    }
-//    this.adapterPath = ofsPath.getNonKeyParts();
-//    this.adapter = createAdapter(this.gConf, this.gOmHost, this.gOmPort,
-//        this.gIsolatedClassloader);
-//  }
-
   protected RootedOzoneClientAdapter createAdapter(Configuration conf,
       String omHost, int omPort, boolean isolatedClassloader)
       throws IOException {
@@ -187,7 +164,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // TODO: Check how this code path need to be changed, for legacy Hadoop?
       return RootedOzoneClientAdapterFactory.createAdapter();
     } else {
-      // Using OFS adapter.
       return new BasicRootedOzoneClientAdapterImpl(omHost, omPort, conf);
     }
   }
@@ -214,12 +190,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   @Override
-  public FSDataInputStream open(Path f, int bufferSize) throws IOException {
+  public FSDataInputStream open(Path path, int bufferSize) throws IOException {
     incrementCounter(Statistic.INVOCATION_OPEN);
     statistics.incrementReadOps(1);
-    LOG.trace("open() path:{}", f);
-//    checkAndCreateAdapter(new OFSPath(f));
-    final String key = pathToKey(f);
+    LOG.trace("open() path: {}", path);
+    final String key = pathToKey(path);
     return new FSDataInputStream(
         new OzoneFSInputStream(adapter.readFile(key), statistics));
   }

@@ -21,11 +21,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.StringTokenizer;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -54,11 +52,8 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.client.utils.URIBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * Basic Implementation of the OzoneFileSystem calls.
@@ -176,29 +171,20 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  public void setVolume(String volumeStr) throws IOException {
-    this.volume = objectStore.getVolume(volumeStr);
+  public void setVolume(String volumeString) throws IOException {
+    this.volume = objectStore.getVolume(volumeString);
   }
 
-  public void setBucket(String bucketStr) throws IOException {
-    this.bucket = volume.getBucket(bucketStr);
+  public void setBucket(String bucketString) throws IOException {
+    this.bucket = volume.getBucket(bucketString);
   }
 
-  // TODO: Remove if unused.
-  public void setVolumeStr(String volumeStr) throws IOException {
+  public void setVolumeStr(String volumeStr) {
     this.volumeStr = volumeStr;
   }
 
-  // TODO: Remove if unused.
-  public void setBucketStr(String bucketStr) throws IOException {
+  public void setBucketStr(String bucketStr) {
     this.bucketStr = bucketStr;
-  }
-
-  private void getVolumeAndBucket(String volumeStr, String bucketStr,
-      boolean createIfNotExist) throws IOException {
-    setVolumeStr(volumeStr);
-    setBucketStr(bucketStr);
-    getVolumeAndBucket(createIfNotExist);
   }
 
   private void getVolumeAndBucket(OFSPath ofsPath,
@@ -219,6 +205,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private void getVolumeAndBucket(boolean createIfNotExist) throws IOException {
     // TODO: I didn't find an existing API to check volume existence, will use
     //  that instead of try-catch if there is, or we might want to add one.
+    // listVolume() doesn't do the exact job as it matches prefix.
     try {
       setVolume(this.volumeStr);
     } catch (OMException e) {
@@ -392,7 +379,6 @@ public class BasicRootedOzoneClientAdapterImpl
           .makeQualified(uri, path,
               username, username);
     }
-
   }
 
   @Override

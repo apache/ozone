@@ -36,8 +36,8 @@ import java.net.URI;
  * <p>
  * This subclass is marked as private as code should not be creating it
  * directly; use {@link FileSystem#get(Configuration)} and variants to create
- * one. If cast to {@link RootedOzoneFileSystem}, extra methods and features may be
- * accessed. Consider those private and unstable.
+ * one. If cast to {@link RootedOzoneFileSystem}, extra methods and features
+ * may be accessed. Consider those private and unstable.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
