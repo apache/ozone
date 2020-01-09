@@ -19,10 +19,12 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -1211,6 +1213,58 @@ public class TestSCMNodeManager {
                 .size()));
       }
     }
+  }
+
+  @Test
+  public void testGetNodeInfo()
+      throws IOException, InterruptedException, NodeNotFoundException,
+        AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    final int nodeCount = 6;
+    SCMNodeManager nodeManager = createNodeManager(conf);
+
+    for (int i=0; i<nodeCount; i++) {
+      DatanodeDetails datanodeDetails =
+          MockDatanodeDetails.randomDatanodeDetails();
+      final long capacity = 2000;
+      final long used = 100;
+      final long remaining = 1900;
+      UUID dnId = datanodeDetails.getUuid();
+      String storagePath = testDir.getAbsolutePath() + "/" + dnId;
+      StorageReportProto report = TestUtils
+          .createStorageReport(dnId, storagePath, capacity, used,
+              remaining, null);
+
+      nodeManager.register(datanodeDetails, TestUtils.createNodeReport(report),
+          TestUtils.getRandomPipelineReports());
+
+      nodeManager.processHeartbeat(datanodeDetails);
+      if (i == 5) {
+        nodeManager.setNodeOperationalState(datanodeDetails,
+            HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE);
+      }
+      if (i == 3 || i == 4) {
+        nodeManager.setNodeOperationalState(datanodeDetails,
+            HddsProtos.NodeOperationalState.DECOMMISSIONED);
+      }
+    }
+    Thread.sleep(100);
+
+    Map<String, Long> stats = nodeManager.getNodeInfo();
+    // 3 IN_SERVICE nodes:
+    assertEquals(6000, stats.get("DiskCapacity").longValue());
+    assertEquals(300, stats.get("DiskUsed").longValue());
+    assertEquals(5700, stats.get("DiskRemaining").longValue());
+
+    // 2 Decommissioned nodes
+    assertEquals(4000, stats.get("DecommissionedDiskCapacity").longValue());
+    assertEquals(200, stats.get("DecommissionedDiskUsed").longValue());
+    assertEquals(3800, stats.get("DecommissionedDiskRemaining").longValue());
+
+    // 1 Maintenance node
+    assertEquals(2000, stats.get("MaintenanceDiskCapacity").longValue());
+    assertEquals(100, stats.get("MaintenanceDiskUsed").longValue());
+    assertEquals(1900, stats.get("MaintenanceDiskRemaining").longValue());
   }
 
   /**

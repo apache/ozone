@@ -502,48 +502,77 @@ public class SCMNodeManager implements NodeManager {
 
   // We should introduce DISK, SSD, etc., notion in
   // SCMNodeStat and try to use it.
-  @Override
+  @Override // NodeManagerMXBean
   public Map<String, Long> getNodeInfo() {
-    long diskCapacity = 0L;
-    long diskUsed = 0L;
-    long diskRemaning = 0L;
-
-    long ssdCapacity = 0L;
-    long ssdUsed = 0L;
-    long ssdRemaining = 0L;
-
-    List<DatanodeInfo> healthyNodes =  nodeStateManager.getHealthyNodes();
-    List<DatanodeInfo> staleNodes = nodeStateManager.getStaleNodes();
-
-    List<DatanodeInfo> datanodes = new ArrayList<>(healthyNodes);
-    datanodes.addAll(staleNodes);
-
-    for (DatanodeInfo dnInfo : datanodes) {
-      List<StorageReportProto> storageReportProtos = dnInfo.getStorageReports();
-      for (StorageReportProto reportProto : storageReportProtos) {
-        if (reportProto.getStorageType() ==
-            StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK) {
-          diskCapacity += reportProto.getCapacity();
-          diskRemaning += reportProto.getRemaining();
-          diskUsed += reportProto.getScmUsed();
-        } else if (reportProto.getStorageType() ==
-            StorageContainerDatanodeProtocolProtos.StorageTypeProto.SSD) {
-          ssdCapacity += reportProto.getCapacity();
-          ssdRemaining += reportProto.getRemaining();
-          ssdUsed += reportProto.getScmUsed();
-        }
+    Map<String, Long> nodeInfo = new HashMap<>();
+    // Compute all the possible stats from the enums, and default to zero:
+    for (UsageStates s : UsageStates.values()) {
+      for (UsageMetrics stat : UsageMetrics.values()) {
+        nodeInfo.put(s.label + stat.name(), 0L);
       }
     }
 
-    Map<String, Long> nodeInfo = new HashMap<>();
-    nodeInfo.put("DISKCapacity", diskCapacity);
-    nodeInfo.put("DISKUsed", diskUsed);
-    nodeInfo.put("DISKRemaining", diskRemaning);
-
-    nodeInfo.put("SSDCapacity", ssdCapacity);
-    nodeInfo.put("SSDUsed", ssdUsed);
-    nodeInfo.put("SSDRemaining", ssdRemaining);
+    for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
+      String keyPrefix = "";
+      NodeStatus status = node.getNodeStatus();
+      if (status.isMaintenance()) {
+        keyPrefix = UsageStates.MAINT.getLabel();
+      } else if (status.isDecommission()) {
+        keyPrefix = UsageStates.DECOM.getLabel();
+      } else if (status.isAlive()) {
+        // Inservice but not dead
+        keyPrefix = UsageStates.ONLINE.getLabel();
+      } else {
+        // dead inservice node, skip it
+        continue;
+      }
+      List<StorageReportProto> storageReportProtos = node.getStorageReports();
+      for (StorageReportProto reportProto : storageReportProtos) {
+        if (reportProto.getStorageType() ==
+            StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK) {
+          nodeInfo.compute(keyPrefix + UsageMetrics.DiskCapacity.name(),
+              (k, v) -> v + reportProto.getCapacity());
+          nodeInfo.compute(keyPrefix + UsageMetrics.DiskRemaining.name(),
+              (k, v) -> v + reportProto.getRemaining());
+          nodeInfo.compute(keyPrefix + UsageMetrics.DiskUsed.name(),
+              (k, v) -> v + reportProto.getScmUsed());
+        } else if (reportProto.getStorageType() ==
+            StorageContainerDatanodeProtocolProtos.StorageTypeProto.SSD) {
+          nodeInfo.compute(keyPrefix + UsageMetrics.SSDCapacity.name(),
+              (k, v) -> v + reportProto.getCapacity());
+          nodeInfo.compute(keyPrefix + UsageMetrics.SSDRemaining.name(),
+              (k, v) -> v + reportProto.getRemaining());
+          nodeInfo.compute(keyPrefix + UsageMetrics.SSDUsed.name(),
+              (k, v) -> v + reportProto.getScmUsed());
+        }
+      }
+    }
     return nodeInfo;
+  }
+
+  private enum UsageMetrics {
+    DiskCapacity,
+    DiskUsed,
+    DiskRemaining,
+    SSDCapacity,
+    SSDUsed,
+    SSDRemaining
+  }
+
+  private enum UsageStates {
+    ONLINE(""),
+    MAINT("Maintenance"),
+    DECOM("Decommissioned");
+
+    private final String label;
+
+    public String getLabel() {
+      return label;
+    }
+
+    UsageStates(String label) {
+      this.label = label;
+    }
   }
 
   /**

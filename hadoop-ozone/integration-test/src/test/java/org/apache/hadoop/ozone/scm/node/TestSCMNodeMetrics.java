@@ -188,6 +188,30 @@ public class TestSCMNodeMetrics {
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("SSDRemaining", 0L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceDiskCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceDiskUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceDiskRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceSSDCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceSSDUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("MaintenanceSSDRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDiskCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDiskUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedDiskRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedSSDCapacity", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedSSDUsed", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("DecommissionedSSDRemaining", 0L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
   }
 
   @After
