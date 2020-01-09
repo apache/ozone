@@ -119,7 +119,7 @@ jobs:
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: integration
+            name: it-freon
             path: target/integration
   it-filesystem:
     name: it-filesystem
@@ -134,7 +134,7 @@ jobs:
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: integration
+            name: it-filesystem
             path: target/integration
   it-filesystem-contract:
     name: it-filesystem-contract
@@ -149,7 +149,7 @@ jobs:
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: integration
+            name: it-filesystem-contract
             path: target/integration
   it-client-and-hdds:
     name: it-client-and-hdds
@@ -164,7 +164,7 @@ jobs:
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: integration
+            name: it-client-and-hdds
             path: target/integration
   it-om:
     name: it-om
@@ -179,7 +179,7 @@ jobs:
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: integration
+            name: it-om
             path: target/integration
   it-ozone:
     name: it-ozone
@@ -194,5 +194,5 @@ jobs:
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: integration
+            name: it-ozone
             path: target/integration
