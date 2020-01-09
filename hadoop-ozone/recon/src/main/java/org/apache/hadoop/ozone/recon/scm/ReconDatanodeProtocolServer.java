@@ -29,17 +29,20 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.hdds.scm.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Recon's Datanode protocol server extended from SCM.
  */
 public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
+
+  private static final Logger LOG = LoggerFactory.getLogger(
+      ReconDatanodeProtocolServer.class);
 
   public ReconDatanodeProtocolServer(OzoneConfiguration conf,
                                      OzoneStorageContainerManager scm,
@@ -49,15 +52,11 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
   }
 
   @Override
-  public SCMVersionResponseProto getVersion(
-      SCMVersionRequestProto versionRequest) throws IOException {
-    return null;
-  }
-
-  @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
       SCMHeartbeatRequestProto heartbeat) throws IOException {
-    return null;
+    LOG.info("Heartbeart from Datanode {}",
+        heartbeat.getDatanodeDetails().getHostName());
+    return super.sendHeartbeat(heartbeat);
   }
 
   @Override
@@ -66,7 +65,10 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsRequestProto,
       PipelineReportsProto pipelineReports) throws IOException {
-    return null;
+    LOG.info("Datanode {} registered with Recon",
+        datanodeDetails.getHostName());
+    return super.register(datanodeDetails, nodeReport,
+        containerReportsRequestProto, pipelineReports);
   }
 
   @Override

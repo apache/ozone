@@ -130,6 +130,29 @@ public class SCMConnectionManager
    * @throws IOException
    */
   public void addSCMServer(InetSocketAddress address) throws IOException {
+    addSCMServer(address, 1000, false);
+  }
+
+  /**
+   * Adds a new Recon server to the set of endpoints.
+   * @param address Recon address.
+   * @throws IOException
+   */
+  public void addReconServer(InetSocketAddress address) throws IOException {
+    LOG.info("Adding Recon Server : {}", address.toString());
+    addSCMServer(address, 60000, true);
+  }
+
+  /**
+   * Add scm server helper method.
+   * @param address address
+   * @param sleepTime sleepTime
+   * @param passiveScm flag to specify passive SCM or not. Recon is passive SCM.
+   * @throws IOException
+   */
+  private void addSCMServer(InetSocketAddress address, long sleepTime,
+                            boolean passiveScm)
+      throws IOException {
     writeLock();
     try {
       if (scmMachines.containsKey(address)) {
@@ -144,7 +167,7 @@ public class SCMConnectionManager
 
       RetryPolicy retryPolicy =
           RetryPolicies.retryForeverWithFixedSleep(
-              1000, TimeUnit.MILLISECONDS);
+              sleepTime, TimeUnit.MILLISECONDS);
       StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           StorageContainerDatanodeProtocolPB.class, version,
           address, UserGroupInformation.getCurrentUser(), conf,
@@ -156,6 +179,7 @@ public class SCMConnectionManager
 
       EndpointStateMachine endPoint =
           new EndpointStateMachine(address, rpcClient, conf);
+      endPoint.setPassive(passiveScm);
       scmMachines.put(address, endPoint);
     } finally {
       writeUnlock();

@@ -33,8 +33,12 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 public interface ContainerDBServiceProvider {
 
   /**
+   * Start the Recon container DB provider service.
+   */
+  void start();
+
+  /*
    * Close the container DB
-   * mapping.
    */
   void stop() throws Exception;
 

@@ -85,7 +85,7 @@ public class ReconControllerModule extends AbstractModule {
 
     bind(ReconTaskController.class)
         .to(ReconTaskControllerImpl.class).in(Singleton.class);
-    bind(ReconStorageContainerManager.class);
+    bind(ReconStorageContainerManager.class).in(Singleton.class);
   }
 
   @Provides
