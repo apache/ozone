@@ -41,6 +41,7 @@ public class ReconServer extends GenericCli {
   private Injector injector;
 
   private ReconHttpServer httpServer;
+  private ReconStorageContainerManager scm;
 
   public static void main(String[] args) {
     new ReconServer().run(args);
@@ -81,7 +82,8 @@ public class ReconServer extends GenericCli {
       httpServer.start();
 
       getOzoneManagerServiceProvider().start();
-      getReconStorageContainerManager().start();
+      scm = getReconStorageContainerManager();
+      scm.start();
 
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
@@ -109,6 +111,10 @@ public class ReconServer extends GenericCli {
     ContainerDBServiceProvider containerDBServiceProvider =
         injector.getInstance(ContainerDBServiceProviderImpl.class);
     containerDBServiceProvider.stop();
+
+    if (scm != null) {
+      scm.stop();
+    }
   }
 
   public Injector getInjector() {
