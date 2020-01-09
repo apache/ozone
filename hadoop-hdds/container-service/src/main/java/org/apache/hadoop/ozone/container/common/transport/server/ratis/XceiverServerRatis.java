@@ -57,7 +57,6 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
-import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.util.SizeInBytes;
@@ -102,9 +101,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final ContainerController containerController;
   private ClientId clientId = ClientId.randomId();
   private final StateContext context;
-  private final ReplicationLevel replicationLevel;
   private long nodeFailureTimeoutMs;
-  private final long cacheEntryExpiryInteval;
   private boolean isStarted = false;
   private DatanodeDetails datanodeDetails;
   private final OzoneConfiguration conf;
@@ -138,14 +135,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
             new ArrayBlockingQueue<>(queueLimit),
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.context = context;
-    this.replicationLevel =
-        conf.getEnum(OzoneConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY,
-            OzoneConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT);
-    cacheEntryExpiryInteval = conf.getTimeDuration(OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_STATEMACHINEDATA_CACHE_EXPIRY_INTERVAL,
-        OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_STATEMACHINEDATA_CACHE_EXPIRY_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
     this.dispatcher = dispatcher;
     this.containerController = containerController;
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
@@ -162,8 +151,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
     return new ContainerStateMachine(gid, dispatcher, containerController,
-        chunkExecutor, this, cacheEntryExpiryInteval,
-        conf);
+        chunkExecutor, this, conf);
   }
 
   private RaftProperties newRaftProperties() {
