@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -1223,7 +1224,8 @@ public class TestSCMNodeManager {
     SCMNodeManager nodeManager = createNodeManager(conf);
 
     for (int i=0; i<nodeCount; i++) {
-      DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+      DatanodeDetails datanodeDetails =
+          MockDatanodeDetails.randomDatanodeDetails();
       final long capacity = 2000;
       final long used = 100;
       final long remaining = 1900;
