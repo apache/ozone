@@ -142,10 +142,14 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // behavior is also like this, even when key exists in a bucket, user
       // can still initiate MPU.
 
-
-      multipartKeyInfo = new OmMultipartKeyInfo(
-          keyArgs.getMultipartUploadID(), keyArgs.getModificationTime(),
-          keyArgs.getType(), keyArgs.getFactor(), new HashMap<>());
+      multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+          .setUploadID(keyArgs.getMultipartUploadID())
+          .setCreationTime(keyArgs.getModificationTime())
+          .setReplicationType(keyArgs.getType())
+          .setReplicationFactor(keyArgs.getFactor())
+          .setObjectID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
@@ -169,7 +173,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
           new CacheValue<>(Optional.of(multipartKeyInfo), transactionLogIndex));
-
 
       omClientResponse =
           new S3InitiateMultipartUploadResponse(multipartKeyInfo, omKeyInfo,

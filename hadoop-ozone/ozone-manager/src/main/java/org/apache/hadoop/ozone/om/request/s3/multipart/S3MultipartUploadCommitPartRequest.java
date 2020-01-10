@@ -175,6 +175,9 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         // Add this part information in to multipartKeyInfo.
         multipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo.build());
 
+        // Set the UpdateID to current transactionLogIndex
+        multipartKeyInfo.setUpdateID(transactionLogIndex);
+
         // Add to cache.
 
         // Delete from open key table and add it to multipart info table.
