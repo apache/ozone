@@ -1592,6 +1592,15 @@
   </property>
 
   <property>
+    <name>ozone.om.ratis.segment.preallocated.size</name>
+    <value>16KB</value>
+    <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
+    <description>The size of the buffer which is preallocated for raft segment
+      used by Apache Ratis on OM.(16 KB by default)
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.ratis.log.appender.queue.num-elements</name>
     <value>1024</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
