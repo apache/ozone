@@ -23,8 +23,11 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.security.token.Token;
@@ -35,10 +38,12 @@ import org.junit.Test;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Function;
 
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 
@@ -55,6 +60,7 @@ public class TestBlockInputStream {
   private int blockSize;
   private List<ChunkInfo> chunks;
   private Map<String, byte[]> chunkDataMap;
+  private boolean refreshFunctionFlag = false;
 
   @Before
   public void setup() throws Exception {
@@ -118,8 +124,19 @@ public class TestBlockInputStream {
           xceiverClientManager);
     }
 
+    DummyBlockInputStream(BlockID blockId,
+                          long blockLen,
+                          Pipeline pipeline,
+                          Token<OzoneBlockTokenIdentifier> token,
+                          boolean verifyChecksum,
+                          XceiverClientManager xceiverClientManager,
+                          Function<BlockID, Pipeline> refreshFunction) {
+      super(blockId, blockLen, pipeline, token, verifyChecksum,
+          xceiverClientManager, refreshFunction);
+    }
+
     @Override
-    protected List<ChunkInfo> getChunkInfos() {
+    protected List<ChunkInfo> getChunkInfos() throws IOException {
       return chunks;
     }
 
@@ -230,5 +247,59 @@ public class TestBlockInputStream {
     byte[] b2 = new byte[100];
     blockStream.read(b2, 0, 100);
     matchWithInputData(b2, 150, 100);
+  }
+
+  /**
+   * A dummy BlockInputStream with pipeline refresh function to mock read
+   * block call to DN.
+   */
+  private final class DummyBlockInputStreamWithRetry
+      extends DummyBlockInputStream {
+
+    private int getChunkInfoCount = 0;
+
+    private DummyBlockInputStreamWithRetry(BlockID blockId,
+                                   long blockLen,
+                                   Pipeline pipeline,
+                                   Token<OzoneBlockTokenIdentifier> token,
+                                   boolean verifyChecksum,
+                                   XceiverClientManager xceiverClientManager) {
+      super(blockId, blockLen, pipeline, token, verifyChecksum,
+          xceiverClientManager, blockID -> {
+            refreshFunctionFlag = true;
+            return Pipeline.newBuilder()
+                .setState(Pipeline.PipelineState.OPEN)
+                .setId(PipelineID.randomId())
+                .setType(HddsProtos.ReplicationType.STAND_ALONE)
+                .setFactor(HddsProtos.ReplicationFactor.ONE)
+                .setNodes(Collections.emptyList())
+                .build();
+          });
+    }
+
+    @Override
+    protected List<ChunkInfo> getChunkInfos() throws IOException {
+      if (getChunkInfoCount == 0) {
+        getChunkInfoCount++;
+        throw new ContainerNotFoundException("Exception encountered");
+      } else {
+        return super.getChunkInfos();
+      }
+    }
+  }
+
+  @Test
+  public void testRefreshPipelineFunction() throws Exception {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    createChunkList(5);
+    BlockInputStream blockInputStreamWithRetry =
+        new DummyBlockInputStreamWithRetry(blockID, blockSize, null, null,
+        false, null);
+
+    Assert.assertFalse(refreshFunctionFlag);
+    seekAndVerify(50);
+    byte[] b = new byte[200];
+    blockInputStreamWithRetry.read(b, 0, 200);
+    Assert.assertTrue(refreshFunctionFlag);
   }
 }

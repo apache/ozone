@@ -64,7 +64,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
   }
 
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     if (getOMResponse().getStatus() == NO_SUCH_MULTIPART_UPLOAD_ERROR) {
@@ -83,43 +83,46 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     }
 
     if (getOMResponse().getStatus() == OK) {
-
-      // If we have old part info:
-      // Need to do 3 steps:
-      //   0. Strip GDPR related metadata from multipart info
-      //   1. add old part to delete table
-      //   2. Commit multipart info which has information about this new part.
-      //   3. delete this new part entry from open key table.
-
-      // This means for this multipart upload part upload, we have an old
-      // part information, so delete it.
-      if (oldMultipartKeyInfo != null) {
-        OmKeyInfo partKey =
-            OmKeyInfo.getFromProtobuf(oldMultipartKeyInfo.getPartKeyInfo());
-
-        RepeatedOmKeyInfo repeatedOmKeyInfo =
-            omMetadataManager.getDeletedTable()
-                .get(oldMultipartKeyInfo.getPartName());
-
-        repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(partKey,
-            repeatedOmKeyInfo);
-
-        omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-            oldMultipartKeyInfo.getPartName(),
-            repeatedOmKeyInfo);
-      }
-
-      omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
-          multipartKey, omMultipartKeyInfo);
-
-      //  This information has been added to multipartKeyInfo. So, we can
-      //  safely delete part key info from open key table.
-      omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-          openKey);
+      addToDBBatch(omMetadataManager, batchOperation);
     }
   }
 
+  @Override
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
 
+    // If we have old part info:
+    // Need to do 3 steps:
+    //   0. Strip GDPR related metadata from multipart info
+    //   1. add old part to delete table
+    //   2. Commit multipart info which has information about this new part.
+    //   3. delete this new part entry from open key table.
 
+    // This means for this multipart upload part upload, we have an old
+    // part information, so delete it.
+    if (oldMultipartKeyInfo != null) {
+      OmKeyInfo partKey =
+          OmKeyInfo.getFromProtobuf(oldMultipartKeyInfo.getPartKeyInfo());
+
+      RepeatedOmKeyInfo repeatedOmKeyInfo =
+          omMetadataManager.getDeletedTable()
+              .get(oldMultipartKeyInfo.getPartName());
+
+      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(partKey,
+          repeatedOmKeyInfo);
+
+      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+          oldMultipartKeyInfo.getPartName(),
+          repeatedOmKeyInfo);
+    }
+
+    omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
+        multipartKey, omMultipartKeyInfo);
+
+    //  This information has been added to multipartKeyInfo. So, we can
+    //  safely delete part key info from open key table.
+    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
+        openKey);
+  }
 }
 

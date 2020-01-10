@@ -19,7 +19,7 @@ Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
-Test Setup          Setup s3 tests
+Suite Setup         Setup s3 tests
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878

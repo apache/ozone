@@ -94,12 +94,23 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
             null, null);
       }
 
-      OmVolumeArgs omVolumeArgs = null;
-      OzoneManagerProtocolProtos.UserVolumeInfo newVolumeList = null;
-
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
-      owner = getVolumeInfo(omMetadataManager, volume).getOwnerName();
+
+      OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
+
+      // Check if this transaction is a replay of ratis logs.
+      // If this is a replay, then the response has already been returned to
+      // the client. So take no further action and return a dummy
+      // OMClientResponse.
+      if (isReplay(ozoneManager, omVolumeArgs.getUpdateID(),
+          transactionLogIndex)) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}",
+            transactionLogIndex, deleteVolumeRequest);
+        return new OMVolumeDeleteResponse(createReplayOMResponse(omResponse));
+      }
+
+      owner = omVolumeArgs.getOwnerName();
       acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
           owner);
 
@@ -111,7 +122,8 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
         throw new OMException(OMException.ResultCodes.VOLUME_NOT_EMPTY);
       }
 
-      newVolumeList = omMetadataManager.getUserTable().get(owner);
+      OzoneManagerProtocolProtos.UserVolumeInfo newVolumeList =
+          omMetadataManager.getUserTable().get(owner);
 
       // delete the volume from the owner list
       // as well as delete the volume entry
@@ -127,12 +139,12 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
 
       omResponse.setDeleteVolumeResponse(
           DeleteVolumeResponse.newBuilder().build());
-      omClientResponse = new OMVolumeDeleteResponse(volume, owner,
-          newVolumeList, omResponse.build());
+      omClientResponse = new OMVolumeDeleteResponse(omResponse.build(),
+          volume, owner, newVolumeList);
 
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMVolumeDeleteResponse(null, null, null,
+      omClientResponse = new OMVolumeDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {
@@ -163,29 +175,6 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       omMetrics.incNumVolumeDeleteFails();
     }
     return omClientResponse;
-
-  }
-
-  /**
-   * Return volume info for the specified volume. This method should be
-   * called after acquiring volume lock.
-   * @param omMetadataManager
-   * @param volume
-   * @return OmVolumeArgs
-   * @throws IOException
-   */
-  private OmVolumeArgs getVolumeInfo(OMMetadataManager omMetadataManager,
-      String volume) throws IOException {
-
-    String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
-    OmVolumeArgs volumeArgs =
-        omMetadataManager.getVolumeTable().get(dbVolumeKey);
-    if (volumeArgs == null) {
-      throw new OMException("Volume " + volume + " is not found",
-          OMException.ResultCodes.VOLUME_NOT_FOUND);
-    }
-    return volumeArgs;
-
   }
 }
 

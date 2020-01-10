@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -54,7 +54,7 @@ public class TestRatisPipelineProvider {
   @Before
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
-    stateManager = new PipelineStateManager(new OzoneConfiguration());
+    stateManager = new PipelineStateManager();
     provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, new OzoneConfiguration());
   }
@@ -108,7 +108,7 @@ public class TestRatisPipelineProvider {
   private List<DatanodeDetails> createListOfNodes(int nodeCount) {
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < nodeCount; i++) {
-      nodes.add(TestUtils.randomDatanodeDetails());
+      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
     return nodes;
   }

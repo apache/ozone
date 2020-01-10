@@ -22,7 +22,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -53,9 +55,13 @@ import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 
 /**
  * The OM StateMachine is the state machine for OM Ratis server. It is
@@ -77,7 +83,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
 
+  // Map which contains index and term for the ratis transactions which are
+  // stateMachine entries which are recived through applyTransaction.
   private ConcurrentMap<Long, Long> applyTransactionMap =
+      new ConcurrentSkipListMap<>();
+
+  // Map which contains index and term for the ratis transactions which are
+  // conf/metadata entries which are received through notifyIndexUpdate.
+  private ConcurrentMap<Long, Long> ratisTransactionMap =
       new ConcurrentSkipListMap<>();
 
 
@@ -134,13 +147,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // SnapshotInfo represents the snapshotIndex i.e. the index of the last
     // transaction included in the snapshot. Hence, snaphsotInfo#index is not
     // updated here.
-    applyTransactionMap.put(index, currentTerm);
+
     // We need to call updateLastApplied here because now in ratis when a
     // node becomes leader, it is checking stateMachineIndex >=
     // placeHolderIndex (when a node becomes leader, it writes a conf entry
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
-    updateLastAppliedIndex(index);
+    computeAndUpdateLastAppliedIndex(index, currentTerm, null, false);
     snapshotInfo.updateTerm(currentTerm);
   }
 
@@ -212,14 +225,59 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
       // Add the term index and transaction log index to applyTransaction map
       // . This map will be used to update lastAppliedIndex.
+
+      CompletableFuture<Message> ratisFuture =
+          new CompletableFuture<>();
+
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
-      CompletableFuture<Message> future = CompletableFuture.supplyAsync(
-          () -> runCommand(request, trxLogIndex),
-          executorService);
-      return future;
-    } catch (IOException e) {
+      CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
+          () -> runCommand(request, trxLogIndex), executorService);
+      future.thenApply(omResponse -> {
+        if(!omResponse.getSuccess()) {
+          // When INTERNAL_ERROR or METADATA_ERROR it is considered as
+          // critical error and terminate the OM. Considering INTERNAL_ERROR
+          // also for now because INTERNAL_ERROR is thrown for any error
+          // which is not type OMException.
+
+          // Not done future with completeExceptionally because if we do
+          // that OM will still continue applying transaction until next
+          // snapshot. So in OM case if a transaction failed with un
+          // recoverable error and if we wait till snapshot to terminate
+          // OM, then if some client requested the read transaction of the
+          // failed request, there is a chance we shall give wrong result.
+          // So, to avoid these kind of issue, we should terminate OM here.
+          if (omResponse.getStatus() == INTERNAL_ERROR) {
+            terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
+          } else if (omResponse.getStatus() == METADATA_ERROR) {
+            terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
+          }
+        }
+
+        // For successful response and for all other errors which are not
+        // critical, we can complete future normally.
+        ratisFuture.complete(OMRatisHelper.convertResponseToMessage(
+            omResponse));
+        return ratisFuture;
+      });
+      return ratisFuture;
+    } catch (Exception e) {
       return completeExceptionally(e);
     }
+  }
+
+  /**
+   * Terminate OM.
+   * @param omResponse
+   * @param resultCode
+   */
+  private void terminate(OMResponse omResponse,
+      OMException.ResultCodes resultCode) {
+    OMException exception = new OMException(omResponse.getMessage(),
+        resultCode);
+    String errorMessage = "OM Ratis Server has received unrecoverable " +
+        "error, to avoid further DB corruption, terminating OM. Error " +
+        "Response received is:" + omResponse;
+    ExitUtils.terminate(1, errorMessage, exception, LOG);
   }
 
   /**
@@ -342,31 +400,74 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    * @throws ServiceException
    */
-  private Message runCommand(OMRequest request, long trxLogIndex) {
-    OMResponse response = handler.handleWriteRequest(request,
-        trxLogIndex).getOMResponse();
-    return OMRatisHelper.convertResponseToMessage(response);
+  private OMResponse runCommand(OMRequest request, long trxLogIndex) {
+    try {
+      return handler.handleWriteRequest(request,
+          trxLogIndex).getOMResponse();
+    } catch (Throwable e) {
+      // For any Runtime exceptions, terminate OM.
+      String errorMessage = "Request " + request + "failed with exception";
+      ExitUtils.terminate(1, errorMessage, e, LOG);
+    }
+    return null;
   }
 
   /**
    * Update lastAppliedIndex term and it's corresponding term in the
    * stateMachine.
-   * @param lastFlushedIndex
+   * @param flushedEpochs
    */
-  public synchronized void updateLastAppliedIndex(long lastFlushedIndex) {
-    Long appliedTerm = null;
-    long appliedIndex = -1;
-    for(long i = getLastAppliedTermIndex().getIndex() + 1;
-        i <= lastFlushedIndex; i++) {
-      final Long removed = applyTransactionMap.remove(i);
-      if (removed == null) {
-        break;
+  public void updateLastAppliedIndex(List<Long> flushedEpochs) {
+    Preconditions.checkArgument(flushedEpochs.size() > 0);
+    computeAndUpdateLastAppliedIndex(flushedEpochs.get(flushedEpochs.size() -1),
+        -1L, flushedEpochs, true);
+  }
+
+  /**
+   * Update State machine lastAppliedTermIndex.
+   * @param lastFlushedIndex
+   * @param currentTerm
+   * @param flushedEpochs - list of ratis transactions flushed to DB. If it
+   * is just one index and term, this can be set to null.
+   * @param checkMap - if true check applyTransactionMap, ratisTransaction
+   * Map and update lastAppliedTermIndex accordingly, else check
+   * lastAppliedTermIndex and update it.
+   */
+  private synchronized void computeAndUpdateLastAppliedIndex(
+      long lastFlushedIndex, long currentTerm, List<Long> flushedEpochs,
+      boolean checkMap) {
+    if (checkMap) {
+      List<Long> flushedTrans = new ArrayList<>(flushedEpochs);
+      Long appliedTerm = null;
+      long appliedIndex = -1;
+      for (long i = getLastAppliedTermIndex().getIndex() + 1; ; i++) {
+        if (flushedTrans.contains(i)) {
+          appliedIndex = i;
+          final Long removed = applyTransactionMap.remove(i);
+          appliedTerm = removed;
+          flushedTrans.remove(i);
+        } else if (ratisTransactionMap.containsKey(i)) {
+          final Long removed = ratisTransactionMap.remove(i);
+          appliedTerm = removed;
+          appliedIndex = i;
+        } else {
+          // Add remaining which are left in flushedEpochs to
+          // ratisTransactionMap to be considered further.
+          for (long epoch : flushedTrans) {
+            ratisTransactionMap.put(epoch, applyTransactionMap.remove(epoch));
+          }
+          break;
+        }
       }
-      appliedTerm = removed;
-      appliedIndex = i;
-    }
-    if (appliedTerm != null) {
-      updateLastAppliedTermIndex(appliedTerm, appliedIndex);
+      if (appliedTerm != null) {
+        updateLastAppliedTermIndex(appliedTerm, appliedIndex);
+      }
+    } else {
+      if (getLastAppliedTermIndex().getIndex() + 1 == lastFlushedIndex) {
+        updateLastAppliedTermIndex(currentTerm, lastFlushedIndex);
+      } else {
+        ratisTransactionMap.put(lastFlushedIndex, currentTerm);
+      }
     }
   }
 
@@ -410,5 +511,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+  }
+
+  @VisibleForTesting
+  void addApplyTransactionTermIndex(long term, long index) {
+    applyTransactionMap.put(index, term);
   }
 }

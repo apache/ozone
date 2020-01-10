@@ -94,6 +94,7 @@ enum Type {
   ListMultipartUploads = 82;
 
   ListTrash = 91;
+  RecoverTrash = 92;
 }
 
 message OMRequest {
@@ -165,6 +166,7 @@ message OMRequest {
   optional ListMultipartUploadsRequest      listMultipartUploadsRequest    = 83;
 
   optional ListTrashRequest                 listTrashRequest               = 91;
+  optional RecoverTrashRequest              RecoverTrashRequest            = 92;
 }
 
 message OMResponse {
@@ -236,6 +238,7 @@ message OMResponse {
   optional ListMultipartUploadsResponse listMultipartUploadsResponse = 82;
 
   optional ListTrashResponse                  listTrashResponse            = 91;
+  optional RecoverTrashResponse               RecoverTrashResponse         = 92;
 }
 
 enum Status {
@@ -308,6 +311,9 @@ enum Status {
     INVALID_PART_ORDER = 56;
     SCM_GET_PIPELINE_EXCEPTION = 57;
     INVALID_BUCKET_NAME = 58;
+
+    // When transactions are replayed
+    REPLAY = 100;
 }
 
 /**
@@ -324,6 +330,22 @@ message ListTrashRequest {
 
 message ListTrashResponse {
   repeated RepeatedKeyInfo deletedKeys = 1;
+}
+
+/**
+    This command acts as a recover command for deleted keys that are still
+    in deleted table on Ozone Manager.
+*/
+
+message RecoverTrashRequest {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    required string keyName = 3;
+    required string destinationBucket = 4;
+}
+
+message RecoverTrashResponse {
+    required bool response = 1;
 }
 
 message VolumeInfo {
@@ -723,6 +745,7 @@ message RepeatedKeyInfo {
 
 message OzoneFileStatusProto {
     required hadoop.fs.FileStatusProto status = 1;
+    optional KeyInfo keyInfo = 2;
 }
 
 message GetFileStatusRequest {
@@ -838,7 +861,7 @@ message PurgeKeysResponse {
 message OMTokenProto {
     enum Type {
       DELEGATION_TOKEN = 1;
-      S3TOKEN = 2;
+      S3AUTHINFO = 2;
     };
     required Type   type           = 1;
     optional uint32 version        = 2;

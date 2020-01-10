@@ -240,7 +240,7 @@ public class DefaultCAServer implements CertificateServer {
         return null; // cannot happen, keeping checkstyle happy.
       }
     } catch (CertificateException | IOException | OperatorCreationException e) {
-      LOG.error("Unable to issue a certificate. {}", e);
+      LOG.error("Unable to issue a certificate.", e);
       xcertHolder.completeExceptionally(new SCMSecurityException(e));
     }
     return xcertHolder;
@@ -279,7 +279,7 @@ public class DefaultCAServer implements CertificateServer {
     try {
       store.revokeCertificate(certificate.getSerialNumber());
     } catch (IOException ex) {
-      LOG.error("Revoking the certificate failed. {}", ex.getCause());
+      LOG.error("Revoking the certificate failed.", ex.getCause());
       throw new SCMSecurityException(ex);
     }
     return revoked;

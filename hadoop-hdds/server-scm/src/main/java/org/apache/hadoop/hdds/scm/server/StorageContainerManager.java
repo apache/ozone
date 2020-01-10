@@ -133,7 +133,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_
  */
 @InterfaceAudience.LimitedPrivate({"HDFS", "CBLOCK", "OZONE", "HBASE"})
 public final class StorageContainerManager extends ServiceRuntimeInfoImpl
-    implements SCMMXBean {
+    implements SCMMXBean, OzoneStorageContainerManager {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(StorageContainerManager.class);
@@ -416,8 +416,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();
     } else {
-      containerManager = new SCMContainerManager(
-          conf, scmNodeManager, pipelineManager, eventQueue);
+      containerManager = new SCMContainerManager(conf, pipelineManager);
     }
 
     if (configurator.getScmBlockManager() != null) {

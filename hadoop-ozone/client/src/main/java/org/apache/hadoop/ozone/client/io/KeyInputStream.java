@@ -18,9 +18,13 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
+
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -33,6 +37,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Maintaining a list of BlockInputStream. Read based on offset.
@@ -77,22 +83,22 @@ public class KeyInputStream extends InputStream implements Seekable {
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
       XceiverClientManager xceiverClientManager,
-      boolean verifyChecksum) {
+      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
     KeyInputStream keyInputStream = new KeyInputStream();
-    keyInputStream.initialize(keyInfo.getKeyName(), keyLocationInfos,
-        xceiverClientManager, verifyChecksum);
+    keyInputStream.initialize(keyInfo, keyLocationInfos,
+        xceiverClientManager, verifyChecksum, retryFunction);
 
     return new LengthInputStream(keyInputStream, keyInputStream.length);
   }
 
-  private synchronized void initialize(String keyName,
+  private synchronized void initialize(OmKeyInfo keyInfo,
       List<OmKeyLocationInfo> blockInfos,
       XceiverClientManager xceiverClientManager,
-      boolean verifyChecksum) {
-    this.key = keyName;
+      boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
+    this.key = keyInfo.getKeyName();
     this.blockOffsets = new long[blockInfos.size()];
     long keyLength = 0;
     for (int i = 0; i < blockInfos.size(); i++) {
@@ -102,8 +108,24 @@ public class KeyInputStream extends InputStream implements Seekable {
             "initialized later.", omKeyLocationInfo);
       }
 
+      // We also pass in functional reference which is used to refresh the
+      // pipeline info for a given OM Key location info.
       addStream(omKeyLocationInfo, xceiverClientManager,
-          verifyChecksum);
+          verifyChecksum, keyLocationInfo -> {
+            OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
+            BlockID blockID = keyLocationInfo.getBlockID();
+            List<OmKeyLocationInfo> collect =
+                newKeyInfo.getLatestVersionLocations()
+                .getLocationList()
+                .stream()
+                .filter(l -> l.getBlockID().equals(blockID))
+                .collect(Collectors.toList());
+            if (CollectionUtils.isNotEmpty(collect)) {
+              return collect.get(0).getPipeline();
+            } else {
+              return null;
+            }
+          });
 
       this.blockOffsets[i] = keyLength;
       keyLength += omKeyLocationInfo.getLength();
@@ -119,10 +141,12 @@ public class KeyInputStream extends InputStream implements Seekable {
    */
   private synchronized void addStream(OmKeyLocationInfo blockInfo,
       XceiverClientManager xceiverClientMngr,
-      boolean verifyChecksum) {
+      boolean verifyChecksum,
+      Function<OmKeyLocationInfo, Pipeline> refreshPipelineFunction) {
     blockStreams.add(new BlockInputStream(blockInfo.getBlockID(),
         blockInfo.getLength(), blockInfo.getPipeline(), blockInfo.getToken(),
-        verifyChecksum, xceiverClientMngr));
+        verifyChecksum, xceiverClientMngr,
+        blockID -> refreshPipelineFunction.apply(blockInfo)));
   }
 
   @VisibleForTesting
@@ -207,12 +231,12 @@ public class KeyInputStream extends InputStream implements Seekable {
   @Override
   public synchronized void seek(long pos) throws IOException {
     checkOpen();
+    if (pos == 0 && length == 0) {
+      // It is possible for length and pos to be zero in which case
+      // seek should return instead of throwing exception
+      return;
+    }
     if (pos < 0 || pos > length) {
-      if (pos == 0) {
-        // It is possible for length and pos to be zero in which case
-        // seek should return instead of throwing exception
-        return;
-      }
       throw new EOFException(
           "EOF encountered at pos: " + pos + " for key: " + key);
     }

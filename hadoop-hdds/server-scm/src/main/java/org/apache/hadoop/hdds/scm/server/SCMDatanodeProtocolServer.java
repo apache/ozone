@@ -115,14 +115,15 @@ public class SCMDatanodeProtocolServer implements
    */
   private final RPC.Server datanodeRpcServer;
 
-  private final StorageContainerManager scm;
+  private final OzoneStorageContainerManager scm;
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
   private final ProtocolMessageMetrics protocolMessageMetrics;
 
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
-      StorageContainerManager scm, EventPublisher eventPublisher)
+                                   OzoneStorageContainerManager scm,
+                                   EventPublisher eventPublisher)
       throws IOException {
 
     Preconditions.checkNotNull(scm, "SCM cannot be null");
@@ -151,8 +152,7 @@ public class SCMDatanodeProtocolServer implements
                 new StorageContainerDatanodeProtocolServerSideTranslatorPB(
                     this, protocolMessageMetrics));
 
-    InetSocketAddress datanodeRpcAddr =
-        HddsServerUtil.getScmDataNodeBindAddress(conf);
+    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
 
     datanodeRpcServer =
         startRpcServer(
@@ -164,7 +164,7 @@ public class SCMDatanodeProtocolServer implements
 
     datanodeRpcAddress =
         updateRPCListenAddress(
-            conf, OZONE_SCM_DATANODE_ADDRESS_KEY, datanodeRpcAddr,
+            conf, getScmDatanodeAddressKey(), datanodeRpcAddr,
             datanodeRpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
@@ -405,6 +405,14 @@ public class SCMDatanodeProtocolServer implements
         .replaceAll(System.lineSeparator(), " ")
         .trim()
         .replaceAll(" +", " ");
+  }
+
+  protected String getScmDatanodeAddressKey() {
+    return OZONE_SCM_DATANODE_ADDRESS_KEY;
+  }
+
+  protected InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
+    return HddsServerUtil.getScmDataNodeBindAddress(conf);
   }
 
   /**

@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .DatanodeBlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -98,7 +99,7 @@ public class TestContainerReplication {
     sourceDatanodes.add(firstDatanode.getDatanodeDetails());
 
     Pipeline sourcePipelines =
-        ContainerTestHelper.createPipeline(sourceDatanodes);
+        MockPipeline.createPipeline(sourceDatanodes);
 
     //create a new client
     XceiverClientSpi client = new XceiverClientGrpc(sourcePipelines, conf);

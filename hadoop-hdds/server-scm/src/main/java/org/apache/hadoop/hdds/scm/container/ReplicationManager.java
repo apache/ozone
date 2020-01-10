@@ -861,20 +861,6 @@ public class ReplicationManager implements MetricsSource {
     /**
      * The frequency in which ReplicationMonitor thread should run.
      */
-    private long interval = 5 * 60 * 1000;
-
-    /**
-     * Timeout for container replication & deletion command issued by
-     * ReplicationManager.
-     */
-    private long eventTimeout = 10 * 60 * 1000;
-
-    /**
-     * The number of container replica which must be available for a node to
-     * enter maintenance.
-     */
-    private int maintenanceReplicaMinimum = 2;
-
     @Config(key = "thread.interval",
         type = ConfigType.TIME,
         defaultValue = "300s",
@@ -884,10 +870,12 @@ public class ReplicationManager implements MetricsSource {
             "cluster. This property is used to configure the interval in " +
             "which that thread runs."
     )
-    public void setInterval(long interval) {
-      this.interval = interval;
-    }
+    private long interval = 5 * 60 * 1000;
 
+    /**
+     * Timeout for container replication & deletion command issued by
+     * ReplicationManager.
+     */
     @Config(key = "event.timeout",
         type = ConfigType.TIME,
         defaultValue = "10m",
@@ -895,10 +883,20 @@ public class ReplicationManager implements MetricsSource {
         description = "Timeout for the container replication/deletion commands "
             + "sent  to datanodes. After this timeout the command will be "
             + "retried.")
+    private long eventTimeout = 10 * 60 * 1000;
+
+    public void setInterval(long interval) {
+      this.interval = interval;
+    }
+
     public void setEventTimeout(long eventTimeout) {
       this.eventTimeout = eventTimeout;
     }
 
+    /**
+     * The number of container replica which must be available for a node to
+     * enter maintenance.
+     */
     @Config(key = "maintenance.replica.minimum",
         type = ConfigType.INT,
         defaultValue = "2",
@@ -908,6 +906,8 @@ public class ReplicationManager implements MetricsSource {
             " node into maintenance reduces the available replicas for any " +
             " container below this level, the node will remain in the " +
             " entering maintenance state until a new replica is created.")
+    private int maintenanceReplicaMinimum = 2;
+
     public void setMaintenanceReplicaMinimum(int replicaCount) {
       this.maintenanceReplicaMinimum = replicaCount;
     }

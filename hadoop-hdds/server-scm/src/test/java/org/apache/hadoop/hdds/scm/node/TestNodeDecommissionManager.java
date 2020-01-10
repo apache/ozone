@@ -20,9 +20,9 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -263,7 +263,7 @@ public class TestNodeDecommissionManager {
   private List<DatanodeDetails> generateDatanodes() {
     List<DatanodeDetails> dns = new ArrayList<>();
     for (int i=0; i<10; i++) {
-      DatanodeDetails dn = TestUtils.randomDatanodeDetails();
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       dns.add(dn);
       nodeManager.register(dn, null, null);
     }

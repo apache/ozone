@@ -39,6 +39,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
  */
@@ -62,7 +64,7 @@ public class TestSCMBlockProtocolServer {
     // add nodes to scm node manager
     nodeManager = scm.getScmNodeManager();
     for (int i = 0; i < nodeCount; i++) {
-      nodeManager.register(TestUtils.randomDatanodeDetails(), null, null);
+      nodeManager.register(randomDatanodeDetails(), null, null);
 
     }
     server = scm.getBlockProtocolServer();

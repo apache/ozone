@@ -134,7 +134,13 @@ public abstract class BackgroundService {
           if (LOG.isDebugEnabled()) {
             LOG.debug("task execution result size {}", result.getSize());
           }
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
+          LOG.warn(
+              "Background task failed due to interruption, retrying in " +
+                  "next interval", e);
+          // Re-interrupt the thread while catching InterruptedException
+          Thread.currentThread().interrupt();
+        } catch (ExecutionException e) {
           LOG.warn(
               "Background task fails to execute, "
                   + "retrying in next interval", e);
@@ -155,6 +161,8 @@ public abstract class BackgroundService {
         exec.shutdownNow();
       }
     } catch (InterruptedException e) {
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
       exec.shutdownNow();
     }
     if (threadGroup.activeCount() == 0 && !threadGroup.isDestroyed()) {

@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -56,7 +56,7 @@ public class TestContainerActionsHandler {
 
     ContainerActionsFromDatanode containerActions =
         new ContainerActionsFromDatanode(
-            TestUtils.randomDatanodeDetails(), cap);
+            MockDatanodeDetails.randomDatanodeDetails(), cap);
 
     queue.fireEvent(SCMEvents.CONTAINER_ACTIONS, containerActions);
     queue.processAll(1000L);

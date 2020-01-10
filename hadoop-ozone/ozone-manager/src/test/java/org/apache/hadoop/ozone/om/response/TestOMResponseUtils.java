@@ -67,7 +67,7 @@ public final class TestOMResponseUtils {
         .setVolume(volumeName).setCreationTime(Time.now()).build();
 
     OMVolumeCreateResponse omVolumeCreateResponse =
-        new OMVolumeCreateResponse(omVolumeArgs, userVolumeInfo, omResponse);
+        new OMVolumeCreateResponse(omResponse, omVolumeArgs, userVolumeInfo);
 
 
     OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(

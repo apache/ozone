@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 
 import org.junit.After;
 import org.junit.Before;
@@ -47,8 +47,8 @@ public class TestDatanodeAdminNodeDetails {
 
   @Test
   public void testEqualityBasedOnDatanodeDetails() {
-    DatanodeDetails dn1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails dn2 = TestUtils.randomDatanodeDetails();
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeAdminNodeDetails details1 =
         new DatanodeAdminNodeDetails(dn1, 0);
     DatanodeAdminNodeDetails details2 =
@@ -64,7 +64,7 @@ public class TestDatanodeAdminNodeDetails {
 
   @Test
   public void testMaintenanceEnd() {
-    DatanodeDetails dn = TestUtils.randomDatanodeDetails();
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     // End in zero hours - should never end.
     DatanodeAdminNodeDetails details = new DatanodeAdminNodeDetails(dn, 0);
     assertFalse(details.shouldMaintenanceEnd());

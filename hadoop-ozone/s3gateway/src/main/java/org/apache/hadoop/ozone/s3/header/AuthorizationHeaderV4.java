@@ -31,8 +31,8 @@ import java.time.LocalDate;
 import java.util.Collection;
 
 import static java.time.temporal.ChronoUnit.DAYS;
-import static org.apache.commons.lang3.StringUtils.isAllEmpty;
-import static org.apache.commons.lang3.StringUtils.isNoneEmpty;
+import static org.apache.commons.lang3.StringUtils.isEmpty;
+import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.AWSV4AuthParser.AWS4_SIGNING_ALGORITHM;
 import static org.apache.hadoop.ozone.s3.AWSV4AuthParser.DATE_FORMATTER;
@@ -107,7 +107,7 @@ public class AuthorizationHeaderV4 {
    * Validate Signed headers.
    * */
   private void validateSignedHeaders() throws OS3Exception {
-    if (isNoneEmpty(signedHeadersStr)
+    if (isNotEmpty(signedHeadersStr)
         && signedHeadersStr.startsWith(SIGNEDHEADERS)) {
       signedHeadersStr = signedHeadersStr.substring(SIGNEDHEADERS.length());
       signedHeaders = StringUtils.getStringCollection(signedHeadersStr, ";");
@@ -127,8 +127,8 @@ public class AuthorizationHeaderV4 {
   private void validateSignature() throws OS3Exception {
     if (signature.startsWith(SIGNATURE)) {
       signature = signature.substring(SIGNATURE.length());
-      if (!isNoneEmpty(signature)) {
-        LOG.error("Signature can't be empty.", signature);
+      if (isEmpty(signature)) {
+        LOG.error("Signature can't be empty: {}", signature);
         throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
       }
       try {
@@ -139,7 +139,7 @@ public class AuthorizationHeaderV4 {
         throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
       }
     } else {
-      LOG.error("Signature can't be empty.", signature);
+      LOG.error("No signature found: {}", signature);
       throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
     }
   }
@@ -148,7 +148,7 @@ public class AuthorizationHeaderV4 {
    * Validate credentials.
    * */
   private void validateCredentials() throws OS3Exception {
-    if (isNoneEmpty(credential) && credential.startsWith(CREDENTIAL)) {
+    if (isNotEmpty(credential) && credential.startsWith(CREDENTIAL)) {
       credential = credential.substring(CREDENTIAL.length());
       // Parse credential. Other parts of header are not validated yet. When
       // security comes, it needs to be completed.
@@ -170,7 +170,7 @@ public class AuthorizationHeaderV4 {
       throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
     }
     if (credentialObj.getAwsService().isEmpty()) {
-      LOG.error("AWS service:{} shouldn't be empty. credential:{}",
+      LOG.error("AWS service shouldn't be empty. credential:{}",
           credential);
       throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
     }
@@ -197,7 +197,7 @@ public class AuthorizationHeaderV4 {
    * Validate if algorithm is in expected format.
    * */
   private void validateAlgorithm() throws OS3Exception {
-    if (isAllEmpty(algorithm) || !algorithm.equals(AWS4_SIGNING_ALGORITHM)) {
+    if (isEmpty(algorithm) || !algorithm.equals(AWS4_SIGNING_ALGORITHM)) {
       LOG.error("Unexpected hash algorithm. Algo:{}", algorithm);
       throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
     }

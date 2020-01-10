@@ -19,5 +19,5 @@ package org.apache.hadoop.ozone.audit;
 /**
  * Unit tests of Ozone Audit Logger.
  * For test purpose, the log4j2 configuration is loaded from file at:
- * src/test/resources/log4j2.properties
+ * src/test/resources/auditlog.properties
  */

@@ -49,8 +49,8 @@ public class ListSubcommand implements Callable<Void> {
   private ContainerCommands parent;
 
   @Option(names = {"-s", "--start"},
-      description = "Container id to start the iteration", required = true)
-  private long startId = 1;
+      description = "Container id to start the iteration", required = false)
+  private long startId = 0;
 
   @Option(names = {"-c", "--count"},
       description = "Maximum number of containers to list",

@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
@@ -190,16 +191,17 @@ public class TestChunkManagerImpl {
   @Test
   public void testReadChunk() throws Exception {
     checkWriteIOStats(0, 0);
+    DispatcherContext dispatcherContext = getDispatcherContext();
     chunkManager.writeChunk(keyValueContainer, blockID, chunkInfo, data,
-        getDispatcherContext());
+        dispatcherContext);
     checkWriteIOStats(chunkInfo.getLen(), 1);
     checkReadIOStats(0, 0);
-    ByteBuffer expectedData = chunkManager.readChunk(keyValueContainer, blockID,
-        chunkInfo, getDispatcherContext());
-    assertEquals(chunkInfo.getLen(),
-        expectedData.limit()-expectedData.position());
+    ByteBuffer expectedData = chunkManager
+        .readChunk(keyValueContainer, blockID, chunkInfo, dispatcherContext)
+        .toByteString().asReadOnlyByteBuffer();
+    assertEquals(chunkInfo.getLen(), expectedData.remaining());
     assertEquals(expectedData.rewind(), rewindBufferToDataStart());
-    checkReadIOStats(expectedData.capacity(), 1);
+    checkReadIOStats(expectedData.limit(), 1);
   }
 
   @Test
@@ -233,7 +235,7 @@ public class TestChunkManagerImpl {
   public void testReadChunkFileNotExists() throws Exception {
     try {
       // trying to read a chunk, where chunk file does not exist
-      ByteBuffer expectedData = chunkManager.readChunk(keyValueContainer,
+      chunkManager.readChunk(keyValueContainer,
           blockID, chunkInfo, getDispatcherContext());
       fail("testReadChunkFileNotExists failed");
     } catch (StorageContainerException ex) {
@@ -281,7 +283,7 @@ public class TestChunkManagerImpl {
   public void dummyManagerReadsAnyChunk() throws Exception {
     ChunkManager dummy = new ChunkManagerDummyImpl(true);
 
-    ByteBuffer dataRead = dummy.readChunk(keyValueContainer,
+    ChunkBuffer dataRead = dummy.readChunk(keyValueContainer,
         blockID, chunkInfo, getDispatcherContext());
 
     assertNotNull(dataRead);

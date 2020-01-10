@@ -48,12 +48,14 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -567,7 +569,7 @@ public class KeyValueHandler extends Handler {
       return ContainerUtils.logAndReturnError(LOG, sce, request);
     }
 
-    ByteBuffer data;
+    ChunkBuffer data;
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getReadChunk().getBlockID());
@@ -592,7 +594,8 @@ public class KeyValueHandler extends Handler {
 
     Preconditions.checkNotNull(data, "Chunk data is null");
 
-    return getReadChunkResponse(request, byteBufferToByteString.apply(data));
+    ByteString byteString = data.toByteString(byteBufferToByteString);
+    return getReadChunkResponse(request, byteString);
   }
 
   /**
@@ -678,21 +681,21 @@ public class KeyValueHandler extends Handler {
     try {
       checkContainerOpen(kvContainer);
 
-      BlockID blockID = BlockID.getFromProtobuf(
-          request.getWriteChunk().getBlockID());
-      ContainerProtos.ChunkInfo chunkInfoProto =
-          request.getWriteChunk().getChunkData();
+      WriteChunkRequestProto writeChunk = request.getWriteChunk();
+      BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
+      ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
       Preconditions.checkNotNull(chunkInfo);
 
-      ByteBuffer data = null;
+      ChunkBuffer data = null;
       if (dispatcherContext == null) {
         dispatcherContext = new DispatcherContext.Builder().build();
       }
       WriteChunkStage stage = dispatcherContext.getStage();
       if (stage == WriteChunkStage.WRITE_DATA ||
           stage == WriteChunkStage.COMBINED) {
-        data = request.getWriteChunk().getData().asReadOnlyByteBuffer();
+        data =
+            ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
       }
 
       chunkManager
@@ -701,7 +704,7 @@ public class KeyValueHandler extends Handler {
       // We should increment stats after writeChunk
       if (stage == WriteChunkStage.WRITE_DATA||
           stage == WriteChunkStage.COMBINED) {
-        metrics.incContainerBytesStats(Type.WriteChunk, request.getWriteChunk()
+        metrics.incContainerBytesStats(Type.WriteChunk, writeChunk
             .getChunkData().getLen());
       }
     } catch (StorageContainerException ex) {
@@ -745,7 +748,8 @@ public class KeyValueHandler extends Handler {
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
       Preconditions.checkNotNull(chunkInfo);
 
-      ByteBuffer data = putSmallFileReq.getData().asReadOnlyByteBuffer();
+      ChunkBuffer data = ChunkBuffer.wrap(
+          putSmallFileReq.getData().asReadOnlyByteBufferList());
       if (dispatcherContext == null) {
         dispatcherContext = new DispatcherContext.Builder().build();
       }
@@ -765,7 +769,7 @@ public class KeyValueHandler extends Handler {
       blockManager.putBlock(kvContainer, blockData);
 
       blockDataProto = blockData.getProtoBufMessage();
-      metrics.incContainerBytesStats(Type.PutSmallFile, data.capacity());
+      metrics.incContainerBytesStats(Type.PutSmallFile, chunkInfo.getLen());
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -815,9 +819,9 @@ public class KeyValueHandler extends Handler {
       for (ContainerProtos.ChunkInfo chunk : responseData.getChunks()) {
         // if the block is committed, all chunks must have been committed.
         // Tmp chunk files won't exist here.
-        ByteBuffer data = chunkManager.readChunk(kvContainer, blockID,
+        ChunkBuffer data = chunkManager.readChunk(kvContainer, blockID,
             ChunkInfo.getFromProtoBuf(chunk), dispatcherContext);
-        ByteString current = byteBufferToByteString.apply(data);
+        ByteString current = data.toByteString(byteBufferToByteString);
         dataBuf = dataBuf.concat(current);
         chunkInfo = chunk;
       }
