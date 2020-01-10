@@ -513,37 +513,31 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
-//    OFSPath ofsPath = new OFSPath(f);
-//    checkAndCreateAdapter(ofsPath);
     int numEntries = LISTING_PAGE_SIZE;
     LinkedList<FileStatus> statuses = new LinkedList<>();
     List<FileStatus> tmpStatusList;
-    String startKey = "";
+    String startPath = "";
 
     do {
       tmpStatusList =
-          adapter.listStatus(pathToKey(f), false, startKey, numEntries,
-              uri,
-              // TODO: Double check, was:
-//              ofsPath.getNonKeyPartsURI(uri),
-              workingDir, getUsername())
+          adapter.listStatus(pathToKey(f), false, startPath,
+              numEntries, uri, workingDir, getUsername())
               .stream()
               .map(this::convertFileStatus)
               .collect(Collectors.toList());
 
       if (!tmpStatusList.isEmpty()) {
-        if (startKey.isEmpty()) {
+        if (startPath.isEmpty()) {
           statuses.addAll(tmpStatusList);
         } else {
           statuses.addAll(tmpStatusList.subList(1, tmpStatusList.size()));
         }
-        startKey = pathToKey(statuses.getLast().getPath());
+        startPath = pathToKey(statuses.getLast().getPath());
       }
       // listStatus returns entries numEntries in size if available.
       // Any lesser number of entries indicate that the required entries have
       // exhausted.
     } while (tmpStatusList.size() == numEntries);
-
 
     return statuses.toArray(new FileStatus[0]);
   }
@@ -804,14 +798,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       //NOOP: If not symlink symlink remains null.
     }
 
-    // Process path. TODO: do this in a better way?
+    // Process path.
     URI newUri = fileStatusAdapter.getPath().toUri();
     try {
       newUri = new URIBuilder().setScheme(newUri.getScheme())
           .setHost(newUri.getAuthority())
           .setPath(newUri.getPath())
-          // TODO: Double check, was:
-//          .setPath(adapterPath + newUri.getPath())
           .build();
     } catch (URISyntaxException e) {
     }

@@ -77,9 +77,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
   private OzoneVolume volume;
-  private String volumeStr;
   private OzoneBucket bucket;
-  private String bucketStr;
   private ReplicationType replicationType;
   private ReplicationFactor replicationFactor;
   private boolean securityEnabled;
@@ -169,8 +167,6 @@ public class BasicRootedOzoneClientAdapterImpl
             OzoneClientFactory.getRpcClient(conf);
       }
       objectStore = ozoneClient.getObjectStore();
-      this.volumeStr = null;
-      this.bucketStr = null;
       this.replicationType = ReplicationType.valueOf(replicationTypeConf);
       this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);
       this.configuredDnPort = conf.getInt(
@@ -189,19 +185,10 @@ public class BasicRootedOzoneClientAdapterImpl
     this.bucket = volume.getBucket(bucketString);
   }
 
-  public void setVolumeStr(String volumeStr) {
-    this.volumeStr = volumeStr;
-  }
-
-  public void setBucketStr(String bucketStr) {
-    this.bucketStr = bucketStr;
-  }
-
   private void getVolumeAndBucket(OFSPath ofsPath,
       boolean createIfNotExist) throws IOException {
-    setVolumeStr(ofsPath.getVolumeName());
-    setBucketStr(ofsPath.getBucketName());
-    getVolumeAndBucket(createIfNotExist);
+    getVolumeAndBucket(ofsPath.getVolumeName(), ofsPath.getBucketName(),
+        createIfNotExist);
   }
 
   /**
@@ -212,33 +199,32 @@ public class BasicRootedOzoneClientAdapterImpl
    *                         in order to create the volume and bucket.
    * @throws IOException
    */
-  private void getVolumeAndBucket(boolean createIfNotExist) throws IOException {
-    // TODO: I didn't find an existing API to check volume existence, will use
-    //  that instead of try-catch if there is, or we might want to add one.
-    // listVolume() doesn't do the exact job as it matches prefix.
+  private void getVolumeAndBucket(String volumeStr, String bucketStr,
+      boolean createIfNotExist) throws IOException {
+    // TODO: use objectStore.getClientProxy() directly to save an RPC roundtrip.
     try {
-      setVolume(this.volumeStr);
+      setVolume(volumeStr);
     } catch (OMException e) {
       if (createIfNotExist && e.getResult().equals(
           OMException.ResultCodes.VOLUME_NOT_FOUND)) {
         // Try to create volume.
-        objectStore.createVolume(this.volumeStr);
+        objectStore.createVolume(volumeStr);
         // Try setVolume again.
-        setVolume(this.volumeStr);
+        setVolume(volumeStr);
       } else {
         throw e;
       }
     }
 
     try {
-      setBucket(this.bucketStr);
+      setBucket(bucketStr);
     } catch (OMException e) {
       if (createIfNotExist && e.getResult().equals(
           OMException.ResultCodes.BUCKET_NOT_FOUND)) {
         // Try to create bucket.
-        volume.createBucket(this.bucketStr);
+        volume.createBucket(bucketStr);
         // Try setBucket again.
-        setBucket(this.bucketStr);
+        setBucket(bucketStr);
       } else {
         throw e;
       }

@@ -70,9 +70,9 @@ class OFSPath {
         mountName = null;
       }
     }
-//      else {
-//        // TODO: Root.
-//      }
+    else {
+      // TODO: Root.
+    }
 
     // Compose key name.
     if (token.hasMoreTokens()) {
