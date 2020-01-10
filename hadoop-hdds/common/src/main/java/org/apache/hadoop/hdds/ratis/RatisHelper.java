@@ -206,6 +206,10 @@ public interface RatisHelper {
     GrpcConfigKeys.OutputStream.setOutstandingAppendsMax(properties,
         maxOutStandingRequest);
 
+    // set async max outstanding requests.
+    RaftClientConfigKeys.Async.setMaxOutstandingRequests(properties,
+        maxOutStandingRequest);
+
     RaftClient.Builder builder =  RaftClient.newBuilder()
         .setRaftGroup(group)
         .setLeaderId(leader)

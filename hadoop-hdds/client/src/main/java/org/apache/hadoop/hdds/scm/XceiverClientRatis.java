@@ -175,9 +175,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       LOG.debug("Connecting to pipeline:{} datanode:{}", getPipeline().getId(),
           RatisHelper.toRaftPeerId(pipeline.getFirstNode()));
     }
-    // TODO : XceiverClient ratis should pass the config value of
-    // maxOutstandingRequests so as to set the upper bound on max no of async
-    // requests to be handled by raft client
+
     if (!client.compareAndSet(null,
         RatisHelper.newRaftClient(rpcType, getPipeline(), retryPolicy,
             maxOutstandingRequests, tlsConfig, clientRequestTimeout))) {
