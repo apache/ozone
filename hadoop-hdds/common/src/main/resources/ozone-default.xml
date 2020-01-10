@@ -1687,20 +1687,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.ratis.client.request.timeout.duration</name>
-    <value>3s</value>
-    <tag>OZONE, OM, MANAGEMENT, RATIS</tag>
-    <description>
-    </description>
-  </property>
-  <property>
-    <name>ozone.om.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
-    <tag>OZONE, OM, MANAGEMENT, RATIS</tag>
-    <description>
-    </description>
-  </property>
-  <property>
     <name>ozone.om.snapshot.provider.socket.timeout</name>
     <value>5000s</value>
     <tag>OZONE, OM, HA, MANAGEMENT</tag>
