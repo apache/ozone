@@ -147,7 +147,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       msg = "No healthy nodes found to allocate pipeline.";
       LOG.error(msg);
       throw new SCMException(msg, SCMException.ResultCodes
-          .FAILED_TO_FIND_HEALTHY_NODES);
+          .FAILED_TO_FIND_SUITABLE_NODE);
     }
 
     if (initialHealthyNodesCount < nodesRequired) {

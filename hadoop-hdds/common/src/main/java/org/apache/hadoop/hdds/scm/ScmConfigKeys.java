@@ -297,7 +297,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT =
           "ozone.scm.datanode.max.pipeline.engagement";
   // Setting to zero by default means this limit doesn't take effect.
-  public static final int OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT = 0;
+  public static final int OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT = 2;
 
   // Upper limit for how many pipelines can be created.
   // Only for test purpose now.

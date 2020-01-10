@@ -792,7 +792,7 @@
   </property>
   <property>
   <name>ozone.scm.datanode.max.pipeline.engagement</name>
-  <value>0</value>
+  <value>2</value>
   <tag>OZONE, SCM, PIPELINE</tag>
   <description>Max number of pipelines per datanode can be engaged in.
   </description>
