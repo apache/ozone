@@ -18,8 +18,11 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.ListIterator;
+
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -27,16 +30,18 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.ListIterator;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 /**
  * This class manages the stream entries list and handles block allocation
@@ -63,9 +68,9 @@ public class BlockOutputStreamEntryPool {
   private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
-  private ExcludeList excludeList;
+  private final ExcludeList excludeList;
 
-  @SuppressWarnings("parameternumber")
+  @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(OzoneManagerProtocol omClient,
       int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType type, long bufferFlushSize, long bufferMaxSize,
@@ -129,6 +134,7 @@ public class BlockOutputStreamEntryPool {
         .OZONE_CLIENT_BYTES_PER_CHECKSUM_DEFAULT_BYTES; // Default is 1MB
     currentStreamIndex = 0;
     openID = -1;
+    excludeList = new ExcludeList();
   }
 
   /**
@@ -221,9 +227,9 @@ public class BlockOutputStreamEntryPool {
       while (streamEntryIterator.hasNext()) {
         BlockOutputStreamEntry streamEntry = streamEntryIterator.next();
         Preconditions.checkArgument(streamEntry.getCurrentPosition() == 0);
-        if ((pipelineId != null && streamEntry.getPipeline().getId()
-            .equals(pipelineId)) || (containerID != -1
-            && streamEntry.getBlockID().getContainerID() == containerID)) {
+        if ((streamEntry.getPipeline().getId().equals(pipelineId)) ||
+            (containerID != -1 &&
+                streamEntry.getBlockID().getContainerID() == containerID)) {
           streamEntryIterator.remove();
         }
       }
@@ -243,7 +249,8 @@ public class BlockOutputStreamEntryPool {
   }
 
   long getKeyLength() {
-    return streamEntries.stream().mapToLong(e -> e.getCurrentPosition()).sum();
+    return streamEntries.stream().mapToLong(
+        BlockOutputStreamEntry::getCurrentPosition).sum();
   }
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
@@ -254,7 +261,9 @@ public class BlockOutputStreamEntryPool {
    * @throws IOException
    */
   private void allocateNewBlock() throws IOException {
-    LOG.info("Allocating block with {}", excludeList);
+    if (!excludeList.isEmpty()) {
+      LOG.info("Allocating block with {}", excludeList);
+    }
     OmKeyLocationInfo subKeyInfo =
         omClient.allocateBlock(keyArgs, openID, excludeList);
     addKeyLocationInfo(subKeyInfo);
@@ -302,21 +311,12 @@ public class BlockOutputStreamEntryPool {
       Preconditions.checkNotNull(omClient);
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
-      int succeededAllocates = 0;
-      try {
-        allocateNewBlock();
-        succeededAllocates += 1;
-      } catch (IOException ioe) {
-        LOG.error("Try to allocate more blocks for write failed, already "
-            + "allocated {} blocks for this write.", succeededAllocates, ioe);
-        throw ioe;
-      }
+      allocateNewBlock();
     }
     // in theory, this condition should never violate due the check above
     // still do a sanity check.
     Preconditions.checkArgument(currentStreamIndex < streamEntries.size());
-    BlockOutputStreamEntry current = streamEntries.get(currentStreamIndex);
-    return current;
+    return streamEntries.get(currentStreamIndex);
   }
 
   long computeBufferData() {
@@ -326,7 +326,6 @@ public class BlockOutputStreamEntryPool {
   void cleanup() {
     if (excludeList != null) {
       excludeList.clear();
-      excludeList = null;
     }
     if (bufferPool != null) {
       bufferPool.clearBufferPool();

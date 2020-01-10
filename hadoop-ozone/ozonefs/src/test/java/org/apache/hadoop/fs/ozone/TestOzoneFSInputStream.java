@@ -6,132 +6,134 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.fs.ozone;
 
-import java.io.IOException;
-import java.util.Arrays;
-
-import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
+import com.google.common.collect.ImmutableList;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-
-import org.apache.commons.lang3.RandomStringUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.IntFunction;
+
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+
 /**
- * Test OzoneFSInputStream by reading through multiple interfaces.
+ * Tests for {@link OzoneFSInputStream}.
  */
 public class TestOzoneFSInputStream {
-  private static MiniOzoneCluster cluster = null;
-  private static FileSystem fs;
-  private static Path filePath = null;
-  private static byte[] data = null;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
-  @BeforeClass
-  public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 10,
-        StorageUnit.MB);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
-        .build();
-    cluster.waitForClusterToBeReady();
+  private static final List<IntFunction<ByteBuffer>> BUFFER_CONSTRUCTORS =
+      ImmutableList.of(ByteBuffer::allocate, ByteBuffer::allocateDirect);
 
-    // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
-
-    // Fetch the host and port for File System init
-    DatanodeDetails datanodeDetails = cluster.getHddsDatanodes().get(0)
-        .getDatanodeDetails();
-
-    // Set the fs.defaultFS and start the filesystem
-    String uri = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, uri);
-    fs =  FileSystem.get(conf);
-    int fileLen = 100 * 1024 * 1024;
-    data = DFSUtil.string2Bytes(RandomStringUtils.randomAlphanumeric(fileLen));
-    filePath = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
-    try (FSDataOutputStream stream = fs.create(filePath)) {
-      stream.write(data);
+  @Test
+  public void readToByteBuffer() throws IOException {
+    for (IntFunction<ByteBuffer> constructor : BUFFER_CONSTRUCTORS) {
+      for (int streamLength = 1; streamLength <= 10; streamLength++) {
+        for (int bufferCapacity = 0; bufferCapacity <= 10; bufferCapacity++) {
+          testReadToByteBuffer(constructor, streamLength, bufferCapacity, 0);
+          if (bufferCapacity > 1) {
+            testReadToByteBuffer(constructor, streamLength, bufferCapacity, 1);
+            if (bufferCapacity > 2) {
+              testReadToByteBuffer(constructor, streamLength, bufferCapacity,
+                  bufferCapacity - 1);
+            }
+          }
+          testReadToByteBuffer(constructor, streamLength, bufferCapacity,
+              bufferCapacity);
+        }
+      }
     }
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
-  @AfterClass
-  public static void shutdown() throws IOException {
-    fs.close();
-    cluster.shutdown();
+  private static void testReadToByteBuffer(
+      IntFunction<ByteBuffer> bufferConstructor,
+      int streamLength, int bufferCapacity,
+      int bufferPosition) throws IOException {
+    final byte[] source = RandomUtils.nextBytes(streamLength);
+    final InputStream input = new ByteArrayInputStream(source);
+    final OzoneFSInputStream subject = createTestSubject(input);
+
+    final int expectedReadLength = Math.min(bufferCapacity - bufferPosition,
+        input.available());
+    final byte[] expectedContent = Arrays.copyOfRange(source, 0,
+        expectedReadLength);
+
+    final ByteBuffer buf = bufferConstructor.apply(bufferCapacity);
+    buf.position(bufferPosition);
+
+    final int bytesRead = subject.read(buf);
+
+    assertEquals(expectedReadLength, bytesRead);
+
+    final byte[] content = new byte[bytesRead];
+    buf.position(bufferPosition);
+    buf.get(content);
+    assertArrayEquals(expectedContent, content);
   }
 
   @Test
-  public void testO3FSSingleByteRead() throws IOException {
-    FSDataInputStream inputStream = fs.open(filePath);
-    byte[] value = new byte[data.length];
-    int i = 0;
-    while(true) {
-      int val = inputStream.read();
-      if (val == -1) {
-        break;
-      }
-      value[i] = (byte)val;
-      Assert.assertEquals("value mismatch at:" + i, value[i], data[i]);
-      i++;
+  public void readEmptyStreamToByteBuffer() throws IOException {
+    for (IntFunction<ByteBuffer> constructor : BUFFER_CONSTRUCTORS) {
+      final OzoneFSInputStream subject = createTestSubject(emptyStream());
+      final ByteBuffer buf = constructor.apply(1);
+
+      final int bytesRead = subject.read(buf);
+
+      assertEquals(-1, bytesRead);
+      assertEquals(0, buf.position());
     }
-    Assert.assertEquals(i, data.length);
-    Assert.assertTrue(Arrays.equals(value, data));
-    inputStream.close();
   }
 
   @Test
-  public void testO3FSMultiByteRead() throws IOException {
-    FSDataInputStream inputStream = fs.open(filePath);
-    byte[] value = new byte[data.length];
-    byte[] tmp = new byte[1* 1024 *1024];
-    int i = 0;
-    while(true) {
-      int val = inputStream.read(tmp);
-      if (val == -1) {
-        break;
-      }
-      System.arraycopy(tmp, 0, value, i * tmp.length, tmp.length);
-      i++;
+  public void bufferPositionUnchangedOnEOF() throws IOException {
+    for (IntFunction<ByteBuffer> constructor : BUFFER_CONSTRUCTORS) {
+      final OzoneFSInputStream subject = createTestSubject(eofStream());
+      final ByteBuffer buf = constructor.apply(123);
+
+      final int bytesRead = subject.read(buf);
+
+      assertEquals(-1, bytesRead);
+      assertEquals(0, buf.position());
     }
-    Assert.assertEquals(i * tmp.length, data.length);
-    Assert.assertTrue(Arrays.equals(value, data));
-    inputStream.close();
   }
+
+  private static OzoneFSInputStream createTestSubject(InputStream input) {
+    return new OzoneFSInputStream(input,
+        new FileSystem.Statistics("test"));
+  }
+
+  private static InputStream emptyStream() {
+    return new ByteArrayInputStream(new byte[0]);
+  }
+
+  private static InputStream eofStream() {
+    return new InputStream() {
+      @Override
+      public int available() {
+        return 123;
+      }
+
+      @Override
+      public int read() {
+        return -1;
+      }
+    };
+  }
+
 }

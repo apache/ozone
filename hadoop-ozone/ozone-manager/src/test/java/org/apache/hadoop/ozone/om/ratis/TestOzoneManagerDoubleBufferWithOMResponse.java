@@ -103,7 +103,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     ozoneManagerRatisSnapshot = index -> {
-      lastAppliedIndex = index;
+      lastAppliedIndex = index.get(index.size() - 1);
     };
     doubleBuffer = new OzoneManagerDoubleBuffer(omMetadataManager,
         ozoneManagerRatisSnapshot);
@@ -124,7 +124,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
    * @throws Exception
    */
   @Test(timeout = 500_000)
-  @Ignore("see HDDS-2535")
   public void testDoubleBuffer() throws Exception {
     // This test checks whether count in tables are correct or not.
     testDoubleBuffer(1, 10);

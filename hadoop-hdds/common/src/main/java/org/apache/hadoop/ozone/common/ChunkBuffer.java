@@ -17,9 +17,13 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.GatheringByteChannel;
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -51,11 +55,22 @@ public interface ChunkBuffer {
     return new ChunkBufferImplWithByteBuffer(buffer);
   }
 
+  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
+  static ChunkBuffer wrap(List<ByteBuffer> buffers) {
+    return new ChunkBufferImplWithByteBufferList(buffers);
+  }
+
   /** Similar to {@link ByteBuffer#position()}. */
   int position();
 
   /** Similar to {@link ByteBuffer#remaining()}. */
   int remaining();
+
+  /** Similar to {@link ByteBuffer#limit()}. */
+  int limit();
+
+  /** Similar to {@link ByteBuffer#rewind()}. */
+  ChunkBuffer rewind();
 
   /** Similar to {@link ByteBuffer#hasRemaining()}. */
   default boolean hasRemaining() {
@@ -63,19 +78,24 @@ public interface ChunkBuffer {
   }
 
   /** Similar to {@link ByteBuffer#clear()}. */
-  void clear();
+  ChunkBuffer clear();
 
   /** Similar to {@link ByteBuffer#put(ByteBuffer)}. */
-  void put(ByteBuffer b);
+  ChunkBuffer put(ByteBuffer b);
+
+  /** Similar to {@link ByteBuffer#put(byte[])}. */
+  default ChunkBuffer put(byte[] b) {
+    return put(ByteBuffer.wrap(b));
+  }
 
   /** Similar to {@link ByteBuffer#put(byte[], int, int)}. */
-  default void put(byte[] b, int offset, int length) {
-    put(ByteBuffer.wrap(b, offset, length));
+  default ChunkBuffer put(byte[] b, int offset, int length) {
+    return put(ByteBuffer.wrap(b, offset, length));
   }
 
   /** The same as put(b.asReadOnlyByteBuffer()). */
-  default void put(ByteString b) {
-    put(b.asReadOnlyByteBuffer());
+  default ChunkBuffer put(ByteString b) {
+    return put(b.asReadOnlyByteBuffer());
   }
 
   /**
@@ -96,6 +116,16 @@ public interface ChunkBuffer {
    */
   Iterable<ByteBuffer> iterate(int bufferSize);
 
+  List<ByteBuffer> asByteBufferList();
+
+  /**
+   * Write the contents of the buffer from the current position to the limit
+   * to {@code channel}.
+   *
+   * @return The number of bytes written, possibly zero
+   */
+  long writeTo(GatheringByteChannel channel) throws IOException;
+
   /**
    * Convert this buffer to a {@link ByteString}.
    * The position and limit of this {@link ChunkBuffer} remains unchanged.
@@ -104,6 +134,11 @@ public interface ChunkBuffer {
    */
   default ByteString toByteString(Function<ByteBuffer, ByteString> function) {
     return toByteStringImpl(b -> applyAndAssertFunction(b, function, this));
+  }
+
+  // for testing
+  default ByteString toByteString() {
+    return toByteString(ByteStringConversion::safeWrap);
   }
 
   ByteString toByteStringImpl(Function<ByteBuffer, ByteString> function);

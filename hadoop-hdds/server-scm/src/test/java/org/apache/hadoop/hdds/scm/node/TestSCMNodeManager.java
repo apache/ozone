@@ -66,6 +66,8 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
@@ -1022,7 +1024,7 @@ public class TestSCMNodeManager {
     conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
 
-    DatanodeDetails datanodeDetails = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
     UUID dnId = datanodeDetails.getUuid();
     String storagePath = testDir.getAbsolutePath() + "/" + dnId;
     StorageReportProto report =
@@ -1120,7 +1122,7 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails[] nodes = new DatanodeDetails[nodeCount];
       for (int i = 0; i < nodeCount; i++) {
-        DatanodeDetails node = TestUtils.createDatanodeDetails(
+        DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
         nodeManager.register(node, null, null);
         nodes[i] = node;
@@ -1163,7 +1165,7 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails[] nodes = new DatanodeDetails[nodeCount];
       for (int i = 0; i < nodeCount; i++) {
-        DatanodeDetails node = TestUtils.createDatanodeDetails(
+        DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
         nodeManager.register(node, null, null);
         nodes[i] = node;
@@ -1214,7 +1216,7 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails[] nodes = new DatanodeDetails[nodeCount];
       for (int i = 0; i < nodeCount; i++) {
-        DatanodeDetails node = TestUtils.createDatanodeDetails(
+        DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
         nodeManager.register(node, null, null);
       }

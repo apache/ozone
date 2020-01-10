@@ -16,19 +16,19 @@
  * limitations under the License.
  */
 
-import { Dashboard } from './views/Dashboard/Dashboard';
-import { ContainerBrowser } from './views/ContainerBrowser/ContainerBrowser';
-import { NotFound } from './views/NotFound/NotFound';
-import { IRoute } from "./routes.types";
+import {Overview} from './views/Overview/Overview';
+import {Datanodes} from './views/Datanodes/Datanodes';
+import {NotFound} from './views/NotFound/NotFound';
+import {IRoute} from "./routes.types";
 
-export const routes:IRoute[] = [
+export const routes: IRoute[] = [
   {
-    path: "/Dashboard",
-    component: Dashboard
+    path: "/Overview",
+    component: Overview
   },
   {
-    path: "/ContainerBrowser",
-    component: ContainerBrowser
+    path: "/Datanodes",
+    component: Datanodes
   },
   {
     path: "/:NotFound",

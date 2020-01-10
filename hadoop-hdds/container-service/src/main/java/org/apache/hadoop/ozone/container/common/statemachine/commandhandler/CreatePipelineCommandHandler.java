@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -16,12 +16,15 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.CreatePipelineCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -31,7 +34,10 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.protocol.NotLeaderException;
+import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,13 +54,16 @@ public class CreatePipelineCommandHandler implements CommandHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(CreatePipelineCommandHandler.class);
 
-  private AtomicLong invocationCount = new AtomicLong(0);
+  private final AtomicLong invocationCount = new AtomicLong(0);
+  private final Configuration conf;
+
   private long totalTime;
 
   /**
    * Constructs a createPipelineCommand handler.
    */
-  public CreatePipelineCommandHandler() {
+  public CreatePipelineCommandHandler(Configuration conf) {
+    this.conf = conf;
   }
 
   /**
@@ -75,22 +84,31 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     final CreatePipelineCommandProto createCommand =
         ((CreatePipelineCommand)command).getProto();
     final HddsProtos.PipelineID pipelineID = createCommand.getPipelineID();
-    Collection<DatanodeDetails> peers =
+    final Collection<DatanodeDetails> peers =
         createCommand.getDatanodeList().stream()
             .map(DatanodeDetails::getFromProtoBuf)
             .collect(Collectors.toList());
 
     try {
       XceiverServerSpi server = ozoneContainer.getWriteChannel();
-      server.addGroup(pipelineID, peers);
-      LOG.info("Create Pipeline {} {} #{} command succeed on datanode {}.",
-          createCommand.getType(), createCommand.getFactor(), pipelineID,
-          dn.getUuidString());
-      // Trigger heartbeat report
-      context.addReport(context.getParent().getContainer().getPipelineReport());
-      context.getParent().triggerHeartbeat();
-    } catch (NotLeaderException e) {
-      LOG.debug("Follower cannot create pipeline #{}.", pipelineID);
+      if (!server.isExist(pipelineID)) {
+        final RaftGroupId groupId = RaftGroupId.valueOf(
+            PipelineID.getFromProtobuf(pipelineID).getId());
+        final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers);
+        server.addGroup(pipelineID, peers);
+        peers.stream().filter(
+            d -> !d.getUuid().equals(dn.getUuid()))
+            .forEach(d -> {
+              final RaftPeer peer = RatisHelper.toRaftPeer(d);
+              try (RaftClient client = RatisHelper.newRaftClient(peer, conf)) {
+                client.groupAdd(group, peer.getId());
+              } catch (IOException ioe) {
+                LOG.warn("Add group failed for {}", d, ioe);
+              }
+            });
+        LOG.info("Created Pipeline {} {} #{}.",
+            createCommand.getType(), createCommand.getFactor(), pipelineID);
+      }
     } catch (IOException e) {
       LOG.error("Can't create pipeline {} {} #{}", createCommand.getType(),
           createCommand.getFactor(), pipelineID, e);

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.common.Storage;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
@@ -41,6 +42,11 @@ public class SCMStorageConfig extends Storage {
    */
   public SCMStorageConfig(OzoneConfiguration conf) throws IOException {
     super(NodeType.SCM, ServerUtils.getScmDbDir(conf), STORAGE_DIR);
+  }
+
+  public SCMStorageConfig(NodeType type, File root, String sdName)
+      throws IOException {
+    super(type, root, sdName);
   }
 
   public void setScmId(String scmId) throws IOException {

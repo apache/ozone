@@ -30,8 +30,6 @@ import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CreateVolumeRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .VolumeInfo;
@@ -44,7 +42,6 @@ import static org.mockito.Mockito.when;
 
 public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
-
   @Test
   public void testPreExecute() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -52,7 +49,6 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     String ownerName = UUID.randomUUID().toString();
     doPreExecute(volumeName, adminName, ownerName);
   }
-
 
   @Test
   public void testValidateAndUpdateCacheWithZeroMaxUserVolumeCount()
@@ -83,7 +79,6 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
       GenericTestUtils.assertExceptionContains("should be greater than zero",
           ex);
     }
-
   }
 
   @Test
@@ -163,10 +158,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
     Assert.assertTrue(omMetadataManager
         .getUserTable().get(ownerKey).getVolumeNamesList().size() == 2);
-
-
   }
-
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeAlreadyExists()
@@ -200,9 +192,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // Check really if we have a volume with the specified volume name.
     Assert.assertNotNull(omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(volumeName)));
-
   }
-
 
   private void doPreExecute(String volumeName,
       String adminName, String ownerName) throws Exception {
@@ -237,22 +227,29 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
         updated.getCreationTime());
   }
 
-  /**
-   * Create OMRequest for create volume.
-   * @param volumeName
-   * @param adminName
-   * @param ownerName
-   * @return OMRequest
-   */
-  private OMRequest createVolumeRequest(String volumeName, String adminName,
-      String ownerName) {
-    VolumeInfo volumeInfo = VolumeInfo.newBuilder().setVolume(volumeName)
-        .setAdminName(adminName).setOwnerName(ownerName).build();
-    CreateVolumeRequest createVolumeRequest =
-        CreateVolumeRequest.newBuilder().setVolumeInfo(volumeInfo).build();
+  @Test
+  public void testReplayRequest() throws Exception {
 
-    return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
-        .setCreateVolumeRequest(createVolumeRequest).build();
+    String volumeName = UUID.randomUUID().toString();
+    String adminName = "user1";
+    String ownerName = "user1";
+    OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
+        ownerName);
+    OMVolumeCreateRequest omVolumeCreateRequest =
+        new OMVolumeCreateRequest(originalRequest);
+
+    // Execute the original request
+    omVolumeCreateRequest.preExecute(ozoneManager);
+    omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
+        ozoneManagerDoubleBufferHelper);
+
+    // Replay the transaction - Execute the same request again
+    OMClientResponse omClientResponse =
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    // Replay should result in Replay response
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+        omClientResponse.getOMResponse().getStatus());
   }
 }

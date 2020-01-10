@@ -199,7 +199,7 @@ public class RocksDBStoreMBean implements DynamicMBean, MetricsSource {
                   histogramAttribute.toUpperCase(), "RocksDBStat"),
               metricValue);
         } catch (Exception e) {
-          LOG.error("Error reading histogram data {} ", e);
+          LOG.error("Error reading histogram data", e);
         }
       }
     }

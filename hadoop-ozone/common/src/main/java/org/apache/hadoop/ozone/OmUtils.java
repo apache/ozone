@@ -205,6 +205,7 @@ public final class OmUtils {
     case LookupKey:
     case ListKeys:
     case ListTrash:
+    case RecoverTrash:
     case InfoS3Bucket:
     case ListS3Buckets:
     case ServiceList:
@@ -446,7 +447,7 @@ public final class OmUtils {
 
   public static File createOMDir(String dirPath) {
     File dirFile = new File(dirPath);
-    if (!dirFile.exists() && !dirFile.mkdirs()) {
+    if (!dirFile.mkdirs() && !dirFile.exists()) {
       throw new IllegalArgumentException("Unable to create path: " + dirFile);
     }
     return dirFile;

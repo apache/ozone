@@ -18,10 +18,10 @@
 package org.apache.hadoop.hdds.scm.container.states;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -421,7 +421,7 @@ public class TestContainerReplicaCount {
       ContainerReplicaProto.State... states) {
     Set<ContainerReplica> replica = new HashSet<>();
     for (ContainerReplicaProto.State s : states) {
-      DatanodeDetails dn = TestUtils.randomDatanodeDetails();
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       replica.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(new ContainerID(1))
           .setContainerState(s)

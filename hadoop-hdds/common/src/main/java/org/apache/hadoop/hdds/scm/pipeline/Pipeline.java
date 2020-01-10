@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -132,6 +133,25 @@ public final class Pipeline {
     return new ArrayList<>(nodeStatus.keySet());
   }
 
+  /**
+   * Returns the leader if found else defaults to closest node.
+   *
+   * @return {@link DatanodeDetails}
+   */
+  public DatanodeDetails getLeaderNode() throws IOException {
+    if (nodeStatus.isEmpty()) {
+      throw new IOException(String.format("Pipeline=%s is empty", id));
+    }
+    Optional<DatanodeDetails> datanodeDetails =
+        nodeStatus.keySet().stream().filter(d ->
+            d.getUuid().equals(leaderId)).findFirst();
+    if (datanodeDetails.isPresent()) {
+      return datanodeDetails.get();
+    } else {
+      return getClosestNode();
+    }
+  }
+
   public DatanodeDetails getFirstNode() throws IOException {
     if (nodeStatus.isEmpty()) {
       throw new IOException(String.format("Pipeline=%s is empty", id));
@@ -218,8 +238,7 @@ public final class Pipeline {
         }
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Serialize pipeline {} with nodesInOrder{ }", id.toString(),
-            nodes);
+        LOG.debug("Serialize pipeline {} with nodesInOrder {}", id, nodes);
       }
     }
     return builder.build();
@@ -379,7 +398,7 @@ public final class Pipeline {
         }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Deserialize nodesInOrder {} in pipeline {}",
-              nodesWithOrder, id.toString());
+              nodesWithOrder, id);
         }
         pipeline.setNodesInOrder(nodesWithOrder);
       } else if (nodesInOrder != null){

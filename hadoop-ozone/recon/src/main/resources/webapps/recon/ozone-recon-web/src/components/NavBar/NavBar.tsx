@@ -18,11 +18,12 @@
 
 import React from 'react';
 import logo from '../../logo.png';
-import { Layout, Menu, Icon } from 'antd';
+import {Layout, Menu, Icon} from 'antd';
 import './NavBar.less';
-import { withRouter, Link } from 'react-router-dom';
-import { RouteComponentProps } from 'react-router';
-const { Sider } = Layout;
+import {withRouter, Link} from 'react-router-dom';
+import {RouteComponentProps} from 'react-router';
+
+const {Sider} = Layout;
 
 interface NavBarProps extends RouteComponentProps<any> {
   collapsed: boolean;
@@ -48,15 +49,20 @@ class NavBar extends React.Component<NavBarProps> {
           </div>
           <Menu theme="dark" defaultSelectedKeys={['/Dashboard']}
                 mode="inline" selectedKeys={[location.pathname]}>
-            <Menu.Item key="/Dashboard">
+            <Menu.Item key="/Overview">
               <Icon type="dashboard"/>
-              <span>Dashboard</span>
-              <Link to="/Dashboard"/>
+              <span>Overview</span>
+              <Link to="/Overview"/>
             </Menu.Item>
-            <Menu.Item key="/ContainerBrowser">
-              <Icon type="file-search"/>
-              <span>Container Browser</span>
-              <Link to="/ContainerBrowser"/>
+            <Menu.Item key="/Datanodes">
+              <Icon type="cluster"/>
+              <span>Datanodes</span>
+              <Link to="/Datanodes"/>
+            </Menu.Item>
+            <Menu.Item key="/Pipelines">
+              <Icon type="deployment-unit"/>
+              <span>Pipelines</span>
+              <Link to="/Pipelines"/>
             </Menu.Item>
           </Menu>
         </Sider>

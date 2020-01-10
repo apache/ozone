@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
@@ -62,7 +63,7 @@ public class ChunkManagerDummyImpl extends ChunkManagerImpl {
    */
   @Override
   public void writeChunk(Container container, BlockID blockID, ChunkInfo info,
-      ByteBuffer data, DispatcherContext dispatcherContext)
+      ChunkBuffer data, DispatcherContext dispatcherContext)
       throws StorageContainerException {
     long writeTimeStart = Time.monotonicNow();
 
@@ -112,7 +113,7 @@ public class ChunkManagerDummyImpl extends ChunkManagerImpl {
    * TODO: Explore if we need to do that for ozone.
    */
   @Override
-  public ByteBuffer readChunk(Container container, BlockID blockID,
+  public ChunkBuffer readChunk(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext) {
 
     long readStartTime = Time.monotonicNow();
@@ -130,7 +131,7 @@ public class ChunkManagerDummyImpl extends ChunkManagerImpl {
     volumeIOStats.incReadOpCount();
     volumeIOStats.incReadBytes(info.getLen());
 
-    return data;
+    return ChunkBuffer.wrap(data);
   }
 
   /**

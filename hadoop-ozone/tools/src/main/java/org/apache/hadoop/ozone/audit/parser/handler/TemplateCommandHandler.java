@@ -32,7 +32,14 @@ import picocli.CommandLine.ParentCommand;
  */
 @Command(name = "template",
     aliases = "t",
-    description = "Execute template query",
+    description = "Execute template query.\n\n" +
+        "To run a template query:\n" +
+        "ozone auditparser <path to db file> template <template>\n\n" +
+        "Following templates are available:\n" +
+        "(Template)              (Description)\n" +
+        "top5users              : Top 5 users.\n" +
+        "top5cmds               : Top 5 commands.\n" +
+        "top5activetimebyseconds: Top 5 active times, grouped by seconds.\n",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class TemplateCommandHandler implements Callable<Void> {

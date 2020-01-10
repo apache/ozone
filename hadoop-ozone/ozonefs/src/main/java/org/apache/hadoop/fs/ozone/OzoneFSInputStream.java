@@ -20,10 +20,14 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.FSInputStream;
+import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Seekable;
 
 /**
@@ -34,22 +38,33 @@ import org.apache.hadoop.fs.Seekable;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public final class OzoneFSInputStream extends FSInputStream {
+public final class OzoneFSInputStream extends FSInputStream
+    implements ByteBufferReadable {
 
   private final InputStream inputStream;
+  private final Statistics statistics;
 
-  public OzoneFSInputStream(InputStream inputStream) {
+  public OzoneFSInputStream(InputStream inputStream, Statistics statistics) {
     this.inputStream = inputStream;
+    this.statistics = statistics;
   }
 
   @Override
   public int read() throws IOException {
-    return inputStream.read();
+    int byteRead = inputStream.read();
+    if (statistics != null && byteRead >= 0) {
+      statistics.incrementBytesRead(1);
+    }
+    return byteRead;
   }
 
   @Override
   public int read(byte[] b, int off, int len) throws IOException {
-    return inputStream.read(b, off, len);
+    int bytesRead = inputStream.read(b, off, len);
+    if (statistics != null && bytesRead >= 0) {
+      statistics.incrementBytesRead(bytesRead);
+    }
+    return bytesRead;
   }
 
   @Override
@@ -75,5 +90,37 @@ public final class OzoneFSInputStream extends FSInputStream {
   @Override
   public int available() throws IOException {
     return inputStream.available();
+  }
+
+  /**
+   * @param buf the ByteBuffer to receive the results of the read operation.
+   * @return the number of bytes read, possibly zero, or -1 if
+   *         reach end-of-stream
+   * @throws IOException if there is some error performing the read
+   */
+  @Override
+  public int read(ByteBuffer buf) throws IOException {
+    if (buf.isReadOnly()){
+      throw new ReadOnlyBufferException();
+    }
+
+    int readLen = Math.min(buf.remaining(), available());
+
+    int bytesRead;
+    if (buf.hasArray()) {
+      int pos = buf.position();
+      bytesRead = read(buf.array(), pos, readLen);
+      if (bytesRead > 0) {
+        buf.position(pos + bytesRead);
+      }
+    } else {
+      byte[] readData = new byte[readLen];
+      bytesRead = read(readData, 0, readLen);
+      if (bytesRead > 0) {
+        buf.put(readData);
+      }
+    }
+
+    return bytesRead;
   }
 }

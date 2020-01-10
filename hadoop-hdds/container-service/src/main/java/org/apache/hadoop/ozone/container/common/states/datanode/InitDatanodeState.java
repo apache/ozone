@@ -42,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
 import static org.apache.hadoop.hdds.HddsUtils.getSCMAddresses;
 
 /**
@@ -88,7 +89,7 @@ public class InitDatanodeState implements DatanodeState,
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
     }
 
-    if (addresses == null || addresses.isEmpty()) {
+    if (addresses.isEmpty()) {
       LOG.error("Null or empty SCM address list found.");
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
     } else {
@@ -104,6 +105,10 @@ public class InitDatanodeState implements DatanodeState,
       }
       for (InetSocketAddress addr : addresses) {
         connectionManager.addSCMServer(addr);
+      }
+      InetSocketAddress reconAddress = getReconAddresses(conf);
+      if (reconAddress != null) {
+        connectionManager.addReconServer(reconAddress);
       }
     }
 

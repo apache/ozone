@@ -83,3 +83,5 @@ LOG4J2.PROPERTIES_logger.audit.appenderRef.file.ref=RollingFile
 LOG4J2.PROPERTIES_rootLogger.level=INFO
 LOG4J2.PROPERTIES_rootLogger.appenderRefs=stdout
 LOG4J2.PROPERTIES_rootLogger.appenderRef.stdout.ref=STDOUT
+
+no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1

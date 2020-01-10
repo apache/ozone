@@ -58,6 +58,7 @@ public class OMMetrics {
   private @Metric MutableCounterLong numKeyDeletes;
   private @Metric MutableCounterLong numBucketLists;
   private @Metric MutableCounterLong numKeyLists;
+  private @Metric MutableCounterLong numTrashKeyLists;
   private @Metric MutableCounterLong numVolumeLists;
   private @Metric MutableCounterLong numKeyCommits;
   private @Metric MutableCounterLong numBlockAllocations;
@@ -88,6 +89,7 @@ public class OMMetrics {
   private @Metric MutableCounterLong numKeyDeleteFails;
   private @Metric MutableCounterLong numBucketListFails;
   private @Metric MutableCounterLong numKeyListFails;
+  private @Metric MutableCounterLong numTrashKeyListFails;
   private @Metric MutableCounterLong numVolumeListFails;
   private @Metric MutableCounterLong numKeyCommitFails;
   private @Metric MutableCounterLong numBlockAllocationFails;
@@ -276,6 +278,11 @@ public class OMMetrics {
   public void incNumKeyLists() {
     numKeyOps.incr();
     numKeyLists.incr();
+  }
+
+  public void incNumTrashKeyLists() {
+    numKeyOps.incr();
+    numTrashKeyLists.incr();
   }
 
   public void incNumVolumeLists() {
@@ -498,6 +505,10 @@ public class OMMetrics {
     numKeyListFails.incr();
   }
 
+  public void incNumTrashKeyListFails() {
+    numTrashKeyListFails.incr();
+  }
+
   public void incNumVolumeListFails() {
     numVolumeListFails.incr();
   }
@@ -572,6 +583,11 @@ public class OMMetrics {
   @VisibleForTesting
   public long getNumKeyLists() {
     return numKeyLists.value();
+  }
+
+  @VisibleForTesting
+  public long getNumTrashKeyLists() {
+    return numTrashKeyLists.value();
   }
 
   @VisibleForTesting
@@ -674,6 +690,10 @@ public class OMMetrics {
     return numKeyListFails.value();
   }
 
+  @VisibleForTesting
+  public long getNumTrashKeyListFails() {
+    return numTrashKeyListFails.value();
+  }
 
   @VisibleForTesting
   public long getNumFSOps() {

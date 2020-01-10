@@ -57,6 +57,11 @@ public final class ReconServerConfigKeys {
   public static final String OZONE_RECON_OM_SNAPSHOT_DB_DIR =
       "ozone.recon.om.db.dir";
 
+  public static final String OZONE_RECON_SCM_DB_DIR =
+      "ozone.recon.scm.db.dirs";
+
+  public static final String RECON_STORAGE_DIR = "recon";
+
   public static final String RECON_OM_SOCKET_TIMEOUT =
       "recon.om.socket.timeout";
   public static final String RECON_OM_SOCKET_TIMEOUT_DEFAULT = "5s";
