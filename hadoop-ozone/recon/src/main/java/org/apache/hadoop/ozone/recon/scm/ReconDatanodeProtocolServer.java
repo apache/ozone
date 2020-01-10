@@ -36,6 +36,8 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
+
 /**
  * Recon's Datanode protocol server extended from SCM.
  */
@@ -69,6 +71,11 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
         datanodeDetails.getHostName());
     return super.register(datanodeDetails, nodeReport,
         containerReportsRequestProto, pipelineReports);
+  }
+
+  @Override
+  protected String getScmDatanodeAddressKey() {
+    return OZONE_RECON_DATANODE_ADDRESS_KEY;
   }
 
   @Override
