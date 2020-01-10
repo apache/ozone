@@ -145,6 +145,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           .collect(Collectors.toList()));
       // Set Modification time
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
+      // Set the UpdateID to current transactionLogIndex
+      omKeyInfo.setUpdateID(transactionLogIndex);
 
       partName = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName) + clientID;

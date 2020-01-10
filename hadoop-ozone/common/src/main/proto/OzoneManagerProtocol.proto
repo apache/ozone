@@ -737,6 +737,8 @@ message KeyInfo {
     repeated hadoop.hdds.KeyValue metadata = 11;
     optional FileEncryptionInfoProto fileEncryptionInfo = 12;
     repeated OzoneAclInfo acls = 13;
+    optional uint64 objectID = 14;
+    optional uint64 updateID = 15;
 }
 
 message RepeatedKeyInfo {

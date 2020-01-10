@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import java.io.IOException;
 
 import com.google.common.base.Optional;
+import java.util.Map;
+import java.util.TreeMap;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +46,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .PartKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -120,6 +124,21 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         multipartKeyInfo = omMetadataManager
             .getMultipartInfoTable().get(multipartKey);
 
+        // Set updateID to current transactionLogIndex for all parts
+        TreeMap<Integer, PartKeyInfo> partKeyInfoMap = multipartKeyInfo
+            .getPartKeyInfoMap();
+        for (Map.Entry<Integer, PartKeyInfo> partKeyInfoEntry :
+            partKeyInfoMap.entrySet()) {
+          PartKeyInfo partKeyInfo = partKeyInfoEntry.getValue();
+          OmKeyInfo currentKeyPartInfo = OmKeyInfo.getFromProtobuf(
+              partKeyInfo.getPartKeyInfo());
+          currentKeyPartInfo.setUpdateID(transactionLogIndex);
+          PartKeyInfo newPartKeyInfo = partKeyInfo.toBuilder()
+              .setPartKeyInfo(currentKeyPartInfo.getProtobuf())
+              .build();
+          multipartKeyInfo.addPartKeyInfo(partKeyInfoEntry.getKey(),
+              newPartKeyInfo);
+        }
 
         // Update cache of openKeyTable and multipartInfo table.
         // No need to add the cache entries to delete table, as the entries

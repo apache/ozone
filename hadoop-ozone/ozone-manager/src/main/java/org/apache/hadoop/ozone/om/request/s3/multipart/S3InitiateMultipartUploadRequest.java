@@ -158,8 +158,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
           .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+          .setObjectID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .build();
-
 
       // Add to cache
       omMetadataManager.getOpenKeyTable().addCacheEntry(

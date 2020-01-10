@@ -112,6 +112,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
+    boolean success = true;
     IOException exception = null;
     OmKeyInfo fromKeyValue = null;
     try {
@@ -155,6 +156,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       //Set modification time
       fromKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
 
+      // Set the UpdateID to current transactionLogIndex
+      fromKeyValue.setUpdateID(transactionLogIndex);
+
       // Add to cache.
       // fromKey should be deleted, toKey should be added with newly updated
       // omKeyInfo.
@@ -170,6 +174,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         fromKeyName, omResponse.setRenameKeyResponse(
             RenameKeyResponse.newBuilder()).build());
     } catch (IOException ex) {
+      success = false;
       exception = ex;
       omClientResponse = new OMKeyRenameResponse(null, null, null,
           createErrorOMResponse(omResponse, exception));
@@ -189,7 +194,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
         exception, getOmRequest().getUserInfo()));
 
-    if (exception == null) {
+    if (success) {
       LOG.debug("Rename Key is successfully completed for volume:{} bucket:{}" +
           " fromKey:{} toKey:{}. ", volumeName, bucketName, fromKeyName,
           toKeyName);
