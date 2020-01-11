@@ -49,13 +49,13 @@ public class MiniOzoneLoadGenerator {
   private static String keyNameDelimiter = "_";
 
   private ThreadPoolExecutor writeExecutor;
-  private int numWriteThreads;
+  private int numThreads;
   // number of buffer to be allocated, each is allocated with length which
   // is multiple of 2, each buffer is populated with random data.
   private int numBuffers;
   private List<ByteBuffer> buffers;
 
-  private AtomicBoolean isWriteThreadRunning;
+  private AtomicBoolean isIOThreadRunning;
 
   private final List<LoadBucket> ozoneBuckets;
 
@@ -64,23 +64,26 @@ public class MiniOzoneLoadGenerator {
   private final LoadBucket agedLoadBucket;
   private final TestProbability agedWriteProbability;
 
+  private final ThreadPoolExecutor fsExecutor;
+  private final LoadBucket fsBucket;
+
   MiniOzoneLoadGenerator(List<LoadBucket> bucket,
-                         LoadBucket agedLoadBucket, int numThreads,
-      int numBuffers) {
+                         LoadBucket agedLoadBucket, LoadBucket fsBucket,
+                         int numThreads, int numBuffers) {
     this.ozoneBuckets = bucket;
-    this.numWriteThreads = numThreads;
+    this.numThreads = numThreads;
     this.numBuffers = numBuffers;
-    this.writeExecutor = new ThreadPoolExecutor(numThreads, numThreads, 100,
-        TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
-        new ThreadPoolExecutor.CallerRunsPolicy());
-    this.writeExecutor.prestartAllCoreThreads();
+    this.writeExecutor = createExecutor();
 
     this.agedFileWrittenIndex = new AtomicInteger(0);
     this.agedFileExecutor = Executors.newSingleThreadExecutor();
     this.agedLoadBucket = agedLoadBucket;
     this.agedWriteProbability = TestProbability.valueOf(10);
 
-    this.isWriteThreadRunning = new AtomicBoolean(false);
+    this.fsExecutor = createExecutor();
+    this.fsBucket = fsBucket;
+
+    this.isIOThreadRunning = new AtomicBoolean(false);
 
     // allocate buffers and populate random data.
     buffers = new ArrayList<>();
@@ -92,14 +95,23 @@ public class MiniOzoneLoadGenerator {
     }
   }
 
+  private ThreadPoolExecutor createExecutor() {
+    ThreadPoolExecutor executor = new ThreadPoolExecutor(numThreads, numThreads,
+        100, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
+        new ThreadPoolExecutor.CallerRunsPolicy());
+    executor.prestartAllCoreThreads();
+    return executor;
+
+  }
+
   // Start IO load on an Ozone bucket.
   private void load(long runTimeMillis) {
     long threadID = Thread.currentThread().getId();
-    LOG.info("Started IO Thread:{}.", threadID);
+    LOG.info("Started Mixed IO Thread:{}.", threadID);
     String threadName = Thread.currentThread().getName();
     long startTime = Time.monotonicNow();
 
-    while (isWriteThreadRunning.get() &&
+    while (isIOThreadRunning.get() &&
         (Time.monotonicNow() < startTime + runTimeMillis)) {
       LoadBucket bucket =
           ozoneBuckets.get((int) (Math.random() * ozoneBuckets.size()));
@@ -107,9 +119,9 @@ public class MiniOzoneLoadGenerator {
         int index = RandomUtils.nextInt();
         ByteBuffer buffer = getBuffer(index);
         String keyName = getKeyName(index, threadName);
-        bucket.writeData(buffer, keyName);
+        bucket.writeKey(buffer, keyName);
 
-        bucket.readData(buffer, keyName);
+        bucket.readKey(buffer, keyName);
 
         bucket.deleteKey(keyName);
       } catch (Exception e) {
@@ -118,7 +130,7 @@ public class MiniOzoneLoadGenerator {
       }
     }
     // This will terminate other threads too.
-    isWriteThreadRunning.set(false);
+    isIOThreadRunning.set(false);
     LOG.info("Terminating IO thread:{}.", threadID);
   }
 
@@ -129,13 +141,13 @@ public class MiniOzoneLoadGenerator {
       : Optional.empty();
   }
 
-  private void startAgedFilesLoad(long runTimeMillis) {
+  private void startAgedLoad(long runTimeMillis) {
     long threadID = Thread.currentThread().getId();
     LOG.info("AGED LOADGEN: Started Aged IO Thread:{}.", threadID);
     String threadName = Thread.currentThread().getName();
     long startTime = Time.monotonicNow();
 
-    while (isWriteThreadRunning.get() &&
+    while (isIOThreadRunning.get() &&
         (Time.monotonicNow() < startTime + runTimeMillis)) {
 
       String keyName = null;
@@ -145,13 +157,13 @@ public class MiniOzoneLoadGenerator {
           ByteBuffer buffer = getBuffer(index);
           keyName = getKeyName(index, threadName);
 
-          agedLoadBucket.writeData(buffer, keyName);
+          agedLoadBucket.writeKey(buffer, keyName);
         } else {
           Optional<Integer> index = randomKeyToRead();
           if (index.isPresent()) {
             ByteBuffer buffer = getBuffer(index.get());
             keyName = getKeyName(index.get(), threadName);
-            agedLoadBucket.readData(buffer, keyName);
+            agedLoadBucket.readKey(buffer, keyName);
           }
         }
       } catch (Throwable t) {
@@ -160,24 +172,61 @@ public class MiniOzoneLoadGenerator {
       }
     }
     // This will terminate other threads too.
-    isWriteThreadRunning.set(false);
+    isIOThreadRunning.set(false);
+    LOG.info("Terminating IO thread:{}.", threadID);
+  }
+
+  // Start IO load on an Ozone bucket.
+  private void startFsLoad(long runTimeMillis) {
+    long threadID = Thread.currentThread().getId();
+    LOG.info("Started Filesystem IO Thread:{}.", threadID);
+    String threadName = Thread.currentThread().getName();
+    long startTime = Time.monotonicNow();
+
+    while (isIOThreadRunning.get() &&
+      (Time.monotonicNow() < startTime + runTimeMillis)) {
+      try {
+        int index = RandomUtils.nextInt();
+        ByteBuffer buffer = getBuffer(index);
+        String keyName = getKeyName(index, threadName);
+        fsBucket.writeKey(true, buffer, keyName);
+
+        fsBucket.readKey(true, buffer, keyName);
+
+        fsBucket.deleteKey(true, keyName);
+      } catch (Exception e) {
+        LOG.error("LOADGEN: Exiting due to exception", e);
+        break;
+      }
+    }
+    // This will terminate other threads too.
+    isIOThreadRunning.set(false);
     LOG.info("Terminating IO thread:{}.", threadID);
   }
 
   void startIO(long time, TimeUnit timeUnit) {
     List<CompletableFuture<Void>> writeFutures = new ArrayList<>();
     LOG.info("Starting MiniOzoneLoadGenerator for time {}:{} with {} buffers " +
-            "and {} threads", time, timeUnit, numBuffers, numWriteThreads);
-    if (isWriteThreadRunning.compareAndSet(false, true)) {
+            "and {} threads", time, timeUnit, numBuffers, numThreads);
+    if (isIOThreadRunning.compareAndSet(false, true)) {
       // Start the IO thread
-      for (int i = 0; i < numWriteThreads; i++) {
+      for (int i = 0; i < numThreads; i++) {
         writeFutures.add(
             CompletableFuture.runAsync(() -> load(timeUnit.toMillis(time)),
                 writeExecutor));
       }
 
-      writeFutures.add(CompletableFuture.runAsync(() ->
-              startAgedFilesLoad(timeUnit.toMillis(time)), agedFileExecutor));
+      for (int i = 0; i < numThreads; i++) {
+        writeFutures.add(
+            CompletableFuture.runAsync(() -> startAgedLoad(
+                timeUnit.toMillis(time)), agedFileExecutor));
+      }
+
+      for (int i = 0; i < numThreads; i++) {
+        writeFutures.add(
+            CompletableFuture.runAsync(() -> startFsLoad(
+              timeUnit.toMillis(time)), fsExecutor));
+      }
 
       // Wait for IO to complete
       for (CompletableFuture<Void> f : writeFutures) {
@@ -199,11 +248,11 @@ public class MiniOzoneLoadGenerator {
     }
   }
 
-  public ByteBuffer getBuffer(int keyIndex) {
+  private ByteBuffer getBuffer(int keyIndex) {
     return buffers.get(keyIndex % numBuffers);
   }
 
-  public String getKeyName(int keyIndex, String threadName) {
+  private String getKeyName(int keyIndex, String threadName) {
     return threadName + keyNameDelimiter + keyIndex;
   }
 }

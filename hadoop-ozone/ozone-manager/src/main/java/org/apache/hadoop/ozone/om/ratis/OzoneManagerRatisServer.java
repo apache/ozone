@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.ratis.RaftConfigKeys;
-import org.apache.ratis.client.RaftClientConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.netty.NettyConfigKeys;
@@ -475,18 +474,6 @@ public final class OzoneManagerRatisServer {
 
     // Set the number of maximum cached segments
     RaftServerConfigKeys.Log.setMaxCachedSegmentNum(properties, 2);
-
-    // Set the client request timeout
-    TimeUnit clientRequestTimeoutUnit = OMConfigKeys
-        .OZONE_OM_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT .getUnit();
-    long clientRequestTimeoutDuration = conf.getTimeDuration(
-        OMConfigKeys.OZONE_OM_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT
-            .getDuration(), clientRequestTimeoutUnit);
-    final TimeDuration clientRequestTimeout = TimeDuration.valueOf(
-        clientRequestTimeoutDuration, clientRequestTimeoutUnit);
-    RaftClientConfigKeys.Rpc.setRequestTimeout(properties,
-        clientRequestTimeout);
 
     // TODO: set max write buffer size
 

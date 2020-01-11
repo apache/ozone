@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -41,6 +42,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * An {@link InputStream} called from KeyInputStream to read a block from the
@@ -93,17 +95,28 @@ public class BlockInputStream extends InputStream implements Seekable {
   // can be reset if a new position is seeked.
   private int chunkIndexOfPrevPosition;
 
+  private Function<BlockID, Pipeline> refreshPipelineFunction;
+
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
-      XceiverClientManager xceiverClientManager) {
+      XceiverClientManager xceiverClientManager,
+      Function<BlockID, Pipeline> refreshPipelineFunction) {
     this.blockID = blockId;
     this.length = blockLen;
     this.pipeline = pipeline;
     this.token = token;
     this.verifyChecksum = verifyChecksum;
     this.xceiverClientManager = xceiverClientManager;
+    this.refreshPipelineFunction = refreshPipelineFunction;
   }
 
+  public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
+                          Token<OzoneBlockTokenIdentifier> token,
+                          boolean verifyChecksum,
+                          XceiverClientManager xceiverClientManager) {
+    this(blockId, blockLen, pipeline, token, verifyChecksum,
+        xceiverClientManager, null);
+  }
   /**
    * Initialize the BlockInputStream. Get the BlockData (list of chunks) from
    * the Container and create the ChunkInputStreams for each Chunk in the Block.
@@ -115,7 +128,24 @@ public class BlockInputStream extends InputStream implements Seekable {
       return;
     }
 
-    List<ChunkInfo> chunks = getChunkInfos();
+    List<ChunkInfo> chunks = null;
+    try {
+      chunks = getChunkInfos();
+    } catch (ContainerNotFoundException ioEx) {
+      LOG.error("Unable to read block information from pipeline.");
+      if (refreshPipelineFunction != null) {
+        LOG.debug("Re-fetching pipeline for block {}", blockID);
+        Pipeline newPipeline = refreshPipelineFunction.apply(blockID);
+        if (newPipeline == null || newPipeline.equals(pipeline)) {
+          throw ioEx;
+        } else {
+          LOG.debug("New pipeline got for block {}", blockID);
+          this.pipeline = newPipeline;
+          chunks = getChunkInfos();
+        }
+      }
+    }
+
     if (chunks != null && !chunks.isEmpty()) {
       // For each chunk in the block, create a ChunkInputStream and compute
       // its chunkOffset

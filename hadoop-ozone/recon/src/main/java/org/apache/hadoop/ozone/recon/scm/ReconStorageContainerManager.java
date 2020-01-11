@@ -29,7 +29,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -52,14 +56,23 @@ public class ReconStorageContainerManager
   private final SCMStorageConfig scmStorageConfig;
   private static final String RECON_SCM_CONFIG_PREFIX = "recon.";
 
+  private NodeManager scmNodeManager;
+  private NetworkTopology clusterMap;
+
   @Inject
   public ReconStorageContainerManager(OzoneConfiguration conf)
       throws IOException {
     this.eventQueue = new EventQueue();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
-    this.scmStorageConfig = new SCMStorageConfig(conf);
+    this.scmStorageConfig = new ReconStorageConfig(conf);
+    this.clusterMap = new NetworkTopologyImpl(conf);
+    this.scmNodeManager = new ReconNodeManager(
+        conf, scmStorageConfig, eventQueue, clusterMap);
+    NodeReportHandler nodeReportHandler =
+        new NodeReportHandler(scmNodeManager);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
+    eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
   }
 
   /**
@@ -108,8 +121,7 @@ public class ReconStorageContainerManager
 
   @Override
   public NodeManager getScmNodeManager() {
-    return new ReconNodeManager(ozoneConfiguration, scmStorageConfig,
-        eventQueue, null);
+    return scmNodeManager;
   }
 
   @Override

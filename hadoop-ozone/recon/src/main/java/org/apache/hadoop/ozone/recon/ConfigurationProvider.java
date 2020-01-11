@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.ozone.recon;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Provider;
-import org.apache.hadoop.conf.Configuration;
-
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
  * Ozone Configuration Provider.
@@ -28,16 +28,19 @@ import org.apache.hadoop.conf.Configuration;
  * it via a singleton instance to the Jax-RS/CDI instances.
  */
 public class ConfigurationProvider implements
-    Provider<Configuration> {
+    Provider<OzoneConfiguration> {
 
-  private static Configuration configuration;
+  private static OzoneConfiguration configuration;
 
-  static void setConfiguration(Configuration conf) {
-    ConfigurationProvider.configuration = conf;
+  @VisibleForTesting
+  public static void setConfiguration(OzoneConfiguration conf) {
+    if (configuration == null) {
+      ConfigurationProvider.configuration = conf;
+    }
   }
 
   @Override
-  public Configuration get() {
+  public OzoneConfiguration get() {
     return configuration;
   }
 }

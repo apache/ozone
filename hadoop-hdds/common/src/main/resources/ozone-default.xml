@@ -253,14 +253,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.statemachine.cache.expiry.interval</name>
-    <value>10s</value>
-    <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>The interval till which the stateMachine data in ratis
-      will be cached inside the ContainerStateMachine.
-    </description>
-  </property>
-  <property>
     <name>dfs.ratis.client.request.timeout.duration</name>
     <value>3s</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
@@ -1600,6 +1592,15 @@
   </property>
 
   <property>
+    <name>ozone.om.ratis.segment.preallocated.size</name>
+    <value>16KB</value>
+    <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
+    <description>The size of the buffer which is preallocated for raft segment
+      used by Apache Ratis on OM.(16 KB by default)
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.ratis.log.appender.queue.num-elements</name>
     <value>1024</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
@@ -2358,7 +2359,7 @@
   </property>
   <property>
     <name>ozone.recon.sql.db.jdbc.url</name>
-    <value>jdbc:sqlite:/${ozone.recon.db.dir}/ozone_recon_sqlite.db</value>
+    <value>jdbc:sqlite:${ozone.recon.db.dir}/ozone_recon_sqlite.db</value>
     <tag>OZONE, RECON</tag>
     <description>
       Ozone Recon SQL database jdbc url.

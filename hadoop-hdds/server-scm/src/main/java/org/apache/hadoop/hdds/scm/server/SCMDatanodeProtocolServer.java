@@ -164,7 +164,7 @@ public class SCMDatanodeProtocolServer implements
 
     datanodeRpcAddress =
         updateRPCListenAddress(
-            conf, OZONE_SCM_DATANODE_ADDRESS_KEY, datanodeRpcAddr,
+            conf, getScmDatanodeAddressKey(), datanodeRpcAddr,
             datanodeRpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
@@ -405,6 +405,10 @@ public class SCMDatanodeProtocolServer implements
         .replaceAll(System.lineSeparator(), " ")
         .trim()
         .replaceAll(" +", " ");
+  }
+
+  protected String getScmDatanodeAddressKey() {
+    return OZONE_SCM_DATANODE_ADDRESS_KEY;
   }
 
   protected InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
