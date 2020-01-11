@@ -73,7 +73,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   static final Logger LOG =
       LoggerFactory.getLogger(BasicOzoneFileSystem.class);
 
-  /**
+  /**o3fs
    * The Ozone client for connecting to Ozone server.
    */
 

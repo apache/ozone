@@ -62,6 +62,7 @@ HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 
 CORE-SITE.XML_fs.AbstractFileSystem.o3fs.impl=org.apache.hadoop.fs.ozone.OzFs
+CORE-SITE.XML_fs.o3fs.impl=org.apache.hadoop.fs.ozone.OzoneFileSystem
 CORE-SITE.XML_fs.defaultFS=o3fs://bucket1.vol1/
 
 MAPRED-SITE.XML_mapreduce.framework.name=yarn
