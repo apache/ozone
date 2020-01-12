@@ -54,8 +54,8 @@ public class LoadExecutors {
     LOG.info("Starting {} threads for {}", numThreads, generator.name());
     generator.initialize();
     for (int i = 0; i < numThreads; i++) {
-      futures.add(
-          CompletableFuture.runAsync(() -> generator.startLoad(time), executor));
+      futures.add(CompletableFuture.runAsync(
+          () ->generator.startLoad(time), executor));
     }
   }
 

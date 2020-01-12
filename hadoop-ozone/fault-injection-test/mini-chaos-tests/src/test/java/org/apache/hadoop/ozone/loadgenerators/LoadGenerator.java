@@ -23,7 +23,7 @@ package org.apache.hadoop.ozone.loadgenerators;
  */
 public interface LoadGenerator {
 
-  void initialize ();
+  void initialize();
 
   void startLoad(long time);
 

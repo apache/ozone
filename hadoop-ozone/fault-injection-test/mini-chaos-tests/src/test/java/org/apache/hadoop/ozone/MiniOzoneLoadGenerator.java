@@ -45,7 +45,8 @@ public class MiniOzoneLoadGenerator {
   private final List<LoadExecutors> loadExecutors;
 
   MiniOzoneLoadGenerator(OzoneVolume volume, int numClients, int numThreads,
-                         int numBuffers, OzoneConfiguration conf) throws Exception {
+                         int numBuffers, OzoneConfiguration conf)
+      throws Exception {
     DataBuffer buffer = new DataBuffer(numBuffers);
     loadExecutors = new ArrayList<>();
 
@@ -57,7 +58,8 @@ public class MiniOzoneLoadGenerator {
       ozoneBuckets.add(new LoadBucket(volume.getBucket(mixBucketName),
           conf));
     }
-    RandomLoadGenerator loadGenerator = new RandomLoadGenerator(buffer, ozoneBuckets);
+    RandomLoadGenerator loadGenerator =
+        new RandomLoadGenerator(buffer, ozoneBuckets);
     loadExecutors.add(new LoadExecutors(numThreads, loadGenerator));
 
     // Aged Load
@@ -66,7 +68,8 @@ public class MiniOzoneLoadGenerator {
     volume.createBucket(agedBucketName);
     LoadBucket agedLoadBucket =
         new LoadBucket(volume.getBucket(agedBucketName), conf);
-    AgedLoadGenerator agedLoadGenerator = new AgedLoadGenerator(buffer, agedLoadBucket);
+    AgedLoadGenerator agedLoadGenerator =
+        new AgedLoadGenerator(buffer, agedLoadBucket);
     loadExecutors.add(new LoadExecutors(numThreads, agedLoadGenerator));
 
     //Filesystem Load
@@ -76,7 +79,8 @@ public class MiniOzoneLoadGenerator {
     volume.createBucket(fsBucketName);
     LoadBucket fsBucket =
         new LoadBucket(volume.getBucket(fsBucketName), conf);
-    FilesystemLoadGenerator filesystemLoadGenerator = new FilesystemLoadGenerator(buffer, fsBucket);
+    FilesystemLoadGenerator filesystemLoadGenerator =
+        new FilesystemLoadGenerator(buffer, fsBucket);
     loadExecutors.add(new LoadExecutors(numThreads, filesystemLoadGenerator));
   }
 
