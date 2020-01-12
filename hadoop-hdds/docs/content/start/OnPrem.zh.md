@@ -20,13 +20,13 @@ weight: 20
   limitations under the License.
 -->
 
-如果你喜欢折腾，你可以在真实的集群上安装 ozone。搭建一个 Ozone 集群需要了解它的各个组件，Ozone 既能够以并存的方式部署到现有的 HDFS，也能够独立运行，但在这两种情况下 ozone 的组件都是相同的。
+如果你想要有点挑战性，你可以在真实的集群上安装 ozone。搭建一个 Ozone 集群需要了解它的各个组件，Ozone 既能够以并存的方式部署到现有的 HDFS，也能够独立运行，但在这两种情况下 ozone 的组件都是相同的。
 
 ## Ozone 组件 
 
 1. Ozone Manager - 管理 Ozone 命名空间的服务，负责所有对卷、桶和键的操作。
 2. Storage Container Manager - Ozone 中块的管理者，Ozone Manager 从 SCM 请求块，然后用户向块写入数据。
-3. Datanodes - Ozone 的数据节点代码既可以运行在 HDFS 的数据节点内，也可以独立部署成单独的进程。
+3. Datanodes - Ozone 的 Datanode 代码既可以运行在 HDFS 的 Datanode 内，也可以独立部署成单独的进程。
 
 ## 搭建一个纯 Ozone 集群
 
@@ -40,7 +40,8 @@ ozone genconf <path>
 
 我们来看看生成的文件（ozone-site.xml）中都有哪些参数，以及它们是如何影响 ozone 的。当各个参数都配置了合适的值之后，需要把该文件拷贝到 ```ozone directory/etc/hadoop```。
 
-* **ozone.metadata.dirs** 管理员通过此参数指定元数据的存储位置，通常应该选择最快的磁盘（比如 SSD，如果节点上有的话），OM、SCM 和数据节点会将元数据写入此路径。这是个必需的参数，如果不配置它，Ozone 会启动失败。
+* **ozone.metadata.dirs** 管理员通过此参数指定元数据的存储位置，通常应该选择最快的磁盘（比如 SSD，如果节点上有的话），OM、SCM 和 Datanode 
+会将元数据写入此路径。这是个必需的参数，如果不配置它，Ozone 会启动失败。
  
 示例如下：
 
@@ -51,7 +52,8 @@ ozone genconf <path>
    </property>
 {{< /highlight >}}
 
-*  **ozone.scm.names**  Storage container manager(SCM) 是 ozone 使用的分布式块服务，数据节点通过这个参数来连接 SCM 并向 SCM 发送心跳。在 HA 特性完成之前，我们给 ozone.scm.names 配置一台机器的地址即可。
+*  **ozone.scm.names**  Storage container manager(SCM) 是 ozone 使用的分布式块服务，Datanode 通过这个参数来连接 SCM 并向 SCM 发送心跳。在 HA
+ 特性完成之前，我们给 ozone.scm.names 配置一台机器的地址即可。
   
   示例如下：
   
@@ -62,7 +64,8 @@ ozone genconf <path>
       </property>
   {{< /highlight >}}
   
- * **ozone.scm.datanode.id.dir** 每个数据节点会生成一个唯一 ID，叫做 Datanode ID。Datanode ID 会被写入此参数所指定路径下名为 datanode.id 的文件中，如果该路径不存在，数据节点会自动创建。
+ * **ozone.scm.datanode.id.dir** 每个 Datanode 会生成一个唯一 ID，叫做 Datanode ID。Datanode ID 会被写入此参数所指定路径下名为 datanode.id
+  的文件中，如果该路径不存在，Datanode 会自动创建。
 
 示例如下：
 
@@ -93,7 +96,7 @@ ozone genconf <path>
 | ozone.scm.names                | SCM 服务地址            | SCM的主机名:端口，或者IP:端口  |
 | ozone.scm.block.client.address | SCM 服务地址和端口 | OM 等服务使用                                 |
 | ozone.scm.client.address       | SCM 服务地址和端口 | 客户端使用                                        |
-| ozone.scm.datanode.address     | SCM 服务地址和端口 | 数据节点使用                            |
+| ozone.scm.datanode.address     | SCM 服务地址和端口 | Datanode 使用                            |
 | ozone.om.address               | OM 服务地址           | Ozone handler 和 Ozone 文件系统使用             |
 
 
@@ -112,7 +115,7 @@ ozone scm --init
 ozone --daemon start scm
 {{< /highlight >}}
 
-SCM 启动之后，我们就可以初始化存储空间，命令如下：
+SCM 启动之后，我们就可以开始初始化对象存储空间，命令如下：
 
 {{< highlight bash >}}
 ozone om --init
@@ -128,13 +131,13 @@ ozone --daemon start om
 此时 Ozone 的命名服务 OM 和 块服务 SCM 都已运行。\
 **注意**: 如果 SCM 未启动，```om --init``` 命令会失败，同样，如果磁盘上的数据结构缺失，SCM 也无法启动，所以请确保 ```scm --init``` 和 ```om --init``` 两条命令都执行了。
 
-接下来启动数据节点，在每个数据节点上运行下面的命令：
+接下来启动 Datanode，在每个 Datanode 上运行下面的命令：
 
 {{< highlight bash >}}
 ozone --daemon start datanode
 {{< /highlight >}}
 
-现在 SCM、OM 和所有的数据节点都已启动并运行。
+现在 SCM、OM 和所有的 Datanode 都已启动并运行。
 
 ***恭喜！你成功地搭建了一个完整的 ozone 集群。***
 
@@ -148,4 +151,4 @@ ozone om --init
 start-ozone.sh
 {{< /highlight >}}
 
-这么做的前提是，slaves 文件已经正确编写，并且配置好了到各个数据节点的 ssh，这和 HDFS 的配置方式相同，具体方法请查看 HDFS 文档。
+这么做的前提是，slaves 文件已经正确编写，并且配置好了到各个 Datanode 的 ssh，这和 HDFS 的配置方式相同，具体方法请查看 HDFS 文档。
