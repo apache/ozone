@@ -49,8 +49,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
 
   private void addPropertiesNotInXml() {
     configurationPropsToSkipCompare.addAll(Arrays.asList(
-        ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR, // HDDS-2872
-        HddsConfigKeys.HDDS_X509_CRL_NAME, // HDDS-2873
         HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA,
         HddsConfigKeys.HDDS_GRPC_TLS_TEST_CERT,
         HddsConfigKeys.HDDS_KEY_ALGORITHM,
