@@ -231,7 +231,23 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       NodeOperationalState newState) throws NodeNotFoundException{
-    nodeStateManager.setNodeOperationalState(datanodeDetails, newState);
+    setNodeOperationalState(datanodeDetails, newState, 0);
+  }
+
+  /**
+   * Set the operation state of a node.
+   * @param datanodeDetails The datanode to set the new state for
+   * @param newState The new operational state for the node
+   * @param opStateExpiryEpocSec Seconds from the epoch when the operational
+   *                             state should end. Zero indicates the state
+   *                             never end.
+   */
+  @Override
+  public void setNodeOperationalState(DatanodeDetails datanodeDetails,
+      NodeOperationalState newState, long opStateExpiryEpocSec)
+      throws NodeNotFoundException{
+    nodeStateManager.setNodeOperationalState(
+        datanodeDetails, newState, opStateExpiryEpocSec);
   }
 
   /**

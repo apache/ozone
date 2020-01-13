@@ -99,13 +99,21 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void setNodeOperationalState(DatanodeDetails dn,
-      HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+    HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+    setNodeOperationalState(dn, newState, 0);
+  }
+
+  @Override
+  public void setNodeOperationalState(DatanodeDetails dn,
+      HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
+      throws NodeNotFoundException {
     DatanodeInfo dni = nodeMap.get(dn.getUuid());
     if (dni == null) {
       throw new NodeNotFoundException();
     }
     dni.setNodeStatus(
-        new NodeStatus(newState, dni.getNodeStatus().getHealth()));
+        new NodeStatus(
+            newState, dni.getNodeStatus().getHealth(), opStateExpiryEpocSec));
   }
 
   /**

@@ -25,17 +25,28 @@ import java.util.Objects;
 /**
  * This class is used to capture the current status of a datanode. This
  * includes its health (healthy, stale or dead) and its operation status (
- * in_service, decommissioned and maintenance mode.
+ * in_service, decommissioned and maintenance mode) along with the expiry time
+ * for the operational state (used with maintenance mode).
  */
 public class NodeStatus {
 
   private HddsProtos.NodeOperationalState operationalState;
   private HddsProtos.NodeState health;
+  private long opStateExpiryEpochSeconds;
 
   public NodeStatus(HddsProtos.NodeOperationalState operationalState,
              HddsProtos.NodeState health) {
     this.operationalState = operationalState;
     this.health = health;
+    this.opStateExpiryEpochSeconds = 0;
+  }
+
+  public NodeStatus(HddsProtos.NodeOperationalState operationalState,
+                    HddsProtos.NodeState health,
+                    long opStateExpireEpocSeconds) {
+    this.operationalState = operationalState;
+    this.health = health;
+    this.opStateExpiryEpochSeconds = opStateExpireEpocSeconds;
   }
 
   public static NodeStatus inServiceHealthy() {
@@ -59,6 +70,17 @@ public class NodeStatus {
 
   public HddsProtos.NodeOperationalState getOperationalState() {
     return operationalState;
+  }
+
+  public long getOpStateExpiryEpochSeconds() {
+    return opStateExpiryEpochSeconds;
+  }
+
+  public boolean operationalStateExpired() {
+    if (0 == opStateExpiryEpochSeconds) {
+      return false;
+    }
+    return System.currentTimeMillis() / 1000 >= opStateExpiryEpochSeconds;
   }
 
   /**
@@ -163,7 +185,8 @@ public class NodeStatus {
     }
     NodeStatus other = (NodeStatus) obj;
     if (this.operationalState == other.operationalState &&
-        this.health == other.health) {
+        this.health == other.health
+        && this.opStateExpiryEpochSeconds == other.opStateExpiryEpochSeconds) {
       return true;
     }
     return false;
@@ -171,12 +194,13 @@ public class NodeStatus {
 
   @Override
   public int hashCode() {
-    return Objects.hash(health, operationalState);
+    return Objects.hash(health, operationalState, opStateExpiryEpochSeconds);
   }
 
   @Override
   public String toString() {
-    return "OperationalState: "+operationalState+" Health: "+health;
+    return "OperationalState: "+operationalState+" Health: "+health+
+        " OperastionStateExpiry: "+opStateExpiryEpochSeconds;
   }
 
 }

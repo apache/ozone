@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import static junit.framework.TestCase.assertEquals;
 import static org.assertj.core.api.Fail.fail;
+import static org.junit.Assert.assertNotEquals;
 
 /**
  * Unit tests for the decommision manager.
@@ -182,8 +183,12 @@ public class TestNodeDecommissionManager {
         dns.get(2).getIpAddress()), 100);
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(dns.get(1)).getOperationalState());
+    assertNotEquals(0, nodeManager.getNodeStatus(
+        dns.get(1)).getOpStateExpiryEpochSeconds());
     assertEquals(HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
         nodeManager.getNodeStatus(dns.get(2)).getOperationalState());
+    assertNotEquals(0, nodeManager.getNodeStatus(
+        dns.get(2)).getOpStateExpiryEpochSeconds());
 
     // Running the command again gives no error - nodes already decommissioning
     // are silently ignored.

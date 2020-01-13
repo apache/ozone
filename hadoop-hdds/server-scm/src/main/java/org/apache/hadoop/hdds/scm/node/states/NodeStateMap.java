@@ -113,13 +113,14 @@ public class NodeStateMap {
    * @throws NodeNotFoundException if the node is not present
    */
   public NodeStatus updateNodeOperationalState(UUID nodeId,
-      NodeOperationalState newOpState) throws NodeNotFoundException {
+      NodeOperationalState newOpState, long opStateExpiryEpochSeconds)
+      throws NodeNotFoundException {
     try {
       lock.writeLock().lock();
       DatanodeInfo dn = getNodeInfo(nodeId);
       NodeStatus oldStatus = dn.getNodeStatus();
       NodeStatus newStatus = new NodeStatus(
-          newOpState, oldStatus.getHealth());
+          newOpState, oldStatus.getHealth(), opStateExpiryEpochSeconds);
       dn.setNodeStatus(newStatus);
       return newStatus;
     } finally {
