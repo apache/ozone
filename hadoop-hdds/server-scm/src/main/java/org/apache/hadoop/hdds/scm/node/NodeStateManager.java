@@ -26,8 +26,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto;
 import org.apache.hadoop.hdds.scm.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -40,7 +38,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine
     .InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
-import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.slf4j.Logger;
@@ -360,7 +357,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @param newState The new operational State of the node.
    */
   public void setNodeOperationalState(DatanodeDetails dn,
-  NodeOperationalState newState)  throws NodeNotFoundException {
+      NodeOperationalState newState)  throws NodeNotFoundException {
     setNodeOperationalState(dn, newState, 0);
   }
 

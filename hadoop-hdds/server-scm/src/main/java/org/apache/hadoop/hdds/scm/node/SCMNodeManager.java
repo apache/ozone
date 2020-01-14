@@ -34,12 +34,9 @@ import java.util.stream.Collectors;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
@@ -253,39 +250,9 @@ public class SCMNodeManager implements NodeManager {
       throws NodeNotFoundException{
     nodeStateManager.setNodeOperationalState(
         datanodeDetails, newState, opStateExpiryEpocSec);
-    fireSetDatanodeStateEvent(datanodeDetails, newState, opStateExpiryEpocSec);
-  }
-
-  private void fireSetDatanodeStateEvent(DatanodeDetails dn,
-                                         HddsProtos.NodeOperationalState state, long stateExpiry) {
-
-    SetNodeOperationalStateCommandProto.NodeOperationalState dnState =
-        SetNodeOperationalStateCommandProto.NodeOperationalState.IN_SERVICE;
-    switch (state) {
-      case IN_SERVICE:
-        dnState = SetNodeOperationalStateCommandProto
-            .NodeOperationalState.IN_SERVICE;
-        break;
-      case DECOMMISSIONING:
-        dnState = SetNodeOperationalStateCommandProto
-            .NodeOperationalState.DECOMMISSIONING;
-        break;
-      case DECOMMISSIONED:
-        dnState = SetNodeOperationalStateCommandProto
-            .NodeOperationalState.DECOMMISSIONED;
-        break;
-      case ENTERING_MAINTENANCE:
-        dnState = SetNodeOperationalStateCommandProto
-            .NodeOperationalState.ENTERING_MAINTENANCE;
-        break;
-      case IN_MAINTENANCE:
-        dnState = SetNodeOperationalStateCommandProto
-            .NodeOperationalState.IN_MAINTENANCE;
-        break;
-      default:
-    }
-    commandQueue.addCommand(dn.getUuid(), new SetNodeOperationalStateCommand(
-        Time.monotonicNow(), dnState, stateExpiry));
+    commandQueue.addCommand(datanodeDetails.getUuid(),
+        new SetNodeOperationalStateCommand(
+        Time.monotonicNow(), newState, opStateExpiryEpocSec));
   }
 
   /**

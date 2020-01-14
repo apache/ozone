@@ -387,13 +387,6 @@ message ClosePipelineCommandProto {
 }
 
 message SetNodeOperationalStateCommandProto {
-  enum NodeOperationalState {
-    IN_SERVICE = 1;
-    DECOMMISSIONING = 2;
-    DECOMMISSIONED = 3;
-    ENTERING_MAINTENANCE = 4;
-    IN_MAINTENANCE = 5;
-  }
   required  NodeOperationalState nodeOperationalState = 1;
   required  int64 stateExpiryEpochSeconds = 2;
 }

@@ -205,7 +205,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
       throws NodeNotFoundException {
     NodeStatus currentStatus = nodeStateMap.get(dd);
     if (currentStatus != null) {
-      nodeStateMap.put(dd,new NodeStatus(newState, currentStatus.getHealth(),
+      nodeStateMap.put(dd, new NodeStatus(newState, currentStatus.getHealth(),
           opStateExpiryEpocSec));
     } else {
       throw new NodeNotFoundException();

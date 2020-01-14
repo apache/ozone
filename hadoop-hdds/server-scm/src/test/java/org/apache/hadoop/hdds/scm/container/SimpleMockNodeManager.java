@@ -99,7 +99,7 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public void setNodeOperationalState(DatanodeDetails dn,
-    HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+      HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
     setNodeOperationalState(dn, newState, 0);
   }
 

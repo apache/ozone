@@ -16,25 +16,23 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto
-    .NodeOperationalState;
 
+/**
+ * A command used to persist the current node operational state on the datanode.
+ */
 public class SetNodeOperationalStateCommand
     extends SCMCommand<SetNodeOperationalStateCommandProto> {
 
-  private final StorageContainerDatanodeProtocolProtos
-      .SetNodeOperationalStateCommandProto.NodeOperationalState opState;
-  long stateExpiryEpochSeconds;
+  private final HddsProtos.NodeOperationalState opState;
+  private long stateExpiryEpochSeconds;
 
   /**
-   * Ctor that creates a SetNodeOperationalStateCommand
+   * Ctor that creates a SetNodeOperationalStateCommand.
    *
    * @param id    - Command ID. Something a time stamp would suffice.
    * @param state - OperationalState that want the node to be set into.
@@ -43,7 +41,7 @@ public class SetNodeOperationalStateCommand
    *                                indefinitely.
    */
   public SetNodeOperationalStateCommand(long id,
-      NodeOperationalState state, long stateExpiryEpochSeconds) {
+      HddsProtos.NodeOperationalState state, long stateExpiryEpochSeconds) {
     super(id);
     this.opState = state;
     this.stateExpiryEpochSeconds = stateExpiryEpochSeconds;
