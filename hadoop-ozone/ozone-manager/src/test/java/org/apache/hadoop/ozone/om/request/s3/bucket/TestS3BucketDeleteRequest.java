@@ -122,4 +122,40 @@ public class TestS3BucketDeleteRequest extends TestS3BucketRequest {
 
     return modifiedOMRequest;
   }
+
+  @Test
+  public void testReplayRequest() throws Exception {
+
+    String userName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    // Execute CreateS3Bucket request
+    S3BucketCreateRequest s3BucketCreateRequest = new S3BucketCreateRequest(
+        TestOMRequestUtils.createS3BucketRequest(userName, bucketName));
+    s3BucketCreateRequest.preExecute(ozoneManager);
+    s3BucketCreateRequest.validateAndUpdateCache(ozoneManager, 2,
+        ozoneManagerDoubleBufferHelper);
+
+    // Execute the original DeleteBucket request
+    OMRequest omRequest = TestOMRequestUtils.deleteS3BucketRequest(bucketName);
+    S3BucketDeleteRequest s3BucketDeleteRequest = new S3BucketDeleteRequest(
+        omRequest);
+    s3BucketDeleteRequest.preExecute(ozoneManager);
+    s3BucketDeleteRequest.validateAndUpdateCache(ozoneManager, 4,
+        ozoneManagerDoubleBufferHelper);
+
+    // Create the bucket again
+    s3BucketCreateRequest.preExecute(ozoneManager);
+    s3BucketCreateRequest.validateAndUpdateCache(ozoneManager, 10,
+        ozoneManagerDoubleBufferHelper);
+
+    // Replay the delete transaction - Execute the same request again
+    OMClientResponse omClientResponse =
+        s3BucketDeleteRequest.validateAndUpdateCache(ozoneManager, 4,
+            ozoneManagerDoubleBufferHelper);
+
+    // Replay should result in Replay response
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+        omClientResponse.getOMResponse().getStatus());
+  }
 }
