@@ -112,7 +112,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
-    boolean success = true;
+    boolean success = false;
     IOException exception = null;
     OmKeyInfo fromKeyValue = null;
     try {
@@ -173,8 +173,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       omClientResponse = new OMKeyRenameResponse(fromKeyValue, toKeyName,
         fromKeyName, omResponse.setRenameKeyResponse(
             RenameKeyResponse.newBuilder()).build());
+      success = true;
     } catch (IOException ex) {
-      success = false;
       exception = ex;
       omClientResponse = new OMKeyRenameResponse(null, null, null,
           createErrorOMResponse(omResponse, exception));

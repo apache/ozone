@@ -248,12 +248,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           // Check if db entry has ObjectID. This check is required because
           // it is possible that between multipart key uploads and complete,
           // we had an upgrade.
-          // TODO: If on upgrades we do not consider the non-completed multipart
-          //  uploads, then this check can be removed.
           if (dbOpenKeyInfo.getObjectID() != 0) {
             builder.setObjectID(dbOpenKeyInfo.getObjectID());
-          } else {
-            builder.setObjectID(transactionLogIndex);
           }
           omKeyInfo = builder.build();
         } else {
