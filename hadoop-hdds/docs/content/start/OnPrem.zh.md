@@ -1,5 +1,5 @@
 ---
-title: Ozone On Premise Installation
+title: 物理集群上 Ozone 的安装 
 weight: 20
 
 ---
@@ -20,44 +20,30 @@ weight: 20
   limitations under the License.
 -->
 
-If you are feeling adventurous, you can setup ozone in a real cluster.
-Setting up a real cluster requires us to understand the components of Ozone.
-Ozone is designed to work concurrently with HDFS. However, Ozone is also
-capable of running independently. The components of ozone are the same in both approaches.
+如果你想要有点挑战性，你可以在物理集群上安装 ozone。搭建一个 Ozone 集群需要了解它的各个组件，Ozone 既能和现有的 HDFS 集群并存运行，也可以独立运行。在这两种模式下，需要运行的 Ozone 组件是相同的。
 
-## Ozone Components
+## Ozone 组件 
 
-1. Ozone Manager - Is the server that is in charge of the namespace of Ozone. Ozone Manager is responsible for all volume, bucket and key operations.
-2. Storage Container Manager - Acts as the block manager. Ozone Manager
-requests blocks from SCM, to which clients can write data.
-3. Datanodes - Ozone data node code runs inside the HDFS datanode or in the independent deployment case runs an ozone datanode daemon.
+1. Ozone Manager - 管理 Ozone 命名空间的服务，负责所有对卷、桶和键的操作。
+2. Storage Container Manager - Ozone 中块的管理者，Ozone Manager 从 SCM 请求块，然后用户向块写入数据。
+3. Datanodes - Ozone 的 Datanode 代码既可以运行在 HDFS 的 Datanode 内，也可以独立部署成单独的进程。
 
-## Setting up an Ozone only cluster
+## 搭建一个独立 Ozone 集群
 
-* Please untar the ozone-\<version\> to the directory where you are going
-to run Ozone from. We need Ozone jars on all machines in the cluster. So you
-need to do this on all machines in the cluster.
+* 将 ozone-\<version\> 安装包解压到目标目录，因为 Ozone 的 jar 包需要部署到集群的所有机器上，所以你需要在所有机器上进行此操作。
 
-* Ozone relies on a configuration file called ```ozone-site.xml```. To
-generate a template that you can replace with proper values, please run the
-following command. This will generate a template called ```ozone-site.xml``` at
-the specified path (directory).
+* Ozone 依赖名为 ```ozone-site.xml``` 的配置文件， 运行下面的命令可以在指定目录生成名为 ```ozone-site.xml``` 的配置文件模板，然后你可以将参数替换为合适的值。
 
 {{< highlight bash >}}
 ozone genconf <path>
 {{< /highlight >}}
 
-Let us look at the settings inside the generated file (ozone-site.xml) and
-how they control ozone. Once the right values are defined, this file
-needs to be copied to ```ozone directory/etc/hadoop```.
+我们来看看生成的文件（ozone-site.xml）中都有哪些参数，以及它们是如何影响 ozone 的。当各个参数都配置了合适的值之后，需要把该文件拷贝到 ```ozone directory/etc/hadoop```。
 
-* **ozone.metadata.dirs** Allows Administrators to specify where the
- metadata must reside. Usually you pick your fastest disk (SSD if
- you have them on your nodes). OzoneManager, SCM and datanode will  write the
- metadata to this path. This is a required setting, if this is missing Ozone
- will fail to come up.
-
-  Here is an example,
+* **ozone.metadata.dirs** 管理员通过此参数指定元数据的存储位置，通常应该选择最快的磁盘（比如 SSD，如果节点上有的话），OM、SCM 和 Datanode 
+会将元数据写入此路径。这是个必需的参数，如果不配置它，Ozone 会启动失败。
+ 
+示例如下：
 
 {{< highlight xml >}}
    <property>
@@ -66,26 +52,23 @@ needs to be copied to ```ozone directory/etc/hadoop```.
    </property>
 {{< /highlight >}}
 
-*  **ozone.scm.names**  Storage container manager(SCM) is a distributed block
-  service which is used by ozone. This property allows data nodes to discover
-   SCM's address. Data nodes send heartbeat to SCM.
-   Until HA  feature is  complete, we configure ozone.scm.names to be a
-   single machine.
-
-  Here is an example,
-
+*  **ozone.scm.names**  Storage container manager(SCM) 提供 ozone 使用的分布式块服务，Datanode 通过这个参数来连接 SCM 并向 SCM 发送心跳。Ozone
+ 目前尚未支持 SCM 的 HA，ozone.scm.names 只需配置单个 SCM 地址即可。
+  
+  示例如下：
+  
   {{< highlight xml >}}
-      <property>
+    <property>
         <name>ozone.scm.names</name>
-        <value>scm.hadoop.apache.org</value>
+      <value>scm.hadoop.apache.org</value>
       </property>
   {{< /highlight >}}
+  
+ * **ozone.scm.datanode.id.dir** 每个 Datanode 会生成一个唯一 ID，叫做 Datanode ID。Datanode ID 会被写入此参数所指定路径下名为 datanode.id
+  的文件中，如果该路径不存在，Datanode 会自动创建。
 
- * **ozone.scm.datanode.id.dir** Data nodes generate a Unique ID called Datanode
- ID. This identity is written to the file datanode.id in a directory specified by this path. *Data nodes
-    will create this path if it doesn't exist already.*
+示例如下：
 
-Here is an  example,
 {{< highlight xml >}}
    <property>
       <name>ozone.scm.datanode.id.dir</name>
@@ -93,10 +76,10 @@ Here is an  example,
    </property>
 {{< /highlight >}}
 
-* **ozone.om.address** OM server address. This is used by OzoneClient and
-Ozone File System.
+* **ozone.om.address** OM 服务地址，OzoneClient 和 Ozone 文件系统需要使用此地址。
 
-Here is an  example,
+示例如下：
+
 {{< highlight xml >}}
     <property>
        <name>ozone.om.address</name>
@@ -105,67 +88,67 @@ Here is an  example,
 {{< /highlight >}}
 
 
-## Ozone Settings Summary
+## Ozone 参数汇总
 
 | Setting                        | Value                        | Comment |
 |--------------------------------|------------------------------|------------------------------------------------------------------|
-| ozone.metadata.dirs            | file path                    | The metadata will be stored here.                                |
-| ozone.scm.names                | SCM server name              | Hostname:port or IP:port address of SCM.                      |
-| ozone.scm.block.client.address | SCM server name and port     | Used by services like OM                                         |
-| ozone.scm.client.address       | SCM server name and port     | Used by client-side                                              |
-| ozone.scm.datanode.address     | SCM server name and port     | Used by datanode to talk to SCM                                  |
-| ozone.om.address               | OM server name               | Used by Ozone handler and Ozone file system.                     |
+| ozone.metadata.dirs            | 文件路径                | 元数据存储位置                    |
+| ozone.scm.names                | SCM 服务地址            | SCM的主机名:端口，或者IP:端口  |
+| ozone.scm.block.client.address | SCM 服务地址和端口 | Ozone 内部服务使用（如 OM）                                |
+| ozone.scm.client.address       | SCM 服务地址和端口 | 客户端使用                                        |
+| ozone.scm.datanode.address     | SCM 服务地址和端口 | Datanode 使用                            |
+| ozone.om.address               | OM 服务地址           | Ozone handler 和 Ozone 文件系统使用             |
 
 
-## Startup the cluster
+## 启动集群
 
-Before we boot up the Ozone cluster, we need to initialize both SCM and Ozone Manager.
+在启动 Ozone 集群之前，需要依次初始化 SCM 和 OM。
 
 {{< highlight bash >}}
 ozone scm --init
 {{< /highlight >}}
-This allows SCM to create the cluster Identity and initialize its state.
-The ```init``` command is similar to Namenode format. Init command is executed only once, that allows SCM to create all the required on-disk structures to work correctly.
+
+这条命令会使 SCM 创建集群 ID 并初始化它的状态。
+```init``` 命令和 Namenode 的 ```format``` 命令类似，只需要执行一次，SCM 就可以在磁盘上准备好正常运行所需的数据结构。
+
 {{< highlight bash >}}
 ozone --daemon start scm
 {{< /highlight >}}
 
-Once we know SCM is up and running, we can create an Object Store for our use. This is done by running the following command.
+SCM 启动之后，我们就可以创建对象存储空间，命令如下：
 
 {{< highlight bash >}}
 ozone om --init
 {{< /highlight >}}
 
 
-Once Ozone manager is initialized, we are ready to run the name service.
+OM 初始化完成之后，就可以启动 OM 服务了：
 
 {{< highlight bash >}}
 ozone --daemon start om
 {{< /highlight >}}
 
-At this point Ozone's name services, the Ozone manager, and the block service  SCM is both running.\
-**Please note**: If SCM is not running
-```om --init``` command will fail. SCM start will fail if on-disk data structures are missing. So please make sure you have done both ```scm --init``` and ```om --init``` commands.
+此时 Ozone 的命名服务 OM 和 块服务 SCM 都已运行。\
+**注意**: 如果 SCM 未启动，```om --init``` 命令会失败，同样，如果磁盘上的元数据缺失，SCM 也无法启动，所以请确保 ```scm --init``` 和 ```om --init``` 两条命令都成功执行了。
 
-Now we need to start the data nodes. Please run the following command on each datanode.
+接下来启动 Datanode，在每个 Datanode 上运行下面的命令：
+
 {{< highlight bash >}}
 ozone --daemon start datanode
 {{< /highlight >}}
 
-At this point SCM, Ozone Manager and data nodes are up and running.
+现在 SCM、OM 和所有的 Datanode 都已启动并运行。
 
-***Congratulations!, You have set up a functional ozone cluster.***
+***恭喜！你成功地搭建了一个完整的 ozone 集群。***
 
-## Shortcut
+## 捷径
 
-If you want to make your life simpler, you can just run
+如果你想简化操作，可以直接运行：
+
 {{< highlight bash >}}
 ozone scm --init
 ozone om --init
 start-ozone.sh
 {{< /highlight >}}
 
-This assumes that you have set up the slaves file correctly and ssh
-configuration that allows ssh-ing to all data nodes. This is the same as the
-HDFS configuration, so please refer to HDFS documentation on how to set this
-up.
+这么做的前提是，slaves 文件已经正确编写，并且配置好了到各个 Datanode 的 ssh，这和 HDFS 的配置方式相同，具体方法请查看 HDFS 文档。
