@@ -343,7 +343,7 @@ public class XceiverClientManager implements Closeable {
    * Configuration for ratis client.
    */
   @ConfigGroup(prefix = "dfs.ratis.client")
-  public class DFSRatisClientConfig {
+  public static class DFSRatisClientConfig {
 
     @Config(key = "async.max.outstanding.requests",
         defaultValue = "64",
