@@ -387,8 +387,9 @@ message ClosePipelineCommandProto {
 }
 
 message SetNodeOperationalStateCommandProto {
-  required  NodeOperationalState nodeOperationalState = 1;
-  required  int64 stateExpiryEpochSeconds = 2;
+  required  int64 cmdId = 1;
+  required  NodeOperationalState nodeOperationalState = 2;
+  required  int64 stateExpiryEpochSeconds = 3;
 }
 
 /**

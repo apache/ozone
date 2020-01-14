@@ -68,6 +68,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
@@ -87,6 +88,7 @@ import static org.apache.hadoop.hdds.protocol.proto
 import static org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type
     .closePipelineCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.setNodeOperationalStateCommand;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
@@ -349,6 +351,12 @@ public class SCMDatanodeProtocolServer implements
           .setCommandType(closePipelineCommand)
           .setClosePipelineCommandProto(
               ((ClosePipelineCommand)cmd).getProto())
+          .build();
+    case setNodeOperationalStateCommand:
+      return builder
+          .setCommandType(setNodeOperationalStateCommand)
+          .setSetNodeOperationalStateCommandProto(
+              ((SetNodeOperationalStateCommand)cmd).getProto())
           .build();
     default:
       throw new IllegalArgumentException("Scm command " +

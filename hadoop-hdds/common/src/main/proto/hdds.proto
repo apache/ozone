@@ -37,6 +37,8 @@ message DatanodeDetailsProto {
     // network name, can be Ip address or host name, depends
     optional string networkName = 6;
     optional string networkLocation = 7; // Network topology location
+    optional NodeOperationalState persistedOpState = 8; // The Operational state persisted in the datanode.id file
+    optional int64 persistedOpStateExpiry = 9; // The seconds after the epoch when the OpState should expire
 }
 
 /**

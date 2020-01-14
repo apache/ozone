@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.protocol.commands;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -65,7 +66,24 @@ public class SetNodeOperationalStateCommand
   @Override
   public SetNodeOperationalStateCommandProto getProto() {
     return SetNodeOperationalStateCommandProto.newBuilder()
+        .setCmdId(getId())
         .setNodeOperationalState(opState)
         .setStateExpiryEpochSeconds(stateExpiryEpochSeconds).build();
+  }
+
+  public HddsProtos.NodeOperationalState getOpState() {
+    return opState;
+  }
+
+  public long getStateExpiryEpochSeconds() {
+    return stateExpiryEpochSeconds;
+  }
+
+  public static SetNodeOperationalStateCommand getFromProtobuf(
+      SetNodeOperationalStateCommandProto cmdProto) {
+    Preconditions.checkNotNull(cmdProto);
+    return new SetNodeOperationalStateCommand(cmdProto.getCmdId(),
+        cmdProto.getNodeOperationalState(),
+        cmdProto.getStateExpiryEpochSeconds());
   }
 }
