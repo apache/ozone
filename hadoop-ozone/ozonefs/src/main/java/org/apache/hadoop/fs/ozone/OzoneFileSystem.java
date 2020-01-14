@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -102,5 +103,10 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
       return new OzoneClientAdapterImpl(omHost, omPort, conf,
           volumeStr, bucketStr, storageStatistics);
     }
+  }
+
+  @Override
+  protected InputStream createFSInputStream(InputStream inputStream) {
+    return new CapableOzoneFSInputStream(inputStream, statistics);
   }
 }
