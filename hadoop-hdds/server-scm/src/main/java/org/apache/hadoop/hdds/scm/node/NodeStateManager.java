@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.SetNodeOperationalStateCommandProto;
 import org.apache.hadoop.hdds.scm.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine
     .InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
+import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.slf4j.Logger;
@@ -388,9 +391,9 @@ public class NodeStateManager implements Runnable, Closeable {
       // container replicas. Sometimes the event will do nothing, but it will
       // not do any harm either. Eg DECOMMISSIONING -> DECOMMISSIONED + HEALTHY
       // but the pipeline creation logic will ignore decommissioning nodes.
-      fireHealthStateEvent(oldStatus.getHealth(), dn);
-      // TODO - here we need to fire an event to persist the opState and expiry
-      //        on the DN.
+      if (oldStatus.getOperationalState() != newState) {
+        fireHealthStateEvent(oldStatus.getHealth(), dn);
+      }
     }
   }
 
