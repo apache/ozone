@@ -25,7 +25,6 @@ import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.HashMap;
 import java.util.UUID;
 
 /**
@@ -35,10 +34,12 @@ public class TestOmMultipartKeyInfo {
 
   @Test
   public void testCopyObject() {
-    OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo(
-        UUID.randomUUID().toString(), Time.now(),
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
-        new HashMap<>());
+    OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
+        .setUploadID(UUID.randomUUID().toString())
+        .setCreationTime(Time.now())
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
+        .build();
 
     OmMultipartKeyInfo cloneMultipartKeyInfo = omMultipartKeyInfo.copyObject();
 

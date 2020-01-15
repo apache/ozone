@@ -52,6 +52,9 @@ public final class OmKeyInfo extends WithMetadata {
   private HddsProtos.ReplicationType type;
   private HddsProtos.ReplicationFactor factor;
   private FileEncryptionInfo encInfo;
+  private long objectID;
+  private long updateID;
+
   /**
    * ACL Information.
    */
@@ -64,7 +67,8 @@ public final class OmKeyInfo extends WithMetadata {
       HddsProtos.ReplicationType type,
       HddsProtos.ReplicationFactor factor,
       Map<String, String> metadata,
-      FileEncryptionInfo encInfo, List<OzoneAcl> acls) {
+      FileEncryptionInfo encInfo, List<OzoneAcl> acls,
+      long objectID, long updateID) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -88,6 +92,8 @@ public final class OmKeyInfo extends WithMetadata {
     this.metadata = metadata;
     this.encInfo = encInfo;
     this.acls = acls;
+    this.objectID = objectID;
+    this.updateID = updateID;
   }
 
   public String getVolumeName() {
@@ -133,6 +139,34 @@ public final class OmKeyInfo extends WithMetadata {
 
   public void updateModifcationTime() {
     this.modificationTime = Time.monotonicNow();
+  }
+
+  /**
+   * Sets the update ID. For each modification of this object, we will set
+   * this to a value greater than the current value.
+   * @param updateId  long
+   */
+  public void setUpdateID(long updateId) {
+    Preconditions.checkArgument(updateId > this.updateID,
+        "Trying to set updateID to a value ({}) which is less than the " +
+            "current value ({}) for ()", updateId, this.updateID, this);
+    this.updateID = updateId;
+  }
+
+  /**
+   * Returns objectID.
+   * @return long
+   */
+  public long getObjectID() {
+    return objectID;
+  }
+
+  /**
+   * Returns updateID.
+   * @return long
+   */
+  public long getUpdateID() {
+    return updateID;
   }
 
   /**
@@ -265,6 +299,8 @@ public final class OmKeyInfo extends WithMetadata {
     private Map<String, String> metadata;
     private FileEncryptionInfo encInfo;
     private List<OzoneAcl> acls;
+    private long objectID;
+    private long updateID;
 
     public Builder() {
       this.metadata = new HashMap<>();
@@ -357,11 +393,21 @@ public final class OmKeyInfo extends WithMetadata {
       return this;
     }
 
+    public Builder setObjectID(long obId) {
+      this.objectID = obId;
+      return this;
+    }
+
+    public Builder setUpdateID(long id) {
+      this.updateID = id;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(
           volumeName, bucketName, keyName, omKeyLocationInfoGroups,
           dataSize, creationTime, modificationTime, type, factor, metadata,
-          encInfo, acls);
+          encInfo, acls, objectID, updateID);
     }
   }
 
@@ -382,7 +428,9 @@ public final class OmKeyInfo extends WithMetadata {
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
-        .addAllAcls(OzoneAclUtil.toProtobuf(acls));
+        .addAllAcls(OzoneAclUtil.toProtobuf(acls))
+        .setObjectID(objectID)
+        .setUpdateID(updateID);
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
@@ -390,7 +438,7 @@ public final class OmKeyInfo extends WithMetadata {
   }
 
   public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
-    return new OmKeyInfo.Builder()
+    Builder builder = new Builder()
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
         .setKeyName(keyInfo.getKeyName())
@@ -404,9 +452,15 @@ public final class OmKeyInfo extends WithMetadata {
         .setReplicationFactor(keyInfo.getFactor())
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
-            OMPBHelper.convert(keyInfo.getFileEncryptionInfo()): null)
-        .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()))
-        .build();
+            OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
+        .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
+    if (keyInfo.hasObjectID()) {
+      builder.setObjectID(keyInfo.getObjectID());
+    }
+    if (keyInfo.hasUpdateID()) {
+      builder.setUpdateID(keyInfo.getUpdateID());
+    }
+    return builder.build();
   }
 
   @Override
@@ -429,7 +483,9 @@ public final class OmKeyInfo extends WithMetadata {
         type == omKeyInfo.type &&
         factor == omKeyInfo.factor &&
         Objects.equals(metadata, omKeyInfo.metadata) &&
-        Objects.equals(acls, omKeyInfo.acls);
+        Objects.equals(acls, omKeyInfo.acls) &&
+        objectID == omKeyInfo.objectID &&
+        updateID == omKeyInfo.updateID;
   }
 
   @Override
@@ -450,7 +506,9 @@ public final class OmKeyInfo extends WithMetadata {
         .setDataSize(dataSize)
         .setReplicationType(type)
         .setReplicationFactor(factor)
-        .setFileEncryptionInfo(encInfo);
+        .setFileEncryptionInfo(encInfo)
+        .setObjectID(objectID)
+        .setUpdateID(updateID);
 
     keyLocationVersions.forEach(keyLocationVersion -> {
       List<OmKeyLocationInfo> keyLocationInfos = new ArrayList<>();

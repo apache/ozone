@@ -160,7 +160,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {
         dirKeyInfo = createDirectoryKeyInfo(ozoneManager, omBucketInfo,
-            volumeName, bucketName, keyName, keyArgs);
+            volumeName, bucketName, keyName, keyArgs, transactionLogIndex);
 
         omMetadataManager.getKeyTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
@@ -210,7 +210,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   private OmKeyInfo createDirectoryKeyInfo(OzoneManager ozoneManager,
       OmBucketInfo omBucketInfo, String volumeName, String bucketName,
-      String keyName, KeyArgs keyArgs)
+      String keyName, KeyArgs keyArgs, long transactionLogIndex)
       throws IOException {
     Optional<FileEncryptionInfo> encryptionInfo =
         getFileEncryptionInfo(ozoneManager, omBucketInfo);
@@ -229,6 +229,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
         .setFileEncryptionInfo(encryptionInfo.orNull())
         .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+        .setObjectID(transactionLogIndex)
+        .setUpdateID(transactionLogIndex)
         .build();
   }
 

@@ -126,6 +126,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       if (omKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
+      // Set the UpdateID to current transactionLogIndex
+      omKeyInfo.setUpdateID(transactionLogIndex);
 
       // Update table cache.
       omMetadataManager.getKeyTable().addCacheEntry(

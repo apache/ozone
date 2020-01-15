@@ -257,7 +257,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs,
           omMetadataManager.getOzoneKey(volumeName, bucketName,
               keyName), keyArgs.getDataSize(), locations,
-          encryptionInfo.orNull(), ozoneManager.getPrefixManager(), bucketInfo);
+          encryptionInfo.orNull(), ozoneManager.getPrefixManager(),
+          bucketInfo, transactionLogIndex);
 
       omClientResponse =  prepareCreateKeyResponse(keyArgs, omKeyInfo,
           locations, encryptionInfo.orNull(), exception,
@@ -285,8 +286,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     return omClientResponse;
   }
-
-
 
   /**
    * Check if any keys exist under given path.
