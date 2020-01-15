@@ -32,6 +32,7 @@ import java.util.function.IntFunction;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for {@link OzoneFSInputStream}.
@@ -111,6 +112,17 @@ public class TestOzoneFSInputStream {
       assertEquals(-1, bytesRead);
       assertEquals(0, buf.position());
     }
+  }
+
+  @Test
+  public void testStreamCapability() {
+    final OzoneFSInputStream subject = createTestSubject(emptyStream());
+    final CapableOzoneFSInputStream capableOzoneFSInputStream =
+        new CapableOzoneFSInputStream(subject,
+            new FileSystem.Statistics("test"));
+
+    assertTrue(capableOzoneFSInputStream.
+        hasCapability(OzoneStreamCapabilities.READBYTEBUFFER));
   }
 
   private static OzoneFSInputStream createTestSubject(InputStream input) {
