@@ -55,12 +55,24 @@ public class ProgressBar {
    */
   public ProgressBar(final PrintStream stream, final long maxValue,
                      final LongSupplier currentValue) {
+    this(stream, maxValue, currentValue, System.console() != null);
+  }
+
+  /**
+   * Creates a new ProgressBar instance which prints the progress on the given
+   * PrintStream when started.
+   *
+   * @param stream       to display the progress
+   * @param maxValue     Maximum value of the progress
+   * @param currentValue Supplier that provides the current value
+   * @param interactive  Print progressbar for interactive environments.
+   */
+  public ProgressBar(final PrintStream stream, final long maxValue,
+      final LongSupplier currentValue, boolean interactive) {
     this.maxValue = maxValue;
     this.currentValue = currentValue;
     this.thread = new Thread(getProgressBar(stream));
-    this.running = false;
-    //This is a shell session if PS1 has been set.
-    this.interactive = System.console() != null;
+    this.interactive = interactive;
   }
 
   /**
@@ -115,11 +127,7 @@ public class ProgressBar {
       while (running && currentValue.getAsLong() < maxValue) {
         print(stream, currentValue.getAsLong());
         try {
-          if (interactive) {
-            Thread.sleep(1000L);
-          } else {
-            Thread.sleep(10000L);
-          }
+          Thread.sleep(1000L);
         } catch (InterruptedException e) {
           LOG.warn("ProgressBar was interrupted.");
           Thread.currentThread().interrupt();
