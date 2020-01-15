@@ -36,7 +36,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -52,18 +51,21 @@ public class TestCachingSpaceUsageSource {
   public void providesInitialValueUntilStarted() {
     final long initialValue = validInitialValue();
     SpaceUsageCheckParams params = paramsBuilder(new AtomicLong(initialValue))
+        .withRefresh(Duration.ZERO)
         .build();
 
-    SpaceUsageSource subject = new CachingSpaceUsageSource(params, null);
+    SpaceUsageSource subject = new CachingSpaceUsageSource(params);
 
     assertEquals(initialValue, subject.getUsedSpace());
   }
 
   @Test
   public void ignoresMissingInitialValue() {
-    SpaceUsageCheckParams params = paramsBuilder().build();
+    SpaceUsageCheckParams params = paramsBuilder()
+        .withRefresh(Duration.ZERO)
+        .build();
 
-    SpaceUsageSource subject = new CachingSpaceUsageSource(params, null);
+    SpaceUsageSource subject = new CachingSpaceUsageSource(params);
 
     assertEquals(0, subject.getUsedSpace());
   }
@@ -73,14 +75,11 @@ public class TestCachingSpaceUsageSource {
     AtomicLong savedValue = new AtomicLong(validInitialValue());
     SpaceUsageCheckParams params = paramsBuilder(savedValue)
         .withRefresh(Duration.ZERO).build();
-    ScheduledExecutorService executor = sameThreadExecutorWithoutDelay();
 
-    CachingSpaceUsageSource subject =
-        new CachingSpaceUsageSource(params, executor);
+    CachingSpaceUsageSource subject = new CachingSpaceUsageSource(params);
     subject.start();
 
     assertSubjectWasRefreshed(params.getSource().getUsedSpace(), subject);
-    verifyRefreshNotScheduled(executor);
   }
 
   @Test
@@ -178,12 +177,6 @@ public class TestCachingSpaceUsageSource {
           return result;
         });
     return executor;
-  }
-
-  private static void verifyRefreshNotScheduled(
-      ScheduledExecutorService executor) {
-    verify(executor, never())
-        .scheduleWithFixedDelay(any(), anyLong(), anyLong(), any());
   }
 
   private static void verifyRefreshWasScheduled(

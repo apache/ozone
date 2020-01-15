@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.fs;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -56,14 +57,18 @@ public class CachingSpaceUsageSource implements SpaceUsageSource {
     this(params, createExecutor(params));
   }
 
-  public CachingSpaceUsageSource(SpaceUsageCheckParams params,
+  @VisibleForTesting
+  CachingSpaceUsageSource(SpaceUsageCheckParams params,
       ScheduledExecutorService executor) {
     Preconditions.checkArgument(params != null, "params == null");
 
     refresh = params.getRefresh();
     source = params.getSource();
     persistence = params.getPersistence();
-    this.executor = refresh.isZero() ? null : executor;
+    this.executor = executor;
+
+    Preconditions.checkArgument(refresh.isZero() == (executor == null),
+        "executor should be provided if and only if refresh is requested");
 
     loadInitialValue();
   }

@@ -56,6 +56,7 @@ public class TestDedicatedDiskSpaceUsage {
     createFile(file, FILE_SIZE);
     SpaceUsageSource subject = new DedicatedDiskSpaceUsage(DIR);
 
+    // condition comes from TestDFCachingGetSpaceUsed in Hadoop Common
     assertTrue(subject.getUsedSpace() >= FILE_SIZE - 20);
   }
 
