@@ -2459,4 +2459,13 @@
       The maximum number of keys to return for a list trash request.
     </description>
   </property>
+  <property>
+    <name>ozone.http.basedir</name>
+    <value></value>
+    <tag>OZONE, OM, SCM, MANAGEMENT</tag>
+    <description>
+      The base dir for HTTP Jetty server to extract content.
+      The directory named by this attribute must exist and be writeable.
+    </description>
+  </property>
 </configuration>

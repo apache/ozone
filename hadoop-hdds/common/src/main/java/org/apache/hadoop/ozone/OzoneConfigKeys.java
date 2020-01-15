@@ -449,6 +449,8 @@ public final class OzoneConfigKeys {
       "ozone.client.list.trash.keys.max";
   public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
 
+  public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
+
   /**
    * There is no need to instantiate this class.
    */
