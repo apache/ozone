@@ -23,7 +23,7 @@ import prettyBytes from 'pretty-bytes';
 import './Datanodes.less';
 import {PaginationConfig} from "antd/lib/pagination";
 import moment from 'moment';
-import {getCapacityPercent} from "../../utils/common";
+import {getCapacityPercent} from "utils/common";
 
 export type DatanodeStatus = "HEALTHY" | "STALE" | "DEAD" | "DECOMMISSIONING" | "DECOMMISSIONED";
 
@@ -54,7 +54,7 @@ interface Datanode {
   lastHeartbeat: number;
   storageUsed: number;
   storageTotal: number;
-  pipelines: string;
+  pipelines: string[];
   containers: number;
 }
 
@@ -107,7 +107,8 @@ const COLUMNS = [
   {
     title: 'Pipeline ID(s)',
     dataIndex: 'pipelines',
-    key: 'pipelines'
+    key: 'pipelines',
+    render: (pipelines: string[]) => <div>{pipelines.map(pipeline => <div>{pipeline}</div>)}</div>
   },
   {
     title: 'Containers',
@@ -143,14 +144,13 @@ export class Datanodes extends React.Component<any, DatanodesState> {
         const storageUsed = datanode.storageReport.reduce((sum: number, storageReport) => {
           return sum  + storageReport.used;
         }, 0);
-        const pipelines = datanode.pipelineIDs ? datanode.pipelineIDs.join(', ') : '';
         return {
           hostname: datanode.hostname,
           state: datanode.state,
           lastHeartbeat: datanode.lastHeartbeat,
           storageUsed,
           storageTotal,
-          pipelines,
+          pipelines: datanode.pipelineIDs,
           containers: datanode.containers
         }
       });
@@ -158,11 +158,12 @@ export class Datanodes extends React.Component<any, DatanodesState> {
         loading: false,
         dataSource,
         totalCount
-      })
+      });
     });
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
+    // TODO: Implement this method once server side pagination is enabled
     console.log(current, pageSize);
   };
 

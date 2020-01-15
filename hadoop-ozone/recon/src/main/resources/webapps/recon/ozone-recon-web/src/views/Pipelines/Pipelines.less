@@ -16,27 +16,8 @@
  * limitations under the License.
  */
 
-import {Overview} from './views/Overview/Overview';
-import {Datanodes} from './views/Datanodes/Datanodes';
-import {Pipelines} from "./views/Pipelines/Pipelines";
-import {NotFound} from './views/NotFound/NotFound';
-import {IRoute} from "./routes.types";
+.pipelines-container {
+  .content-div {
 
-export const routes: IRoute[] = [
-  {
-    path: "/Overview",
-    component: Overview
-  },
-  {
-    path: "/Datanodes",
-    component: Datanodes
-  },
-  {
-    path: "/Pipelines",
-    component: Pipelines
-  },
-  {
-    path: "/:NotFound",
-    component: NotFound,
   }
-];
+}
