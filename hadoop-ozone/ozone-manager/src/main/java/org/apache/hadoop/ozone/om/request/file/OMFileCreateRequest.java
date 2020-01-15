@@ -30,9 +30,7 @@ import javax.annotation.Nonnull;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,21 +45,31 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .CreateFileResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Type;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-
 
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
@@ -81,6 +89,11 @@ public class OMFileCreateRequest extends OMKeyRequest {
     super(omRequest);
   }
 
+  private enum Result {
+    SUCCESS,
+    REPLAY,
+    FAILURE
+  }
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
@@ -147,9 +160,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     CreateFileRequest createFileRequest = getOmRequest().getCreateFileRequest();
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
@@ -171,12 +184,16 @@ public class OMFileCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     boolean acquiredLock = false;
-    IOException exception = null;
     Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
     OmKeyInfo omKeyInfo = null;
-
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
+
     OMClientResponse omClientResponse = null;
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateFile)
+        .setStatus(Status.OK);
+    IOException exception = null;
+    Result result = null;
     try {
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
@@ -194,94 +211,157 @@ public class OMFileCreateRequest extends OMKeyRequest {
             OMException.ResultCodes.NOT_A_FILE);
       }
 
-      OMFileRequest.OMDirectoryResult omDirectoryResult =
-          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
-              bucketName, keyName, Paths.get(keyName));
-
-      // Check if a file or directory exists with same key name.
-      if (omDirectoryResult == FILE_EXISTS) {
-        if (!isOverWrite) {
-          throw new OMException("File " + keyName + " already exists",
-              OMException.ResultCodes.FILE_ALREADY_EXISTS);
+      // Check if Key already exists in KeyTable and this transaction is a
+      // replay.
+      String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+          keyName);
+      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+      if (dbKeyInfo != null) {
+        // Check if this transaction is a replay of ratis logs.
+        if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(), trxnLogIndex)) {
+          // Replay implies the response has already been returned to
+          // the client. So take no further action and return a dummy response.
+          result = Result.REPLAY;
+          omClientResponse = new OMFileCreateResponse(createReplayOMResponse(
+              omResponse));
         }
-      } else if (omDirectoryResult == DIRECTORY_EXISTS) {
-        throw new OMException("Can not write to directory: " + keyName,
-            OMException.ResultCodes.NOT_A_FILE);
-      } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-        throw new OMException("Can not create file: " + keyName + " as there " +
-            "is already file in the given path",
-            OMException.ResultCodes.NOT_A_FILE);
       }
 
-      if (!isRecursive) {
-        // We cannot create a file if complete parent directories does not exist
+      if (result == null) {
 
-        // verifyFilesInPath, checks only the path and its parent directories.
-        // But there may be some keys below the given path. So this method
-        // checks them.
+        OMFileRequest.OMDirectoryResult omDirectoryResult =
+            OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
+                bucketName, keyName, Paths.get(keyName));
 
-        // Example:
-        // Existing keys in table
-        // a/b/c/d/e
-        // a/b/c/d/f
-        // a/b
+        // Check if a file or directory exists with same key name.
+        if (omDirectoryResult == FILE_EXISTS) {
+          if (!isOverWrite) {
+            throw new OMException("File " + keyName + " already exists",
+                OMException.ResultCodes.FILE_ALREADY_EXISTS);
+          }
+        } else if (omDirectoryResult == DIRECTORY_EXISTS) {
+          throw new OMException("Can not write to directory: " + keyName,
+              OMException.ResultCodes.NOT_A_FILE);
+        } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
+          throw new OMException(
+              "Can not create file: " + keyName + " as there " +
+                  "is already file in the given path",
+              OMException.ResultCodes.NOT_A_FILE);
+        }
 
-        // Take an example if given key to be created with isRecursive set
-        // to false is "a/b/c/e".
+        if (!isRecursive) {
+          // We cannot create a file if complete parent directories don't exist.
 
-        // There is no key in keyTable with the provided path.
-        // Check in case if there are keys exist in given path. (This can
-        // happen if keys are directly created using key requests.)
+          // verifyFilesInPath, checks only the path and its parent directories.
+          // But there may be some keys below the given path. So this method
+          // checks them.
 
-        // We need to do this check only in the case of non-recursive, so
-        // not included the checks done in checkKeysUnderPath in
-        // verifyFilesInPath method, as that method is common method for
-        // directory and file create request. This also avoid's this
-        // unnecessary check which is not required for those cases.
-        if (omDirectoryResult == NONE ||
-            omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH) {
-          boolean canBeCreated = checkKeysUnderPath(omMetadataManager,
-              volumeName, bucketName, keyName);
-          if (!canBeCreated) {
-            throw new OMException("Can not create file: " + keyName +
-                " as one of parent directory is not created",
-                OMException.ResultCodes.NOT_A_FILE);
+          // Example:
+          // Existing keys in table
+          // a/b/c/d/e
+          // a/b/c/d/f
+          // a/b
+
+          // Take an example if given key to be created with isRecursive set
+          // to false is "a/b/c/e".
+          // There is no key in keyTable with the provided path.
+          // Check in case if there are keys exist in given path. (This can
+          // happen if keys are directly created using key requests.)
+
+          // We need to do this check only in the case of non-recursive, so
+          // not included the checks done in checkKeysUnderPath in
+          // verifyFilesInPath method, as that method is common method for
+          // directory and file create request. This also avoid's this
+          // unnecessary check which is not required for those cases.
+          if (omDirectoryResult == NONE ||
+              omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH) {
+            boolean canBeCreated = checkKeysUnderPath(omMetadataManager,
+                volumeName, bucketName, keyName);
+            if (!canBeCreated) {
+              throw new OMException("Can not create file: " + keyName +
+                  " as one of parent directory is not created",
+                  OMException.ResultCodes.NOT_A_FILE);
+            }
           }
         }
+
+        // do open key
+        OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(volumeName, bucketName));
+        encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
+
+        omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
+            keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
+            ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex);
+
+        long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
+        long clientID = createFileRequest.getClientID();
+        String dbOpenKeyName = omMetadataManager.getOpenKey(volumeName,
+            bucketName, keyName, clientID);
+
+        // Append new blocks
+        omKeyInfo.appendNewBlocks(keyArgs.getKeyLocationsList().stream()
+            .map(OmKeyLocationInfo::getFromProtobuf)
+            .collect(Collectors.toList()), false);
+
+        // Add to cache entry can be done outside of lock for this openKey.
+        // Even if bucket gets deleted, when commitKey we shall identify if
+        // bucket gets deleted.
+        omMetadataManager.getOpenKeyTable().addCacheEntry(
+            new CacheKey<>(dbOpenKeyName),
+            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+
+        // Prepare response
+        omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
+            .setKeyInfo(omKeyInfo.getProtobuf())
+            .setID(clientID)
+            .setOpenVersion(openVersion).build())
+            .setCmdType(Type.CreateFile);
+        omClientResponse = new OMFileCreateResponse(omResponse.build(),
+            omKeyInfo, clientID);
+
+        result = Result.SUCCESS;
       }
-
-      // do open key
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
-      encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
-      omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs,
-          omMetadataManager.getOzoneKey(volumeName, bucketName,
-              keyName), keyArgs.getDataSize(), locations,
-          encryptionInfo.orNull(), ozoneManager.getPrefixManager(),
-          bucketInfo, transactionLogIndex);
-
-      omClientResponse =  prepareCreateKeyResponse(keyArgs, omKeyInfo,
-          locations, encryptionInfo.orNull(), exception,
-          createFileRequest.getClientID(), transactionLogIndex, volumeName,
-          bucketName, keyName, ozoneManager,
-          OMAction.CREATE_FILE, ozoneManager.getPrefixManager(), bucketInfo);
     } catch (IOException ex) {
+      result = Result.FAILURE;
       exception = ex;
-      omClientResponse =  prepareCreateKeyResponse(keyArgs, omKeyInfo,
-          locations, encryptionInfo.orNull(), exception,
-          createFileRequest.getClientID(), transactionLogIndex,
-          volumeName, bucketName, keyName, ozoneManager,
-          OMAction.CREATE_FILE, ozoneManager.getPrefixManager(), null);
+      omMetrics.incNumCreateFileFails();
+      omResponse.setCmdType(Type.CreateFile);
+      omClientResponse =  new OMFileCreateResponse(createErrorOMResponse(
+          omResponse, exception));
     } finally {
       if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+        omClientResponse.setFlushFuture(omDoubleBufferHelper.add(
+            omClientResponse, trxnLogIndex));
       }
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
+    }
+
+    // Audit Log outside the lock
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        OMAction.CREATE_FILE, auditMap, exception,
+        getOmRequest().getUserInfo()));
+
+    switch (result) {
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+          createFileRequest);
+      break;
+    case SUCCESS:
+      LOG.debug("File created. Volume:{}, Bucket:{}, Key:{}", volumeName,
+          bucketName, keyName);
+      break;
+    case FAILURE:
+      LOG.error("File create failed. Volume:{}, Bucket:{}, Key{}. Exception:{}",
+          volumeName, bucketName, keyName, exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMFileCreateRequest: {}",
+          createFileRequest);
     }
 
     return omClientResponse;

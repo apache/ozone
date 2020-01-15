@@ -21,20 +21,19 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -43,16 +42,29 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .CreateKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Type;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+
 /**
  * Handles CreateKey request.
  */
@@ -63,6 +75,12 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
   public OMKeyCreateRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  private enum Result {
+    SUCCESS,
+    REPLAY,
+    FAILURE
   }
 
   @Override
@@ -141,10 +159,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
-
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
@@ -159,9 +175,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OmKeyInfo omKeyInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
     Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
-    IOException exception = null;
     boolean acquireLock = false;
     OMClientResponse omClientResponse = null;
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK);
+    IOException exception = null;
+    Result result = null;
     try {
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
@@ -174,36 +194,101 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // bucket encryptionInfo will be not set. If this assumption holds
       // true, we can avoid get from bucket table.
 
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-              omMetadataManager.getBucketKey(volumeName, bucketName));
+      // Check if Key already exists
+      String dbKeyName = omMetadataManager.getOzoneKey(volumeName, bucketName,
+          keyName);
+      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(dbKeyName);
+      if (dbKeyInfo != null) {
+        // Check if this transaction is a replay of ratis logs.
+        if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(),
+            trxnLogIndex)) {
+          // Replay implies the response has already been returned to
+          // the client. So take no further action and return a dummy
+          // OMClientResponse.
+          result = Result.REPLAY;
+          omClientResponse = new OMKeyCreateResponse(createReplayOMResponse(
+              omResponse));
+        }
+      }
 
-      encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
+      if (result == null) {
+        OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(volumeName, bucketName));
+        encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
 
-      omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
-          keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
-          ozoneManager.getPrefixManager(), bucketInfo, transactionLogIndex);
-      omClientResponse = prepareCreateKeyResponse(keyArgs, omKeyInfo,
-          locations, encryptionInfo.orNull(), exception,
-          createKeyRequest.getClientID(), transactionLogIndex, volumeName,
-          bucketName, keyName, ozoneManager, OMAction.ALLOCATE_KEY,
-          ozoneManager.getPrefixManager(), bucketInfo);
+        omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
+            keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
+            ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex);
+
+        long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
+        long clientID = createKeyRequest.getClientID();
+        String dbOpenKeyName = omMetadataManager.getOpenKey(volumeName,
+            bucketName, keyName, clientID);
+
+        // Append new blocks
+        omKeyInfo.appendNewBlocks(keyArgs.getKeyLocationsList().stream()
+            .map(OmKeyLocationInfo::getFromProtobuf)
+            .collect(Collectors.toList()), false);
+
+        // Add to cache entry can be done outside of lock for this openKey.
+        // Even if bucket gets deleted, when commitKey we shall identify if
+        // bucket gets deleted.
+        omMetadataManager.getOpenKeyTable().addCacheEntry(
+            new CacheKey<>(dbOpenKeyName),
+            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+
+        // Prepare response
+        omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
+            .setKeyInfo(omKeyInfo.getProtobuf())
+            .setID(clientID)
+            .setOpenVersion(openVersion).build())
+            .setCmdType(Type.CreateKey);
+        omClientResponse = new OMKeyCreateResponse(omResponse.build(),
+            omKeyInfo, clientID);
+
+        result = Result.SUCCESS;
+      }
     } catch (IOException ex) {
+      result = Result.FAILURE;
       exception = ex;
-      omClientResponse = prepareCreateKeyResponse(keyArgs, omKeyInfo, locations,
-          encryptionInfo.orNull(), exception, createKeyRequest.getClientID(),
-          transactionLogIndex, volumeName, bucketName, keyName, ozoneManager,
-          OMAction.ALLOCATE_KEY, ozoneManager.getPrefixManager(), null);
+      omMetrics.incNumKeyAllocateFails();
+      omResponse.setCmdType(Type.CreateKey);
+      omClientResponse =  new OMKeyCreateResponse(createErrorOMResponse(
+          omResponse, exception));
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+            omDoubleBufferHelper.add(omClientResponse,
+                trxnLogIndex));
       }
       if (acquireLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
+    }
+
+    // Audit Log outside the lock
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        OMAction.ALLOCATE_KEY, auditMap, exception,
+        getOmRequest().getUserInfo()));
+
+    switch (result) {
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+          createKeyRequest);
+      break;
+    case SUCCESS:
+      LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}", volumeName,
+          bucketName, keyName);
+      break;
+    case FAILURE:
+      LOG.error("Key create failed. Volume:{}, Bucket:{}, Key{}. Exception:{}",
+          volumeName, bucketName, keyName, exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyCreateRequest: {}",
+          createKeyRequest);
     }
 
     return omClientResponse;
