@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
-import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +68,10 @@ public class ReconServer extends GenericCli {
     LOG.info("Initializing Recon server...");
     try {
 
+      // Initialize the Container DB Service provider first since it creates
+      // the ozone.recon.db.dir which is needed by SQL schema.
+      getContainerDBServiceProvider().start();
+
       LOG.info("Creating Recon Schema.");
       ReconSchemaManager reconSchemaManager = injector.getInstance(
           ReconSchemaManager.class);
@@ -103,16 +106,10 @@ public class ReconServer extends GenericCli {
     if (httpServer != null) {
       httpServer.stop();
     }
-    OzoneManagerServiceProvider ozoneManagerServiceProvider = injector
-        .getInstance(OzoneManagerServiceProvider.class);
-    ozoneManagerServiceProvider.stop();
-    ContainerDBServiceProvider containerDBServiceProvider =
-        injector.getInstance(ContainerDBServiceProviderImpl.class);
-    containerDBServiceProvider.stop();
-  }
 
-  public Injector getInjector() {
-    return injector;
+    getReconStorageContainerManager().stop();
+    getOzoneManagerServiceProvider().stop();
+    getContainerDBServiceProvider().stop();
   }
 
   private OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
@@ -123,4 +120,7 @@ public class ReconServer extends GenericCli {
     return injector.getInstance(ReconStorageContainerManager.class);
   }
 
+  private ContainerDBServiceProvider getContainerDBServiceProvider() {
+    return injector.getInstance(ContainerDBServiceProvider.class);
+  }
 }

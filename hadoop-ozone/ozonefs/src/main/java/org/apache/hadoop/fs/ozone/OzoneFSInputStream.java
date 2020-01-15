@@ -38,7 +38,7 @@ import org.apache.hadoop.fs.Seekable;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public final class OzoneFSInputStream extends FSInputStream
+public class OzoneFSInputStream extends FSInputStream
     implements ByteBufferReadable {
 
   private final InputStream inputStream;

@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
 import org.apache.http.client.utils.URIBuilder;
 
 /**
@@ -122,6 +124,41 @@ public class OzoneAddress {
           "Invalid URI, unknown protocol scheme: " + scheme);
     }
     return client;
+  }
+
+  /**
+   * Create OzoneClient for S3Commands.
+   * @param conf
+   * @param omServiceID
+   * @return OzoneClient
+   * @throws IOException
+   * @throws OzoneClientException
+   */
+  public OzoneClient  createClientForS3Commands(OzoneConfiguration conf,
+      String omServiceID)
+      throws IOException, OzoneClientException {
+    if (omServiceID != null) {
+      // OM HA cluster
+      if (OmUtils.isOmHAServiceId(conf, omServiceID)) {
+        return OzoneClientFactory.getRpcClient(omServiceID, conf);
+      } else {
+        throw new OzoneClientException("Service ID specified does not match" +
+            " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
+            "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
+            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+      }
+    } else {
+      // If om service id is not specified, consider it as a non-HA cluster.
+      // But before that check if serviceId is defined. If it is defined
+      // throw an error om service ID needs to be specified.
+      if (OmUtils.isServiceIdsDefined(conf)) {
+        throw new OzoneClientException("Service ID must not"
+            + " be omitted when " + OZONE_OM_SERVICE_IDS_KEY + " is defined. " +
+            "Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
+            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+      }
+      return OzoneClientFactory.getRpcClient(conf);
+    }
   }
 
   /**

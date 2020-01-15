@@ -35,6 +35,8 @@ import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Preconditions;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -64,6 +66,9 @@ import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
 
 import com.google.common.net.HostAndPort;
+
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY;
@@ -285,6 +290,27 @@ public final class HddsUtils {
       addresses.add(addr);
     }
     return addresses;
+  }
+
+  /**
+   * Retrieve the socket addresses of recon.
+   *
+   * @return Recon address
+   * @throws IllegalArgumentException If the configuration is invalid
+   */
+  public static InetSocketAddress getReconAddresses(
+      Configuration conf) {
+    String name = conf.get(OZONE_RECON_ADDRESS_KEY);
+    if (StringUtils.isEmpty(name)) {
+      return null;
+    }
+    Optional<String> hostname = getHostName(name);
+    if (!hostname.isPresent()) {
+      throw new IllegalArgumentException("Invalid hostname for Recon: "
+          + name);
+    }
+    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
+    return NetUtils.createSocketAddr(hostname.get(), port);
   }
 
   /**

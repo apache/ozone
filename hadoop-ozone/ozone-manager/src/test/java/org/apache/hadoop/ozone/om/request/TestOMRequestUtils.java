@@ -215,6 +215,9 @@ public final class TestOMRequestUtils {
       OMMetadataManager omMetadataManager) throws Exception {
     omMetadataManager.getS3Table().put(s3BucketName,
         S3BucketCreateRequest.formatS3MappingName(volumeName, s3BucketName));
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(s3BucketName).build();
+    addBucketToOM(omMetadataManager, omBucketInfo);
   }
 
   /**
@@ -302,13 +305,22 @@ public final class TestOMRequestUtils {
    */
   public static void addUserToDB(String volumeName, String ownerName,
       OMMetadataManager omMetadataManager) throws Exception {
-    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo =
-        OzoneManagerProtocolProtos.UserVolumeInfo
-            .newBuilder()
-            .addVolumeNames(volumeName)
-            .setObjectID(1)
-            .setUpdateID(1)
-            .build();
+
+    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo = omMetadataManager
+        .getUserTable().get(omMetadataManager.getUserKey(ownerName));
+    if (userVolumeInfo == null) {
+      userVolumeInfo = OzoneManagerProtocolProtos.UserVolumeInfo
+          .newBuilder()
+          .addVolumeNames(volumeName)
+          .setObjectID(1)
+          .setUpdateID(1)
+          .build();
+    } else {
+      userVolumeInfo = userVolumeInfo.toBuilder()
+          .addVolumeNames(volumeName)
+          .build();
+    }
+
     omMetadataManager.getUserTable().put(
         omMetadataManager.getUserKey(ownerName), userVolumeInfo);
   }

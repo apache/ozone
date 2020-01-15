@@ -62,7 +62,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
-
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_VOLUME_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.S3_BUCKET_MAX_LENGTH;
 import static org.apache.hadoop.ozone.OzoneConsts.S3_BUCKET_MIN_LENGTH;
@@ -114,12 +113,10 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
-    S3CreateBucketRequest s3CreateBucketRequest =
-        getOmRequest().getCreateS3BucketRequest();
-
+    S3CreateBucketRequest s3CreateBucketRequest = getOmRequest()
+        .getCreateS3BucketRequest();
     String userName = s3CreateBucketRequest.getUserName();
     String s3BucketName = s3CreateBucketRequest.getS3Bucketname();
 
@@ -131,12 +128,8 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
     omMetrics.incNumS3BucketCreates();
 
     // When s3 Bucket is created, we internally create ozone volume/ozone
-    // bucket.
-
-    // ozone volume name is generated from userName by calling
-    // formatOzoneVolumeName.
-
-    // ozone bucket name is same as s3 bucket name.
+    // bucket. Ozone volume name is generated from userName by calling
+    // formatOzoneVolumeName. Ozone bucket name is same as s3 bucket name.
     // In S3 buckets are unique, so we create a mapping like s3BucketName ->
     // ozoneVolume/ozoneBucket and add it to s3 mapping table. If
     // s3BucketName exists in mapping table, bucket already exist or we go
@@ -144,49 +137,65 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     IOException exception = null;
 
-    boolean volumeCreated = false;
-    boolean acquiredVolumeLock = false;
-    boolean acquiredUserLock = false;
-    boolean acquiredS3Lock = false;
+    boolean volumeCreated = false, acquiredVolumeLock = false,
+        acquiredUserLock = false, acquiredS3Lock = false, success = true;
     String volumeName = formatOzoneVolumeName(userName);
     OMClientResponse omClientResponse = null;
-    try {
 
+    try {
       // TODO to support S3 ACL later.
       acquiredS3Lock = omMetadataManager.getLock().acquireWriteLock(
           S3_BUCKET_LOCK, s3BucketName);
 
-      // First check if this s3Bucket exists
+      // First check if this s3Bucket exists in S3 table
       if (omMetadataManager.getS3Table().isExist(s3BucketName)) {
+        // Check if Bucket exists in Bucket Table
+        String omBucketKey = omMetadataManager.getBucketKey(volumeName,
+            s3BucketName);
+        OmBucketInfo dbBucketInfo = omMetadataManager.getBucketTable()
+            .get(omBucketKey);
+        if (dbBucketInfo != null) {
+          // Check if this transaction is a replay of ratis logs.
+          if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
+              trxnLogIndex)) {
+            // Replay implies the response has already been returned to
+            // the client. So take no further action and return a dummy
+            // OMClientResponse.
+            LOG.debug("Replayed Transaction {} ignored. Request: {}",
+                trxnLogIndex, s3CreateBucketRequest);
+            return new S3BucketCreateResponse(
+                createReplayOMResponse(omResponse));
+          }
+        } else {
+          throw new OMException("S3Bucket " + s3BucketName + " mapping " +
+              "already exists in S3 table but Bucket does not exist.",
+              OMException.ResultCodes.S3_BUCKET_ALREADY_EXISTS);
+        }
         throw new OMException("S3Bucket " + s3BucketName + " already exists",
             OMException.ResultCodes.S3_BUCKET_ALREADY_EXISTS);
       }
 
       OMVolumeCreateResponse omVolumeCreateResponse = null;
       try {
-        acquiredVolumeLock =
-            omMetadataManager.getLock().acquireWriteLock(VOLUME_LOCK,
-                volumeName);
+        acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
+            VOLUME_LOCK, volumeName);
         acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(
             USER_LOCK, userName);
-        // Check if volume exists, if it does not exist create
-        // ozone volume.
+        // Check if volume exists, if it does not exist create ozone volume.
         String volumeKey = omMetadataManager.getVolumeKey(volumeName);
         if (!omMetadataManager.getVolumeTable().isExist(volumeKey)) {
-          // A replay transaction for S3BucketCreate can reach here only if the
-          // volume has been deleted in later transactions. Hence, we can
-          // continue with this request irrespective of whether it is a
-          // replay or not.
+          // A replay transaction can reach here only if the volume has been
+          // deleted in later transactions. Hence, we can continue with this
+          // request irrespective of whether it is a replay or not.
           OmVolumeArgs omVolumeArgs = createOmVolumeArgs(volumeName, userName,
               s3CreateBucketRequest.getS3CreateVolumeInfo().getCreationTime(),
-              transactionLogIndex);
+              trxnLogIndex);
           UserVolumeInfo volumeList = omMetadataManager.getUserTable().get(
               omMetadataManager.getUserKey(userName));
-          volumeList = addVolumeToOwnerList(volumeList,
-              volumeName, userName, ozoneManager.getMaxUserVolumeCount(),
-              transactionLogIndex);
+          volumeList = addVolumeToOwnerList(volumeList, volumeName, userName,
+              ozoneManager.getMaxUserVolumeCount(), trxnLogIndex);
           createVolume(omMetadataManager, omVolumeArgs, volumeList, volumeKey,
-              omMetadataManager.getUserKey(userName), transactionLogIndex);
+              omMetadataManager.getUserKey(userName), trxnLogIndex);
           volumeCreated = true;
           omVolumeCreateResponse = new OMVolumeCreateResponse(
               omResponse.build(), omVolumeArgs, volumeList);
@@ -200,36 +209,34 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
         }
       }
 
-      // check if ozone bucket exists, if it does not exist create ozone
-      // bucket
-      OmBucketInfo omBucketInfo = createBucket(omMetadataManager, volumeName,
-          s3BucketName, userName,
-          s3CreateBucketRequest.getS3CreateVolumeInfo().getCreationTime(),
-          transactionLogIndex);
+      // check if ozone bucket exists, if not create ozone bucket
+      OmBucketInfo omBucketInfo = createBucket(ozoneManager, volumeName,
+          s3BucketName, userName, s3CreateBucketRequest.getS3CreateVolumeInfo()
+              .getCreationTime(), trxnLogIndex);
 
       // Now finally add it to s3 table cache.
       omMetadataManager.getS3Table().addCacheEntry(
           new CacheKey<>(s3BucketName), new CacheValue<>(
               Optional.of(formatS3MappingName(volumeName, s3BucketName)),
-              transactionLogIndex));
+              trxnLogIndex));
 
       OMBucketCreateResponse omBucketCreateResponse =
-          new OMBucketCreateResponse(omBucketInfo, omResponse.build());
+          new OMBucketCreateResponse(omResponse.build(), omBucketInfo);
 
-      omClientResponse = new S3BucketCreateResponse(omVolumeCreateResponse,
-          omBucketCreateResponse, s3BucketName,
-          formatS3MappingName(volumeName, s3BucketName),
+      omClientResponse = new S3BucketCreateResponse(
           omResponse.setCreateS3BucketResponse(
-              S3CreateBucketResponse.newBuilder()).build());
+              S3CreateBucketResponse.newBuilder()).build(),
+          omVolumeCreateResponse, omBucketCreateResponse, s3BucketName,
+          formatS3MappingName(volumeName, s3BucketName));
     } catch (IOException ex) {
+      success = false;
       exception = ex;
-      omClientResponse = new S3BucketCreateResponse(null, null, null, null,
+      omClientResponse = new S3BucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+        omClientResponse.setFlushFuture(omDoubleBufferHelper.add(
+            omClientResponse, trxnLogIndex));
       }
       if (acquiredS3Lock) {
         omMetadataManager.getLock().releaseWriteLock(
@@ -238,34 +245,26 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(ozoneManager.getAuditLogger(),
-        buildAuditMessage(OMAction.CREATE_S3_BUCKET,
-            buildAuditMap(userName, s3BucketName), exception,
-            getOmRequest().getUserInfo()));
+    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        OMAction.CREATE_S3_BUCKET, buildAuditMap(userName, s3BucketName),
+        exception, getOmRequest().getUserInfo()));
 
-    if (exception == null) {
+    if (success) {
       LOG.debug("S3Bucket is successfully created for userName: {}, " +
           "s3BucketName {}, volumeName {}", userName, s3BucketName, volumeName);
-      OMVolumeCreateResponse omVolumeCreateResponse = null;
-      if (volumeCreated) {
-        omMetrics.incNumVolumes();
-      }
-      omMetrics.incNumBuckets();
-      omMetrics.incNumS3Buckets();
-
-      return omClientResponse;
+      updateMetrics(omMetrics, volumeCreated);
     } else {
       LOG.error("S3Bucket Creation Failed for userName: {}, s3BucketName {}, " +
           "VolumeName {}", userName, s3BucketName, volumeName);
       omMetrics.incNumS3BucketCreateFails();
-      return omClientResponse;
     }
+    return omClientResponse;
   }
 
-
-  private OmBucketInfo createBucket(OMMetadataManager omMetadataManager,
+  private OmBucketInfo createBucket(OzoneManager ozoneManager,
       String volumeName, String s3BucketName, String userName,
       long creationTime, long transactionLogIndex) throws IOException {
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     // check if ozone bucket exists, if it does not exist create ozone
     // bucket
     boolean acquireBucketLock = false;
@@ -278,7 +277,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
           s3BucketName);
       if (!omMetadataManager.getBucketTable().isExist(bucketKey)) {
         omBucketInfo = createOmBucketInfo(volumeName, s3BucketName, userName,
-            creationTime);
+            creationTime, transactionLogIndex);
         // Add to bucket table cache.
         omMetadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(bucketKey),
@@ -296,6 +295,18 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
       }
     }
     return omBucketInfo;
+  }
+
+  /**
+   * Increment OMMetrics on success.
+   */
+  private static void updateMetrics(OMMetrics omMetrics,
+      boolean isVolumeCreated) {
+    if (isVolumeCreated) {
+      omMetrics.incNumVolumes();
+    }
+    omMetrics.incNumBuckets();
+    omMetrics.incNumS3Buckets();
   }
 
   /**
@@ -357,13 +368,18 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
    * @return {@link OmBucketInfo}
    */
   private OmBucketInfo createOmBucketInfo(String volumeName,
-      String s3BucketName, String userName, long creationTime) {
+      String s3BucketName, String userName, long creationTime,
+      long transactionLogIndex) {
     //TODO: Now S3Bucket API takes only bucketName as param. In future if we
     // support some configurable options we need to fix this.
-    OmBucketInfo.Builder builder =
-        OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(s3BucketName).setIsVersionEnabled(Boolean.FALSE)
-            .setStorageType(StorageType.DEFAULT).setCreationTime(creationTime);
+    OmBucketInfo.Builder builder = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(s3BucketName)
+        .setIsVersionEnabled(Boolean.FALSE)
+        .setStorageType(StorageType.DEFAULT)
+        .setCreationTime(creationTime)
+        .setObjectID(transactionLogIndex)
+        .setUpdateID(transactionLogIndex);
 
     // Set default acls.
     builder.setAcls(getDefaultAcls(userName));

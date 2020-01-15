@@ -22,12 +22,10 @@ import java.io.IOException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 /**
@@ -36,25 +34,30 @@ import javax.annotation.Nonnull;
 public class OMBucketSetPropertyResponse extends OMClientResponse {
   private OmBucketInfo omBucketInfo;
 
-  public OMBucketSetPropertyResponse(@Nullable OmBucketInfo omBucketInfo,
-      @Nonnull OMResponse omResponse) {
+  public OMBucketSetPropertyResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omBucketInfo = omBucketInfo;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMBucketSetPropertyResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String dbBucketKey =
-          omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
-              omBucketInfo.getBucketName());
-      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-          dbBucketKey, omBucketInfo);
-    }
+    String dbBucketKey =
+        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
+            omBucketInfo.getBucketName());
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        dbBucketKey, omBucketInfo);
   }
 
 }
