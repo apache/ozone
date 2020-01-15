@@ -739,6 +739,8 @@ message KeyInfo {
     repeated hadoop.hdds.KeyValue metadata = 11;
     optional FileEncryptionInfoProto fileEncryptionInfo = 12;
     repeated OzoneAclInfo acls = 13;
+    optional uint64 objectID = 14;
+    optional uint64 updateID = 15;
 }
 
 message RepeatedKeyInfo {
@@ -1032,6 +1034,8 @@ message MultipartKeyInfo {
     required hadoop.hdds.ReplicationType type = 3;
     required hadoop.hdds.ReplicationFactor factor = 4;
     repeated PartKeyInfo partKeyInfoList = 5;
+    optional uint64 objectID = 6;
+    optional uint64 updateID = 7;
 }
 
 message PartKeyInfo {

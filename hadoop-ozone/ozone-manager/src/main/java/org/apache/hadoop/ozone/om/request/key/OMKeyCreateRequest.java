@@ -182,7 +182,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs,
           omMetadataManager.getOzoneKey(volumeName, bucketName, keyName),
           keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
-          ozoneManager.getPrefixManager(), bucketInfo);
+          ozoneManager.getPrefixManager(), bucketInfo, transactionLogIndex);
       omClientResponse = prepareCreateKeyResponse(keyArgs, omKeyInfo,
           locations, encryptionInfo.orNull(), exception,
           createKeyRequest.getClientID(), transactionLogIndex, volumeName,

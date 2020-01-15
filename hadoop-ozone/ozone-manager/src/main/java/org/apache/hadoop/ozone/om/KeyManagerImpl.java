@@ -943,9 +943,13 @@ public class KeyManagerImpl implements KeyManager {
 
       long currentTime = Time.now();
       Map<Integer, PartKeyInfo> partKeyInfoMap = new HashMap<>();
-      OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
-          multipartUploadID, currentTime, keyArgs.getType(),
-          keyArgs.getFactor(), partKeyInfoMap);
+      OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+          .setUploadID(multipartUploadID)
+          .setCreationTime(currentTime)
+          .setReplicationType(keyArgs.getType())
+          .setReplicationFactor(keyArgs.getFactor())
+          .setPartKeyInfoList(partKeyInfoMap)
+          .build();
       List<OmKeyLocationInfo> locations = new ArrayList<>();
       OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
