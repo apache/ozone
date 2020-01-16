@@ -203,7 +203,9 @@ public interface RatisHelper {
 
     GrpcConfigKeys.setMessageSizeMax(properties,
         SizeInBytes.valueOf(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE));
-    GrpcConfigKeys.OutputStream.setOutstandingAppendsMax(properties,
+
+    // set async max outstanding requests.
+    RaftClientConfigKeys.Async.setMaxOutstandingRequests(properties,
         maxOutStandingRequest);
 
     RaftClient.Builder builder =  RaftClient.newBuilder()
