@@ -185,9 +185,9 @@ public class BasicRootedOzoneClientAdapterImpl
     this.bucket = volume.getBucket(bucketString);
   }
 
-  private void getVolumeAndBucket(OFSPath ofsPath,
+  private void setVolumeAndBucket(OFSPath ofsPath,
       boolean createIfNotExist) throws IOException {
-    getVolumeAndBucket(ofsPath.getVolumeName(), ofsPath.getBucketName(),
+    setVolumeAndBucket(ofsPath.getVolumeName(), ofsPath.getBucketName(),
         createIfNotExist);
   }
 
@@ -199,7 +199,7 @@ public class BasicRootedOzoneClientAdapterImpl
    *                         in order to create the volume and bucket.
    * @throws IOException
    */
-  private void getVolumeAndBucket(String volumeStr, String bucketStr,
+  private void setVolumeAndBucket(String volumeStr, String bucketStr,
       boolean createIfNotExist) throws IOException {
     // TODO: use objectStore.getClientProxy() directly to save an RPC roundtrip.
     try {
@@ -242,7 +242,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
     try {
-      getVolumeAndBucket(ofsPath, false);
+      setVolumeAndBucket(ofsPath, false);
       return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
@@ -266,7 +266,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
     try {
-      getVolumeAndBucket(ofsPath, false);
+      setVolumeAndBucket(ofsPath, false);
       OzoneOutputStream ozoneOutputStream = bucket
           .createFile(key, 0, replicationType, replicationFactor, overWrite,
               recursive);
@@ -292,7 +292,7 @@ public class BasicRootedOzoneClientAdapterImpl
         !ofsPath.getBucketName().equals(ofsNewPath.getBucketName())) {
       throw new IOException("Can't rename a key to a different bucket.");
     }
-    getVolumeAndBucket(ofsPath, false);
+    setVolumeAndBucket(ofsPath, false);
 
     String key = ofsPath.getKeyName();
     String newKey = ofsNewPath.getKeyName();
@@ -312,7 +312,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr);
     String keyStr = ofsPath.getKeyName();
     try {
-      getVolumeAndBucket(ofsPath, true);
+      setVolumeAndBucket(ofsPath, true);
       bucket.createDirectory(keyStr);
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS) {
@@ -335,7 +335,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(path);
     String keyName = ofsPath.getKeyName();
     try {
-      getVolumeAndBucket(ofsPath, false);
+      setVolumeAndBucket(ofsPath, false);
       incrementCounter(Statistic.OBJECTS_DELETED);
       bucket.deleteKey(keyName);
       return true;
@@ -351,7 +351,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(path);
     String key = ofsPath.getKeyName();
     try {
-      getVolumeAndBucket(ofsPath, false);
+      setVolumeAndBucket(ofsPath, false);
       incrementCounter(Statistic.OBJECTS_QUERY);
       OzoneFileStatus status = bucket.getFileStatus(key);
       // Note: qualifiedPath passed in is good from
@@ -383,7 +383,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
     try {
-      getVolumeAndBucket(ofsPath, false);
+      setVolumeAndBucket(ofsPath, false);
     } catch (Exception e) {
       // TODO
     }
@@ -399,7 +399,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsStartPath = new OFSPath(startPath);
     String startKey = ofsStartPath.getKeyName();
     try {
-      getVolumeAndBucket(ofsPath, false);
+      setVolumeAndBucket(ofsPath, false);
       incrementCounter(Statistic.OBJECTS_LIST);
       List<OzoneFileStatus> statuses = bucket
           .listStatus(keyName, recursive, startKey, numEntries);
