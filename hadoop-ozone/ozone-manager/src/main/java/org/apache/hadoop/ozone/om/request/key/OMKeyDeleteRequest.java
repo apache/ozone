@@ -45,6 +45,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .DeleteKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Type;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -100,12 +106,13 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
 
-    OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
-        OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(
-            OzoneManagerProtocolProtos.Type.DeleteKey).setStatus(
-            OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setCmdType(Type.DeleteKey)
+        .setStatus(Status.OK)
+        .setSuccess(true);
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     IOException exception = null;
+    boolean success = true;
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     try {
@@ -126,6 +133,18 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       if (omKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
+
+      // Check if this transaction is a replay of ratis logs.
+      if (isReplay(ozoneManager, omKeyInfo.getUpdateID(),
+          transactionLogIndex)) {
+        // Replay implies the response has already been returned to
+        // the client. So take no further action and return a dummy
+        // OMClientResponse.
+        LOG.debug("Replayed Transaction {} ignored. Request: {}",
+            transactionLogIndex, deleteKeyRequest);
+        return new OMKeyDeleteResponse(createReplayOMResponse(omResponse));
+      }
+
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(transactionLogIndex);
 
@@ -140,14 +159,15 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       // validation, so we don't need to add to cache.
       // TODO: Revisit if we need it later.
 
-      omClientResponse = new OMKeyDeleteResponse(omKeyInfo,
-          omResponse.setDeleteKeyResponse(
-              DeleteKeyResponse.newBuilder()).build());
+      omClientResponse = new OMKeyDeleteResponse(omResponse
+          .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
+          omKeyInfo);
 
     } catch (IOException ex) {
+      success = false;
       exception = ex;
-      omClientResponse = new OMKeyDeleteResponse(null,
-          createErrorOMResponse(omResponse, exception));
+      omClientResponse = new OMKeyDeleteResponse(createErrorOMResponse(
+          omResponse, exception));
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
@@ -165,13 +185,12 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         exception, userInfo));
 
     // return response.
-    if (exception == null) {
+    if (success) {
       omMetrics.decNumKeys();
       return omClientResponse;
     } else {
       omMetrics.incNumKeyDeleteFails();
       return omClientResponse;
     }
-
   }
 }
