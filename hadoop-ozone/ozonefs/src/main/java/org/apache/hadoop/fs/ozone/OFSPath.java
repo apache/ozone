@@ -53,7 +53,7 @@ class OFSPath {
     int numToken = token.countTokens();
     if (numToken > 0) {
       String firstToken = token.nextToken();
-      // TODO: Compare a "keyword" list later for expandability.
+      // TODO: Compare a keyword list instead of hardcoded "tmp".
       if (firstToken.equals("tmp")) {
         volumeName = null;
         bucketName = null;
@@ -69,9 +69,7 @@ class OFSPath {
         bucketName = null;
         mountName = null;
       }
-    }
-    else {
-      // TODO: Root.
+//    } else {  // TODO: Implement '/' case.
     }
 
     // Compose key name.
