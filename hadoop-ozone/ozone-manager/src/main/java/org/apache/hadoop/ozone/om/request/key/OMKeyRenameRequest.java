@@ -24,7 +24,6 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -84,12 +83,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
-
     OzoneManagerProtocolProtos.KeyArgs renameKeyArgs =
         renameKeyRequest.getKeyArgs();
 
@@ -145,7 +143,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
         // Check if this transaction is a replay of ratis logs.
         if (isReplay(ozoneManager, toKeyValue.getUpdateID(),
-            transactionLogIndex)) {
+            trxnLogIndex)) {
 
           // Check if fromKey is still in the DB and created before this
           // replay.
@@ -161,9 +159,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
           if (fromKeyValue != null) {
             if (isReplay(ozoneManager, fromKeyValue.getUpdateID(),
-                transactionLogIndex)) {
+                trxnLogIndex)) {
               LOG.debug("Replayed transaction {}: {}. Renamed Key {} already " +
-                  "exists. Deleting old key {}.", transactionLogIndex,
+                  "exists. Deleting old key {}.", trxnLogIndex,
                   renameKeyRequest, toKey, fromKey);
               omClientResponse = new OMKeyRenameResponse(omResponse
                   .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
@@ -175,7 +173,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           // If toKey exists and fromKey does not, then no further action is
           // required. Return a dummy OMCLientResponse.
           LOG.debug("Replayed Transaction {} ignored. Request: {}",
-              transactionLogIndex, renameKeyRequest);
+              trxnLogIndex, renameKeyRequest);
           return new OMKeyRenameResponse(createReplayOMResponse(omResponse));
         } else {
           // This transaction is not a replay. toKeyName should not exist
@@ -196,8 +194,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       //Set modification time
       fromKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
       // Set the ObjectID and UpdateID to current transactionLogIndex
-      fromKeyValue.setObjectID(transactionLogIndex);
-      fromKeyValue.setUpdateID(transactionLogIndex);
+      fromKeyValue.setObjectID(trxnLogIndex);
+      fromKeyValue.setUpdateID(trxnLogIndex);
 
       // Add to cache.
       // fromKey should be deleted, toKey should be added with newly updated
@@ -205,10 +203,10 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
 
       keyTable.addCacheEntry(new CacheKey<>(fromKey),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
+          new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       keyTable.addCacheEntry(new CacheKey<>(toKey),
-          new CacheValue<>(Optional.of(fromKeyValue), transactionLogIndex));
+          new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
 
       omClientResponse = new OMKeyRenameResponse(omResponse
           .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
@@ -221,8 +219,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+            omDoubleBufferHelper.add(omClientResponse,
+                trxnLogIndex));
       }
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,

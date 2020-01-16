@@ -21,13 +21,11 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 /**
@@ -87,7 +85,7 @@ public class OMKeyRenameResponse extends OMClientResponse {
     if (toKeyName == null && fromKeyName != null) {
       omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
           omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
-    } else if (!toKeyName.equals(fromKeyName)) {
+    } else if (toKeyName != null && !toKeyName.equals(fromKeyName)) {
       // If both from and toKeyName are equal do nothing
       omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
           omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
