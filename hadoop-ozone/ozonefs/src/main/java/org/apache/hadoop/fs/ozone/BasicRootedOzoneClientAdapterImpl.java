@@ -382,17 +382,11 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public Iterator<BasicKeyInfo> listKeys(String pathStr) {
+  public Iterator<BasicKeyInfo> listKeys(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_LIST);
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
-    OzoneBucket bucket;
-    try {
-      bucket = getBucket(ofsPath, false);
-    } catch (Exception e) {
-      // TODO
-      return null;
-    }
+    OzoneBucket bucket = getBucket(ofsPath, false);
     return new IteratorAdapter(bucket.listKeys(key));
   }
 
