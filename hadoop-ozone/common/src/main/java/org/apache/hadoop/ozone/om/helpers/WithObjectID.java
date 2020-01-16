@@ -28,11 +28,13 @@ public class WithObjectID extends WithMetadata {
    * ObjectIDs are unique and immutable identifier for each object in the
    * System.
    */
+  @SuppressWarnings("visibilitymodifier")
   long objectID;
   /**
    * UpdateIDs are monotonically increasing values which are updated
    * each time there is an update.
    */
+  @SuppressWarnings("visibilitymodifier")
   long updateID;
 
   /**
