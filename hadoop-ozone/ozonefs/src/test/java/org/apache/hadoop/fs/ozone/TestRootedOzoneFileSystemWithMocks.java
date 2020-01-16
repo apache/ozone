@@ -47,7 +47,7 @@ import static org.mockito.Mockito.when;
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({ OzoneClientFactory.class, UserGroupInformation.class })
 @PowerMockIgnore("javax.management.*")
-public class TestOFileSystemWithMocks {
+public class TestRootedOzoneFileSystemWithMocks {
 
   @Test
   public void testFSUriWithHostPortOverrides() throws Exception {
