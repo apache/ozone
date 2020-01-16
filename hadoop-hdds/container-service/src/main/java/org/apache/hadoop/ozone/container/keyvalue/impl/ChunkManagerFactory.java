@@ -64,8 +64,9 @@ public final class ChunkManagerFactory {
       LOG.warn(HDDS_CONTAINER_PERSISTDATA
           + " is set to false. This should be used only for testing."
           + " All user data will be discarded.");
+      return new ChunkManagerDummyImpl();
     }
 
-    return new ChunkManagerImpl(sync, persist);
+    return new ChunkManagerDispatcher(sync, true); // TODO add config
   }
 }

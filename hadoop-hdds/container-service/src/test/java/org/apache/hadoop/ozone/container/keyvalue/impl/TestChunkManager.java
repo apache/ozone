@@ -61,8 +61,9 @@ import static org.mockito.Mockito.mock;
 /**
  * This class is used to test ChunkManager operations.
  */
-// TODO split: some tests specific to V1, some apply to both V1 and V2
-public class TestChunkManagerImpl {
+// TODO test common behavior for various implementations
+// TODO extract implementation-specific tests
+public class TestChunkManager {
 
   private OzoneConfiguration config;
   private String scmId = UUID.randomUUID().toString();
@@ -72,7 +73,7 @@ public class TestChunkManagerImpl {
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private BlockID blockID;
-  private ChunkManagerImpl chunkManager;
+  private ChunkManagerDispatcher chunkManager;
   private ChunkInfo chunkInfo;
   private ByteBuffer data;
 
@@ -114,7 +115,7 @@ public class TestChunkManagerImpl {
         .getLocalID(), 0), 0, bytes.length);
 
     // Create a ChunkManager object.
-    chunkManager = new ChunkManagerImpl(true);
+    chunkManager = new ChunkManagerDispatcher(true, false);
   }
 
   private DispatcherContext getDispatcherContext() {
@@ -163,7 +164,7 @@ public class TestChunkManagerImpl {
   }
 
   @Test
-  public void testWriteChunkIncorrectLength() throws Exception {
+  public void testWriteChunkIncorrectLength() {
     try {
       long randomLength = 200L;
       chunkInfo = new ChunkInfo(String.format("%d.data.%d", blockID
@@ -221,7 +222,7 @@ public class TestChunkManagerImpl {
   }
 
   @Test
-  public void testDeleteChunkUnsupportedRequest() throws Exception {
+  public void testDeleteChunkUnsupportedRequest() {
     try {
       chunkManager.writeChunk(keyValueContainer, blockID, chunkInfo, data,
           getDispatcherContext());
@@ -231,20 +232,18 @@ public class TestChunkManagerImpl {
       chunkManager.deleteChunk(keyValueContainer, blockID, chunkInfo);
       fail("testDeleteChunkUnsupportedRequest");
     } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains("Not Supported Operation.", ex);
       assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, ex.getResult());
     }
   }
 
   @Test
-  public void testReadChunkFileNotExists() throws Exception {
+  public void testReadChunkFileNotExists() {
     try {
       // trying to read a chunk, where chunk file does not exist
       chunkManager.readChunk(keyValueContainer,
           blockID, chunkInfo, getDispatcherContext());
       fail("testReadChunkFileNotExists failed");
     } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains("Chunk file can't be found", ex);
       assertEquals(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, ex.getResult());
     }
   }
@@ -311,22 +310,12 @@ public class TestChunkManagerImpl {
     assertEquals(expected, files.length);
   }
 
-  /**
-   * Check WriteIO stats.
-   * @param length
-   * @param opCount
-   */
   private void checkWriteIOStats(long length, long opCount) {
     VolumeIOStats volumeIOStats = hddsVolume.getVolumeIOStats();
     assertEquals(length, volumeIOStats.getWriteBytes());
     assertEquals(opCount, volumeIOStats.getWriteOpCount());
   }
 
-  /**
-   * Check ReadIO stats.
-   * @param length
-   * @param opCount
-   */
   private void checkReadIOStats(long length, long opCount) {
     VolumeIOStats volumeIOStats = hddsVolume.getVolumeIOStats();
     assertEquals(length, volumeIOStats.getReadBytes());

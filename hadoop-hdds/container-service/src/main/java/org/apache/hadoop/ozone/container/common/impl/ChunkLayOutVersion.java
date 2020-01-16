@@ -29,9 +29,7 @@ import java.util.List;
  */
 public enum ChunkLayOutVersion {
 
-  DUMMY(-1, "Transient, only for testing."),
-  V1(1, "Data without checksums."),
-  V2(2, "Allows non-zero offset, no tmp files");
+  V1(1, "Data without checksums.");
 
   private static final List<ChunkLayOutVersion> CHUNK_LAYOUT_VERSIONS =
       ImmutableList.copyOf(values());
@@ -50,9 +48,7 @@ public enum ChunkLayOutVersion {
   }
 
   /**
-   * Return ChunkLayOutVersion object for the chunkVersion.
-   * @param chunkVersion
-   * @return ChunkLayOutVersion
+   * Return ChunkLayOutVersion object for the numeric chunkVersion.
    */
   public static ChunkLayOutVersion getChunkLayOutVersion(int chunkVersion) {
     Preconditions.checkArgument(V1.getVersion() <= chunkVersion);

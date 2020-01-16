@@ -39,27 +39,21 @@ import java.util.Map;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 
 /**
- * This class is for performing chunk related operations.
+ * Selects ChunkManager implementation to use for each chunk operation.
  */
-public class ChunkManagerImpl implements ChunkManager {
+public class ChunkManagerDispatcher implements ChunkManager {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ChunkManagerImpl.class);
+      LoggerFactory.getLogger(ChunkManagerDispatcher.class);
 
-  private final boolean persist;
   private final Map<ChunkLayOutVersion, ChunkManager> handlers
       = new EnumMap<>(ChunkLayOutVersion.class);
 
-  public ChunkManagerImpl(boolean sync) {
-    this(sync, true);
-  }
-
-  public ChunkManagerImpl(boolean sync, boolean persist) {
-    this.persist = persist;
-
-    handlers.put(ChunkLayOutVersion.DUMMY, new ChunkManagerDummyImpl());
-    handlers.put(ChunkLayOutVersion.V1, new ChunkManagerV1(sync));
-    handlers.put(ChunkLayOutVersion.V2, new ChunkManagerV2(sync));
+  ChunkManagerDispatcher(boolean sync, boolean incremental) {
+    ChunkManager v1 = incremental
+        ? new IncrementalV1ChunkManager(sync)
+        : new ChunkManagerV1(sync);
+    handlers.put(ChunkLayOutVersion.V1, v1);
   }
 
   @Override
@@ -104,21 +98,17 @@ public class ChunkManagerImpl implements ChunkManager {
   private @Nonnull ChunkManager selectHandler(Container container)
       throws StorageContainerException {
 
-    if (!persist) {
-      return handlers.get(ChunkLayOutVersion.DUMMY);
-    }
-
     ChunkLayOutVersion layout = container.getContainerData().getLayOutVersion();
     return selectVersionHandler(layout);
   }
 
   private @Nonnull ChunkManager selectVersionHandler(ChunkLayOutVersion version)
       throws StorageContainerException {
-    ChunkManager handler = handlers.get(version);
-    if (handler == null) {
+    ChunkManager versionHandler = handlers.get(version);
+    if (versionHandler == null) {
       return throwUnknownLayoutVersion(version);
     }
-    return handler;
+    return versionHandler;
   }
 
   private static ChunkManager throwUnknownLayoutVersion(
