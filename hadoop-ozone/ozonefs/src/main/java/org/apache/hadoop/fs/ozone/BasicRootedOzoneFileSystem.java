@@ -173,9 +173,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public void close() throws IOException {
     try {
-      if (adapter != null) {
-        adapter.close();
-      }
+      adapter.close();
     } finally {
       super.close();
     }
@@ -211,7 +209,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       short replication, long blockSize,
       Progressable progress) throws IOException {
     LOG.trace("create() path:{}", f);
-//    checkAndCreateAdapter(new OFSPath(f));
     incrementCounter(Statistic.INVOCATION_CREATE);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
@@ -585,7 +582,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * @throws IOException
    */
   private boolean mkdir(Path path) throws IOException {
-//    checkAndCreateAdapter(new OFSPath(path));
     return adapter.createDirectory(pathToKey(path));
   }
 
@@ -604,7 +600,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
-//    checkAndCreateAdapter(new OFSPath(f));
     Path qualifiedPath = f.makeQualified(uri, workingDir);
     String key = pathToKey(qualifiedPath);
     FileStatus fileStatus = null;
@@ -762,32 +757,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
     return true;
-  }
-
-  private FileStatus convertFileStatusNoAppend(
-      FileStatusAdapter fileStatusAdapter) {
-
-    Path symLink = null;
-    try {
-      fileStatusAdapter.getSymlink();
-    } catch (Exception ex) {
-      //NOOP: If not symlink symlink remains null.
-    }
-
-    return new FileStatus(
-        fileStatusAdapter.getLength(),
-        fileStatusAdapter.isDir(),
-        fileStatusAdapter.getBlockReplication(),
-        fileStatusAdapter.getBlocksize(),
-        fileStatusAdapter.getModificationTime(),
-        fileStatusAdapter.getAccessTime(),
-        new FsPermission(fileStatusAdapter.getPermission()),
-        fileStatusAdapter.getOwner(),
-        fileStatusAdapter.getGroup(),
-        symLink,
-        // Without this, the path would be incorrect: ofs://localhost:51625/dir1
-        fileStatusAdapter.getPath()
-    );
   }
 
   private FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {

@@ -70,11 +70,9 @@ public class TestOFileSystemWithMocks {
     PowerMockito.when(UserGroupInformation.getCurrentUser()).thenReturn(ugi);
     when(ugi.getShortUserName()).thenReturn("user1");
 
-    // TODO: FileSystem#loadFileSystems somehow is not loading the ofs://
-    //  hence the workaround.
+    // Note: FileSystem#loadFileSystems doesn't load OFS class because
+    //  META-INF still points to org.apache.hadoop.fs.ozone.OzoneFileSystem
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
-
-//    URI uri = new URI("ofs://bucket1.volume1.local.host:5899");
     URI uri = new URI("ofs://local.host:5899/volume1/bucket1");
 
     FileSystem fileSystem = FileSystem.get(uri, conf);

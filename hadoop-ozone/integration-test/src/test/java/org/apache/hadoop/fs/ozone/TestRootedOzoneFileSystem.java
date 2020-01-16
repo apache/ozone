@@ -113,8 +113,8 @@ public class TestRootedOzoneFileSystem {
     // TODO: Address this properly.
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
     assertEquals(
-        FileSystem.getFileSystemClass(OzoneConsts.OZONE_OFS_URI_SCHEME,
-            conf), RootedOzoneFileSystem.class);
+        FileSystem.getFileSystemClass(OzoneConsts.OZONE_OFS_URI_SCHEME, conf),
+        RootedOzoneFileSystem.class);
   }
 
   @Test
