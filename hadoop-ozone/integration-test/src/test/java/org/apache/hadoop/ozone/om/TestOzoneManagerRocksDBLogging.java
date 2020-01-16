@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,24 +38,18 @@ import org.junit.rules.Timeout;
 public class TestOzoneManagerRocksDBLogging {
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omId;
 
   @Rule
   public Timeout timeout = new Timeout(60000);
 
+  private static GenericTestUtils.LogCapturer logCapturer =
+      GenericTestUtils.LogCapturer.captureLogs(DBStoreBuilder.ROCKS_DB_LOGGER);
+
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.set("hadoop.hdds.db.rocksdb.logging.enabled", "true");
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
+    enableRocksDbLogging(false);
     cluster =  MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
   }
@@ -73,25 +66,28 @@ public class TestOzoneManagerRocksDBLogging {
 
   @Test
   public void testOMRocksDBLoggingEnabled() throws Exception {
-
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(DBStoreBuilder.ROCKS_DB_LOGGER);
-    cluster.restartOzoneManager();
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
-            .contains("db_impl.cc"),
-        1000, 10000);
-
-    cluster.getConf().set("hadoop.hdds.db.rocksdb.logging.enabled", "false");
-    cluster.restartOzoneManager();
-    logCapturer.clearOutput();
     try {
-      GenericTestUtils.waitFor(() -> logCapturer.getOutput()
-              .contains("db_impl.cc"),
-          1000, 10000);
-      Assert.fail();
+      waitForRocksDbLog();
+      Assert.fail("Unexpected RocksDB log: " + logCapturer.getOutput());
     } catch (TimeoutException ex) {
       Assert.assertTrue(ex.getMessage().contains("Timed out"));
     }
+
+    enableRocksDbLogging(true);
+    cluster.restartOzoneManager();
+
+    waitForRocksDbLog();
+  }
+
+  private void enableRocksDbLogging(boolean b) {
+    conf.setBoolean("hadoop.hdds.db.rocksdb.logging.enabled", b);
+  }
+
+  private static void waitForRocksDbLog()
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
+            .contains("db_impl.cc"),
+        1000, 10000);
   }
 
 }
