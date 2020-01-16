@@ -227,5 +227,49 @@
         "containers": 543
       }
     ]
+  },
+  "pipelines": {
+    "totalCount": 3,
+    "pipelines": [
+      {
+        "pipelineId": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+        "status": "active",
+        "leaderNode": "localhost1.storage.enterprise.com",
+        "datanodes": [
+          "localhost1.storage.enterprise.com",
+          "localhost2.storage.enterprise.com",
+          "localhost3.storage.enterprise.com"
+        ],
+        "lastLeaderElection": 1578491471528,
+        "duration": 389445,
+        "leaderElections": 28
+      },
+      {
+        "pipelineId": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+        "status": "active",
+        "leaderNode": "localhost5.storage.enterprise.com",
+        "datanodes": [
+          "localhost4.storage.enterprise.com",
+          "localhost5.storage.enterprise.com",
+          "localhost6.storage.enterprise.com"
+        ],
+        "lastLeaderElection": 1578441471528,
+        "duration": 50073382,
+        "leaderElections": 7
+      },
+      {
+        "pipelineId": "04a5d908-ff01-4ce6-ad75-f3ec73dfc8a2",
+        "status": "active",
+        "leaderNode": "localhost9.storage.enterprise.com",
+        "datanodes": [
+          "localhost7.storage.enterprise.com",
+          "localhost8.storage.enterprise.com",
+          "localhost9.storage.enterprise.com"
+        ],
+        "lastLeaderElection": 1578441871828,
+        "duration": 49712212,
+        "leaderElections": 5
+      }
+    ]
   }
 }

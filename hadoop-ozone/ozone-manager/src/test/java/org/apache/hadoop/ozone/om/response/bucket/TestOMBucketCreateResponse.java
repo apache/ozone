@@ -70,11 +70,12 @@ public class TestOMBucketCreateResponse {
     Assert.assertEquals(0,
         omMetadataManager.countRowsInTable(omMetadataManager.getBucketTable()));
     OMBucketCreateResponse omBucketCreateResponse =
-        new OMBucketCreateResponse(omBucketInfo, OMResponse.newBuilder()
+        new OMBucketCreateResponse(OMResponse.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
             .setStatus(OzoneManagerProtocolProtos.Status.OK)
             .setCreateBucketResponse(
-                CreateBucketResponse.newBuilder().build()).build());
+                CreateBucketResponse.newBuilder().build()).build(),
+            omBucketInfo);
 
     omBucketCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 

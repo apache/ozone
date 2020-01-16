@@ -271,8 +271,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
         // the key does not exist, create a new object, the new blocks are the
         // version 0
         omKeyInfo = createKeyInfo(keyArgs, locations, keyArgs.getFactor(),
-            keyArgs.getType(), keyArgs.getDataSize(),
-            encryptionInfo, prefixManager, omBucketInfo);
+            keyArgs.getType(), keyArgs.getDataSize(), encryptionInfo,
+            prefixManager, omBucketInfo, transactionLogIndex);
       }
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
@@ -349,7 +349,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull HddsProtos.ReplicationType type, long size,
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
-      @Nullable OmBucketInfo omBucketInfo) {
+      @Nullable OmBucketInfo omBucketInfo,
+        long transactionLogIndex) {
     return new OmKeyInfo.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
@@ -364,6 +365,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .setFileEncryptionInfo(encInfo)
         .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
+        .setObjectID(transactionLogIndex)
+        .setUpdateID(transactionLogIndex)
         .build();
   }
 
@@ -416,12 +419,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull KeyArgs keyArgs, @Nonnull String dbKeyName, long size,
       @Nonnull List<OmKeyLocationInfo> locations,
       @Nullable FileEncryptionInfo encInfo,
-      @Nonnull PrefixManager prefixManager, @Nullable OmBucketInfo omBucketInfo)
+      @Nonnull PrefixManager prefixManager,
+      @Nullable OmBucketInfo omBucketInfo,
+      long transactionLogIndex)
       throws IOException {
     OmKeyInfo keyInfo = null;
     if (keyArgs.getIsMultipartKey()) {
       keyInfo = prepareMultipartKeyInfo(omMetadataManager, keyArgs, size,
-          locations, encInfo, prefixManager, omBucketInfo);
+          locations, encInfo, prefixManager, omBucketInfo, transactionLogIndex);
       //TODO args.getMetadata
     } else if (omMetadataManager.getKeyTable().isExist(dbKeyName)) {
       // TODO: Need to be fixed, as when key already exists, we are
@@ -435,6 +440,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // The modification time is set in preExecute, use the same as
       // modification time when key already exists.
       keyInfo.setModificationTime(keyArgs.getModificationTime());
+      keyInfo.setUpdateID(transactionLogIndex);
     }
     return keyInfo;
   }
@@ -445,12 +451,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
    * @return OmKeyInfo
    * @throws IOException
    */
+  @SuppressWarnings("parameternumber")
   private OmKeyInfo prepareMultipartKeyInfo(
       @Nonnull OMMetadataManager omMetadataManager,
       @Nonnull KeyArgs args, long size,
       @Nonnull List<OmKeyLocationInfo> locations,
       FileEncryptionInfo encInfo,  @Nonnull PrefixManager prefixManager,
-      @Nullable OmBucketInfo omBucketInfo) throws IOException {
+      @Nullable OmBucketInfo omBucketInfo, @Nonnull long transactionLogIndex)
+      throws IOException {
     HddsProtos.ReplicationFactor factor;
     HddsProtos.ReplicationType type;
 
@@ -478,9 +486,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
     return createKeyInfo(args, locations, factor, type, size, encInfo,
-        prefixManager, omBucketInfo);
+        prefixManager, omBucketInfo, transactionLogIndex);
   }
-
 
   private OMClientResponse createKeyErrorResponse(@Nonnull OMMetrics omMetrics,
       @Nonnull OMAction omAction, @Nonnull IOException exception,

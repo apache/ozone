@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.UUID;
 
 import org.junit.Before;
@@ -74,10 +73,12 @@ public class TestS3MultipartResponse {
   public S3InitiateMultipartUploadResponse createS3InitiateMPUResponse(
       String volumeName, String bucketName, String keyName,
       String multipartUploadID) {
-    OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
-        multipartUploadID, Time.now(),
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
-        new HashMap<>());
+    OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+        .setUploadID(multipartUploadID)
+        .setCreationTime(Time.now())
+        .setReplicationType(HddsProtos.ReplicationType.RATIS)
+        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .build();
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
         .setVolumeName(volumeName)

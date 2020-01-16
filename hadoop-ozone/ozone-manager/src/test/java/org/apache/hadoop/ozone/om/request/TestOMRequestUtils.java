@@ -215,6 +215,9 @@ public final class TestOMRequestUtils {
       OMMetadataManager omMetadataManager) throws Exception {
     omMetadataManager.getS3Table().put(s3BucketName,
         S3BucketCreateRequest.formatS3MappingName(volumeName, s3BucketName));
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(s3BucketName).build();
+    addBucketToOM(omMetadataManager, omBucketInfo);
   }
 
   /**
