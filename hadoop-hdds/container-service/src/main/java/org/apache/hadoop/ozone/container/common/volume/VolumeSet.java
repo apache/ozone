@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -33,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -87,6 +89,7 @@ public class VolumeSet {
    */
   private final ScheduledExecutorService diskCheckerservice;
   private final ScheduledFuture<?> periodicDiskChecker;
+  private final SpaceUsageCheckFactory usageCheckFactory;
 
   private static final long DISK_CHECK_INTERVAL_MINUTES = 15;
 
@@ -127,6 +130,9 @@ public class VolumeSet {
         }
       }, DISK_CHECK_INTERVAL_MINUTES, DISK_CHECK_INTERVAL_MINUTES,
         TimeUnit.MINUTES);
+
+    usageCheckFactory = SpaceUsageCheckFactory.create(conf);
+
     initializeVolumeSet();
   }
 
@@ -308,6 +314,7 @@ public class VolumeSet {
         .conf(conf)
         .datanodeUuid(datanodeUuid)
         .clusterID(clusterID)
+        .usageCheckFactory(usageCheckFactory)
         .storageType(storageType);
     return volumeBuilder.build();
   }
@@ -475,7 +482,7 @@ public class VolumeSet {
           scmUsed = volumeInfo.getScmUsed();
           remaining = volumeInfo.getAvailable();
           capacity = volumeInfo.getCapacity();
-        } catch (IOException ex) {
+        } catch (UncheckedIOException ex) {
           LOG.warn("Failed to get scmUsed and remaining for container " +
               "storage location {}", volumeInfo.getRootDir(), ex);
           // reset scmUsed and remaining if df/du failed.
