@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -79,10 +80,13 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -137,14 +141,14 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final RaftGroupId gid;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
-  private final ThreadPoolExecutor chunkExecutor;
   private final XceiverServerRatis ratisServer;
   private final ConcurrentHashMap<Long,
       CompletableFuture<ContainerCommandResponseProto>> writeChunkFutureMap;
 
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
-  private ExecutorService[] executors;
+  private final ExecutorService[] executors;
+  private final ExecutorService[] chunkExecutors;
   private final Map<Long, Long> applyTransactionCompletionMap;
   private final Cache<Long, ByteString> stateMachineDataCache;
   private final AtomicBoolean stateMachineHealthy;
@@ -178,23 +182,10 @@ public class ContainerStateMachine extends BaseStateMachine {
         (index, data) -> new int[] {1, data.size()}, numPendingRequests,
         pendingRequestsByteLimit);
 
-    final int numWriteChunkThreads = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
-    final int queueLimit = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
-        OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
-    );
-    this.container2BCSIDMap = new ConcurrentHashMap<>();
+    chunkExecutors = createChunkExecutors(conf);
+    // TODO chunkExecutors[].prestartAllCoreThreads(); on "start"?
 
-    // TODO convert to array of single-thread executors,
-    chunkExecutor =
-        new ThreadPoolExecutor(numWriteChunkThreads, numWriteChunkThreads,
-            100, TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(queueLimit),
-            new ThreadPoolExecutor.CallerRunsPolicy());
-    // TODO chunkExecutor.prestartAllCoreThreads();
+    this.container2BCSIDMap = new ConcurrentHashMap<>();
 
     final int numContainerOpExecutors = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
@@ -215,6 +206,30 @@ public class ContainerStateMachine extends BaseStateMachine {
         return t;
       });
     }
+  }
+
+  private static ThreadPoolExecutor[] createChunkExecutors(Configuration conf) {
+    final int threadCount = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
+    final int queueLimit = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
+        OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
+    );
+    ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
+    // TODO any way to enforce queueLimit across executors[]?
+    RejectedExecutionHandler callerRuns =
+        new ThreadPoolExecutor.CallerRunsPolicy();
+    for (int i = 0; i < executors.length; i++) {
+      ThreadFactory threadFactory = new ThreadFactoryBuilder()
+          .setNameFormat("ChunkExecutor-" + i + "-%s")
+          .build();
+      BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(queueLimit);
+      executors[i] = new ThreadPoolExecutor(1, 1,
+          0, TimeUnit.SECONDS, workQueue, threadFactory, callerRuns);
+    }
+    return executors;
   }
 
   @Override
@@ -452,6 +467,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     CompletableFuture<Message> raftFuture = new CompletableFuture<>();
     // ensure the write chunk happens asynchronously in writeChunkExecutor pool
     // thread.
+    String chunkName =
+        requestProto.getWriteChunk().getChunkData().getChunkName();
     CompletableFuture<ContainerCommandResponseProto> writeChunkFuture =
         CompletableFuture.supplyAsync(() -> {
           try {
@@ -467,7 +484,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             raftFuture.completeExceptionally(e);
             throw e;
           }
-        }, chunkExecutor);
+        }, getChunkExecutor(chunkName));
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
@@ -511,6 +528,12 @@ public class ContainerStateMachine extends BaseStateMachine {
       return r;
     });
     return raftFuture;
+  }
+
+  private ExecutorService getChunkExecutor(String chunkName) {
+    int hash = chunkName.hashCode();
+    int i = Math.abs(hash) % chunkExecutors.length;
+    return chunkExecutors[i];
   }
 
   /*
@@ -661,6 +684,8 @@ public class ContainerStateMachine extends BaseStateMachine {
       Preconditions.checkArgument(!HddsUtils.isReadOnly(requestProto));
       if (requestProto.getCmdType() == Type.WriteChunk) {
         final CompletableFuture<ByteString> future = new CompletableFuture<>();
+        String chunkName =
+            requestProto.getWriteChunk().getChunkData().getChunkName();
         CompletableFuture.supplyAsync(() -> {
           try {
             future.complete(
@@ -671,7 +696,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             future.completeExceptionally(e);
           }
           return future;
-        }, chunkExecutor);
+        }, getChunkExecutor(chunkName));
         return future;
       } else {
         throw new IllegalStateException("Cmd type:" + requestProto.getCmdType()
@@ -893,7 +918,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     for (ExecutorService executor : executors) {
       executor.shutdown();
     }
-    chunkExecutor.shutdown();
+    for (ExecutorService executor : chunkExecutors) {
+      executor.shutdown();
+    }
     metrics.unRegister();
   }
 

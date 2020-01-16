@@ -95,6 +95,7 @@ public class IncrementalV1ChunkManager implements ChunkManager {
     if (stage == WRITE_DATA || stage == COMBINED) {
       long offset = info.getOffset();
       File chunkFile = getChunkFile(containerData, info.getChunkName());
+      // TODO handle overwrite (for replay)
       validateChunkFileSize(info, chunkFile);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Writing chunk {} in stage {} to file {}",
@@ -109,6 +110,7 @@ public class IncrementalV1ChunkManager implements ChunkManager {
           volumeIOStats);
     }
 
+    // TODO consider moving to ChunkManagerDispatcher
     if (stage == COMMIT_DATA || stage == COMBINED) {
       containerData.updateWriteStats(len, false);
     }
