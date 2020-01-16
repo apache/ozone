@@ -39,6 +39,8 @@ class OFSPath {
   private String mountName;
   private String keyName;
 
+  private final String OFS_MOUNT_NAME_TMP = "tmp";
+
   OFSPath(Path path) {
     String pathStr = path.toUri().getPath();
     initOFSPath(pathStr);
@@ -53,8 +55,8 @@ class OFSPath {
     int numToken = token.countTokens();
     if (numToken > 0) {
       String firstToken = token.nextToken();
-      // TODO: Compare a keyword list instead of hardcoded "tmp".
-      if (firstToken.equals("tmp")) {
+      // TODO: Compare a keyword list instead for future expansion.
+      if (firstToken.equals(OFS_MOUNT_NAME_TMP)) {
         volumeName = null;
         bucketName = null;
         mountName = firstToken;
