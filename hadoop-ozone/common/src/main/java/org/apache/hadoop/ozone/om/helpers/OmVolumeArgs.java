@@ -315,7 +315,13 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
 
   @Override
   public String getObjectInfo() {
-    return getProtobuf().toString();
+    return "OMVolumeArgs{" +
+        "volume='" + volume + '\'' +
+        ", admin='" + adminName + '\'' +
+        ", owner='" + ownerName + '\'' +
+        ", creationTime='" + creationTime + '\'' +
+        ", quota='" + quotaInBytes + '\'' +
+        '}';
   }
 
   /**

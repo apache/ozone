@@ -435,7 +435,15 @@ public final class OmKeyInfo extends WithObjectID {
 
   @Override
   public String getObjectInfo() {
-    return getProtobuf().toString();
+    return "OMVolumeArgs{" +
+        "volume='" + volumeName + '\'' +
+        ", bucket='" + bucketName + '\'' +
+        ", key='" + keyName + '\'' +
+        ", dataSize='" + dataSize + '\'' +
+        ", creationTime='" + creationTime + '\'' +
+        ", type='" + type + '\'' +
+        ", factor='" + factor + '\'' +
+        '}';
   }
 
   @Override

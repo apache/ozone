@@ -140,8 +140,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         ozoneManagerDoubleBufferHelper);
 
     // Replay the transaction - Execute the same request again
-    OMClientResponse omClientResponse =
-        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
+    OMClientResponse omClientResponse = omBucketSetPropertyRequest
+        .validateAndUpdateCache(ozoneManager, 1,
             ozoneManagerDoubleBufferHelper);
 
     // Replay should result in Replay response

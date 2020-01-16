@@ -29,13 +29,13 @@ public class WithObjectID extends WithMetadata {
    * System.
    */
   @SuppressWarnings("visibilitymodifier")
-  long objectID;
+  protected long objectID;
   /**
    * UpdateIDs are monotonically increasing values which are updated
    * each time there is an update.
    */
   @SuppressWarnings("visibilitymodifier")
-  long updateID;
+  protected long updateID;
 
   /**
    * Returns objectID.
@@ -82,8 +82,8 @@ public class WithObjectID extends WithMetadata {
     this.updateID = updateId;
   }
 
-  public boolean isObjectIDset() {
-    return this.objectID > 0;
+  public boolean isUpdateIDset() {
+    return this.updateID > 0;
   }
 
   public String getObjectInfo() {

@@ -256,7 +256,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   protected boolean isReplay(OzoneManager om, WithObjectID ozoneObj,
       long transactionID) {
-    return om.isRatisEnabled() && ozoneObj.isObjectIDset() &&
+    return om.isRatisEnabled() && ozoneObj.isUpdateIDset() &&
         transactionID <= ozoneObj.getUpdateID();
   }
 

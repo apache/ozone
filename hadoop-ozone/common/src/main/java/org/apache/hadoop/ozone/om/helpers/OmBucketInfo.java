@@ -403,7 +403,13 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
   @Override
   public String getObjectInfo() {
-    return getProtobuf().toString();
+    return "OMVolumeArgs{" +
+        "volume='" + volumeName + '\'' +
+        ", bucket='" + bucketName + '\'' +
+        ", isVersionEnabled='" + isVersionEnabled + '\'' +
+        ", storageType='" + storageType + '\'' +
+        ", creationTime='" + creationTime + '\'' +
+        '}';
   }
 
   @Override
