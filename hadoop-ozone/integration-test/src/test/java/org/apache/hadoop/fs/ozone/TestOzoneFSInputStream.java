@@ -63,26 +63,24 @@ public class TestOzoneFSInputStream {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 10,
-        StorageUnit.MB);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
+        .setNumDatanodes(3)
+        .setChunkSize(2) // MB
+        .setBlockSize(8) // MB
+        .setStreamBufferFlushSize(2) // MB
+        .setStreamBufferMaxSize(4) // MB
         .build();
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
 
-    // Fetch the host and port for File System init
-    DatanodeDetails datanodeDetails = cluster.getHddsDatanodes().get(0)
-        .getDatanodeDetails();
-
     // Set the fs.defaultFS and start the filesystem
     String uri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, uri);
     fs =  FileSystem.get(conf);
-    int fileLen = 100 * 1024 * 1024;
+    int fileLen = 30 * 1024 * 1024;
     data = DFSUtil.string2Bytes(RandomStringUtils.randomAlphanumeric(fileLen));
     filePath = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
     try (FSDataOutputStream stream = fs.create(filePath)) {
