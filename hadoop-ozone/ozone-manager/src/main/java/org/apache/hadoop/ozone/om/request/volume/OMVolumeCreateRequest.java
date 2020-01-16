@@ -160,8 +160,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
       } else {
         // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, dbVolumeArgs.getUpdateID(),
-            transactionLogIndex)) {
+        if (isReplay(ozoneManager, dbVolumeArgs, transactionLogIndex)) {
           // Replay implies the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.

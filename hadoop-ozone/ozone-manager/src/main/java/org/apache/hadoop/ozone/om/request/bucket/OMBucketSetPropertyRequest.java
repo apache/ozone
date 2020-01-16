@@ -124,8 +124,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       // Check if this transaction is a replay of ratis logs.
       // If a replay, then the response has already been returned to the
       // client. So take no further action and return a dummy OMClientResponse.
-      if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
-          transactionLogIndex)) {
+      if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
         LOG.debug("Replayed Transaction {} ignored. Request: {}",
             transactionLogIndex, setBucketPropertyRequest);
         return new OMBucketSetPropertyResponse(

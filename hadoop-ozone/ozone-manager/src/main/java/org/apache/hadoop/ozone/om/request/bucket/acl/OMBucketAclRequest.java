@@ -110,8 +110,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       // If this is a replay, then the response has already been returned to
       // the client. So take no further action and return a dummy
       // OMClientResponse.
-      if (isReplay(ozoneManager, omBucketInfo.getUpdateID(),
-          transactionLogIndex)) {
+      if (isReplay(ozoneManager, omBucketInfo, transactionLogIndex)) {
         LOG.debug("Replayed Transaction {} ignored. Request: {}",
             transactionLogIndex, getOmRequest());
         return new OMBucketAclResponse(createReplayOMResponse(omResponse));
