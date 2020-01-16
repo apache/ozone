@@ -18,12 +18,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.http.client.utils.URIBuilder;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
-
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.StringTokenizer;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -39,7 +35,7 @@ class OFSPath {
   private String mountName;
   private String keyName;
 
-  private final String OFS_MOUNT_NAME_TMP = "tmp";
+  private static final String OFS_MOUNT_NAME_TMP = "tmp";
 
   OFSPath(Path path) {
     String pathStr = path.toUri().getPath();
@@ -71,7 +67,7 @@ class OFSPath {
         bucketName = null;
         mountName = null;
       }
-//    } else {  // TODO: Implement '/' case.
+//    } else {  // TODO: Implement '/' case for ls.
     }
 
     // Compose key name.
@@ -114,19 +110,6 @@ class OFSPath {
       return mountName;
     } else {
       return volumeName + OZONE_URI_DELIMITER + bucketName;
-    }
-  }
-
-  public URI getNonKeyPartsURI(URI baseURI) {
-    try {
-      URI uri = new URIBuilder().setScheme(baseURI.getScheme())
-          .setHost(baseURI.getAuthority())
-          .setPath(getNonKeyPath())
-          .build();
-      return uri;
-    } catch (URISyntaxException e) {
-      // TODO: Handle.
-      return baseURI;
     }
   }
 

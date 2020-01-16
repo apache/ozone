@@ -92,8 +92,8 @@ public class TestRootedOzoneFileSystem {
 
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    // TODO: FileSystem#loadFileSystems is not loading ofs:// class by default
-    //  hence this workaround. Might need to add some config in hadoop source.
+    // Note: FileSystem#loadFileSystems won't load OFS class due to META-INF
+    //  hence this workaround.
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
     fs = FileSystem.get(conf);
     ofs = (RootedOzoneFileSystem) fs;
@@ -110,7 +110,8 @@ public class TestRootedOzoneFileSystem {
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    // TODO: Address this properly.
+    // Note: FileSystem#loadFileSystems won't load OFS class due to META-INF
+    //  hence this workaround.
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
     assertEquals(
         FileSystem.getFileSystemClass(OzoneConsts.OZONE_OFS_URI_SCHEME, conf),
