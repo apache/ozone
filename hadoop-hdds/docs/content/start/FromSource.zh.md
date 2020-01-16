@@ -1,5 +1,5 @@
 ---
-title: From Source
+title: 从源码构建 Ozone
 weight: 30
 ---
 <!---
@@ -25,44 +25,35 @@ weight: 30
  * Protoc (2.5)
 {{< /requirements >}}
 
-<div class="alert alert-info" role="alert">This is a guide on how to build the ozone sources.  If you are <font
-color="red">not</font>
-planning to build sources yourself, you can safely skip this page.</div>
+<div class="alert alert-info" role="alert">本文档是关于从源码构建 Ozone 的指南，如果你<font
+color="red">不</font>打算亲自这么做，你大可放心地跳过本页。</div>
 
-If you are a Hadoop ninja, and wise in the ways of Apache, you already know
-that a real Apache release is a source release.
+如果你十分了解 Hadoop，并且熟悉 Apache 之道，那你应当知道 Apache 发行包的精髓在于源代码。
 
-If you want to build from sources, Please untar the source tarball and run
-the ozone build command. This instruction assumes that you have all the
-dependencies to build Hadoop on your build machine. If you need instructions
-on how to build Hadoop, please look at the Apache Hadoop Website.
+从源码构建 ozone 只需要解压源码压缩包然后运行构建命令即可，下面这条命令假设你的机器上拥有构建 Hadoop 所需的所有环境，如果你需要构建 Hadoop 的指南，请查看 Apache Hadoop 网站。
 
 ```bash
 mvn clean package -DskipTests=true
 ```
 
-This will build an ozone-\<version\>.tar.gz in your `hadoop-ozone/dist/target` directory.
+命令执行完成后，`hadoop-ozone/dist/target` 目录下会生成一个 ozone-\<version\>.tar.gz 文件。
 
-You can copy this tarball and use this instead of binary artifacts that are
-provided along with the official release.
+你可以拷贝和使用这个压缩包来替代官方发行的二进制包。
 
-## How to test the build
+## 构建结果测试
 
-You can run the acceptance tests in the hadoop-ozone directory to make sure
-that  your build is functional. To launch the acceptance tests, please follow
- the instructions in the **README.md** in the `smoketest` directory.
+为了确保从源码构建出的二进制包可用，你可以运行 hadoop-zone 目录下的验收测试集，测试方法请参照 `smoketest` 目录下的 **READMD.md** 说明。
 
 ```bash
 cd smoketest
 ./test.sh
 ```
 
- You can also execute only a minimal subset of the tests:
+你也可以只执行最基本的验收测试：
 
 ```bash
 cd smoketest
 ./test.sh --env ozone basic
 ```
 
-Acceptance tests will start a small ozone cluster and verify that ozone shell and ozone file
- system is fully functional.
+验收测试会启动一个基于 docker-compose 的小型 ozone 集群，然后验证 ozone shell 和文件系统是否完全可用。
