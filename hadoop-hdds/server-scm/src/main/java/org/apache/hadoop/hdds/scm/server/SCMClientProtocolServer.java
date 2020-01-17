@@ -434,7 +434,7 @@ public class SCMClientProtocolServer implements
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline pipeline =
         pipelineManager.getPipeline(PipelineID.getFromProtobuf(pipelineID));
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+    pipelineManager.finalizeAndDestroyPipeline(pipeline, true);
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.CLOSE_PIPELINE, null)
     );
