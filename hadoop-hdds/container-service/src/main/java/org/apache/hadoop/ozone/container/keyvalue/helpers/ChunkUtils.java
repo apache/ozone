@@ -129,12 +129,13 @@ public final class ChunkUtils {
     }
 
     final long endTime = Time.monotonicNow();
-    volumeIOStats.incWriteTime(endTime - startTime);
+    long elapsed = endTime - startTime;
+    volumeIOStats.incWriteTime(elapsed);
     volumeIOStats.incWriteOpCount();
     volumeIOStats.incWriteBytes(bytesWritten);
 
-    LOG.debug("Written {} bytes at offset {} to {}",
-        bytesWritten, offset, filename);
+    LOG.debug("Written {} bytes at offset {} to {} in {} ms",
+        bytesWritten, offset, filename, elapsed);
 
     validateWriteSize(len, bytesWritten);
   }

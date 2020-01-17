@@ -239,6 +239,7 @@ public class IncrementalV1ChunkManager implements ChunkManager {
       String mode = sync ? "rws" : "rw";
       this.file = new RandomAccessFile(file, mode);
       this.openedAt = Instant.now();
+      LOG.debug("Opened file {}", file);
     }
 
     public FileChannel getChannel() {
