@@ -71,13 +71,16 @@ public interface SpaceUsageCheckFactory {
   static SpaceUsageCheckFactory create(Configuration config) {
     Conf conf = OzoneConfiguration.of(config).getObject(Conf.class);
     Class<? extends SpaceUsageCheckFactory> aClass = null;
-    try {
-      aClass = config.getClassByName(conf.getClassName())
-          .asSubclass(SpaceUsageCheckFactory.class);
-    } catch (ClassNotFoundException | RuntimeException e) {
-      Logger log = LoggerFactory.getLogger(SpaceUsageCheckFactory.class);
-      log.warn("Error trying to create SpaceUsageCheckFactory: '{}'",
-          conf.getClassName(), e);
+    String className = conf.getClassName();
+    if (className != null && !className.isEmpty()) {
+      try {
+        aClass = config.getClassByName(className)
+            .asSubclass(SpaceUsageCheckFactory.class);
+      } catch (ClassNotFoundException | RuntimeException e) {
+        Logger log = LoggerFactory.getLogger(SpaceUsageCheckFactory.class);
+        log.warn("Error trying to create SpaceUsageCheckFactory: '{}'",
+            className, e);
+      }
     }
 
     SpaceUsageCheckFactory instance = null;
