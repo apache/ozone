@@ -14,16 +14,17 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Recon Basic API test
+Documentation       Smoke test to start cluster with docker-compose environments.
 Library             OperatingSystem
 Library             String
+Library             BuiltIn
 Resource            ../commonlib.robot
 
 *** Variables ***
-${ENDPOINT_URL}       http://recon:9888
+${ENDPOINT_URL}     http://recon:9888
 
 *** Test Cases ***
-
 Recon REST API
-    ${result} =         Execute                             curl ${ENDPOINT_URL}/api/containers
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
+    ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}/api/containers
                         Should contain      ${result}       containers
