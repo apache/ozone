@@ -129,7 +129,7 @@ public interface RatisTestHelper {
         RatisHelper.getClientRequestTimeout(conf);
     final RaftClient client =
         newRaftClient(rpc, p, RatisHelper.createRetryPolicy(conf),
-            maxOutstandingRequests, requestTimeout);
+            maxOutstandingRequests, requestTimeout, conf);
     client.groupAdd(RatisHelper.newRaftGroup(pipeline), p.getId());
   }
 }

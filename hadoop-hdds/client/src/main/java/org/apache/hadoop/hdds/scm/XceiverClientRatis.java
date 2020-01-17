@@ -98,7 +98,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
         SecurityConfig(ozoneConf), caCert);
     return new XceiverClientRatis(pipeline,
         SupportedRpcType.valueOfIgnoreCase(rpcType), maxOutstandingRequests,
-        retryPolicy, tlsConfig, clientRequestTimeout);
+        retryPolicy, tlsConfig, clientRequestTimeout, ozoneConf);
   }
 
   private final Pipeline pipeline;
@@ -108,6 +108,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   private final RetryPolicy retryPolicy;
   private final GrpcTlsConfig tlsConfig;
   private final TimeDuration clientRequestTimeout;
+  private final Configuration ozoneConfiguration;
 
   // Map to track commit index at every server
   private final ConcurrentHashMap<UUID, Long> commitInfoMap;
@@ -119,7 +120,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
    */
   private XceiverClientRatis(Pipeline pipeline, RpcType rpcType,
       int maxOutStandingChunks, RetryPolicy retryPolicy,
-      GrpcTlsConfig tlsConfig, TimeDuration timeout) {
+      GrpcTlsConfig tlsConfig, TimeDuration timeout,
+      Configuration configuration) {
     super();
     this.pipeline = pipeline;
     this.rpcType = rpcType;
@@ -129,6 +131,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     this.tlsConfig = tlsConfig;
     this.clientRequestTimeout = timeout;
     metrics = XceiverClientManager.getXceiverClientMetrics();
+    this.ozoneConfiguration = configuration;
   }
 
   private void updateCommitInfosMap(
@@ -178,7 +181,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
     if (!client.compareAndSet(null,
         RatisHelper.newRaftClient(rpcType, getPipeline(), retryPolicy,
-            maxOutstandingRequests, tlsConfig, clientRequestTimeout))) {
+            maxOutstandingRequests, tlsConfig, clientRequestTimeout,
+            ozoneConfiguration))) {
       throw new IllegalStateException("Client is already connected.");
     }
   }
