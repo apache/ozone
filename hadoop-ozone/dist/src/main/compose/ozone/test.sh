@@ -38,6 +38,8 @@ execute_robot_test scm gdpr
 
 execute_robot_test scm s3
 
+execute_robot_test recon recon
+
 stop_docker_env
 
 generate_report
