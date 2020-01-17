@@ -74,6 +74,9 @@ public interface RatisHelper {
   String RATIS_GRPC_CLIENT_HEADER_REGEX = "raft\\.grpc\\.(?!server|tls)" +
       "([a-z\\.]+)";
 
+  // Ratis Server header regex filter.
+  String RATIS_SERVER_HEADER_REGEX = "raft\\.server\\.([a-z\\.]+)";
+
   static String toRaftPeerIdString(DatanodeDetails id) {
     return id.getUuidString();
   }
@@ -265,6 +268,20 @@ public interface RatisHelper {
     Map<String, String> ratisClientConf =
         ozoneConf.getValByRegex(RATIS_GRPC_CLIENT_HEADER_REGEX);
     ratisClientConf.forEach((key, val) -> raftProperties.set(key, val));
+  }
+
+  /**
+   * Set all the properties matching with regex
+   * {@link RatisHelper#RATIS_SERVER_HEADER_REGEX} in ozone configuration
+   * object and configure it to RaftProperties.
+   * @param ozoneConf
+   * @param raftProperties
+   */
+  static void createRaftServerProperties(Configuration ozoneConf,
+       RaftProperties raftProperties) {
+    Map<String, String> ratisServerConf =
+        ozoneConf.getValByRegex(RATIS_SERVER_HEADER_REGEX);
+    ratisServerConf.forEach((key, val) -> raftProperties.set(key, val));
   }
 
   // For External gRPC client to server with gRPC TLS.

@@ -70,4 +70,21 @@ public class TestRatisHelper {
     Assert.assertNull(raftProperties.get("raft.grpc.server.port"));
 
   }
+
+  @Test
+  public void testCreateRaftServerProperties() {
+
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.set("raft.server.rpc.watch.request.timeout", "30s");
+    ozoneConfiguration.set("raft.server.rpc.request.timeout", "30s");
+
+    RaftProperties raftProperties = new RaftProperties();
+    RatisHelper.createRaftServerProperties(ozoneConfiguration, raftProperties);
+
+    Assert.assertEquals("30s",
+        raftProperties.get("raft.server.rpc.watch.request.timeout"));
+    Assert.assertEquals("30s",
+        raftProperties.get("raft.server.rpc.request.timeout"));
+
+  }
 }
