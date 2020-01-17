@@ -53,6 +53,8 @@ class OFSPath {
       String firstToken = token.nextToken();
       // TODO: Compare a keyword list instead for future expansion.
       if (firstToken.equals(OFS_MOUNT_NAME_TMP)) {
+        // TODO: Retrieve volume and bucket name with the mount name.
+        //  Set to null just for now.
         volumeName = null;
         bucketName = null;
         mountName = firstToken;
@@ -115,5 +117,21 @@ class OFSPath {
 
   public boolean isMount() {
     return mountName != null;
+  }
+
+  private static boolean isInSameBucketAsInternal(
+      OFSPath p1, OFSPath p2) {
+
+    return p1.getVolumeName().equals(p2.getVolumeName()) &&
+        p1.getBucketName().equals(p2.getBucketName());
+  }
+
+  /**
+   * Check if this OFSPath is in the same bucket as another given OFSPath.
+   * Note that mount name is resolved into volume and bucket names.
+   * @return true if in the same bucket, false otherwise.
+   */
+  public boolean isInSameBucketAs(OFSPath p2) {
+    return isInSameBucketAsInternal(this, p2);
   }
 }

@@ -291,13 +291,15 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.OBJECTS_RENAMED);
     OFSPath ofsPath = new OFSPath(path);
     OFSPath ofsNewPath = new OFSPath(newPath);
-    // Check path and newPathName are in the same volume and same bucket.
-    if (!ofsPath.getVolumeName().equals(ofsNewPath.getVolumeName()) ||
-        !ofsPath.getBucketName().equals(ofsNewPath.getBucketName())) {
-      throw new IOException("Can't rename a key to a different bucket.");
-    }
-    OzoneBucket bucket = getBucket(ofsPath, false);
 
+    // Check path and newPathName are in the same volume and same bucket.
+    // This should have been checked in BasicRootedOzoneFileSystem#rename
+    // already via regular call path unless bypassed.
+    if (!ofsPath.isInSameBucketAs(ofsNewPath)) {
+      throw new IOException("Cannot rename a key to a different bucket");
+    }
+
+    OzoneBucket bucket = getBucket(ofsPath, false);
     String key = ofsPath.getKeyName();
     String newKey = ofsNewPath.getKeyName();
     bucket.renameKey(key, newKey);

@@ -290,6 +290,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
 
+    // src and dst should be in the same bucket
+    OFSPath ofsSrc = new OFSPath(src);
+    OFSPath ofsDst = new OFSPath(dst);
+    if (!ofsSrc.isInSameBucketAs(ofsDst)) {
+      throw new IOException("Cannot rename a key to a different bucket");
+    }
+
     // Cannot rename a directory to its own subdirectory
     Path dstParent = dst.getParent();
     while (dstParent != null && !src.equals(dstParent)) {
@@ -351,9 +358,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
             "Failed to rename %s to %s, file already exists!", src, dst));
       }
     }
-
-    // TODO: Could also check same bucket rename restriction here,
-    //  not just in AdapterImpl
 
     if (srcStatus.isDirectory()) {
       if (dst.toString().startsWith(src.toString() + OZONE_URI_DELIMITER)) {

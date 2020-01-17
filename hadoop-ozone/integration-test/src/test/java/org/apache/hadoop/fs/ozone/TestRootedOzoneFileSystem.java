@@ -51,6 +51,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
@@ -366,6 +367,17 @@ public class TestRootedOzoneFileSystem {
     fs.mkdirs(source);
     fs.mkdirs(target);
     fs.mkdirs(leafInsideInterimPath);
+
+    // Attempt to rename the key to a different bucket
+    Path bucket2 = new Path("/" + volumeName + "/" + bucketName + "test");
+    Path leafInTargetInAnotherBucket = new Path(bucket2, "leaf");
+    try {
+      fs.rename(leafInsideInterimPath, leafInTargetInAnotherBucket);
+      fail("Should have thrown exception when renaming to a different bucket");
+    } catch (IOException ex) {
+      System.out.println("Exception thrown as expected");
+    }
+
     assertTrue(fs.rename(leafInsideInterimPath, leafInTarget));
 
     // after rename listStatus for interimPath should succeed and
