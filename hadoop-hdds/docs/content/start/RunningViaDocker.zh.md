@@ -34,14 +34,14 @@ cd compose/ozone/
 docker-compose up -d
 {{< /highlight >}}
 
-为了验证 Ozone 正常运行，我们可以登录到 Datanode 并运行 Ozone 的负载生成命令 _freon_。 ```exec datanode bash``` 命令会在 Datanode 上启动一个 bash，`ozone freon` 命令在 Datanode 所在的容器内执行，你随时可以通过  CTRL-C 退出 freon，```rk``` 指令会让 freon 生成随机的键。
+为了验证 Ozone 正常运行，我们可以登录到 Datanode 并运行 Ozone 的负载生成工具 _freon_。 ```exec datanode bash``` 命令会在 Datanode 上启动一个 bash，`ozone freon` 命令在 Datanode 所在的容器内执行，你随时可以通过  CTRL-C 退出 freon，命令行选项 ```rk``` 会让 freon 生成随机的键。
 
 {{< highlight bash >}}
 docker-compose exec datanode bash
 ozone freon rk
 {{< /highlight >}}
 
-你可以访问 http://localhost:9874/ 在 **OzoneManager UI** 中查看 freon 的负载生成情况，同时也可以浏览 ozone 的配置。
+你可以通过 http://localhost:9874/ 访问 **OzoneManager UI** 来查看服务端处理 freon 负载的情况，以及浏览 ozone 的配置。
 
 ***恭喜，你成功运行了你的第一个 ozone 集群。***
 
