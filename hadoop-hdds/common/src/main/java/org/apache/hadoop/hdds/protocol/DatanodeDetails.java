@@ -169,12 +169,17 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
-   * Return the persistedOpState.
+   * Return the persistedOpState. If the stored value is null, return the
+   * default value of IN_SERVICE.
    *
    * @return The OperationalState persisted on the datanode.
    */
   public HddsProtos.NodeOperationalState getPersistedOpState() {
-    return persistedOpState;
+    if (persistedOpState == null) {
+      return HddsProtos.NodeOperationalState.IN_SERVICE;
+    } else {
+      return persistedOpState;
+    }
   }
 
   /**

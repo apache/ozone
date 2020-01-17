@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -250,9 +251,6 @@ public class SCMNodeManager implements NodeManager {
       throws NodeNotFoundException{
     nodeStateManager.setNodeOperationalState(
         datanodeDetails, newState, opStateExpiryEpocSec);
-    commandQueue.addCommand(datanodeDetails.getUuid(),
-        new SetNodeOperationalStateCommand(
-        Time.monotonicNow(), newState, opStateExpiryEpocSec));
   }
 
   /**
@@ -333,11 +331,35 @@ public class SCMNodeManager implements NodeManager {
             datanodeDetails.toString());
       }
     }
+    registerInitialDatanodeOpState(datanodeDetails);
 
     return RegisteredCommand.newBuilder().setErrorCode(ErrorCode.success)
         .setDatanode(datanodeDetails)
         .setClusterID(this.scmStorageConfig.getClusterID())
         .build();
+  }
+
+  /**
+   * When a node registers with SCM, the operational state stored on the
+   * datanode is the source of truth. Therefore, if the datanode reports
+   * anything other than IN_SERVICE on registration, the state in SCM should be
+   * updated to reflect the datanode state.
+   * @param dn
+   */
+  private void registerInitialDatanodeOpState(DatanodeDetails dn) {
+    try {
+      HddsProtos.NodeOperationalState dnOpState = dn.getPersistedOpState();
+      if (dnOpState != NodeOperationalState.IN_SERVICE) {
+        LOG.info("Updating nodeOperationalState on registration as the " +
+            "datanode has a persisted state of {} and expiry of {}",
+            dnOpState, dn.getPersistedOpStateExpiryEpochSec());
+        setNodeOperationalState(dn, dnOpState,
+            dn.getPersistedOpStateExpiryEpochSec());
+      }
+    } catch (NodeNotFoundException e) {
+      LOG.error("Unable to find the node when setting the operational state",
+          e);
+    }
   }
 
   /**
@@ -373,12 +395,48 @@ public class SCMNodeManager implements NodeManager {
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
       metrics.incNumHBProcessed();
+      updateDatanodeOpState(datanodeDetails);
     } catch (NodeNotFoundException e) {
       metrics.incNumHBProcessingFailed();
       LOG.error("SCM trying to process heartbeat from an " +
           "unregistered node {}. Ignoring the heartbeat.", datanodeDetails);
     }
     return commandQueue.getCommand(datanodeDetails.getUuid());
+  }
+
+  /**
+   * If the operational state or expiry reported in the datanode heartbeat do
+   * not match those store in SCM, queue a command to update the state persisted
+   * on the datanode. Additionally, ensure the datanodeDetails stored in SCM
+   * match those reported in the heartbeat.
+   * This method should only be called when processing the
+   * heartbeat, and for a registered node, the information stored in SCM is the
+   * source of truth.
+   * @param reportedDn The DatanodeDetails taken from the node heartbeat.
+   * @throws NodeNotFoundException
+   */
+  private void updateDatanodeOpState(DatanodeDetails reportedDn)
+      throws NodeNotFoundException {
+    NodeStatus scmStatus = getNodeStatus(reportedDn);
+    if (scmStatus.getOperationalState() != reportedDn.getPersistedOpState()
+        || scmStatus.getOpStateExpiryEpochSeconds()
+        != reportedDn.getPersistedOpStateExpiryEpochSec()) {
+      LOG.info("Scheduling a command to update the operationalState " +
+          "persisted on the datanode as the reported value ({}, {}) does not " +
+          "match the value stored in SCM ({}, {})",
+          reportedDn.getPersistedOpState(),
+          reportedDn.getPersistedOpStateExpiryEpochSec(),
+          scmStatus.getOperationalState(),
+          scmStatus.getOpStateExpiryEpochSeconds());
+      commandQueue.addCommand(reportedDn.getUuid(),
+          new SetNodeOperationalStateCommand(
+              Time.monotonicNow(), scmStatus.getOperationalState(),
+              scmStatus.getOpStateExpiryEpochSeconds()));
+    }
+    DatanodeDetails scmDnd = nodeStateManager.getNode(reportedDn);
+    scmDnd.setPersistedOpStateExpiryEpochSec(
+        reportedDn.getPersistedOpStateExpiryEpochSec());
+    scmDnd.setPersistedOpState(reportedDn.getPersistedOpState());
   }
 
   @Override

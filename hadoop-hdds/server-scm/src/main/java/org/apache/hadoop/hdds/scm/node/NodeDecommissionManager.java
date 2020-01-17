@@ -318,7 +318,7 @@ public class NodeDecommissionManager {
     long maintenanceEnd = 0;
     if (endInHours != 0) {
       maintenanceEnd =
-          (System.currentTimeMillis() / 1000) + (endInHours * 60 * 60);
+          (System.currentTimeMillis() / 1000L) + (endInHours * 60L * 60L);
     }
     if (opState == NodeOperationalState.IN_SERVICE) {
       nodeManager.setNodeOperationalState(
