@@ -229,7 +229,6 @@ public final class OmUtils {
     case LookupKey:
     case ListKeys:
     case ListTrash:
-    case RecoverTrash:
     case ServiceList:
     case ListMultiPartUploadParts:
     case GetFileStatus:
@@ -264,6 +263,7 @@ public final class OmUtils {
     case SetAcl:
     case AddAcl:
     case PurgeKeys:
+    case RecoverTrash:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

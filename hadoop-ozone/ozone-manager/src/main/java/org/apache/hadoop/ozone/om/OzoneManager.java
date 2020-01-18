@@ -2324,7 +2324,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String keyName, String destinationBucket) throws IOException {
 
     if (isAclEnabled) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.DELETE,
+      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
           volumeName, bucketName, keyName);
     }
 
