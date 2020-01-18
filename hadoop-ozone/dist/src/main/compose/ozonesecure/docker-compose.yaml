@@ -42,7 +42,7 @@ services:
     env_file:
       - docker-config
     environment:
-      KERBEROS_KEYTABS: dn
+      KERBEROS_KEYTABS: dn HTTP
   om:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: om
