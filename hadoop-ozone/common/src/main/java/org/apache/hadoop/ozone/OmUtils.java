@@ -502,4 +502,18 @@ public final class OmUtils {
     return OzoneConfiguration.of(configuration)
         .getObject(OMClientConfig.class).getRpcTimeOut();
   }
+
+  /**
+   * Return OmKeyInfo that would be recovered.
+   */
+  public static OmKeyInfo prepareKeyForRecover(OmKeyInfo keyInfo,
+      RepeatedOmKeyInfo repeatedOmKeyInfo) {
+
+    /* TODO: HDDS-2425. HDDS-2426.*/
+    if (repeatedOmKeyInfo.getOmKeyInfoList().contains(keyInfo)) {
+      return keyInfo;
+    } else {
+      return null;
+    }
+  }
 }
