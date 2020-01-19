@@ -126,12 +126,15 @@ public class TestOmMetadataManager {
         prefix, startKey, 1000);
     Assert.assertEquals(volListB.size(), 50);
 
-    // Test list all volumes with startKey
+    // Test list all volumes with setting startVolume
+    // that was not part of result.
     prefix = "";
-    startKey = "vola1";
+    int totalVol = volListB.size();
+    int startOrder = 0;
+    startKey = "volb" + startOrder;
     List<OmVolumeArgs> volListC = omMetadataManager.listVolumes(null,
         prefix, startKey, 1000);
-    Assert.assertEquals(volListC.size(), 100);
+    Assert.assertEquals(volListC.size(), totalVol - startOrder - 1);
   }
 
   @Test
