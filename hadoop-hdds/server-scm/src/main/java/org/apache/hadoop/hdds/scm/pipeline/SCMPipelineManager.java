@@ -100,8 +100,7 @@ public class SCMPipelineManager implements PipelineManager {
         new BackgroundPipelineCreator(this, scheduler, conf);
     int cacheSize = conf.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
         OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
-    final File metaDir = ServerUtils.getScmDbDir(conf);
-    final File pipelineDBPath = new File(metaDir, SCM_PIPELINE_DB);
+    final File pipelineDBPath = getPipelineDBPath(conf);
     this.pipelineStore =
         MetadataStoreBuilder.newBuilder()
             .setCreateIfMissing(true)
@@ -330,7 +329,7 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
-    LOG.info("destroying pipeline:{}", pipeline);
+    LOG.info("Destroying pipeline:{}", pipeline);
     finalizePipeline(pipeline.getId());
     if (onTimeout) {
       long pipelineDestroyTimeoutInMillis =
@@ -465,7 +464,7 @@ public class SCMPipelineManager implements PipelineManager {
    * @param pipeline        - Pipeline to be destroyed
    * @throws IOException
    */
-  private void destroyPipeline(Pipeline pipeline) throws IOException {
+  protected void destroyPipeline(Pipeline pipeline) throws IOException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     // remove the pipeline from the pipeline manager
     removePipeline(pipeline.getId());
@@ -478,7 +477,7 @@ public class SCMPipelineManager implements PipelineManager {
    * @param pipelineId - ID of the pipeline to be removed
    * @throws IOException
    */
-  private void removePipeline(PipelineID pipelineId) throws IOException {
+  protected void removePipeline(PipelineID pipelineId) throws IOException {
     lock.writeLock().lock();
     try {
       pipelineStore.delete(pipelineId.getProtobuf().toByteArray());
@@ -518,5 +517,10 @@ public class SCMPipelineManager implements PipelineManager {
     }
     // shutdown pipeline provider.
     pipelineFactory.shutdown();
+  }
+
+  protected File getPipelineDBPath(Configuration configuration) {
+    File metaDir = ServerUtils.getScmDbDir(configuration);
+    return new File(metaDir, SCM_PIPELINE_DB);
   }
 }
