@@ -869,21 +869,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     String volumeName;
     OmVolumeArgs omVolumeArgs;
     boolean prefixIsEmpty = Strings.isNullOrEmpty(prefix);
-    boolean startKeyFound = Strings.isNullOrEmpty(startKey);
+    boolean startKeyIsEmpty = Strings.isNullOrEmpty(startKey);
     while (cacheIterator.hasNext() && result.size() < maxKeys) {
       Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry =
           cacheIterator.next();
       omVolumeArgs = entry.getValue().getCacheValue();
       volumeName = omVolumeArgs.getVolume();
 
-      if (!prefixIsEmpty) {
-        if (!volumeName.startsWith(prefix)) {
-          continue;
-        }
+      if (!prefixIsEmpty && !volumeName.startsWith(prefix)) {
+        continue;
       }
-      if (!startKeyFound && volumeName.equals(startKey)) {
-        result.add(0, omVolumeArgs);
-        startKeyFound = true;
+
+      if (!startKeyIsEmpty) {
+        if (volumeName.equals(startKey)) {
+          startKeyIsEmpty = true;
+        }
         continue;
       }
 
