@@ -90,7 +90,7 @@ public class TestOmMetadataManager {
   }
 
   @Test
-  public void testListVolumes() throws Exception {
+  public void testListAllVolumes() throws Exception {
     OmVolumeArgs.Builder argsBuilder =
         OmVolumeArgs.newBuilder().setAdminName("admin");
     String volName;
