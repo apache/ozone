@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -51,10 +51,10 @@ public class PipelineReportHandler implements
       PipelineReportHandler.class);
   private final PipelineManager pipelineManager;
   private final Configuration conf;
-  private final SCMSafeModeManager scmSafeModeManager;
+  private final SafeModeManager scmSafeModeManager;
   private final boolean pipelineAvailabilityCheck;
 
-  public PipelineReportHandler(SCMSafeModeManager scmSafeModeManager,
+  public PipelineReportHandler(SafeModeManager scmSafeModeManager,
       PipelineManager pipelineManager, Configuration conf) {
     Preconditions.checkNotNull(pipelineManager);
     this.scmSafeModeManager = scmSafeModeManager;

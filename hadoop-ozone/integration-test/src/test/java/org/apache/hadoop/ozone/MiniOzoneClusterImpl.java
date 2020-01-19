@@ -776,6 +776,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY, "2s");
       conf.set(RECON_OM_SNAPSHOT_TASK_INTERVAL, "10s");
       conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
+      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
     }
   }
 }

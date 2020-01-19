@@ -61,6 +61,8 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   private static final Gson TRACING_SERIALIZER = new GsonBuilder().create();
 
+  private boolean isSilent = false;
+
   public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void addHandler(
       EVENT_TYPE event, EventHandler<PAYLOAD> handler) {
     this.addHandler(event, handler, generateHandlerName(handler));
@@ -180,7 +182,9 @@ public class EventQueue implements EventPublisher, AutoCloseable {
       }
 
     } else {
-      LOG.warn("No event handler registered for event {}", event);
+      if (!isSilent) {
+        LOG.warn("No event handler registered for event {}", event);
+      }
     }
 
   }
@@ -258,4 +262,11 @@ public class EventQueue implements EventPublisher, AutoCloseable {
     });
   }
 
+  /**
+   * Dont log messages when there are no consumers of a message.
+   * @param silent flag.
+   */
+  public void setSilent(boolean silent) {
+    isSilent = silent;
+  }
 }
