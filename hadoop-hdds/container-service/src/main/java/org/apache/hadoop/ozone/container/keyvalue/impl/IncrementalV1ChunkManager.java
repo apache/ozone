@@ -49,9 +49,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V1;
-import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMBINED;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
-import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.WRITE_DATA;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
 
 /**
@@ -89,31 +87,31 @@ public class IncrementalV1ChunkManager implements ChunkManager {
       return;
     }
 
+    if (stage == COMMIT_DATA) {
+      LOG.debug("Ignore chunk {} in stage {}", info, stage);
+      return;
+    }
+
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
     File chunkFile = getChunkFile(containerData, info.getChunkName());
     boolean overwrite = validateChunkForOverwrite(chunkFile, info);
     long len = info.getLen();
-    if (stage == WRITE_DATA || stage == COMBINED) {
-      long offset = info.getOffset();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
-            info, overwrite, stage, chunkFile);
-      }
-
-      HddsVolume volume = containerData.getVolume();
-      VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
-
-      FileChannel channel = files.getChannel(chunkFile, doSyncWrite);
-      ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, len,
-          volumeIOStats);
+    long offset = info.getOffset();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
+          info, overwrite, stage, chunkFile);
     }
 
-    // TODO consider moving to ChunkManagerDispatcher
-    if (stage == COMMIT_DATA || stage == COMBINED) {
-      containerData.updateWriteStats(len, overwrite);
-    }
+    HddsVolume volume = containerData.getVolume();
+    VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
+
+    FileChannel channel = files.getChannel(chunkFile, doSyncWrite);
+    ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, len,
+        volumeIOStats);
+
+    containerData.updateWriteStats(len, overwrite);
   }
 
   @Override

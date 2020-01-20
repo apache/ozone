@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
@@ -33,6 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import java.io.File;
+import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -63,6 +66,14 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
     selectHandler(container)
         .writeChunk(container, blockID, info, data, dispatcherContext);
+  }
+
+  @Override
+  public void finishWriteChunk(KeyValueContainer kvContainer,
+      String chunkName) throws IOException {
+
+    selectHandler(kvContainer)
+        .finishWriteChunk(kvContainer, chunkName);
   }
 
   @Override
