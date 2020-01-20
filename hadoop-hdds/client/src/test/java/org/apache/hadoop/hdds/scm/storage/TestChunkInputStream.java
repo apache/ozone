@@ -18,21 +18,17 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.EOFException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
 /**
@@ -66,52 +62,14 @@ public class TestChunkInputStream {
             chunkData, 0, CHUNK_SIZE).getProtoBufMessage())
         .build();
 
-    chunkStream = new DummyChunkInputStream(chunkInfo, null, null, true);
+    chunkStream =
+        new DummyChunkInputStream(this, chunkInfo, null, null, true, chunkData);
   }
 
   static byte[] generateRandomData(int length) {
     byte[] bytes = new byte[length];
     RANDOM.nextBytes(bytes);
     return bytes;
-  }
-
-  /**
-   * A dummy ChunkInputStream to mock read chunk calls to DN.
-   */
-  public class DummyChunkInputStream extends ChunkInputStream {
-
-    // Stores the read chunk data in each readChunk call
-    private List<ByteString> readByteBuffers = new ArrayList<>();
-
-    DummyChunkInputStream(ChunkInfo chunkInfo,
-        BlockID blockId,
-        XceiverClientSpi xceiverClient,
-        boolean verifyChecksum) {
-      super(chunkInfo, blockId, xceiverClient, verifyChecksum);
-    }
-
-    public DummyChunkInputStream(ChunkInfo chunkInfo,
-        BlockID blockId,
-        XceiverClientSpi xceiverClient,
-        boolean verifyChecksum,
-        byte[] data) {
-      super(chunkInfo, blockId, xceiverClient, verifyChecksum);
-      chunkData = data;
-    }
-
-    @Override
-    protected ByteString readChunk(ChunkInfo readChunkInfo) {
-      ByteString byteString = ByteString.copyFrom(chunkData,
-          (int) readChunkInfo.getOffset(),
-          (int) readChunkInfo.getLen());
-      readByteBuffers.add(byteString);
-      return byteString;
-    }
-
-    @Override
-    protected void checkOpen() {
-      // No action needed
-    }
   }
 
   /**
