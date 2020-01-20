@@ -18,18 +18,25 @@
 package org.apache.hadoop.hdds.fs;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
+import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 
 import static org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory.Conf.configKeyForClassName;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link SpaceUsageCheckFactory}.
  */
 public class TestSpaceUsageFactory {
+
+  private LogCapturer capturer;
 
   /**
    * Verifies that {@link SpaceUsageCheckFactory#create(Configuration)} creates
@@ -47,6 +54,12 @@ public class TestSpaceUsageFactory {
     assertSame(factoryClass, factory.getClass());
 
     return factoryClass.cast(factory);
+  }
+
+  @Before
+  public void setUp() {
+    capturer = LogCapturer.captureLogs(
+        LoggerFactory.getLogger(SpaceUsageCheckFactory.class));
   }
 
   @Test
@@ -81,6 +94,16 @@ public class TestSpaceUsageFactory {
     testDefaultFactoryForWrongConfig("java.lang.String");
   }
 
+  private void assertNoLog() {
+    assertEquals("", capturer.getOutput());
+  }
+
+  private void assertLogged(String substring) {
+    String output = capturer.getOutput();
+    assertTrue(output.contains(substring), () -> "Expected " + substring + " " +
+        "in log output, but only got: " + output);
+  }
+
   private static <T extends SpaceUsageCheckFactory> Configuration configFor(
       Class<T> factoryClass) {
 
@@ -97,11 +120,17 @@ public class TestSpaceUsageFactory {
     assertCreatesDefaultImplementation(conf);
   }
 
-  private static void testDefaultFactoryForWrongConfig(String value) {
+  private void testDefaultFactoryForWrongConfig(String value) {
     Configuration conf = new Configuration();
     conf.set(configKeyForClassName(), value);
 
     assertCreatesDefaultImplementation(conf);
+
+    if (value == null || value.isEmpty()) {
+      assertNoLog();
+    } else {
+      assertLogged(value);
+    }
   }
 
   private static void assertCreatesDefaultImplementation(Configuration conf) {
