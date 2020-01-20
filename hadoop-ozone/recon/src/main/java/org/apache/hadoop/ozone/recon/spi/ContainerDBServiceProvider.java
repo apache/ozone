@@ -32,11 +32,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 @InterfaceStability.Unstable
 public interface ContainerDBServiceProvider {
 
-  /**
-   * Start the Recon container DB provider service.
-   */
-  void start();
-
   /*
    * Close the container DB
    */

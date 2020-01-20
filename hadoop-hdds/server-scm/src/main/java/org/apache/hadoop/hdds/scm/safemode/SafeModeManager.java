@@ -15,24 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.recon.scm;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
-import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
+package org.apache.hadoop.hdds.scm.safemode;
 
 /**
- * Recon's version of SCM Node Manager.
- * TODO This is just an initial implementation. Will be revisited in future.
+ * Interface for SafeModeManager.
  */
-public class ReconNodeManager extends SCMNodeManager {
+public interface SafeModeManager {
 
-  public ReconNodeManager(OzoneConfiguration conf,
-                          SCMStorageConfig scmStorageConfig,
-                          EventPublisher eventPublisher,
-                          NetworkTopology networkTopology) {
-    super(conf, scmStorageConfig, eventPublisher, networkTopology);
-  }
+  /**
+   * Returns if the component is in Safemode or not.
+   * @return true/false.
+   */
+  boolean getInSafeMode();
 }

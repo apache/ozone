@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.recon;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
@@ -40,6 +40,9 @@ public class ReconServer extends GenericCli {
   private Injector injector;
 
   private ReconHttpServer httpServer;
+  private ContainerDBServiceProvider containerDBServiceProvider;
+  private OzoneManagerServiceProvider ozoneManagerServiceProvider;
+  private ReconStorageContainerManagerFacade reconStorageContainerManager;
 
   public static void main(String[] args) {
     new ReconServer().run(args);
@@ -68,23 +71,22 @@ public class ReconServer extends GenericCli {
     LOG.info("Initializing Recon server...");
     try {
 
-      // Initialize the Container DB Service provider first since it creates
-      // the ozone.recon.db.dir which is needed by SQL schema.
-      getContainerDBServiceProvider().start();
+      this.containerDBServiceProvider = getContainerDBServiceProvider();
 
+      ReconSchemaManager reconSchemaManager =
+          injector.getInstance(ReconSchemaManager.class);
       LOG.info("Creating Recon Schema.");
-      ReconSchemaManager reconSchemaManager = injector.getInstance(
-          ReconSchemaManager.class);
       reconSchemaManager.createReconSchema();
 
-      LOG.info("Recon server initialized successfully!");
-
       httpServer = injector.getInstance(ReconHttpServer.class);
+      this.ozoneManagerServiceProvider = getOzoneManagerServiceProvider();
+      this.reconStorageContainerManager = getReconStorageContainerManager();
+
       LOG.info("Starting Recon server");
       httpServer.start();
-
-      getOzoneManagerServiceProvider().start();
-      getReconStorageContainerManager().start();
+      ozoneManagerServiceProvider.start();
+      reconStorageContainerManager.start();
+      LOG.info("Recon server initialized successfully!");
 
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
@@ -106,18 +108,23 @@ public class ReconServer extends GenericCli {
     if (httpServer != null) {
       httpServer.stop();
     }
-
-    getReconStorageContainerManager().stop();
-    getOzoneManagerServiceProvider().stop();
-    getContainerDBServiceProvider().stop();
+    if (reconStorageContainerManager != null) {
+      reconStorageContainerManager.stop();
+    }
+    if (ozoneManagerServiceProvider != null) {
+      ozoneManagerServiceProvider.stop();
+    }
+    if (containerDBServiceProvider != null) {
+      containerDBServiceProvider.stop();
+    }
   }
 
   private OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
     return injector.getInstance(OzoneManagerServiceProvider.class);
   }
 
-  private ReconStorageContainerManager getReconStorageContainerManager() {
-    return injector.getInstance(ReconStorageContainerManager.class);
+  private ReconStorageContainerManagerFacade getReconStorageContainerManager() {
+    return injector.getInstance(ReconStorageContainerManagerFacade.class);
   }
 
   private ContainerDBServiceProvider getContainerDBServiceProvider() {
