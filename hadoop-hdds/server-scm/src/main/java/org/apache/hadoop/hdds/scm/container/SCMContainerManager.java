@@ -20,6 +20,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -53,7 +54,6 @@ import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
@@ -292,9 +292,18 @@ public class SCMContainerManager implements ContainerManager {
     try {
       Set<ContainerReplica> replicas =
           containerStateManager.getContainerReplicas(containerID);
-      for(ContainerReplica replica : replicas){
-        nodeManager.removeContainers(replica.getDatanodeDetails(), Stream.of(
-            containerID).collect(Collectors.toSet()));
+      Set containerIdSet = Collections.singleton(containerID);
+      for (ContainerReplica replica : replicas){
+        DatanodeDetails datanodeDetails = replica.getDatanodeDetails();
+        try {
+          nodeManager.removeContainers(datanodeDetails, containerIdSet);
+        } catch (NodeNotFoundException nnfe){
+          scmContainerManagerMetrics.incNumFailureDeleteContainers();
+          throw new SCMException(
+              "Failed to delete container" + containerID + ", reason : " +
+                  "DataNode " + datanodeDetails + " doesn't exist.",
+              SCMException.ResultCodes.FAILED_TO_FIND_NODE_IN_POOL);
+        }
       }
       containerStateManager.removeContainer(containerID);
       final byte[] dbKey = Longs.toByteArray(containerID.getId());
@@ -307,12 +316,6 @@ public class SCMContainerManager implements ContainerManager {
                 " it's missing!", containerID);
       }
       scmContainerManagerMetrics.incNumSuccessfulDeleteContainers();
-    } catch (NodeNotFoundException nnfe) {
-      scmContainerManagerMetrics.incNumFailureDeleteContainers();
-      throw new SCMException(
-          "Failed to delete container " + containerID + ", reason : " +
-              "node doesn't exist.",
-          SCMException.ResultCodes.FAILED_TO_FIND_NODE_IN_POOL);
     } catch (ContainerNotFoundException cnfe) {
       scmContainerManagerMetrics.incNumFailureDeleteContainers();
       throw new SCMException(
