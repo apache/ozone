@@ -51,12 +51,16 @@ public class DummyChunkInputStream extends ChunkInputStream {
     ByteString byteString = ByteString.copyFrom(chunkData,
         (int) readChunkInfo.getOffset(),
         (int) readChunkInfo.getLen());
-    readByteBuffers.add(byteString);
+    getReadByteBuffers().add(byteString);
     return byteString;
   }
 
   @Override
   protected void checkOpen() {
     // No action needed
+  }
+
+  public List<ByteString> getReadByteBuffers() {
+    return readByteBuffers;
   }
 }

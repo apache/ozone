@@ -117,7 +117,7 @@ public class TestChunkInputStream {
     // chunk from offset 0 to 60 as the checksum boundary is at every 20
     // bytes. Verify that 60 bytes of chunk data are read and stored in the
     // buffers.
-    matchWithInputData(chunkStream.readByteBuffers.get(0).toByteArray(),
+    matchWithInputData(chunkStream.getReadByteBuffers().get(0).toByteArray(),
         0, 60);
 
   }
@@ -145,7 +145,7 @@ public class TestChunkInputStream {
     byte[] b = new byte[30];
     chunkStream.read(b, 0, 30);
     matchWithInputData(b, 25, 30);
-    matchWithInputData(chunkStream.readByteBuffers.get(0).toByteArray(),
+    matchWithInputData(chunkStream.getReadByteBuffers().get(0).toByteArray(),
         20, 40);
 
     // After read, the position of the chunkStream is evaluated from the
