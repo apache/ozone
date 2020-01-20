@@ -57,8 +57,7 @@ public class Node2PipelineMap extends Node2ObjectsMap<PipelineID> {
    * @return Number of pipelines or 0.
    */
   public int getPipelinesCount(UUID datanode) {
-    Set<PipelineID> pipelines = getObjects(datanode);
-    return pipelines == null ? 0 : pipelines.size();
+    return getObjects(datanode).size();
   }
 
   /**
@@ -80,7 +79,7 @@ public class Node2PipelineMap extends Node2ObjectsMap<PipelineID> {
       dn2ObjectMap.computeIfPresent(dnId,
           (k, v) -> {
             v.remove(pipeline.getId());
-            return v.isEmpty() ? null : v;
+            return v;
           });
     }
   }

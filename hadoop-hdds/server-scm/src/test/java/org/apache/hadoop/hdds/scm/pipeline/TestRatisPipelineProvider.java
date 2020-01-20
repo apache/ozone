@@ -61,7 +61,7 @@ public class TestRatisPipelineProvider {
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
     conf = new OzoneConfiguration();
-    conf.setInt(ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT,
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
         maxPipelinePerNode);
     stateManager = new PipelineStateManager();
     provider = new MockRatisPipelineProvider(nodeManager,

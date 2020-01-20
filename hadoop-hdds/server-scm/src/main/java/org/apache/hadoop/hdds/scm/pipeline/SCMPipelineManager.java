@@ -45,6 +45,8 @@ import org.slf4j.LoggerFactory;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -128,19 +130,6 @@ public class SCMPipelineManager implements PipelineManager {
     pipelineFactory.setProvider(replicationType, provider);
   }
 
-  private int computeNodeIdHash(Pipeline pipeline) {
-    if (pipeline.getType() != ReplicationType.RATIS) {
-      return 0;
-    }
-
-    if (pipeline.getFactor() != ReplicationFactor.THREE) {
-      return 0;
-    }
-
-    return RatisPipelineUtils.
-        encodeNodeIdsOfFactorThreePipeline(pipeline.getNodes());
-  }
-
   private void initializePipelineState() throws IOException {
     if (pipelineStore.isEmpty()) {
       LOG.info("No pipeline exists in current db");
@@ -156,7 +145,8 @@ public class SCMPipelineManager implements PipelineManager {
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.setState(
           HddsProtos.PipelineState.PIPELINE_ALLOCATED).build());
       Preconditions.checkNotNull(pipeline);
-      pipeline.setNodeIdsHash(computeNodeIdHash(pipeline));
+      pipeline.setNodeIdsHash(RatisPipelineUtils.
+          encodeNodeIdsOfFactorThreePipeline(pipeline.getNodes()));
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
     }
@@ -177,17 +167,20 @@ public class SCMPipelineManager implements PipelineManager {
         metrics.incNumPipelineCreated();
         metrics.createPerPipelineMetrics(pipeline);
       }
-      Pipeline overlapPipeline = RatisPipelineUtils
+      List<Pipeline> overlapPipelines = RatisPipelineUtils
           .checkPipelineContainSameDatanodes(stateManager, pipeline);
-      if (overlapPipeline != null) {
+      if (!overlapPipelines.isEmpty()) {
+        // Count 1 overlap at a time.
         metrics.incNumPipelineContainSameDatanodes();
         //TODO remove until pipeline allocation is proved equally distributed.
-        LOG.info("Pipeline: " + pipeline.getId().toString() +
-            " contains same datanodes as previous pipeline: " +
-            overlapPipeline.getId().toString() + " nodeIds: " +
-            pipeline.getNodes().get(0).getUuid().toString() +
-            ", " + pipeline.getNodes().get(1).getUuid().toString() +
-            ", " + pipeline.getNodes().get(2).getUuid().toString());
+        for (Pipeline overlapPipeline : overlapPipelines) {
+          LOG.info("Pipeline: " + pipeline.getId().toString() +
+              " contains same datanodes as previous pipelines: " +
+              overlapPipeline.getId().toString() + " nodeIds: " +
+              pipeline.getNodes().get(0).getUuid().toString() +
+              ", " + pipeline.getNodes().get(1).getUuid().toString() +
+              ", " + pipeline.getNodes().get(2).getUuid().toString());
+        }
       }
       return pipeline;
     } catch (IOException ex) {
@@ -373,20 +366,21 @@ public class SCMPipelineManager implements PipelineManager {
       // Only srub pipeline for RATIS THREE pipeline
       return;
     }
-    Long currentTime = System.currentTimeMillis();
+    Instant currentTime = Instant.now();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
     List<Pipeline> needToSrubPipelines = stateManager.getPipelines(type, factor,
         Pipeline.PipelineState.ALLOCATED).stream()
-        .filter(p -> (currentTime - p.getCreationTimestamp()
-            >= pipelineScrubTimeoutInMills))
+        .filter(p -> currentTime.toEpochMilli() - p.getCreationTimestamp()
+            .toEpochMilli() >= pipelineScrubTimeoutInMills)
         .collect(Collectors.toList());
     for (Pipeline p : needToSrubPipelines) {
       LOG.info("srubbing pipeline: id: " + p.getId().toString() +
           " since it stays at ALLOCATED stage for " +
-          (currentTime - p.getCreationTimestamp())/60000 + " mins.");
+          Duration.between(currentTime, p.getCreationTimestamp()).toMinutes() +
+          " mins.");
       finalizeAndDestroyPipeline(p, false);
     }
   }

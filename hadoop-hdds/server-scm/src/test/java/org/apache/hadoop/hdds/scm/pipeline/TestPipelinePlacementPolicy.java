@@ -34,7 +34,7 @@ import org.junit.Test;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
  * Test for PipelinePlacementPolicy.
@@ -50,7 +50,7 @@ public class TestPipelinePlacementPolicy {
     nodeManager = new MockNodeManager(true,
         PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     conf = new OzoneConfiguration();
-    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 5);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 5);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, new PipelineStateManager(), conf);
   }
@@ -185,8 +185,8 @@ public class TestPipelinePlacementPolicy {
 
     int considerHeavyCount =
         conf.getInt(
-            ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT,
-            ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT) + 1;
+            ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+            ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) + 1;
 
     Node2PipelineMap mockMap = new Node2PipelineMap();
     for (DatanodeDetails node : nodes) {

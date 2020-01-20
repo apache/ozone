@@ -34,8 +34,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 
 /**
@@ -77,7 +78,7 @@ public class TestPipelineDatanodesIntersection {
   @Test
   public void testPipelineDatanodesIntersection() {
     NodeManager nodeManager= new MockNodeManager(true, nodeCount);
-    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, nodeHeaviness);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, nodeHeaviness);
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     PipelineStateManager stateManager = new PipelineStateManager();
     PipelineProvider provider = new MockRatisPipelineProvider(nodeManager,
@@ -92,20 +93,23 @@ public class TestPipelineDatanodesIntersection {
         Pipeline pipeline = provider.create(HddsProtos.ReplicationFactor.THREE);
         stateManager.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
-        Pipeline overlapPipeline = RatisPipelineUtils
+        List<Pipeline> overlapPipelines = RatisPipelineUtils
             .checkPipelineContainSameDatanodes(stateManager, pipeline);
-        if (overlapPipeline != null){
+
+        if (overlapPipelines.isEmpty()){
           intersectionCount++;
-          LOG.info("This pipeline: " + pipeline.getId().toString() +
-              " overlaps with previous pipeline: " + overlapPipeline.getId() +
-              ". They share same set of datanodes as: " +
-              pipeline.getNodesInOrder().get(0).getUuid() + "/" +
-              pipeline.getNodesInOrder().get(1).getUuid() + "/" +
-              pipeline.getNodesInOrder().get(2).getUuid() + " and " +
-              overlapPipeline.getNodesInOrder().get(0).getUuid() + "/" +
-              overlapPipeline.getNodesInOrder().get(1).getUuid() + "/" +
-              overlapPipeline.getNodesInOrder().get(2).getUuid() +
-              " is the same.");
+          for (Pipeline overlapPipeline : overlapPipelines) {
+            LOG.info("This pipeline: " + pipeline.getId().toString() +
+                " overlaps with previous pipeline: " + overlapPipeline.getId() +
+                ". They share same set of datanodes as: " +
+                pipeline.getNodesInOrder().get(0).getUuid() + "/" +
+                pipeline.getNodesInOrder().get(1).getUuid() + "/" +
+                pipeline.getNodesInOrder().get(2).getUuid() + " and " +
+                overlapPipeline.getNodesInOrder().get(0).getUuid() + "/" +
+                overlapPipeline.getNodesInOrder().get(1).getUuid() + "/" +
+                overlapPipeline.getNodesInOrder().get(2).getUuid() +
+                " is the same.");
+          }
         }
         createdPipelineCount++;
       } catch(SCMException e) {

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -62,15 +63,15 @@ public class ListInfoSubcommand implements Callable<Void> {
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
       pipelines = scmClient.listPipelines();
-      if (isNullOrEmpty(ipaddress) && isNullOrEmpty(uuid)) {
+      if (Strings.isNullOrEmpty(ipaddress) && Strings.isNullOrEmpty(uuid)) {
         getAllNodes(scmClient).stream().forEach(p -> printDatanodeInfo(p));
       } else {
         Stream<DatanodeDetails> allNodes = getAllNodes(scmClient).stream();
-        if (!isNullOrEmpty(ipaddress)) {
+        if (!Strings.isNullOrEmpty(ipaddress)) {
           allNodes = allNodes.filter(p -> p.getIpAddress()
               .compareToIgnoreCase(ipaddress) == 0);
         }
-        if (!isNullOrEmpty(uuid)) {
+        if (!Strings.isNullOrEmpty(uuid)) {
           allNodes = allNodes.filter(p -> p.getUuid().toString().equals(uuid));
         }
         allNodes.forEach(p -> printDatanodeInfo(p));
@@ -116,9 +117,5 @@ public class ListInfoSubcommand implements Callable<Void> {
         " (" + datanode.getIpAddress() + "/"
         + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines) \n" + "Related pipelines: \n" + pipelineListInfo);
-  }
-
-  protected static boolean isNullOrEmpty(String str) {
-    return ((str == null) || str.trim().isEmpty());
   }
 }

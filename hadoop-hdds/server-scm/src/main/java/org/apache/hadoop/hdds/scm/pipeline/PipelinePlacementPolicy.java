@@ -72,8 +72,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     this.conf = conf;
     this.stateManager = stateManager;
     this.heavyNodeCriteria = conf.getInt(
-        ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT,
-        ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT);
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
   }
 
   /**
@@ -113,7 +113,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     }
     boolean meet = (nodeManager.getPipelinesCount(datanodeDetails)
         - pipelineNumDeductable) < heavyNodeCriteria;
-    if (!meet) {
+    if (!meet && LOG.isDebugEnabled()) {
       LOG.debug("Pipeline Placement: can't place more pipeline on heavy " +
           "datanode： " + datanodeDetails.getUuid().toString() +
           " Heaviness: " + nodeManager.getPipelinesCount(datanodeDetails) +
@@ -143,17 +143,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     }
     int initialHealthyNodesCount = healthyNodes.size();
     String msg;
-    if (initialHealthyNodesCount == 0) {
-      msg = "No healthy nodes found to allocate pipeline.";
-      LOG.error(msg);
-      throw new SCMException(msg, SCMException.ResultCodes
-          .FAILED_TO_FIND_SUITABLE_NODE);
-    }
 
     if (initialHealthyNodesCount < nodesRequired) {
-      LOG.warn("Not enough healthy nodes to allocate pipeline. %d "
-              + " datanodes required. Found %d",
-          nodesRequired, initialHealthyNodesCount);
+      LOG.warn("Not enough healthy nodes to allocate pipeline." +
+              nodesRequired + " datanodes required. Found: " +
+          initialHealthyNodesCount);
       msg = String.format("Pipeline creation failed due to no sufficient" +
               " healthy datanodes. Required %d. Found %d.",
           nodesRequired, initialHealthyNodesCount);
@@ -168,15 +162,17 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         .collect(Collectors.toList());
 
     if (healthyList.size() < nodesRequired) {
-      LOG.debug("Unable to find enough nodes that meet " +
-              "the criteria that cannot engage in more than %d pipelines." +
-              " Nodes required: %d Found: %d, healthy nodes count in " +
-              "NodeManager: %d.",
-          heavyNodeCriteria, nodesRequired, healthyList.size(),
-          initialHealthyNodesCount);
-      msg = String.format("Pipeline creation failed due to not enough" +
-              " healthy datanodes after filter. Required %d. Found %d",
-          nodesRequired, initialHealthyNodesCount);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Unable to find enough nodes that meet the criteria that" +
+            " cannot engage in more than" + heavyNodeCriteria +
+            " pipelines. Nodes required: " + nodesRequired + " Found:" +
+            healthyList.size() + " healthy nodes count in NodeManager: " +
+            initialHealthyNodesCount);
+      }
+      msg = String.format("Pipeline creation failed because nodes are engaged" +
+              " in other pipelines and every node can only be engaged in" +
+              " max %d pipelines. Required %d. Found %d",
+          heavyNodeCriteria, nodesRequired, healthyList.size());
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
