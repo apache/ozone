@@ -532,6 +532,9 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   private ExecutorService getChunkExecutor(String chunkName) {
     int hash = chunkName.hashCode();
+    if (hash == Integer.MIN_VALUE) {
+      hash = Integer.MAX_VALUE;
+    }
     int i = Math.abs(hash) % chunkExecutors.length;
     return chunkExecutors[i];
   }
