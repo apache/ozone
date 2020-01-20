@@ -336,8 +336,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (omStorage.getState() != StorageState.INITIALIZED) {
       throw new OMException("OM not initialized, current OM storage state: " +
-          omStorage.getState().name() + ". Please check if 'ozone om --init' "
-          + "command is executed before starting the OM service.",
+          omStorage.getState().name() + ". Please ensure 'ozone om --init' "
+          + "command is executed once before starting the OM service.",
           ResultCodes.OM_NOT_INITIALIZED);
     }
 
