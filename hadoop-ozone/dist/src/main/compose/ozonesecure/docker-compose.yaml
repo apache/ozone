@@ -68,7 +68,7 @@ services:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","s3g"]
     environment:
-      KERBEROS_KEYTABS: s3g HTTP
+      KERBEROS_KEYTABS: s3g HTTP testuser
   recon:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: recon
