@@ -52,6 +52,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMBINED;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.WRITE_DATA;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
 
 /**
  * This class is for performing chunk related operations.
@@ -91,15 +92,14 @@ public class IncrementalV1ChunkManager implements ChunkManager {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
+    File chunkFile = getChunkFile(containerData, info.getChunkName());
+    boolean overwrite = validateChunkForOverwrite(chunkFile, info);
     long len = info.getLen();
     if (stage == WRITE_DATA || stage == COMBINED) {
       long offset = info.getOffset();
-      File chunkFile = getChunkFile(containerData, info.getChunkName());
-      // TODO handle overwrite (for replay)
-      validateChunkFileSize(info, chunkFile);
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Writing chunk {} in stage {} to file {}",
-            info, stage, chunkFile);
+        LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
+            info, overwrite, stage, chunkFile);
       }
 
       HddsVolume volume = containerData.getVolume();
@@ -112,21 +112,7 @@ public class IncrementalV1ChunkManager implements ChunkManager {
 
     // TODO consider moving to ChunkManagerDispatcher
     if (stage == COMMIT_DATA || stage == COMBINED) {
-      containerData.updateWriteStats(len, false);
-    }
-  }
-
-  private static void validateChunkFileSize(ChunkInfo info, File chunkFile)
-      throws StorageContainerException {
-
-    long size = chunkFile.length();
-    long offset = info.getOffset();
-    if (offset != size) {
-      String message = String.format(
-          "Unexpected offset for %s, got: %d, expected %d",
-          info.getChunkName(), offset, size);
-      LOG.warn(message);
-      throw new StorageContainerException(message, UNSUPPORTED_REQUEST);
+      containerData.updateWriteStats(len, overwrite);
     }
   }
 

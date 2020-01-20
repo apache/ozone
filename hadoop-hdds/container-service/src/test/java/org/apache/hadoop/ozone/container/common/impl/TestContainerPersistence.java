@@ -159,7 +159,7 @@ public class TestContainerPersistence {
     return new DispatcherContext.Builder().build();
   }
 
-  private Container addContainer(ContainerSet cSet, long cID)
+  private KeyValueContainer addContainer(ContainerSet cSet, long cID)
       throws IOException {
     long commitBytesBefore = 0;
     long commitBytesAfter = 0;
@@ -484,7 +484,7 @@ public class TestContainerPersistence {
     final int datalen = 1024;
 
     long testContainerID = getTestContainerID();
-    Container container = addContainer(containerSet, testContainerID);
+    KeyValueContainer container = addContainer(containerSet, testContainerID);
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
     ChunkInfo info = getChunk(
@@ -574,7 +574,6 @@ public class TestContainerPersistence {
         getDispatcherContext());
     chunkManager.deleteChunk(container, blockID, info);
     exception.expect(StorageContainerException.class);
-    exception.expectMessage("Chunk file can't be found");
     chunkManager.readChunk(container, blockID, info, getDispatcherContext());
   }
 
@@ -677,12 +676,9 @@ public class TestContainerPersistence {
     Container container = addContainer(containerSet, testContainerID);
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
     List<ChunkInfo> chunkList = new LinkedList<>();
-    ChunkInfo info = writeChunkHelper(blockID);
-    totalSize += datalen;
-    chunkList.add(info);
-    for (int x = 1; x < chunkCount; x++) {
-      // with holes in the front (before x * datalen)
-      info = getChunk(blockID.getLocalID(), x, x * datalen, datalen);
+    for (int x = 0; x < chunkCount; x++) {
+      ChunkInfo info = new ChunkInfo(String.format("%d.data",
+          blockID.getLocalID()), x * datalen, datalen);
       ChunkBuffer data = getData(datalen);
       setDataChecksum(info, data);
       chunkManager.writeChunk(container, blockID, info, data,
