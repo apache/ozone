@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
@@ -138,6 +139,15 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException in case of any exception
    */
   List<Pipeline> listPipelines() throws IOException;
+
+  /**
+   * Returns Pipeline with given ID if present.
+   *
+   * @return Pipeline
+   *
+   * @throws IOException in case of any exception
+   */
+  Pipeline getPipeline(HddsProtos.PipelineID pipelineID) throws IOException;
 
   /**
    * Activates a dormant pipeline.

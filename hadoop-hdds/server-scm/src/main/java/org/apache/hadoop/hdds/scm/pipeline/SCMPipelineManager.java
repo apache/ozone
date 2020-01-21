@@ -72,8 +72,8 @@ public class SCMPipelineManager implements PipelineManager {
       LoggerFactory.getLogger(SCMPipelineManager.class);
 
   private final ReadWriteLock lock;
-  private final PipelineFactory pipelineFactory;
-  private final PipelineStateManager stateManager;
+  private PipelineFactory pipelineFactory;
+  private PipelineStateManager stateManager;
   private final BackgroundPipelineCreator backgroundPipelineCreator;
   private Scheduler scheduler;
   private MetadataStore pipelineStore;
@@ -89,11 +89,21 @@ public class SCMPipelineManager implements PipelineManager {
   public SCMPipelineManager(Configuration conf, NodeManager nodeManager,
       EventPublisher eventPublisher)
       throws IOException {
+    this(conf, nodeManager, eventPublisher, null, null);
+    this.stateManager = new PipelineStateManager();
+    this.pipelineFactory = new PipelineFactory(nodeManager,
+        stateManager, conf, eventPublisher);
+  }
+
+  protected SCMPipelineManager(Configuration conf, NodeManager nodeManager,
+                               EventPublisher eventPublisher,
+                               PipelineStateManager pipelineStateManager,
+                               PipelineFactory pipelineFactory)
+      throws IOException {
     this.lock = new ReentrantReadWriteLock();
     this.conf = conf;
-    this.stateManager = new PipelineStateManager();
-    this.pipelineFactory = new PipelineFactory(nodeManager, stateManager,
-        conf, eventPublisher);
+    this.pipelineFactory = pipelineFactory;
+    this.stateManager = pipelineStateManager;
     // TODO: See if thread priority needs to be set for these threads
     scheduler = new Scheduler("RatisPipelineUtilsThread", false, 1);
     this.backgroundPipelineCreator =
@@ -197,6 +207,15 @@ public class SCMPipelineManager implements PipelineManager {
       return stateManager.getPipeline(pipelineID);
     } finally {
       lock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public boolean containsPipeline(PipelineID pipelineID) {
+    try {
+      return (getPipeline(pipelineID) != null);
+    } catch (PipelineNotFoundException e) {
+      return false;
     }
   }
 
@@ -522,5 +541,22 @@ public class SCMPipelineManager implements PipelineManager {
   protected File getPipelineDBPath(Configuration configuration) {
     File metaDir = ServerUtils.getScmDbDir(configuration);
     return new File(metaDir, SCM_PIPELINE_DB);
+  }
+
+  protected ReadWriteLock getLock() {
+    return lock;
+  }
+
+  @VisibleForTesting
+  public PipelineFactory getPipelineFactory() {
+    return pipelineFactory;
+  }
+
+  protected MetadataStore getPipelineStore() {
+    return pipelineStore;
+  }
+
+  protected NodeManager getNodeManager() {
+    return nodeManager;
   }
 }
