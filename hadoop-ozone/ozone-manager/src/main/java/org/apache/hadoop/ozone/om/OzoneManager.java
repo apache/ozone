@@ -335,7 +335,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_OM_USER_MAX_VOLUME + " value should be greater than zero");
 
     if (omStorage.getState() != StorageState.INITIALIZED) {
-      throw new OMException("OM not initialized.",
+      throw new OMException("OM not initialized, current OM storage state: " +
+          omStorage.getState().name() + ". Please ensure 'ozone om --init' "
+          + "command is executed once before starting the OM service.",
           ResultCodes.OM_NOT_INITIALIZED);
     }
 
