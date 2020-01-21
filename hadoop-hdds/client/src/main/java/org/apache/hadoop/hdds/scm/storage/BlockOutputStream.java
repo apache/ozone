@@ -270,6 +270,10 @@ public class BlockOutputStream extends OutputStream {
     if (len == 0) {
       return;
     }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Retrying write length {} for blockID {}, last offset {}",
+          len, blockID, chunkOffset);
+    }
     Preconditions.checkArgument(len <= streamBufferMaxSize);
     final long offset = chunkOffset.addAndGet(-len);
     Preconditions.checkArgument(0 <= offset);
@@ -593,6 +597,11 @@ public class BlockOutputStream extends OutputStream {
         .setChecksumData(checksumData.getProtoBufMessage())
         .build();
 
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Writing chunk {} length {} at offset {}",
+          chunkInfo.getChunkName(), effectiveChunkSize, offset);
+    }
+
     try {
       XceiverClientReply asyncReply =
           writeChunkAsync(xceiverClient, chunkInfo, blockID.get(), data);
@@ -618,11 +627,6 @@ public class BlockOutputStream extends OutputStream {
     } catch (IOException | InterruptedException | ExecutionException e) {
       throw new IOException(
           "Unexpected Storage Container Exception: " + e.toString(), e);
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "writing chunk " + chunkInfo.getChunkName() + " blockID " + blockID
-              + " length " + effectiveChunkSize);
     }
     containerBlockData.addChunks(chunkInfo);
   }
