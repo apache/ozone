@@ -412,9 +412,6 @@ public class KeyValueHandler extends Handler {
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
-      for (ContainerProtos.ChunkInfo chunk : data.getChunksList()) {
-        chunkManager.finishWriteChunk(kvContainer, chunk.getChunkName());
-      }
       blockManager.putBlock(kvContainer, blockData);
 
       blockDataProto = blockData.getProtoBufMessage();
