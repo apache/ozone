@@ -93,6 +93,7 @@ public class SCMPipelineManager implements PipelineManager {
     this.stateManager = new PipelineStateManager();
     this.pipelineFactory = new PipelineFactory(nodeManager,
         stateManager, conf, eventPublisher);
+    initializePipelineState();
   }
 
   protected SCMPipelineManager(Configuration conf, NodeManager nodeManager,
@@ -127,7 +128,6 @@ public class SCMPipelineManager implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-    initializePipelineState();
   }
 
   public PipelineStateManager getStateManager() {
@@ -140,7 +140,7 @@ public class SCMPipelineManager implements PipelineManager {
     pipelineFactory.setProvider(replicationType, provider);
   }
 
-  private void initializePipelineState() throws IOException {
+  protected void initializePipelineState() throws IOException {
     if (pipelineStore.isEmpty()) {
       LOG.info("No pipeline exists in current db");
       return;

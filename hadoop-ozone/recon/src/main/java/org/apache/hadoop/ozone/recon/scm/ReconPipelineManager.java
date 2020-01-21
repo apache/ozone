@@ -52,6 +52,7 @@ public class ReconPipelineManager extends SCMPipelineManager {
       throws IOException {
     super(conf, nodeManager, eventPublisher, new PipelineStateManager(),
         new ReconPipelineFactory());
+    initializePipelineState();
   }
 
   @Override
