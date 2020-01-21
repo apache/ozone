@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
+import org.apache.ratis.client.retry.RequestTypeDependentRetryPolicy;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcFactory;
@@ -277,9 +278,15 @@ public interface RatisHelper {
         .toIntExact(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
     TimeDuration sleepDuration =
         TimeDuration.valueOf(retryInterval, TimeUnit.MILLISECONDS);
-    RetryPolicy retryPolicy = RetryPolicies
+    RetryPolicy writeRetryPolicy = RetryPolicies
         .retryUpToMaximumCountWithFixedSleep(maxRetryCount, sleepDuration);
-    return retryPolicy;
+    final RequestTypeDependentRetryPolicy.Builder builder =
+            RequestTypeDependentRetryPolicy.newBuilder();
+    builder.set(RaftProtos.
+            RaftClientRequestProto.TypeCase.WRITE, writeRetryPolicy);
+    builder.set(RaftProtos.
+            RaftClientRequestProto.TypeCase.WATCH, RetryPolicies.noRetry());
+    return builder.build();
   }
 
   static Long getMinReplicatedIndex(
