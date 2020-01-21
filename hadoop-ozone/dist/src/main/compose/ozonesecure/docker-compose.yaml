@@ -73,7 +73,6 @@ services:
       - 9888:9888
     env_file:
       - ./docker-config
-    environment:
     command: ["/opt/hadoop/bin/ozone","recon"]
   scm:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}

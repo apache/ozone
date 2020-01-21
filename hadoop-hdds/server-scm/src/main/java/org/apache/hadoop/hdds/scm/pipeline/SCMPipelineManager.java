@@ -213,7 +213,8 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public boolean containsPipeline(PipelineID pipelineID) {
     try {
-      return (getPipeline(pipelineID) != null);
+      getPipeline(pipelineID);
+      return true;
     } catch (PipelineNotFoundException e) {
       return false;
     }
