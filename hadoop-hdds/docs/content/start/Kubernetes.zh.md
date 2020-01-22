@@ -1,5 +1,5 @@
 ---
-title: 在 Kubernetes 上部署 Ozone
+title: 在 Kubernetes 集群上部署 Ozone
 weight: 22
 ---
 <!---
@@ -30,7 +30,7 @@ weight: 22
 文件（比如，我们可以在每个 K8s 节点上部署一个 Datanode）。
 
 
-ozone 安装包中的 `kubernetes/examples` 目录包含了不同用途的部署资源文件。
+ozone 安装包中的 `kubernetes/examples` 目录包含了为不同用例设计的 Kubernetes 部署资源文件。
 
 使用 ozone 子目录进行部署：
 
@@ -46,7 +46,7 @@ kubectl get pod
 Access the services
 ```
 
-现在你可以访问 ozone 的各个服务，默认情况下它们并没有向外暴露，不过你可以通过设置端口转发规则进行访问：
+现在你可以访问 ozone 的各个服务，默认情况下它们的端口并没有向外开放，不过你可以通过设置端口转发规则来开放外部访问：
 
 ```
 kubectl port-forward s3g-0 9878:9878
