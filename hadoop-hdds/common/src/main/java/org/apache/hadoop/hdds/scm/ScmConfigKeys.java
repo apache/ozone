@@ -330,7 +330,7 @@ public final class ScmConfigKeys {
   // across the cluster nodes managed by SCM.
   // Only for test purpose now.
   public static final String OZONE_SCM_RATIS_PIPELINE_LIMIT =
-      "ozone.scm.pipeline.number.limit";
+      "ozone.scm.ratis.pipeline.limit";
   // Setting to zero by default means this limit doesn't take effect.
   public static final int OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT = 0;
 

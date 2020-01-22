@@ -847,7 +847,7 @@
   </description>
   </property>
   <property>
-    <name>ozone.scm.pipeline.number.limit</name>
+    <name>ozone.scm.ratis.pipeline.limit</name>
     <value>0</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>Upper limit for how many pipelines can be OPEN in SCM.
