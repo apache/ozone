@@ -18,7 +18,8 @@ cd "$DIR/../../.." || exit 1
 
 export MAVEN_OPTS="-Xmx4096m"
 mvn -B install -DskipTests
-mvn -B -fn test -pl :hadoop-ozone-integration-test "$@"
+mvn -B -fae test -pl :hadoop-ozone-integration-test "$@"
+rc=$?
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/integration"}
 mkdir -p "$REPORT_DIR"
@@ -29,4 +30,4 @@ source "$DIR/_mvn_unit_report.sh"
 if [[ -s "$REPORT_DIR/summary.txt" ]] ; then
     exit 1
 fi
-exit 0
+exit ${rc}
