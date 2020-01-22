@@ -114,8 +114,8 @@ public class ListInfoSubcommand implements Callable<Void> {
       pipelineListInfo.append("No pipelines in cluster.");
     }
     System.out.println("Datanode: " + datanode.getUuid().toString() +
-        " (" + datanode.getIpAddress() + "/"
-        + datanode.getHostName() + "/" + relatedPipelineNum +
+        " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
+        + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
         " pipelines) \n" + "Related pipelines: \n" + pipelineListInfo);
   }
 }

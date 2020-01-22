@@ -145,12 +145,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     String msg;
 
     if (initialHealthyNodesCount < nodesRequired) {
-      LOG.warn("Not enough healthy nodes to allocate pipeline." +
-              nodesRequired + " datanodes required. Found: " +
-          initialHealthyNodesCount);
       msg = String.format("Pipeline creation failed due to no sufficient" +
               " healthy datanodes. Required %d. Found %d.",
           nodesRequired, initialHealthyNodesCount);
+      LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
