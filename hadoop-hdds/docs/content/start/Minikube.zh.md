@@ -43,11 +43,11 @@ kubectl get pod
 注意：kubernetes/exampls/minikube 资源集为 minikube 部署进行了如下优化：
 
  * 即使你只有一个主机，也可以运行多个 Datanode（在实际的生产集群中，每个物理主机上通常只运行一个 Datanode）
- * 服务通过 NodePort 方式向外暴露
+ * Ozone 通过不同的节点端口提供服务
 
 ## 访问服务
 
-现在你可以访问 Ozone 的各个服务，minikube 资源集为每个 web 端点额外定义了一个 NodePort 服务，NodePort 服务可以通过任意节点的指定端口进行访问:
+现在你可以访问 Ozone 的各个服务，minikube 资源集为每个 web 端点额外定义了一个 NodePort 服务，NodePort 服务可以通过指定端口从任意节点访问：
 
 ```bash
 kubectl get svc
