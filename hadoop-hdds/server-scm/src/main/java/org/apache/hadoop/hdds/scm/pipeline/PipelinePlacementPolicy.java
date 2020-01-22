@@ -229,11 +229,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // First choose an anchor nodes randomly
     DatanodeDetails anchor = chooseNode(healthyNodes);
     if (anchor == null) {
-      LOG.warn("Unable to find healthy nodes." +
+      LOG.warn("Unable to find healthy node for anchor(first) node." +
               " Required nodes: {}, Found nodes: {}",
           nodesRequired, results.size());
       throw new SCMException("Unable to find required number of nodes.",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("First node chosen: {}", anchor);
     }
 
     results.add(anchor);
@@ -245,11 +248,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         healthyNodes, exclude,
         nodeManager.getClusterNetworkTopologyMap(), anchor);
     if (nodeOnDifferentRack == null) {
-      LOG.warn("Pipeline Placement: Unable to find nodes on different racks " +
-              " that meet the criteria. Required nodes: {}, Found nodes: {}",
-          nodesRequired, results.size());
+      LOG.warn("Pipeline Placement: Unable to find 2nd node on different " +
+              "racks that meets the criteria. Required nodes: {}, Found nodes:" +
+              " {}", nodesRequired, results.size());
       throw new SCMException("Unable to find required number of nodes.",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Second node chosen: {}", nodeOnDifferentRack);
     }
 
     results.add(nodeOnDifferentRack);
@@ -263,8 +269,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
           nodeManager.getClusterNetworkTopologyMap(), anchor, exclude);
       if (pick != null) {
         results.add(pick);
-        // exclude the picked node for next time
         exclude.add(pick);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Remaining node chosen: {}", pick);
+        }
       }
     }
 
@@ -306,9 +314,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       datanodeDetails = firstNodeMetric.isGreater(secondNodeMetric.get())
           ? firstNodeDetails : secondNodeDetails;
     }
-    // the pick is decided and it should be removed from candidates.
-    healthyNodes.remove(datanodeDetails);
-
     return datanodeDetails;
   }
 
@@ -331,12 +336,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     }
 
     for (DatanodeDetails node : healthyNodes) {
-      if (excludedNodes.contains(node)
-          || networkTopology.isSameParent(anchor, node)) {
+      if (excludedNodes.contains(node) ||
+          anchor.getNetworkLocation().equals(node.getNetworkLocation())) {
         continue;
       } else {
-        // the pick is decided and it should be removed from candidates.
-        healthyNodes.remove(node);
         return node;
       }
     }
@@ -374,15 +377,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     if (excludedNodes != null && excludedNodes.size() != 0) {
       excluded.addAll(excludedNodes);
     }
-    excluded.add(anchor);
 
     Node pick = networkTopology.chooseRandom(
         anchor.getNetworkLocation(), excluded);
     DatanodeDetails pickedNode = (DatanodeDetails) pick;
-    // exclude the picked node for next time
-    if (excludedNodes != null) {
-      excludedNodes.add(pickedNode);
-    }
     return pickedNode;
   }
 }

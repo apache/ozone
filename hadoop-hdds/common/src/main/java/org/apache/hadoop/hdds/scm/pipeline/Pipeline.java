@@ -158,7 +158,7 @@ public final class Pipeline {
   }
 
   /**
-   * Return an immutable set of nodes which form this pipeline
+   * Return an immutable set of nodes which form this pipeline.
    * @return Set of DatanodeDetails
    */
   public Set<DatanodeDetails> getNodeSet() {
