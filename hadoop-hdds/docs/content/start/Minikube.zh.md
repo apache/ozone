@@ -1,5 +1,5 @@
 ---
-title: Minikube & Ozone
+title: 在 Minikube 中运行 Ozone
 weight: 21
 ---
 <!---
@@ -21,33 +21,33 @@ weight: 21
 
 
 {{< requirements >}}
- * Working minikube setup
+ * minikube
  * kubectl
 {{< /requirements >}}
 
-`kubernetes/examples` folder of the ozone distribution contains kubernetes deployment resource files for multiple use cases. By default the kubernetes resource files are configured to use `apache/ozone` image from the dockerhub.
+ozone 发行包中的 `kubernetes/examples` 文件夹下包含了多种用途的 kubernetes 部署资源文件，这些资源文件默认使用 Docker Hub 上的 `apache/ozone` 镜像。
 
-To deploy it to minikube use the minikube configuration set:
+使用 minikube 资源集在 minikube 上进行部署：
 
 ```
 cd kubernetes/examples/minikube
 kubectl apply -f .
 ```
 
-And you can check the results with
+使用下面的命令检查结果：
 
 ```
 kubectl get pod
 ```
 
-Note: the kubernetes/examples/minikube resource set is optimized for minikube usage:
+注意：kubernetes/exampls/minikube 资源集为 minikube 部署进行了如下优化：
 
- * You can have multiple datanodes even if you have only one host (in a real production cluster usually you need one datanode per physical host)
- * The services are published with node port
+ * 即使你只有一个主机，也可以运行多个 Datanode（在实际的生产集群中，每个物理主机上通常只运行一个 Datanode）
+ * Ozone 通过不同的节点端口提供服务
 
-## Access the services
+## 访问服务
 
-Now you can access any of the services. For each web endpoint an additional NodeType service is defined in the minikube k8s resource set. NodeType services are available via a generated port of any of the host nodes:
+现在你可以访问 Ozone 的各个服务，minikube 资源集为每个 web 端点额外定义了一个 NodePort 服务，NodePort 服务可以通过指定端口从任意节点访问：
 
 ```bash
 kubectl get svc
@@ -62,9 +62,9 @@ scm          ClusterIP   None            <none>        9876/TCP         27s
 scm-public   NodePort    10.105.231.28   <none>        9876:32171/TCP   27s
 ```
 
-Minikube contains a convenience command to access any of the NodePort services:
+Minikube 为访问任意的 NodePort 服务提供了一个方便的命令：
 
 ```
 minikube service s3g-public
-Opening kubernetes service default/s3g-public in default browser...
+# 此命令会在默认浏览器中打开 default/s3g-public 服务的页面...
 ```
