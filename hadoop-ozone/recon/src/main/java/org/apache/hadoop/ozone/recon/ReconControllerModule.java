@@ -116,7 +116,6 @@ public class ReconControllerModule extends AbstractModule {
     StorageContainerLocationProtocol storageContainerLocationProtocol = null;
     try {
       storageContainerLocationProtocol = newContainerRpcClient(configuration);
-      return storageContainerLocationProtocol;
     } catch (IOException e) {
       LOG.error("Error in provisioning StorageContainerLocationProtocol ", e);
     }
