@@ -170,7 +170,6 @@ public abstract class XceiverClientSpi implements Closeable {
   /**
    * Check if an specfic commitIndex is replicated to majority/all servers.
    * @param index index to watch for
-   * @param timeout timeout provided for the watch operation to complete
    * @return reply containing the min commit index replicated to all or majority
    *         servers in case of a failure
    * @throws InterruptedException
@@ -178,7 +177,7 @@ public abstract class XceiverClientSpi implements Closeable {
    * @throws TimeoutException
    * @throws IOException
    */
-  public abstract XceiverClientReply watchForCommit(long index, long timeout)
+  public abstract XceiverClientReply watchForCommit(long index)
       throws InterruptedException, ExecutionException, TimeoutException,
       IOException;
 

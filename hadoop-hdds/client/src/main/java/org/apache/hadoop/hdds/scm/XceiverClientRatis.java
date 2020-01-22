@@ -245,7 +245,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   }
 
   @Override
-  public XceiverClientReply watchForCommit(long index, long timeout)
+  public XceiverClientReply watchForCommit(long index)
       throws InterruptedException, ExecutionException, TimeoutException,
       IOException {
     long commitIndex = getReplicatedMinCommitIndex();
@@ -256,14 +256,11 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       clientReply.setLogIndex(commitIndex);
       return clientReply;
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("commit index : {} watch timeout : {}", index, timeout);
-    }
     RaftClientReply reply;
     try {
       CompletableFuture<RaftClientReply> replyFuture = getClient()
           .sendWatchAsync(index, RaftProtos.ReplicationLevel.ALL_COMMITTED);
-      replyFuture.get(timeout, TimeUnit.MILLISECONDS);
+      replyFuture.get();
     } catch (Exception e) {
       Throwable t = HddsClientUtils.checkForException(e);
       LOG.warn("3 way commit failed on pipeline {}", pipeline, e);
@@ -272,7 +269,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       }
       reply = getClient()
           .sendWatchAsync(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
-          .get(timeout, TimeUnit.MILLISECONDS);
+          .get();
       List<RaftProtos.CommitInfoProto> commitInfoProtoList =
           reply.getCommitInfos().stream()
               .filter(i -> i.getCommitIndex() < index)

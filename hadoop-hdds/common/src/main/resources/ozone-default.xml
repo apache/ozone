@@ -428,14 +428,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.watch.request.timeout</name>
-    <value>30s</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Timeout for the watch API in Ratis client to acknowledge
-      a particular request getting replayed to all servers.
-    </description>
-  </property>
-  <property>
     <name>ozone.client.max.retries</name>
     <value>100</value>
     <tag>OZONE, CLIENT</tag>

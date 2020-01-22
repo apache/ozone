@@ -134,12 +134,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE_DEFAULT =
       "128MB";
 
-  public static final String OZONE_CLIENT_WATCH_REQUEST_TIMEOUT =
-      "ozone.client.watch.request.timeout";
-
-  public static final String OZONE_CLIENT_WATCH_REQUEST_TIMEOUT_DEFAULT =
-      "30s";
-
   public static final String OZONE_CLIENT_MAX_RETRIES =
       "ozone.client.max.retries";
   public static final int OZONE_CLIENT_MAX_RETRIES_DEFAULT = 100;
