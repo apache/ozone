@@ -247,8 +247,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         nodeManager.getClusterNetworkTopologyMap(), anchor);
     if (nodeOnDifferentRack == null) {
       LOG.warn("Pipeline Placement: Unable to find 2nd node on different " +
-              "racks that meets the criteria. Required nodes: {}, Found nodes:" +
-              " {}", nodesRequired, results.size());
+          "racks that meets the criteria. Required nodes: {}, Found nodes:" +
+          " {}", nodesRequired, results.size());
       throw new SCMException("Unable to find required number of nodes.",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
