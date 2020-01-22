@@ -29,8 +29,10 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
@@ -50,6 +52,9 @@ public class RunningDatanodeState implements DatanodeState {
   private final Configuration conf;
   private final StateContext context;
   private CompletionService<EndpointStateMachine.EndPointStates> ecs;
+  /** Cache the end point task for each end point. */
+  private Map<EndpointStateMachine,
+      Callable<EndpointStateMachine.EndPointStates>> endpointTasks;
 
   public RunningDatanodeState(Configuration conf,
       SCMConnectionManager connectionManager,
@@ -57,6 +62,44 @@ public class RunningDatanodeState implements DatanodeState {
     this.connectionManager = connectionManager;
     this.conf = conf;
     this.context = context;
+    initEndPointTask();
+  }
+
+  /**
+   * Initialize end point tasks corresponding to each end point.
+   */
+  private void initEndPointTask() {
+    endpointTasks = new HashMap<EndpointStateMachine,
+        Callable<EndpointStateMachine.EndPointStates>>();
+    for (EndpointStateMachine endpoint : connectionManager.getValues()) {
+      Callable<EndpointStateMachine.EndPointStates> endPointTask = null;
+      switch (endpoint.getState()) {
+      case GETVERSION:
+        endPointTask = new VersionEndpointTask(endpoint, conf,
+            context.getParent().getContainer());
+        break;
+      case REGISTER:
+        endPointTask = RegisterEndpointTask.newBuilder()
+            .setConfig(conf)
+            .setEndpointStateMachine(endpoint)
+            .setContext(context)
+            .setDatanodeDetails(context.getParent().getDatanodeDetails())
+            .setOzoneContainer(context.getParent().getContainer())
+            .build();
+        break;
+      case HEARTBEAT:
+        endPointTask = HeartbeatEndpointTask.newBuilder()
+            .setConfig(conf)
+            .setEndpointStateMachine(endpoint)
+            .setDatanodeDetails(context.getParent().getDatanodeDetails())
+            .setContext(context)
+            .build();
+        break;
+      case SHUTDOWN:
+        break;
+      }
+      endpointTasks.put(endpoint, endPointTask);
+    }
   }
 
   /**
@@ -98,35 +141,14 @@ public class RunningDatanodeState implements DatanodeState {
       }
     }
   }
-  //TODO : Cache some of these tasks instead of creating them
-  //all the time.
-  private Callable<EndpointStateMachine.EndPointStates>
-      getEndPointTask(EndpointStateMachine endpoint) {
-    switch (endpoint.getState()) {
-    case GETVERSION:
-      return new VersionEndpointTask(endpoint, conf, context.getParent()
-          .getContainer());
-    case REGISTER:
-      return  RegisterEndpointTask.newBuilder()
-          .setConfig(conf)
-          .setEndpointStateMachine(endpoint)
-          .setContext(context)
-          .setDatanodeDetails(context.getParent().getDatanodeDetails())
-          .setOzoneContainer(context.getParent().getContainer())
-          .build();
-    case HEARTBEAT:
-      return HeartbeatEndpointTask.newBuilder()
-          .setConfig(conf)
-          .setEndpointStateMachine(endpoint)
-          .setDatanodeDetails(context.getParent().getDatanodeDetails())
-          .setContext(context)
-          .build();
-    case SHUTDOWN:
-      break;
-    default:
-      throw new IllegalArgumentException("Illegal Argument.");
+
+  private Callable<EndpointStateMachine.EndPointStates> getEndPointTask(
+      EndpointStateMachine endpoint) {
+    if (endpointTasks.containsKey(endpoint)) {
+      return endpointTasks.get(endpoint);
+    } else {
+      throw new IllegalArgumentException("Illegal endpoint: " + endpoint);
     }
-    return null;
   }
 
   /**
