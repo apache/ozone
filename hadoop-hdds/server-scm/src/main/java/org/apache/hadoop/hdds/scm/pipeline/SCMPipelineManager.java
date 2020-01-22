@@ -145,8 +145,6 @@ public class SCMPipelineManager implements PipelineManager {
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.setState(
           HddsProtos.PipelineState.PIPELINE_ALLOCATED).build());
       Preconditions.checkNotNull(pipeline);
-      pipeline.setNodeIdsHash(RatisPipelineUtils.
-          encodeNodeIdsOfFactorThreePipeline(pipeline.getNodes()));
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
     }
