@@ -342,10 +342,10 @@ public class XceiverClientManager implements Closeable {
   /**
    * Configuration for ratis client.
    */
-  @ConfigGroup(prefix = "dfs.ratis.client")
+  @ConfigGroup(prefix = "raft.client")
   public static class DFSRatisClientConfig {
 
-    @Config(key = "async.max.outstanding.requests",
+    @Config(key = "async.outstanding-requests.max",
         defaultValue = "64",
         tags = {OZONE, CLIENT, PERFORMANCE},
         description =
@@ -361,6 +361,39 @@ public class XceiverClientManager implements Closeable {
     public void setMaxOutstandingRequests(int maxOutstandingRequests) {
       this.maxOutstandingRequests = maxOutstandingRequests;
     }
+
+    @Config(key = "rpc.request.timeout",
+        defaultValue = "60s",
+        tags = {OZONE, CLIENT, PERFORMANCE},
+        description = "The timeout duration for ratis client request (except " +
+            "for watch request). It should be set greater than leader " +
+            "election timeout in Ratis."
+    )
+    private long requestTimeOut;
+
+    public long getRequestTimeOut() {
+      return requestTimeOut;
+    }
+
+    public void setRequestTimeOut(long requestTimeOut) {
+      this.requestTimeOut = requestTimeOut;
+    }
+
+    @Config(key = "watch.request.timeout",
+        defaultValue = "180s",
+        tags = {OZONE, CLIENT, PERFORMANCE},
+        description = "The timeout duration for ratis client watch request."
+    )
+    private long watchRequestTimeOut;
+
+    public long getWatchRequestTimeOut() {
+      return watchRequestTimeOut;
+    }
+
+    public void setWatchRequestTimeOut(long watchRequestTimeOut) {
+      this.watchRequestTimeOut = watchRequestTimeOut;
+    }
   }
+
 
 }

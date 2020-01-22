@@ -253,14 +253,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.client.request.timeout.duration</name>
-    <value>3s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for ratis client request.It should be
-        set greater than leader election timeout in Ratis.
-    </description>
-  </property>
-  <property>
     <name>dfs.ratis.client.request.max.retries</name>
     <value>180</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
