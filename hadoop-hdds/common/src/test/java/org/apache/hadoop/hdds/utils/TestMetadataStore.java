@@ -23,7 +23,6 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
@@ -227,12 +226,12 @@ public class TestMetadataStore {
 
   private byte[] getBytes(String str) {
     return str == null ? null :
-        DFSUtilClient.string2Bytes(str);
+        DFSUtil.string2Bytes(str);
   }
 
   private String getString(byte[] bytes) {
     return bytes == null ? null :
-        DFSUtilClient.bytes2String(bytes);
+        DFSUtil.bytes2String(bytes);
   }
 
   @Test

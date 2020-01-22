@@ -31,7 +31,6 @@ import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
 
-import static org.apache.hadoop.hdfs.server.datanode.DataNode.MAX_VOLUME_FAILURE_TOLERATED_LIMIT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +63,8 @@ public class HddsVolumeChecker {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(HddsVolumeChecker.class);
+
+  private static final int MAX_VOLUME_FAILURE_TOLERATED_LIMIT = -1;
 
   private AsyncChecker<Boolean, VolumeCheckResult> delegateChecker;
 
