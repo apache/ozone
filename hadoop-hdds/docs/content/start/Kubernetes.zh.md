@@ -43,7 +43,7 @@ kubectl apply -f .
 
 ```
 kubectl get pod
-Access the services
+访问 ozone 服务
 ```
 
 现在你可以访问 ozone 的各个服务，默认情况下它们的端口并没有向外开放，不过你可以通过设置端口转发规则来开放外部访问：
