@@ -32,7 +32,7 @@ create_results_dir() {
 }
 
 
-## @description wait until safemode exit (or 90 seconds)
+## @description wait until safemode exit (or 180 seconds)
 ## @param the docker-compose file
 wait_for_safemode_exit(){
   local compose_file=$1
@@ -40,8 +40,8 @@ wait_for_safemode_exit(){
   #Reset the timer
   SECONDS=0
 
-  #Don't give it up until 90 seconds
-  while [[ $SECONDS -lt 90 ]]; do
+  #Don't give it up until 180 seconds
+  while [[ $SECONDS -lt 180 ]]; do
 
      #This line checks the safemode status in scm
      local command="ozone scmcli safemode status"
@@ -74,10 +74,8 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
   docker-compose -f "$COMPOSE_FILE" --no-ansi down
-  docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
-    && wait_for_safemode_exit "$COMPOSE_FILE"
-
-  if [[ $? -gt 0 ]]; then
+  if ! { docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
+      && wait_for_safemode_exit "$COMPOSE_FILE"; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
