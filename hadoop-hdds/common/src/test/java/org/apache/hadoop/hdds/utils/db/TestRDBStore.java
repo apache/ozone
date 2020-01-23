@@ -20,7 +20,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import javax.management.MBeanServer;
-
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
@@ -32,9 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.codec.binary.StringUtils;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdds.StingUtils;
 
+import org.apache.commons.codec.binary.StringUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -54,7 +53,7 @@ import org.rocksdb.StatsLevel;
  */
 public class TestRDBStore {
   private final List<String> families =
-      Arrays.asList(DFSUtil.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+      Arrays.asList(StingUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth");
