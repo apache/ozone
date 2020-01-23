@@ -1,7 +1,7 @@
 ---
 title: 卷命令
 weight: 2
-summary: 卷命令帮助你管理卷的生命周期
+summary: 用卷命令管理卷的生命周期
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -20,7 +20,7 @@ summary: 卷命令帮助你管理卷的生命周期
   limitations under the License.
 -->
 
-Volume 命令通常需要管理员权限，ozone shell 支持以下卷命令：
+卷命令通常需要管理员权限，ozone shell 支持以下卷命令：
 
   * [创建](#创建)
   * [删除](#删除)
@@ -36,7 +36,7 @@ Volume 命令通常需要管理员权限，ozone shell 支持以下卷命令：
 
 | 参数名                      |  说明                                |
 |--------------------------------|-----------------------------------------|
-| -q, \-\-quota                    | 可选，指明该卷在 Ozone 集群所能使用的最大空间，即份额。         |
+| -q, \-\-quota                    | 可选，指明该卷在 Ozone 集群所能使用的最大空间，即限额。         |
 | -u, \-\-user                     |  必需，指明该卷的所有者，此用户可以在该卷中创建桶和键。    |
 |  Uri                           | 卷名                                       |
 
@@ -44,7 +44,7 @@ Volume 命令通常需要管理员权限，ozone shell 支持以下卷命令：
 ozone sh volume create --quota=1TB --user=bilbo /hive
 {{< /highlight >}}
 
-上述命令会在 ozone 集群中创建名为 _hive_ 的卷，卷的份额为 1TB，所有者为 _bilbo_ 。
+上述命令会在 ozone 集群中创建名为 _hive_ 的卷，卷的限额为 1TB，所有者为 _bilbo_ 。
 
 ### 删除
 
@@ -64,7 +64,7 @@ ozone sh volume delete /hive
 
 ### 查看
 
-通过 `volume info` 命令可以获取卷的份额和所有者信息。
+通过 `volume info` 命令可以获取卷的限额和所有者信息。
 
 ***参数：***
 
@@ -90,13 +90,13 @@ ozone sh volume list --user hadoop
 
 ### 更新
 
-`volume update` 命令用来修改卷的所有者和份额。
+`volume update` 命令用来修改卷的所有者和限额。
 
 ***参数***
 
 | 参数名                      |  说明                                |
 |--------------------------------|-----------------------------------------|
-| -q, \-\-quota                    | 可选，重新指定该卷在 Ozone 集群中的份额。  |
+| -q, \-\-quota                    | 可选，重新指定该卷在 Ozone 集群中的限额。  |
 | -u, \-\-user                     | 可选，重新指定该卷的所有者 |
 |  Uri                           | 卷名                                        |
 
@@ -104,4 +104,4 @@ ozone sh volume list --user hadoop
 ozone sh volume update --quota=10TB /hive
 {{< /highlight >}}
 
-上述命令将 hive 卷的份额更新为 10TB。
+上述命令将 hive 卷的限额更新为 10TB。
