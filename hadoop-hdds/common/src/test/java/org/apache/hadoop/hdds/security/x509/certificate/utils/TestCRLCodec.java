@@ -159,10 +159,8 @@ public class TestCRLCodec {
     builder.addCRLEntry(x509CertificateHolder.getSerialNumber(), now,
                         CRLReason.cACompromise);
 
-    InputStream inStream = null;
     byte[] crlBytes = TMP_CRL_ENTRY.getBytes();
-    try {
-      inStream = new ByteArrayInputStream(crlBytes);
+    try (InputStream inStream = new ByteArrayInputStream(crlBytes)) {
       CertificateFactory cf = CertificateFactory.getInstance("X.509");
       X509CRL crl = (X509CRL)cf.generateCRL(inStream);
 
@@ -175,11 +173,6 @@ public class TestCRLCodec {
                     this.securityConfig.getCrlName()).toFile();
 
       assertTrue(crlFile.exists());
-
-    } finally {
-      if (inStream != null) {
-        inStream.close();
-      }
     }
   }
 
@@ -238,7 +231,7 @@ public class TestCRLCodec {
 
     CRLCodec crlCodec = new CRLCodec(securityConfig);
 
-    X509CRL crl = crlCodec.get509CRL(cRLHolder);
+    X509CRL crl = crlCodec.getX509CRL(cRLHolder);
     assertNotNull(crl);
   }
 

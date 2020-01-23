@@ -81,7 +81,7 @@ public class CRLCodec {
    * @return X509CRL - X509 CRL.
    * @throws CRLException - on Error.
    */
-  public static X509CRL get509CRL(X509CRLHolder holder)
+  public static X509CRL getX509CRL(X509CRLHolder holder)
       throws CRLException {
     return CRL_CONVERTER.getCRL(holder);
   }
@@ -97,7 +97,7 @@ public class CRLCodec {
       throws SCMSecurityException {
     LOG.trace("Getting PEM version of a CRL.");
     try {
-      return getPEMEncodedString(get509CRL(holder));
+      return getPEMEncodedString(getX509CRL(holder));
     } catch (CRLException exp) {
       throw new SCMSecurityException(exp);
     }
