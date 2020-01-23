@@ -151,6 +151,7 @@ public class TestOMDbCheckpointServlet {
           responseMock);
 
       omDbCheckpointServletMock.init();
+      long initialCheckpointCount = omMetrics.getNumCheckpoints();
 
       omDbCheckpointServletMock.doGet(requestMock, responseMock);
 
@@ -159,6 +160,7 @@ public class TestOMDbCheckpointServlet {
           omMetrics.getLastCheckpointCreationTimeTaken() > 0);
       Assert.assertTrue(
           omMetrics.getLastCheckpointStreamingTimeTaken() > 0);
+      Assert.assertTrue(omMetrics.getNumCheckpoints() > initialCheckpointCount);
     } finally {
       FileUtils.deleteQuietly(tempFile);
     }
