@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
@@ -38,6 +39,7 @@ import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,8 +123,13 @@ public interface RatisTestHelper {
       RpcType rpc, DatanodeDetails dd, Pipeline pipeline) throws IOException {
     final RaftPeer p = RatisHelper.toRaftPeer(dd);
     final OzoneConfiguration conf = new OzoneConfiguration();
+    final int maxOutstandingRequests =
+        HddsClientUtils.getMaxOutstandingRequests(conf);
+    final TimeDuration requestTimeout =
+        RatisHelper.getClientRequestTimeout(conf);
     final RaftClient client =
-        newRaftClient(rpc, p, RatisHelper.createRetryPolicy(conf), conf);
+        newRaftClient(rpc, p, RatisHelper.createRetryPolicy(conf),
+            maxOutstandingRequests, requestTimeout, conf);
     client.groupAdd(RatisHelper.newRaftGroup(pipeline), p.getId());
   }
 }
