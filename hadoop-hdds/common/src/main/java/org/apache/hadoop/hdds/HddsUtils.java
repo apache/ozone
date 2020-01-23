@@ -34,24 +34,20 @@ import java.util.OptionalInt;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.base.Preconditions;
-
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client;
@@ -64,16 +60,16 @@ import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 
+import com.google.common.base.Preconditions;
 import com.google.common.net.HostAndPort;
-
+import org.apache.commons.lang3.StringUtils;
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_INTERFACE_KEY;
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DNS_NAMESERVER_KEY;
+import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_INTERFACE_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DNS_NAMESERVER_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HOST_NAME_KEY;
-
-import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -352,6 +348,7 @@ public final class HddsUtils {
       if (dnsInterface == null) {
         // Try the legacy configuration keys.
         dnsInterface = conf.get(DFS_DATANODE_DNS_INTERFACE_KEY);
+        dnsInterface = conf.get(DFS_DATANODE_DNS_INTERFACE_KEY);
         nameServer = conf.get(DFS_DATANODE_DNS_NAMESERVER_KEY);
       } else {
         // If HADOOP_SECURITY_DNS_* is set then also attempt hosts file
@@ -552,7 +549,7 @@ public final class HddsUtils {
     MetricsSystem metricsSystem = DefaultMetricsSystem.initialize(serverName);
     try {
       JvmMetrics.create(serverName,
-          configuration.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY),
+          configuration.get(DFSConfigKeysLegacy.DFS_METRICS_SESSION_ID_KEY),
           DefaultMetricsSystem.instance());
     } catch (MetricsException e) {
       LOG.info("Metrics source JvmMetrics already added to DataNode.");
