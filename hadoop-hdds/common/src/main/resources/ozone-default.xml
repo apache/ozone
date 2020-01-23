@@ -2459,4 +2459,19 @@
       The maximum number of keys to return for a list trash request.
     </description>
   </property>
+  <property>
+    <name>ozone.http.basedir</name>
+    <value></value>
+    <tag>OZONE, OM, SCM, MANAGEMENT</tag>
+    <description>
+      The base dir for HTTP Jetty server to extract contents. If this property
+      is not configured, by default, Jetty will create a directory inside the
+      directory named by the java.io.tmpdir System property（/tmp by default）.
+      While in production environment, it's strongly suggested to instruct Jetty
+      to use a different parent directory by setting this property to the name
+      of the desired parent directory. The value of the property will be used to
+      set Jetty context attribute 'org.eclipse.jetty.webapp.basetempdir'.
+      The directory named by this property must exist and be writeable.
+    </description>
+  </property>
 </configuration>
