@@ -64,11 +64,13 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
     DBStore dbStore;
     File reconDbDir =
         reconUtils.getReconDbDir(configuration, OZONE_RECON_DB_DIR);
-    File lastKnownOMSnapshot =
+    File lastKnownContainerKeyDb =
         reconUtils.getLastKnownDB(reconDbDir, RECON_CONTAINER_KEY_DB);
-    if (lastKnownOMSnapshot != null) {
+    if (lastKnownContainerKeyDb != null) {
+      LOG.info("Last known container-key DB : {}",
+          lastKnownContainerKeyDb.getAbsolutePath());
       dbStore = getDBStore(configuration, reconUtils,
-          lastKnownOMSnapshot.getName());
+          lastKnownContainerKeyDb.getName());
     } else {
       dbStore = getNewDBStore(configuration, reconUtils);
     }
@@ -79,7 +81,7 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
     return dbStore;
   }
 
-  private static DBStore getDBStore(OzoneConfiguration configuration,
+  public static DBStore getDBStore(OzoneConfiguration configuration,
                             ReconUtils reconUtils, String dbName) {
     DBStore dbStore = null;
     try {

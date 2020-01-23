@@ -32,6 +32,11 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 @InterfaceStability.Unstable
 public interface ContainerDBServiceProvider {
 
+  /**
+   * Initialize the Container DB.
+   */
+  void start();
+
   /*
    * Close the container DB
    */
