@@ -342,11 +342,12 @@ public class XceiverClientManager implements Closeable {
   /**
    * Configuration for ratis client.
    */
-  @ConfigGroup(prefix = "dfs.ratis.client")
+  @ConfigGroup(prefix = "raft.client")
   public static class DFSRatisClientConfig {
 
-    @Config(key = "async.max.outstanding.requests",
+    @Config(key = "async.outstanding-requests.max",
         defaultValue = "64",
+        type = ConfigType.INT,
         tags = {OZONE, CLIENT, PERFORMANCE},
         description =
             "Controls the maximum number of outstanding async requests that can"
@@ -361,6 +362,43 @@ public class XceiverClientManager implements Closeable {
     public void setMaxOutstandingRequests(int maxOutstandingRequests) {
       this.maxOutstandingRequests = maxOutstandingRequests;
     }
+
+    @Config(key = "rpc.request.timeout",
+        defaultValue = "60s",
+        type = ConfigType.TIME,
+        tags = {OZONE, CLIENT, PERFORMANCE},
+        description = "The timeout duration for ratis client request (except " +
+            "for watch request). It should be set greater than leader " +
+            "election timeout in Ratis."
+    )
+    private long requestTimeOut = 60 * 1000;
+
+    public long getRequestTimeOut() {
+      return requestTimeOut;
+    }
+
+    public void setRequestTimeOut(long requestTimeOut) {
+      this.requestTimeOut = requestTimeOut;
+    }
+
+    @Config(key = "watch.request.timeout",
+        defaultValue = "180s",
+        type = ConfigType.TIME,
+        tags = {OZONE, CLIENT, PERFORMANCE},
+        description = "The timeout duration for ratis client watch request. " +
+            "Timeout for the watch API in Ratis client to acknowledgea " +
+            "particular request getting replayed to all servers."
+    )
+    private long watchRequestTimeOut = 180 * 1000;
+
+    public long getWatchRequestTimeOut() {
+      return watchRequestTimeOut;
+    }
+
+    public void setWatchRequestTimeOut(long watchRequestTimeOut) {
+      this.watchRequestTimeOut = watchRequestTimeOut;
+    }
   }
+
 
 }
