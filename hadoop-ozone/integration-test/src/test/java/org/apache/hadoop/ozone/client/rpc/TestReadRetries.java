@@ -174,7 +174,7 @@ public class TestReadRetries {
     Assert.assertTrue(clientSpi instanceof XceiverClientRatis);
     XceiverClientRatis ratisClient = (XceiverClientRatis)clientSpi;
 
-    ratisClient.watchForCommit(keyInfo.getBlockCommitSequenceId());
+    ratisClient.watchForCommit(keyInfo.getBlockCommitSequenceId(), 5000);
     // shutdown the datanode
     cluster.shutdownHddsDatanode(datanodeDetails);
 

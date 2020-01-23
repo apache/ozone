@@ -71,13 +71,17 @@ public class CommitWatcher {
 
   private XceiverClientSpi xceiverClient;
 
+  private final long watchTimeout;
+
   // total data which has been successfully flushed and acknowledged
   // by all servers
   private long totalAckDataLength;
 
-  public CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
+  public CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient,
+      long watchTimeout) {
     this.bufferPool = bufferPool;
     this.xceiverClient = xceiverClient;
+    this.watchTimeout = watchTimeout;
     commitIndex2flushedDataMap = new ConcurrentSkipListMap<>();
     totalAckDataLength = 0;
     futureMap = new ConcurrentHashMap<>();
@@ -187,7 +191,7 @@ public class CommitWatcher {
     long index;
     try {
       XceiverClientReply reply =
-          xceiverClient.watchForCommit(commitIndex);
+          xceiverClient.watchForCommit(commitIndex, watchTimeout);
       if (reply == null) {
         index = 0;
       } else {
