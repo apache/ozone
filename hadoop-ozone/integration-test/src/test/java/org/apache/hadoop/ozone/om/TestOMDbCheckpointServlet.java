@@ -152,6 +152,11 @@ public class TestOMDbCheckpointServlet {
 
       omDbCheckpointServletMock.init();
 
+      Assert.assertTrue(
+          omMetrics.getLastCheckpointCreationTimeTaken() == 0);
+      Assert.assertTrue(
+          omMetrics.getLastCheckpointStreamingTimeTaken() == 0);
+
       omDbCheckpointServletMock.doGet(requestMock, responseMock);
 
       Assert.assertTrue(tempFile.length() > 0);
