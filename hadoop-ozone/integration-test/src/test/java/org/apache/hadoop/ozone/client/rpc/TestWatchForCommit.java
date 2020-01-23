@@ -269,49 +269,9 @@ public class TestWatchForCommit {
   }
 
   @Test
-  public void testWatchForCommitWithSmallerTimeoutValue() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
-    startCluster(conf);
-    XceiverClientManager clientManager = new XceiverClientManager(conf);
-    ContainerWithPipeline container1 = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
-    XceiverClientSpi xceiverClient = clientManager
-        .acquireClient(container1.getPipeline());
-    Assert.assertEquals(1, xceiverClient.getRefcount());
-    Assert.assertEquals(container1.getPipeline(),
-        xceiverClient.getPipeline());
-    Pipeline pipeline = xceiverClient.getPipeline();
-    XceiverClientReply reply = xceiverClient.sendCommandAsync(
-        ContainerTestHelper.getCreateContainerRequest(
-            container1.getContainerInfo().getContainerID(),
-            xceiverClient.getPipeline()));
-    reply.getResponse().get();
-    long index = reply.getLogIndex();
-    cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
-    cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
-    try {
-      // just watch for a log index which in not updated in the commitInfo Map
-      // as well as there is no logIndex generate in Ratis.
-      // The basic idea here is just to test if its throws an exception.
-      xceiverClient
-          .watchForCommit(index + new Random().nextInt(100) + 10);
-      Assert.fail("expected exception not thrown");
-    } catch (Exception e) {
-      Assert.assertTrue(
-          HddsClientUtils.checkForException(e) instanceof TimeoutException);
-    }
-    // After releasing the xceiverClient, this connection should be closed
-    // and any container operations should fail
-    clientManager.releaseClient(xceiverClient, false);
-    shutdown();
-  }
-
-  @Test
   public void testWatchForCommitForRetryfailure() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
+    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 10);
     startCluster(conf);
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container1 = storageContainerLocationClient
@@ -355,6 +315,7 @@ public class TestWatchForCommit {
   public void test2WayCommitForTimeoutException() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
+    conf.set("raft.client.watch.request.timeout", "3s");
     startCluster(conf);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
