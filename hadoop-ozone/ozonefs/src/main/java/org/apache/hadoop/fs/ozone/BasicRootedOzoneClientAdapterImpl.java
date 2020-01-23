@@ -63,6 +63,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
+    .BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
+    .VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
@@ -213,18 +217,32 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneVolume volume;
           try {
             volume = proxy.getVolumeDetails(volumeStr);
-          } catch (OMException volEx) {
-            if (volEx.getResult().equals(VOLUME_NOT_FOUND)) {
+          } catch (OMException getVolEx) {
+            if (getVolEx.getResult().equals(VOLUME_NOT_FOUND)) {
               // Volume doesn't exist. Create it
-              objectStore.createVolume(volumeStr);
+              try {
+                objectStore.createVolume(volumeStr);
+              } catch (OMException newVolEx) {
+                // Ignore the case where another client created the volume
+                if (!newVolEx.getResult().equals(VOLUME_ALREADY_EXISTS)) {
+                  throw newVolEx;
+                }
+              }
             } else {
-              throw volEx;
+              throw getVolEx;
             }
             // Try get volume again
             volume = proxy.getVolumeDetails(volumeStr);
           }
           // Create the bucket
-          volume.createBucket(bucketStr);
+          try {
+            volume.createBucket(bucketStr);
+          } catch (OMException newBucEx) {
+            // Ignore the case where another client created the bucket
+            if (!newBucEx.getResult().equals(BUCKET_ALREADY_EXISTS)) {
+              throw newBucEx;
+            }
+          }
         }
         // Try get bucket again
         bucket = proxy.getBucketDetails(volumeStr, bucketStr);
