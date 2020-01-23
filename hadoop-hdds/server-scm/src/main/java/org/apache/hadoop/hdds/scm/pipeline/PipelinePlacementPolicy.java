@@ -239,7 +239,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
     results.add(anchor);
     exclude.add(anchor);
-    nodesRequired--;
 
     // Choose the second node on different racks from anchor.
     DatanodeDetails nodeOnDifferentRack = chooseNodeBasedOnRackAwareness(
@@ -258,10 +257,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
     results.add(nodeOnDifferentRack);
     exclude.add(nodeOnDifferentRack);
-    nodesRequired--;
 
     // Then choose nodes close to anchor based on network topology
-    for (int x = 0; x < nodesRequired; x++) {
+    int nodesToFind = nodesRequired - results.size();
+    for (int x = 0; x < nodesToFind; x++) {
       // invoke the choose function defined in the derived classes.
       DatanodeDetails pick = chooseNodeFromNetworkTopology(
           nodeManager.getClusterNetworkTopologyMap(), anchor, exclude);
@@ -312,6 +311,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       datanodeDetails = firstNodeMetric.isGreater(secondNodeMetric.get())
           ? firstNodeDetails : secondNodeDetails;
     }
+    healthyNodes.remove(datanodeDetails);
     return datanodeDetails;
   }
 
