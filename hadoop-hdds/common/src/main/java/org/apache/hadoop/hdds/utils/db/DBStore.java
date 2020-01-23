@@ -159,7 +159,7 @@ public interface DBStore extends AutoCloseable {
   void commitBatchOperation(BatchOperation operation) throws IOException;
 
   /**
-   * Get current snapshot of OM DB store as an artifact stored on
+   * Get current snapshot of DB store as an artifact stored on
    * the local filesystem.
    * @return An object that encapsulates the checkpoint information along with
    * location.
