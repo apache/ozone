@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.states.datanode;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
@@ -51,10 +52,10 @@ public class RunningDatanodeState implements DatanodeState {
   private final SCMConnectionManager connectionManager;
   private final Configuration conf;
   private final StateContext context;
-  private CompletionService<EndpointStateMachine.EndPointStates> ecs;
-  /** Cache the end point task for each end point. */
-  private Map<EndpointStateMachine,
-      Callable<EndpointStateMachine.EndPointStates>> endpointTasks;
+  private CompletionService<EndPointStates> ecs;
+  /** Cache the end point task per end point per end point state. */
+  private Map<String, Map<EndPointStates,
+      Callable<EndPointStates>>> endpointTasks;
 
   public RunningDatanodeState(Configuration conf,
       SCMConnectionManager connectionManager,
@@ -66,39 +67,46 @@ public class RunningDatanodeState implements DatanodeState {
   }
 
   /**
-   * Initialize end point tasks corresponding to each end point.
+   * Initialize end point tasks corresponding to each end point,
+   * each end point state.
    */
   private void initEndPointTask() {
-    endpointTasks = new HashMap<EndpointStateMachine,
-        Callable<EndpointStateMachine.EndPointStates>>();
+    endpointTasks = new HashMap<String, Map<EndPointStates,
+        Callable<EndPointStates>>>();
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
-      Callable<EndpointStateMachine.EndPointStates> endPointTask = null;
-      switch (endpoint.getState()) {
-      case GETVERSION:
-        endPointTask = new VersionEndpointTask(endpoint, conf,
-            context.getParent().getContainer());
-        break;
-      case REGISTER:
-        endPointTask = RegisterEndpointTask.newBuilder()
-            .setConfig(conf)
-            .setEndpointStateMachine(endpoint)
-            .setContext(context)
-            .setDatanodeDetails(context.getParent().getDatanodeDetails())
-            .setOzoneContainer(context.getParent().getContainer())
-            .build();
-        break;
-      case HEARTBEAT:
-        endPointTask = HeartbeatEndpointTask.newBuilder()
-            .setConfig(conf)
-            .setEndpointStateMachine(endpoint)
-            .setDatanodeDetails(context.getParent().getDatanodeDetails())
-            .setContext(context)
-            .build();
-        break;
-      case SHUTDOWN:
-        break;
+      Map<EndPointStates, Callable<EndPointStates>> endpointTaskForState
+          = new HashMap<EndPointStates, Callable<EndPointStates>>();
+
+      for (EndPointStates state : EndPointStates.values()) {
+        Callable<EndPointStates> endPointTask = null;
+        switch (endpoint.getState()) {
+        case GETVERSION:
+          endPointTask = new VersionEndpointTask(endpoint, conf,
+              context.getParent().getContainer());
+          break;
+        case REGISTER:
+          endPointTask = RegisterEndpointTask.newBuilder()
+              .setConfig(conf)
+              .setEndpointStateMachine(endpoint)
+              .setContext(context)
+              .setDatanodeDetails(context.getParent().getDatanodeDetails())
+              .setOzoneContainer(context.getParent().getContainer())
+              .build();
+          break;
+        case HEARTBEAT:
+          endPointTask = HeartbeatEndpointTask.newBuilder()
+              .setConfig(conf)
+              .setEndpointStateMachine(endpoint)
+              .setDatanodeDetails(context.getParent().getDatanodeDetails())
+              .setContext(context)
+              .build();
+          break;
+        case SHUTDOWN:
+          break;
+        }
+        endpointTaskForState.put(state, endPointTask);
       }
-      endpointTasks.put(endpoint, endPointTask);
+      endpointTasks.put(endpoint.toString(), endpointTaskForState);
     }
   }
 
@@ -127,8 +135,7 @@ public class RunningDatanodeState implements DatanodeState {
   public void execute(ExecutorService executor) {
     ecs = new ExecutorCompletionService<>(executor);
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
-      Callable<EndpointStateMachine.EndPointStates> endpointTask
-          = getEndPointTask(endpoint);
+      Callable<EndPointStates> endpointTask = getEndPointTask(endpoint);
       if (endpointTask != null) {
         ecs.submit(endpointTask);
       } else {
@@ -142,10 +149,10 @@ public class RunningDatanodeState implements DatanodeState {
     }
   }
 
-  private Callable<EndpointStateMachine.EndPointStates> getEndPointTask(
+  private Callable<EndPointStates> getEndPointTask(
       EndpointStateMachine endpoint) {
-    if (endpointTasks.containsKey(endpoint)) {
-      return endpointTasks.get(endpoint);
+    if (endpointTasks.containsKey(endpoint.toString())) {
+      return endpointTasks.get(endpoint.toString()).get(endpoint.getState());
     } else {
       throw new IllegalArgumentException("Illegal endpoint: " + endpoint);
     }
@@ -164,10 +171,10 @@ public class RunningDatanodeState implements DatanodeState {
    */
   private DatanodeStateMachine.DatanodeStates
       computeNextContainerState(
-      List<Future<EndpointStateMachine.EndPointStates>> results) {
-    for (Future<EndpointStateMachine.EndPointStates> state : results) {
+      List<Future<EndPointStates>> results) {
+    for (Future<EndPointStates> state : results) {
       try {
-        if (state.get() == EndpointStateMachine.EndPointStates.SHUTDOWN) {
+        if (state.get() == EndPointStates.SHUTDOWN) {
           // if any endpoint tells us to shutdown we move to shutdown state.
           return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
         }
@@ -192,11 +199,10 @@ public class RunningDatanodeState implements DatanodeState {
     int returned = 0;
     long timeLeft = timeUnit.toMillis(duration);
     long startTime = Time.monotonicNow();
-    List<Future<EndpointStateMachine.EndPointStates>> results = new
-        LinkedList<>();
+    List<Future<EndPointStates>> results = new LinkedList<>();
 
     while (returned < count && timeLeft > 0) {
-      Future<EndpointStateMachine.EndPointStates> result =
+      Future<EndPointStates> result =
           ecs.poll(timeLeft, TimeUnit.MILLISECONDS);
       if (result != null) {
         results.add(result);
