@@ -36,6 +36,7 @@ The `bucket create` command allows users to create a bucket.
 | Arguments                      |  Comment                                |
 |--------------------------------|-----------------------------------------|
 | -g, \-\-enforcegdpr            | Optional, if set to true it creates a GDPR compliant bucket, if not specified or set to false, it creates an ordinary bucket.
+| -k, \-\-bucketKey              | Optional, if a bucket encryption key name from the configured KMS server is specified, the files in the bucket will be transparently encrypted. Instruction on KMS configuration can be found from Hadoop KMS document. 
 |  Uri                           | The name of the bucket in **/volume/bucket** format.
 
 
