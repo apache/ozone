@@ -271,12 +271,9 @@ public class BlockOutputStream extends OutputStream {
       return;
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Retrying write length {} for blockID {}, last offset {}",
-          len, blockID, chunkOffset);
+      LOG.debug("Retrying write length {} for blockID {}", len, blockID);
     }
     Preconditions.checkArgument(len <= streamBufferMaxSize);
-    final long offset = chunkOffset.addAndGet(-len);
-    Preconditions.checkArgument(0 <= offset);
     int count = 0;
     while (len > 0) {
       ChunkBuffer buffer = bufferPool.getBuffer(count);
