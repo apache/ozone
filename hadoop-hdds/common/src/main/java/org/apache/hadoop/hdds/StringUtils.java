@@ -23,9 +23,9 @@ import java.nio.charset.StandardCharsets;
 /**
  * Simple utility class to collection string conversion methods.
  */
-public final class StingUtils {
+public final class StringUtils {
 
-  private StingUtils() {
+  private StringUtils() {
   }
 
   // Using the charset canonical name for String/byte[] conversions is much

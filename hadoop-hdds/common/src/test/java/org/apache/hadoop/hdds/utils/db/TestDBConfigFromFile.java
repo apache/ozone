@@ -39,7 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.hadoop.hdds.StingUtils;
+import org.apache.hadoop.hdds.StringUtils;
 
 import static org.apache.hadoop.hdds.utils.db.DBConfigFromFile.getOptionsFileNameFromDB;
 
@@ -70,7 +70,7 @@ public class TestDBConfigFromFile {
   @Test
   public void readFromFile() throws IOException {
     final List<String> families =
-        Arrays.asList(StingUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+        Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
             "First", "Second", "Third",
             "Fourth", "Fifth",
             "Sixth");
@@ -96,7 +96,7 @@ public class TestDBConfigFromFile {
   @Test
   public void readFromFileInvalidConfig() throws IOException {
     final List<String> families =
-        Arrays.asList(StingUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+        Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
             "First", "Second", "Third",
             "Fourth", "Fifth",
             "Sixth");

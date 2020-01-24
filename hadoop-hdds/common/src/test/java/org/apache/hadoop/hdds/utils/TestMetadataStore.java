@@ -29,7 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.StingUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter;
@@ -224,12 +224,12 @@ public class TestMetadataStore {
 
   private byte[] getBytes(String str) {
     return str == null ? null :
-        StingUtils.string2Bytes(str);
+        StringUtils.string2Bytes(str);
   }
 
   private String getString(byte[] bytes) {
     return bytes == null ? null :
-        StingUtils.bytes2String(bytes);
+        StringUtils.bytes2String(bytes);
   }
 
   @Test
@@ -417,20 +417,20 @@ public class TestMetadataStore {
   @Test
   public void testGetSequentialRangeKVs() throws IOException {
     MetadataKeyFilter suffixFilter = (preKey, currentKey, nextKey)
-        -> StingUtils.bytes2String(currentKey).endsWith("2");
+        -> StringUtils.bytes2String(currentKey).endsWith("2");
     // Suppose to return a2 and b2
     List<Map.Entry<byte[], byte[]>> result =
         store.getRangeKVs(null, MAX_GETRANGE_LENGTH, suffixFilter);
     assertEquals(2, result.size());
-    assertEquals("a2", StingUtils.bytes2String(result.get(0).getKey()));
-    assertEquals("b2", StingUtils.bytes2String(result.get(1).getKey()));
+    assertEquals("a2", StringUtils.bytes2String(result.get(0).getKey()));
+    assertEquals("b2", StringUtils.bytes2String(result.get(1).getKey()));
 
     // Suppose to return just a2, because when it iterates to a3,
     // the filter no long matches and it should stop from there.
     result = store.getSequentialRangeKVs(null,
         MAX_GETRANGE_LENGTH, suffixFilter);
     assertEquals(1, result.size());
-    assertEquals("a2", StingUtils.bytes2String(result.get(0).getKey()));
+    assertEquals("a2", StringUtils.bytes2String(result.get(0).getKey()));
   }
 
   @Test

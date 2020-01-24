@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.utils;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.hdds.StingUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
@@ -157,7 +157,7 @@ public final class MetadataKeyFilters {
 
       accept = !positivePrefixList.isEmpty() && positivePrefixList.stream()
           .anyMatch(prefix -> {
-            byte[] prefixBytes = StingUtils.string2Bytes(prefix);
+            byte[] prefixBytes = StringUtils.string2Bytes(prefix);
             return prefixMatch(prefixBytes, currentKey);
           });
       if (accept) {
@@ -169,7 +169,7 @@ public final class MetadataKeyFilters {
 
       accept = !negativePrefixList.isEmpty() && negativePrefixList.stream()
           .allMatch(prefix -> {
-            byte[] prefixBytes = StingUtils.string2Bytes(prefix);
+            byte[] prefixBytes = StringUtils.string2Bytes(prefix);
             return !prefixMatch(prefixBytes, currentKey);
           });
       if (accept) {
