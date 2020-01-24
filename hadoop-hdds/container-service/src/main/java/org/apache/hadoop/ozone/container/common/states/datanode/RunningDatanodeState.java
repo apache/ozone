@@ -30,6 +30,7 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -54,7 +55,7 @@ public class RunningDatanodeState implements DatanodeState {
   private final StateContext context;
   private CompletionService<EndPointStates> ecs;
   /** Cache the end point task per end point per end point state. */
-  private Map<String, Map<EndPointStates,
+  private Map<EndpointStateMachine, Map<EndPointStates,
       Callable<EndPointStates>>> endpointTasks;
 
   public RunningDatanodeState(Configuration conf,
@@ -71,15 +72,15 @@ public class RunningDatanodeState implements DatanodeState {
    * each end point state.
    */
   private void initEndPointTask() {
-    endpointTasks = new HashMap<String, Map<EndPointStates,
+    endpointTasks = new HashMap<EndpointStateMachine, Map<EndPointStates,
         Callable<EndPointStates>>>();
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
-      Map<EndPointStates, Callable<EndPointStates>> endpointTaskForState
-          = new HashMap<EndPointStates, Callable<EndPointStates>>();
+      EnumMap<EndPointStates, Callable<EndPointStates>> endpointTaskForState =
+          new EnumMap<>(EndPointStates.class);
 
       for (EndPointStates state : EndPointStates.values()) {
         Callable<EndPointStates> endPointTask = null;
-        switch (endpoint.getState()) {
+        switch (state) {
         case GETVERSION:
           endPointTask = new VersionEndpointTask(endpoint, conf,
               context.getParent().getContainer());
@@ -101,12 +102,15 @@ public class RunningDatanodeState implements DatanodeState {
               .setContext(context)
               .build();
           break;
-        case SHUTDOWN:
+        default:
           break;
         }
-        endpointTaskForState.put(state, endPointTask);
+
+        if (endPointTask != null) {
+          endpointTaskForState.put(state, endPointTask);
+        }
       }
-      endpointTasks.put(endpoint.toString(), endpointTaskForState);
+      endpointTasks.put(endpoint, endpointTaskForState);
     }
   }
 
@@ -151,8 +155,8 @@ public class RunningDatanodeState implements DatanodeState {
 
   private Callable<EndPointStates> getEndPointTask(
       EndpointStateMachine endpoint) {
-    if (endpointTasks.containsKey(endpoint.toString())) {
-      return endpointTasks.get(endpoint.toString()).get(endpoint.getState());
+    if (endpointTasks.containsKey(endpoint)) {
+      return endpointTasks.get(endpoint).get(endpoint.getState());
     } else {
       throw new IllegalArgumentException("Illegal endpoint: " + endpoint);
     }
