@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -107,9 +107,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * @throws IOException if there is an I/O error
    */
   protected MiniOzoneClusterImpl(OzoneConfiguration conf,
-                       OzoneManager ozoneManager,
-                       StorageContainerManager scm,
-                       List<HddsDatanodeService> hddsDatanodes) {
+      OzoneManager ozoneManager,
+      StorageContainerManager scm,
+      List<HddsDatanodeService> hddsDatanodes) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
@@ -122,10 +122,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * @throws IOException if there is an I/O error
    */
   MiniOzoneClusterImpl(OzoneConfiguration conf,
-                       OzoneManager ozoneManager,
-                       StorageContainerManager scm,
-                       List<HddsDatanodeService> hddsDatanodes,
-                       ReconServer reconServer) {
+      OzoneManager ozoneManager,
+      StorageContainerManager scm,
+      List<HddsDatanodeService> hddsDatanodes,
+      ReconServer reconServer) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
@@ -136,6 +136,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   /**
    * Creates a new MiniOzoneCluster without the OzoneManager. This is used by
    * {@link MiniOzoneHAClusterImpl} for starting multiple OzoneManagers.
+   *
    * @param conf
    * @param scm
    * @param hddsDatanodes
@@ -168,9 +169,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       final boolean exitSafeMode = !scm.isInSafeMode();
 
       LOG.info("{}. Got {} of {} DN Heartbeats.",
-          isNodeReady? "Nodes are ready" : "Waiting for nodes to be ready",
+          isNodeReady ? "Nodes are ready" : "Waiting for nodes to be ready",
           healthy, hddsDatanodes.size());
-      LOG.info(exitSafeMode? "Cluster exits safe mode" :
+      LOG.info(exitSafeMode ? "Cluster exits safe mode" :
               "Waiting for cluster to exit safe mode",
           healthy, hddsDatanodes.size());
 
@@ -296,7 +297,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void restartReconServer() {
     try {
       reconServer.stop();
-      reconServer.run(new String[]{});
+      reconServer.run(new String[] {});
     } catch (Exception e) {
       LOG.info("Exception while stopping Recon", e);
     }
@@ -336,7 +337,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // wait for node to be removed from SCM healthy node list.
       waitForHddsDatanodesStop();
     }
-    String[] args = new String[]{};
+    String[] args = new String[] {};
     HddsDatanodeService service =
         HddsDatanodeService.createHddsDatanodeService(args);
     hddsDatanodes.add(i, service);
@@ -496,7 +497,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         scm = createSCM();
         scm.start();
         om = createOM();
-        if(certClient != null) {
+        if (certClient != null) {
           om.setCertClient(certClient);
         }
         om.start();
@@ -514,7 +515,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
-        reconServer.run(new String[]{});
+        reconServer.run(new String[] {});
         return cluster;
       } catch (Exception ex) {
         stopOM(om);
@@ -553,7 +554,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         chunkSize = Optional.of(1);
       }
       if (!streamBufferFlushSize.isPresent()) {
-        streamBufferFlushSize = Optional.of((long)chunkSize.get());
+        streamBufferFlushSize = Optional.of((long) chunkSize.get());
       }
       if (!streamBufferMaxSize.isPresent()) {
         streamBufferMaxSize = Optional.of(2 * streamBufferFlushSize.get());
@@ -584,7 +585,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * Creates a new StorageContainerManager instance.
      *
      * @return {@link StorageContainerManager}
-     *
      * @throws IOException
      */
     protected StorageContainerManager createSCM()
@@ -616,7 +616,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       scmStore.initialize();
     }
 
-    void initializeOmStorage(OMStorage omStorage) throws IOException{
+    void initializeOmStorage(OMStorage omStorage) throws IOException {
       if (omStorage.getState() == StorageState.INITIALIZED) {
         return;
       }
@@ -634,7 +634,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * Creates a new OzoneManager instance.
      *
      * @return {@link OzoneManager}
-     *
      * @throws IOException
      */
     protected OzoneManager createOM()
@@ -649,13 +648,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * Creates HddsDatanodeService(s) instance.
      *
      * @return List of HddsDatanodeService
-     *
      * @throws IOException
      */
     protected List<HddsDatanodeService> createHddsDatanodes(
         StorageContainerManager scm) throws IOException {
       configureHddsDatanodes();
-      String scmAddress =  scm.getDatanodeRpcAddress().getHostString() +
+      String scmAddress = scm.getDatanodeRpcAddress().getHostString() +
           ":" + scm.getDatanodeRpcAddress().getPort();
       String[] args = new String[] {};
       conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, scmAddress);
@@ -673,7 +671,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         Files.createDirectories(ratisDir);
         Files.createDirectories(wrokDir);
         dnConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
-        dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, dataDir.toString());
+        dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
+            dataDir.toString());
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
         dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
@@ -721,7 +720,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
     }
 
-
     private void configureOM() {
       conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "127.0.0.1:0");
       conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
@@ -757,8 +755,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
           .getAbsolutePath());
 
-      conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:"+
-          tempNewFolder.getAbsolutePath()+"/ozone_recon_sqlite.db");
+      conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:" +
+          tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
 
       conf.set(RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY, "2s");
       conf.set(RECON_OM_SNAPSHOT_TASK_INTERVAL, "10s");
