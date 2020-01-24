@@ -50,7 +50,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 
@@ -337,30 +336,6 @@ public class XceiverClientManager implements Closeable {
       this.maxSize = maxSize;
     }
 
-  }
-
-  /**
-   * Configuration for ratis client.
-   */
-  @ConfigGroup(prefix = "dfs.ratis.client")
-  public static class DFSRatisClientConfig {
-
-    @Config(key = "async.max.outstanding.requests",
-        defaultValue = "64",
-        tags = {OZONE, CLIENT, PERFORMANCE},
-        description =
-            "Controls the maximum number of outstanding async requests that can"
-                + " be handled by the Standalone as well as Ratis client."
-    )
-    private int maxOutstandingRequests;
-
-    public int getMaxOutstandingRequests() {
-      return maxOutstandingRequests;
-    }
-
-    public void setMaxOutstandingRequests(int maxOutstandingRequests) {
-      this.maxOutstandingRequests = maxOutstandingRequests;
-    }
   }
 
 }
