@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysInBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
@@ -61,8 +61,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
-    List<DeleteKeysInBucket> bucketDeleteKeysList = purgeKeysRequest
-        .getDeleteKeysInBucketsList();
+    List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest
+        .getDeletedKeysList();
     List<String> keysToBePurgedList = new ArrayList<>();
 
     OMResponse.Builder omResponse = OMResponse.newBuilder()
@@ -79,7 +79,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     // created after the original purge request.
     // PurgeKeys request has keys belonging to same bucket grouped together.
     // We get each bucket lock and check the above condition.
-    for (DeleteKeysInBucket bucketWithDeleteKeys : bucketDeleteKeysList) {
+    for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
       boolean acquiredLock = false;
       String volumeName = bucketWithDeleteKeys.getVolumeName();
       String bucketName = bucketWithDeleteKeys.getBucketName();
@@ -92,7 +92,10 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
           boolean purgeKey = true;
           if (repeatedOmKeyInfo != null) {
             for (OmKeyInfo omKeyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
-              if (transactionLogIndex < omKeyInfo.getUpdateID()) {
+              // Discard those keys whose updateID is > transactionLogIndex.
+              // This could happen when the PurgeRequest is replayed.
+              if (isReplay(ozoneManager, omKeyInfo.getUpdateID(),
+                  transactionLogIndex)) {
                 purgeKey = false;
                 break;
               }

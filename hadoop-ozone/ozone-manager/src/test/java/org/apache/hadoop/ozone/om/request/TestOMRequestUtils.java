@@ -88,14 +88,7 @@ public final class TestOMRequestUtils {
 
     addVolumeToDB(volumeName, omMetadataManager);
 
-    OmBucketInfo omBucketInfo =
-        OmBucketInfo.newBuilder().setVolumeName(volumeName)
-            .setBucketName(bucketName).setCreationTime(Time.now()).build();
-
-    // Add to cache.
-    omMetadataManager.getBucketTable().addCacheEntry(
-        new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
-        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+    addBucketToDB(volumeName, bucketName, omMetadataManager);
   }
 
   @SuppressWarnings("parameterNumber")
@@ -142,6 +135,26 @@ public final class TestOMRequestUtils {
       HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
       OMMetadataManager omMetadataManager) throws Exception {
 
+  /**
+   * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
+   * to openKeyTable, else add's it to keyTable.
+   * @param openKeyTable
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param clientID
+   * @param replicationType
+   * @param replicationFactor
+   * @param trxnLogIndex
+   * @param omMetadataManager
+   * @throws Exception
+   */
+  @SuppressWarnings("parameternumber")
+  public static void addKeyToTable(boolean openKeyTable, String volumeName,
+      String bucketName, String keyName, long clientID,
+      HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
+      OMMetadataManager omMetadataManager) throws Exception {
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
         replicationType, replicationFactor, trxnLogIndex);
 
@@ -280,6 +293,25 @@ public final class TestOMRequestUtils {
             new CacheValue<>(Optional.of(omVolumeArgs), 1L));
   }
 
+  /**
+   * Add volume creation entry to OM DB.
+   * @param volumeName
+   * @param bucketName
+   * @param omMetadataManager
+   * @throws Exception
+   */
+  public static void addBucketToDB(String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager) throws Exception {
+
+    OmBucketInfo omBucketInfo =
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName).setCreationTime(Time.now()).build();
+
+    // Add to cache.
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
+        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+  }
 
   public static OzoneManagerProtocolProtos.OMRequest createBucketRequest(
       String bucketName, String volumeName, boolean isVersionEnabled,
@@ -455,9 +487,11 @@ public final class TestOMRequestUtils {
    * @return the deletedKey name
    */
   public static String deleteKey(String ozoneKey,
-      OMMetadataManager omMetadataManager) throws IOException {
+      OMMetadataManager omMetadataManager, long trxnLogIndex)
+      throws IOException {
     // Retrieve the keyInfo
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    omKeyInfo.setUpdateID(trxnLogIndex);
 
     // Delete key from KeyTable and put in DeletedKeyTable
     omMetadataManager.getKeyTable().delete(ozoneKey);

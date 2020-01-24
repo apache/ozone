@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;submitPurgeKeysRequest
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -30,7 +30,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysInBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -247,12 +247,12 @@ public class KeyDeletingService extends BackgroundService {
       for (Map.Entry<Pair<String, String>, List<String>> entry :
           purgeKeysMapPerBucket.entrySet()) {
         Pair<String, String> volumeBucketPair = entry.getKey();
-        DeleteKeysInBucket deleteKeysInBucket = DeleteKeysInBucket.newBuilder()
+        DeletedKeys deletedKeysInBucket = DeletedKeys.newBuilder()
             .setVolumeName(volumeBucketPair.getLeft())
             .setBucketName(volumeBucketPair.getRight())
             .addAllKeys(entry.getValue())
             .build();
-        purgeKeysRequest.addDeleteKeysInBuckets(deleteKeysInBucket);
+        purgeKeysRequest.addDeletedKeys(deletedKeysInBucket);
       }
 
       OMRequest omRequest = OMRequest.newBuilder()
