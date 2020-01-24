@@ -73,6 +73,10 @@ public class TestRootedOzoneFileSystem {
 
   private String rootPath;
 
+  // Store path commonly used by tests that test functionality within a bucket
+  private String testBucketStr;
+  private Path testBucketPath;
+
   @Before
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -82,12 +86,13 @@ public class TestRootedOzoneFileSystem {
     cluster.waitForClusterToBeReady();
     objectStore = cluster.getClient().getObjectStore();
 
-    // create a volume and a bucket to be used by OFileSystem
+    // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
+    testBucketStr = "/" + volumeName + "/" + bucketName;
+    testBucketPath = new Path(testBucketStr);
 
-    // For now:
     rootPath = String.format("%s://%s/", OzoneConsts.OZONE_OFS_URI_SCHEME,
         conf.get(OZONE_OM_ADDRESS_KEY));
 
@@ -121,8 +126,7 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testCreateDoesNotAddParentDirKeys() throws Exception {
-    Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path grandparent = new Path(rootBucket,
+    Path grandparent = new Path(testBucketPath,
         "testCreateDoesNotAddParentDirKeys");
     Path parent = new Path(grandparent, "parent");
     Path child = new Path(parent, "child");
@@ -148,8 +152,8 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testDeleteCreatesFakeParentDir() throws Exception {
-    Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path grandparent = new Path(rootBucket, "testDeleteCreatesFakeParentDir");
+    Path grandparent = new Path(testBucketPath,
+        "testDeleteCreatesFakeParentDir");
     Path parent = new Path(grandparent, "parent");
     Path child = new Path(parent, "child");
     ContractTestUtils.touch(fs, child);
@@ -178,12 +182,11 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testListStatus() throws Exception {
-    Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path parent = new Path(rootBucket, "testListStatus");
+    Path parent = new Path(testBucketPath, "testListStatus");
     Path file1 = new Path(parent, "key1");
     Path file2 = new Path(parent, "key2");
 
-    FileStatus[] fileStatuses = ofs.listStatus(rootBucket);
+    FileStatus[] fileStatuses = ofs.listStatus(testBucketPath);
     assertEquals("Should be empty", 0, fileStatuses.length);
 
     ContractTestUtils.touch(fs, file1);
@@ -328,13 +331,12 @@ public class TestRootedOzoneFileSystem {
     // which are /dir1/dir11 and /dir1/dir12. Super child files/dirs
     // (/dir1/dir12/file121 and /dir1/dir11/dir111) should not be returned by
     // listStatus.
-    Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path dir1 = new Path(rootBucket, "dir1");
+    Path dir1 = new Path(testBucketPath, "dir1");
     Path dir11 = new Path(dir1, "dir11");
     Path dir111 = new Path(dir11, "dir111");
     Path dir12 = new Path(dir1, "dir12");
     Path file121 = new Path(dir12, "file121");
-    Path dir2 = new Path(rootBucket, "dir2");
+    Path dir2 = new Path(testBucketPath, "dir2");
     fs.mkdirs(dir111);
     fs.mkdirs(dir12);
     ContractTestUtils.touch(fs, file121);
@@ -357,11 +359,10 @@ public class TestRootedOzoneFileSystem {
   @Test
   public void testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved()
       throws Exception {
-    Path rootBucket = new Path("/" + volumeName + "/" + bucketName);
-    Path source = new Path(rootBucket, "source");
+    Path source = new Path(testBucketPath, "source");
     Path interimPath = new Path(source, "interimPath");
     Path leafInsideInterimPath = new Path(interimPath, "leaf");
-    Path target = new Path(rootBucket, "target");
+    Path target = new Path(testBucketPath, "target");
     Path leafInTarget = new Path(target, "leaf");
 
     fs.mkdirs(source);
@@ -405,4 +406,5 @@ public class TestRootedOzoneFileSystem {
   private void assertKeyNotFoundException(IOException ex) {
     GenericTestUtils.assertExceptionContains("KEY_NOT_FOUND", ex);
   }
+
 }
