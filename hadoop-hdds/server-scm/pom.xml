@@ -73,7 +73,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>okhttp</artifactId>
         </exclusion>
       </exclusions>
-      <scope>test</scope>
     </dependency>
 
     <dependency>
