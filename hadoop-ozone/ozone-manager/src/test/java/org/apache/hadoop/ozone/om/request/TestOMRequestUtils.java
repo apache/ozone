@@ -142,8 +142,11 @@ public final class TestOMRequestUtils {
           omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
               clientID), omKeyInfo);
     } else {
-      omMetadataManager.getKeyTable().put(omMetadataManager.getOzoneKey(
-          volumeName, bucketName, keyName), omKeyInfo);
+      String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+          keyName);
+      omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
     }
   }
 

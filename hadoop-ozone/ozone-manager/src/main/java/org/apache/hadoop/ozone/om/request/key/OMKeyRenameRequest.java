@@ -158,8 +158,16 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           //                     is still in the DB and needs to be deleted.
           fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
           if (fromKeyValue != null) {
-            if (isReplay(ozoneManager, fromKeyValue.getUpdateID(),
-                trxnLogIndex)) {
+            // Check if this replay transaction was after the fromkey was
+            // created. If so, we have to delete the fromKey.
+            if (ozoneManager.isRatisEnabled() &&
+                trxnLogIndex > fromKeyValue.getUpdateID()) {
+              // Add to cache.
+              // fromKey should be deleted, toKey should be added with newly updated
+              // omKeyInfo.
+              Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+              keyTable.addCacheEntry(new CacheKey<>(fromKey),
+                  new CacheValue<>(Optional.absent(), trxnLogIndex));
               LOG.debug("Replayed transaction {}: {}. Renamed Key {} already " +
                   "exists. Deleting old key {}.", trxnLogIndex,
                   renameKeyRequest, toKey, fromKey);
@@ -190,12 +198,15 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
       }
 
-      fromKeyValue.setKeyName(toKeyName);
+      // Copy fromKeyValue into toKeyValue and set objectID and updateID to
+      // current transactionLogIndex
+      toKeyValue = fromKeyValue.copyObject(false);
+      toKeyValue.setObjectID(trxnLogIndex);
+      toKeyValue.setUpdateID(trxnLogIndex);
+
+      toKeyValue.setKeyName(toKeyName);
       //Set modification time
-      fromKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
-      // Set the ObjectID and UpdateID to current transactionLogIndex
-      fromKeyValue.setObjectID(trxnLogIndex);
-      fromKeyValue.setUpdateID(trxnLogIndex);
+      toKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
 
       // Add to cache.
       // fromKey should be deleted, toKey should be added with newly updated
@@ -206,11 +217,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       keyTable.addCacheEntry(new CacheKey<>(toKey),
-          new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+          new CacheValue<>(Optional.of(toKeyValue), trxnLogIndex));
 
       omClientResponse = new OMKeyRenameResponse(omResponse
           .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-          fromKeyName, toKeyName, fromKeyValue);
+          fromKeyName, toKeyName, toKeyValue);
       success = true;
     } catch (IOException ex) {
       exception = ex;
