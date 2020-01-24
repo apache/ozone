@@ -252,7 +252,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private void updateFlushLength() {
-    totalDataFlushedLength += writtenDataLength - totalDataFlushedLength;
+    totalDataFlushedLength = writtenDataLength;
   }
 
   private boolean isBufferPoolFull() {
