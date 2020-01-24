@@ -71,6 +71,36 @@ public class TestRatisHelper {
 
   }
 
+
+  @Test
+  public void testCreateRaftServerGrpcProperties() {
+
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.set("datanode.ratis.raft.grpc.message.size.max", "30MB");
+    ozoneConfiguration.set("datanode.ratis.raft.grpc.flow.control.window",
+        "1MB");
+    ozoneConfiguration.set("datanode.ratis.raft.grpc.tls.enabled", "true");
+    ozoneConfiguration.set("datanode.ratis.raft.grpc.tls.mutual_authn" +
+        ".enabled", "true");
+    ozoneConfiguration.set("datanode.ratis.raft.grpc.server.port", "100");
+
+    RaftProperties raftProperties = new RaftProperties();
+    RatisHelper.createRaftServerGrpcProperties(ozoneConfiguration,
+        raftProperties);
+
+    Assert.assertEquals("30MB",
+        raftProperties.get("raft.grpc.message.size.max"));
+    Assert.assertEquals("1MB",
+        raftProperties.get("raft.grpc.flow.control.window"));
+    Assert.assertEquals("true",
+        raftProperties.get("raft.grpc.tls.enabled"));
+    Assert.assertEquals("true",
+        raftProperties.get("raft.grpc.tls.mutual_authn.enabled"));
+    Assert.assertEquals("100",
+        raftProperties.get("raft.grpc.server.port"));
+
+  }
+
   @Test
   public void testCreateRaftServerProperties() {
 

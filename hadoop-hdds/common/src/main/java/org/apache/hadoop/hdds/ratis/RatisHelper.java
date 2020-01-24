@@ -76,6 +76,8 @@ public interface RatisHelper {
 
   // Ratis Server header regex filter.
   String RATIS_SERVER_HEADER_REGEX = "raft\\.server\\.([a-z\\.]+)";
+  String RATIS_SERVER_GRPC_HEADER_REGEX = "datanode\\.ratis\\.raft\\.grpc\\" +
+      ".([a-z\\.]+)";
 
   static String toRaftPeerIdString(DatanodeDetails id) {
     return id.getUuidString();
@@ -269,6 +271,19 @@ public interface RatisHelper {
         ozoneConf.getValByRegex(RATIS_GRPC_CLIENT_HEADER_REGEX);
     ratisClientConf.forEach((key, val) -> raftProperties.set(key, val));
   }
+
+  static void createRaftServerGrpcProperties(Configuration ozoneConf,
+      RaftProperties raftProperties) {
+    Map<String, String> ratisClientConf =
+        ozoneConf.getValByRegex(RATIS_SERVER_GRPC_HEADER_REGEX);
+    ratisClientConf.forEach((key, val) -> raftProperties.set(
+        removeDatanodePrefix(key), val));
+  }
+
+  static String removeDatanodePrefix(String key) {
+    return key.replaceFirst("datanode.ratis.", "");
+  }
+
 
   /**
    * Set all the properties matching with regex
