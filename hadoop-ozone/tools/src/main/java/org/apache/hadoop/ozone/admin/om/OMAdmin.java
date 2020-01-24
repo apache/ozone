@@ -28,8 +28,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import picocli.CommandLine;
 
-import java.io.IOException;
-
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 /**
