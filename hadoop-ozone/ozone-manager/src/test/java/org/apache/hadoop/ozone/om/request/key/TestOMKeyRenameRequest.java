@@ -210,8 +210,9 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, 1L, omMetadataManager);
+    TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName,
+        keyName, clientID, replicationType, replicationFactor, 1L,
+        omMetadataManager);
 
     // Execute RenameRequest
     OMKeyRenameRequest omKeyRenameRequest =
@@ -247,7 +248,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, 1L, omMetadataManager);
 
     // Execute RenameRequest
@@ -268,7 +269,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     // RenameRequest should then delete fromKey but not add toKey again.
 
     // Replay CreateKey request for fromKey
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, 1L, omMetadataManager);
 
     // Verify fromKey exists in DB

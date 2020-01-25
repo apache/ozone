@@ -148,7 +148,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, 1L, omMetadataManager);
 
     // Delete the key manually. Lets say the Delete Requests
@@ -160,7 +160,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
     // Create the same key again with TransactionLogIndex > Delete requests
     // TransactionLogIndex
-    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+    TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, 20L, omMetadataManager);
 
     // Replay the original DeleteRequest.
