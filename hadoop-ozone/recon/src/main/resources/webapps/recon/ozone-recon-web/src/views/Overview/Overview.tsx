@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import {Row, Col, Icon} from 'antd';
+import {Row, Col, Icon, Tooltip} from 'antd';
 import OverviewCard from 'components/OverviewCard/OverviewCard';
 import axios from 'axios';
 import prettyBytes from 'pretty-bytes';
@@ -34,6 +34,7 @@ interface OverviewState {
   volumes: string;
   buckets: string;
   keys: string;
+  missingContainersCount: number;
 }
 
 export class Overview extends React.Component<any, OverviewState> {
@@ -49,7 +50,8 @@ export class Overview extends React.Component<any, OverviewState> {
       containers: '',
       volumes: '',
       buckets: '',
-      keys: ''
+      keys: '',
+      missingContainersCount: 0
     }
   }
 
@@ -57,8 +59,12 @@ export class Overview extends React.Component<any, OverviewState> {
     this.setState({
       loading: true
     });
-    axios.get('/api/v1/stats').then(response => {
-      const stats = response.data;
+    axios.all([
+        axios.get('/api/v1/stats'),
+        axios.get('/api/v1/missingContainers')
+    ]).then(axios.spread((statsResponse, missingContainersResponse) => {
+      const stats = statsResponse.data;
+      const missingContainers = missingContainersResponse.data;
       const clusterUsedPercent = getCapacityPercent(stats.capacity.used, stats.capacity.total);
       this.setState({
         loading: false,
@@ -69,16 +75,28 @@ export class Overview extends React.Component<any, OverviewState> {
         containers: stats.containers,
         volumes: stats.volumes,
         buckets: stats.buckets,
-        keys: stats.keys
+        keys: stats.keys,
+        missingContainersCount: missingContainers.totalCount
       });
-    });
+    }));
   }
 
   render() {
-    const {loading, datanodes, pipelines, clusterCapacity, clusterUsedPercent, containers, volumes, buckets, keys} = this.state;
+    const {loading, datanodes, pipelines, clusterCapacity, clusterUsedPercent, containers, volumes, buckets,
+      keys, missingContainersCount} = this.state;
     const datanodesElement = <span>
       <Icon type="check-circle" theme="filled" className="icon-success icon-small"/> {datanodes} <span className="ant-card-meta-description meta">HEALTHY</span>
     </span>;
+    const containersTooltip = missingContainersCount === 1 ? "container is missing" : "containers are missing";
+    const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '';
+    const containersElement = missingContainersCount > 0 ?
+        <span>
+          <Tooltip placement="bottom" title={`${missingContainersCount} ${containersTooltip}`}>
+            <Icon type="exclamation-circle" theme="filled" className="icon-failure icon-small"/>
+          </Tooltip>
+          <span className="padded-text">{containers}</span>
+        </span>
+        : containers;
     return (
         <div className="overview-content">
           <Row gutter={[25, 25]}>
@@ -95,7 +113,8 @@ export class Overview extends React.Component<any, OverviewState> {
                             capacityPercent={clusterUsedPercent}/>
             </Col>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-              <OverviewCard loading={loading} title={"Containers"} data={containers} icon={"container"}/>
+              <OverviewCard loading={loading} title={"Containers"} data={containersElement} icon={"container"}
+                            error={missingContainersCount > 0} linkToUrl={containersLink}/>
             </Col>
           </Row>
           <Row gutter={[25, 25]}>
