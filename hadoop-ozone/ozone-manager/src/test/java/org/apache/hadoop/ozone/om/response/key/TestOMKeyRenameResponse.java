@@ -100,7 +100,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
     Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneToKey));
 
-    omKeyRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omKeyRenameResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
