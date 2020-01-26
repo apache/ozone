@@ -63,7 +63,7 @@ public class IncrementalV1ChunkManager implements ChunkManager {
   private final boolean doSyncWrite;
   private final OpenFiles files = new OpenFiles();
 
-  IncrementalV1ChunkManager(boolean sync) {
+  public IncrementalV1ChunkManager(boolean sync) {
     doSyncWrite = sync;
   }
 
@@ -95,7 +95,7 @@ public class IncrementalV1ChunkManager implements ChunkManager {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
-    File chunkFile = getChunkFile(containerData, info.getChunkName());
+    File chunkFile = getChunkFile(containerData, blockID);
     boolean overwrite = validateChunkForOverwrite(chunkFile, info);
     long len = info.getLen();
     long offset = info.getOffset();
@@ -132,7 +132,7 @@ public class IncrementalV1ChunkManager implements ChunkManager {
     HddsVolume volume = containerData.getVolume();
     VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
-    File chunkFile = getChunkFile(containerData, info.getChunkName());
+    File chunkFile = getChunkFile(containerData, blockID);
 
     long len = info.getLen();
     long offset = info.getOffset();
@@ -152,7 +152,7 @@ public class IncrementalV1ChunkManager implements ChunkManager {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
-    File chunkFile = getChunkFile(containerData, info.getChunkName());
+    File chunkFile = getChunkFile(containerData, blockID);
 
     // if the chunk file does not exist, it might have already been deleted.
     // The call might be because of reapply of transactions on datanode
@@ -175,15 +175,16 @@ public class IncrementalV1ChunkManager implements ChunkManager {
   }
 
   @Override
-  public void finishWriteChunk(KeyValueContainer kvContainer,
-      String chunkName) throws IOException {
-    File chunkFile = getChunkFile(kvContainer.getContainerData(), chunkName);
+  public void finishWriteChunk(KeyValueContainer container, BlockID blockID,
+      ChunkInfo info) throws IOException {
+    File chunkFile = getChunkFile(container.getContainerData(), blockID);
     files.close(chunkFile);
   }
 
   private static File getChunkFile(
-      KeyValueContainerData containerData, String chunkName) {
-    return new File(containerData.getChunksPath(), chunkName);
+      KeyValueContainerData containerData, BlockID blockID) {
+    return new File(containerData.getChunksPath(),
+        blockID.getLocalID() + ".block");
   }
 
   private static final class OpenFiles {
@@ -232,6 +233,10 @@ public class IncrementalV1ChunkManager implements ChunkManager {
 
     public void close() throws IOException {
       file.close();
+    }
+
+    public Instant getFileOpenTime() {
+      return openedAt;
     }
   }
 

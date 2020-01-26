@@ -27,6 +27,8 @@ import picocli.CommandLine;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Command;
 
+import static org.openjdk.jmh.runner.options.TimeValue.seconds;
+
 /**
  * Main class that executes a set of HDDS/Ozone benchmarks.
  * We purposefully don't use the runner and tools classes from Hadoop.
@@ -60,6 +62,11 @@ public final class Genesis {
           + "This option can be overridden by threads mentioned in benchmark.")
   private static int numThreads;
 
+  @Option(names = "--seconds",
+      description = "Number of seconds to run each benchmark method.\n"
+          + "By default no limit is set.")
+  private static int seconds = -1;
+
   private Genesis() {
   }
 
@@ -89,6 +96,10 @@ public final class Genesis {
         .shouldDoGC(true)
         .forks(1)
         .threads(numThreads);
+
+    if (seconds > 0) {
+      optionsBuilder.measurementTime(seconds(seconds));
+    }
 
     new Runner(optionsBuilder.build()).run();
   }

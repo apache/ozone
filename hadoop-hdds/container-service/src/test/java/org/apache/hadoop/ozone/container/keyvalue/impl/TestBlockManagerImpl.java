@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSetImpl;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -75,7 +76,7 @@ public class TestBlockManagerImpl {
         .getAbsolutePath()).conf(config).datanodeUuid(datanodeId
         .toString()).build();
 
-    volumeSet = mock(VolumeSet.class);
+    volumeSet = mock(VolumeSetImpl.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))

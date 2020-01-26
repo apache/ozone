@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSetImpl;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -231,7 +231,8 @@ public class TestKeyValueHandler {
     File path = GenericTestUtils.getRandomizedTestDir();
     Configuration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
-    VolumeSet volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
+    VolumeSetImpl
+        volumeSet = new VolumeSetImpl(UUID.randomUUID().toString(), conf);
     try {
       ContainerSet cset = new ContainerSet();
       int[] interval = new int[1];

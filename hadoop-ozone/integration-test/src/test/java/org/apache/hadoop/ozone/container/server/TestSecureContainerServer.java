@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGr
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSetImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.GrpcReplicationService;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
@@ -145,7 +146,7 @@ public class TestSecureContainerServer {
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(TEST_DIR, "dfs", "data", "hdds",
             RandomStringUtils.randomAlphabetic(4)).toString());
-    VolumeSet volumeSet = new VolumeSet(dd.getUuidString(), conf);
+    VolumeSet volumeSet = new VolumeSetImpl(dd.getUuidString(), conf);
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
     StateContext context = Mockito.mock(StateContext.class);

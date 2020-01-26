@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSetImpl;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
@@ -89,7 +90,7 @@ public class TestChunkManager {
         .getAbsolutePath()).conf(config).datanodeUuid(datanodeId
         .toString()).build();
 
-    volumeSet = mock(VolumeSet.class);
+    volumeSet = mock(VolumeSetImpl.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))

@@ -60,7 +60,7 @@ public class ChunkManagerV1 implements ChunkManager {
 
   private final boolean doSyncWrite;
 
-  ChunkManagerV1(boolean sync) {
+  public ChunkManagerV1(boolean sync) {
     doSyncWrite = sync;
   }
 
@@ -107,7 +107,7 @@ public class ChunkManagerV1 implements ChunkManager {
       }
 
       long len = info.getLen();
-      long offset = info.getOffset();
+      long offset = 0; // ignore offset in chunk info
       switch (stage) {
       case WRITE_DATA:
         if (isOverwrite) {
@@ -214,7 +214,7 @@ public class ChunkManagerV1 implements ChunkManager {
     }
 
     long len = info.getLen();
-    long offset = info.getOffset();
+    long offset = 0; // ignore offset in chunk info
     ByteBuffer data = ByteBuffer.allocate((int) len);
 
     for (File chunkFile : possibleFiles) {
@@ -263,7 +263,7 @@ public class ChunkManagerV1 implements ChunkManager {
       LOG.warn("Chunk file doe not exist. chunk info :" + info.toString());
       return;
     }
-    if ((info.getOffset() == 0) && (info.getLen() == chunkFile.length())) {
+    if (info.getLen() == chunkFile.length()) {
       FileUtil.fullyDelete(chunkFile);
     } else {
       LOG.error("Not Supported Operation. Trying to delete a " +

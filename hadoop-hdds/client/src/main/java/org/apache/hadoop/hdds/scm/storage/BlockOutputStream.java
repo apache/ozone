@@ -83,6 +83,7 @@ public class BlockOutputStream extends OutputStream {
   private XceiverClientManager xceiverClientManager;
   private XceiverClientSpi xceiverClient;
   private final int bytesPerChecksum;
+  private int chunkIndex;
   private final AtomicLong chunkOffset = new AtomicLong();
   private final long streamBufferFlushSize;
   private final long streamBufferMaxSize;
@@ -588,7 +589,7 @@ public class BlockOutputStream extends OutputStream {
         bufferPool.byteStringConversion());
     ChecksumData checksumData = checksum.computeChecksum(chunk);
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
-        .setChunkName(blockID.get().getLocalID() + "_chunk")
+        .setChunkName(blockID.get().getLocalID() + "_chunk" + ++chunkIndex)
         .setOffset(offset)
         .setLen(effectiveChunkSize)
         .setChecksumData(checksumData.getProtoBufMessage())

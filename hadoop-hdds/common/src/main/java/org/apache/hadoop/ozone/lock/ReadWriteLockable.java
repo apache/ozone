@@ -15,14 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.container.common.volume;
+package org.apache.hadoop.ozone.lock;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.ozone.lock.ReadWriteLockable;
+public interface ReadWriteLockable {
+  void readLock();
 
-import java.util.List;
+  void readUnlock();
 
-public interface VolumeSet extends ReadWriteLockable {
-  @VisibleForTesting
-  List<HddsVolume> getVolumesList();
+  void writeLock();
+
+  void writeUnlock();
 }

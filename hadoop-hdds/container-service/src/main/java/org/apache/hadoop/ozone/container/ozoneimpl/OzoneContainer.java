@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGr
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSetImpl;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.replication.GrpcReplicationService;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
@@ -73,7 +73,7 @@ public class OzoneContainer {
   private final HddsDispatcher hddsDispatcher;
   private final Map<ContainerType, Handler> handlers;
   private final OzoneConfiguration config;
-  private final VolumeSet volumeSet;
+  private final VolumeSetImpl volumeSet;
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
   private final XceiverServerSpi readChannel;
@@ -94,7 +94,7 @@ public class OzoneContainer {
       conf, StateContext context, CertificateClient certClient)
       throws IOException {
     this.config = conf;
-    this.volumeSet = new VolumeSet(datanodeDetails.getUuidString(), conf);
+    this.volumeSet = new VolumeSetImpl(datanodeDetails.getUuidString(), conf);
     this.containerSet = new ContainerSet();
     this.metadataScanner = null;
 
@@ -295,7 +295,7 @@ public class OzoneContainer {
     return this.hddsDispatcher;
   }
 
-  public VolumeSet getVolumeSet() {
+  public VolumeSetImpl getVolumeSet() {
     return volumeSet;
   }
 }

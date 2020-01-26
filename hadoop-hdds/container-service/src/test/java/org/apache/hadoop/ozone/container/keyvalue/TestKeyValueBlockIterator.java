@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSetImpl;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -67,7 +67,7 @@ public class TestKeyValueBlockIterator {
 
   private KeyValueContainer container;
   private KeyValueContainerData containerData;
-  private VolumeSet volumeSet;
+  private VolumeSetImpl volumeSet;
   private Configuration conf;
   private File testRoot;
 
@@ -90,7 +90,7 @@ public class TestKeyValueBlockIterator {
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
-    volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
+    volumeSet = new VolumeSetImpl(UUID.randomUUID().toString(), conf);
   }
 
 
