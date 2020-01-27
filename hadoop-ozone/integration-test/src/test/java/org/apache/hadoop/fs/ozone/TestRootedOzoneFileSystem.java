@@ -132,13 +132,13 @@ public class TestRootedOzoneFileSystem {
     Path child = new Path(parent, "child");
     ContractTestUtils.touch(fs, child);
 
-    OzoneKeyDetails key = getKeyInBucket(child, false);
+    OzoneKeyDetails key = getKey(child, false);
     OFSPath childOFSPath = new OFSPath(child);
     assertEquals(key.getName(), childOFSPath.getKeyName());
 
     // Creating a child should not add parent keys to the bucket
     try {
-      getKeyInBucket(parent, true);
+      getKey(parent, true);
     } catch (IOException ex) {
       assertKeyNotFoundException(ex);
     }
@@ -161,7 +161,7 @@ public class TestRootedOzoneFileSystem {
     // Verify that parent dir key does not exist
     // Creating a child should not add parent keys to the bucket
     try {
-      getKeyInBucket(parent, true);
+      getKey(parent, true);
     } catch (IOException ex) {
       assertKeyNotFoundException(ex);
     }
@@ -173,7 +173,7 @@ public class TestRootedOzoneFileSystem {
     // not exist
     OFSPath parentOFSPath = new OFSPath(parent);
     String parentKey = parentOFSPath.getKeyName() + "/";
-    OzoneKeyDetails parentKeyInfo = getKeyInBucket(parent, true);
+    OzoneKeyDetails parentKeyInfo = getKey(parent, true);
     assertEquals(parentKey, parentKeyInfo.getName());
 
     // Recursive delete with DeleteIterator
@@ -413,7 +413,7 @@ public class TestRootedOzoneFileSystem {
     }
   }
 
-  private OzoneKeyDetails getKeyInBucket(Path keyPath, boolean isDirectory)
+  private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
       throws IOException, OzoneClientException {
     String key = ofs.pathToKey(keyPath);
     if (isDirectory) {
