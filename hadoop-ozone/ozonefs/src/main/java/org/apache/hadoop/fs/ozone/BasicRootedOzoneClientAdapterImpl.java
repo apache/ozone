@@ -410,6 +410,25 @@ public class BasicRootedOzoneClientAdapterImpl
     return new IteratorAdapter(bucket.listKeys(key));
   }
 
+  /**
+   * listStatus implementation for OFS.
+   *
+   * @param pathStr Path for the listStatus to operate on.
+   *                This takes an absolute path from OFS root.
+   * @param recursive Set to true to get keys inside subdirectories.
+   * @param startPath Start path of next batch of result for continuation.
+   *                  This takes an absolute path from OFS root. e.g.
+   *                  /volumeA/bucketB/dirC/fileD
+   * @param numEntries Number of maximum entries in the batch.
+   * @param uri URI of OFS root.
+   *            Used in making the return path qualified.
+   * @param workingDir Working directory.
+   *                   Used in making the return path qualified.
+   * @param username User name.
+   *                 Used in making the return path qualified.
+   * @return A list of FileStatusAdapter.
+   * @throws IOException Bucket exception or FileNotFoundException.
+   */
   public List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
       String startPath, long numEntries, URI uri,
       Path workingDir, String username) throws IOException {
@@ -417,6 +436,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr);
     String keyName = ofsPath.getKeyName();
     OFSPath ofsStartPath = new OFSPath(startPath);
+    // Internally, we need startKey to feed into bucket.listStatus()
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
