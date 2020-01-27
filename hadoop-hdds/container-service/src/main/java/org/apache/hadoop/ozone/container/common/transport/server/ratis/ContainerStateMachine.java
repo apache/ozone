@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -79,16 +78,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.concurrent.Executors;
@@ -162,6 +155,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
       ContainerController containerController,
+      ExecutorService[] chunkExecutors,
       XceiverServerRatis ratisServer, Configuration conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
@@ -182,8 +176,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         (index, data) -> new int[] {1, data.size()}, numPendingRequests,
         pendingRequestsByteLimit);
 
-    chunkExecutors = createChunkExecutors(conf);
-    // TODO chunkExecutors[].prestartAllCoreThreads(); on "start"?
+    this.chunkExecutors = chunkExecutors;
 
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
@@ -206,30 +199,6 @@ public class ContainerStateMachine extends BaseStateMachine {
         return t;
       });
     }
-  }
-
-  private static ThreadPoolExecutor[] createChunkExecutors(Configuration conf) {
-    final int threadCount = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
-    final int queueLimit = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
-        OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
-    );
-    ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
-    // TODO any way to enforce queueLimit across executors[]?
-    RejectedExecutionHandler callerRuns =
-        new ThreadPoolExecutor.CallerRunsPolicy();
-    for (int i = 0; i < executors.length; i++) {
-      ThreadFactory threadFactory = new ThreadFactoryBuilder()
-          .setNameFormat("ChunkExecutor-" + i + "-%s")
-          .build();
-      BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(queueLimit);
-      executors[i] = new ThreadPoolExecutor(1, 1,
-          0, TimeUnit.SECONDS, workQueue, threadFactory, callerRuns);
-    }
-    return executors;
   }
 
   @Override
@@ -919,9 +888,6 @@ public class ContainerStateMachine extends BaseStateMachine {
   public void close() throws IOException {
     evictStateMachineCache();
     for (ExecutorService executor : executors) {
-      executor.shutdown();
-    }
-    for (ExecutorService executor : chunkExecutors) {
       executor.shutdown();
     }
     metrics.unRegister();

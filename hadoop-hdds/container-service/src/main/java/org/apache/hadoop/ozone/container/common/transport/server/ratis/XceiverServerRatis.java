@@ -19,7 +19,9 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -75,7 +77,13 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.ArrayList;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -94,6 +102,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private int port;
   private final RaftServer server;
+  private final ThreadPoolExecutor[] chunkExecutors;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private ClientId clientId = ClientId.randomId();
@@ -122,6 +131,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.dispatcher = dispatcher;
     this.containerController = containerController;
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
+    chunkExecutors = createChunkExecutors(conf);
 
     RaftServer.Builder builder =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -135,7 +145,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
     return new ContainerStateMachine(gid, dispatcher, containerController,
-        this, conf);
+        chunkExecutors, this, conf);
   }
 
   private RaftProperties newRaftProperties() {
@@ -406,6 +416,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     if (!isStarted) {
       LOG.info("Starting {} {} at port {}", getClass().getSimpleName(),
           server.getId(), getIPCPort());
+      for (ThreadPoolExecutor executor : chunkExecutors) {
+        executor.prestartAllCoreThreads();
+      }
       server.start();
 
       int realPort =
@@ -434,6 +447,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         // shutdown server before the executors as while shutting down,
         // some of the tasks would be executed using the executors.
         server.close();
+        for (ExecutorService executor : chunkExecutors) {
+          executor.shutdown();
+        }
         isStarted = false;
       } catch (IOException e) {
         throw new RuntimeException(e);
@@ -730,4 +746,29 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     context.addReport(context.getParent().getContainer().getPipelineReport());
     context.getParent().triggerHeartbeat();
   }
+
+  private static ThreadPoolExecutor[] createChunkExecutors(Configuration conf) {
+    final int threadCount = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
+    final int queueLimit = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
+        OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
+    );
+    ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
+    // TODO any way to enforce queueLimit across executors[]?
+    RejectedExecutionHandler callerRuns =
+        new ThreadPoolExecutor.CallerRunsPolicy();
+    for (int i = 0; i < executors.length; i++) {
+      ThreadFactory threadFactory = new ThreadFactoryBuilder()
+          .setNameFormat("ChunkExecutor-" + i + "-%s")
+          .build();
+      BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(queueLimit);
+      executors[i] = new ThreadPoolExecutor(1, 1,
+          0, TimeUnit.SECONDS, workQueue, threadFactory, callerRuns);
+    }
+    return executors;
+  }
+
 }
