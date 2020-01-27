@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -38,7 +38,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
+import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerV1;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -215,7 +215,7 @@ import static org.junit.Assert.assertFalse;
         UUID.randomUUID().toString());
     try (ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
         conf)) {
-      ChunkManager chunkManager = ChunkManagerFactory.createChunkManager(conf);
+      ChunkManager chunkManager = new ChunkManagerV1(true);
 
       assertNotNull(containerData.getChunksPath());
       File chunksPath = new File(containerData.getChunksPath());

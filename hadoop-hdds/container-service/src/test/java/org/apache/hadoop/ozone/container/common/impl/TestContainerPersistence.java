@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -65,7 +65,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -110,10 +109,9 @@ public class TestContainerPersistence {
    */
   @Rule
   public Timeout testTimeout = new Timeout(300000);
-  private Long containerID = 8888L;
 
   @BeforeClass
-  public static void init() throws Throwable {
+  public static void init() {
     conf = new OzoneConfiguration();
     hddsPath = GenericTestUtils
         .getTempPath(TestContainerPersistence.class.getSimpleName());
@@ -394,15 +392,14 @@ public class TestContainerPersistence {
     Container container = addContainer(containerSet, testContainerID);
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
-    Map<String, ChunkInfo> fileHashMap = new HashMap<>();
+    List<ChunkInfo> chunks = new ArrayList<>(chunkCount);
     for (int x = 0; x < chunkCount; x++) {
-      ChunkInfo info = getChunk(blockID.getLocalID(), x, 0, datalen);
+      ChunkInfo info = getChunk(blockID.getLocalID(), x, x * datalen, datalen);
       ChunkBuffer data = getData(datalen);
       setDataChecksum(info, data);
       chunkManager.writeChunk(container, blockID, info, data,
           getDispatcherContext());
-      String fileName = String.format("%s.data.%d", blockID.getLocalID(), x);
-      fileHashMap.put(fileName, info);
+      chunks.add(info);
     }
 
     KeyValueContainerData cNewData =
@@ -410,32 +407,16 @@ public class TestContainerPersistence {
     Assert.assertNotNull(cNewData);
     Path dataDir = Paths.get(cNewData.getChunksPath());
 
-    String globFormat = String.format("%s.data.*", blockID.getLocalID());
-
     // Read chunk via file system and verify.
-    int count = 0;
-    try (DirectoryStream<Path> stream =
-             Files.newDirectoryStream(dataDir, globFormat)) {
-      Checksum checksum = new Checksum();
+    Checksum checksum = new Checksum();
 
-      for (Path fname : stream) {
-        ChecksumData checksumData = checksum
-            .computeChecksum(FileUtils.readFileToByteArray(fname.toFile()));
-        Assert.assertEquals(fileHashMap.get(fname.getFileName().toString())
-            .getChecksumData(), checksumData);
-        count++;
-      }
-      Assert.assertEquals(chunkCount, count);
-
-      // Read chunk via ReadChunk call.
-      for (int x = 0; x < chunkCount; x++) {
-        String fileName = String.format("%s.data.%d", blockID.getLocalID(), x);
-        ChunkInfo info = fileHashMap.get(fileName);
-        ChunkBuffer data = chunkManager
-            .readChunk(container, blockID, info, getDispatcherContext());
-        ChecksumData checksumData = checksum.computeChecksum(data);
-        Assert.assertEquals(info.getChecksumData(), checksumData);
-      }
+    // Read chunk via ReadChunk call.
+    for (int x = 0; x < chunkCount; x++) {
+      ChunkInfo info = chunks.get(x);
+      ChunkBuffer data = chunkManager
+          .readChunk(container, blockID, info, getDispatcherContext());
+      ChecksumData checksumData = checksum.computeChecksum(data);
+      Assert.assertEquals(info.getChecksumData(), checksumData);
     }
   }
 
