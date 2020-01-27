@@ -114,7 +114,6 @@ public class ReconServer extends GenericCli {
     if (!isStarted) {
       LOG.info("Starting Recon server");
       httpServer.start();
-      containerDBServiceProvider.start();
       ozoneManagerServiceProvider.start();
       reconStorageContainerManager.start();
       isStarted = true;
@@ -134,7 +133,7 @@ public class ReconServer extends GenericCli {
         ozoneManagerServiceProvider.stop();
       }
       if (containerDBServiceProvider != null) {
-        containerDBServiceProvider.stop();
+        containerDBServiceProvider.close();
       }
       isStarted = false;
     }

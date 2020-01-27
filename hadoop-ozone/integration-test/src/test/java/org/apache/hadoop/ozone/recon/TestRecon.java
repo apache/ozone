@@ -256,7 +256,7 @@ public class TestRecon {
     omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
-    //pause to get the next snapshot from om
+    // get the next snapshot from om
     impl.syncDataFromOM();
 
     // HTTP call to /api/containers

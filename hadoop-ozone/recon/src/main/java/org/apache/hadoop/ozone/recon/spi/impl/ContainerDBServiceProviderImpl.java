@@ -21,9 +21,6 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_COUNT_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_TABLE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider.getDBStore;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider.getNewDBStore;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
@@ -81,45 +78,20 @@ public class ContainerDBServiceProviderImpl
   @Inject
   private ReconUtils reconUtils;
 
-  private boolean isStarted;
-
   @Inject
   public ContainerDBServiceProviderImpl(DBStore dbStore,
                                         Configuration sqlConfiguration) {
     containerDbStore = dbStore;
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
     initializeTables();
-    isStarted = true;
   }
 
   @Override
-  public void start() {
-    if (!isStarted) {
-      LOG.info("Starting ContainerKey DB Service Provider.");
-      File reconDbDir =
-          reconUtils.getReconDbDir(configuration, OZONE_RECON_DB_DIR);
-      File lastKnownContainerKeyDb =
-          reconUtils.getLastKnownDB(reconDbDir, RECON_CONTAINER_KEY_DB);
-      if (lastKnownContainerKeyDb != null) {
-        LOG.info("Last known container-key DB : {}",
-            lastKnownContainerKeyDb.getAbsolutePath());
-        containerDbStore = getDBStore(configuration,
-            reconUtils, lastKnownContainerKeyDb.getName());
-      } else {
-        containerDbStore = getNewDBStore(configuration, reconUtils);
-      }
-      initializeTables();
-      isStarted = true;
-    }
-  }
-
-  @Override
-  public void stop() throws Exception {
+  public void close() throws Exception {
     if (containerDbStore != null) {
       LOG.info("Stopping ContainerKeyDB Service Provider");
       containerDbStore.close();
       containerDbStore = null;
-      isStarted = false;
     }
   }
 
