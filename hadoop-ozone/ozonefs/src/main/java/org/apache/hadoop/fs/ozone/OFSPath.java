@@ -30,11 +30,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 class OFSPath {
-  private String volumeName;
-  private String bucketName;
-  private String mountName;
-  private String keyName;
-
+  private String volumeName = null;
+  private String bucketName = null;
+  private String mountName = null;
+  private String keyName = null;
   private static final String OFS_MOUNT_NAME_TMP = "tmp";
 
   OFSPath(Path path) {
@@ -55,19 +54,14 @@ class OFSPath {
       if (firstToken.equals(OFS_MOUNT_NAME_TMP)) {
         // TODO: Retrieve volume and bucket name with the mount name.
         //  Set to null just for now.
-        volumeName = null;
-        bucketName = null;
         mountName = firstToken;
       } else if (numToken >= 2) {
         // Regular volume and bucket path
         volumeName = firstToken;
         bucketName = token.nextToken();
-        mountName = null;
       } else {
         // Volume only.
         volumeName = firstToken;
-        bucketName = null;
-        mountName = null;
       }
 //    } else {  // TODO: Implement '/' case for ls.
     }
@@ -76,7 +70,7 @@ class OFSPath {
     if (token.hasMoreTokens()) {
       keyName = token.nextToken("").substring(1);
     } else {
-      keyName = "";  // Assign empty String, shouldn't be null.
+      keyName = "";  // Assign empty String, keyName shouldn't be null.
     }
   }
 
