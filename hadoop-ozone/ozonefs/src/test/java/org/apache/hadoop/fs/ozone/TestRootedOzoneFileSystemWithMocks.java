@@ -36,6 +36,7 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.net.URI;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -54,12 +55,8 @@ public class TestRootedOzoneFileSystemWithMocks {
     Configuration conf = new OzoneConfiguration();
     OzoneClient ozoneClient = mock(OzoneClient.class);
     ObjectStore objectStore = mock(ObjectStore.class);
-    OzoneVolume volume = mock(OzoneVolume.class);
-    OzoneBucket bucket = mock(OzoneBucket.class);
 
     when(ozoneClient.getObjectStore()).thenReturn(objectStore);
-    when(objectStore.getVolume(eq("volume1"))).thenReturn(volume);
-    when(volume.getBucket("bucket1")).thenReturn(bucket);
 
     PowerMockito.mockStatic(OzoneClientFactory.class);
     PowerMockito.when(OzoneClientFactory.getRpcClient(eq("local.host"),
@@ -73,7 +70,8 @@ public class TestRootedOzoneFileSystemWithMocks {
     // Note: FileSystem#loadFileSystems doesn't load OFS class because
     //  META-INF still points to org.apache.hadoop.fs.ozone.OzoneFileSystem
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
-    URI uri = new URI("ofs://local.host:5899/volume1/bucket1");
+
+    URI uri = new URI("ofs://local.host:5899");
 
     FileSystem fileSystem = FileSystem.get(uri, conf);
     RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) fileSystem;
@@ -90,12 +88,8 @@ public class TestRootedOzoneFileSystemWithMocks {
 
     OzoneClient ozoneClient = mock(OzoneClient.class);
     ObjectStore objectStore = mock(ObjectStore.class);
-    OzoneVolume volume = mock(OzoneVolume.class);
-    OzoneBucket bucket = mock(OzoneBucket.class);
 
     when(ozoneClient.getObjectStore()).thenReturn(objectStore);
-    when(objectStore.getVolume(eq("volume1"))).thenReturn(volume);
-    when(volume.getBucket("bucket1")).thenReturn(bucket);
 
     PowerMockito.mockStatic(OzoneClientFactory.class);
     PowerMockito.when(OzoneClientFactory.getRpcClient(eq("local.host"),
@@ -106,47 +100,20 @@ public class TestRootedOzoneFileSystemWithMocks {
     PowerMockito.when(UserGroupInformation.getCurrentUser()).thenReturn(ugi);
     when(ugi.getShortUserName()).thenReturn("user1");
 
-    URI uri = new URI("o3fs://bucket1.volume1.local.host");
+    // Note: FileSystem#loadFileSystems doesn't load OFS class because
+    //  META-INF still points to org.apache.hadoop.fs.ozone.OzoneFileSystem
+    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+
+    URI uri = new URI("ofs://local.host");
 
     FileSystem fileSystem = FileSystem.get(uri, conf);
-    OzoneFileSystem ozfs = (OzoneFileSystem) fileSystem;
+    RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) fileSystem;
 
-    assertEquals(ozfs.getUri().getHost(), "bucket1.volume1.local.host");
+    assertEquals(ofs.getUri().getHost(), "local.host");
     // The URI doesn't contain a port number, expect -1 from getPort()
-    assertEquals(ozfs.getUri().getPort(), -1);
+    assertEquals(ofs.getUri().getPort(), -1);
     PowerMockito.verifyStatic();
     // Check the actual port number in use
     OzoneClientFactory.getRpcClient("local.host", omPort, conf);
-  }
-
-  @Test
-  public void testFSUriHostVersionDefault() throws Exception {
-    Configuration conf = new OzoneConfiguration();
-    OzoneClient ozoneClient = mock(OzoneClient.class);
-    ObjectStore objectStore = mock(ObjectStore.class);
-    OzoneVolume volume = mock(OzoneVolume.class);
-    OzoneBucket bucket = mock(OzoneBucket.class);
-
-    when(ozoneClient.getObjectStore()).thenReturn(objectStore);
-    when(objectStore.getVolume(eq("volume1"))).thenReturn(volume);
-    when(volume.getBucket("bucket1")).thenReturn(bucket);
-
-    PowerMockito.mockStatic(OzoneClientFactory.class);
-    PowerMockito.when(OzoneClientFactory.getRpcClient(eq(conf)))
-        .thenReturn(ozoneClient);
-
-    UserGroupInformation ugi = mock(UserGroupInformation.class);
-    PowerMockito.mockStatic(UserGroupInformation.class);
-    PowerMockito.when(UserGroupInformation.getCurrentUser()).thenReturn(ugi);
-    when(ugi.getShortUserName()).thenReturn("user1");
-
-    URI uri = new URI("o3fs://bucket1.volume1/key");
-
-    FileSystem fileSystem = FileSystem.get(uri, conf);
-    OzoneFileSystem ozfs = (OzoneFileSystem) fileSystem;
-
-    assertEquals(ozfs.getUri().getAuthority(), "bucket1.volume1");
-    PowerMockito.verifyStatic();
-    OzoneClientFactory.getRpcClient(conf);
   }
 }
