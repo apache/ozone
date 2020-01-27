@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -222,27 +223,52 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testDirectory() throws IOException {
-    String dirPath = RandomStringUtils.randomAlphanumeric(5);
-    Path path = createPath("/" + dirPath);
-    assertTrue("Makedirs returned with false for the path " + path,
-        fs.mkdirs(path));
+    String leafName = RandomStringUtils.randomAlphanumeric(5);
 
-    FileStatus status = fs.getFileStatus(path);
-    assertTrue("The created path is not directory.", status.isDirectory());
+    String lev1dir = "abc";
+    Path lev1path = createPath("/" + lev1dir);
+    String lev2dir = "def";
+    Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
+    FileStatus lev1status;
+    FileStatus lev2status;
+    FileStatus rootstatus;
+    FileStatus leafstatus;
+    FileStatus rootChild;
 
-    assertTrue(status.isDirectory());
-    assertEquals(FsPermission.getDirDefault(), status.getPermission());
-    verifyOwnerGroup(status);
+    Path leaf = createPath("/" + lev1dir + "/" + lev2dir + "/" + leafName);
 
-    assertEquals(0, status.getLen());
+    // verify prefix directories and the leaf, do not already exist
+    lev1status = verifyDirectory(lev1path);
+    lev2status = verifyDirectory(lev2path);
+    assertTrue((lev1status == null) && (lev2status == null));
+    leafstatus = verifyDirectory(leaf);
+    assertTrue(leafstatus == null);
 
+    assertTrue("Makedirs returned with false for the path " + leaf,
+        fs.mkdirs(leaf));
+
+    // verify the leaf directory got created.
+    leafstatus = verifyDirectory(leaf);
+    assertTrue(leafstatus != null);
+
+    if (cluster.getOzoneManager().createPrefixEntries()) {
+      // verify prefix directories got created when creating the leaf directory.
+      lev1status = verifyDirectory(lev1path);
+      lev2status = verifyDirectory(lev2path);
+      assertTrue((lev1status != null) && (lev2status != null));
+      rootChild = lev1status;
+    } else {
+      rootChild = leafstatus;
+    }
+
+    // check the root directory
+    rootstatus = verifyDirectory(createPath("/"));
+    assertTrue(rootstatus != null);
+
+    // root directory listing should contain the lev1 prefix directory
     FileStatus[] statusList = fs.listStatus(createPath("/"));
     assertEquals(1, statusList.length);
-    assertEquals(status, statusList[0]);
-
-    fs.getFileStatus(createPath("/"));
-    assertTrue("Root dir (/) is not a directory.", status.isDirectory());
-    assertEquals(0, status.getLen());
+    assertEquals(rootChild, statusList[0]);
   }
 
   @Test
@@ -392,5 +418,31 @@ public class TestOzoneFileInterfaces {
     } else {
       return new Path(relativePath);
     }
+  }
+
+  /**
+   * verify that a directory exists and is initialized correctly.
+   * @param path of the directory
+   * @return null indicates FILE_NOT_FOUND, else the FileStatus
+   * @throws IOException
+   */
+  private FileStatus verifyDirectory(Path path) throws IOException {
+
+    FileStatus status = null;
+
+    try {
+      status = fs.getFileStatus(path);
+    } catch (FileNotFoundException e) {
+      return null;
+    }
+    assertTrue("The created path is not directory.", status.isDirectory());
+
+    assertTrue(status.isDirectory());
+    assertEquals(FsPermission.getDirDefault(), status.getPermission());
+    verifyOwnerGroup(status);
+
+    assertEquals(0, status.getLen());
+
+    return status;
   }
 }

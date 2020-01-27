@@ -20,15 +20,23 @@ package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import javax.annotation.Nonnull;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 /**
  * Base class for file requests.
  */
 public final class OMFileRequest {
+
+  private static final long TRANSACTION_ID_SHIFT = 8;
 
   private OMFileRequest() {
   }
@@ -82,6 +90,70 @@ public final class OMFileRequest {
 
     // Found no files/ directories in the given path.
     return OMDirectoryResult.NONE;
+  }
+
+  /**
+   * generate the object id from the transaction id.
+   * @param id
+   * @return object id
+   */
+  public static long getObjIdFromTxId(long id) {
+    return id << TRANSACTION_ID_SHIFT;
+  }
+
+  /**
+   * Return list of missing parent directories in the given path.
+   * @param omMetadataManager
+   * @param volumeName
+   * @param bucketName
+   * @param keyPath
+   * @return List of keys representing non-existent parent dirs
+   * @throws IOException
+   */
+  public static List<String> getMissingParents(
+      @Nonnull OMMetadataManager omMetadataManager,
+      @Nonnull String volumeName,
+      @Nonnull String bucketName,
+      @Nonnull Path keyPath) throws IOException {
+
+    List<String> missing = new ArrayList<>();
+
+    while (keyPath != null) {
+      String pathName = keyPath.toString();
+
+      String dbKeyName = omMetadataManager.getOzoneKey(volumeName,
+          bucketName, pathName);
+      String dbDirKeyName = omMetadataManager.getOzoneDirKey(volumeName,
+          bucketName, pathName);
+
+      if (omMetadataManager.getKeyTable().isExist(dbKeyName)) {
+        // Found a file in the given path.
+        String errorMsg = "File " + dbKeyName + " exists with same name as " +
+            " directory in path : " + pathName;
+        throw new IOException(errorMsg);
+      } else if (omMetadataManager.getKeyTable().isExist(dbDirKeyName)) {
+        // Found a directory in the given path. Higher parents must exist.
+        break;
+      } else {
+        missing.add(pathName);
+      }
+      keyPath = keyPath.getParent();
+    }
+
+    return missing;
+  }
+
+  private static OmKeyInfo getKeyInfo(
+      @Nonnull OMMetadataManager omMetadataManager,
+      @Nonnull String volumeName,
+      @Nonnull String bucketName,
+      @Nonnull String keyName) throws IOException {
+
+    if (omMetadataManager.getKeyTable().isExist(keyName)) {
+      return omMetadataManager.getKeyTable().get(keyName);
+    } else {
+      return null;
+    }
   }
 
   /**
