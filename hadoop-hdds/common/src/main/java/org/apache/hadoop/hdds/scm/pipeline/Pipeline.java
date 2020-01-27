@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -57,7 +58,7 @@ public final class Pipeline {
   // Current reported Leader for the pipeline
   private UUID leaderId;
   // Timestamp for pipeline upon creation
-  private Long creationTimestamp;
+  private Instant creationTimestamp;
   // Only valid for Ratis THREE pipeline. No need persist.
   private int nodeIdsHash;
 
@@ -74,7 +75,7 @@ public final class Pipeline {
     this.factor = factor;
     this.state = state;
     this.nodeStatus = nodeStatus;
-    this.creationTimestamp = System.currentTimeMillis();
+    this.creationTimestamp = Instant.now();
     this.nodeIdsHash = 0;
   }
 
@@ -119,7 +120,7 @@ public final class Pipeline {
    *
    * @return Creation Timestamp
    */
-  public Long getCreationTimestamp() {
+  public Instant getCreationTimestamp() {
     return creationTimestamp;
   }
 
@@ -128,7 +129,7 @@ public final class Pipeline {
    *
    * @param creationTimestamp
    */
-  void setCreationTimestamp(Long creationTimestamp) {
+  void setCreationTimestamp(Instant creationTimestamp) {
     this.creationTimestamp = creationTimestamp;
   }
 
@@ -253,7 +254,7 @@ public final class Pipeline {
         .setFactor(factor)
         .setState(PipelineState.getProtobuf(state))
         .setLeaderID(leaderId != null ? leaderId.toString() : "")
-        .setCreationTimeStamp(creationTimestamp)
+        .setCreationTimeStamp(creationTimestamp.toEpochMilli())
         .addAllMembers(nodeStatus.keySet().stream()
             .map(DatanodeDetails::getProtoBufMessage)
             .collect(Collectors.toList()));
@@ -289,6 +290,7 @@ public final class Pipeline {
         .setNodes(pipeline.getMembersList().stream()
             .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList()))
         .setNodesInOrder(pipeline.getMemberOrdersList())
+        .setCreateTimestamp(pipeline.getCreationTimeStamp())
         .build();
   }
 
@@ -357,7 +359,7 @@ public final class Pipeline {
     private List<Integer> nodeOrder = null;
     private List<DatanodeDetails> nodesInOrder = null;
     private UUID leaderId = null;
-    private Long creationTimestamp = null;
+    private Instant creationTimestamp = null;
     private int nodeIdsHash = 0;
 
     public Builder() {}
@@ -407,6 +409,11 @@ public final class Pipeline {
 
     public Builder setNodesInOrder(List<Integer> orders) {
       this.nodeOrder = orders;
+      return this;
+    }
+
+    public Builder setCreateTimestamp(long createTimestamp) {
+      this.creationTimestamp = Instant.ofEpochMilli(createTimestamp);
       return this;
     }
 

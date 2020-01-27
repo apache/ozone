@@ -84,11 +84,11 @@ public class RatisPipelineProvider implements PipelineProvider {
     this.placementPolicy =
         new PipelinePlacementPolicy(nodeManager, stateManager, conf);
     this.pipelineNumberLimit = conf.getInt(
-        ScmConfigKeys.OZONE_SCM_PIPELINE_NUMBER_LIMIT,
-        ScmConfigKeys.OZONE_SCM_PIPELINE_NUMBER_LIMIT_DEFAULT);
+        ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);
     this.maxPipelinePerDatanode = conf.getInt(
-        ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT,
-        ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT);
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
   }
 
   private List<DatanodeDetails> pickNodesNeverUsed(ReplicationFactor factor)

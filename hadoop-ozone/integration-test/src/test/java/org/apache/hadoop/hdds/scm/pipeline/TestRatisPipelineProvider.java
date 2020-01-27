@@ -34,7 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
+    .OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
  * Test for RatisPipelineProvider.
@@ -50,7 +50,7 @@ public class TestRatisPipelineProvider {
     nodeManager = new MockNodeManager(true, 10);
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 1);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
     stateManager = new PipelineStateManager();
     provider = new MockRatisPipelineProvider(nodeManager,
         stateManager, conf);
