@@ -81,8 +81,8 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
     return dbStore;
   }
 
-  static DBStore initializeDBStore(OzoneConfiguration configuration,
-                                   ReconUtils reconUtils, String dbName) {
+  private static DBStore initializeDBStore(OzoneConfiguration configuration,
+      ReconUtils reconUtils, String dbName) {
     DBStore dbStore = null;
     try {
       Path metaDir = reconUtils.getReconDbDir(
