@@ -98,6 +98,7 @@ public final class TestOMRequestUtils {
         new CacheValue<>(Optional.of(omBucketInfo), 1L));
   }
 
+  @SuppressWarnings("parameterNumber")
   public static void addKeyToTableAndCache(String volumeName, String bucketName,
       String keyName, long clientID, HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
@@ -157,8 +158,8 @@ public final class TestOMRequestUtils {
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
       if (addToCache) {
-      omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+        omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
       omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
     }

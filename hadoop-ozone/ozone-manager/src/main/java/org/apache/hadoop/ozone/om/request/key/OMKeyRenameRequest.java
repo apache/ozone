@@ -175,7 +175,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
               // Add to cache. Only fromKey should be deleted. ToKey already
               // exists in DB as this transaction is a replay.
               result = Result.DELETE_FROM_KEY_ONLY;
-              Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+              Table<String, OmKeyInfo> keyTable = omMetadataManager
+                  .getKeyTable();
               keyTable.addCacheEntry(new CacheKey<>(fromKey),
                   new CacheValue<>(Optional.absent(), trxnLogIndex));
 
@@ -258,26 +259,27 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     }
 
     switch (result) {
-      case SUCCESS:
-        LOG.debug("Rename Key is successfully completed for volume:{} " +
-                "bucket:{} fromKey:{} toKey:{}. ", volumeName, bucketName,
-            fromKeyName, toKeyName);
-        break;
-      case DELETE_FROM_KEY_ONLY:
-        LOG.debug("Replayed transaction {}: {}. Renamed Key {} already " +
-                "exists. Deleting old key {}.", trxnLogIndex,
-            renameKeyRequest, toKey, fromKey);
-      case REPLAY:
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            trxnLogIndex, renameKeyRequest);
-      case FAILURE:
-      default:
-        ozoneManager.getMetrics().incNumKeyRenameFails();
-        LOG.error(
-            "Rename key failed for volume:{} bucket:{} fromKey:{} toKey:{}. "
-                + "Key: {} not found.", volumeName, bucketName, fromKeyName,
-            toKeyName, fromKeyName);
-        break;
+    case SUCCESS:
+      LOG.debug("Rename Key is successfully completed for volume:{} bucket:{}" +
+              " fromKey:{} toKey:{}. ", volumeName, bucketName, fromKeyName,
+          toKeyName);
+      break;
+    case DELETE_FROM_KEY_ONLY:
+      LOG.debug("Replayed transaction {}: {}. Renamed Key {} already exists. " +
+              "Deleting old key {}.", trxnLogIndex, renameKeyRequest, toKey,
+          fromKey);
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+          renameKeyRequest);
+    case FAILURE:
+      ozoneManager.getMetrics().incNumKeyRenameFails();
+      LOG.error("Rename key failed for volume:{} bucket:{} fromKey:{} " +
+              "toKey:{}. Key: {} not found.", volumeName, bucketName,
+          fromKeyName, toKeyName, fromKeyName);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",
+          renameKeyRequest);
     }
     return omClientResponse;
   }
