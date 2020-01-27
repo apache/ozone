@@ -268,9 +268,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       LOG.debug("Replayed transaction {}: {}. Renamed Key {} already exists. " +
               "Deleting old key {}.", trxnLogIndex, renameKeyRequest, toKey,
           fromKey);
+      break;
     case REPLAY:
       LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
           renameKeyRequest);
+      break;
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
       LOG.error("Rename key failed for volume:{} bucket:{} fromKey:{} " +
