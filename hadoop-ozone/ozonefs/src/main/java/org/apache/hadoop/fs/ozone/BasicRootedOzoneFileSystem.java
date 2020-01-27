@@ -63,7 +63,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
  * This is a basic version which doesn't extend
  * KeyProviderTokenIssuer and doesn't include statistics. It can be used
  * from older hadoop version. For newer hadoop version use the full featured
- * OFileSystem.
+ * BasicRootedOzoneFileSystem.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -78,19 +78,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private URI uri;
   private String userName;
   private Path workingDir;
-//  private String gOmHost;
-//  private int gOmPort;
-//  private Configuration gConf;
-//  private boolean gIsolatedClassloader;
-
   private RootedOzoneClientAdapter adapter;
-//  private String adapterPath;
 
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
-      "ofs://om-service-id/  OR " +
-      "ofs://om-host.example.com/  OR " +
-      "ofs://om-host.example.com:5678/";
+      "ofs://om-service-id/path/to/key  OR " +
+      "ofs://om-host.example.com/path/to/key  OR " +
+      "ofs://om-host.example.com:5678/path/to/key";
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
