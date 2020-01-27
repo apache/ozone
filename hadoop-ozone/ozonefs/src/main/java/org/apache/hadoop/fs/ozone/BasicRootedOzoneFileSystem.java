@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -79,6 +80,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private String userName;
   private Path workingDir;
   private RootedOzoneClientAdapter adapter;
+  private BasicRootedOzoneClientAdapterImpl adapterImpl;
 
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
@@ -137,6 +139,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // adapter should be initialized in operations.
       this.adapter = createAdapter(
           conf, omHostOrServiceId, omPort, isolatedClassloader);
+      this.adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
 
       try {
         this.userName =
@@ -240,6 +243,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private class RenameIterator extends OzoneListingIterator {
     private final String srcPath;
     private final String dstPath;
+    private final OzoneBucket bucket;
 
     RenameIterator(Path srcPath, Path dstPath)
         throws IOException {
@@ -247,12 +251,15 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       this.srcPath = pathToKey(srcPath);
       this.dstPath = pathToKey(dstPath);
       LOG.trace("rename from:{} to:{}", this.srcPath, this.dstPath);
+      // Initialize bucket here to reduce number of RPC calls
+      OFSPath ofsPath = new OFSPath(srcPath);
+      this.bucket = adapterImpl.getBucket(ofsPath, false);
     }
 
     @Override
     boolean processKeyPath(String keyPath) throws IOException {
       String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
-      adapter.renamePath(keyPath, newPath);
+      adapterImpl.renamePath(this.bucket, keyPath, newPath);
       return true;
     }
   }
@@ -370,6 +377,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   private class DeleteIterator extends OzoneListingIterator {
     private boolean recursive;
+    private final OzoneBucket bucket;
 
     DeleteIterator(Path f, boolean recursive)
         throws IOException {
@@ -380,6 +388,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           && listStatus(f).length != 0) {
         throw new PathIsNotEmptyDirectoryException(f.toString());
       }
+      // Initialize bucket here to reduce number of RPC calls
+      OFSPath ofsPath = new OFSPath(f);
+      this.bucket = adapterImpl.getBucket(ofsPath, false);
     }
 
     @Override
@@ -389,7 +400,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return true;
       } else {
         LOG.trace("deleting key path:" + keyPath);
-        boolean succeed = adapter.deleteObject(keyPath);
+        boolean succeed = adapterImpl.deleteObject(this.bucket, keyPath);
         // if recursive delete is requested ignore the return value of
         // deleteObject and issue deletes for other keys.
         return recursive || succeed;

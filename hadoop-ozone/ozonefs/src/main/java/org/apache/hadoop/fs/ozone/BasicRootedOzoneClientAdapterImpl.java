@@ -187,8 +187,8 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  private OzoneBucket getBucket(OFSPath ofsPath,
-      boolean createIfNotExist) throws IOException {
+  OzoneBucket getBucket(OFSPath ofsPath, boolean createIfNotExist)
+      throws IOException {
 
     return getBucket(ofsPath.getVolumeName(), ofsPath.getBucketName(),
         createIfNotExist);
@@ -324,6 +324,24 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
+   * Package-private helper function to reduce calls to getBucket().
+   * @param bucket Bucket to operate in.
+   * @param path Existing key path.
+   * @param newPath New key path.
+   * @throws IOException IOException from bucket.renameKey().
+   */
+  void renamePath(OzoneBucket bucket, String path, String newPath)
+      throws IOException {
+    incrementCounter(Statistic.OBJECTS_RENAMED);
+    OFSPath ofsPath = new OFSPath(path);
+    OFSPath ofsNewPath = new OFSPath(newPath);
+    // No same-bucket policy check here since this call path is controlled
+    String key = ofsPath.getKeyName();
+    String newKey = ofsNewPath.getKeyName();
+    bucket.renameKey(key, newKey);
+  }
+
+  /**
    * Helper method to create an directory specified by key name in bucket.
    *
    * @param pathStr path to be created as directory
@@ -360,6 +378,26 @@ public class BasicRootedOzoneClientAdapterImpl
     String keyName = ofsPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
+      incrementCounter(Statistic.OBJECTS_DELETED);
+      bucket.deleteKey(keyName);
+      return true;
+    } catch (IOException ioe) {
+      LOG.error("delete key failed " + ioe.getMessage());
+      return false;
+    }
+  }
+
+  /**
+   * Package-private helper function to reduce calls to getBucket().
+   * @param bucket Bucket to operate in.
+   * @param path Path to delete.
+   * @return true if operation succeeded, false upon IOException.
+   */
+  boolean deleteObject(OzoneBucket bucket, String path) {
+    LOG.trace("issuing delete for path to key: {}", path);
+    OFSPath ofsPath = new OFSPath(path);
+    String keyName = ofsPath.getKeyName();
+    try {
       incrementCounter(Statistic.OBJECTS_DELETED);
       bucket.deleteKey(keyName);
       return true;
