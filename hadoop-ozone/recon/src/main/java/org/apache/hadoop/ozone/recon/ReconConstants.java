@@ -44,7 +44,7 @@ public final class ReconConstants {
       "containerKeyCountTable";
 
   // By default, limit the number of results returned
-  public static final String FETCH_ALL = "1000";
+  public static final String DEFAULT_FETCH_COUNT = "1000";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
   public static final String RECON_QUERY_LIMIT = "limit";
