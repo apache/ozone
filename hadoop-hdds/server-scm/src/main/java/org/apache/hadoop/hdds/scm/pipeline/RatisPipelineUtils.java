@@ -96,21 +96,12 @@ public final class RatisPipelineUtils {
     }
   }
 
-  static int encodeNodeIdsOfFactorThreePipeline(List<DatanodeDetails> nodes) {
-    if (nodes.size() != HddsProtos.ReplicationFactor.THREE.getNumber()) {
-      return 0;
-    }
-    return nodes.get(0).getUuid().hashCode() ^
-        nodes.get(1).getUuid().hashCode() ^
-        nodes.get(2).getUuid().hashCode();
-  }
-
   /**
    * Return the list of pipelines who share the same set of datanodes
    * with the input pipeline.
    * @param stateManager PipelineStateManager
    * @param pipeline input pipeline
-   * @return first matched pipeline
+   * @return list of matched pipeline
    */
   static List<Pipeline> checkPipelineContainSameDatanodes(
       PipelineStateManager stateManager, Pipeline pipeline) {
@@ -118,9 +109,8 @@ public final class RatisPipelineUtils {
         HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE)
         .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
-            (// For all OPEN or ALLOCATED pipelines
-                p.getPipelineState() != Pipeline.PipelineState.CLOSED &&
-                p.getNodeIdsHash() == pipeline.getNodeIdsHash()))
+            (p.getPipelineState() != Pipeline.PipelineState.CLOSED &&
+                p.sameDatanodes(pipeline)))
         .collect(Collectors.toList());
   }
 }

@@ -35,7 +35,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.apache.commons.collections.CollectionUtils.intersection;
@@ -84,7 +83,7 @@ public class TestRatisPipelineProvider {
         intersection(pipeline.getNodes(), pipeline1.getNodes())
             .size() < factor.getNumber());
     if (pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE) {
-      assertNotEquals(pipeline.getNodeIdsHash(), pipeline1.getNodeIdsHash());
+      assertNotEquals(pipeline.getNodeSet(), pipeline1.getNodeSet());
     }
     stateManager.addPipeline(pipeline1);
     nodeManager.addPipeline(pipeline1);
@@ -105,7 +104,7 @@ public class TestRatisPipelineProvider {
     stateManager.addPipeline(pipeline1);
     // With enough pipeline quote on datanodes, they should not share
     // the same set of datanodes.
-    assertNotEquals(pipeline.getNodeIdsHash(), pipeline1.getNodeIdsHash());
+    assertNotEquals(pipeline.getNodeSet(), pipeline1.getNodeSet());
   }
 
   @Test
@@ -141,33 +140,6 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
-  public void testComputeNodeIdsHash() {
-    int total = HddsProtos.ReplicationFactor.THREE.getNumber();
-    List<DatanodeDetails> nodes1 = new ArrayList<>();
-    for (int i = 0; i < total; i++) {
-      nodes1.add(MockDatanodeDetails.createDatanodeDetails(
-          UUID.fromString("00000-11000-00000-00000-0000" + (i + 1))));
-    }
-
-    Assert.assertEquals(total, nodes1.size());
-    Assert.assertNotEquals(0,
-        RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(nodes1));
-
-    List<DatanodeDetails> nodes2 = new ArrayList<>();
-    for (int i = 0; i < total; i++) {
-      nodes2.add(MockDatanodeDetails.createDatanodeDetails(
-          UUID.fromString("00000-11000-00000-00000-0000" + (total - i))));
-    }
-    Assert.assertEquals(total, nodes2.size());
-    Assert.assertNotEquals(0,
-        RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(nodes2));
-
-    Assert.assertEquals(
-        RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(nodes1),
-        RatisPipelineUtils.encodeNodeIdsOfFactorThreePipeline(nodes2));
-  }
-
-  @Test
   public void testCreateFactorTHREEPipelineWithSameDatanodes() {
     List<DatanodeDetails> healthyNodes = nodeManager
         .getNodes(HddsProtos.NodeState.HEALTHY).stream()
@@ -178,9 +150,7 @@ public class TestRatisPipelineProvider {
     Pipeline pipeline2 = provider.create(
         HddsProtos.ReplicationFactor.THREE, healthyNodes);
 
-    Assert.assertTrue(pipeline1.getNodes().parallelStream()
-        .allMatch(pipeline2.getNodes()::contains));
-    Assert.assertEquals(pipeline1.getNodeIdsHash(), pipeline2.getNodeIdsHash());
+    Assert.assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
   }
 
   @Test
