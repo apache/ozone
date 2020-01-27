@@ -82,6 +82,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.concurrent.Executors;
@@ -141,7 +142,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
   private final ExecutorService[] executors;
-  private final ExecutorService[] chunkExecutors;
+  private final List<ThreadPoolExecutor> chunkExecutors;
   private final Map<Long, Long> applyTransactionCompletionMap;
   private final Cache<Long, ByteString> stateMachineDataCache;
   private final AtomicBoolean stateMachineHealthy;
@@ -155,7 +156,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
       ContainerController containerController,
-      ExecutorService[] chunkExecutors,
+      List<ThreadPoolExecutor> chunkExecutors,
       XceiverServerRatis ratisServer, Configuration conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
@@ -504,8 +505,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     if (hash == Integer.MIN_VALUE) {
       hash = Integer.MAX_VALUE;
     }
-    int i = Math.abs(hash) % chunkExecutors.length;
-    return chunkExecutors[i];
+    int i = Math.abs(hash) % chunkExecutors.size();
+    return chunkExecutors.get(i);
   }
 
   /*

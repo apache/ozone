@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.apache.hadoop.conf.Configuration;
@@ -101,7 +102,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private int port;
   private final RaftServer server;
-  private final ThreadPoolExecutor[] chunkExecutors;
+  private final List<ThreadPoolExecutor> chunkExecutors;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private ClientId clientId = ClientId.randomId();
@@ -746,7 +747,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     context.getParent().triggerHeartbeat();
   }
 
-  private static ThreadPoolExecutor[] createChunkExecutors(Configuration conf) {
+  private static List<ThreadPoolExecutor> createChunkExecutors(
+      Configuration conf) {
     final int threadCount = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
@@ -759,7 +761,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       executors[i] = new ThreadPoolExecutor(1, 1,
           0, TimeUnit.SECONDS, workQueue, threadFactory);
     }
-    return executors;
+    return ImmutableList.copyOf(executors);
   }
 
 }
