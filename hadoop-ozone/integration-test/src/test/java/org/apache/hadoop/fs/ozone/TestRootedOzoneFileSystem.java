@@ -375,16 +375,6 @@ public class TestRootedOzoneFileSystem {
     fs.mkdirs(target);
     fs.mkdirs(leafInsideInterimPath);
 
-    // Attempt to rename the key to a different bucket
-    Path bucket2 = new Path("/" + volumeName + "/" + bucketName + "test");
-    Path leafInTargetInAnotherBucket = new Path(bucket2, "leaf");
-    try {
-      fs.rename(leafInsideInterimPath, leafInTargetInAnotherBucket);
-      fail("Should have thrown exception when renaming to a different bucket");
-    } catch (IOException ex) {
-      System.out.println("Exception thrown as expected");
-    }
-
     assertTrue(fs.rename(leafInsideInterimPath, leafInTarget));
 
     // after rename listStatus for interimPath should succeed and
@@ -395,6 +385,32 @@ public class TestRootedOzoneFileSystem {
     FileStatus fileStatus = fs.getFileStatus(interimPath);
     assertEquals("FileStatus does not point to interimPath",
         interimPath.getName(), fileStatus.getPath().getName());
+  }
+
+  /**
+   * Attempt to rename a key to a different bucket, expect failure.
+   * @throws IOException IOException from fs.mkdirs()
+   */
+  @Test
+  public void testRenameToDifferentBucket() throws IOException {
+    Path source = new Path(testBucketPath, "source");
+    Path interimPath = new Path(source, "interimPath");
+    Path leafInsideInterimPath = new Path(interimPath, "leaf");
+    Path target = new Path(testBucketPath, "target");
+
+    fs.mkdirs(source);
+    fs.mkdirs(target);
+    fs.mkdirs(leafInsideInterimPath);
+
+    // Attempt to rename the key to a different bucket
+    Path bucket2 = new Path("/" + volumeName + "/" + bucketName + "test");
+    Path leafInTargetInAnotherBucket = new Path(bucket2, "leaf");
+    try {
+      fs.rename(leafInsideInterimPath, leafInTargetInAnotherBucket);
+      fail("Should have thrown exception when renaming to a different bucket");
+    } catch (IOException ex) {
+      System.out.println("Test passed: Exception thrown as expected");
+    }
   }
 
   private OzoneKeyDetails getKeyInBucket(Path keyPath, boolean isDirectory)
