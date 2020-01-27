@@ -106,27 +106,21 @@ public final class RatisPipelineUtils {
   }
 
   /**
-   * Return first existed pipeline which share the same set of datanodes
+   * Return the list of pipelines who share the same set of datanodes
    * with the input pipeline.
    * @param stateManager PipelineStateManager
    * @param pipeline input pipeline
    * @return first matched pipeline
    */
-  static Pipeline checkPipelineContainSameDatanodes(
+  static List<Pipeline> checkPipelineContainSameDatanodes(
       PipelineStateManager stateManager, Pipeline pipeline) {
-    List<Pipeline> matchedPipelines = stateManager.getPipelines(
+    return stateManager.getPipelines(
         HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE)
         .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
             (// For all OPEN or ALLOCATED pipelines
-                p.getPipelineState() == Pipeline.PipelineState.OPEN ||
-                p.getPipelineState() == Pipeline.PipelineState.ALLOCATED) &&
-                p.getNodeIdsHash() == pipeline.getNodeIdsHash())
+                p.getPipelineState() != Pipeline.PipelineState.CLOSED &&
+                p.getNodeIdsHash() == pipeline.getNodeIdsHash()))
         .collect(Collectors.toList());
-    if (matchedPipelines.size() == 0) {
-      return null;
-    } else {
-      return matchedPipelines.stream().findFirst().get();
-    }
   }
 }

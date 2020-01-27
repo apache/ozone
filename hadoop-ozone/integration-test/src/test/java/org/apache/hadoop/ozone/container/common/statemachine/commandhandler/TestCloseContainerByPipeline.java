@@ -53,7 +53,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
  * Test container closing.
@@ -77,7 +77,7 @@ public class TestCloseContainerByPipeline {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, "1");
-    conf.setInt(OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 2);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)

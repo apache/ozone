@@ -791,14 +791,14 @@
     </description>
   </property>
   <property>
-  <name>ozone.scm.datanode.max.pipeline.engagement</name>
+  <name>ozone.datanode.pipeline.limit</name>
   <value>2</value>
   <tag>OZONE, SCM, PIPELINE</tag>
   <description>Max number of pipelines per datanode can be engaged in.
   </description>
   </property>
   <property>
-    <name>ozone.scm.pipeline.number.limit</name>
+    <name>ozone.scm.ratis.pipeline.limit</name>
     <value>0</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>Upper limit for how many pipelines can be OPEN in SCM.
@@ -813,8 +813,9 @@
     <description>
       Timeout for every pipeline to stay in ALLOCATED stage. When pipeline is created,
       it should be at OPEN stage once pipeline report is successfully received by SCM.
-      If a pipeline stays at ALLOCATED for too long, it should be scrubbed so that new
-      pipeline can be created. This timeout is for how long pipeline can stay at ALLOCATED
+      If a pipeline stays at ALLOCATED longer than the specified period of time,
+      it should be scrubbed so that new pipeline can be created.
+      This timeout is for how long pipeline can stay at ALLOCATED
       stage until it gets scrubbed.
     </description>
   </property>

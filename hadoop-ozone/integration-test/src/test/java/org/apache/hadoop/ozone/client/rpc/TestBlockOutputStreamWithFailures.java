@@ -92,7 +92,7 @@ public class TestBlockOutputStreamWithFailures {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
-    conf.setInt(ScmConfigKeys.OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT, 3);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(7)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)

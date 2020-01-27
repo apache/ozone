@@ -293,18 +293,18 @@ public final class ScmConfigKeys {
       "ozone.scm.pipeline.owner.container.count";
   public static final int OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT = 3;
   // Pipeline placement policy:
-  // the max number of pipelines can a single datanode be engaged in.
-  public static final String OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT =
-          "ozone.scm.datanode.max.pipeline.engagement";
-  // Setting to zero by default means this limit doesn't take effect.
-  public static final int OZONE_DATANODE_MAX_PIPELINE_ENGAGEMENT_DEFAULT = 2;
+  // Upper limit for how many pipelines a datanode can engage in.
+  public static final String OZONE_DATANODE_PIPELINE_LIMIT =
+          "ozone.datanode.pipeline.limit";
+  public static final int OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT = 2;
 
-  // Upper limit for how many pipelines can be created.
+  // Upper limit for how many pipelines can be created
+  // across the cluster nodes managed by SCM.
   // Only for test purpose now.
-  public static final String OZONE_SCM_PIPELINE_NUMBER_LIMIT =
-      "ozone.scm.pipeline.number.limit";
+  public static final String OZONE_SCM_RATIS_PIPELINE_LIMIT =
+      "ozone.scm.ratis.pipeline.limit";
   // Setting to zero by default means this limit doesn't take effect.
-  public static final int OZONE_SCM_PIPELINE_NUMBER_LIMIT_DEFAULT = 0;
+  public static final int OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT = 0;
 
   public static final String
       OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY =
