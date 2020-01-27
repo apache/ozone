@@ -264,6 +264,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         ratisServerConfiguration.getNumSnapshotsRetained();
     RaftServerConfigKeys.Snapshot.setRetentionFileNum(properties,
         numSnapshotsRetained);
+
+    // Set properties starting with prefix raft.server
+    RatisHelper.createRaftServerProperties(conf, properties);
+
+    // Set properties starting with prefix raft.grpc
+    RatisHelper.createRaftServerGrpcProperties(conf, properties);
+
     return properties;
   }
 

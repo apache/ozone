@@ -586,11 +586,6 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-    public Builder setWatchTimeout(long timeout) {
-      this.watchTimeout = timeout;
-      return this;
-    }
-
     public Builder setChecksumType(ChecksumType cType) {
       this.checksumType = cType;
       return this;

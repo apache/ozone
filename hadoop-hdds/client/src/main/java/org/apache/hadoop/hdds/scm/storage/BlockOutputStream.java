@@ -125,7 +125,6 @@ public class BlockOutputStream extends OutputStream {
    * @param bufferPool           pool of buffers
    * @param streamBufferFlushSize flush size
    * @param streamBufferMaxSize   max size of the currentBuffer
-   * @param watchTimeout          watch timeout
    * @param checksumType          checksum type
    * @param bytesPerChecksum      Bytes per checksum
    */
@@ -133,8 +132,7 @@ public class BlockOutputStream extends OutputStream {
   public BlockOutputStream(BlockID blockID,
       XceiverClientManager xceiverClientManager, Pipeline pipeline,
       int chunkSize, long streamBufferFlushSize, long streamBufferMaxSize,
-      long watchTimeout, BufferPool bufferPool, ChecksumType checksumType,
-      int bytesPerChecksum)
+      BufferPool bufferPool, ChecksumType checksumType, int bytesPerChecksum)
       throws IOException {
     this.blockID = new AtomicReference<>(blockID);
     this.chunkSize = chunkSize;
@@ -154,7 +152,7 @@ public class BlockOutputStream extends OutputStream {
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
-    commitWatcher = new CommitWatcher(bufferPool, xceiverClient, watchTimeout);
+    commitWatcher = new CommitWatcher(bufferPool, xceiverClient);
     bufferList = null;
     totalDataFlushedLength = 0;
     writtenDataLength = 0;
