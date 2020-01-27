@@ -101,14 +101,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
 
-    String omHost;
+    String omHostOrServiceId;
     int omPort = -1;
     // Parse hostname and port
     String[] parts = authority.split(":");
     if (parts.length > 2) {
       throw new IllegalArgumentException(URI_EXCEPTION_TEXT);
     }
-    omHost = parts[0];
+    omHostOrServiceId = parts[0];
     if (parts.length == 2) {
       try {
         omPort = Integer.parseInt(parts[1]);
@@ -135,7 +135,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
 
       // adapter should be initialized in operations.
-      this.adapter = createAdapter(conf, omHost, omPort, isolatedClassloader);
+      this.adapter = createAdapter(
+          conf, omHostOrServiceId, omPort, isolatedClassloader);
 
       try {
         this.userName =
