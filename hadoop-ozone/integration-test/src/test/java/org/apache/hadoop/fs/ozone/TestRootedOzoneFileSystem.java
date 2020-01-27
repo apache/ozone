@@ -408,8 +408,8 @@ public class TestRootedOzoneFileSystem {
     try {
       fs.rename(leafInsideInterimPath, leafInTargetInAnotherBucket);
       fail("Should have thrown exception when renaming to a different bucket");
-    } catch (IOException ex) {
-      System.out.println("Test passed: Exception thrown as expected");
+    } catch (IOException ignored) {
+      // Test passed. Exception thrown as expected.
     }
   }
 
