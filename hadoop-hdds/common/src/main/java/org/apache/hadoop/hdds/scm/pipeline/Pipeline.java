@@ -21,11 +21,13 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -59,8 +61,6 @@ public final class Pipeline {
   private UUID leaderId;
   // Timestamp for pipeline upon creation
   private Instant creationTimestamp;
-  // Only valid for Ratis THREE pipeline. No need persist.
-  private int nodeIdsHash;
 
   /**
    * The immutable properties of pipeline object is used in
@@ -76,7 +76,6 @@ public final class Pipeline {
     this.state = state;
     this.nodeStatus = nodeStatus;
     this.creationTimestamp = Instant.now();
-    this.nodeIdsHash = 0;
   }
 
   /**
@@ -133,14 +132,6 @@ public final class Pipeline {
     this.creationTimestamp = creationTimestamp;
   }
 
-  public int getNodeIdsHash() {
-    return nodeIdsHash;
-  }
-
-  void setNodeIdsHash(int nodeIdsHash) {
-    this.nodeIdsHash = nodeIdsHash;
-  }
-
   /**
    * Return the pipeline leader's UUID.
    *
@@ -164,6 +155,23 @@ public final class Pipeline {
    */
   public List<DatanodeDetails> getNodes() {
     return new ArrayList<>(nodeStatus.keySet());
+  }
+
+  /**
+   * Return an immutable set of nodes which form this pipeline.
+   * @return Set of DatanodeDetails
+   */
+  public Set<DatanodeDetails> getNodeSet() {
+    return Collections.unmodifiableSet(nodeStatus.keySet());
+  }
+
+  /**
+   * Check if the input pipeline share the same set of datanodes.
+   * @param pipeline
+   * @return true if the input pipeline shares the same set of datanodes.
+   */
+  public boolean sameDatanodes(Pipeline pipeline) {
+    return getNodeSet().equals(pipeline.getNodeSet());
   }
 
   /**
@@ -360,7 +368,6 @@ public final class Pipeline {
     private List<DatanodeDetails> nodesInOrder = null;
     private UUID leaderId = null;
     private Instant creationTimestamp = null;
-    private int nodeIdsHash = 0;
 
     public Builder() {}
 
@@ -373,7 +380,6 @@ public final class Pipeline {
       this.nodesInOrder = pipeline.nodesInOrder.get();
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
-      this.nodeIdsHash = 0;
     }
 
     public Builder setId(PipelineID id1) {
@@ -417,11 +423,6 @@ public final class Pipeline {
       return this;
     }
 
-    public Builder setNodeIdsHash(int nodeIdsHash1) {
-      this.nodeIdsHash = nodeIdsHash1;
-      return this;
-    }
-
     public Pipeline build() {
       Preconditions.checkNotNull(id);
       Preconditions.checkNotNull(type);
@@ -430,7 +431,6 @@ public final class Pipeline {
       Preconditions.checkNotNull(nodeStatus);
       Pipeline pipeline = new Pipeline(id, type, factor, state, nodeStatus);
       pipeline.setLeaderId(leaderId);
-      pipeline.setNodeIdsHash(nodeIdsHash);
       // overwrite with original creationTimestamp
       if (creationTimestamp != null) {
         pipeline.setCreationTimestamp(creationTimestamp);

@@ -65,10 +65,10 @@ public class TestPipelinePlacementPolicy {
 
     List<DatanodeDetails> excludedNodes =
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+    excludedNodes.add(anchor);
     DatanodeDetails nextNode = placementPolicy.chooseNodeFromNetworkTopology(
         nodeManager.getClusterNetworkTopologyMap(), anchor, excludedNodes);
-    // excludedNodes should contain nextNode after being chosen.
-    Assert.assertTrue(excludedNodes.contains(nextNode));
+    Assert.assertFalse(excludedNodes.contains(nextNode));
     // nextNode should not be the same as anchor.
     Assert.assertTrue(anchor.getUuid() != nextNode.getUuid());
   }
@@ -83,7 +83,8 @@ public class TestPipelinePlacementPolicy {
     DatanodeDetails nextNode = placementPolicy.chooseNodeBasedOnRackAwareness(
         healthyNodes, new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
         topologyWithDifRacks, anchor);
-    Assert.assertFalse(topologyWithDifRacks.isSameParent(anchor, nextNode));
+    Assert.assertFalse(anchor.getNetworkLocation().equals(
+        nextNode.getNetworkLocation()));
   }
 
   private final static Node[] NODES = new NodeImpl[] {

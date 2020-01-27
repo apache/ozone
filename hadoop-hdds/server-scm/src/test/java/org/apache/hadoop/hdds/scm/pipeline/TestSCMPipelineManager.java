@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import static org.apache.commons.collections.CollectionUtils.intersection;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
@@ -116,15 +115,13 @@ public class TestSCMPipelineManager {
     List<Pipeline> pipelineList =
         pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS);
     Assert.assertEquals(pipelines, new HashSet<>(pipelineList));
-    // All NodeIdsHash from original pipeline list
-    List<Integer> originalPipelineHash = pipelineList.stream()
-        .map(Pipeline::getNodeIdsHash).collect(Collectors.toList());
-    // All NodeIdsHash from reloaded pipeline list
-    List<Integer> reloadedPipelineHash = pipelines.stream()
-        .map(Pipeline::getNodeIdsHash).collect(Collectors.toList());
-    // Original NodeIdsHash list should contain same items from reloaded one.
-    Assert.assertEquals(pipelineNum,
-        intersection(originalPipelineHash, reloadedPipelineHash).size());
+
+    Set<Set<DatanodeDetails>> originalPipelines = pipelineList.stream()
+        .map(Pipeline::getNodeSet).collect(Collectors.toSet());
+    Set<Set<DatanodeDetails>> reloadedPipelineHash = pipelines.stream()
+        .map(Pipeline::getNodeSet).collect(Collectors.toSet());
+    Assert.assertEquals(reloadedPipelineHash, originalPipelines);
+    Assert.assertEquals(pipelineNum, originalPipelines.size());
 
     // clean up
     for (Pipeline pipeline : pipelines) {
