@@ -77,11 +77,10 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.ArrayList;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -751,22 +750,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final int threadCount = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
-    final int queueLimit = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
-        OzoneConfigKeys.
-            DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
-    );
     ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
-    // TODO any way to enforce queueLimit across executors[]?
-    RejectedExecutionHandler callerRuns =
-        new ThreadPoolExecutor.CallerRunsPolicy();
     for (int i = 0; i < executors.length; i++) {
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setNameFormat("ChunkExecutor-" + i + "-%s")
           .build();
-      BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(queueLimit);
+      BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
       executors[i] = new ThreadPoolExecutor(1, 1,
-          0, TimeUnit.SECONDS, workQueue, threadFactory, callerRuns);
+          0, TimeUnit.SECONDS, workQueue, threadFactory);
     }
     return executors;
   }
