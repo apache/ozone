@@ -192,6 +192,12 @@ public class TestRootedOzoneFileSystem {
     ContractTestUtils.touch(fs, file1);
     ContractTestUtils.touch(fs, file2);
 
+    fileStatuses = ofs.listStatus(testBucketPath);
+    assertEquals("Should have created parent",
+        1, fileStatuses.length);
+    assertEquals("Parent path doesn't match",
+        fileStatuses[0].getPath().toUri().getPath(), parent.toString());
+
     // ListStatus on a directory should return all subdirs along with
     // files, even if there exists a file and sub-dir with the same name.
     fileStatuses = ofs.listStatus(parent);
