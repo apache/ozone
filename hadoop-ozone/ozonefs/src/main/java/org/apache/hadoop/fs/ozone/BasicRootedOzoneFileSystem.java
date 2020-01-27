@@ -772,22 +772,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return true;
   }
 
-  private FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
+  private FileStatus convertFileStatus(
+      FileStatusAdapter fileStatusAdapter) {
+
     Path symLink = null;
     try {
       fileStatusAdapter.getSymlink();
     } catch (Exception ex) {
       //NOOP: If not symlink symlink remains null.
-    }
-
-    // Process path.
-    URI newUri = fileStatusAdapter.getPath().toUri();
-    try {
-      newUri = new URIBuilder().setScheme(newUri.getScheme())
-          .setHost(newUri.getAuthority())
-          .setPath(newUri.getPath())
-          .build();
-    } catch (URISyntaxException e) {
     }
 
     FileStatus fileStatus = new FileStatus(
@@ -801,8 +793,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         fileStatusAdapter.getOwner(),
         fileStatusAdapter.getGroup(),
         symLink,
-        // Without this, the path would be incorrect: ofs://localhost:51625/dir1
-        new Path(newUri)
+        fileStatusAdapter.getPath()
     );
 
     BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
