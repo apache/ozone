@@ -17,12 +17,13 @@
  */
 package org.apache.hadoop.ozone.container.common.volume;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.lock.ReadWriteLockable;
 
 import java.util.List;
 
+/**
+ * Set of HDDS volumes.
+ */
 public interface VolumeSet extends ReadWriteLockable {
-  @VisibleForTesting
   List<HddsVolume> getVolumesList();
 }

@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.lock;
 
+/**
+ * Interface for objects with a read-write lock.
+ */
 public interface ReadWriteLockable {
   void readLock();
 

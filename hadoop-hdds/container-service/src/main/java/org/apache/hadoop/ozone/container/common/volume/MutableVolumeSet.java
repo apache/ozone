@@ -60,27 +60,26 @@ import org.slf4j.LoggerFactory;
 /**
  * VolumeSet to manage HDDS volumes in a DataNode.
  */
-public class VolumeSetImpl implements VolumeSet {
+public class MutableVolumeSet implements VolumeSet {
 
-  private static final Logger LOG = LoggerFactory.getLogger(VolumeSetImpl.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MutableVolumeSet.class);
 
   private Configuration conf;
 
   /**
-   * {@link VolumeSetImpl#volumeMap} maintains a map of all active volumes in the
-   * DataNode. Each volume has one-to-one mapping with a volumeInfo object.
+   * Maintains a map of all active volumes in the DataNode.
+   * Each volume has one-to-one mapping with a volumeInfo object.
    */
   private Map<String, HddsVolume> volumeMap;
   /**
-   * {@link VolumeSetImpl#failedVolumeMap} maintains a map of volumes which have
-   * failed. The keys in this map and {@link VolumeSetImpl#volumeMap} are
-   * mutually exclusive.
+   * Maintains a map of volumes which have failed. The keys in this map and
+   * {@link #volumeMap} are mutually exclusive.
    */
   private Map<String, HddsVolume> failedVolumeMap;
 
   /**
-   * {@link VolumeSetImpl#volumeStateMap} maintains a list of active volumes per
-   * StorageType.
+   * Maintains a list of active volumes per StorageType.
    */
   private EnumMap<StorageType, List<HddsVolume>> volumeStateMap;
 
@@ -95,9 +94,8 @@ public class VolumeSetImpl implements VolumeSet {
 
   /**
    * A Reentrant Read Write Lock to synchronize volume operations in VolumeSet.
-   * Any update to {@link VolumeSetImpl#volumeMap},
-   * {@link VolumeSetImpl#failedVolumeMap}, or {@link VolumeSetImpl#volumeStateMap}
-   * should be done after acquiring the write lock.
+   * Any update to {@link #volumeMap}, {@link #failedVolumeMap}, or
+   * {@link #volumeStateMap} should be done after acquiring the write lock.
    */
   private final ReentrantReadWriteLock volumeSetRWLock;
 
@@ -107,12 +105,12 @@ public class VolumeSetImpl implements VolumeSet {
   private Runnable shutdownHook;
   private final HddsVolumeChecker volumeChecker;
 
-  public VolumeSetImpl(String dnUuid, Configuration conf)
+  public MutableVolumeSet(String dnUuid, Configuration conf)
       throws IOException {
     this(dnUuid, null, conf);
   }
 
-  public VolumeSetImpl(String dnUuid, String clusterID, Configuration conf)
+  public MutableVolumeSet(String dnUuid, String clusterID, Configuration conf)
       throws IOException {
     this.datanodeUuid = dnUuid;
     this.clusterID = clusterID;
@@ -255,7 +253,7 @@ public class VolumeSetImpl implements VolumeSet {
   }
 
   /**
-   * If Version file exists and the {@link VolumeSetImpl#clusterID} is not set yet,
+   * If Version file exists and the {@link #clusterID} is not set yet,
    * assign it the value from Version file. Otherwise, check that the given
    * id matches with the id from version file.
    * @param idFromVersionFile value of the property from Version file

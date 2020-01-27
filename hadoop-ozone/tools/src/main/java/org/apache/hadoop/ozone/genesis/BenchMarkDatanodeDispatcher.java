@@ -51,7 +51,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSetImpl;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
@@ -83,7 +83,7 @@ public class BenchMarkDatanodeDispatcher {
   private List<Long> containers;
   private List<Long> keys;
   private List<String> chunks;
-  private VolumeSetImpl volumeSet;
+  private MutableVolumeSet volumeSet;
 
   @Setup(Level.Trial)
   public void initialize() throws IOException {
@@ -103,7 +103,7 @@ public class BenchMarkDatanodeDispatcher {
     conf.set("ozone.scm.container.size", "10MB");
 
     ContainerSet containerSet = new ContainerSet();
-    volumeSet = new VolumeSetImpl(datanodeUuid, conf);
+    volumeSet = new MutableVolumeSet(datanodeUuid, conf);
     StateContext context = new StateContext(
         conf, DatanodeStates.RUNNING, null);
     ContainerMetrics metrics = ContainerMetrics.create(conf);

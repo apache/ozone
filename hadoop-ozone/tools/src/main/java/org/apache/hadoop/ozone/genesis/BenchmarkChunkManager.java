@@ -57,6 +57,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V1;
 
+/**
+ * Benchmark for ChunkManager implementations.
+ */
 @Warmup(time = 1, timeUnit = TimeUnit.SECONDS)
 @Measurement(time = 1, timeUnit = TimeUnit.SECONDS)
 public class BenchmarkChunkManager {
@@ -82,8 +85,12 @@ public class BenchmarkChunkManager {
   private static final String SCM_ID = UUID.randomUUID().toString();
   private static final String DATANODE_ID = UUID.randomUUID().toString();
 
+  /**
+   * State for the benchmark.
+   */
   @State(Scope.Benchmark)
   public static class BenchmarkState {
+
     @Param({"1048576", "4194304", "16777216", "67108864"})
     private int chunkSize;
 

@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSetImpl;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.GrpcReplicationService;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
@@ -212,7 +212,7 @@ public class TestContainerServer {
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
       ContainerSet containerSet = new ContainerSet();
-      VolumeSet volumeSet = mock(VolumeSetImpl.class);
+      VolumeSet volumeSet = mock(MutableVolumeSet.class);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
       DatanodeDetails datanodeDetails = randomDatanodeDetails();

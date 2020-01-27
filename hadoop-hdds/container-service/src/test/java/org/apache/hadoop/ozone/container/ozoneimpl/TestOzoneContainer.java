@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSetImpl;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -73,7 +73,7 @@ public class TestOzoneContainer {
 
   private OzoneConfiguration conf;
   private String scmId = UUID.randomUUID().toString();
-  private VolumeSetImpl volumeSet;
+  private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
@@ -89,7 +89,7 @@ public class TestOzoneContainer {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         folder.newFolder().getAbsolutePath());
     commitSpaceMap = new HashMap<String, Long>();
-    volumeSet = new VolumeSetImpl(datanodeDetails.getUuidString(), conf);
+    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 

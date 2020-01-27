@@ -21,6 +21,9 @@ import com.google.common.collect.ImmutableList;
 
 import java.util.List;
 
+/**
+ * Fixed list of HDDS volumes.
+ */
 public final class ImmutableVolumeSet implements VolumeSet {
 
   private final List<HddsVolume> volumes;

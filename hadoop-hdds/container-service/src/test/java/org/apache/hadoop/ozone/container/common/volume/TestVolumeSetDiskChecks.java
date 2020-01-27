@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Verify that {@link VolumeSetImpl} correctly checks for failed disks
+ * Verify that {@link MutableVolumeSet} correctly checks for failed disks
  * during initialization.
  */
 public class TestVolumeSetDiskChecks {
@@ -88,8 +88,8 @@ public class TestVolumeSetDiskChecks {
     final int numVolumes = 2;
 
     conf = getConfWithDataNodeDirs(numVolumes);
-    final VolumeSetImpl volumeSet =
-        new VolumeSetImpl(UUID.randomUUID().toString(), conf);
+    final MutableVolumeSet volumeSet =
+        new MutableVolumeSet(UUID.randomUUID().toString(), conf);
 
     assertThat(volumeSet.getVolumesList().size(), is(numVolumes));
     assertThat(volumeSet.getFailedVolumesList().size(), is(0));
@@ -113,7 +113,7 @@ public class TestVolumeSetDiskChecks {
     final int numBadVolumes = 2;
 
     conf = getConfWithDataNodeDirs(numVolumes);
-    final VolumeSetImpl volumeSet = new VolumeSetImpl(
+    final MutableVolumeSet volumeSet = new MutableVolumeSet(
         UUID.randomUUID().toString(), conf) {
       @Override
       HddsVolumeChecker getVolumeChecker(Configuration configuration)
@@ -137,7 +137,7 @@ public class TestVolumeSetDiskChecks {
 
     conf = getConfWithDataNodeDirs(numVolumes);
 
-    final VolumeSetImpl volumeSet = new VolumeSetImpl(
+    final MutableVolumeSet volumeSet = new MutableVolumeSet(
         UUID.randomUUID().toString(), conf) {
       @Override
       HddsVolumeChecker getVolumeChecker(Configuration configuration)
