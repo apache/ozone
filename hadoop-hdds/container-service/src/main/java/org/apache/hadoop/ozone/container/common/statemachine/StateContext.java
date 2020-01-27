@@ -18,8 +18,14 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.GeneratedMessage;
+
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -69,9 +75,10 @@ public class StateContext {
   private final DatanodeStateMachine parent;
   private final AtomicLong stateExecutionCount;
   private final Configuration conf;
-  private final List<GeneratedMessage> reports;
-  private final Queue<ContainerAction> containerActions;
-  private final Queue<PipelineAction> pipelineActions;
+  private final Set<String> endpoints;
+  private final Map<String, List<GeneratedMessage>> reports;
+  private final Map<String, Queue<ContainerAction>> containerActions;
+  private final Map<String, Queue<PipelineAction>> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
 
@@ -96,9 +103,10 @@ public class StateContext {
     this.parent = parent;
     commandQueue = new LinkedList<>();
     cmdStatusMap = new ConcurrentHashMap<>();
-    reports = new LinkedList<>();
-    containerActions = new LinkedList<>();
-    pipelineActions = new LinkedList<>();
+    reports = new HashMap<>();
+    endpoints = new HashSet<>();
+    containerActions = new HashMap<>();
+    pipelineActions = new HashMap<>();
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
   }
@@ -177,7 +185,9 @@ public class StateContext {
   public void addReport(GeneratedMessage report) {
     if (report != null) {
       synchronized (reports) {
-        reports.add(report);
+        for (String endpoint : endpoints) {
+          reports.get(endpoint).add(report);
+        }
       }
     }
   }
@@ -189,9 +199,12 @@ public class StateContext {
    * @param reportsToPutBack list of reports which failed to be sent by
    *                         heartbeat.
    */
-  public void putBackReports(List<GeneratedMessage> reportsToPutBack) {
+  public void putBackReports(List<GeneratedMessage> reportsToPutBack,
+                             String endpoint) {
     synchronized (reports) {
-      reports.addAll(0, reportsToPutBack);
+      if (reports.containsKey(endpoint)){
+        reports.get(endpoint).addAll(0, reportsToPutBack);
+      }
     }
   }
 
@@ -201,8 +214,8 @@ public class StateContext {
    *
    * @return List of reports
    */
-  public List<GeneratedMessage> getAllAvailableReports() {
-    return getReports(Integer.MAX_VALUE);
+  public List<GeneratedMessage> getAllAvailableReports(String endpoint) {
+    return getReports(endpoint, Integer.MAX_VALUE);
   }
 
   /**
@@ -211,13 +224,16 @@ public class StateContext {
    *
    * @return List of reports
    */
-  public List<GeneratedMessage> getReports(int maxLimit) {
+  public List<GeneratedMessage> getReports(String endpoint, int maxLimit) {
     List<GeneratedMessage> reportsToReturn = new LinkedList<>();
     synchronized (reports) {
-      List<GeneratedMessage> tempList = reports.subList(
-          0, min(reports.size(), maxLimit));
-      reportsToReturn.addAll(tempList);
-      tempList.clear();
+      List<GeneratedMessage> reportsForEndpoint = reports.get(endpoint);
+      if (reportsForEndpoint != null) {
+        List<GeneratedMessage> tempList = reportsForEndpoint.subList(
+            0, min(reportsForEndpoint.size(), maxLimit));
+        reportsToReturn.addAll(tempList);
+        tempList.clear();
+      }
     }
     return reportsToReturn;
   }
@@ -230,7 +246,9 @@ public class StateContext {
    */
   public void addContainerAction(ContainerAction containerAction) {
     synchronized (containerActions) {
-      containerActions.add(containerAction);
+      for (String endpoint : endpoints) {
+        containerActions.get(endpoint).add(containerAction);
+      }
     }
   }
 
@@ -241,8 +259,10 @@ public class StateContext {
    */
   public void addContainerActionIfAbsent(ContainerAction containerAction) {
     synchronized (containerActions) {
-      if (!containerActions.contains(containerAction)) {
-        containerActions.add(containerAction);
+      for (String endpoint : endpoints) {
+        if (!containerActions.get(endpoint).contains(containerAction)) {
+          containerActions.get(endpoint).add(containerAction);
+        }
       }
     }
   }
@@ -253,8 +273,8 @@ public class StateContext {
    *
    * @return {@literal List<ContainerAction>}
    */
-  public List<ContainerAction> getAllPendingContainerActions() {
-    return getPendingContainerAction(Integer.MAX_VALUE);
+  public List<ContainerAction> getAllPendingContainerActions(String endpoint) {
+    return getPendingContainerAction(endpoint, Integer.MAX_VALUE);
   }
 
   /**
@@ -263,16 +283,19 @@ public class StateContext {
    *
    * @return {@literal List<ContainerAction>}
    */
-  public List<ContainerAction> getPendingContainerAction(int maxLimit) {
+  public List<ContainerAction> getPendingContainerAction(String endpoint,
+                                                         int maxLimit) {
     List<ContainerAction> containerActionList = new ArrayList<>();
     synchronized (containerActions) {
-      if (!containerActions.isEmpty()) {
-        int size = containerActions.size();
+      if (!containerActions.isEmpty() &&
+          CollectionUtils.isNotEmpty(containerActions.get(endpoint))) {
+        Queue<ContainerAction> actions = containerActions.get(endpoint);
+        int size = actions.size();
         int limit = size > maxLimit ? maxLimit : size;
         for (int count = 0; count < limit; count++) {
           // we need to remove the action from the containerAction queue
           // as well
-          ContainerAction action = containerActions.poll();
+          ContainerAction action = actions.poll();
           Preconditions.checkNotNull(action);
           containerActionList.add(action);
         }
@@ -296,16 +319,20 @@ public class StateContext {
        * action remains same on the given pipeline, it will end up adding it
        * multiple times here.
        */
-      for (PipelineAction pipelineActionIter : pipelineActions) {
-        if (pipelineActionIter.getAction() == pipelineAction.getAction()
-            && pipelineActionIter.hasClosePipeline() && pipelineAction
-            .hasClosePipeline()
-            && pipelineActionIter.getClosePipeline().getPipelineID()
-            .equals(pipelineAction.getClosePipeline().getPipelineID())) {
-          return;
+      for (String endpoint : endpoints) {
+        Queue<PipelineAction> actionsForEndpoint =
+            this.pipelineActions.get(endpoint);
+        for (PipelineAction pipelineActionIter : actionsForEndpoint) {
+          if (pipelineActionIter.getAction() == pipelineAction.getAction()
+              && pipelineActionIter.hasClosePipeline() && pipelineAction
+              .hasClosePipeline()
+              && pipelineActionIter.getClosePipeline().getPipelineID()
+              .equals(pipelineAction.getClosePipeline().getPipelineID())) {
+            break;
+          }
         }
+        actionsForEndpoint.add(pipelineAction);
       }
-      pipelineActions.add(pipelineAction);
     }
   }
 
@@ -315,14 +342,18 @@ public class StateContext {
    *
    * @return {@literal List<ContainerAction>}
    */
-  public List<PipelineAction> getPendingPipelineAction(int maxLimit) {
+  public List<PipelineAction> getPendingPipelineAction(String endpoint,
+                                                       int maxLimit) {
     List<PipelineAction> pipelineActionList = new ArrayList<>();
     synchronized (pipelineActions) {
-      if (!pipelineActions.isEmpty()) {
-        int size = pipelineActions.size();
+      if (!pipelineActions.isEmpty() &&
+          CollectionUtils.isNotEmpty(pipelineActions.get(endpoint))) {
+        Queue<PipelineAction> actionsForEndpoint =
+            this.pipelineActions.get(endpoint);
+        int size = actionsForEndpoint.size();
         int limit = size > maxLimit ? maxLimit : size;
         for (int count = 0; count < limit; count++) {
-          pipelineActionList.add(pipelineActions.poll());
+          pipelineActionList.add(actionsForEndpoint.poll());
         }
       }
       return pipelineActionList;
@@ -498,5 +529,14 @@ public class StateContext {
    */
   public long getHeartbeatFrequency() {
     return heartbeatFrequency.get();
+  }
+
+  public void addEndpoint(String endpoint) {
+    if (!endpoints.contains(endpoint)) {
+      this.endpoints.add(endpoint);
+      this.containerActions.put(endpoint, new LinkedList<>());
+      this.pipelineActions.put(endpoint, new LinkedList<>());
+      this.reports.put(endpoint, new LinkedList<>());
+    }
   }
 }

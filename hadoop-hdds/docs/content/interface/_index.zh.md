@@ -1,8 +1,8 @@
 ---
-title: 命令行接口
+title: "编程接口"
 menu:
    main:
-      weight: 3
+      weight: 4
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -21,7 +21,6 @@ menu:
   limitations under the License.
 -->
 
-
-{{<jumbotron title="OzoneShell">}}
-    Ozone shell 是用户与 Ozone 进行交互的主要接口，它提供了操作 Ozone 的命令行接口。
+{{<jumbotron title="多协议支持">}}
+Ozone 是一个多协议文件系统，用户可以通过多种协议访问 Ozone 中的数据。
 {{</jumbotron>}}

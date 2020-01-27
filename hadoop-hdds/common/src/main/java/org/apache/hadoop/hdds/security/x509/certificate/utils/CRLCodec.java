@@ -78,10 +78,10 @@ public class CRLCodec {
    * Returns a X509 CRL from the CRL Holder.
    *
    * @param holder - Holder
-   * @return X509Certificate.
+   * @return X509CRL - X509 CRL.
    * @throws CRLException - on Error.
    */
-  public static X509CRL get509CRL(X509CRLHolder holder)
+  public static X509CRL getX509CRL(X509CRLHolder holder)
       throws CRLException {
     return CRL_CONVERTER.getCRL(holder);
   }
@@ -97,7 +97,7 @@ public class CRLCodec {
       throws SCMSecurityException {
     LOG.trace("Getting PEM version of a CRL.");
     try {
-      return getPEMEncodedString(get509CRL(holder));
+      return getPEMEncodedString(getX509CRL(holder));
     } catch (CRLException exp) {
       throw new SCMSecurityException(exp);
     }
@@ -121,7 +121,8 @@ public class CRLCodec {
    * Gets the X.509 CRL from PEM encoded String.
    *
    * @param pemEncodedString - PEM encoded String.
-   * @return X509Certificate  - Certificate.
+   * @return X509CRL  - Crl.
+   * @throws CRLException - Thrown on Failure.
    * @throws CertificateException - Thrown on Failure.
    * @throws IOException          - Thrown on Failure.
    */
@@ -134,7 +135,7 @@ public class CRLCodec {
   }
 
   /**
-   * Get Certificate location.
+   * Get CRL location.
    *
    * @return Path
    */
@@ -145,8 +146,7 @@ public class CRLCodec {
   /**
    * Write the CRL pointed to the location by the configs.
    *
-   * @param crl - CRL to write.
-   * @throws SCMSecurityException - on Error.
+   * @param crl - X509CRL CRL to write.
    * @throws IOException          - on Error.
    */
   public void writeCRL(X509CRL crl)
@@ -162,8 +162,7 @@ public class CRLCodec {
    * @param crlHolder - CRL to write.
    * @param fileName - file name to write to.
    * @param overwrite - boolean value, true means overwrite an existing
-   * certificate.
-   * @throws SCMSecurityException - On Error.
+   * crl.
    * @throws IOException          - On Error.
    */
   public void writeCRL(X509CRLHolder crlHolder,
@@ -173,6 +172,16 @@ public class CRLCodec {
     writeCRL(location.toAbsolutePath(), fileName, pem, overwrite);
   }
 
+  /**
+   * Write the CRL to the specific file.
+   *
+   * @param basePath - Base Path where CRL file to be written.
+   * @param fileName - file name of CRL file.
+   * @param pemCRLString - PEN Encoded string
+   * @param force - boolean value, true means overwrite an existing
+   * crl.
+   * @throws IOException          - On Error.
+   */
   public synchronized void writeCRL(Path basePath, String fileName,
       String pemCRLString, boolean force)
       throws IOException {
