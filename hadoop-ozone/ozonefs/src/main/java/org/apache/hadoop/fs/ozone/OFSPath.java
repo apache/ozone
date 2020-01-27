@@ -30,6 +30,20 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 class OFSPath {
+  /**
+   * Here is a table illustrating what each name variable is given an input path
+   * Assuming /tmp is mounted to /tempVol/tempBucket
+   * (null) means null, (empty) means empty string "".
+   *
+   * Path                  volumeName     bucketName     mountName    keyName
+   * --------------------------------------------------------------------------
+   * /vol1/buc2/dir3/key4  vol1           buc2           (null)       dir3/key4
+   * /vol1/buc2            vol1           buc2           (null)       (empty)
+   * /vol1                 vol1           (null)         (null)       (empty)
+   * /tmp/dir3/key4        tempVol        tempBucket     tmp          dir3/key4
+   *
+   * Note the leading '/' doesn't matter.
+   */
   private String volumeName = null;
   private String bucketName = null;
   private String mountName = null;
@@ -70,7 +84,8 @@ class OFSPath {
     if (token.hasMoreTokens()) {
       keyName = token.nextToken("").substring(1);
     } else {
-      keyName = "";  // Assign empty String, keyName shouldn't be null.
+      // Assign empty String, keyName won't be null.
+      keyName = "";
     }
   }
 
