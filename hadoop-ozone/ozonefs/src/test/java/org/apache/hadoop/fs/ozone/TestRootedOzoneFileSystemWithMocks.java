@@ -22,10 +22,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,7 +34,6 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.net.URI;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
