@@ -30,8 +30,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.metrics2.util.MBeans;
 
 import com.google.common.base.Preconditions;
@@ -99,7 +99,7 @@ public class RDBStore implements DBStore {
 
       for (int x = 0; x < columnFamilyHandles.size(); x++) {
         handleTable.put(
-            DFSUtil.bytes2String(columnFamilyHandles.get(x).getName()),
+            StringUtils.bytes2String(columnFamilyHandles.get(x).getName()),
             columnFamilyHandles.get(x));
       }
 
