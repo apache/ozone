@@ -411,8 +411,6 @@ public class SCMClientProtocolServer implements
   @Override
   public Pipeline getPipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    AUDIT.logReadSuccess(
-        buildAuditMessageForSuccess(SCMAction.GET_PIPELINE, null));
     return scm.getPipelineManager().getPipeline(
         PipelineID.getFromProtobuf(pipelineID));
   }
