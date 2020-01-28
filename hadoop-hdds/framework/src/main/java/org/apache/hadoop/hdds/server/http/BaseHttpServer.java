@@ -89,9 +89,12 @@ public abstract class BaseHttpServer {
       // CommonConfigurationKeysPublic.HADOOP_PROMETHEUS_ENABLED when possible.
       conf.setBoolean("hadoop.prometheus.endpoint.enabled", false);
 
-      HttpServer2.Builder builder = httpServerTemplateForOzone(conf,
-          httpAddress, httpsAddress,
-          name, getSpnegoPrincipal(), getKeytabFile());
+      HttpServer2.Builder builder = initializeServerBuild(conf,
+          httpAddress,
+          httpsAddress,
+          name,
+          getSpnegoPrincipal(),
+          getKeytabFile());
 
       final boolean xFrameEnabled = conf.getBoolean(
           DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED,
@@ -241,39 +244,39 @@ public abstract class BaseHttpServer {
     }
   }
 
-  public static HttpServer2.Builder httpServerTemplateForOzone(
-      Configuration conf, final InetSocketAddress httpAddr,
-      final InetSocketAddress httpsAddr, String name, String spnegoUserNameKey,
+  public HttpServer2.Builder initializeServerBuild(
+      Configuration configuration, final InetSocketAddress httpAddr,
+      final InetSocketAddress httpsAddr, String serverName, String spnegoUserNameKey,
       String spnegoKeytabFileKey) throws IOException {
-    HttpConfig.Policy policy = getHttpPolicy(conf);
+    HttpConfig.Policy httpPolicy = getHttpPolicy(configuration);
 
     HttpServer2.Builder builder =
-        new HttpServer2.Builder().setName(name)
-            .setConf(conf)
-            .setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")))
+        new HttpServer2.Builder().setName(serverName)
+            .setConf(configuration)
+            .setACL(new AccessControlList(configuration.get(DFS_ADMIN, " ")))
             .setSecurityEnabled(UserGroupInformation.isSecurityEnabled())
             .setUsernameConfKey(spnegoUserNameKey)
-            .setKeytabConfKey(getSpnegoKeytabKey(conf, spnegoKeytabFileKey));
+            .setKeytabConfKey(getSpnegoKeytabKey(configuration, spnegoKeytabFileKey));
 
     // initialize the webserver for uploading/downloading files.
     if (UserGroupInformation.isSecurityEnabled()) {
       LOG.info("Starting web server as: "
-          + SecurityUtil.getServerPrincipal(conf.get(spnegoUserNameKey),
+          + SecurityUtil.getServerPrincipal(configuration.get(spnegoUserNameKey),
           httpAddr.getHostName()));
     }
 
-    if (policy.isHttpEnabled()) {
+    if (httpPolicy.isHttpEnabled()) {
       if (httpAddr.getPort() == 0) {
         builder.setFindPort(true);
       }
 
       URI uri = URI.create("http://" + NetUtils.getHostPortString(httpAddr));
       builder.addEndpoint(uri);
-      LOG.info("Starting Web-server for {} at: {}", name, uri);
+      LOG.info("Starting Web-server for {} at: {}", serverName, uri);
     }
 
-    if (policy.isHttpsEnabled() && httpsAddr != null) {
-      Configuration sslConf = loadSslConfiguration(conf);
+    if (httpPolicy.isHttpsEnabled() && httpsAddr != null) {
+      Configuration sslConf = loadSslConfiguration(configuration);
       loadSslConfToHttpServerBuilder(builder, sslConf);
 
       if (httpsAddr.getPort() == 0) {
@@ -282,7 +285,7 @@ public abstract class BaseHttpServer {
 
       URI uri = URI.create("https://" + NetUtils.getHostPortString(httpsAddr));
       builder.addEndpoint(uri);
-      LOG.info("Starting Web-server for {} at: {}", name, uri);
+      LOG.info("Starting Web-server for {} at: {}", serverName, uri);
     }
     return builder;
   }

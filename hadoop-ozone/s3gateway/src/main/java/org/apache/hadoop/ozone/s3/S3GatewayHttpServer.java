@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.s3;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
+import org.apache.hadoop.hdds.server.http.HttpServer2.Builder;
 
 /**
  * S3 Gateway specific configuration keys.
@@ -35,6 +37,17 @@ public class S3GatewayHttpServer extends BaseHttpServer {
   public S3GatewayHttpServer(Configuration conf,
       String name) throws IOException {
     super(conf, name);
+  }
+
+  @Override
+  public Builder initializeServerBuild(Configuration configuration,
+      InetSocketAddress httpAddr, InetSocketAddress httpsAddr,
+      String serverName, String spnegoUserNameKey, String spnegoKeytabFileKey)
+      throws IOException {
+    Builder builder = super
+        .initializeServerBuild(configuration, httpAddr, httpsAddr, serverName,
+            spnegoUserNameKey, spnegoKeytabFileKey);
+    return builder.withoutAuthenticationFilter();
   }
 
   @Override

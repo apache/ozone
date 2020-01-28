@@ -222,6 +222,7 @@ public final class HttpServer2 implements FilterContainer {
     private String keyStorePassword;
     private String keyStoreType;
 
+    private boolean withoutAuthenticationFilter;
     // The -keypass option in keytool
     private String keyPassword;
 
@@ -449,6 +450,17 @@ public final class HttpServer2 implements FilterContainer {
       excludeCiphers = sslConf.get(SSLFactory.SSL_SERVER_EXCLUDE_CIPHER_LIST);
     }
 
+    public Builder withoutAuthenticationFilter() {
+      this.withoutAuthenticationFilter = true;
+      return this;
+    }
+
+    public boolean ignoreAuthenticationFilter() {
+      return withoutAuthenticationFilter ||
+          this.conf.get(authFilterConfigurationPrefix + "type")
+              .equals(PseudoAuthenticationHandler.TYPE);
+    }
+
     public HttpServer2 build() throws IOException {
       Preconditions.checkNotNull(name, "name is not set");
       Preconditions.checkState(!endpoints.isEmpty(), "No endpoints specified");
@@ -463,9 +475,7 @@ public final class HttpServer2 implements FilterContainer {
 
       HttpServer2 server = new HttpServer2(this);
 
-      if (this.securityEnabled &&
-          !this.conf.get(authFilterConfigurationPrefix + "type").
-              equals(PseudoAuthenticationHandler.TYPE)) {
+      if (!this.securityEnabled || !ignoreAuthenticationFilter()) {
         server.initSpnego(conf, hostName, usernameConfKey, keytabConfKey);
       }
 
