@@ -82,6 +82,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
+  public enum Result {
+    SUCCESS,
+    REPLAY,
+    FAILURE
+  }
+
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
   }
