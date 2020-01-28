@@ -20,7 +20,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import javax.management.MBeanServer;
-
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
@@ -32,8 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.codec.binary.StringUtils;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdds.StringUtils;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
@@ -54,7 +52,7 @@ import org.rocksdb.StatsLevel;
  */
 public class TestRDBStore {
   private final List<String> families =
-      Arrays.asList(DFSUtil.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+      Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth");
@@ -89,7 +87,6 @@ public class TestRDBStore {
       rdbStore.close();
     }
   }
-
   private void insertRandomData(RDBStore dbStore, int familyIndex)
       throws Exception {
     try (Table firstTable = dbStore.getTable(families.get(familyIndex))) {
@@ -308,7 +305,8 @@ public class TestRDBStore {
       long start = System.nanoTime();
       for (int i = 0; i < 50; i++) {
         Assert.assertTrue(db.get(
-            StringUtils.getBytesUtf16("key" + i))== null);
+            org.apache.commons.codec.binary.StringUtils
+                .getBytesUtf16("key" + i)) == null);
       }
       long end = System.nanoTime();
       long keyGetLatency = end - start;
@@ -316,7 +314,8 @@ public class TestRDBStore {
       start = System.nanoTime();
       for (int i = 0; i < 50; i++) {
         Assert.assertFalse(db.keyMayExist(
-            StringUtils.getBytesUtf16("key" + i), new StringBuilder()));
+            org.apache.commons.codec.binary.StringUtils
+                .getBytesUtf16("key" + i), new StringBuilder()));
       }
       end = System.nanoTime();
       long keyMayExistLatency = end - start;
@@ -332,10 +331,14 @@ public class TestRDBStore {
              new RDBStore(folder.newFolder(), options, configSet)) {
 
       try (Table firstTable = newStore.getTable(families.get(1))) {
-        firstTable.put(StringUtils.getBytesUtf16("Key1"), StringUtils
-            .getBytesUtf16("Value1"));
-        firstTable.put(StringUtils.getBytesUtf16("Key2"), StringUtils
-            .getBytesUtf16("Value2"));
+        firstTable.put(
+            org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key1"),
+            org.apache.commons.codec.binary.StringUtils
+                .getBytesUtf16("Value1"));
+        firstTable.put(
+            org.apache.commons.codec.binary.StringUtils.getBytesUtf16("Key2"),
+            org.apache.commons.codec.binary.StringUtils
+                .getBytesUtf16("Value2"));
       }
       Assert.assertTrue(
           newStore.getDb().getLatestSequenceNumber() == 2);

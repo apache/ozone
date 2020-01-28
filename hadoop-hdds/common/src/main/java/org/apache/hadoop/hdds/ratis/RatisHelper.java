@@ -39,13 +39,10 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateSer
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
 
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
-import org.apache.ratis.client.RaftClientConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
-import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcFactory;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
@@ -58,10 +55,11 @@ import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig.DATANODE_RATIS_SERVER_CONFIG_PREFIX;
 
 /**
  * Ratis helper methods.
@@ -75,7 +73,11 @@ public interface RatisHelper {
       "([a-z\\.]+)";
 
   // Ratis Server header regex filter.
-  String RATIS_SERVER_HEADER_REGEX = "raft\\.server\\.([a-z\\.]+)";
+  String RATIS_SERVER_HEADER_REGEX = "datanode\\.ratis\\.raft\\.server\\" +
+      ".([a-z\\.]+)";
+  String RATIS_SERVER_GRPC_HEADER_REGEX = "datanode\\.ratis\\.raft\\.grpc\\" +
+      ".([a-z\\.]+)";
+
 
   static String toRaftPeerIdString(DatanodeDetails id) {
     return id.getUuidString();
@@ -149,26 +151,12 @@ public interface RatisHelper {
   }
 
   static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
-      RetryPolicy retryPolicy, int maxOutStandingRequest,
-      GrpcTlsConfig tlsConfig, TimeDuration timeout,
+      RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       Configuration ozoneConfiguration) throws IOException {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
-            pipeline.getNodes()), retryPolicy, maxOutStandingRequest, tlsConfig,
-        timeout, ozoneConfiguration);
-  }
-
-  static TimeDuration getClientRequestTimeout(Configuration conf) {
-    // Set the client requestTimeout
-    final TimeUnit timeUnit =
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT
-            .getUnit();
-    final long duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_KEY,
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT
-            .getDuration(), timeUnit);
-    return TimeDuration.valueOf(duration, timeUnit);
+            pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
 
   static RpcType getRpcType(Configuration conf) {
@@ -178,57 +166,43 @@ public interface RatisHelper {
   }
 
   static RaftClient newRaftClient(RaftPeer leader, Configuration conf) {
-    return newRaftClient(getRpcType(conf), leader, RetryPolicies.noRetry(),
-        GrpcConfigKeys.OutputStream.OUTSTANDING_APPENDS_MAX_DEFAULT,
-        getClientRequestTimeout(conf), conf);
+    return newRaftClient(getRpcType(conf), leader,
+        RatisHelper.createRetryPolicy(conf), conf);
   }
 
   static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
-      RetryPolicy retryPolicy, int maxOutstandingRequests,
-      GrpcTlsConfig tlsConfig, TimeDuration clientRequestTimeout,
+      RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
       Configuration configuration) {
     return newRaftClient(rpcType, leader.getId(),
         newRaftGroup(Collections.singletonList(leader)), retryPolicy,
-        maxOutstandingRequests, tlsConfig, clientRequestTimeout, configuration);
+        tlsConfig, configuration);
   }
 
   static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
-      RetryPolicy retryPolicy, int maxOutstandingRequests,
-      TimeDuration clientRequestTimeout,
+      RetryPolicy retryPolicy,
       Configuration ozoneConfiguration) {
     return newRaftClient(rpcType, leader.getId(),
-        newRaftGroup(Collections.singletonList(leader)), retryPolicy,
-        maxOutstandingRequests, null, clientRequestTimeout,
+        newRaftGroup(Collections.singletonList(leader)), retryPolicy, null,
         ozoneConfiguration);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader,
-      RaftGroup group, RetryPolicy retryPolicy, int maxOutStandingRequest,
-      GrpcTlsConfig tlsConfig, TimeDuration clientRequestTimeout,
-      Configuration ozoneConfiguration) {
+      RaftGroup group, RetryPolicy retryPolicy,
+      GrpcTlsConfig tlsConfig, Configuration ozoneConfiguration) {
     if (LOG.isTraceEnabled()) {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
     }
     final RaftProperties properties = new RaftProperties();
 
+    RaftConfigKeys.Rpc.setType(properties, rpcType);
+
     // Set the ratis client headers which are matching with regex.
     createRaftClientProperties(ozoneConfiguration, properties);
 
     // Set the ratis grpc client headers which are matching with regex.
     createRaftGrpcProperties(ozoneConfiguration, properties);
-
-    RaftConfigKeys.Rpc.setType(properties, rpcType);
-    RaftClientConfigKeys.Rpc
-        .setRequestTimeout(properties, clientRequestTimeout);
-
-    GrpcConfigKeys.setMessageSizeMax(properties,
-        SizeInBytes.valueOf(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE));
-
-    // set async max outstanding requests.
-    RaftClientConfigKeys.Async.setMaxOutstandingRequests(properties,
-        maxOutStandingRequest);
 
     RaftClient.Builder builder =  RaftClient.newBuilder()
         .setRaftGroup(group)
@@ -270,6 +244,15 @@ public interface RatisHelper {
     ratisClientConf.forEach((key, val) -> raftProperties.set(key, val));
   }
 
+  static void createRaftServerGrpcProperties(Configuration ozoneConf,
+      RaftProperties raftProperties) {
+    Map<String, String> ratisClientConf =
+        ozoneConf.getValByRegex(RATIS_SERVER_GRPC_HEADER_REGEX);
+    ratisClientConf.forEach((key, val) -> raftProperties.set(
+        removeDatanodePrefix(key), val));
+  }
+
+
   /**
    * Set all the properties matching with regex
    * {@link RatisHelper#RATIS_SERVER_HEADER_REGEX} in ozone configuration
@@ -281,7 +264,12 @@ public interface RatisHelper {
        RaftProperties raftProperties) {
     Map<String, String> ratisServerConf =
         ozoneConf.getValByRegex(RATIS_SERVER_HEADER_REGEX);
-    ratisServerConf.forEach((key, val) -> raftProperties.set(key, val));
+    ratisServerConf.forEach((key, val) -> raftProperties.set(
+        removeDatanodePrefix(key), val));
+  }
+
+  static String removeDatanodePrefix(String key) {
+    return key.replaceFirst(DATANODE_RATIS_SERVER_CONFIG_PREFIX, "");
   }
 
   // For External gRPC client to server with gRPC TLS.

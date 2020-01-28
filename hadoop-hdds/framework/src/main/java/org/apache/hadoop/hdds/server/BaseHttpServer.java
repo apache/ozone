@@ -17,30 +17,29 @@
 
 package org.apache.hadoop.hdds.server;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdds.conf.HddsConfServlet;
-import org.apache.hadoop.http.HttpConfig;
-import org.apache.hadoop.http.HttpServer2;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.net.NetUtils;
-
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.eclipse.jetty.webapp.WebAppContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.servlet.http.HttpServlet;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.HddsConfServlet;
+import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.http.HttpConfig;
+import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import org.eclipse.jetty.webapp.WebAppContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base class for HTTP server of the Ozone related components.
@@ -86,12 +85,12 @@ public abstract class BaseHttpServer {
           name, getSpnegoPrincipal(), getKeytabFile());
 
       final boolean xFrameEnabled = conf.getBoolean(
-          DFSConfigKeys.DFS_XFRAME_OPTION_ENABLED,
-          DFSConfigKeys.DFS_XFRAME_OPTION_ENABLED_DEFAULT);
+          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED,
+          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED_DEFAULT);
 
       final String xFrameOptionValue = conf.getTrimmed(
-          DFSConfigKeys.DFS_XFRAME_OPTION_VALUE,
-          DFSConfigKeys.DFS_XFRAME_OPTION_VALUE_DEFAULT);
+          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE,
+          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE_DEFAULT);
 
       builder.configureXFrame(xFrameEnabled).setXFrameOption(xFrameOptionValue);
 
