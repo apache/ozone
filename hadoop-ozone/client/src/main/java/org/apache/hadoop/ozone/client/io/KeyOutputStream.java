@@ -573,8 +573,8 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-    public Builder setStreamBufferSize(int streamBufferSize) {
-      this.streamBufferSize = streamBufferSize;
+    public Builder setStreamBufferSize(int size) {
+      this.streamBufferSize = size;
       return this;
     }
 
