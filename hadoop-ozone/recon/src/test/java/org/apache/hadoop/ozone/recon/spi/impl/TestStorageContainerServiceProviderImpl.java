@@ -26,45 +26,68 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
+
+import com.google.inject.AbstractModule;
+import com.google.inject.Guice;
+import com.google.inject.Injector;
 
 /**
  * Class to test StorageContainerServiceProviderImpl APIs.
  */
 public class TestStorageContainerServiceProviderImpl {
 
+  private Injector injector;
+  private HddsProtos.PipelineID pipelineID;
+
+  @Before
+  public void setup() {
+    injector = Guice.createInjector(new AbstractModule() {
+      @Override
+      protected void configure() {
+        try {
+          StorageContainerLocationProtocol mockScmClient = mock(
+              StorageContainerLocationProtocol.class);
+          pipelineID = PipelineID.randomId().getProtobuf();
+          when(mockScmClient.getPipeline(pipelineID))
+              .thenReturn(mock(Pipeline.class));
+          bind(StorageContainerLocationProtocol.class)
+              .toInstance(mockScmClient);
+          bind(StorageContainerServiceProvider.class)
+              .to(StorageContainerServiceProviderImpl.class);
+        } catch (Exception e) {
+          Assert.fail();
+        }
+      }
+    });
+  }
+
   @Test
   public void testGetPipelines() throws IOException {
-
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    StorageContainerLocationProtocol mockScmClient = mock(
-        StorageContainerLocationProtocol.class);
     StorageContainerServiceProvider scmProvider =
-        new StorageContainerServiceProviderImpl(configuration, mockScmClient);
+        injector.getInstance(StorageContainerServiceProvider.class);
+    StorageContainerLocationProtocol scmClient =
+        injector.getInstance(StorageContainerLocationProtocol.class);
     scmProvider.getPipelines();
-    verify(mockScmClient, times(1)).listPipelines();
+    verify(scmClient, times(1)).listPipelines();
   }
 
   @Test
   public void testGetPipeline() throws IOException {
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    StorageContainerLocationProtocol mockScmClient = mock(
-        StorageContainerLocationProtocol.class);
-    HddsProtos.PipelineID pipelineID = PipelineID.randomId().getProtobuf();
-    when(mockScmClient.getPipeline(pipelineID))
-        .thenReturn(mock(Pipeline.class));
-
     StorageContainerServiceProvider scmProvider =
-        new StorageContainerServiceProviderImpl(configuration, mockScmClient);
+        injector.getInstance(StorageContainerServiceProvider.class);
+    StorageContainerLocationProtocol scmClient =
+        injector.getInstance(StorageContainerLocationProtocol.class);
     Pipeline pipeline = scmProvider.getPipeline(pipelineID);
     assertNotNull(pipeline);
-    verify(mockScmClient, times(1))
+    verify(scmClient, times(1))
         .getPipeline(pipelineID);
   }
 }
