@@ -44,8 +44,8 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V1;
@@ -189,7 +189,7 @@ public class IncrementalV1ChunkManager implements ChunkManager {
 
   private static final class OpenFiles {
 
-    private final Map<String, OpenFile> files = new HashMap<>();
+    private final Map<String, OpenFile> files = new ConcurrentHashMap<>();
 
     public FileChannel getChannel(File file, boolean sync) {
       return files.computeIfAbsent(file.getAbsolutePath(),
