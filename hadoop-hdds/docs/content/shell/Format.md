@@ -53,12 +53,12 @@ create, list, delete etc.
 
 Ozone URL can point to a volume, bucket or keys in the following format:
 
-_\[scheme\]\[server:port\]/volume/bucket/key_
+_\[schema\]\[server:port\]/volume/bucket/key_
 
 
 Where,
 
-1. **Scheme** - This should be `o3` which is the native RPC protocol to access
+1. **Schema** - This should be `o3` which is the native RPC protocol to access
   Ozone API. The usage of the schema is optional.
 
 2. **Server:Port** - This is the address of the Ozone Manager. If the port is

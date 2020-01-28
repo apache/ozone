@@ -19,7 +19,8 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
-import org.apache.hadoop.hdfs.DFSUtil;
+
+import org.apache.hadoop.hdds.StringUtils;
 
 /**
  * Codec to convert String to/from byte array.
@@ -29,7 +30,7 @@ public class StringCodec implements Codec<String> {
   @Override
   public byte[] toPersistedFormat(String object) throws IOException {
     if (object != null) {
-      return DFSUtil.string2Bytes(object);
+      return StringUtils.string2Bytes(object);
     } else {
       return null;
     }
@@ -38,7 +39,7 @@ public class StringCodec implements Codec<String> {
   @Override
   public String fromPersistedFormat(byte[] rawData) throws IOException {
     if (rawData != null) {
-      return DFSUtil.bytes2String(rawData);
+      return StringUtils.bytes2String(rawData);
     } else {
       return null;
     }

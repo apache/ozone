@@ -44,9 +44,8 @@ public class OzoneFileStatus extends FileStatus {
     keyInfo = key;
   }
 
-  public OzoneFileStatus(FileStatus status, OmKeyInfo key) throws IOException {
+  public OzoneFileStatus(FileStatus status) throws IOException {
     super(status);
-    keyInfo = key;
   }
 
   // Use this constructor only for directories
@@ -55,18 +54,13 @@ public class OzoneFileStatus extends FileStatus {
   }
 
   public OzoneFileStatusProto getProtobuf() throws IOException {
-    OzoneFileStatusProto.Builder builder = OzoneFileStatusProto.newBuilder()
-        .setStatus(PBHelper.convert(this));
-    if (keyInfo != null) {
-      builder.setKeyInfo(keyInfo.getProtobuf());
-    }
-    return builder.build();
+    return OzoneFileStatusProto.newBuilder().setStatus(PBHelper.convert(this))
+        .build();
   }
 
   public static OzoneFileStatus getFromProtobuf(OzoneFileStatusProto response)
       throws IOException {
-    return new OzoneFileStatus(PBHelper.convert(response.getStatus()),
-        OmKeyInfo.getFromProtobuf(response.getKeyInfo()));
+    return new OzoneFileStatus(PBHelper.convert(response.getStatus()));
   }
 
   public static Path getPath(String keyName) {

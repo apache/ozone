@@ -173,7 +173,7 @@ public class HeartbeatEndpointTask
     if (requestBuilder.getIncrementalContainerReportCount() != 0) {
       reports.addAll(requestBuilder.getIncrementalContainerReportList());
     }
-    context.putBackReports(reports);
+    context.putBackReports(reports, rpcEndpoint.getAddressString());
   }
 
   /**
@@ -182,7 +182,8 @@ public class HeartbeatEndpointTask
    * @param requestBuilder builder to which the report has to be added.
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
-    for (GeneratedMessage report : context.getAllAvailableReports()) {
+    for (GeneratedMessage report :
+        context.getAllAvailableReports(rpcEndpoint.getAddressString())) {
       String reportName = report.getDescriptorForType().getFullName();
       for (Descriptors.FieldDescriptor descriptor :
           SCMHeartbeatRequestProto.getDescriptor().getFields()) {
@@ -206,7 +207,7 @@ public class HeartbeatEndpointTask
   private void addContainerActions(
       SCMHeartbeatRequestProto.Builder requestBuilder) {
     List<ContainerAction> actions = context.getPendingContainerAction(
-        maxContainerActionsPerHB);
+        rpcEndpoint.getAddressString(), maxContainerActionsPerHB);
     if (!actions.isEmpty()) {
       ContainerActionsProto cap = ContainerActionsProto.newBuilder()
           .addAllContainerActions(actions)
@@ -223,7 +224,7 @@ public class HeartbeatEndpointTask
   private void addPipelineActions(
       SCMHeartbeatRequestProto.Builder requestBuilder) {
     List<PipelineAction> actions = context.getPendingPipelineAction(
-        maxPipelineActionsPerHB);
+        rpcEndpoint.getAddressString(), maxPipelineActionsPerHB);
     if (!actions.isEmpty()) {
       PipelineActionsProto pap = PipelineActionsProto.newBuilder()
           .addAllPipelineActions(actions)
