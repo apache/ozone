@@ -39,12 +39,12 @@ public class ReconPipelineFactory extends PipelineFactory {
       LoggerFactory.getLogger(ReconPipelineFactory.class);
 
   ReconPipelineFactory() {
-    ReconMockPipelineProvider reconMockPipelineProvider =
-        new ReconMockPipelineProvider();
+    ReconPipelineProvider reconMockPipelineProvider =
+        new ReconPipelineProvider();
     setProviders(new DefaultedMap(reconMockPipelineProvider));
   }
 
-  static class ReconMockPipelineProvider implements PipelineProvider {
+  static class ReconPipelineProvider implements PipelineProvider {
 
     @Override
     public Pipeline create(HddsProtos.ReplicationFactor factor){

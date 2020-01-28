@@ -176,7 +176,7 @@ public class TestRecon {
   }
 
   @Test
-  public void testReconWithOzoneManager() throws Exception {
+  public void testRecon() throws Exception {
     //add a vol, bucket and key
     addKeys(0, 1);
 

@@ -79,38 +79,44 @@ public class ReconPipelineManager extends SCMPipelineManager {
    * @throws IOException on exception.
    */
   void initializePipelines(List<Pipeline> pipelinesFromScm) throws IOException {
-    List<Pipeline> pipelinesInHouse = getPipelines();
-    LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
 
-    for (Pipeline pipeline : pipelinesFromScm) {
-      if (!containsPipeline(pipeline.getId())) {
-        // New pipeline got from SCM. Recon does not know anything about it,
-        // so let's add it.
-        LOG.info("Adding new pipeline {} from SCM.", pipeline.getId());
-        addPipeline(pipeline);
-      } else {
-        // Recon already has this pipeline. Just update state.
-        getStateManager().updatePipelineState(pipeline.getId(),
-            pipeline.getPipelineState());
+    getLock().writeLock().lock();
+    try {
+      List<Pipeline> pipelinesInHouse = getPipelines();
+      LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
+
+      for (Pipeline pipeline : pipelinesFromScm) {
+        if (!containsPipeline(pipeline.getId())) {
+          // New pipeline got from SCM. Recon does not know anything about it,
+          // so let's add it.
+          LOG.info("Adding new pipeline {} from SCM.", pipeline.getId());
+          addPipeline(pipeline);
+        } else {
+          // Recon already has this pipeline. Just update state.
+          getStateManager().updatePipelineState(pipeline.getId(),
+              pipeline.getPipelineState());
+        }
       }
+
+      // Removing pipelines in Recon that are no longer in SCM.
+      // TODO Recon may need to track inactive pipelines as well. So this can be
+      // removed in a followup JIRA.
+      List<Pipeline> invalidPipelines = pipelinesInHouse
+          .stream()
+          .filter(p -> !pipelinesFromScm.contains(p))
+          .collect(Collectors.toList());
+      invalidPipelines.forEach(p -> {
+        PipelineID pipelineID = p.getId();
+        try {
+          LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
+          removePipeline(pipelineID);
+        } catch (IOException e) {
+          LOG.warn("Unable to remove pipeline {}", pipelineID);
+        }
+      });
+    } finally {
+      getLock().writeLock().unlock();
     }
-
-    // Removing pipelines in Recon that are no longer in SCM.
-    // TODO Recon may need to track inactive pipelines as well. So this can be
-    // removed in a followup JIRA.
-    List<Pipeline> invalidPipelines = pipelinesInHouse
-            .stream()
-            .filter(p -> !pipelinesFromScm.contains(p))
-            .collect(Collectors.toList());
-    invalidPipelines.forEach(p -> {
-      PipelineID pipelineID = p.getId();
-      try {
-        LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
-        removePipeline(pipelineID);
-      } catch (IOException e) {
-        LOG.warn("Unable to remove pipeline {}", pipelineID);
-      }
-    });
   }
 
   /**

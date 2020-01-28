@@ -45,7 +45,7 @@ public class StorageContainerServiceProviderImpl
 
   private OzoneConfiguration configuration;
   private StorageContainerLocationProtocol scmClient;
-  private boolean isInitialized = false;
+  private volatile boolean isInitialized = false;
 
   @Inject
   public StorageContainerServiceProviderImpl(OzoneConfiguration configuration,
@@ -53,41 +53,38 @@ public class StorageContainerServiceProviderImpl
     this.configuration = configuration;
     this.scmClient = scmClient;
     if (this.scmClient != null) {
+      initialize();
       isInitialized = true;
     }
   }
 
   private void initialize() {
-    try {
-      this.scmClient = newContainerRpcClient(configuration);
-    } catch (IOException ioEx) {
-      LOG.error("Exception encountered while creating SCM client.", ioEx);
+    if (!isInitialized) {
+      try {
+        this.scmClient = newContainerRpcClient(configuration);
+      } catch (IOException ioEx) {
+        LOG.error("Exception encountered while creating SCM client.", ioEx);
+      }
+      isInitialized = true;
     }
-    isInitialized = true;
   }
 
   @Override
   public List<Pipeline> getPipelines() throws IOException {
-    if (!isInitialized) {
-      initialize();
-    }
     if (isInitialized) {
       return scmClient.listPipelines();
     } else {
-      throw new IOException("Unable to initialize SCM client.");
+      throw new IOException("SCM client not initialized");
     }
   }
 
   @Override
   public Pipeline getPipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
-    if (!isInitialized) {
-      initialize();
-    }
     if (isInitialized) {
       return scmClient.getPipeline(pipelineID);
     } else {
-      throw new IOException("Unable to initialize SCM client.");
+      throw new IOException("SCM client not initialized");
     }
   }
 

@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.ozone.recon.scm.ReconPipelineFactory.ReconMockPipelineProvider;
+import org.apache.hadoop.ozone.recon.scm.ReconPipelineFactory.ReconPipelineProvider;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -159,7 +159,7 @@ public class TestReconPipelineManager {
     for (ReplicationType type  : reconPipelineFactory.getProviders().keySet()) {
       PipelineProvider pipelineProvider =
           reconPipelineFactory.getProviders().get(type);
-      assertTrue(pipelineProvider instanceof ReconMockPipelineProvider);
+      assertTrue(pipelineProvider instanceof ReconPipelineProvider);
     }
   }
 

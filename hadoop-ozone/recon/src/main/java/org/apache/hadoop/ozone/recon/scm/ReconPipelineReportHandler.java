@@ -76,7 +76,7 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
       return;
     }
 
-    reportDatanode(pipeline, dn);
+    setReportedDatanode(pipeline, dn);
     setPipelineLeaderId(report, pipeline, dn);
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {

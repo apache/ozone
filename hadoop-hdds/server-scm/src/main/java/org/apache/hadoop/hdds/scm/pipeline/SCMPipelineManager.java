@@ -212,11 +212,14 @@ public class SCMPipelineManager implements PipelineManager {
 
   @Override
   public boolean containsPipeline(PipelineID pipelineID) {
+    lock.readLock().lock();
     try {
       getPipeline(pipelineID);
       return true;
     } catch (PipelineNotFoundException e) {
       return false;
+    } finally {
+      lock.readLock().unlock();
     }
   }
 

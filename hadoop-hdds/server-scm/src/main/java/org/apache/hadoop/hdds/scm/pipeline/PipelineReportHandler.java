@@ -102,7 +102,7 @@ public class PipelineReportHandler implements
       return;
     }
 
-    reportDatanode(pipeline, dn);
+    setReportedDatanode(pipeline, dn);
     setPipelineLeaderId(report, pipeline, dn);
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
@@ -118,7 +118,7 @@ public class PipelineReportHandler implements
   }
 
 
-  protected void reportDatanode(Pipeline pipeline, DatanodeDetails dn)
+  protected void setReportedDatanode(Pipeline pipeline, DatanodeDetails dn)
       throws IOException {
     pipeline.reportDatanode(dn);
   }
