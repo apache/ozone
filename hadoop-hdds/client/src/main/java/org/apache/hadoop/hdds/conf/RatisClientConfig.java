@@ -69,7 +69,7 @@ public class RatisClientConfig {
       type = ConfigType.TIME,
       tags = {OZONE, CLIENT, PERFORMANCE},
       description = "The timeout duration for ratis client watch request. " +
-          "Timeout for the watch API in Ratis client to acknowledgea " +
+          "Timeout for the watch API in Ratis client to acknowledge a " +
           "particular request getting replayed to all servers."
   )
   private long watchRequestTimeOut = 180 * 1000;

@@ -105,11 +105,6 @@ public final class ScmConfigKeys {
   // TODO: Set to 1024 once RATIS issue around purge is fixed.
   public static final int DFS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT =
       1000000;
-
-  public static final String DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS =
-      "dfs.container.ratis.leader.num.pending.requests";
-  public static final int
-      DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT = 4096;
   public static final String DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
       "dfs.container.ratis.leader.pending.bytes.limit";
   public static final String
@@ -128,11 +123,6 @@ public final class ScmConfigKeys {
   public static final TimeDuration
       DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT =
       TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
-  public static final String DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_KEY =
-      "dfs.ratis.server.request.timeout.duration";
-  public static final TimeDuration
-      DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_DEFAULT =
-      TimeDuration.valueOf(3000, TimeUnit.MILLISECONDS);
   public static final String
       DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
       "dfs.ratis.leader.election.minimum.timeout.duration";
@@ -143,12 +133,6 @@ public final class ScmConfigKeys {
   public static final String DFS_RATIS_SNAPSHOT_THRESHOLD_KEY =
       "dfs.ratis.snapshot.threshold";
   public static final long DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT = 100000;
-
-  public static final String DFS_RATIS_SERVER_FAILURE_DURATION_KEY =
-      "dfs.ratis.server.failure.duration";
-  public static final TimeDuration
-      DFS_RATIS_SERVER_FAILURE_DURATION_DEFAULT =
-      TimeDuration.valueOf(120, TimeUnit.SECONDS);
 
   // TODO : this is copied from OzoneConsts, may need to move to a better place
   public static final String OZONE_SCM_CHUNK_SIZE_KEY = "ozone.scm.chunk.size";
