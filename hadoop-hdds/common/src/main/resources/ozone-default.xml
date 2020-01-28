@@ -204,14 +204,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.leader.num.pending.requests</name>
-    <value>4096</value>
-    <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum number of pending requests after which the leader
-      starts rejecting requests from client.
-    </description>
-  </property>
-  <property>
     <name>dfs.container.ratis.leader.pending.bytes.limit</name>
     <value>1GB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
@@ -272,26 +264,11 @@
     <description>Retry Cache entry timeout for ratis server.</description>
   </property>
   <property>
-    <name>dfs.ratis.server.request.timeout.duration</name>
-    <value>3s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for ratis server request.</description>
-  </property>
-  <property>
     <name>dfs.ratis.leader.election.minimum.timeout.duration</name>
     <value>5s</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for ratis leader election.
         Default is 5s.
-    </description>
-  </property>
-  <property>
-    <name>dfs.ratis.server.failure.duration</name>
-    <value>120s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for ratis server failure detection,
-      once the threshold has reached, the ratis state machine will be informed
-      about the failure in the ratis ring
     </description>
   </property>
   <property>

@@ -105,8 +105,10 @@ public class TestRatisHelper {
   public void testCreateRaftServerProperties() {
 
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set("raft.server.rpc.watch.request.timeout", "30s");
-    ozoneConfiguration.set("raft.server.rpc.request.timeout", "30s");
+    ozoneConfiguration.set(
+        "datanode.ratis.raft.server.rpc.watch.request.timeout", "30s");
+    ozoneConfiguration.set(
+        "datanode.ratis.raft.server.rpc.request.timeout", "30s");
 
     RaftProperties raftProperties = new RaftProperties();
     RatisHelper.createRaftServerProperties(ozoneConfiguration, raftProperties);

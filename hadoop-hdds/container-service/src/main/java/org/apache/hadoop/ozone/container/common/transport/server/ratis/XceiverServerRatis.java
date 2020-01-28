@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
@@ -124,11 +125,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     final int numWriteChunkThreads = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
-    final int queueLimit = conf.getInt(
-            OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
-            OzoneConfigKeys.
-                    DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
-    );
+    final int queueLimit = OzoneConfiguration.of(conf)
+        .getObject(DatanodeRatisServerConfig.class)
+        .getLeaderNumPendingRequests();
     chunkExecutor =
         new ThreadPoolExecutor(numWriteChunkThreads, numWriteChunkThreads,
             100, TimeUnit.SECONDS,
@@ -183,9 +182,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         TimeDuration.valueOf(duration, timeUnit);
     RaftServerConfigKeys.Log.StateMachineData
         .setSyncTimeout(properties, dataSyncTimeout);
-
-    // Set the server Request timeout
-    setServerRequestTimeout(properties);
 
     // set timeout for a retry cache entry
     setTimeoutForRetryCache(properties);
@@ -275,21 +271,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void setNodeFailureTimeout(RaftProperties properties) {
-    TimeUnit timeUnit;
-    long duration;
-    timeUnit = OzoneConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_DEFAULT
-        .getUnit();
-    duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_KEY,
-        OzoneConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_DEFAULT
-            .getDuration(), timeUnit);
-    final TimeDuration nodeFailureTimeout =
-        TimeDuration.valueOf(duration, timeUnit);
-    RaftServerConfigKeys.Notification.setNoLeaderTimeout(properties,
-        nodeFailureTimeout);
-    RaftServerConfigKeys.Rpc.setSlownessTimeout(properties,
-        nodeFailureTimeout);
-    nodeFailureTimeoutMs = nodeFailureTimeout.toLong(TimeUnit.MILLISECONDS);
+    nodeFailureTimeoutMs =
+        conf.getObject(DatanodeRatisServerConfig.class)
+            .getFollowerSlownessTimeout();
+
   }
 
   private void setRatisLeaderElectionTimeout(RaftProperties properties) {
@@ -327,21 +312,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         TimeDuration.valueOf(duration, timeUnit);
     RaftServerConfigKeys.RetryCache
         .setExpiryTime(properties, retryCacheTimeout);
-  }
-
-  private void setServerRequestTimeout(RaftProperties properties) {
-    TimeUnit timeUnit;
-    long duration;
-    timeUnit = OzoneConfigKeys.DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_DEFAULT
-        .getUnit();
-    duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_KEY,
-        OzoneConfigKeys.DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_DEFAULT
-            .getDuration(), timeUnit);
-    final TimeDuration serverRequestTimeout =
-        TimeDuration.valueOf(duration, timeUnit);
-    RaftServerConfigKeys.Rpc
-        .setRequestTimeout(properties, serverRequestTimeout);
   }
 
   private int setRaftSegmentPreallocatedSize(RaftProperties properties) {
@@ -388,11 +358,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void setPendingRequestsLimits(RaftProperties properties) {
-    final int maxPendingRequests = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT
-    );
-    RaftServerConfigKeys.Write.setElementLimit(properties, maxPendingRequests);
 
     final int pendingRequestsByteLimit = (int)conf.getStorageSize(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT,
