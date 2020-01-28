@@ -23,5 +23,6 @@ interface IBreadcrumbNameMap {
 export const breadcrumbNameMap: IBreadcrumbNameMap = {
   '/Overview': 'Overview',
   '/Datanodes': 'Datanodes',
-  '/Pipelines': 'Pipelines'
+  '/Pipelines': 'Pipelines',
+  '/MissingContainers': 'Missing Containers'
 };
