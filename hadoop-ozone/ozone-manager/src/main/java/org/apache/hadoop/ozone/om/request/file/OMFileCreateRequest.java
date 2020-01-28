@@ -219,7 +219,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
       if (dbKeyInfo != null) {
         // Check if this transaction is a replay of ratis logs.
-        // Check if this transaction is a replay of ratis logs.
         // We check only the KeyTable here and not the OpenKeyTable. In case
         // this transaction is a replay but the transaction was not committed
         // to the KeyTable, then we recreate the key in OpenKey table. This is
