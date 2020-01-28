@@ -15,28 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.om.exceptions;
 
-package org.apache.hadoop.ozone.om.response.file;
-
-import javax.annotation.Nonnull;
-
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import java.io.IOException;
 
 /**
- * Response for crate file request.
+ * Exception thrown by Ozone Manager when a transaction is replayed. This
+ * exception should not be thrown to client. It is used in
+ * OMClientRequest#validateAndUpdateCache to log error and continue in case
+ * of replay transaction.
  */
-public class OMFileCreateResponse extends OMKeyCreateResponse {
+public class OMReplayException extends IOException {
 
-  public OMFileCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, long openKeySessionID) {
-    super(omResponse, omKeyInfo, openKeySessionID);
+  public OMReplayException() {
+    // Dummy message. This exception is not thrown to client.
+    super("Replayed transaction");
   }
 
-  public OMFileCreateResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
+  public OMReplayException(String message) {
+    super(message);
   }
-
 }
