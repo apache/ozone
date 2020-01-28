@@ -589,7 +589,7 @@ public class BlockOutputStream extends OutputStream {
         bufferPool.byteStringConversion());
     ChecksumData checksumData = checksum.computeChecksum(chunk);
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
-        .setChunkName(blockID.get().getLocalID() + "_chunk" + ++chunkIndex)
+        .setChunkName(blockID.get().getLocalID() + "_chunk_" + ++chunkIndex)
         .setOffset(offset)
         .setLen(effectiveChunkSize)
         .setChecksumData(checksumData.getProtoBufMessage())

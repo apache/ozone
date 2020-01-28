@@ -83,12 +83,16 @@ public class IncrementalV1ChunkManager implements ChunkManager {
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
 
     if (info.getLen() <= 0) {
-      LOG.debug("Skip writing empty chunk {} in stage {}", info, stage);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skip writing empty chunk {} in stage {}", info, stage);
+      }
       return;
     }
 
     if (stage == COMMIT_DATA) {
-      LOG.debug("Ignore chunk {} in stage {}", info, stage);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Ignore chunk {} in stage {}", info, stage);
+      }
       return;
     }
 
@@ -204,13 +208,17 @@ public class IncrementalV1ChunkManager implements ChunkManager {
       }
     }
 
-    public void close(File chunkFile) throws IOException {
-      OpenFile openFile = files.remove(chunkFile.getAbsolutePath());
+    public void close(File file) throws IOException {
+      OpenFile openFile = files.remove(file.getAbsolutePath());
       if (openFile != null) {
-        LOG.debug("Closing file {}", chunkFile);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Closing file {}", file);
+        }
         openFile.close();
       } else {
-        LOG.debug("File {} not open", chunkFile);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("File {} not open", file);
+        }
       }
     }
   }
@@ -224,7 +232,9 @@ public class IncrementalV1ChunkManager implements ChunkManager {
       String mode = sync ? "rws" : "rw";
       this.file = new RandomAccessFile(file, mode);
       this.openedAt = Instant.now();
-      LOG.debug("Opened file {}", file);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Opened file {}", file);
+      }
     }
 
     public FileChannel getChannel() {

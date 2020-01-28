@@ -78,6 +78,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -454,7 +455,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             raftFuture.completeExceptionally(e);
             throw e;
           }
-        }, getChunkExecutor(chunkName));
+        }, getChunkExecutor(requestProto.getWriteChunk()));
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
@@ -500,8 +501,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     return raftFuture;
   }
 
-  private ExecutorService getChunkExecutor(String chunkName) {
-    int hash = chunkName.hashCode();
+  private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
+    int hash = Objects.hashCode(req.getBlockID());
     if (hash == Integer.MIN_VALUE) {
       hash = Integer.MAX_VALUE;
     }
@@ -657,8 +658,6 @@ public class ContainerStateMachine extends BaseStateMachine {
       Preconditions.checkArgument(!HddsUtils.isReadOnly(requestProto));
       if (requestProto.getCmdType() == Type.WriteChunk) {
         final CompletableFuture<ByteString> future = new CompletableFuture<>();
-        String chunkName =
-            requestProto.getWriteChunk().getChunkData().getChunkName();
         CompletableFuture.supplyAsync(() -> {
           try {
             future.complete(
@@ -669,7 +668,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             future.completeExceptionally(e);
           }
           return future;
-        }, getChunkExecutor(chunkName));
+        }, getChunkExecutor(requestProto.getWriteChunk()));
         return future;
       } else {
         throw new IllegalStateException("Cmd type:" + requestProto.getCmdType()

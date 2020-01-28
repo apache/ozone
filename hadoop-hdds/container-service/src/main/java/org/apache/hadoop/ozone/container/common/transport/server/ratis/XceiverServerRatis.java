@@ -749,6 +749,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private static List<ThreadPoolExecutor> createChunkExecutors(
       Configuration conf) {
+    // TODO create single pool with N threads if using non-incremental chunks
     final int threadCount = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
