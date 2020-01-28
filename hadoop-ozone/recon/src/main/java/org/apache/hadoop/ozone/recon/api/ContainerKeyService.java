@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.FETCH_ALL;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_CONTAINER_ID_DEFAULT_VALUE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
@@ -79,7 +79,8 @@ public class ContainerKeyService {
    */
   @GET
   public Response getContainers(
-      @DefaultValue(FETCH_ALL) @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+          int limit,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_PREVKEY) long prevKey) {
     Map<Long, ContainerMetadata> containersMap;
@@ -111,7 +112,8 @@ public class ContainerKeyService {
   @Path("/{id}/keys")
   public Response getKeysForContainer(
       @PathParam("id") Long containerID,
-      @DefaultValue(FETCH_ALL) @QueryParam(RECON_QUERY_LIMIT) int limit,
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+          int limit,
       @DefaultValue(StringUtils.EMPTY) @QueryParam(RECON_QUERY_PREVKEY)
           String prevKeyPrefix) {
     Map<String, KeyMetadata> keyMetadataMap = new LinkedHashMap<>();
