@@ -33,21 +33,21 @@ class OFSPath {
   /**
    * Here is a table illustrating what each name variable is given an input path
    * Assuming /tmp is mounted to /tempVol/tempBucket
-   * (null) means null, (empty) means empty string "".
+   * (empty) = empty string "".
    *
    * Path                  volumeName     bucketName     mountName    keyName
    * --------------------------------------------------------------------------
-   * /vol1/buc2/dir3/key4  vol1           buc2           (null)       dir3/key4
-   * /vol1/buc2            vol1           buc2           (null)       (empty)
-   * /vol1                 vol1           (null)         (null)       (empty)
+   * /vol1/buc2/dir3/key4  vol1           buc2           (empty)      dir3/key4
+   * /vol1/buc2            vol1           buc2           (empty)      (empty)
+   * /vol1                 vol1           (empty)        (empty)      (empty)
    * /tmp/dir3/key4        tempVol        tempBucket     tmp          dir3/key4
    *
    * Note the leading '/' doesn't matter.
    */
-  private String volumeName = null;
-  private String bucketName = null;
-  private String mountName = null;
-  private String keyName = null;
+  private String volumeName = "";
+  private String bucketName = "";
+  private String mountName = "";
+  private String keyName = "";
   private static final String OFS_MOUNT_NAME_TMP = "tmp";
 
   OFSPath(Path path) {
@@ -66,26 +66,23 @@ class OFSPath {
       String firstToken = token.nextToken();
       // TODO: Compare a keyword list instead for future expansion.
       if (firstToken.equals(OFS_MOUNT_NAME_TMP)) {
-        // TODO: Retrieve volume and bucket name with the mount name.
-        //  Set to null just for now.
         mountName = firstToken;
+        // TODO: Retrieve volume and bucket of the mount from user protobuf.
+        //  Leave them as "" just for now. Will be addressed in HDDS-2929
       } else if (numToken >= 2) {
         // Regular volume and bucket path
         volumeName = firstToken;
         bucketName = token.nextToken();
       } else {
-        // Volume only.
+        // Volume only
         volumeName = firstToken;
       }
 //    } else {  // TODO: Implement '/' case for ls.
     }
 
-    // Compose key name.
+    // Compose key name
     if (token.hasMoreTokens()) {
       keyName = token.nextToken("").substring(1);
-    } else {
-      // Assign empty String, keyName won't be null.
-      keyName = "";
     }
   }
 
@@ -125,7 +122,7 @@ class OFSPath {
   }
 
   public boolean isMount() {
-    return mountName != null;
+    return mountName.length() > 0;
   }
 
   private static boolean isInSameBucketAsInternal(

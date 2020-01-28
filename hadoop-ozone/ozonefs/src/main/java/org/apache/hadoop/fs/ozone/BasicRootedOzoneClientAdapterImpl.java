@@ -352,10 +352,24 @@ public class BasicRootedOzoneClientAdapterImpl
     LOG.trace("creating dir for path: {}", pathStr);
     incrementCounter(Statistic.OBJECTS_CREATED);
     OFSPath ofsPath = new OFSPath(pathStr);
+    // Volume name unspecified, return failure
+    if (ofsPath.getVolumeName().length() == 0) {
+      return false;
+    }
+    // Handle where only volume is specified in pathStr
+    if (ofsPath.getBucketName().length() == 0) {
+      objectStore.createVolume(ofsPath.getVolumeName());
+      return true;
+    }
     String keyStr = ofsPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, true);
-      bucket.createDirectory(keyStr);
+      // if keyStr is empty, it indicates that only volume or volume+bucket is
+      // given in pathStr, so getBucket() above should've handled the creation
+      // of volume/bucket already.
+      if (keyStr != null && keyStr.length() > 0) {
+        bucket.createDirectory(keyStr);
+      }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS) {
         throw new FileAlreadyExistsException(e.getMessage());

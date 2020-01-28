@@ -106,7 +106,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @After
-  public void teardown() throws IOException {
+  public void teardown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -238,11 +238,10 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Tests Mkdir operation on a volume that doesn't exist.
-   * Expect Mkdir to create the volume and bucket.
+   * Test mkdir on volume, bucket and dir that doesn't exist.
    */
   @Test
-  public void testMkdirOnNonExistentVolumeBucket() throws Exception {
+  public void testMkdirOnNonExistentVolumeBucketDir() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = "bucket-" + RandomStringUtils.randomNumeric(5);
     Path root = new Path("/" + volumeNameLocal + "/" + bucketNameLocal);
@@ -271,6 +270,52 @@ public class TestRootedOzoneFileSystem {
     assertEquals(fileStatuses.length, 0);
     fileStatuses = ofs.listStatus(dir2);
     assertEquals(fileStatuses.length, 0);
+  }
+
+  /**
+   * Tests mkdir on a volume and bucket that doesn't exist.
+   */
+  @Test
+  public void testMkdirNonExistentVolumeBucket() throws Exception {
+    String volumeNameLocal = getRandomNonExistVolumeName();
+    String bucketNameLocal = "bucket-" + RandomStringUtils.randomNumeric(5);
+    Path newVolBucket = new Path(
+        "/" + volumeNameLocal + "/" + bucketNameLocal);
+    fs.mkdirs(newVolBucket);
+
+    // Verify with listVolumes and listBuckets
+    Iterator<? extends OzoneVolume> iterVol =
+        objectStore.listVolumesByUser(null, volumeNameLocal, null);
+    OzoneVolume ozoneVolume = iterVol.next();
+    assertNotNull(ozoneVolume);
+    assertEquals(volumeNameLocal, ozoneVolume.getName());
+
+    Iterator<? extends OzoneBucket> iterBuc =
+        ozoneVolume.listBuckets("bucket-");
+    OzoneBucket ozoneBucket = iterBuc.next();
+    assertNotNull(ozoneBucket);
+    assertEquals(bucketNameLocal, ozoneBucket.getName());
+
+    // TODO: Use listStatus to check volume and bucket creation in HDDS-2928.
+  }
+
+  /**
+   * Tests mkdir on a volume that doesn't exist.
+   */
+  @Test
+  public void testMkdirNonExistentVolume() throws Exception {
+    String volumeNameLocal = getRandomNonExistVolumeName();
+    Path newVolume = new Path("/" + volumeNameLocal);
+    fs.mkdirs(newVolume);
+
+    // Verify with listVolumes and listBuckets
+    Iterator<? extends OzoneVolume> iterVol =
+        objectStore.listVolumesByUser(null, volumeNameLocal, null);
+    OzoneVolume ozoneVolume = iterVol.next();
+    assertNotNull(ozoneVolume);
+    assertEquals(volumeNameLocal, ozoneVolume.getName());
+
+    // TODO: Use listStatus to check volume and bucket creation in HDDS-2928.
   }
 
   /**
