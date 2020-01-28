@@ -438,8 +438,6 @@ public class ContainerStateMachine extends BaseStateMachine {
     CompletableFuture<Message> raftFuture = new CompletableFuture<>();
     // ensure the write chunk happens asynchronously in writeChunkExecutor pool
     // thread.
-    String chunkName =
-        requestProto.getWriteChunk().getChunkData().getChunkName();
     CompletableFuture<ContainerCommandResponseProto> writeChunkFuture =
         CompletableFuture.supplyAsync(() -> {
           try {
