@@ -444,10 +444,8 @@
     <value></value>
     <tag>OM, HA</tag>
     <description>
-      Comma-separated list of OM service Ids.
-
-      If not set, the default value of "omServiceIdDefault" is assigned as the
-      OM service ID.
+      Comma-separated list of OM service Ids. This property allows the client
+      to figure out quorum of OzoneManager address.
     </description>
   </property>
   <property>
