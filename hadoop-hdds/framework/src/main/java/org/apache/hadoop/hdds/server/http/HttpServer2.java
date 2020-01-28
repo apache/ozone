@@ -324,7 +324,7 @@ public final class HttpServer2 implements FilterContainer {
     }
 
     public Builder setPathSpec(String[] pathSpec) {
-      this.pathSpecs = pathSpec;
+      this.pathSpecs = pathSpec.clone();
       return this;
     }
 
