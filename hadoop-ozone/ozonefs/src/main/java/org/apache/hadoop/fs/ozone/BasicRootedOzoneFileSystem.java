@@ -80,8 +80,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private String userName;
   private Path workingDir;
   private OzoneClientAdapter adapter;
-  // TODO: Remove this.
-  private BasicRootedOzoneClientAdapterImpl adapterImpl;
 
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
@@ -140,7 +138,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // adapter should be initialized in operations.
       this.adapter = createAdapter(
           conf, omHostOrServiceId, omPort, isolatedClassloader);
-      this.adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
 
       try {
         this.userName =
@@ -244,6 +241,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     private final String srcPath;
     private final String dstPath;
     private final OzoneBucket bucket;
+    private final BasicRootedOzoneClientAdapterImpl adapterImpl;
 
     RenameIterator(Path srcPath, Path dstPath)
         throws IOException {
@@ -253,6 +251,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       LOG.trace("rename from:{} to:{}", this.srcPath, this.dstPath);
       // Initialize bucket here to reduce number of RPC calls
       OFSPath ofsPath = new OFSPath(srcPath);
+      // TODO: Refactor later.
+      adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
       this.bucket = adapterImpl.getBucket(ofsPath, false);
     }
 
@@ -378,6 +378,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private class DeleteIterator extends OzoneListingIterator {
     private boolean recursive;
     private final OzoneBucket bucket;
+    private final BasicRootedOzoneClientAdapterImpl adapterImpl;
 
     DeleteIterator(Path f, boolean recursive)
         throws IOException {
@@ -390,6 +391,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       }
       // Initialize bucket here to reduce number of RPC calls
       OFSPath ofsPath = new OFSPath(f);
+      // TODO: Refactor later.
+      adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
       this.bucket = adapterImpl.getBucket(ofsPath, false);
     }
 
