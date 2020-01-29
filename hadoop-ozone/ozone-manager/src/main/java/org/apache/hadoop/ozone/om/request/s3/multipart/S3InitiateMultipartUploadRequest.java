@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -59,6 +60,12 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3InitiateMultipartUploadRequest.class);
 
+  private enum Result {
+    SUCCESS,
+    REPLAY,
+    FAILURE
+  }
+
   public S3InitiateMultipartUploadRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -82,6 +89,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
@@ -104,6 +112,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     IOException exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     OmKeyInfo omKeyInfo = null;
+    Result result = null;
 
     OMResponse.Builder omResponse = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.InitiateMultiPartUpload)
@@ -117,6 +126,28 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
               bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+      // Check if this transaction is a replay.
+      // We check only the KeyTable here and not the OpenKeyTable. In case
+      // this transaction is a replay but the transaction was not committed
+      // to the KeyTable, then we recreate the key in OpenKey table. This is
+      // okay as all the subsequent transactions would also be replayed and
+      // the openKey table would eventually reach the same state.
+      // The reason we do not check the OpenKey table is to avoid a DB read
+      // in regular non-replay scenario.
+      String dbKeyName = omMetadataManager.getOzoneKey(volumeName, bucketName,
+          keyName);
+      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(dbKeyName);
+      if (dbKeyInfo != null) {
+        // Check if this transaction is a replay of ratis logs.
+        if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(),
+            transactionLogIndex)) {
+          // Replay implies the response has already been returned to
+          // the client. So take no further action and return a dummy
+          // OMClientResponse.
+          throw new OMReplayException();
+        }
+      }
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
@@ -136,10 +167,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       String multipartKey = omMetadataManager.getMultipartKey(volumeName,
           bucketName, keyName, keyArgs.getMultipartUploadID());
 
-      // Not checking if there is an already key for this in the keyTable, as
-      // during final complete multipart upload we take care of this. AWS S3
-      // behavior is also like this, even when key exists in a bucket, user
-      // can still initiate MPU.
+      // Even if this key already exists in the KeyTable, it would be taken
+      // care of in the final complete multipart upload. AWS S3 behavior is
+      // also like this, even when key exists in a bucket, user can still
+      // initiate MPU.
 
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
@@ -171,21 +202,31 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
-          new CacheValue<>(Optional.of(multipartKeyInfo), transactionLogIndex));
+          new CacheValue<>(Optional.of(multipartKeyInfo),
+              transactionLogIndex));
 
       omClientResponse =
-          new S3InitiateMultipartUploadResponse(multipartKeyInfo, omKeyInfo,
-          omResponse.setInitiateMultiPartUploadResponse(
-              MultipartInfoInitiateResponse.newBuilder()
-                  .setVolumeName(volumeName)
-                  .setBucketName(bucketName)
-                  .setKeyName(keyName)
-                  .setMultipartUploadID(keyArgs.getMultipartUploadID()))
-              .build());
+          new S3InitiateMultipartUploadResponse(
+              omResponse.setInitiateMultiPartUploadResponse(
+                  MultipartInfoInitiateResponse.newBuilder()
+                      .setVolumeName(volumeName)
+                      .setBucketName(bucketName)
+                      .setKeyName(keyName)
+                      .setMultipartUploadID(keyArgs.getMultipartUploadID()))
+                  .build(), multipartKeyInfo, omKeyInfo);
+
+      result = Result.SUCCESS;
     } catch (IOException ex) {
-      exception = ex;
-      omClientResponse = new S3InitiateMultipartUploadResponse(null, null,
-          createErrorOMResponse(omResponse, exception));
+      if (ex instanceof  OMReplayException) {
+        result = Result.REPLAY;
+        omClientResponse = new S3InitiateMultipartUploadResponse(
+            createReplayOMResponse(omResponse));
+      } else {
+        result = Result.FAILURE;
+        exception = ex;
+        omClientResponse = new S3InitiateMultipartUploadResponse(
+            createErrorOMResponse(omResponse, exception));
+      }
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
@@ -198,26 +239,31 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       }
     }
 
-
-
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.INITIATE_MULTIPART_UPLOAD, buildKeyArgsAuditMap(keyArgs),
         exception, getOmRequest().getUserInfo()));
 
-    if (exception == null) {
+    switch (result) {
+    case SUCCESS:
       LOG.debug("S3 InitiateMultipart Upload request for Key {} in " +
-          "Volume/Bucket {}/{} is successfully completed", keyName,
+              "Volume/Bucket {}/{} is successfully completed", keyName,
           volumeName, bucketName);
-
-      return omClientResponse;
-
-    } else {
+      break;
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}",
+          transactionLogIndex, multipartInfoInitiateRequest);
+      break;
+    case FAILURE:
       ozoneManager.getMetrics().incNumInitiateMultipartUploadFails();
       LOG.error("S3 InitiateMultipart Upload request for Key {} in " +
               "Volume/Bucket {}/{} is failed", keyName, volumeName, bucketName,
           exception);
-      return omClientResponse;
+    default:
+      LOG.error("Unrecognized Result for S3InitiateMultipartUploadRequest: {}",
+          multipartInfoInitiateRequest);
     }
+
+    return omClientResponse;
   }
 }

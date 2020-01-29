@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 /**
@@ -45,46 +44,51 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
   private String multipartKey;
   private OmMultipartKeyInfo omMultipartKeyInfo;
 
-  public S3MultipartUploadAbortResponse(String multipartKey,
-      @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OMResponse omResponse) {
+  public S3MultipartUploadAbortResponse(@Nonnull OMResponse omResponse,
+      String multipartKey,
+      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public S3MultipartUploadAbortResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
+    // Delete from openKey table and multipart info table.
+    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
+        multipartKey);
+    omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
+        multipartKey);
 
-      // Delete from openKey table and multipart info table.
-      omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-          multipartKey);
-      omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
-          multipartKey);
+    // Move all the parts to delete table
+    TreeMap<Integer, PartKeyInfo > partKeyInfoMap =
+        omMultipartKeyInfo.getPartKeyInfoMap();
+    for (Map.Entry<Integer, PartKeyInfo > partKeyInfoEntry :
+        partKeyInfoMap.entrySet()) {
+      PartKeyInfo partKeyInfo = partKeyInfoEntry.getValue();
+      OmKeyInfo currentKeyPartInfo =
+          OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 
-      // Move all the parts to delete table
-      TreeMap<Integer, PartKeyInfo > partKeyInfoMap =
-          omMultipartKeyInfo.getPartKeyInfoMap();
-      for (Map.Entry<Integer, PartKeyInfo > partKeyInfoEntry :
-          partKeyInfoMap.entrySet()) {
-        PartKeyInfo partKeyInfo = partKeyInfoEntry.getValue();
-        OmKeyInfo currentKeyPartInfo =
-            OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      RepeatedOmKeyInfo repeatedOmKeyInfo =
+          omMetadataManager.getDeletedTable().get(partKeyInfo.getPartName());
 
-        RepeatedOmKeyInfo repeatedOmKeyInfo =
-            omMetadataManager.getDeletedTable().get(partKeyInfo.getPartName());
+      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+          currentKeyPartInfo, repeatedOmKeyInfo);
 
-        repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            currentKeyPartInfo, repeatedOmKeyInfo);
-
-        omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-            partKeyInfo.getPartName(),
-            repeatedOmKeyInfo);
-      }
-
+      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+          partKeyInfo.getPartName(),
+          repeatedOmKeyInfo);
     }
   }
 }

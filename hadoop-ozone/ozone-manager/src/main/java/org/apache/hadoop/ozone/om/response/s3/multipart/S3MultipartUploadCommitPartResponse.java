@@ -35,7 +35,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Status.OK;
 
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 /**
@@ -50,17 +49,26 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
   private OzoneManagerProtocolProtos.PartKeyInfo oldMultipartKeyInfo;
 
 
-  public S3MultipartUploadCommitPartResponse(String multipartKey,
-      String openKey, @Nullable OmKeyInfo deletePartKeyInfo,
-      @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
-      @Nonnull OMResponse omResponse) {
+  public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
+      String multipartKey,
+      String openKey, @Nonnull OmKeyInfo deletePartKeyInfo,
+      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
+      @Nonnull OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
     this.deletePartKeyInfo = deletePartKeyInfo;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.oldMultipartKeyInfo = oldPartKeyInfo;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override

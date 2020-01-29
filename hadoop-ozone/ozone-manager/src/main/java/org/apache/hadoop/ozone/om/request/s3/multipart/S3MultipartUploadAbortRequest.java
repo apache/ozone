@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
@@ -38,6 +39,8 @@ import org.apache.hadoop.ozone.om.response.s3.multipart
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .MultipartUploadAbortRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -76,10 +79,12 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
-    OzoneManagerProtocolProtos.KeyArgs keyArgs =
-        getOmRequest().getAbortMultiPartUploadRequest().getKeyArgs();
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+
+    MultipartUploadAbortRequest multipartUploadAbortRequest = getOmRequest()
+        .getAbortMultiPartUploadRequest();
+    OzoneManagerProtocolProtos.KeyArgs keyArgs = multipartUploadAbortRequest
+        .getKeyArgs();
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -96,6 +101,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         .setStatus(OzoneManagerProtocolProtos.Status.OK)
         .setSuccess(true);
     OMClientResponse omClientResponse = null;
+    Result result = null;
     try {
       // TODO to support S3 ACL later.
       acquiredLock =
@@ -116,36 +122,51 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         throw new OMException("Abort Multipart Upload Failed: volume: " +
             volumeName + "bucket: " + bucketName + "key: " + keyName,
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
-      } else {
-        multipartKeyInfo = omMetadataManager
-            .getMultipartInfoTable().get(multipartKey);
-
-        multipartKeyInfo.setUpdateID(transactionLogIndex);
-
-        // Update cache of openKeyTable and multipartInfo table.
-        // No need to add the cache entries to delete table, as the entries
-        // in delete table are not used by any read/write operations.
-        omMetadataManager.getOpenKeyTable().addCacheEntry(
-            new CacheKey<>(multipartKey),
-            new CacheValue<>(Optional.absent(), transactionLogIndex));
-        omMetadataManager.getMultipartInfoTable().addCacheEntry(
-            new CacheKey<>(multipartKey),
-            new CacheValue<>(Optional.absent(), transactionLogIndex));
       }
 
-      omClientResponse = new S3MultipartUploadAbortResponse(multipartKey,
-          multipartKeyInfo,
+      // Check the OpenKeyTable if this transaction is a replay of ratis logs.
+      if (isReplay(ozoneManager, omKeyInfo.getUpdateID(), trxnLogIndex)) {
+        throw new OMReplayException();
+      }
+
+      multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
+          .get(multipartKey);
+
+      multipartKeyInfo.setUpdateID(trxnLogIndex);
+
+      // Update cache of openKeyTable and multipartInfo table.
+      // No need to add the cache entries to delete table, as the entries
+      // in delete table are not used by any read/write operations.
+      omMetadataManager.getOpenKeyTable().addCacheEntry(
+          new CacheKey<>(multipartKey),
+          new CacheValue<>(Optional.absent(), trxnLogIndex));
+      omMetadataManager.getMultipartInfoTable().addCacheEntry(
+          new CacheKey<>(multipartKey),
+          new CacheValue<>(Optional.absent(), trxnLogIndex));
+
+      omClientResponse = new S3MultipartUploadAbortResponse(
           omResponse.setAbortMultiPartUploadResponse(
-              MultipartUploadAbortResponse.newBuilder()).build());
+              MultipartUploadAbortResponse.newBuilder()).build(),
+          multipartKey, multipartKeyInfo);
+
+      result = Result.SUCCESS;
     } catch (IOException ex) {
-      exception = ex;
-      omClientResponse = new S3MultipartUploadAbortResponse(multipartKey,
-          multipartKeyInfo, createErrorOMResponse(omResponse, exception));
+      if (ex instanceof OMReplayException) {
+        result = Result.REPLAY;
+        omClientResponse = new S3MultipartUploadAbortResponse(
+            createReplayOMResponse(omResponse));
+      } else {
+        result = Result.FAILURE;
+        exception = ex;
+        omClientResponse =
+            new S3MultipartUploadAbortResponse(createErrorOMResponse(
+                omResponse, exception), multipartKey, multipartKeyInfo);
+      }
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+            omDoubleBufferHelper.add(omClientResponse,
+                trxnLogIndex));
       }
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
@@ -154,21 +175,32 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     }
 
     // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.ABORT_MULTIPART_UPLOAD, buildKeyArgsAuditMap(keyArgs),
-        exception, getOmRequest().getUserInfo()));
-
-    if (exception == null) {
-      LOG.debug("Abort Multipart request is successfully completed for " +
-          "KeyName {} in VolumeName/Bucket {}/{}", keyName, volumeName,
-          bucketName);
-    } else {
-      ozoneManager.getMetrics().incNumAbortMultipartUploadFails();
-      LOG.error("Abort Multipart request is failed for " +
-          "KeyName {} in VolumeName/Bucket {}/{}", keyName, volumeName,
-          bucketName, exception);
+    if (result != Result.REPLAY) {
+      auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+          OMAction.ABORT_MULTIPART_UPLOAD, buildKeyArgsAuditMap(keyArgs),
+          exception, getOmRequest().getUserInfo()));
     }
-    return omClientResponse;
 
+    switch (result) {
+    case SUCCESS:
+      LOG.debug("Abort Multipart request is successfully completed for " +
+              "KeyName {} in VolumeName/Bucket {}/{}", keyName, volumeName,
+          bucketName);
+      break;
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}",
+          trxnLogIndex, multipartUploadAbortRequest);
+      break;
+    case FAILURE:
+      ozoneManager.getMetrics().incNumAbortMultipartUploadFails();
+      LOG.error("Abort Multipart request is failed for KeyName {} in " +
+              "VolumeName/Bucket {}/{}", keyName, volumeName, bucketName,
+          exception);
+    default:
+      LOG.error("Unrecognized Result for S3MultipartUploadAbortRequest: {}",
+          multipartUploadAbortRequest);
+    }
+
+    return omClientResponse;
   }
 }
