@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -475,7 +476,7 @@ public class BasicRootedOzoneClientAdapterImpl
       bucket = getBucket(ofsPath, false);
     } catch (IOException ex) {
       // return an empty list on error
-      return new IteratorAdapter(new ArrayList<OzoneKey>().iterator());
+      return new IteratorAdapter(Collections.emptyIterator());
     }
     return new IteratorAdapter(bucket.listKeys(key));
   }
