@@ -95,8 +95,8 @@ public class TestOFSPath {
     // Mount only
     OFSPath ofsPath = new OFSPath("/tmp/");
     // TODO: HDDS-2929
-    Assert.assertEquals("", ofsPath.getVolumeName());
-    Assert.assertEquals("", ofsPath.getBucketName());
+    Assert.assertEquals("tempVolume", ofsPath.getVolumeName());
+    Assert.assertEquals("tempBucket", ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());
     Assert.assertEquals("", ofsPath.getKeyName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());
@@ -105,8 +105,8 @@ public class TestOFSPath {
     // Mount with key
     ofsPath = new OFSPath("/tmp/key1");
     // TODO: HDDS-2929
-    Assert.assertEquals("", ofsPath.getVolumeName());
-    Assert.assertEquals("", ofsPath.getBucketName());
+    Assert.assertEquals("tempVolume", ofsPath.getVolumeName());
+    Assert.assertEquals("tempBucket", ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());
     Assert.assertEquals("key1", ofsPath.getKeyName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());

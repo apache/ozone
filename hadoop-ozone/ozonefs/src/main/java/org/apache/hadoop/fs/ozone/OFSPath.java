@@ -70,7 +70,7 @@ class OFSPath {
         // TODO: Retrieve volume and bucket of the mount from user protobuf.
         //  Leave them hard-coded just for now. Will be addressed in HDDS-2929
         volumeName = "tempVolume";
-        mountName = "tempBucket";
+        bucketName = "tempBucket";
       } else if (numToken >= 2) {
         // Regular volume and bucket path
         volumeName = firstToken;
