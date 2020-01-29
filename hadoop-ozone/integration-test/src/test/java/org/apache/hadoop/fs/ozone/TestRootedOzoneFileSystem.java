@@ -55,6 +55,9 @@ import static org.junit.Assert.fail;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
+ *
+ * TODO: Refactor this and TestOzoneFileSystem to eliminate most
+ *  code duplication.
  */
 public class TestRootedOzoneFileSystem {
 
@@ -214,6 +217,9 @@ public class TestRootedOzoneFileSystem {
         3, fileStatuses.length);
   }
 
+  /**
+   * OFS: Helper function for tests. Return a volume name that doesn't exist.
+   */
   private String getRandomNonExistVolumeName() throws Exception {
     final int numDigit = 5;
     long retriesLeft = Math.round(Math.pow(10, 5));
@@ -238,7 +244,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Test mkdir on volume, bucket and dir that doesn't exist.
+   * OFS: Test mkdir on volume, bucket and dir that doesn't exist.
    */
   @Test
   public void testMkdirOnNonExistentVolumeBucketDir() throws Exception {
@@ -273,7 +279,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Tests mkdir on a volume and bucket that doesn't exist.
+   * OFS: Tests mkdir on a volume and bucket that doesn't exist.
    */
   @Test
   public void testMkdirNonExistentVolumeBucket() throws Exception {
@@ -300,7 +306,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Tests mkdir on a volume that doesn't exist.
+   * OFS: Tests mkdir on a volume that doesn't exist.
    */
   @Test
   public void testMkdirNonExistentVolume() throws Exception {
@@ -319,7 +325,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Tests listStatus operation on root directory.
+   * Tests listStatus operation in a bucket.
    */
   @Test
   public void testListStatusOnRoot() throws Exception {
@@ -433,8 +439,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Attempt to rename a key to a different bucket, expect failure.
-   * @throws IOException IOException from fs.mkdirs()
+   * OFS: Try to rename a key to a different bucket. The attempt should fail.
    */
   @Test
   public void testRenameToDifferentBucket() throws IOException {
