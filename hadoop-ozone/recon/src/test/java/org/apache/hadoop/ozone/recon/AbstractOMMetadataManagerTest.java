@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.junit.Assert.assertNotNull;
@@ -206,11 +207,11 @@ public abstract class AbstractOMMetadataManagerTest {
    * Return random pipeline.
    * @return pipeline
    */
-  protected Pipeline getRandomPipeline() {
+  public static Pipeline getRandomPipeline() {
     return Pipeline.newBuilder()
         .setFactor(HddsProtos.ReplicationFactor.ONE)
         .setId(PipelineID.randomId())
-        .setNodes(Collections.EMPTY_LIST)
+        .setNodes(Collections.singletonList(randomDatanodeDetails()))
         .setState(Pipeline.PipelineState.OPEN)
         .setType(HddsProtos.ReplicationType.STAND_ALONE)
         .build();

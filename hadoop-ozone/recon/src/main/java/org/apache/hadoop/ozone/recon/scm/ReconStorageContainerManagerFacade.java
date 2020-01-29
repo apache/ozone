@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREF
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import javax.inject.Inject;
@@ -42,14 +43,15 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,12 +70,14 @@ public class ReconStorageContainerManagerFacade
   private final SCMStorageConfig scmStorageConfig;
 
   private NodeManager scmNodeManager;
-  private PipelineManager pipelineManager;
+  private ReconPipelineManager pipelineManager;
   private ContainerManager containerManager;
   private NetworkTopology clusterMap;
+  private StorageContainerServiceProvider scmServiceProvider;
 
   @Inject
-  public ReconStorageContainerManagerFacade(OzoneConfiguration conf)
+  public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
+      StorageContainerServiceProvider scmServiceProvider)
       throws IOException {
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -88,12 +92,16 @@ public class ReconStorageContainerManagerFacade
         new ReconPipelineManager(conf, scmNodeManager, eventQueue);
     this.containerManager = new ReconContainerManager(conf, pipelineManager);
 
+    this.scmServiceProvider = scmServiceProvider;
+    initializePipelinesFromScm();
+
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(scmNodeManager);
 
     SafeModeManager safeModeManager = new ReconSafeModeManager();
-    PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(safeModeManager, pipelineManager, conf);
+    ReconPipelineReportHandler pipelineReportHandler =
+        new ReconPipelineReportHandler(
+            safeModeManager, pipelineManager, conf, scmServiceProvider);
 
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, conf);
@@ -105,7 +113,7 @@ public class ReconStorageContainerManagerFacade
 
     ContainerReportHandler containerReportHandler =
         new ContainerReportHandler(scmNodeManager, containerManager);
-    IncrementalContainerReportHandler incrementalContainerReportHandler =
+    IncrementalContainerReportHandler icrHandler =
         new IncrementalContainerReportHandler(scmNodeManager, containerManager);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, containerManager);
@@ -117,8 +125,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.STALE_NODE, staleNodeHandler);
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportHandler);
-    eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT,
-        incrementalContainerReportHandler);
+    eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT, icrHandler);
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
   }
@@ -186,6 +193,17 @@ public class ReconStorageContainerManagerFacade
 
   public ReconDatanodeProtocolServer getDatanodeProtocolServer() {
     return datanodeProtocolServer;
+  }
+
+  private void initializePipelinesFromScm() {
+    try {
+      List<Pipeline> pipelinesFromScm = scmServiceProvider.getPipelines();
+      LOG.info("Obtained {} pipelines from SCM.", pipelinesFromScm.size());
+      pipelineManager.initializePipelines(pipelinesFromScm);
+    } catch (IOException ioEx) {
+      LOG.error("Exception encountered while getting pipelines from SCM.",
+          ioEx);
+    }
   }
 
   @Override
