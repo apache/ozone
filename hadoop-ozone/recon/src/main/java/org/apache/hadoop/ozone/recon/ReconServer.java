@@ -27,6 +27,7 @@ import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
@@ -43,6 +44,8 @@ public class ReconServer extends GenericCli {
   private ContainerDBServiceProvider containerDBServiceProvider;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
   private ReconStorageContainerManagerFacade reconStorageContainerManager;
+
+  private volatile boolean isStarted = false;
 
   public static void main(String[] args) {
     new ReconServer().run(args);
@@ -71,7 +74,8 @@ public class ReconServer extends GenericCli {
     LOG.info("Initializing Recon server...");
     try {
 
-      this.containerDBServiceProvider = getContainerDBServiceProvider();
+      this.containerDBServiceProvider =
+          injector.getInstance(ContainerDBServiceProvider.class);
 
       ReconSchemaManager reconSchemaManager =
           injector.getInstance(ReconSchemaManager.class);
@@ -79,23 +83,23 @@ public class ReconServer extends GenericCli {
       reconSchemaManager.createReconSchema();
 
       httpServer = injector.getInstance(ReconHttpServer.class);
-      this.ozoneManagerServiceProvider = getOzoneManagerServiceProvider();
-      this.reconStorageContainerManager = getReconStorageContainerManager();
-
-      LOG.info("Starting Recon server");
-      httpServer.start();
-      ozoneManagerServiceProvider.start();
-      reconStorageContainerManager.start();
+      this.ozoneManagerServiceProvider =
+          injector.getInstance(OzoneManagerServiceProvider.class);
+      this.reconStorageContainerManager =
+          injector.getInstance(ReconStorageContainerManagerFacade.class);
       LOG.info("Recon server initialized successfully!");
 
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
-      stop();
     }
+    // Start all services
+    start();
+    isStarted = true;
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
         stop();
+        join();
       } catch (Exception e) {
         LOG.error("Error during stop Recon server", e);
       }
@@ -103,31 +107,46 @@ public class ReconServer extends GenericCli {
     return null;
   }
 
+  /**
+   * Need a way to restart services from tests.
+   */
+  public void start() throws Exception {
+    if (!isStarted) {
+      LOG.info("Starting Recon server");
+      httpServer.start();
+      ozoneManagerServiceProvider.start();
+      reconStorageContainerManager.start();
+      isStarted = true;
+    }
+  }
+
   public void stop() throws Exception {
-    LOG.info("Stopping Recon server");
-    if (httpServer != null) {
-      httpServer.stop();
+    if (isStarted) {
+      LOG.info("Stopping Recon server");
+      if (httpServer != null) {
+        httpServer.stop();
+      }
+      if (reconStorageContainerManager != null) {
+        reconStorageContainerManager.stop();
+      }
+      if (ozoneManagerServiceProvider != null) {
+        ozoneManagerServiceProvider.stop();
+      }
+      if (containerDBServiceProvider != null) {
+        containerDBServiceProvider.close();
+      }
+      isStarted = false;
     }
+  }
+
+  public void join() {
     if (reconStorageContainerManager != null) {
-      reconStorageContainerManager.stop();
-    }
-    if (ozoneManagerServiceProvider != null) {
-      ozoneManagerServiceProvider.stop();
-    }
-    if (containerDBServiceProvider != null) {
-      containerDBServiceProvider.stop();
+      reconStorageContainerManager.join();
     }
   }
 
-  private OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
-    return injector.getInstance(OzoneManagerServiceProvider.class);
-  }
-
-  private ReconStorageContainerManagerFacade getReconStorageContainerManager() {
-    return injector.getInstance(ReconStorageContainerManagerFacade.class);
-  }
-
-  private ContainerDBServiceProvider getContainerDBServiceProvider() {
-    return injector.getInstance(ContainerDBServiceProvider.class);
+  @VisibleForTesting
+  public OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
+    return ozoneManagerServiceProvider;
   }
 }
