@@ -1,5 +1,3 @@
-package org.apache.hadoop.ozone.recon.spi;
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,29 +16,42 @@ package org.apache.hadoop.ozone.recon.spi;
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.recon.spi.impl;
+
 import java.io.IOException;
 import java.util.List;
 
+import javax.inject.Inject;
+
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 
 /**
- * Interface to access SCM endpoints.
+ * Implementation for StorageContainerServiceProvider that talks with actual
+ * cluster SCM.
  */
-public interface StorageContainerServiceProvider {
+public class StorageContainerServiceProviderImpl
+    implements StorageContainerServiceProvider {
 
-  /**
-   * Returns the list of active Pipelines from SCM.
-   *
-   * @return list of Pipelines
-   * @throws IOException in case of any exception
-   */
-  List<Pipeline> getPipelines() throws IOException;
+  private StorageContainerLocationProtocol scmClient;
 
-  /**
-   * Requests SCM for a pipeline with ID.
-   * @return pipeline if present
-   * @throws IOException in case of exception
-   */
-  Pipeline getPipeline(HddsProtos.PipelineID pipelineID) throws IOException;
+  @Inject
+  public StorageContainerServiceProviderImpl(
+      StorageContainerLocationProtocol scmClient) {
+    this.scmClient = scmClient;
+  }
+
+  @Override
+  public List<Pipeline> getPipelines() throws IOException {
+    return scmClient.listPipelines();
+  }
+
+  @Override
+  public Pipeline getPipeline(HddsProtos.PipelineID pipelineID)
+      throws IOException {
+    return scmClient.getPipeline(pipelineID);
+  }
+
 }

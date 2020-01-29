@@ -87,8 +87,8 @@ public class PipelineReportHandler implements
     }
   }
 
-  private void processPipelineReport(PipelineReport report, DatanodeDetails dn,
-      EventPublisher publisher) throws IOException {
+  protected void processPipelineReport(PipelineReport report,
+      DatanodeDetails dn, EventPublisher publisher) throws IOException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(report.getPipelineID());
     Pipeline pipeline;
     try {
@@ -102,12 +102,8 @@ public class PipelineReportHandler implements
       return;
     }
 
-    pipeline.reportDatanode(dn);
-    // ONE replica pipeline doesn't have leader flag
-    if (report.getIsLeader() ||
-        pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
-      pipeline.setLeaderId(dn.getUuid());
-    }
+    setReportedDatanode(pipeline, dn);
+    setPipelineLeaderId(report, pipeline, dn);
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
       LOGGER.info("Pipeline {} {} reported by {}", pipeline.getFactor(),
@@ -119,5 +115,25 @@ public class PipelineReportHandler implements
         }
       }
     }
+  }
+
+
+  protected void setReportedDatanode(Pipeline pipeline, DatanodeDetails dn)
+      throws IOException {
+    pipeline.reportDatanode(dn);
+  }
+
+  protected void setPipelineLeaderId(PipelineReport report,
+                                     Pipeline pipeline,
+                                     DatanodeDetails dn) {
+    // ONE replica pipeline doesn't have leader flag
+    if (report.getIsLeader() ||
+        pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
+      pipeline.setLeaderId(dn.getUuid());
+    }
+  }
+
+  protected PipelineManager getPipelineManager() {
+    return pipelineManager;
   }
 }

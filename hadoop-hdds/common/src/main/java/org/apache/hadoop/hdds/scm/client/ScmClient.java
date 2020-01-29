@@ -172,6 +172,13 @@ public interface ScmClient extends Closeable {
   List<Pipeline> listPipelines() throws IOException;
 
   /**
+   * Returns a pipeline with ID, if present.
+   * @return pipeline
+   * @throws IOException in case of exception
+   */
+  Pipeline getPipeline(HddsProtos.PipelineID pipelineID) throws IOException;
+
+  /**
    * Activates the pipeline given a pipeline ID.
    *
    * @param pipelineID PipelineID to activate.
