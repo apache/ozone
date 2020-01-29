@@ -352,21 +352,22 @@ public class BasicRootedOzoneClientAdapterImpl
     LOG.trace("creating dir for path: {}", pathStr);
     incrementCounter(Statistic.OBJECTS_CREATED);
     OFSPath ofsPath = new OFSPath(pathStr);
-    // Volume name unspecified, return failure
     if (ofsPath.getVolumeName().length() == 0) {
+      // Volume name unspecified, invalid param, return failure
       return false;
     }
-    // Handle where only volume is specified in pathStr
     if (ofsPath.getBucketName().length() == 0) {
+      // Create volume only
       objectStore.createVolume(ofsPath.getVolumeName());
       return true;
     }
     String keyStr = ofsPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, true);
-      // if keyStr is empty, it indicates that only volume or volume+bucket is
-      // given in pathStr, so getBucket() above should've handled the creation
-      // of volume/bucket already.
+      // Empty keyStr here indicates only volume and bucket is
+      // given in pathStr, so getBucket above should handle the creation
+      // of volume and bucket. We won't feed empty keyStr to
+      // bucket.createDirectory as that would be a NPE.
       if (keyStr != null && keyStr.length() > 0) {
         bucket.createDirectory(keyStr);
       }
