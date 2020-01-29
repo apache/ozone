@@ -87,37 +87,4 @@ public class TestOMDirectoryCreateResponse {
     Assert.assertNotNull(omMetadataManager.getKeyTable().get(
         omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
   }
-
-  @Test
-  public void testAddToDBBatchWithNullOmkeyInfo() throws Exception {
-
-    GenericTestUtils.setLogLevel(OMDirectoryCreateResponse.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OMDirectoryCreateResponse.LOG);
-
-
-    String volumeName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-
-    OMResponse omResponse = OMResponse.newBuilder().setCreateDirectoryResponse(
-        OzoneManagerProtocolProtos.CreateDirectoryResponse.getDefaultInstance())
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-        .build();
-
-    OMDirectoryCreateResponse omDirectoryCreateResponse =
-        new OMDirectoryCreateResponse(omResponse);
-
-    omDirectoryCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
-
-    // Do manual commit and see whether addToBatch is successful or not.
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
-
-    Assert.assertNull(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
-
-    Assert.assertTrue(logCapturer.getOutput().contains("Response Status is " +
-        "OK, dirKeyInfo is null"));
-  }
 }
