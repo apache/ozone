@@ -94,8 +94,6 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
                 OzoneFSStorageStatistics::new);
 
     if (isolatedClassloader) {
-      // TODO: Check how this code path need to be changed, for legacy Hadoop?
-      //  Similar to BasicOFileSystem#createAdapter
       return RootedOzoneClientAdapterFactory.createAdapter(storageStatistics);
     } else {
       return new RootedOzoneClientAdapterImpl(omHost, omPort, conf,

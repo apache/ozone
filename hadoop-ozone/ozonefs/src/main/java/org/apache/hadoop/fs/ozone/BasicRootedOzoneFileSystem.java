@@ -161,7 +161,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throws IOException {
 
     if (isolatedClassloader) {
-      // TODO: Check how this code path need to be changed, for legacy Hadoop?
       return RootedOzoneClientAdapterFactory.createAdapter();
     } else {
       return new BasicRootedOzoneClientAdapterImpl(omHost, omPort, conf);
