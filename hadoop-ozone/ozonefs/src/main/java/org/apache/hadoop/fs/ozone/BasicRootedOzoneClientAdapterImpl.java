@@ -305,7 +305,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public void renamePath(String path, String newPath) throws IOException {
+  public void rename(String path, String newPath) throws IOException {
     incrementCounter(Statistic.OBJECTS_RENAMED);
     OFSPath ofsPath = new OFSPath(path);
     OFSPath ofsNewPath = new OFSPath(newPath);
@@ -330,7 +330,7 @@ public class BasicRootedOzoneClientAdapterImpl
    * @param newPath New key path.
    * @throws IOException IOException from bucket.renameKey().
    */
-  void renamePath(OzoneBucket bucket, String path, String newPath)
+  void rename(OzoneBucket bucket, String path, String newPath)
       throws IOException {
     incrementCounter(Statistic.OBJECTS_RENAMED);
     OFSPath ofsPath = new OFSPath(path);

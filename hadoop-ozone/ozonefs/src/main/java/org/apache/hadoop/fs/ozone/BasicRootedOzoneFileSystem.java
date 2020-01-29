@@ -259,7 +259,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     @Override
     boolean processKeyPath(String keyPath) throws IOException {
       String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
-      adapterImpl.renamePath(this.bucket, keyPath, newPath);
+      adapterImpl.rename(this.bucket, keyPath, newPath);
       return true;
     }
   }
