@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_COUNT_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_TABLE;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider.getNewDBStore;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -80,14 +81,17 @@ public class ContainerDBServiceProviderImpl
   @Inject
   public ContainerDBServiceProviderImpl(DBStore dbStore,
                                         Configuration sqlConfiguration) {
+    containerDbStore = dbStore;
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
-    initializeTables(dbStore);
+    initializeTables();
   }
 
   @Override
-  public void stop() throws Exception {
+  public void close() throws Exception {
     if (containerDbStore != null) {
+      LOG.info("Stopping ContainerKeyDB Service Provider");
       containerDbStore.close();
+      containerDbStore = null;
     }
   }
 
@@ -105,11 +109,10 @@ public class ContainerDBServiceProviderImpl
       throws IOException {
 
     File oldDBLocation = containerDbStore.getDbLocation();
-    containerDbStore = ReconContainerDBProvider
-        .getNewDBStore(configuration, reconUtils);
+    containerDbStore = getNewDBStore(configuration, reconUtils);
     LOG.info("Creating new Recon Container DB at {}",
         containerDbStore.getDbLocation().getAbsolutePath());
-    initializeTables(containerDbStore);
+    initializeTables();
 
     if (oldDBLocation.exists()) {
       LOG.info("Cleaning up old Recon Container DB at {}.",
@@ -130,14 +133,13 @@ public class ContainerDBServiceProviderImpl
 
   /**
    * Initialize the container DB tables.
-   * @param dbStore
    */
-  private void initializeTables(DBStore dbStore) {
+  private void initializeTables() {
     try {
-      this.containerKeyTable = dbStore.getTable(CONTAINER_KEY_TABLE,
+      this.containerKeyTable = containerDbStore.getTable(CONTAINER_KEY_TABLE,
           ContainerKeyPrefix.class, Integer.class);
-      this.containerKeyCountTable = dbStore.getTable(CONTAINER_KEY_COUNT_TABLE,
-          Long.class, Long.class);
+      this.containerKeyCountTable = containerDbStore
+          .getTable(CONTAINER_KEY_COUNT_TABLE, Long.class, Long.class);
     } catch (IOException e) {
       LOG.error("Unable to create Container Key tables." + e);
     }
