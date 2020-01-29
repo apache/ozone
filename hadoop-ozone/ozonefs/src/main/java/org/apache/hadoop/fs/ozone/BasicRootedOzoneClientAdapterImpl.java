@@ -305,6 +305,11 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
+  public void renameKey(String key, String newKeyName) throws IOException {
+    throw new IOException("OFS doesn't support renameKey, use rename instead.");
+  }
+
+  @Override
   public void rename(String path, String newPath) throws IOException {
     incrementCounter(Statistic.OBJECTS_RENAMED);
     OFSPath ofsPath = new OFSPath(path);

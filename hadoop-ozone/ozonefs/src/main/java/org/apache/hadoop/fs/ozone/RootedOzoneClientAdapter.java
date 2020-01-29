@@ -18,15 +18,6 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.util.Iterator;
-import java.util.List;
-
-import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.security.token.Token;
 
 /**
  * Lightweight adapter to separate hadoop/ozone classes.
@@ -35,37 +26,7 @@ import org.apache.hadoop.security.token.Token;
  * It could be loaded by a different classloader because only the objects in
  * the method signatures should be shared between the classloader.
  */
-public interface RootedOzoneClientAdapter {
-
-  void close() throws IOException;
-
-  InputStream readFile(String pathStr) throws IOException;
-
-  OzoneFSOutputStream createFile(String pathStr, boolean overWrite,
-      boolean recursive) throws IOException;
+public interface RootedOzoneClientAdapter extends OzoneClientAdapter {
 
   void rename(String pathStr, String newPath) throws IOException;
-
-  boolean createDirectory(String pathStr) throws IOException;
-
-  boolean deleteObject(String pathStr);
-
-  Iterator<BasicKeyInfo> listKeys(String pathStr);
-
-  List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
-      String startPath, long numEntries, URI uri,
-      Path workingDir, String username) throws IOException;
-
-  FileStatusAdapter getFileStatus(String pathStr, URI uri,
-      Path qualifiedPath, String userName) throws IOException;
-
-  Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
-      throws IOException;
-
-  KeyProvider getKeyProvider() throws IOException;
-
-  URI getKeyProviderUri() throws IOException;
-
-  String getCanonicalServiceName();
-
 }
