@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om.request;
 
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -135,26 +134,6 @@ public final class TestOMRequestUtils {
       HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
       OMMetadataManager omMetadataManager) throws Exception {
 
-  /**
-   * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
-   * to openKeyTable, else add's it to keyTable.
-   * @param openKeyTable
-   * @param volumeName
-   * @param bucketName
-   * @param keyName
-   * @param clientID
-   * @param replicationType
-   * @param replicationFactor
-   * @param trxnLogIndex
-   * @param omMetadataManager
-   * @throws Exception
-   */
-  @SuppressWarnings("parameternumber")
-  public static void addKeyToTable(boolean openKeyTable, String volumeName,
-      String bucketName, String keyName, long clientID,
-      HddsProtos.ReplicationType replicationType,
-      HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
-      OMMetadataManager omMetadataManager) throws Exception {
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
         replicationType, replicationFactor, trxnLogIndex);
 
@@ -294,7 +273,7 @@ public final class TestOMRequestUtils {
   }
 
   /**
-   * Add volume creation entry to OM DB.
+   * Add bucket creation entry to OM DB.
    * @param volumeName
    * @param bucketName
    * @param omMetadataManager
