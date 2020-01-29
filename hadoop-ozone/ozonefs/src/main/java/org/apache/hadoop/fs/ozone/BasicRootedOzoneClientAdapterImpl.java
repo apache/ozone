@@ -389,11 +389,11 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public boolean deleteObject(String path) {
     LOG.trace("issuing delete for path to key: {}", path);
+    incrementCounter(Statistic.OBJECTS_DELETED);
     OFSPath ofsPath = new OFSPath(path);
     String keyName = ofsPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      incrementCounter(Statistic.OBJECTS_DELETED);
       bucket.deleteKey(keyName);
       return true;
     } catch (IOException ioe) {
@@ -410,10 +410,10 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   boolean deleteObject(OzoneBucket bucket, String path) {
     LOG.trace("issuing delete for path to key: {}", path);
+    incrementCounter(Statistic.OBJECTS_DELETED);
     OFSPath ofsPath = new OFSPath(path);
     String keyName = ofsPath.getKeyName();
     try {
-      incrementCounter(Statistic.OBJECTS_DELETED);
       bucket.deleteKey(keyName);
       return true;
     } catch (IOException ioe) {
@@ -425,11 +425,11 @@ public class BasicRootedOzoneClientAdapterImpl
   public FileStatusAdapter getFileStatus(String path, URI uri,
       Path qualifiedPath, String userName)
       throws IOException {
+    incrementCounter(Statistic.OBJECTS_QUERY);
     OFSPath ofsPath = new OFSPath(path);
     String key = ofsPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      incrementCounter(Statistic.OBJECTS_QUERY);
       OzoneFileStatus status = bucket.getFileStatus(key);
       // Note: qualifiedPath passed in is good from
       //  BasicRootedOzoneFileSystem#getFileStatus. No need to prepend here.
@@ -486,6 +486,7 @@ public class BasicRootedOzoneClientAdapterImpl
       String startPath, long numEntries, URI uri,
       Path workingDir, String username) throws IOException {
 
+    incrementCounter(Statistic.OBJECTS_LIST);
     OFSPath ofsPath = new OFSPath(pathStr);
     String keyName = ofsPath.getKeyName();
     OFSPath ofsStartPath = new OFSPath(startPath);
@@ -493,7 +494,6 @@ public class BasicRootedOzoneClientAdapterImpl
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
-      incrementCounter(Statistic.OBJECTS_LIST);
       List<OzoneFileStatus> statuses = bucket
           .listStatus(keyName, recursive, startKey, numEntries);
       // Note: result in statuses above doesn't have volume/bucket path since
