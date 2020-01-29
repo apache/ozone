@@ -40,7 +40,7 @@ class OFSPath {
    * /vol1/buc2/dir3/key4  vol1           buc2           (empty)      dir3/key4
    * /vol1/buc2            vol1           buc2           (empty)      (empty)
    * /vol1                 vol1           (empty)        (empty)      (empty)
-   * /tmp/dir3/key4        tempVol        tempBucket     tmp          dir3/key4
+   * /tmp/dir3/key4        tempVolume     tempBucket     tmp          dir3/key4
    *
    * Note the leading '/' doesn't matter.
    */
@@ -68,7 +68,9 @@ class OFSPath {
       if (firstToken.equals(OFS_MOUNT_NAME_TMP)) {
         mountName = firstToken;
         // TODO: Retrieve volume and bucket of the mount from user protobuf.
-        //  Leave them as "" just for now. Will be addressed in HDDS-2929
+        //  Leave them hard-coded just for now. Will be addressed in HDDS-2929
+        volumeName = "tempVolume";
+        mountName = "tempBucket";
       } else if (numToken >= 2) {
         // Regular volume and bucket path
         volumeName = firstToken;
