@@ -42,6 +42,10 @@ public class OMKeyCommitResponse extends OMClientResponse {
     this.openKeySessionID = openKeySessionID;
   }
 
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();

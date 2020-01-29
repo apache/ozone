@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 
@@ -40,27 +39,29 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
   private OmKeyInfo dirKeyInfo;
 
-  public OMDirectoryCreateResponse(@Nullable OmKeyInfo dirKeyInfo,
-      @Nonnull OMResponse omResponse) {
+  public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo dirKeyInfo) {
     super(omResponse);
     this.dirKeyInfo = dirKeyInfo;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (dirKeyInfo != null) {
-      String dirKey =
-          omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
-              dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
-          dirKeyInfo);
-    } else {
-      // When directory already exists, we don't add it to cache. And it is
-      // not an error, in this case dirKeyInfo will be null.
-      LOG.debug("Response Status is OK, dirKeyInfo is null in " +
-          "OMDirectoryCreateResponse");
-    }
+    String dirKey =
+        omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
+            dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
+    omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
+        dirKeyInfo);
   }
 }

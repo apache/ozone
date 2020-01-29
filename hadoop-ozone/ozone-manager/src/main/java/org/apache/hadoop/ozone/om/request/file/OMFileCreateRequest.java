@@ -303,11 +303,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
       String dbOpenKeyName = omMetadataManager.getOpenKey(volumeName,
           bucketName, keyName, clientID);
 
-      // Append new blocks
-      omKeyInfo.appendNewBlocks(keyArgs.getKeyLocationsList().stream()
-          .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList()), false);
-
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
