@@ -84,7 +84,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   }
 
   @Override
-  protected RootedOzoneClientAdapter createAdapter(Configuration conf,
+  protected OzoneClientAdapter createAdapter(Configuration conf,
       String omHost, int omPort, boolean isolatedClassloader)
       throws IOException {
 
@@ -94,7 +94,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
                 OzoneFSStorageStatistics::new);
 
     if (isolatedClassloader) {
-      return RootedOzoneClientAdapterFactory.createAdapter(storageStatistics);
+      return OzoneClientAdapterFactory.createAdapter(storageStatistics);
     } else {
       return new RootedOzoneClientAdapterImpl(omHost, omPort, conf,
           storageStatistics);

@@ -79,7 +79,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private URI uri;
   private String userName;
   private Path workingDir;
-  private RootedOzoneClientAdapter adapter;
+  private OzoneClientAdapter adapter;
+  // TODO: Remove this.
   private BasicRootedOzoneClientAdapterImpl adapterImpl;
 
   private static final String URI_EXCEPTION_TEXT =
@@ -156,12 +157,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  protected RootedOzoneClientAdapter createAdapter(Configuration conf,
+  protected OzoneClientAdapter createAdapter(Configuration conf,
       String omHost, int omPort, boolean isolatedClassloader)
       throws IOException {
 
     if (isolatedClassloader) {
-      return RootedOzoneClientAdapterFactory.createAdapter();
+      return OzoneClientAdapterFactory.createAdapter();
     } else {
       return new BasicRootedOzoneClientAdapterImpl(omHost, omPort, conf);
     }
@@ -755,7 +756,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  public RootedOzoneClientAdapter getAdapter() {
+  public OzoneClientAdapter getAdapter() {
     return adapter;
   }
 

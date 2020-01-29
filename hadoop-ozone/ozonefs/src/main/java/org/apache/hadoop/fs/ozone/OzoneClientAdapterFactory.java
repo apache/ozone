@@ -125,6 +125,33 @@ public final class OzoneClientAdapterFactory {
     }
   }
 
+  /**
+   * createAdapter() for OFS.
+   */
+  @SuppressFBWarnings("DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED")
+  public static OzoneClientAdapter createAdapter()
+      throws IOException {
+    return createAdapter(true,
+        (aClass) -> (RootedOzoneClientAdapter) aClass
+            .getConstructor()
+            .newInstance());
+  }
+
+  @SuppressFBWarnings("DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED")
+  public static OzoneClientAdapter createAdapter(
+      StorageStatistics storageStatistics) throws IOException {
+    return createAdapter(false,
+        (aClass) -> (RootedOzoneClientAdapter) aClass
+            .getConstructor(OzoneFSStorageStatistics.class)
+            .newInstance(storageStatistics));
+  }
+
+  @SuppressFBWarnings("DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED")
+  public static OzoneClientAdapter createAdapter(
+      boolean basic, OzoneClientAdapterCreator creator) throws IOException {
+    return createAdapter(null, null, basic, creator);
+  }
+
   private static void findConfigDirUrl(List<URL> urls,
       ClassLoader currentClassLoader) throws IOException {
     Enumeration<URL> conf =
