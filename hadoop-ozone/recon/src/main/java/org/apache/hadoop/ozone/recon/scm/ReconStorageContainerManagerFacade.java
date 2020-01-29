@@ -157,6 +157,18 @@ public class ReconStorageContainerManagerFacade
   }
 
   /**
+   * Wait until service has completed shutdown.
+   */
+  public void join() {
+    try {
+      getDatanodeProtocolServer().join();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.info("Interrupted during StorageContainerManager join.");
+    }
+  }
+
+  /**
    * Stop the Recon SCM subsystems.
    */
   public void stop() {
