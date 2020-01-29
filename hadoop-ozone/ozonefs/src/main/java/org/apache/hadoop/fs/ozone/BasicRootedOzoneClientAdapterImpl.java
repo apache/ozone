@@ -392,6 +392,9 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.OBJECTS_DELETED);
     OFSPath ofsPath = new OFSPath(path);
     String keyName = ofsPath.getKeyName();
+    if (keyName.length() == 0) {
+      return false;
+    }
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
       bucket.deleteKey(keyName);
@@ -413,6 +416,9 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.OBJECTS_DELETED);
     OFSPath ofsPath = new OFSPath(path);
     String keyName = ofsPath.getKeyName();
+    if (keyName.length() == 0) {
+      return false;
+    }
     try {
       bucket.deleteKey(keyName);
       return true;
