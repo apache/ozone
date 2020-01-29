@@ -59,6 +59,7 @@ message ScmContainerLocationRequest {
   optional StartReplicationManagerRequestProto startReplicationManagerRequest = 21;
   optional StopReplicationManagerRequestProto stopReplicationManagerRequest = 22;
   optional ReplicationManagerStatusRequestProto seplicationManagerStatusRequest = 23;
+  optional GetPipelineRequestProto getPipelineRequest = 24;
 
 }
 
@@ -91,6 +92,7 @@ message ScmContainerLocationResponse {
   optional StartReplicationManagerResponseProto startReplicationManagerResponse = 21;
   optional StopReplicationManagerResponseProto stopReplicationManagerResponse = 22;
   optional ReplicationManagerStatusResponseProto replicationManagerStatusResponse = 23;
+  optional GetPipelineResponseProto getPipelineResponse = 24;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -118,6 +120,7 @@ enum Type {
   StartReplicationManager = 16;
   StopReplicationManager = 17;
   GetReplicationManagerStatus = 18;
+  GetPipeline = 19;
 }
 
 /**
@@ -239,6 +242,15 @@ message ListPipelineRequestProto {
 
 message ListPipelineResponseProto {
   repeated Pipeline pipelines = 1;
+}
+
+message GetPipelineRequestProto {
+  required PipelineID pipelineID = 1;
+  optional string traceID = 2;
+}
+
+message GetPipelineResponseProto {
+  required Pipeline pipeline = 1;
 }
 
 message ActivatePipelineRequestProto {
