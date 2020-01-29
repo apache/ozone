@@ -504,12 +504,13 @@ public class BasicRootedOzoneClientAdapterImpl
           .listStatus(keyName, recursive, startKey, numEntries);
       // Note: result in statuses above doesn't have volume/bucket path since
       //  they are from the server.
+      String ofsPathPrefix = ofsPath.getNonKeyPath();
 
       List<FileStatusAdapter> result = new ArrayList<>();
       for (OzoneFileStatus status : statuses) {
         // Get raw path (without volume and bucket name) and remove leading '/'
         String rawPath = status.getPath().toString().substring(1);
-        Path appendedPath = new Path(ofsPath.getNonKeyPath(), rawPath);
+        Path appendedPath = new Path(ofsPathPrefix, rawPath);
         Path qualifiedPath = appendedPath.makeQualified(uri, workingDir);
         makeQualified(status, uri, qualifiedPath, username);
         result.add(toFileStatusAdapter(status));

@@ -723,13 +723,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       if (status.isDirectory()) {
         LOG.trace("Iterating directory: {}", pathKey);
         OFSPath ofsPath = new OFSPath(pathKey);
+        String ofsPathPrefix =
+            ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
         while (keyIterator.hasNext()) {
           BasicKeyInfo key = keyIterator.next();
           // Convert key to full path before passing it to processKeyPath
           // TODO: This conversion is redundant. But want to use only full path
           //  outside AdapterImpl. - Maybe a refactor later.
-          String keyPath = ofsPath.getNonKeyPathNoPrefixDelim() +
-              OZONE_URI_DELIMITER + key.getName();
+          String keyPath = ofsPathPrefix + key.getName();
           LOG.trace("iterating key path: {}", keyPath);
           if (!processKeyPath(keyPath)) {
             return false;
