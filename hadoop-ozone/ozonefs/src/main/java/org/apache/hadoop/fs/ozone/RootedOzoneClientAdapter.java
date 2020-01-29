@@ -50,7 +50,7 @@ public interface RootedOzoneClientAdapter {
 
   boolean deleteObject(String pathStr);
 
-  Iterator<BasicKeyInfo> listKeys(String pathStr) throws IOException;
+  Iterator<BasicKeyInfo> listKeys(String pathStr);
 
   List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
       String startPath, long numEntries, URI uri,
