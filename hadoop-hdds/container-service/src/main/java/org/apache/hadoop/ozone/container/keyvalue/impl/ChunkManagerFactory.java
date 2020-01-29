@@ -67,6 +67,6 @@ public final class ChunkManagerFactory {
       return new ChunkManagerDummyImpl();
     }
 
-    return new ChunkManagerDispatcher(sync, true); // TODO add config
+    return new ChunkManagerDispatcher(sync);
   }
 }
