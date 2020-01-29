@@ -55,11 +55,9 @@ public class OMKeyPurgeResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      for (String key : purgeKeyList) {
-        omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation,
-            key);
-      }
+    for (String key : purgeKeyList) {
+      omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation,
+          key);
     }
   }
 }

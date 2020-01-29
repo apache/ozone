@@ -55,8 +55,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -74,7 +73,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     boolean success = true;
     IOException exception = null;
 
-    // Filter the keys that objectID > transactionLogIndex. This is done so
+    // Filter the keys that have updateID > transactionLogIndex. This is done so
     // that in case this transaction is a replay, we do not purge keys
     // created after the original purge request.
     // PurgeKeys request has keys belonging to same bucket grouped together.
@@ -83,6 +82,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       boolean acquiredLock = false;
       String volumeName = bucketWithDeleteKeys.getVolumeName();
       String bucketName = bucketWithDeleteKeys.getBucketName();
+      ArrayList<String> keysNotPurged = new ArrayList<>();
+      Result result = null;
       try {
         acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
             volumeName, bucketName);
@@ -95,13 +96,23 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
               // Discard those keys whose updateID is > transactionLogIndex.
               // This could happen when the PurgeRequest is replayed.
               if (isReplay(ozoneManager, omKeyInfo.getUpdateID(),
-                  transactionLogIndex)) {
+                  trxnLogIndex)) {
                 purgeKey = false;
+                result = Result.REPLAY;
                 break;
               }
+              // TODO: If a deletedKey has any one OmKeyInfo which was
+              //  deleted after the original PurgeRequest (updateID >
+              //  trxnLogIndex), we avoid purging that whole key in the
+              //  replay request. Instead of discarding the whole key, we can
+              //  identify the OmKeyInfo's which have updateID <
+              //  trxnLogIndex and purge only those OMKeyInfo's from the
+              //  deletedKey in DeletedTable.
             }
             if (purgeKey) {
               keysToBePurgedList.add(deletedKey);
+            } else {
+              keysNotPurged.add(deletedKey);
             }
           }
         }
@@ -115,9 +126,33 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
               bucketName);
         }
       }
+
+      if (result == Result.REPLAY) {
+        LOG.debug("Replayed Transaction {}. Request: {}", trxnLogIndex,
+            purgeKeysRequest);
+        if (!keysNotPurged.isEmpty()) {
+          StringBuilder notPurgeList = new StringBuilder();
+          for (String key : keysNotPurged) {
+            notPurgeList.append(", ").append(key);
+          }
+          LOG.debug("Following keys from Volume:{}, Bucket:{} will not be" +
+              " purged: {}", notPurgeList.toString().substring(2));
+        }
+      }
     }
 
     if (success) {
+      if (keysToBePurgedList.isEmpty()) {
+        LOG.debug("No keys will be purged as part of KeyPurgeRequest: {}",
+            purgeKeysRequest);
+      } else {
+        StringBuilder purgeList = new StringBuilder();
+        for (String key : keysToBePurgedList) {
+          purgeList.append(", ").append(key);
+        }
+        LOG.debug("Following keys will be purged as part of KeyPurgeRequest: " +
+            "{} - {}", purgeKeysRequest, purgeList.toString().substring(2));
+      }
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
           keysToBePurgedList);
     } else {
@@ -125,8 +160,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
           omResponse, exception));
     }
 
-    omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper.add(
-        omClientResponse, transactionLogIndex));
+    omClientResponse.setFlushFuture(omDoubleBufferHelper.add(
+        omClientResponse, trxnLogIndex));
     return omClientResponse;
   }
 }
