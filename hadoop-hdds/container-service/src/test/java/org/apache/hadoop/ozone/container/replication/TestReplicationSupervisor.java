@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -193,7 +194,8 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(1, supervisor.getInFlightReplications());
 
       KeyValueContainerData kvcd =
-          new KeyValueContainerData(task.getContainerId(), 100L,
+          new KeyValueContainerData(task.getContainerId(),
+              ChunkLayOutVersion.FILE_PER_CHUNK, 100L,
               UUID.randomUUID().toString(), UUID.randomUUID().toString());
       KeyValueContainer kvc =
           new KeyValueContainer(kvcd, conf);

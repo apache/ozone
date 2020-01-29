@@ -95,6 +95,7 @@ public class TestHddsDispatcher {
       Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
       Mockito.when(context.getParent()).thenReturn(stateMachine);
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
+          ChunkLayOutVersion.FILE_PER_CHUNK,
           (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
           dd.getUuidString());
       Container container = new KeyValueContainer(containerData, conf);

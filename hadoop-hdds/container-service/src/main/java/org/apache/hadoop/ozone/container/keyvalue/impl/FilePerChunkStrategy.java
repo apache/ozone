@@ -48,25 +48,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V1;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 
 /**
  * This class is for performing chunk related operations.
  */
-public class ChunkManagerV1 implements ChunkManager {
+public class FilePerChunkStrategy implements ChunkManager {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ChunkManagerV1.class);
+      LoggerFactory.getLogger(FilePerChunkStrategy.class);
 
   private final boolean doSyncWrite;
 
-  public ChunkManagerV1(boolean sync) {
+  public FilePerChunkStrategy(boolean sync) {
     doSyncWrite = sync;
   }
 
   private static void checkLayoutVersion(Container container) {
     Preconditions.checkArgument(
-        container.getContainerData().getLayOutVersion() == V1);
+        container.getContainerData().getLayOutVersion() == FILE_PER_CHUNK);
   }
 
   /**

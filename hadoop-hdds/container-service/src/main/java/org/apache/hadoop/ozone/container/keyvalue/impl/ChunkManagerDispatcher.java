@@ -39,6 +39,8 @@ import java.util.EnumMap;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 
 /**
  * Selects ChunkManager implementation to use for each chunk operation.
@@ -52,10 +54,8 @@ public class ChunkManagerDispatcher implements ChunkManager {
       = new EnumMap<>(ChunkLayOutVersion.class);
 
   ChunkManagerDispatcher(boolean sync, boolean incremental) {
-    ChunkManager v1 = incremental
-        ? new IncrementalV1ChunkManager(sync)
-        : new ChunkManagerV1(sync);
-    handlers.put(ChunkLayOutVersion.V1, v1);
+    handlers.put(FILE_PER_CHUNK, new FilePerChunkStrategy(sync));
+    handlers.put(FILE_PER_BLOCK, new FilePerBlockStrategy(sync));
   }
 
   @Override

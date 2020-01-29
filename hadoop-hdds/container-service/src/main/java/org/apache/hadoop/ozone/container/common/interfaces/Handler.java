@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerT
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -108,11 +109,7 @@ public abstract class Handler {
    * Imports container from a raw input stream.
    */
   public abstract Container importContainer(
-      long containerID,
-      long maxSize,
-      String originPipelineId,
-      String originNodeId,
-      InputStream rawContainerStream,
+      ContainerData containerData, InputStream rawContainerStream,
       TarContainerPacker packer)
       throws IOException;
 

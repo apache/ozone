@@ -29,6 +29,7 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -249,6 +250,7 @@ public class TestKeyValueBlockIterator {
       normalBlocks, int deletedBlocks) throws
       Exception {
     containerData = new KeyValueContainerData(containerId,
+        ChunkLayOutVersion.FILE_PER_CHUNK,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     container = new KeyValueContainer(containerData, conf);

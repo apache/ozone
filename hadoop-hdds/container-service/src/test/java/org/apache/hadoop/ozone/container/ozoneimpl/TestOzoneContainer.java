@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -118,6 +119,7 @@ public class TestOzoneContainer {
       HddsVolume myVolume;
 
       keyValueContainerData = new KeyValueContainerData(i,
+          ChunkLayOutVersion.FILE_PER_CHUNK,
           maxCap, UUID.randomUUID().toString(),
           datanodeDetails.getUuidString());
       keyValueContainer = new KeyValueContainer(
@@ -164,7 +166,8 @@ public class TestOzoneContainer {
       // eat up 10 bytes more, now available space is less than 1 container
       volume.incCommittedBytes(10);
     }
-    keyValueContainerData = new KeyValueContainerData(99, containerSize,
+    keyValueContainerData = new KeyValueContainerData(99,
+        ChunkLayOutVersion.FILE_PER_CHUNK, containerSize,
         UUID.randomUUID().toString(), datanodeDetails.getUuidString());
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
 

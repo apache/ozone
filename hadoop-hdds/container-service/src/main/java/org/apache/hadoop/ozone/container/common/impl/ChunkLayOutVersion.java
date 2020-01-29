@@ -18,10 +18,9 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.conf.Configuration;
 
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -29,15 +28,11 @@ import java.util.List;
  */
 public enum ChunkLayOutVersion {
 
-  V1(1, "Data without checksums.");
+  FILE_PER_CHUNK(1, "One file per chunk"),
+  FILE_PER_BLOCK(2, "One file per block");
 
   private static final List<ChunkLayOutVersion> CHUNK_LAYOUT_VERSIONS =
       ImmutableList.copyOf(values());
-
-  private static final ChunkLayOutVersion LATEST = CHUNK_LAYOUT_VERSIONS
-      .stream()
-      .max(Comparator.comparing(ChunkLayOutVersion::getVersion))
-      .orElse(V1); // should never happen
 
   private final int version;
   private final String description;
@@ -51,8 +46,6 @@ public enum ChunkLayOutVersion {
    * Return ChunkLayOutVersion object for the numeric chunkVersion.
    */
   public static ChunkLayOutVersion getChunkLayOutVersion(int chunkVersion) {
-    Preconditions.checkArgument(V1.getVersion() <= chunkVersion);
-    Preconditions.checkArgument(chunkVersion <= LATEST.getVersion());
     for (ChunkLayOutVersion chunkLayOutVersion : CHUNK_LAYOUT_VERSIONS) {
       if (chunkLayOutVersion.getVersion() == chunkVersion) {
         return chunkLayOutVersion;
@@ -71,8 +64,8 @@ public enum ChunkLayOutVersion {
   /**
    * @return the latest version.
    */
-  public static ChunkLayOutVersion getLatestVersion() {
-    return LATEST;
+  public static ChunkLayOutVersion getConfiguredVersion(Configuration conf) {
+    return FILE_PER_BLOCK; // TODO make it configurable
   }
 
   /**

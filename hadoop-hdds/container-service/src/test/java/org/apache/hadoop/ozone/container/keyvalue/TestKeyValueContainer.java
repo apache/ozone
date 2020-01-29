@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume
@@ -101,6 +102,7 @@ public class TestKeyValueContainer {
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
+        ChunkLayOutVersion.FILE_PER_CHUNK,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 
@@ -110,6 +112,7 @@ public class TestKeyValueContainer {
   @Test
   public void testBlockIterator() throws Exception{
     keyValueContainerData = new KeyValueContainerData(100L,
+        ChunkLayOutVersion.FILE_PER_CHUNK,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         datanodeId.toString());
     keyValueContainer = new KeyValueContainer(
@@ -222,7 +225,8 @@ public class TestKeyValueContainer {
 
     //create a new one
     KeyValueContainerData containerData =
-        new KeyValueContainerData(containerId, 1,
+        new KeyValueContainerData(containerId,
+            ChunkLayOutVersion.FILE_PER_CHUNK,
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
@@ -403,6 +407,7 @@ public class TestKeyValueContainer {
 
     // Create Container 2
     keyValueContainerData = new KeyValueContainerData(2L,
+        ChunkLayOutVersion.FILE_PER_CHUNK,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 

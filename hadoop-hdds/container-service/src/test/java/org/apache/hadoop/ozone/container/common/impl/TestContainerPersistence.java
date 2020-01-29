@@ -164,6 +164,7 @@ public class TestContainerPersistence {
     long commitBytesAfter = 0;
     long commitIncrement = 0;
     KeyValueContainerData data = new KeyValueContainerData(cID,
+        ChunkLayOutVersion.FILE_PER_CHUNK,
         ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     data.addMetadata("VOLUME", "shire");

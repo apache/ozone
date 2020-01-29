@@ -59,6 +59,8 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -225,8 +227,10 @@ public class KeyValueHandler extends Handler {
 
     long containerID = request.getContainerID();
 
+    ChunkLayOutVersion layoutVersion =
+        ChunkLayOutVersion.getConfiguredVersion(conf);
     KeyValueContainerData newContainerData = new KeyValueContainerData(
-        containerID, maxContainerSize, request.getPipelineID(),
+        containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
@@ -259,12 +263,12 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  public void populateContainerPathFields(KeyValueContainer container,
-      long maxSize) throws IOException {
+  private void populateContainerPathFields(KeyValueContainer container)
+      throws IOException {
     volumeSet.readLock();
     try {
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
-          .getVolumesList(), maxSize);
+          .getVolumesList(), container.getContainerData().getMaxSize());
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
       container.populatePathFields(scmID, containerVolume, hddsVolumeDir);
     } finally {
@@ -888,21 +892,18 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public Container importContainer(final long containerID,
-      final long maxSize, final String originPipelineId,
-      final String originNodeId, final InputStream rawContainerStream,
+  public Container importContainer(ContainerData originalContainerData,
+      final InputStream rawContainerStream,
       final TarContainerPacker packer)
       throws IOException {
 
-    // TODO: Add layout version!
     KeyValueContainerData containerData =
-        new KeyValueContainerData(containerID,
-            maxSize, originPipelineId, originNodeId);
+        new KeyValueContainerData(originalContainerData);
 
     KeyValueContainer container = new KeyValueContainer(containerData,
         conf);
 
-    populateContainerPathFields(container, maxSize);
+    populateContainerPathFields(container);
     container.importContainerData(rawContainerStream, packer);
     sendICR(container);
     return container;

@@ -25,14 +25,15 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.ImmutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerV1;
-import org.apache.hadoop.ozone.container.keyvalue.impl.IncrementalV1ChunkManager;
+import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
+import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
@@ -55,7 +56,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V1;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 
 /**
  * Benchmark for ChunkManager implementations.
@@ -130,26 +132,26 @@ public class BenchmarkChunkManager {
   public void writeMultipleFiles(BenchmarkState state, Blackhole sink)
       throws StorageContainerException {
 
-    ChunkManager chunkManager = new ChunkManagerV1(true);
-    benchmark(chunkManager, state, sink);
+    ChunkManager chunkManager = new FilePerChunkStrategy(true);
+    benchmark(chunkManager, FILE_PER_CHUNK, state, sink);
   }
 
   @Benchmark
   public void writeSingleFile(BenchmarkState state, Blackhole sink)
       throws StorageContainerException {
 
-    ChunkManager chunkManager = new IncrementalV1ChunkManager(true);
-    benchmark(chunkManager, state, sink);
+    ChunkManager chunkManager = new FilePerBlockStrategy(true);
+    benchmark(chunkManager, FILE_PER_BLOCK, state, sink);
   }
 
-  private void benchmark(ChunkManager subject,
+  private void benchmark(ChunkManager subject, ChunkLayOutVersion layout,
       BenchmarkState state, Blackhole sink)
       throws StorageContainerException {
 
     final long containerID = CONTAINER_COUNTER.getAndIncrement();
 
     KeyValueContainerData containerData =
-        new KeyValueContainerData(containerID, V1.getVersion(),
+        new KeyValueContainerData(containerID, layout,
             CONTAINER_SIZE, UUID.randomUUID().toString(),
             DATANODE_ID);
     KeyValueContainer container =

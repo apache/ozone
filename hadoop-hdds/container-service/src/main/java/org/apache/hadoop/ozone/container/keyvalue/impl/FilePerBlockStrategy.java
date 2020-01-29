@@ -48,28 +48,28 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.V1;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
 
 /**
  * This class is for performing chunk related operations.
  */
-public class IncrementalV1ChunkManager implements ChunkManager {
+public class FilePerBlockStrategy implements ChunkManager {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(IncrementalV1ChunkManager.class);
+      LoggerFactory.getLogger(FilePerBlockStrategy.class);
 
   private final boolean doSyncWrite;
   private final OpenFiles files = new OpenFiles();
 
-  public IncrementalV1ChunkManager(boolean sync) {
+  public FilePerBlockStrategy(boolean sync) {
     doSyncWrite = sync;
   }
 
   private static void checkLayoutVersion(Container container) {
     Preconditions.checkArgument(
-        container.getContainerData().getLayOutVersion() == V1);
+        container.getContainerData().getLayOutVersion() == FILE_PER_BLOCK);
   }
 
   @Override
