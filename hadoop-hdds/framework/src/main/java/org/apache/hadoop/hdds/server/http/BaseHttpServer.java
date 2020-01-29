@@ -246,7 +246,8 @@ public abstract class BaseHttpServer {
 
   public HttpServer2.Builder initializeServerBuild(
       Configuration configuration, final InetSocketAddress httpAddr,
-      final InetSocketAddress httpsAddr, String serverName, String spnegoUserNameKey,
+      final InetSocketAddress httpsAddr, String serverName,
+      String spnegoUserNameKey,
       String spnegoKeytabFileKey) throws IOException {
     HttpConfig.Policy httpPolicy = getHttpPolicy(configuration);
 
@@ -256,13 +257,15 @@ public abstract class BaseHttpServer {
             .setACL(new AccessControlList(configuration.get(DFS_ADMIN, " ")))
             .setSecurityEnabled(UserGroupInformation.isSecurityEnabled())
             .setUsernameConfKey(spnegoUserNameKey)
-            .setKeytabConfKey(getSpnegoKeytabKey(configuration, spnegoKeytabFileKey));
+            .setKeytabConfKey(
+                getSpnegoKeytabKey(configuration, spnegoKeytabFileKey));
 
     // initialize the webserver for uploading/downloading files.
     if (UserGroupInformation.isSecurityEnabled()) {
       LOG.info("Starting web server as: "
-          + SecurityUtil.getServerPrincipal(configuration.get(spnegoUserNameKey),
-          httpAddr.getHostName()));
+          + SecurityUtil
+          .getServerPrincipal(configuration.get(spnegoUserNameKey),
+              httpAddr.getHostName()));
     }
 
     if (httpPolicy.isHttpEnabled()) {

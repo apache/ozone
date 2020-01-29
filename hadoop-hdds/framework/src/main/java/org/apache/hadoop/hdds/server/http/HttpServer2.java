@@ -475,7 +475,7 @@ public final class HttpServer2 implements FilterContainer {
 
       HttpServer2 server = new HttpServer2(this);
 
-      if (!this.securityEnabled || !ignoreAuthenticationFilter()) {
+      if (this.securityEnabled && !ignoreAuthenticationFilter()) {
         server.initSpnego(conf, hostName, usernameConfKey, keytabConfKey);
       }
 
