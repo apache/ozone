@@ -71,6 +71,7 @@ public class TestHddsDatanodeService {
     service.stop();
     service.join();
     service.close();
+    System.exit(1);
   }
 
   static class MockService implements ServicePlugin {
