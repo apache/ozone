@@ -46,6 +46,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.TreeSet;
 
+import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -357,7 +358,7 @@ public class TestRootedOzoneFileSystem {
   public void testListStatusOnLargeDirectory() throws Exception {
     Path root = new Path("/" + volumeName + "/" + bucketName);
     Set<String> paths = new TreeSet<>();
-    int numDirs = 5111;
+    int numDirs = LISTING_PAGE_SIZE + LISTING_PAGE_SIZE / 2;
     for(int i = 0; i < numDirs; i++) {
       Path p = new Path(root, String.valueOf(i));
       fs.mkdirs(p);
