@@ -21,4 +21,9 @@
 
 <configuration>
 
+  <property>
+    <name>hdds.datanode.du.factory.classname</name>
+    <value>org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory$None</value>
+  </property>
+
 </configuration>
