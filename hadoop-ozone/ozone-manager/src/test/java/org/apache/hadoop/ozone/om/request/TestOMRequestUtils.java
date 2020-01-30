@@ -98,6 +98,15 @@ public final class TestOMRequestUtils {
         new CacheValue<>(Optional.of(omBucketInfo), 1L));
   }
 
+  @SuppressWarnings("parameterNumber")
+  public static void addKeyToTableAndCache(String volumeName, String bucketName,
+      String keyName, long clientID, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
+      OMMetadataManager omMetadataManager) throws Exception {
+    addKeyToTable(false, true, volumeName, bucketName, keyName, clientID,
+        replicationType, replicationFactor, trxnLogIndex, omMetadataManager);
+  }
+
   /**
    * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
    * to openKeyTable, else add's it to keyTable.
@@ -113,13 +122,12 @@ public final class TestOMRequestUtils {
    */
   @SuppressWarnings("parameterNumber")
   public static void addKeyToTable(boolean openKeyTable, String volumeName,
-      String bucketName,
-      String keyName, long clientID,
+      String bucketName, String keyName, long clientID,
       HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor,
       OMMetadataManager omMetadataManager) throws Exception {
-    addKeyToTable(openKeyTable, volumeName, bucketName, keyName, clientID,
-        replicationType, replicationFactor, 0L, omMetadataManager);
+    addKeyToTable(openKeyTable, false, volumeName, bucketName, keyName,
+        clientID, replicationType, replicationFactor, 0L, omMetadataManager);
   }
 
   /**
@@ -128,8 +136,8 @@ public final class TestOMRequestUtils {
    * @throws Exception
    */
   @SuppressWarnings("parameternumber")
-  public static void addKeyToTable(boolean openKeyTable, String volumeName,
-      String bucketName, String keyName, long clientID,
+  public static void addKeyToTable(boolean openKeyTable, boolean addToCache,
+      String volumeName, String bucketName, String keyName, long clientID,
       HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long trxnLogIndex,
       OMMetadataManager omMetadataManager) throws Exception {
@@ -138,12 +146,22 @@ public final class TestOMRequestUtils {
         replicationType, replicationFactor, trxnLogIndex);
 
     if (openKeyTable) {
-      omMetadataManager.getOpenKeyTable().put(
-          omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
-              clientID), omKeyInfo);
+      String ozoneKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+          keyName, clientID);
+      if (addToCache) {
+        omMetadataManager.getOpenKeyTable().addCacheEntry(
+            new CacheKey<>(ozoneKey),
+            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      }
+      omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
     } else {
-      omMetadataManager.getKeyTable().put(omMetadataManager.getOzoneKey(
-          volumeName, bucketName, keyName), omKeyInfo);
+      String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+          keyName);
+      if (addToCache) {
+        omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      }
+      omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
     }
   }
 

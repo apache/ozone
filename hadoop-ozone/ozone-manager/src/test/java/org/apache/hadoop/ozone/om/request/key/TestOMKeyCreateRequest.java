@@ -359,7 +359,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Manually add volume, bucket and key to DB table
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
-    addKeyToTable(false, volumeName, bucketName, keyName, clientID,
+    addKeyToTable(false, false, volumeName, bucketName, keyName, clientID,
         replicationType, replicationFactor, 1L, omMetadataManager);
 
     // Replay the transaction - Execute the createKey request again

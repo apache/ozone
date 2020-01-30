@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteResponse;
@@ -45,6 +46,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .DeleteKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Type;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -80,9 +87,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
     OzoneManagerProtocolProtos.KeyArgs deleteKeyArgs =
@@ -100,14 +107,15 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
 
-    OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
-        OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(
-            OzoneManagerProtocolProtos.Type.DeleteKey).setStatus(
-            OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
+        .setCmdType(Type.DeleteKey)
+        .setStatus(Status.OK)
+        .setSuccess(true);
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     IOException exception = null;
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
+    Result result = null;
     try {
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
@@ -126,33 +134,51 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       if (omKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
+
+      // Check if this transaction is a replay of ratis logs.
+      if (isReplay(ozoneManager, omKeyInfo.getUpdateID(),
+          trxnLogIndex)) {
+        // Replay implies the response has already been returned to
+        // the client. So take no further action and return a dummy
+        // OMClientResponse.
+        throw new OMReplayException();
+      }
+
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(transactionLogIndex);
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
       // Update table cache.
       omMetadataManager.getKeyTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
               keyName)),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
+          new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       // No need to add cache entries to delete table. As delete table will
       // be used by DeleteKeyService only, not used for any client response
       // validation, so we don't need to add to cache.
       // TODO: Revisit if we need it later.
 
-      omClientResponse = new OMKeyDeleteResponse(omKeyInfo,
-          omResponse.setDeleteKeyResponse(
-              DeleteKeyResponse.newBuilder()).build());
+      omClientResponse = new OMKeyDeleteResponse(omResponse
+          .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
+          omKeyInfo);
 
+      result = Result.SUCCESS;
     } catch (IOException ex) {
-      exception = ex;
-      omClientResponse = new OMKeyDeleteResponse(null,
-          createErrorOMResponse(omResponse, exception));
+      if (ex instanceof OMReplayException) {
+        result = Result.REPLAY;
+        omClientResponse = new OMKeyDeleteResponse(createReplayOMResponse(
+            omResponse));
+      } else {
+        result = Result.FAILURE;
+        exception = ex;
+        omClientResponse = new OMKeyDeleteResponse(createErrorOMResponse(
+            omResponse, exception));
+      }
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+            omDoubleBufferHelper.add(omClientResponse,
+                trxnLogIndex));
       }
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
@@ -161,17 +187,31 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_KEY, auditMap,
-        exception, userInfo));
-
-    // return response.
-    if (exception == null) {
-      omMetrics.decNumKeys();
-      return omClientResponse;
-    } else {
-      omMetrics.incNumKeyDeleteFails();
-      return omClientResponse;
+    if (result != Result.REPLAY) {
+      auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_KEY, auditMap,
+          exception, userInfo));
     }
 
+    switch (result) {
+    case SUCCESS:
+      omMetrics.decNumKeys();
+      LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
+          bucketName, keyName);
+      break;
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+          deleteKeyRequest);
+      break;
+    case FAILURE:
+      omMetrics.incNumKeyDeleteFails();
+      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key{}. Exception:{}",
+          volumeName, bucketName, keyName, exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyDeleteRequest: {}",
+          deleteKeyRequest);
+    }
+
+    return omClientResponse;
   }
 }
