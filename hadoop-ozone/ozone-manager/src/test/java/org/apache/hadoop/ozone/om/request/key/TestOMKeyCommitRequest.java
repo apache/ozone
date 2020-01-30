@@ -214,8 +214,9 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     // Manually add Key to OpenKey table in DB
-    TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, 1L, omMetadataManager);
+    TestOMRequestUtils.addKeyToTable(true, false, volumeName, bucketName,
+        keyName, clientID, replicationType, replicationFactor, 1L,
+        omMetadataManager);
 
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
 
