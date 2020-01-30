@@ -101,7 +101,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
         throw new OMReplayException();
       }
 
-      operationResult = apply(omKeyInfo);
+      operationResult = apply(omKeyInfo, trxnLogIndex);
 
       if (operationResult) {
         // update cache.
@@ -192,6 +192,6 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * else false.
    * @param omKeyInfo
    */
-  abstract boolean apply(OmKeyInfo omKeyInfo);
+  abstract boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex);
 }
 

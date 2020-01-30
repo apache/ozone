@@ -103,10 +103,13 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   }
 
   @Override
-  boolean apply(OmKeyInfo omKeyInfo) {
+  boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
-    return omKeyInfo.setAcls(ozoneAcls);
+    boolean operationResult = omKeyInfo.setAcls(ozoneAcls);
+    if (operationResult) {
+      omKeyInfo.setUpdateID(trxnLogIndex);
+    }
+    return operationResult;
   }
-
 }
 
