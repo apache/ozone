@@ -81,7 +81,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
         keyName, clientID);
     Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
-    omAllocateBlockResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omAllocateBlockResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);

@@ -197,7 +197,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             throw new OMReplayException();
           }
         }
-        throw new OMException("Open Key not found " + openKeyName, KEY_NOT_FOUND);
+        throw new OMException("Open Key not found " + openKeyName,
+            KEY_NOT_FOUND);
       }
 
       // Check if this transaction is a replay of ratis logs.
@@ -220,8 +221,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       // Add to cache.
       omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(openKeyName), new CacheValue<>(Optional.of(openKeyInfo),
-              trxnLogIndex));
+          new CacheKey<>(openKeyName),
+          new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
