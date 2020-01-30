@@ -76,6 +76,11 @@ public class KeyOutputStream extends OutputStream {
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
   private long offset;
+  // how much data has been ingested into the stream
+  private long writeOffset;
+  // whether an exception is encountered while write and whole write could
+  // not succeed
+  private boolean isException;
   private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
   /**
@@ -134,6 +139,8 @@ public class KeyOutputStream extends OutputStream {
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         maxRetryCount, retryInterval);
     this.retryCount = 0;
+    this.isException = false;
+    this.writeOffset = 0;
   }
 
   /**
@@ -188,6 +195,7 @@ public class KeyOutputStream extends OutputStream {
       return;
     }
     handleWrite(b, off, len, false);
+    writeOffset += len;
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean retry)
@@ -201,7 +209,11 @@ public class KeyOutputStream extends OutputStream {
         // comes via Exception path.
         int writeLen = Math.min((int) len, (int) current.getRemaining());
         long currentPos = current.getWrittenDataLength();
-        writeToOutputStream(current, retry, len, b, writeLen, off, currentPos);
+        // writeLen will be updated based on whether the write was succeeded
+        // or if it sees an exception, how much the actual write was
+        // acknowledged.
+        writeLen = writeToOutputStream(current, retry, len, b, writeLen,
+                off, currentPos);
         if (current.getRemaining() <= 0) {
           // since the current block is already written close the stream.
           handleFlushOrClose(StreamAction.FULL);
@@ -215,7 +227,7 @@ public class KeyOutputStream extends OutputStream {
     }
   }
 
-  private void writeToOutputStream(BlockOutputStreamEntry current,
+  private int writeToOutputStream(BlockOutputStreamEntry current,
       boolean retry, long len, byte[] b, int writeLen, int off, long currentPos)
       throws IOException {
     try {
@@ -244,6 +256,7 @@ public class KeyOutputStream extends OutputStream {
       LOG.debug("writeLen {}, total len {}", writeLen, len);
       handleException(current, ioe);
     }
+    return writeLen;
   }
 
   /**
@@ -348,6 +361,7 @@ public class KeyOutputStream extends OutputStream {
     try {
       action = retryPolicy.shouldRetry(exception, retryCount, 0, true);
     } catch (Exception e) {
+      isException = true;
       throw new IOException(e);
     }
     if (action.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
@@ -356,6 +370,7 @@ public class KeyOutputStream extends OutputStream {
         msg = "Retry request failed. " + action.reason;
         LOG.error(msg, exception);
       }
+      isException = true;
       throw new IOException(msg, exception);
     }
 
@@ -484,6 +499,9 @@ public class KeyOutputStream extends OutputStream {
     closed = true;
     try {
       handleFlushOrClose(StreamAction.CLOSE);
+      if (!isException) {
+        Preconditions.checkArgument(writeOffset == offset);
+      }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();
