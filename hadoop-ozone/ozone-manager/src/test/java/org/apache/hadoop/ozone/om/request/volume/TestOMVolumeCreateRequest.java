@@ -139,6 +139,11 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     Assert.assertEquals(expectedObjId, omVolumeArgs.getObjectID());
     Assert.assertEquals(txLogIndex, omVolumeArgs.getUpdateID());
 
+    // Initial modificationTime should be equal to creationTime.
+    long creationTime = omVolumeArgs.getCreationTime();
+    long modificationTime = omVolumeArgs.getModificationTime();
+    Assert.assertEquals(creationTime, modificationTime);
+
     // Check data from table and request.
     Assert.assertEquals(volumeInfo.getVolume(), omVolumeArgs.getVolume());
     Assert.assertEquals(volumeInfo.getOwnerName(), omVolumeArgs.getOwnerName());
