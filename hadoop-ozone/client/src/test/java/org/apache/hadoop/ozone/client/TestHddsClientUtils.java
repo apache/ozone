@@ -142,7 +142,6 @@ public class TestHddsClientUtils {
         conf);
     assertEquals(scmHost.split(":")[0], address.getHostName());
     assertEquals(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, address.getPort());
-    System.exit(1);
   }
 
   @Test
