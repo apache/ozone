@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -61,6 +62,7 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
+@Ignore("HDDS-2961")
 public class TestSCMContainerPlacementPolicyMetrics {
 
   private MiniOzoneCluster cluster;
