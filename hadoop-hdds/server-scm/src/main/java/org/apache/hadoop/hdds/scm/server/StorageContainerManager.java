@@ -168,7 +168,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * SCM super user.
    */
-  private final String scmUsername;
   private final Collection<String> scmAdminUsernames;
   /**
    * SCM mxbean.
@@ -319,7 +318,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);
-    scmUsername = UserGroupInformation.getCurrentUser().getUserName();
+    String scmUsername = UserGroupInformation.getCurrentUser().getUserName();
     if (!scmAdminUsernames.contains(scmUsername)) {
       scmAdminUsernames.add(scmUsername);
     }
