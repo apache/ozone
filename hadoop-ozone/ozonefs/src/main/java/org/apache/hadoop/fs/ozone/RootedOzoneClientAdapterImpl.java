@@ -22,7 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
- * Implementation of the OzoneFileSystem calls.
+ * Implementation of the RootedOzoneFileSystem calls.
  */
 public class RootedOzoneClientAdapterImpl
     extends BasicRootedOzoneClientAdapterImpl {

@@ -94,7 +94,7 @@ public class TestOFSPath {
   public void testParsingMount() {
     // Mount only
     OFSPath ofsPath = new OFSPath("/tmp/");
-    // TODO: HDDS-2929
+    // TODO: Subject to change in HDDS-2929.
     Assert.assertEquals("tempVolume", ofsPath.getVolumeName());
     Assert.assertEquals("tempBucket", ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());
@@ -104,7 +104,7 @@ public class TestOFSPath {
 
     // Mount with key
     ofsPath = new OFSPath("/tmp/key1");
-    // TODO: HDDS-2929
+    // TODO: Subject to change in HDDS-2929.
     Assert.assertEquals("tempVolume", ofsPath.getVolumeName());
     Assert.assertEquals("tempBucket", ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());

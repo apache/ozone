@@ -28,5 +28,6 @@ import java.io.IOException;
  */
 public interface RootedOzoneClientAdapter extends OzoneClientAdapter {
 
+  // renameKey is not supported in OFS, user should use rename instead.
   void rename(String pathStr, String newPath) throws IOException;
 }

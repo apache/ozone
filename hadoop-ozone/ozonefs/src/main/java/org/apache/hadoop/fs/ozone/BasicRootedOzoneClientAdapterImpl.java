@@ -482,7 +482,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
-   * listStatus implementation for OFS.
+   * OFS listStatus implementation.
    *
    * @param pathStr Path for the listStatus to operate on.
    *                This takes an absolute path from OFS root.
@@ -506,9 +506,10 @@ public class BasicRootedOzoneClientAdapterImpl
 
     incrementCounter(Statistic.OBJECTS_LIST);
     OFSPath ofsPath = new OFSPath(pathStr);
+    // TODO: Subject to change in HDDS-2928.
     String keyName = ofsPath.getKeyName();
     OFSPath ofsStartPath = new OFSPath(startPath);
-    // Internally, we need startKey to feed into bucket.listStatus()
+    // Internally we need startKey to be passed into bucket.listStatus
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
