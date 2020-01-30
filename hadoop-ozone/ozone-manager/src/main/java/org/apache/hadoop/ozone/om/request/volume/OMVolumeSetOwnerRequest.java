@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Optional;
@@ -63,6 +64,20 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
   public OMVolumeSetOwnerRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
+    long modificationTime = Time.now();
+    SetVolumePropertyRequest modifiedRequest = getOmRequest()
+        .getSetVolumePropertyRequest().toBuilder()
+        .setModificationTime(modificationTime).build();
+
+    return getOmRequest().toBuilder()
+        .setSetVolumePropertyRequest(modifiedRequest.toBuilder())
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
   @Override
@@ -166,6 +181,10 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       omVolumeArgs.setOwnerName(newOwner);
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
+
+      // Update modificationTime.
+      omVolumeArgs.setModificationTime(
+          setVolumePropertyRequest.getModificationTime());
 
       // Update cache.
       omMetadataManager.getUserTable().addCacheEntry(

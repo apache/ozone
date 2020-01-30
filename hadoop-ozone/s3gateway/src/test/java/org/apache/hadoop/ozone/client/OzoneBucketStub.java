@@ -65,19 +65,21 @@ public class OzoneBucketStub extends OzoneBucket {
    * @param storageType  StorageType of the bucket.
    * @param versioning   versioning status of the bucket.
    * @param creationTime creation time of the bucket.
+   * @param modificationTime modification time of the bucket.
    */
   public OzoneBucketStub(
       String volumeName,
       String bucketName,
       StorageType storageType, Boolean versioning,
-      long creationTime) {
+      long creationTime, long modificationTime) {
     super(volumeName,
         bucketName,
         ReplicationFactor.ONE,
         ReplicationType.STAND_ALONE,
         storageType,
         versioning,
-        creationTime);
+        creationTime,
+        modificationTime);
   }
 
   @Override

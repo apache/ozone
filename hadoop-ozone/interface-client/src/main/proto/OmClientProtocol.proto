@@ -346,6 +346,7 @@ message VolumeInfo {
     optional uint64 creationTime = 7;
     optional uint64 objectID = 8;
     optional uint64 updateID = 9;
+    optional uint64 modificationTime = 10;
 }
 
 /**
@@ -403,6 +404,7 @@ message SetVolumePropertyRequest {
     required string volumeName = 1;
     optional string ownerName = 2;
     optional uint64 quotaInBytes = 3;
+    optional uint64 modificationTime = 4;
 }
 
 message SetVolumePropertyResponse {
@@ -478,6 +480,7 @@ message BucketInfo {
     optional BucketEncryptionInfoProto beinfo = 8;
     optional uint64 objectID = 9;
     optional uint64 updateID = 10;
+    optional uint64 modificationTime = 11;
 }
 
 enum StorageTypeProto {
