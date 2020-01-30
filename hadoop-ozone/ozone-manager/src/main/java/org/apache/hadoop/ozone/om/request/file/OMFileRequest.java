@@ -23,13 +23,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
 import javax.annotation.Nonnull;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 /**
  * Base class for file requests.
@@ -110,6 +107,7 @@ public final class OMFileRequest {
    * @return List of keys representing non-existent parent dirs
    * @throws IOException
    */
+  @Nonnull
   public static List<String> getMissingParents(
       @Nonnull OMMetadataManager omMetadataManager,
       @Nonnull String volumeName,
@@ -141,19 +139,6 @@ public final class OMFileRequest {
     }
 
     return missing;
-  }
-
-  private static OmKeyInfo getKeyInfo(
-      @Nonnull OMMetadataManager omMetadataManager,
-      @Nonnull String volumeName,
-      @Nonnull String bucketName,
-      @Nonnull String keyName) throws IOException {
-
-    if (omMetadataManager.getKeyTable().isExist(keyName)) {
-      return omMetadataManager.getKeyTable().get(keyName);
-    } else {
-      return null;
-    }
   }
 
   /**

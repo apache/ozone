@@ -376,7 +376,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (createPrefixDirectories) {
       LOG.info("OzoneFS will create entries for parent directories in path.");
     } else {
-      LOG.info("OzoneFS will not create entries for parent directories in path.");
+      LOG.info("OzoneFS won't create entries for parent directories in path.");
     }
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
@@ -401,26 +401,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     RPC.setProtocolEngine(configuration, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
 
-    secConfig = new SecurityConfig(configuration);
-    // Create the KMS Key Provider
-    try {
-      kmsProvider = createKeyProviderExt(configuration);
-    } catch (IOException ioe) {
-      kmsProvider = null;
-      LOG.error("Fail to create Key Provider");
-    }
-    if (secConfig.isSecurityEnabled()) {
-      omComponent = OM_DAEMON + "-" + omId;
-      if(omStorage.getOmCertSerialId() == null) {
-        throw new RuntimeException("OzoneManager started in secure mode but " +
-            "doesn't have SCM signed certificate.");
-      }
-      certClient = new OMCertificateClient(new SecurityConfig(conf),
-          omStorage.getOmCertSerialId());
-    }
-    if (secConfig.isBlockTokenEnabled()) {
-      blockTokenMgr = createBlockTokenSecretManager(configuration);
-    }
+    secConfig = setupSecurity(conf);
 
     instantiateServices();
 
@@ -464,6 +445,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
+  }
+
+  private SecurityConfig setupSecurity(OzoneConfiguration conf)
+      throws IOException {
+    SecurityConfig securityConfig = new SecurityConfig(configuration);
+    // Create the KMS Key Provider
+    try {
+      kmsProvider = createKeyProviderExt(configuration);
+    } catch (IOException ioe) {
+      kmsProvider = null;
+      LOG.error("Fail to create Key Provider");
+    }
+    if (securityConfig.isSecurityEnabled()) {
+      omComponent = OM_DAEMON + "-" + omId;
+      if(omStorage.getOmCertSerialId() == null) {
+        throw new RuntimeException("OzoneManager started in secure mode but " +
+            "doesn't have SCM signed certificate.");
+      }
+      certClient = new OMCertificateClient(new SecurityConfig(conf),
+          omStorage.getOmCertSerialId());
+    }
+    if (securityConfig.isBlockTokenEnabled()) {
+      blockTokenMgr = createBlockTokenSecretManager(configuration);
+    }
+
+    return securityConfig;
   }
 
   /**

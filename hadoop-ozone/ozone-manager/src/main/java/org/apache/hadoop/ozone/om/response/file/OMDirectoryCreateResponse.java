@@ -75,8 +75,8 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
         if (parentKeyInfos != null) {
           for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
             String parentKey = omMetadataManager
-                .getOzoneDirKey(parentKeyInfo.getVolumeName(), parentKeyInfo.getBucketName(),
-                    parentKeyInfo.getKeyName());
+                .getOzoneDirKey(parentKeyInfo.getVolumeName(),
+                    parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
             LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
                 parentKeyInfo);
             omMetadataManager.getKeyTable()
