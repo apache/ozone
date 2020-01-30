@@ -58,7 +58,7 @@ public class ReconIncrementalContainerReportHandler
                         final EventPublisher publisher) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing incremental container report from data node {}",
-          report.getDatanodeDetails().getUuid());
+          report.getDatanodeDetails());
     }
 
     ReconContainerManager containerManager =
