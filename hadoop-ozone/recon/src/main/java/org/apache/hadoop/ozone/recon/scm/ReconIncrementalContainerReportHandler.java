@@ -98,11 +98,6 @@ public class ReconIncrementalContainerReportHandler
             replicaProto.getContainerID());
       }
     }
-
-    if (success) {
-      getContainerManager().notifyContainerReportProcessing(false, true);
-    } else {
-      getContainerManager().notifyContainerReportProcessing(false, false);
-    }
+    getContainerManager().notifyContainerReportProcessing(false, success);
   }
 }

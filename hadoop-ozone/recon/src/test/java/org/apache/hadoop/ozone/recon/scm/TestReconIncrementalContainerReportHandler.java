@@ -22,8 +22,6 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest.getRandomPipeline;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -34,7 +32,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -42,61 +39,25 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
-import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 
 /**
  * Test Recon ICR handler.
  */
-public class TestReconIncrementalContainerReportHandler {
-
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
-  private OzoneConfiguration conf;
-  private SCMStorageConfig scmStorageConfig;
-  private ReconPipelineManager pipelineManager;
-  private ReconContainerManager containerManager;
-
-  @Before
-  public void setUp() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.set(OZONE_METADATA_DIRS,
-        temporaryFolder.newFolder().getAbsolutePath());
-    conf.set(OZONE_SCM_NAMES, "localhost");
-    scmStorageConfig = new ReconStorageConfig(conf);
-    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    EventQueue eventQueue = new EventQueue();
-    NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
-    pipelineManager = new ReconPipelineManager(conf, nodeManager, eventQueue);
-    containerManager = new ReconContainerManager(conf, pipelineManager);
-  }
-
-  @After
-  public void tearDown() throws IOException {
-    containerManager.close();
-    pipelineManager.close();
-  }
+public class TestReconIncrementalContainerReportHandler
+    extends AbstractReconContainerManagerTest {
 
   @Test
   public void testProcessICR() throws IOException, NodeNotFoundException {
 
     Pipeline pipeline = getRandomPipeline();
+    ReconPipelineManager pipelineManager = getPipelineManager();
     pipelineManager.addPipeline(pipeline);
 
     ContainerID containerID = new ContainerID(100L);
@@ -130,6 +91,7 @@ public class TestReconIncrementalContainerReportHandler {
 
     NodeManager nodeManagerMock = mock(NodeManager.class);
 
+    ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler recconIcr =
         new ReconIncrementalContainerReportHandler(nodeManagerMock,
             containerManager, scmServiceProviderMock);
