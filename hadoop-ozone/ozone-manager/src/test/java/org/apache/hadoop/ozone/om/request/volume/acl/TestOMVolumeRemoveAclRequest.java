@@ -75,7 +75,6 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omAddAclResponse.getStatus());
 
-
     // remove acl
     OMRequest removeAclRequest =
         TestOMRequestUtils.createVolumeRemoveAclRequest(volumeName, acl);
@@ -94,7 +93,7 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     Assert.assertEquals(acl, aclMapBeforeRemove.getAcl().get(0));
 
     OMClientResponse omClientRemoveResponse =
-        omVolumeRemoveAclRequest.validateAndUpdateCache(ozoneManager, 1,
+        omVolumeRemoveAclRequest.validateAndUpdateCache(ozoneManager, 2,
             ozoneManagerDoubleBufferHelper);
 
     OMResponse omRemoveAclResponse = omClientRemoveResponse.getOMResponse();
