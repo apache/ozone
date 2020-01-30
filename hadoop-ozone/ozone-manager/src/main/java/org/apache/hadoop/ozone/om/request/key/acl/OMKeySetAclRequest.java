@@ -74,27 +74,31 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
     omResponse.setSuccess(operationResult);
     omResponse.setSetAclResponse(SetAclResponse.newBuilder()
         .setResponse(operationResult));
-    return new OMKeyAclResponse(omKeyInfo,
-        omResponse.build());
+    return new OMKeyAclResponse(omResponse.build(), omKeyInfo);
   }
 
   @Override
-  OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
-    return new OMKeyAclResponse(null,
-        createErrorOMResponse(omResponse, exception));
-  }
-
-  @Override
-  void onComplete(boolean operationResult, IOException exception) {
-    if (operationResult) {
-      LOG.debug("Set acl: {} to path: {} success!", ozoneAcls, path);
-    } else {
-      if (exception == null) {
-        LOG.debug("Set acl {} to path {} failed!", ozoneAcls, path);
+  void onComplete(Result result, boolean operationResult,
+      IOException exception, long trxnLogIndex) {
+    switch (result) {
+    case SUCCESS:
+      if (operationResult) {
+        LOG.debug("Set acl: {} to path: {} success!", ozoneAcls, path);
       } else {
-        LOG.error("Set acl {} to path {} failed!", ozoneAcls, path, exception);
+        LOG.debug("Set acl {} to path {} failed because acl already exists",
+            ozoneAcls, path);
       }
+      break;
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+          getOmRequest());
+      break;
+    case FAILURE:
+      LOG.error("Set acl {} to path {} failed!", ozoneAcls, path, exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeySetAclRequest: {}",
+          getOmRequest());
     }
   }
 

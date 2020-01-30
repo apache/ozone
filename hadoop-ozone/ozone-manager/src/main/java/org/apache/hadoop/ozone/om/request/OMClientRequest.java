@@ -58,6 +58,18 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   private OMRequest omRequest;
 
+  /**
+   * Stores the result of request execution in
+   * OMClientRequest#validateAndUpdateCache.
+   */
+  public enum Result {
+    SUCCESS, // The request was executed successfully
+
+    REPLAY, // The request is a replay and was ignored
+
+    FAILURE // The request failed and exception was thrown
+  }
+
   public OMClientRequest(OMRequest omRequest) {
     Preconditions.checkNotNull(omRequest);
     this.omRequest = omRequest;
