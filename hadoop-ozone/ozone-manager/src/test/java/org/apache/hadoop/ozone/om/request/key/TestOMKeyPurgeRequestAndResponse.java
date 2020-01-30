@@ -55,17 +55,17 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
       bucket = bucketName;
     }
     // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucket,
         omMetadataManager);
 
     List<String> ozoneKeyNames = new ArrayList<>(numKeys);
     for (int i = 1; i <= numKeys; i++) {
       String key = keyName + "-" + i;
-      TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, key,
-          clientID, replicationType, replicationFactor, trxnIndex++,
+      TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucket,
+          key, clientID, replicationType, replicationFactor, trxnIndex++,
           omMetadataManager);
       ozoneKeyNames.add(omMetadataManager.getOzoneKey(
-          volumeName, bucketName, key));
+          volumeName, bucket, key));
     }
 
     List<String> deletedKeyNames = new ArrayList<>(numKeys);
