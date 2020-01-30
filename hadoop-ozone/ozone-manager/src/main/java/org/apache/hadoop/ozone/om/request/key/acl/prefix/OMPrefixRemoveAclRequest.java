@@ -80,32 +80,41 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
     omResponse.setSuccess(operationResult);
     omResponse.setRemoveAclResponse(RemoveAclResponse.newBuilder()
         .setResponse(operationResult));
-    return new OMPrefixAclResponse(omPrefixInfo,
-        omResponse.build());
+    return new OMPrefixAclResponse(omResponse.build(), omPrefixInfo);
   }
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
-    return new OMPrefixAclResponse(null,
-        createErrorOMResponse(omResponse, exception));
+    return new OMPrefixAclResponse(createErrorOMResponse(omResponse,
+        exception));
   }
 
   @Override
   void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics) {
-    if (operationResult) {
-      LOG.debug("Remove acl: {} to path: {} success!", ozoneAcls,
-          ozoneObj.getPath());
-    } else {
-      omMetrics.incNumBucketUpdateFails();
-      if (exception == null) {
-        LOG.debug("Remove acl {} to path {} failed, because acl does not exist",
-            ozoneAcls, ozoneObj.getPath());
+      OMMetrics omMetrics, Result result, long trxnLogIndex) {
+    switch (result) {
+    case SUCCESS:
+      if (operationResult) {
+        LOG.debug("Remove acl: {} to path: {} success!", ozoneAcls,
+            ozoneObj.getPath());
       } else {
-        LOG.error("Remove acl {} to path {} failed!", ozoneAcls,
-            ozoneObj.getPath(), exception);
+        LOG.debug("Remove acl {} to path {} failed because acl does not exist",
+            ozoneAcls, ozoneObj.getPath());
       }
+      break;
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+          getOmRequest());
+      break;
+    case FAILURE:
+      omMetrics.incNumBucketUpdateFails();
+      LOG.error("Remove acl {} to path {} failed!", ozoneAcls,
+          ozoneObj.getPath(), exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMPrefixRemoveAclRequest: {}",
+          getOmRequest());
     }
   }
 

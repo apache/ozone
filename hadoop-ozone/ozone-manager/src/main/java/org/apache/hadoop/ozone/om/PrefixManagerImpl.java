@@ -108,7 +108,7 @@ public class PrefixManagerImpl implements PrefixManager {
 
       OMPrefixAclOpResult omPrefixAclOpResult = addAcl(obj, acl, prefixInfo);
 
-      return omPrefixAclOpResult.isOperationsResult();
+      return omPrefixAclOpResult.isSuccess();
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Add acl operation failed for prefix path:{} acl:{}",
@@ -138,7 +138,7 @@ public class PrefixManagerImpl implements PrefixManager {
           metadataManager.getPrefixTable().get(prefixPath);
       OMPrefixAclOpResult omPrefixAclOpResult = removeAcl(obj, acl, prefixInfo);
 
-      if (!omPrefixAclOpResult.isOperationsResult()) {
+      if (!omPrefixAclOpResult.isSuccess()) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("acl {} does not exist for prefix path {} ",
               acl, prefixPath);
@@ -146,7 +146,7 @@ public class PrefixManagerImpl implements PrefixManager {
         return false;
       }
 
-      return omPrefixAclOpResult.isOperationsResult();
+      return omPrefixAclOpResult.isSuccess();
 
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
@@ -178,7 +178,7 @@ public class PrefixManagerImpl implements PrefixManager {
 
       OMPrefixAclOpResult omPrefixAclOpResult = setAcl(obj, acls, prefixInfo);
 
-      return omPrefixAclOpResult.isOperationsResult();
+      return omPrefixAclOpResult.isSuccess();
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Set prefix acl operation failed for prefix path:{} acls:{}",
@@ -410,7 +410,7 @@ public class PrefixManagerImpl implements PrefixManager {
       return omPrefixInfo;
     }
 
-    public boolean isOperationsResult() {
+    public boolean isSuccess() {
       return operationsResult;
     }
   }

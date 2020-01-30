@@ -83,32 +83,41 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
     omResponse.setSuccess(operationResult);
     omResponse.setAddAclResponse(AddAclResponse.newBuilder()
         .setResponse(operationResult));
-    return new OMPrefixAclResponse(omPrefixInfo,
-        omResponse.build());
+    return new OMPrefixAclResponse(omResponse.build(), omPrefixInfo);
   }
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
-    return new OMPrefixAclResponse(null,
-        createErrorOMResponse(omResponse, exception));
+    return new OMPrefixAclResponse(createErrorOMResponse(omResponse,
+        exception));
   }
 
   @Override
   void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics) {
-    if (operationResult) {
-      LOG.debug("Add acl: {} to path: {} success!", ozoneAcls,
-          ozoneObj.getPath());
-    } else {
-      omMetrics.incNumBucketUpdateFails();
-      if (exception == null) {
-        LOG.debug("Add acl {} to path {} failed, because acl already exist",
-            ozoneAcls, ozoneObj.getPath());
+      OMMetrics omMetrics, Result result, long trxnLogIndex) {
+    switch (result) {
+    case SUCCESS:
+      if (operationResult) {
+        LOG.debug("Add acl: {} to path: {} success!", ozoneAcls,
+            ozoneObj.getPath());
       } else {
-        LOG.error("Add acl {} to path {} failed!", ozoneAcls,
-            ozoneObj.getPath(), exception);
+        LOG.debug("Add acl {} to path {} failed because acl already exists",
+            ozoneAcls, ozoneObj.getPath());
       }
+      break;
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+          getOmRequest());
+      break;
+    case FAILURE:
+      omMetrics.incNumBucketUpdateFails();
+      LOG.error("Add acl {} to path {} failed!", ozoneAcls,
+          ozoneObj.getPath(), exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMPrefixAddAclRequest: {}",
+          getOmRequest());
     }
   }
 
@@ -117,6 +126,5 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
       OmPrefixInfo omPrefixInfo) throws IOException {
     return prefixManager.addAcl(ozoneObj, ozoneAcls.get(0), omPrefixInfo);
   }
-
 }
 

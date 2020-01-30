@@ -26,10 +26,12 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
+import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.acl.prefix.OMPrefixAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -50,9 +52,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
-
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     OmPrefixInfo omPrefixInfo = null;
 
@@ -66,7 +66,8 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
     String bucket = null;
     String key = null;
     OMPrefixAclOpResult operationResult = null;
-    boolean result = false;
+    boolean opResult = false;
+    Result result = null;
 
     PrefixManagerImpl prefixManager =
         (PrefixManagerImpl) ozoneManager.getPrefixManager();
@@ -85,6 +86,14 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
       omPrefixInfo = omMetadataManager.getPrefixTable().get(prefixPath);
 
+      // Check if this transaction is a replay of ratis logs.
+      if (omPrefixInfo != null) {
+        if (isReplay(ozoneManager, omPrefixInfo.getUpdateID(), trxnLogIndex)) {
+          // This is a replayed transaction. Return dummy response.
+          throw new OMReplayException();
+        }
+      }
+
       try {
         operationResult = apply(prefixManager, omPrefixInfo);
       } catch (IOException ex) {
@@ -96,7 +105,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
         operationResult = new OMPrefixAclOpResult(null, false);
       }
 
-      if (operationResult.isOperationsResult()) {
+      if (operationResult.isSuccess()) {
         // As for remove acl list, for a prefix if after removing acl from
         // the existing acl list, if list size becomes zero, delete the
         // prefix from prefix table.
@@ -104,28 +113,35 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
             operationResult.getOmPrefixInfo().getAcls().size() == 0) {
           omMetadataManager.getPrefixTable().addCacheEntry(
               new CacheKey<>(prefixPath),
-              new CacheValue<>(Optional.absent(), transactionLogIndex));
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
         } else {
           // update cache.
           omMetadataManager.getPrefixTable().addCacheEntry(
               new CacheKey<>(prefixPath),
               new CacheValue<>(Optional.of(operationResult.getOmPrefixInfo()),
-                  transactionLogIndex));
+                  trxnLogIndex));
         }
       }
 
-      result  = operationResult.isOperationsResult();
+      opResult  = operationResult.isSuccess();
       omClientResponse = onSuccess(omResponse,
-          operationResult.getOmPrefixInfo(), result);
+          operationResult.getOmPrefixInfo(), opResult);
+      result = Result.SUCCESS;
 
     } catch (IOException ex) {
-      exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      if (ex instanceof OMReplayException) {
+        result = Result.REPLAY;
+        omClientResponse = onReplay(omResponse);
+      } else {
+        result = Result.FAILURE;
+        exception = ex;
+        omClientResponse = onFailure(omResponse, ex);
+      }
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+            omDoubleBufferHelper.add(omClientResponse,
+                trxnLogIndex));
       }
       if (lockAcquired) {
         omMetadataManager.getLock().releaseWriteLock(PREFIX_LOCK,
@@ -133,7 +149,8 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       }
     }
 
-    onComplete(result, exception, ozoneManager.getMetrics());
+    onComplete(opResult, exception, ozoneManager.getMetrics(), result,
+        trxnLogIndex);
 
     return omClientResponse;
   }
@@ -173,6 +190,15 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       IOException exception);
 
   /**
+   * Get the OM Client Response on replayed transactions
+   * @param omResonse
+   * @return OMClientResponse
+   */
+  OMClientResponse onReplay(OMResponse.Builder omResonse) {
+    return new OMPrefixAclResponse(createReplayOMResponse(omResonse));
+  }
+
+  /**
    * Completion hook for final processing before return without lock.
    * Usually used for logging without lock and metric update.
    * @param operationResult
@@ -180,7 +206,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    * @param omMetrics
    */
   abstract void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics);
+      OMMetrics omMetrics, Result result, long trxnLogIndex);
 
   /**
    * Apply the acl operation, if successfully completed returns true,
@@ -191,7 +217,5 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    */
   abstract OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
       OmPrefixInfo omPrefixInfo) throws IOException;
-
-
 }
 
