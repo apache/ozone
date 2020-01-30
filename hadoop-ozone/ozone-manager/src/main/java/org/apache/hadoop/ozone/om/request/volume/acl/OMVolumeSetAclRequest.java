@@ -80,29 +80,36 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
 
   @Override
   OMClientResponse onSuccess(OMResponse.Builder omResponse,
-      OmVolumeArgs omVolumeArgs, boolean result){
+      OmVolumeArgs omVolumeArgs, boolean aclApplied){
     omResponse.setSetAclResponse(OzoneManagerProtocolProtos.SetAclResponse
-        .newBuilder().setResponse(result).build());
-    return new OMVolumeAclOpResponse(omVolumeArgs, omResponse.build());
+        .newBuilder().setResponse(aclApplied).build());
+    return new OMVolumeAclOpResponse(omResponse.build(), omVolumeArgs);
   }
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException ex) {
-    return new OMVolumeAclOpResponse(null,
-        createErrorOMResponse(omResponse, ex));
+    return new OMVolumeAclOpResponse(createErrorOMResponse(omResponse, ex));
   }
 
   @Override
-  void onComplete(IOException ex) {
-    if (ex == null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Set acls: {} to volume: {} success!",
-            getAcls(), getVolumeName());
-      }
-    } else {
-      LOG.error("Set acls {} to volume {} failed!",
-          getAcls(), getVolumeName(), ex);
+  void onComplete(Result result, IOException ex, long trxnLogIndex) {
+    switch (result) {
+    case SUCCESS:
+      LOG.debug("Set acls: {} to volume: {} success!", getAcls(),
+          getVolumeName());
+      break;
+    case REPLAY:
+      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+          getOmRequest());
+      break;
+    case FAILURE:
+      LOG.error("Set acls {} to volume {} failed!", getAcls(),
+          getVolumeName(), ex);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMVolumeSetAclRequest: {}",
+          getOmRequest());
     }
   }
 }
