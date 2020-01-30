@@ -21,14 +21,12 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -627,17 +625,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return fileStatus;
   }
 
-  @Override
-  public BlockLocation[] getFileBlockLocations(FileStatus fileStatus,
-      long start, long len)
-      throws IOException {
-    if (fileStatus instanceof LocatedFileStatus) {
-      return ((LocatedFileStatus) fileStatus).getBlockLocations();
-    } else {
-      return super.getFileBlockLocations(fileStatus, start, len);
-    }
-  }
-
   /**
    * Turn a path (relative or otherwise) into an Ozone key.
    *
@@ -786,7 +773,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       //NOOP: If not symlink symlink remains null.
     }
 
-    FileStatus fileStatus = new FileStatus(
+    return new FileStatus(
         fileStatusAdapter.getLength(),
         fileStatusAdapter.isDir(),
         fileStatusAdapter.getBlockReplication(),
@@ -799,11 +786,5 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         symLink,
         fileStatusAdapter.getPath()
     );
-
-    BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
-    if (blockLocations == null || blockLocations.length == 0) {
-      return fileStatus;
-    }
-    return new LocatedFileStatus(fileStatus, blockLocations);
   }
 }
