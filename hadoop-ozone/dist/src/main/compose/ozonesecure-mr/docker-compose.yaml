@@ -46,6 +46,8 @@ services:
     command: ["/opt/hadoop/bin/ozone","datanode"]
     env_file:
       - docker-config
+    environment:
+      KERBEROS_KEYTABS: dn HTTP
   om:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: om
@@ -57,6 +59,7 @@ services:
       - 9874:9874
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      KERBEROS_KEYTABS: om HTTP testuser
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -71,6 +74,8 @@ services:
       - 9878:9878
     env_file:
       - ./docker-config
+    environment:
+      KERBEROS_KEYTABS: s3g HTTP
     command: ["/opt/hadoop/bin/ozone","s3g"]
   scm:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -86,6 +91,7 @@ services:
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
+      KERBEROS_KEYTABS: scm HTTP
     command: ["/opt/hadoop/bin/ozone","scm"]
   rm:
     image: apache/hadoop:${HADOOP_VERSION}
@@ -100,6 +106,7 @@ services:
       - ./docker-config
     environment:
       HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      KERBEROS_KEYTABS: rm HTTP hadoop
     command: ["yarn", "resourcemanager"]
   nm:
     image: apache/hadoop:${HADOOP_VERSION}
@@ -113,6 +120,7 @@ services:
     environment:
       HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
       WAIT_FOR: rm:8088
+      KERBEROS_KEYTABS: nm HTTP
     command: ["yarn","nodemanager"]
   jhs:
     image: apache/hadoop:${HADOOP_VERSION}
@@ -127,6 +135,7 @@ services:
     env_file:
       - ./docker-config
     environment:
+      KERBEROS_KEYTABS: jhs HTTP
       HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
       WAIT_FOR: rm:8088
     command: ["yarn","timelineserver"]

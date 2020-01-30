@@ -17,19 +17,19 @@
  */
 package org.apache.hadoop.ozone;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-
 import java.io.File;
 import java.io.IOException;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
+
 import org.junit.After;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -51,7 +51,7 @@ public class TestHddsDatanodeService {
         ServicePlugin.class);
 
     String volumeDir = testDir + "/disk1";
-    conf.set(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
+    conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
   }
 
   @After

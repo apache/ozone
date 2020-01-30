@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.HashMap;
@@ -231,8 +232,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     try {
       return sendCommandWithTraceIDAndRetry(request, null).
           getResponse().get();
-    } catch (ExecutionException | InterruptedException e) {
+    } catch (ExecutionException e) {
       throw new IOException("Failed to execute command " + request, e);
+    } catch (InterruptedException e) {
+      LOG.error("Command execution was interrupted.");
+      Thread.currentThread().interrupt();
+      throw (IOException) new InterruptedIOException(
+          "Command " + request + " was interrupted.")
+          .initCause(e);
     }
   }
 
@@ -244,8 +251,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       XceiverClientReply reply;
       reply = sendCommandWithTraceIDAndRetry(request, validators);
       return reply.getResponse().get();
-    } catch (ExecutionException | InterruptedException e) {
+    } catch (ExecutionException e) {
       throw new IOException("Failed to execute command " + request, e);
+    } catch (InterruptedException e) {
+      LOG.error("Command execution was interrupted.");
+      Thread.currentThread().interrupt();
+      throw (IOException) new InterruptedIOException(
+          "Command " + request + " was interrupted.")
+          .initCause(e);
     }
   }
 
@@ -327,7 +340,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       } catch (IOException e) {
         ioException = e;
         responseProto = null;
-      } catch (ExecutionException | InterruptedException e) {
+      } catch (ExecutionException e) {
         LOG.debug("Failed to execute command {} on datanode {}",
             request, dn.getUuid(), e);
         if (Status.fromThrowable(e.getCause()).getCode()
@@ -337,6 +350,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         }
 
         ioException = new IOException(e);
+        responseProto = null;
+      } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted ", e);
+        Thread.currentThread().interrupt();
         responseProto = null;
       }
     }
@@ -473,7 +490,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   @Override
-  public XceiverClientReply watchForCommit(long index, long timeout)
+  public XceiverClientReply watchForCommit(long index)
       throws InterruptedException, ExecutionException, TimeoutException,
       IOException {
     // there is no notion of watch for commit index in standalone pipeline

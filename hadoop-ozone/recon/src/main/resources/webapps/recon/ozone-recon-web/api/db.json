@@ -227,5 +227,134 @@
         "containers": 543
       }
     ]
+  },
+  "pipelines": {
+    "totalCount": 3,
+    "pipelines": [
+      {
+        "pipelineId": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+        "status": "active",
+        "leaderNode": "localhost1.storage.enterprise.com",
+        "datanodes": [
+          "localhost1.storage.enterprise.com",
+          "localhost2.storage.enterprise.com",
+          "localhost3.storage.enterprise.com"
+        ],
+        "lastLeaderElection": 1578491471528,
+        "duration": 389445,
+        "leaderElections": 28
+      },
+      {
+        "pipelineId": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+        "status": "active",
+        "leaderNode": "localhost5.storage.enterprise.com",
+        "datanodes": [
+          "localhost4.storage.enterprise.com",
+          "localhost5.storage.enterprise.com",
+          "localhost6.storage.enterprise.com"
+        ],
+        "lastLeaderElection": 1578441471528,
+        "duration": 50073382,
+        "leaderElections": 7
+      },
+      {
+        "pipelineId": "04a5d908-ff01-4ce6-ad75-f3ec73dfc8a2",
+        "status": "active",
+        "leaderNode": "localhost9.storage.enterprise.com",
+        "datanodes": [
+          "localhost7.storage.enterprise.com",
+          "localhost8.storage.enterprise.com",
+          "localhost9.storage.enterprise.com"
+        ],
+        "lastLeaderElection": 1578441871828,
+        "duration": 49712212,
+        "leaderElections": 5
+      }
+    ]
+  },
+  "missingContainers": {
+    "totalCount": 2,
+    "containers": [
+      {
+        "id": 1,
+        "keys": 3876,
+        "datanodes": [
+          "localhost1.storage.enterprise.com",
+          "localhost3.storage.enterprise.com",
+          "localhost5.storage.enterprise.com"
+        ]
+      },
+      {
+        "id": 2,
+        "keys": 5943,
+        "datanodes": [
+          "localhost1.storage.enterprise.com",
+          "localhost3.storage.enterprise.com",
+          "localhost5.storage.enterprise.com"
+        ]
+      }
+    ]
+  },
+  "keys": {
+    "totalCount": 534,
+    "keys": [
+      {
+        "Volume": "vol-0-20448",
+        "Bucket": "bucket-0-12811",
+        "Key": "key-0-77505",
+        "DataSize": 10240,
+        "Versions": [
+          0
+        ],
+        "Blocks": {
+          "0": [
+            {
+              "containerID": 1,
+              "localID": 103206297511460860
+            }
+          ]
+        },
+        "CreationTime": "2019-11-26T21:18:43.688Z",
+        "ModificationTime": "2019-11-26T21:18:46.062Z"
+      },
+      {
+        "Volume": "vol-0-20448",
+        "Bucket": "bucket-0-12811",
+        "Key": "key-21-64511",
+        "DataSize": 5692407,
+        "Versions": [
+          0
+        ],
+        "Blocks": {
+          "0": [
+            {
+              "containerID": 1,
+              "localID": 103206299949795380
+            }
+          ]
+        },
+        "CreationTime": "2019-11-26T21:19:20.855Z",
+        "ModificationTime": "2019-11-26T21:19:20.991Z"
+      },
+      {
+        "Volume": "vol-0-20448",
+        "Bucket": "bucket-0-12811",
+        "Key": "key-22-69104",
+        "DataSize": 189407,
+        "Versions": [
+          0
+        ],
+        "Blocks": {
+          "0": [
+            {
+              "containerID": 1,
+              "localID": 103206300033091740
+            }
+          ]
+        },
+        "CreationTime": "2019-11-26T21:19:22.126Z",
+        "ModificationTime": "2019-11-26T21:19:22.251Z"
+      }
+    ]
   }
 }

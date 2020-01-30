@@ -16,8 +16,25 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
+import static java.net.HttpURLConnection.HTTP_CREATED;
+import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT_DEFAULT;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -27,13 +44,13 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -47,35 +64,8 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-
-import static java.net.HttpURLConnection.HTTP_CREATED;
-import static java.net.HttpURLConnection.HTTP_OK;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL;
-import static org.apache.hadoop.ozone.recon.
-    ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
+import com.google.gson.Gson;
+import com.google.gson.internal.LinkedTreeMap;
 
 /**
  * Test Ozone Recon.
@@ -84,23 +74,15 @@ public class TestRecon {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
-  private static File dir;
-  private static UserGroupInformation ugi;
   private static CloseableHttpClient httpClient;
-  private static long pauseInterval;
-  private static String reconHTTPAddress;
   private static String containerKeyServiceURL;
-  private static String fileSizeCountURL;
   private static String taskStatusURL;
 
   @BeforeClass
   public static void init() throws Exception {
-    dir = GenericTestUtils.getRandomizedTestDir();
+    File dir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
-    ugi = UserGroupInformation.getCurrentUser();
-
-
     int socketTimeout = (int) conf.getTimeDuration(
         RECON_OM_SOCKET_TIMEOUT, RECON_OM_SOCKET_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
@@ -115,15 +97,12 @@ public class TestRecon {
         .setConnectionRequestTimeout(connectionTimeout)
         .setSocketTimeout(connectionRequestTimeout).build();
 
-    reconHTTPAddress = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
-    containerKeyServiceURL = "http://" + reconHTTPAddress
-        + "/api/containers";
-    fileSizeCountURL = "http://" + reconHTTPAddress
-        + "/api/utilization";
-    taskStatusURL = "http://" + reconHTTPAddress
-        + "/api/task/status";
+    String reconHTTPAddress = "localhost:" + NetUtils.getFreeSocketPort();
+    conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, reconHTTPAddress);
+    containerKeyServiceURL = "http://" + reconHTTPAddress + "/api/containers";
+    taskStatusURL = "http://" + reconHTTPAddress + "/api/task/status";
 
-    cluster =  MiniOzoneCluster.newBuilder(conf).build();
+    cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
     metadataManager = cluster.getOzoneManager().getMetadataManager();
 
@@ -134,11 +113,6 @@ public class TestRecon {
         .create()
         .setDefaultRequestConfig(config)
         .build();
-
-    pauseInterval = conf.getTimeDuration(
-        RECON_OM_SNAPSHOT_TASK_INTERVAL,
-        RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
   }
 
   @AfterClass
@@ -167,8 +141,8 @@ public class TestRecon {
     }
 
     if (entity != null) {
-      throw new IOException("Unexpected exception when trying to reach Ozone " +
-          "Manager, " + EntityUtils.toString(entity));
+      throw new IOException("Unexpected exception when trying to reach " +
+          "Recon Server, " + EntityUtils.toString(entity));
     } else {
       throw new IOException("Unexpected null in http payload," +
           " while processing request");
@@ -176,11 +150,11 @@ public class TestRecon {
   }
 
   @Test
-  public void testReconServer() throws Exception {
-    //add a vol, bucket and key
+  public void testReconWithOzoneManager() throws Exception {
+    // add a vol, bucket and key
     addKeys(0, 1);
 
-    //check if OM metadata has vol0/bucket0/key0 info
+    // check if OM metadata has vol0/bucket0/key0 info
     String ozoneKey = metadataManager.getOzoneKey(
         "vol0", "bucket0", "key0");
     OmKeyInfo keyInfo1 = metadataManager.getKeyTable().get(ozoneKey);
@@ -190,29 +164,29 @@ public class TestRecon {
 
     long omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
-    //verify if OM has /vol0/bucket0/key0
+    // verify if OM has /vol0/bucket0/key0
     Assert.assertEquals("vol0", keyInfo1.getVolumeName());
     Assert.assertEquals("bucket0", keyInfo1.getBucketName());
 
-    //pause to get the next snapshot from om
-    Thread.sleep(pauseInterval);
+    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
+        cluster.getReconServer().getOzoneManagerServiceProvider();
+    impl.syncDataFromOM();
 
     // HTTP call to /api/containers
     String containerResponse = makeHttpCall(containerKeyServiceURL);
     long reconMetadataContainerCount =
         getReconContainerCount(containerResponse);
-    //verify count of keys after full snapshot
+    // verify count of keys after full snapshot
     Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
 
-    //verify if Recon Metadata captures vol0/bucket0/key0 info in container0
+    // verify if Recon Metadata captures vol0/bucket0/key0 info in container0
     LinkedTreeMap containerResponseMap = getContainerResponseMap(
         containerResponse, 0);
     Assert.assertEquals(0,
         (long)(double) containerResponseMap.get("ContainerID"));
     Assert.assertEquals(1,
         (long)(double) containerResponseMap.get("NumberOfKeys"));
-
-
+    
     // HTTP call to /api/task/status
     long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
         .getDb().getLatestSequenceNumber();
@@ -221,7 +195,7 @@ public class TestRecon {
     long reconLatestSeqNumber = getReconTaskLastUpdatedSeqNumber(
         taskStatusResponse, 3);
 
-    //verify sequence number after full snapshot
+    // verify sequence number after full snapshot
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
 
     //add 4 keys to check for delta updates
@@ -229,8 +203,8 @@ public class TestRecon {
     omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
-    //pause to get the next snapshot from om to verify delta updates
-    Thread.sleep(pauseInterval);
+    // update the next snapshot from om to verify delta updates
+    impl.syncDataFromOM();
 
     // HTTP call to /api/containers
     containerResponse = makeHttpCall(containerKeyServiceURL);
@@ -264,22 +238,25 @@ public class TestRecon {
     //restart Recon
     cluster.restartReconServer();
 
+    impl = (OzoneManagerServiceProviderImpl)
+        cluster.getReconServer().getOzoneManagerServiceProvider();
+
     //add 5 more keys to OM
     addKeys(5, 10);
     omKeyValueTableIterator = metadataManager.getKeyTable().iterator();
     omMetadataKeyCount = getTableKeyCount(omKeyValueTableIterator);
 
-    //pause to get the next snapshot from om
-    Thread.sleep(pauseInterval);
+    // get the next snapshot from om
+    impl.syncDataFromOM();
 
     // HTTP call to /api/containers
     containerResponse = makeHttpCall(containerKeyServiceURL);
     reconMetadataContainerCount = getReconContainerCount(containerResponse);
 
-    //verify count of keys
+    // verify count of keys
     Assert.assertEquals(omMetadataKeyCount, reconMetadataContainerCount);
 
-    //verify if Recon Metadata captures vol7/bucket7/key7 info in container7
+    // verify if Recon Metadata captures vol7/bucket7/key7 info in container7
     containerResponseMap = getContainerResponseMap(
         containerResponse, 7);
     Assert.assertEquals(7,
@@ -294,7 +271,6 @@ public class TestRecon {
     taskStatusResponse = makeHttpCall(taskStatusURL);
     reconLatestSeqNumber = getReconTaskLastUpdatedSeqNumber(
         taskStatusResponse, 2);
-
 
     long afterRestartSnapShotTimeStamp =
         getReconTaskLastUpdatedTimeStamp(taskStatusResponse, 3);
