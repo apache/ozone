@@ -101,7 +101,7 @@ public final class OmPrefixInfo extends WithMetadata {
    * @param updateId  long
    */
   public void setUpdateID(long updateId) {
-    Preconditions.checkArgument(updateId > this.updateID,
+    Preconditions.checkArgument(updateId >= this.updateID,
         "Trying to set updateID to a value ({}) which is less than the " +
             "current value ({}) for ()", updateId, this.updateID, this);
     this.updateID = updateId;

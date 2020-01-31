@@ -96,17 +96,21 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
       OMMetrics omMetrics, Result result, long trxnLogIndex) {
     switch (result) {
     case SUCCESS:
-      if (operationResult) {
-        LOG.debug("Set acl: {} to path: {} success!", ozoneAcls,
-            ozoneObj.getPath());
-      } else {
-        LOG.debug("Set acl {} to path {} failed", ozoneAcls,
-            ozoneObj.getPath());
+      if (LOG.isDebugEnabled()) {
+        if (operationResult) {
+          LOG.debug("Set acl: {} to path: {} success!", ozoneAcls,
+              ozoneObj.getPath());
+        } else {
+          LOG.debug("Set acl {} to path {} failed", ozoneAcls,
+              ozoneObj.getPath());
+        }
       }
       break;
     case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          getOmRequest());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            getOmRequest());
+      }
       break;
     case FAILURE:
       omMetrics.incNumBucketUpdateFails();
@@ -121,9 +125,13 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
 
   @Override
   OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
-      OmPrefixInfo omPrefixInfo) throws IOException {
-    return prefixManager.setAcl(ozoneObj, ozoneAcls, omPrefixInfo);
+      OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
+    OMPrefixAclOpResult operationResult = prefixManager.setAcl(ozoneObj,
+        ozoneAcls, omPrefixInfo, trxnLogIndex);
+    if (operationResult.isSuccess()) {
+      operationResult.getOmPrefixInfo().setUpdateID(trxnLogIndex);
+    }
+    return operationResult;
   }
-
 }
 

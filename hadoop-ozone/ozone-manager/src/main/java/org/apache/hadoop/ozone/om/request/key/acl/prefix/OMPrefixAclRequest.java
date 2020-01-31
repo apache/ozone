@@ -95,7 +95,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       }
 
       try {
-        operationResult = apply(prefixManager, omPrefixInfo);
+        operationResult = apply(prefixManager, omPrefixInfo, trxnLogIndex);
       } catch (IOException ex) {
         // In HA case this will never happen.
         // As in add/remove/setAcl method we have logic to update database,
@@ -190,7 +190,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       IOException exception);
 
   /**
-   * Get the OM Client Response on replayed transactions
+   * Get the OM Client Response on replayed transactions.
    * @param omResonse
    * @return OMClientResponse
    */
@@ -213,9 +213,10 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    * else false.
    * @param prefixManager
    * @param omPrefixInfo
+   * @param trxnLogIndex
    * @throws IOException
    */
   abstract OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
-      OmPrefixInfo omPrefixInfo) throws IOException;
+      OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException;
 }
 

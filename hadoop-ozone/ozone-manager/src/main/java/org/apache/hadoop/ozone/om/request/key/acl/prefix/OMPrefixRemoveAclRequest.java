@@ -95,17 +95,22 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
       OMMetrics omMetrics, Result result, long trxnLogIndex) {
     switch (result) {
     case SUCCESS:
-      if (operationResult) {
-        LOG.debug("Remove acl: {} to path: {} success!", ozoneAcls,
-            ozoneObj.getPath());
-      } else {
-        LOG.debug("Remove acl {} to path {} failed because acl does not exist",
-            ozoneAcls, ozoneObj.getPath());
+      if (LOG.isDebugEnabled()) {
+        if (operationResult) {
+          LOG.debug("Remove acl: {} to path: {} success!", ozoneAcls,
+              ozoneObj.getPath());
+        } else {
+          LOG.debug(
+              "Remove acl {} to path {} failed because acl does not exist",
+              ozoneAcls, ozoneObj.getPath());
+        }
       }
       break;
     case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          getOmRequest());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            getOmRequest());
+      }
       break;
     case FAILURE:
       omMetrics.incNumBucketUpdateFails();
@@ -120,9 +125,13 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
 
   @Override
   OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
-      OmPrefixInfo omPrefixInfo) throws IOException {
-    return prefixManager.removeAcl(ozoneObj, ozoneAcls.get(0), omPrefixInfo);
+      OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
+    OMPrefixAclOpResult operationResult = prefixManager.removeAcl(ozoneObj,
+        ozoneAcls.get(0), omPrefixInfo);
+    if (operationResult.isSuccess()) {
+      operationResult.getOmPrefixInfo().setUpdateID(trxnLogIndex);
+    }
+    return operationResult;
   }
-
 }
 

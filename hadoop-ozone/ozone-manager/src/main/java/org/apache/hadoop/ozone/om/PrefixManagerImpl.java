@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.util.RadixNode;
@@ -106,7 +107,8 @@ public class PrefixManagerImpl implements PrefixManager {
       OmPrefixInfo prefixInfo =
           metadataManager.getPrefixTable().get(prefixPath);
 
-      OMPrefixAclOpResult omPrefixAclOpResult = addAcl(obj, acl, prefixInfo);
+      OMPrefixAclOpResult omPrefixAclOpResult = addAcl(obj, acl, prefixInfo,
+          0L);
 
       return omPrefixAclOpResult.isSuccess();
     } catch (IOException ex) {
@@ -176,7 +178,8 @@ public class PrefixManagerImpl implements PrefixManager {
       OmPrefixInfo prefixInfo =
           metadataManager.getPrefixTable().get(prefixPath);
 
-      OMPrefixAclOpResult omPrefixAclOpResult = setAcl(obj, acls, prefixInfo);
+      OMPrefixAclOpResult omPrefixAclOpResult = setAcl(obj, acls, prefixInfo,
+          0L);
 
       return omPrefixAclOpResult.isSuccess();
     } catch (IOException ex) {
@@ -307,12 +310,18 @@ public class PrefixManagerImpl implements PrefixManager {
   }
 
   public OMPrefixAclOpResult addAcl(OzoneObj ozoneObj, OzoneAcl ozoneAcl,
-      OmPrefixInfo prefixInfo) throws IOException {
-
+      OmPrefixInfo prefixInfo, long transactionLogIndex) throws IOException {
     if (prefixInfo == null) {
-      prefixInfo = new OmPrefixInfo.Builder().setName(ozoneObj
-          .getPath()).build();
+      OmPrefixInfo.Builder prefixInfoBuilder =
+          new OmPrefixInfo.Builder()
+          .setName(ozoneObj.getPath());
+      if (transactionLogIndex > 0) {
+        prefixInfoBuilder.setObjectID(transactionLogIndex);
+        prefixInfoBuilder.setUpdateID(transactionLogIndex);
+      }
+      prefixInfo = prefixInfoBuilder.build();
     }
+
     boolean changed = prefixInfo.addAcl(ozoneAcl);
     if (changed) {
       // update the in-memory prefix tree
@@ -351,10 +360,16 @@ public class PrefixManagerImpl implements PrefixManager {
   }
 
   public OMPrefixAclOpResult setAcl(OzoneObj ozoneObj, List<OzoneAcl> ozoneAcls,
-      OmPrefixInfo prefixInfo) throws IOException {
+      OmPrefixInfo prefixInfo, long transactionLogIndex) throws IOException {
     if (prefixInfo == null) {
-      prefixInfo = new OmPrefixInfo.Builder().setName(ozoneObj
-          .getPath()).build();
+      OmPrefixInfo.Builder prefixInfoBuilder =
+          new OmPrefixInfo.Builder()
+              .setName(ozoneObj.getPath());
+      if (transactionLogIndex > 0) {
+        prefixInfoBuilder.setObjectID(transactionLogIndex);
+        prefixInfoBuilder.setUpdateID(transactionLogIndex);
+      }
+      prefixInfo = prefixInfoBuilder.build();
     }
 
     boolean changed = prefixInfo.setAcls(ozoneAcls);
