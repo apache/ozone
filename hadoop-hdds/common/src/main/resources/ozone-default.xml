@@ -387,12 +387,18 @@
     </description>
   </property>
   <property>
+    <name>ozone.client.stream.buffer.size</name>
+    <value>16MB</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>The size of chunks the client will send to the server.</description>
+  </property>
+  <property>
     <name>ozone.client.stream.buffer.flush.size</name>
     <value>64MB</value>
     <tag>OZONE, CLIENT</tag>
     <description>Size which determines at what buffer position , a partial
-      flush will be initiated during write. It should be ideally a multiple
-      of chunkSize.
+      flush will be initiated during write. It should be a multiple
+      of buffer size.
     </description>
   </property>
   <property>
