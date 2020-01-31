@@ -661,7 +661,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
         // We should return only the keys, whose keys match with prefix and
         // the keys after the startBucket.
-        if (key.startsWith(seekPrefix) && key.compareTo(startKey) > 0) {
+        if (key.startsWith(seekPrefix) && key.compareTo(startKey) >= 0) {
           result.add(omBucketInfo);
           currentCount++;
         }

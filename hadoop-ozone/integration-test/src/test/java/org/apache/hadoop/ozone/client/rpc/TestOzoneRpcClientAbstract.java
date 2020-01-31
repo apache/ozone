@@ -1432,6 +1432,32 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  public void testListBucketWithPrefixAsExactBucketName()
+      throws IOException {
+    // Create a volume
+    String volumeName = "vol-a-" + RandomStringUtils.randomNumeric(5);
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    // Create a bucket
+    String bucketName = "bucket-a-" + "-" + RandomStringUtils.randomNumeric(5);
+    volume.createBucket(bucketName);
+
+    // Test listBuckets: bucketPrefix is PART of bucketName
+    Iterator<? extends OzoneBucket> volABucketIter =
+        volume.listBuckets("bucket-");
+    Assert.assertTrue(volABucketIter.hasNext());
+    OzoneBucket ozoneBucket = volABucketIter.next();
+    Assert.assertEquals(bucketName, ozoneBucket.getName());
+
+    // Test listBuckets: bucketPrefix is EXACTLY bucketName
+    volABucketIter = volume.listBuckets(bucketName);
+    // Should match the bucket
+    Assert.assertTrue(volABucketIter.hasNext());
+    ozoneBucket = volABucketIter.next();
+    Assert.assertEquals(bucketName, ozoneBucket.getName());
+  }
+
+  @Test
   public void testListKey()
       throws IOException {
     String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
