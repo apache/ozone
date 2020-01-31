@@ -2,7 +2,7 @@
 title: Ozone 文件系统
 date: 2017-09-14
 weight: 2
-summary: 兼容 Hadoop 的文件系统使得任何使用类 HDFS 接口的应用无需任何修改就可以在 Ozone 上工作，比如 Apache Spark、YARN 和 Hive 等框架。
+summary: Hadoop 文件系统兼容使得任何使用类 HDFS 接口的应用无需任何修改就可以在 Ozone 上工作，比如基于 Apache Spark、YARN 和 Hive 等框架的应用。
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -21,11 +21,11 @@ summary: 兼容 Hadoop 的文件系统使得任何使用类 HDFS 接口的应用
   limitations under the License.
 -->
 
-兼容 Hadoop 的文件系统接口可以让任意像 Ozone 这样的存储后端轻松地整合进 Hadoop 生态系统，Ozone 文件系统就是一个兼容 Hadoop 的文件系统。
+Hadoop 的文件系统接口兼容可以让任意像 Ozone 这样的存储后端轻松地整合进 Hadoop 生态系统，Ozone 文件系统就是一个兼容 Hadoop 的文件系统。
 
 ## 搭建 Ozone 文件系统
 
-要创建一个 ozone 文件系统，我们需要先为它选择一个用来盛放数据的桶，这个桶会被用作 Ozone 文件系统的后端存储，所有的文件和目录都存储为这个桶中的键。
+要创建一个 ozone 文件系统，我们需要先为它选择一个用来存放数据的桶，这个桶会被用作 Ozone 文件系统的后端存储，所有的文件和目录都存储为这个桶中的键。
 
 如果你还没有可用的卷和桶的话，请使用下面的命令创建：
 
@@ -84,7 +84,8 @@ hdfs dfs -mkdir /users
 hdfs dfs -ls o3fs://bucket.volume.om-host.example.com:5678/key
 {{< /highlight >}}
 
-如果未指定端口，将会尝试从 `ozone.om.address` 配置中获取端口，如果未配置，则使用默认端口 `9862`，比如，我们在 `ozone-site.xml` 中配置 `ozone.om.address` 如下：
+如果 URI 未指定端口，将会尝试从 `ozone.om.address` 配置中获取端口，如果 `ozone.om.address` 未配置，则使用默认端口 `9862`，比如，我们在 `ozone-site.xml
+` 中配置 `ozone.om.address` 如下：
 
 {{< highlight xml >}}
   <property>
@@ -123,7 +124,7 @@ Ozone 文件系统的 jar 包有两种类型，它们都包含了所有的依赖
 
 对于 Hadoop 3.0 之后的版本，你应当使用 `org.apache.hadoop.fs.ozone.OzoneFileSystem`，它是兼容 Hadoop 文件系统 API 的完整实现。
 
-对于 Hadoop 2.x 的版本，你应该使用基础版本 `org.apache.hadoop.fs.ozone.BasicOzoneFileSystem`，两者实现基本相同，但是不包含在 Hadoop 3.0 中引入的特性和依赖（比如 FS statistics、加密空间等）。
+对于 Hadoop 2.x 的版本，你应该使用基础版本 `org.apache.hadoop.fs.ozone.BasicOzoneFileSystem`，两者实现基本相同，但是不包含在 Hadoop 3.0 中引入的特性和依赖（比如文件系统统计信息、加密桶等）。
 
 ### 总结
 
