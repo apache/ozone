@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_COUNT_TABLE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_DB;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 
@@ -64,11 +64,13 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
     DBStore dbStore;
     File reconDbDir =
         reconUtils.getReconDbDir(configuration, OZONE_RECON_DB_DIR);
-    File lastKnownOMSnapshot =
-        reconUtils.getLastKnownDB(reconDbDir, RECON_CONTAINER_DB);
-    if (lastKnownOMSnapshot != null) {
-      dbStore = getDBStore(configuration, reconUtils,
-          lastKnownOMSnapshot.getName());
+    File lastKnownContainerKeyDb =
+        reconUtils.getLastKnownDB(reconDbDir, RECON_CONTAINER_KEY_DB);
+    if (lastKnownContainerKeyDb != null) {
+      LOG.info("Last known container-key DB : {}",
+          lastKnownContainerKeyDb.getAbsolutePath());
+      dbStore = initializeDBStore(configuration, reconUtils,
+          lastKnownContainerKeyDb.getName());
     } else {
       dbStore = getNewDBStore(configuration, reconUtils);
     }
@@ -79,8 +81,8 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
     return dbStore;
   }
 
-  private static DBStore getDBStore(OzoneConfiguration configuration,
-                            ReconUtils reconUtils, String dbName) {
+  private static DBStore initializeDBStore(OzoneConfiguration configuration,
+      ReconUtils reconUtils, String dbName) {
     DBStore dbStore = null;
     try {
       Path metaDir = reconUtils.getReconDbDir(
@@ -101,7 +103,7 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
 
   static DBStore getNewDBStore(OzoneConfiguration configuration,
                                ReconUtils reconUtils) {
-    String dbName = RECON_CONTAINER_DB + "_" + System.currentTimeMillis();
-    return getDBStore(configuration, reconUtils, dbName);
+    String dbName = RECON_CONTAINER_KEY_DB + "_" + System.currentTimeMillis();
+    return initializeDBStore(configuration, reconUtils, dbName);
   }
 }

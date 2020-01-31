@@ -18,61 +18,116 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import javax.inject.Inject;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
+import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
+import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
+import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
+import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Recon's 'lite' version of SCM.
  */
-public class ReconStorageContainerManager
+public class ReconStorageContainerManagerFacade
     implements OzoneStorageContainerManager {
 
   private static final Logger LOG = LoggerFactory
-      .getLogger(ReconStorageContainerManager.class);
+      .getLogger(ReconStorageContainerManagerFacade.class);
 
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
   private final EventQueue eventQueue;
   private final SCMStorageConfig scmStorageConfig;
-  private static final String RECON_SCM_CONFIG_PREFIX = "recon.";
 
   private NodeManager scmNodeManager;
+  private ReconPipelineManager pipelineManager;
+  private ContainerManager containerManager;
   private NetworkTopology clusterMap;
+  private StorageContainerServiceProvider scmServiceProvider;
 
   @Inject
-  public ReconStorageContainerManager(OzoneConfiguration conf)
+  public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
+      StorageContainerServiceProvider scmServiceProvider)
       throws IOException {
     this.eventQueue = new EventQueue();
+    eventQueue.setSilent(true);
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
-    this.scmNodeManager = new ReconNodeManager(
-        conf, scmStorageConfig, eventQueue, clusterMap);
-    NodeReportHandler nodeReportHandler =
-        new NodeReportHandler(scmNodeManager);
+    this.scmNodeManager =
+        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
+    this.pipelineManager =
+        new ReconPipelineManager(conf, scmNodeManager, eventQueue);
+    this.containerManager = new ReconContainerManager(conf, pipelineManager);
+
+    this.scmServiceProvider = scmServiceProvider;
+    initializePipelinesFromScm();
+
+    NodeReportHandler nodeReportHandler =
+        new NodeReportHandler(scmNodeManager);
+
+    SafeModeManager safeModeManager = new ReconSafeModeManager();
+    ReconPipelineReportHandler pipelineReportHandler =
+        new ReconPipelineReportHandler(
+            safeModeManager, pipelineManager, conf, scmServiceProvider);
+
+    PipelineActionHandler pipelineActionHandler =
+        new PipelineActionHandler(pipelineManager, conf);
+
+    StaleNodeHandler staleNodeHandler =
+        new StaleNodeHandler(scmNodeManager, pipelineManager, conf);
+    DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
+        pipelineManager, containerManager);
+
+    ContainerReportHandler containerReportHandler =
+        new ContainerReportHandler(scmNodeManager, containerManager);
+    IncrementalContainerReportHandler icrHandler =
+        new IncrementalContainerReportHandler(scmNodeManager, containerManager);
+    CloseContainerEventHandler closeContainerHandler =
+        new CloseContainerEventHandler(pipelineManager, containerManager);
+    ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
+
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
+    eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
+    eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
+    eventQueue.addHandler(SCMEvents.STALE_NODE, staleNodeHandler);
+    eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
+    eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportHandler);
+    eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT, icrHandler);
+    eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
+    eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
   }
 
   /**
@@ -109,14 +164,46 @@ public class ReconStorageContainerManager
   }
 
   /**
+   * Wait until service has completed shutdown.
+   */
+  public void join() {
+    try {
+      getDatanodeProtocolServer().join();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.info("Interrupted during StorageContainerManager join.");
+    }
+  }
+
+  /**
    * Stop the Recon SCM subsystems.
    */
   public void stop() {
     getDatanodeProtocolServer().stop();
+    try {
+      LOG.info("Stopping SCM Event Queue.");
+      eventQueue.close();
+    } catch (Exception ex) {
+      LOG.error("SCM Event Queue stop failed", ex);
+    }
+    IOUtils.cleanupWithLogger(LOG, scmNodeManager);
+    IOUtils.cleanupWithLogger(LOG, containerManager);
+    IOUtils.cleanupWithLogger(LOG, pipelineManager);
   }
 
   public ReconDatanodeProtocolServer getDatanodeProtocolServer() {
     return datanodeProtocolServer;
+  }
+
+  private void initializePipelinesFromScm() {
+    try {
+      List<Pipeline> pipelinesFromScm = scmServiceProvider.getPipelines();
+      LOG.info("Obtained {} pipelines from SCM.", pipelinesFromScm.size());
+      pipelineManager.initializePipelines(pipelinesFromScm);
+    } catch (IOException ioEx) {
+      LOG.error("Exception encountered while getting pipelines from SCM.",
+          ioEx);
+    }
   }
 
   @Override
@@ -131,12 +218,12 @@ public class ReconStorageContainerManager
 
   @Override
   public PipelineManager getPipelineManager() {
-    return null;
+    return pipelineManager;
   }
 
   @Override
   public ContainerManager getContainerManager() {
-    return null;
+    return containerManager;
   }
 
   @Override

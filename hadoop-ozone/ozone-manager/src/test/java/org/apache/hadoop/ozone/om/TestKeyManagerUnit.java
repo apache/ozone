@@ -293,9 +293,14 @@ public class TestKeyManagerUnit {
     Map<Integer, OzoneManagerProtocolProtos.PartKeyInfo > partKeyInfoMap =
         new HashMap<>();
     String uploadID = UUID.randomUUID().toString();
-    OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
-        uploadID, Time.now(), ReplicationType.RATIS,
-        ReplicationFactor.THREE, partKeyInfoMap);
+    OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+        .setUploadID(uploadID)
+        .setCreationTime(Time.now())
+        .setReplicationType(ReplicationType.RATIS)
+        .setReplicationFactor(ReplicationFactor.THREE)
+        .setPartKeyInfoList(partKeyInfoMap)
+        .build();
+
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
             uploadID)), new CacheValue<>(Optional.of(multipartKeyInfo),

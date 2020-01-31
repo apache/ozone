@@ -42,6 +42,25 @@
   padding: 24px;
   background-color: #FFF;
   min-height: 80vh;
+  .ant-table {
+    .ant-table-body {
+      table {
+        .ant-table-thead > tr > th {
+          background-color: #ececec;
+        }
+
+        .ant-table-tbody {
+          tr.ant-table-row:hover {
+            background: rgba(60, 90, 100, 0.01);
+
+            & > td {
+              background: rgba(60, 90, 100, 0.01);
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 body {

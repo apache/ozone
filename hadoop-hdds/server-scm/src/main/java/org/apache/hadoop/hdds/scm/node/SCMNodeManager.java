@@ -22,16 +22,16 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.LinkedList;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -52,7 +52,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
@@ -68,6 +67,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,7 +118,8 @@ public class SCMNodeManager implements NodeManager {
     this.metrics = SCMNodeMetrics.create(this);
     this.clusterMap = networkTopology;
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        conf.getClass(DFSConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+        conf.getClass(
+            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
             TableMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, conf);
@@ -126,8 +127,8 @@ public class SCMNodeManager implements NodeManager {
         ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
             : new CachedDNSToSwitchMapping(newInstance));
     this.useHostname = conf.getBoolean(
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
-        DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
   }
 
   private void registerMXBean() {
@@ -282,11 +283,12 @@ public class SCMNodeManager implements NodeManager {
    * Add an entry to the dnsToUuidMap, which maps hostname / IP to the DNs
    * running on that host. As each address can have many DNs running on it,
    * this is a one to many mapping.
+   *
    * @param dnsName String representing the hostname or IP of the node
-   * @param uuid String representing the UUID of the registered node.
+   * @param uuid    String representing the UUID of the registered node.
    */
-  @SuppressFBWarnings(value="AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
-      justification="The method is synchronized and this is the only place "+
+  @SuppressFBWarnings(value = "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
+      justification = "The method is synchronized and this is the only place " +
           "dnsToUuidMap is modified")
   private synchronized void addEntryTodnsToUuidMap(
       String dnsName, String uuid) {

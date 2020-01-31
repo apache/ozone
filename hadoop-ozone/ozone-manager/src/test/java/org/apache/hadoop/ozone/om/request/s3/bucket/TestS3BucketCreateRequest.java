@@ -74,7 +74,6 @@ public class TestS3BucketCreateRequest extends TestS3BucketRequest {
     }
   }
 
-
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     String userName = UUID.randomUUID().toString();
@@ -85,9 +84,7 @@ public class TestS3BucketCreateRequest extends TestS3BucketRequest {
 
     doValidateAndUpdateCache(userName, s3BucketName,
         s3BucketCreateRequest.getOmRequest());
-
   }
-
 
   @Test
   public void testValidateAndUpdateCacheWithS3BucketAlreadyExists()
@@ -128,7 +125,6 @@ public class TestS3BucketCreateRequest extends TestS3BucketRequest {
         s3BucketCreateRequest.formatOzoneVolumeName(userName),
         s3BucketName, omMetadataManager);
 
-
     // Try create same bucket again
     OMClientResponse omClientResponse =
         s3BucketCreateRequest.validateAndUpdateCache(ozoneManager, 2,
@@ -139,8 +135,6 @@ public class TestS3BucketCreateRequest extends TestS3BucketRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_ALREADY_EXISTS,
         omResponse.getStatus());
   }
-
-
 
   private S3BucketCreateRequest doPreExecute(String userName,
       String s3BucketName) throws Exception {
@@ -195,8 +189,28 @@ public class TestS3BucketCreateRequest extends TestS3BucketRequest {
         omClientResponse.getOMResponse().getStatus());
     Assert.assertEquals(OzoneManagerProtocolProtos.Type.CreateS3Bucket,
         omClientResponse.getOMResponse().getCmdType());
-
   }
 
+  @Test
+  public void testReplayRequest() throws Exception {
+
+    String userName = UUID.randomUUID().toString();
+    String s3BucketName = UUID.randomUUID().toString();
+
+    // Execute the original request
+    S3BucketCreateRequest s3BucketCreateRequest =
+        doPreExecute(userName, s3BucketName);
+    s3BucketCreateRequest.validateAndUpdateCache(ozoneManager, 2,
+         ozoneManagerDoubleBufferHelper);
+
+    // Replay the transaction - Execute the same request again
+    OMClientResponse omClientResponse =
+        s3BucketCreateRequest.validateAndUpdateCache(ozoneManager, 2,
+            ozoneManagerDoubleBufferHelper);
+
+    // Replay should result in Replay response
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+        omClientResponse.getOMResponse().getStatus());
+  }
 }
 
