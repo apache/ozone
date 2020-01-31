@@ -171,6 +171,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
     OmKeyInfo openKeyInfo = null;
     IOException exception = null;
+    Result result = null;
 
     try {
       // check Acl
@@ -228,15 +229,19 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           .setKeyLocation(blockLocation).build());
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
           openKeyInfo, clientID);
+      result = Result.SUCCESS;
+
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
     } catch (IOException ex) {
       if (ex instanceof OMReplayException) {
+        result = Result.REPLAY;
         omClientResponse = new OMAllocateBlockResponse(createReplayOMResponse(
             omResponse));
         LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
             allocateBlockRequest);
       } else {
+        result = Result.FAILURE;
         omMetrics.incNumBlockAllocateCallFails();
         exception = ex;
         omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
@@ -246,8 +251,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
-        exception, getOmRequest().getUserInfo()));
+    if (result != Result.REPLAY) {
+      auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
+          exception, getOmRequest().getUserInfo()));
+    }
 
     omClientResponse.setFlushFuture(omDoubleBufferHelper.add(omClientResponse,
         trxnLogIndex));
