@@ -41,6 +41,7 @@ import org.apache.ratis.protocol.GroupMismatchException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -56,6 +57,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
  */
+@Ignore
 public class TestOzoneClientRetriesOnException {
 
   private static MiniOzoneCluster cluster;
