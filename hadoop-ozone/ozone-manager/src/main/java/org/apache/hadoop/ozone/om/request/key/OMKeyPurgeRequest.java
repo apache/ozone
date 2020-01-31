@@ -142,16 +142,15 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
     }
 
     if (success) {
-      if (keysToBePurgedList.isEmpty()) {
-        LOG.debug("No keys will be purged as part of KeyPurgeRequest: {}",
-            purgeKeysRequest);
-      } else {
-        StringBuilder purgeList = new StringBuilder();
-        for (String key : keysToBePurgedList) {
-          purgeList.append(", ").append(key);
+      if (LOG.isDebugEnabled()) {
+        if (keysToBePurgedList.isEmpty()) {
+          LOG.debug("No keys will be purged as part of KeyPurgeRequest: {}",
+              purgeKeysRequest);
+        } else {
+          LOG.debug("Following keys will be purged as part of " +
+              "KeyPurgeRequest: {} - {}", purgeKeysRequest,
+              String.join(",", keysToBePurgedList));
         }
-        LOG.debug("Following keys will be purged as part of KeyPurgeRequest: " +
-            "{} - {}", purgeKeysRequest, purgeList.toString().substring(2));
       }
       omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
           keysToBePurgedList);
