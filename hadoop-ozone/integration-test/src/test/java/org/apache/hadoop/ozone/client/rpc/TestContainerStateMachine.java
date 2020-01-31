@@ -40,6 +40,7 @@ import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -58,7 +59,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests the containerStateMachine failure handling.
  */
-
+@Ignore
 public class TestContainerStateMachine {
 
   private MiniOzoneCluster cluster;

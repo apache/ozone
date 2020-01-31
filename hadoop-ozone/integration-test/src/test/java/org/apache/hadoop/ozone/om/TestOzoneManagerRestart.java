@@ -43,6 +43,7 @@ import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.fail;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -51,6 +52,7 @@ import org.junit.rules.Timeout;
  * Test some client operations after cluster starts. And perform restart and
  * then performs client operations and check the behavior is expected or not.
  */
+@Ignore
 public class TestOzoneManagerRestart {
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;

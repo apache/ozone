@@ -42,6 +42,7 @@ import org.apache.ratis.protocol.RaftRetryFailureException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -56,6 +57,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
  */
+@Ignore
 public class TestBlockOutputStreamWithFailures {
 
   private static MiniOzoneCluster cluster;
