@@ -25,6 +25,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
@@ -134,8 +135,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest =
         getOmRequest().getAllocateBlockRequest();
@@ -160,71 +160,105 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditMap.put(OzoneConsts.CLIENT_ID, String.valueOf(clientID));
 
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    String openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, clientID);
+
     OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
         OzoneManagerProtocolProtos.Type.AllocateBlock).setStatus(
         OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
+    OMClientResponse omClientResponse = null;
 
+    OmKeyInfo openKeyInfo = null;
     IOException exception = null;
-    OmKeyInfo omKeyInfo = null;
+    Result result = null;
+
     try {
       // check Acl
       checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.WRITE, allocateBlockRequest.getClientID());
 
-      OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
       validateBucketAndVolume(omMetadataManager, volumeName,
           bucketName);
-
-      String openKey = omMetadataManager.getOpenKey(
-          volumeName, bucketName, keyName, clientID);
 
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion.
 
-      omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
-      if (omKeyInfo == null) {
-        throw new OMException("Open Key not found " + openKey, KEY_NOT_FOUND);
+      openKeyInfo = omMetadataManager.getOpenKeyTable().get(openKeyName);
+      if (openKeyInfo == null) {
+        // Check if this transaction is a replay of ratis logs.
+        // If the Key was already committed and this transaction is being
+        // replayed, we should ignore this transaction.
+        String ozoneKey = omMetadataManager.getOzoneKey(volumeName,
+            bucketName, keyName);
+        OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+        if (dbKeyInfo != null) {
+          if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(), trxnLogIndex)) {
+            // This transaction is a replay. Send replay response.
+            throw new OMReplayException();
+          }
+        }
+        throw new OMException("Open Key not found " + openKeyName,
+            KEY_NOT_FOUND);
+      }
+
+      // Check if this transaction is a replay of ratis logs.
+      // Check the updateID of the openKey to verify that it is not greater
+      // than the current transactionLogIndex
+      if (isReplay(ozoneManager, openKeyInfo.getUpdateID(), trxnLogIndex)) {
+        // This transaction is a replay. Send replay response.
+        throw new OMReplayException();
       }
 
       // Append new block
-      omKeyInfo.appendNewBlocks(Collections.singletonList(
+      openKeyInfo.appendNewBlocks(Collections.singletonList(
           OmKeyLocationInfo.getFromProtobuf(blockLocation)), false);
 
       // Set modification time.
-      omKeyInfo.setModificationTime(keyArgs.getModificationTime());
+      openKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(transactionLogIndex);
+      openKeyInfo.setUpdateID(trxnLogIndex);
 
       // Add to cache.
       omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(openKey), new CacheValue<>(Optional.of(omKeyInfo),
-              transactionLogIndex));
+          new CacheKey<>(openKeyName),
+          new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
 
-    } catch (IOException ex) {
-      exception = ex;
-    }
-
-    auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
-        exception, getOmRequest().getUserInfo()));
-
-    OMClientResponse omClientResponse = null;
-    if (exception == null) {
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
-      omClientResponse = new OMAllocateBlockResponse(omKeyInfo,
-          clientID, omResponse.build());
-    } else {
-      omMetrics.incNumBlockAllocateCallFails();
-      omClientResponse = new OMAllocateBlockResponse(null, -1L,
-          createErrorOMResponse(omResponse, exception));
+      omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
+          openKeyInfo, clientID);
+      result = Result.SUCCESS;
+
+      LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
+          volumeName, bucketName, openKeyName);
+    } catch (IOException ex) {
+      if (ex instanceof OMReplayException) {
+        result = Result.REPLAY;
+        omClientResponse = new OMAllocateBlockResponse(createReplayOMResponse(
+            omResponse));
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            allocateBlockRequest);
+      } else {
+        result = Result.FAILURE;
+        omMetrics.incNumBlockAllocateCallFails();
+        exception = ex;
+        omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
+            omResponse, exception));
+        LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
+            "Exception:{}", volumeName, bucketName, openKeyName, exception);
+      }
     }
 
-    omClientResponse.setFlushFuture(
-        ozoneManagerDoubleBufferHelper.add(omClientResponse,
-            transactionLogIndex));
+    if (result != Result.REPLAY) {
+      auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
+          exception, getOmRequest().getUserInfo()));
+    }
+
+    omClientResponse.setFlushFuture(omDoubleBufferHelper.add(omClientResponse,
+        trxnLogIndex));
+
     return omClientResponse;
-
   }
-
 }
