@@ -100,12 +100,16 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
   void onComplete(Result result, IOException ex, long trxnLogIndex) {
     switch (result) {
     case SUCCESS:
-      LOG.debug("Add acl: {} to volume: {} success!", getAcl(),
-          getVolumeName());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Add acl: {} to volume: {} success!", getAcl(),
+            getVolumeName());
+      }
       break;
     case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          getOmRequest());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            getOmRequest());
+      }
       break;
     case FAILURE:
       LOG.error("Add acl {} to volume {} failed!", getAcl(), getVolumeName(),
