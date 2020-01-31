@@ -110,8 +110,8 @@ The `key list` command allows user to list all keys in a bucket.
 
 | Arguments                      |  Comment                                |
 |--------------------------------|-----------------------------------------|
-| -l, \-\-length                   | Maximum number of results to return. Default: 1000
-| -p, \-\-prefix                   | Optional, Only buckets that match this prefix will be returned.
+| -l, \-\-length                   | Maximum number of results to return. Default: 100
+| -p, \-\-prefix                   | Optional, Only keys that match this prefix will be returned.
 | -s, \-\-start                    | The listing will start from key after the start key.
 |  Uri                           | The name of the _volume_.
 

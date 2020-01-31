@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -44,6 +45,7 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
+@Ignore
 public class TestSCMPipelineMetrics {
 
   private MiniOzoneCluster cluster;

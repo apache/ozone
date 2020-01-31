@@ -80,7 +80,6 @@ HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 OZONE_DATANODE_SECURE_USER=root
 SECURITY_ENABLED=true
 KEYTAB_DIR=/etc/security/keytabs
-KERBEROS_KEYTABS=dn om scm HTTP testuser testuser2 s3g
 KERBEROS_KEYSTORES=hadoop
 KERBEROS_SERVER=kdc
 JAVA_HOME=/usr/lib/jvm/jre

@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
@@ -35,10 +36,8 @@ import org.apache.hadoop.util.Timer;
 import com.google.common.collect.Iterables;
 import org.apache.commons.io.FileUtils;
 import org.apache.curator.shaded.com.google.common.collect.ImmutableSet;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
 import static org.hamcrest.CoreMatchers.is;
 import org.junit.After;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -72,7 +71,7 @@ public class TestVolumeSetDiskChecks {
   @After
   public void cleanup() {
     final Collection<String> dirs = conf.getTrimmedStringCollection(
-        DFS_DATANODE_DATA_DIR_KEY);
+        DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY);
 
     for (String d: dirs) {
       FileUtils.deleteQuietly(new File(d));
@@ -96,7 +95,7 @@ public class TestVolumeSetDiskChecks {
 
     // Verify that the Ozone dirs were created during initialization.
     Collection<String> dirs = conf.getTrimmedStringCollection(
-        DFS_DATANODE_DATA_DIR_KEY);
+        DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY);
     for (String d : dirs) {
       assertTrue(new File(d).isDirectory());
     }
@@ -163,7 +162,8 @@ public class TestVolumeSetDiskChecks {
     for (int i = 0; i < numDirs; ++i) {
       dirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
     }
-    ozoneConf.set(DFS_DATANODE_DATA_DIR_KEY, String.join(",", dirs));
+    ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
+        String.join(",", dirs));
     return ozoneConf;
   }
 

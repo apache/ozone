@@ -18,8 +18,10 @@
 
 import {Overview} from './views/Overview/Overview';
 import {Datanodes} from './views/Datanodes/Datanodes';
+import {Pipelines} from "./views/Pipelines/Pipelines";
 import {NotFound} from './views/NotFound/NotFound';
 import {IRoute} from "./routes.types";
+import {MissingContainers} from "./views/MissingContainers/MissingContainers";
 
 export const routes: IRoute[] = [
   {
@@ -29,6 +31,14 @@ export const routes: IRoute[] = [
   {
     path: "/Datanodes",
     component: Datanodes
+  },
+  {
+    path: "/Pipelines",
+    component: Pipelines
+  },
+  {
+    path: "/MissingContainers",
+    component: MissingContainers
   },
   {
     path: "/:NotFound",

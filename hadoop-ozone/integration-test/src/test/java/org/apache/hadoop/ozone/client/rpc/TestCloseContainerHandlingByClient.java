@@ -62,6 +62,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * Tests Close Container Exception handling by Ozone Client.
  */
+@Ignore
 public class TestCloseContainerHandlingByClient {
 
   private static MiniOzoneCluster cluster;
@@ -85,7 +86,6 @@ public class TestCloseContainerHandlingByClient {
   public static void init() throws Exception {
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
-    conf.set(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, "5000ms");
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.set(OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE, "NONE");

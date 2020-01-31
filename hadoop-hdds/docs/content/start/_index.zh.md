@@ -36,8 +36,7 @@ Ozone 的安装和运行有多种方式，支持从简单的本地节点 docker 
 
 你可以通过 Docker Hub 来运行 Ozone，无需下载官方发行包，这让探索 Ozone 十分容易。
 <br />
-  {{<card title="在 Docker 中启动 ozone" link="start/StartFromDockerHub.zh.md" link-text="Ozone In Docker" image="start
-  /docker.png">}}
+  {{<card title="在 Docker 中启动 ozone" link="start/StartFromDockerHub.zh.md" link-text="Ozone In Docker" image="start/docker.png">}}
   启动一个 ozone 集群来探索其功能的最简易的方式就是通过 docker 来启动 ozone。
   {{</card>}}
 

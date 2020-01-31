@@ -35,21 +35,50 @@ public class OmMultipartKeyInfo {
   private final ReplicationType replicationType;
   private final ReplicationFactor replicationFactor;
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
+  private long objectID;
+  private long updateID;
 
   /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
    * information for a key.
    */
   public OmMultipartKeyInfo(String id, long creationTime,
-                            ReplicationType replicationType,
-                            ReplicationFactor replicationFactor,
-                            Map<Integer, PartKeyInfo> list) {
+      ReplicationType replicationType, ReplicationFactor replicationFactor,
+      Map<Integer, PartKeyInfo> list, long objectID, long updateID) {
     this.uploadID = id;
     this.creationTime = creationTime;
     this.replicationType = replicationType;
     this.replicationFactor = replicationFactor;
     this.partKeyInfoList = new TreeMap<>(list);
+    this.objectID = objectID;
+    this.updateID = updateID;
   }
+
+  /**
+   * Sets the update ID. For each modification of this object, we will set
+   * this to a value greater than the current value.
+   * @param updateID  long
+   */
+  public void setUpdateID(long updateID) {
+    this.updateID = updateID;
+  }
+
+  /**
+   * Returns objectID.
+   * @return long
+   */
+  public long getObjectID() {
+    return objectID;
+  }
+
+  /**
+   * Returns updateID.
+   * @return long
+   */
+  public long getUpdateID() {
+    return updateID;
+  }
+
 
   /**
    * Returns the uploadID for this multi part upload of a key.
@@ -84,6 +113,72 @@ public class OmMultipartKeyInfo {
   }
 
   /**
+   * Builder of OmMultipartKeyInfo.
+   */
+  public static class Builder {
+    private String uploadID;
+    private long creationTime;
+    private ReplicationType replicationType;
+    private ReplicationFactor replicationFactor;
+    private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
+    private long objectID;
+    private long updateID;
+
+    public Builder() {
+      this.partKeyInfoList = new TreeMap<>();
+    }
+
+    public Builder setUploadID(String uploadId) {
+      this.uploadID = uploadId;
+      return this;
+    }
+
+    public Builder setCreationTime(long crTime) {
+      this.creationTime = crTime;
+      return this;
+    }
+
+    public Builder setReplicationType(ReplicationType replType) {
+      this.replicationType = replType;
+      return this;
+    }
+
+    public Builder setReplicationFactor(ReplicationFactor replFactor) {
+      this.replicationFactor = replFactor;
+      return this;
+    }
+
+    public Builder setPartKeyInfoList(Map<Integer, PartKeyInfo> partKeyInfos) {
+      if (partKeyInfos != null) {
+        this.partKeyInfoList.putAll(partKeyInfos);
+      }
+      return this;
+    }
+
+    public Builder addPartKeyInfoList(int partNum, PartKeyInfo partKeyInfo) {
+      if (partKeyInfo != null) {
+        partKeyInfoList.put(partNum, partKeyInfo);
+      }
+      return this;
+    }
+
+    public Builder setObjectID(long obId) {
+      this.objectID = obId;
+      return this;
+    }
+
+    public Builder setUpdateID(long id) {
+      this.updateID = id;
+      return this;
+    }
+
+    public OmMultipartKeyInfo build() {
+      return new OmMultipartKeyInfo(uploadID, creationTime, replicationType,
+          replicationFactor, partKeyInfoList, objectID, updateID);
+    }
+  }
+
+  /**
    * Construct OmMultipartInfo from MultipartKeyInfo proto object.
    * @param multipartKeyInfo
    * @return OmMultipartKeyInfo
@@ -95,7 +190,8 @@ public class OmMultipartKeyInfo {
         list.put(partKeyInfo.getPartNumber(), partKeyInfo));
     return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
         multipartKeyInfo.getCreationTime(), multipartKeyInfo.getType(),
-        multipartKeyInfo.getFactor(), list);
+        multipartKeyInfo.getFactor(), list, multipartKeyInfo.getObjectID(),
+        multipartKeyInfo.getUpdateID());
   }
 
   /**
@@ -107,7 +203,9 @@ public class OmMultipartKeyInfo {
         .setUploadID(uploadID)
         .setCreationTime(creationTime)
         .setType(replicationType)
-        .setFactor(replicationFactor);
+        .setFactor(replicationFactor)
+        .setObjectID(objectID)
+        .setUpdateID(updateID);
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
   }
@@ -130,7 +228,7 @@ public class OmMultipartKeyInfo {
     // For partKeyInfoList we can do shallow copy here, as the PartKeyInfo is
     // immutable here.
     return new OmMultipartKeyInfo(uploadID, creationTime, replicationType,
-        replicationFactor, new TreeMap<>(partKeyInfoList));
+        replicationFactor, new TreeMap<>(partKeyInfoList), objectID, updateID);
   }
 
 }

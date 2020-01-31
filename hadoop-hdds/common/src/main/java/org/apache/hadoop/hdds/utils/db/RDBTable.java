@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdds.StringUtils;
 
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ReadOptions;
@@ -185,7 +185,7 @@ class RDBTable implements Table<byte[], byte[]> {
   @Override
   public String getName() throws IOException {
     try {
-      return DFSUtil.bytes2String(this.getHandle().getName());
+      return StringUtils.bytes2String(this.getHandle().getName());
     } catch (RocksDBException rdbEx) {
       throw toIOException("Unable to get the table name.", rdbEx);
     }

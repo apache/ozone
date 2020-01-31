@@ -50,7 +50,6 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
         omBucketDeleteRequest.preExecute(ozoneManager));
   }
 
-
   @Test
   public void testValidateAndUpdateCache() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -71,7 +70,6 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
     Assert.assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
   }
-
 
   @Test
   public void testValidateAndUpdateCacheFailure() throws Exception {
@@ -99,9 +97,6 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
         omMetadataManager);
   }
 
-
-
-
   private OMRequest createDeleteBucketRequest(String volumeName,
       String bucketName) {
     return OMRequest.newBuilder().setDeleteBucketRequest(
@@ -111,4 +106,45 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
+  @Test
+  public void testReplayRequest() throws Exception {
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    // CreateBucket request
+    OMBucketCreateRequest omBucketCreateRequest = new OMBucketCreateRequest(
+        TestOMRequestUtils.createBucketRequest(bucketName, volumeName,
+            false, OzoneManagerProtocolProtos.StorageTypeProto.SSD));
+
+    // Create volume entry in DB
+    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+
+    // Execute CreateBucket request
+    omBucketCreateRequest.preExecute(ozoneManager);
+    omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 2,
+        ozoneManagerDoubleBufferHelper);
+
+    // Execute the original DeleteBucket request
+    OMRequest omRequest = createDeleteBucketRequest(volumeName, bucketName);
+    OMBucketDeleteRequest omBucketDeleteRequest = new OMBucketDeleteRequest(
+        omRequest);
+    omBucketDeleteRequest.preExecute(ozoneManager);
+    omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 4,
+        ozoneManagerDoubleBufferHelper);
+
+    // Create the bucket again
+    omBucketCreateRequest.preExecute(ozoneManager);
+    omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 10,
+        ozoneManagerDoubleBufferHelper);
+
+    // Replay the delete transaction - Execute the same request again
+    OMClientResponse omClientResponse =
+        omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 4,
+            ozoneManagerDoubleBufferHelper);
+
+    // Replay should result in Replay response
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+        omClientResponse.getOMResponse().getStatus());
+  }
 }
