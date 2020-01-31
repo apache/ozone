@@ -34,6 +34,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -268,6 +269,7 @@ public interface MiniOzoneCluster {
     
     protected Boolean randomContainerPort = true;
     protected Optional<Integer> chunkSize = Optional.empty();
+    protected OptionalInt streamBufferSize = OptionalInt.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
     protected Optional<Long> streamBufferMaxSize = Optional.empty();
     protected Optional<Long> blockSize = Optional.empty();
@@ -409,6 +411,11 @@ public interface MiniOzoneCluster {
      */
     public Builder setChunkSize(int size) {
       chunkSize = Optional.of(size);
+      return this;
+    }
+
+    public Builder setStreamBufferSize(int size) {
+      streamBufferSize = OptionalInt.of(size);
       return this;
     }
 

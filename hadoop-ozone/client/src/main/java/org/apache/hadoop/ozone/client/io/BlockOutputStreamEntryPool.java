@@ -109,7 +109,9 @@ public class BlockOutputStreamEntryPool {
     Preconditions.checkState(blockSize >= streamBufferMaxSize);
     Preconditions.checkState(streamBufferMaxSize % bytesPerChecksum == 0);
     Preconditions.checkState(streamBufferMaxSize % streamBufferFlushSize == 0);
-    Preconditions.checkState(streamBufferFlushSize % streamBufferSize == 0);
+    Preconditions.checkState(streamBufferFlushSize % streamBufferSize == 0,
+        "expected flush size (%s) to be a multiple of buffer size (%s)",
+        streamBufferFlushSize, streamBufferSize);
     this.bufferPool =
         new BufferPool(streamBufferSize,
             (int) (streamBufferMaxSize / streamBufferSize),
