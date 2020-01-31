@@ -113,10 +113,10 @@ public class ReconServer extends GenericCli {
   public void start() throws Exception {
     if (!isStarted) {
       LOG.info("Starting Recon server");
+      isStarted = true;
       httpServer.start();
       ozoneManagerServiceProvider.start();
       reconStorageContainerManager.start();
-      isStarted = true;
     }
   }
 
