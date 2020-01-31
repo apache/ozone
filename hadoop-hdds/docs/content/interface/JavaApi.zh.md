@@ -2,7 +2,7 @@
 title: "Java API"
 date: "2017-09-14"
 weight: 1
-summary: Ozone 有一套基于原生 RPC 的 API，其它协议都由这个最底层的 API 扩展而来，它也是所有协议中性能最好、功能最全的。
+summary: Ozone 有一套基于原生 RPC 的 API，其它协议都由这个最底层的 API 扩展而来，它也是所有 Ozone 支持的协议中性能最好、功能最全的。
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -21,7 +21,7 @@ summary: Ozone 有一套基于原生 RPC 的 API，其它协议都由这个最�
   limitations under the License.
 -->
 
-Ozone 自带了支持 RPC 的客户端库，对于一般的应用场景也可以使用兼容 S3 的 REST 接口替代 Ozone 客户端 API。
+Ozone 自带了支持 RPC 的客户端库，对于一般的应用场景也可以使用兼容 AWS S3 的 REST 接口替代 Ozone 客户端 API。
 
 
 ## 创建 Ozone 客户端
@@ -55,8 +55,8 @@ ObjectStore objectStore = ozClient.getObjectStore();
 ObjectStore 对象表示了客户端连接的集群。
 
 {{< highlight java >}}
-// 我们创建一个卷来存储数据
-// 使用默认参数来创建 assets 卷
+// 让我们创建一个卷来存储资产数据
+// 使用默认参数来创建资产卷
 objectStore.createVolume("assets");
 
 // 验证 assets 卷是否已创建
@@ -64,7 +64,7 @@ OzoneVolume assets = objectStore.getVolume("assets");
 {{< /highlight >}}
 
 
-createVolume 方法也支持接收一个数组来指定卷的创建参数。
+createVolume 方法也支持传入参数数组来指定卷的创建参数。
 
 ### 创建桶
 
