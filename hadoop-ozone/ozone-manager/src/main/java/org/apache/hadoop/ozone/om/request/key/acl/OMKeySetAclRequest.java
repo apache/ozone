@@ -82,16 +82,20 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
       IOException exception, long trxnLogIndex) {
     switch (result) {
     case SUCCESS:
-      if (operationResult) {
-        LOG.debug("Set acl: {} to path: {} success!", ozoneAcls, path);
-      } else {
-        LOG.debug("Set acl {} to path {} failed because acl already exists",
-            ozoneAcls, path);
+      if (LOG.isDebugEnabled()) {
+        if (operationResult) {
+          LOG.debug("Set acl: {} to path: {} success!", ozoneAcls, path);
+        } else {
+          LOG.debug("Set acl {} to path {} failed because acl already exists",
+              ozoneAcls, path);
+        }
       }
       break;
     case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          getOmRequest());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            getOmRequest());
+      }
       break;
     case FAILURE:
       LOG.error("Set acl {} to path {} failed!", ozoneAcls, path, exception);
