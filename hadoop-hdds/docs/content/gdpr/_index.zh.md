@@ -23,7 +23,7 @@ weight: 5
     -->
 
 {{<jumbotron title="GDPR 在 Ozone 中的应用">}}
-          通用数据保护条例（GDPR）是关于如何处理个人数据的规范，它属于欧盟的法律，但是由于软件常常跨越地理位置传播，Ozone 支持 GDPR 中的删除权（被遗忘权）。
+          通用数据保护条例（GDPR）是关于如何处理个人数据的规范，它属于欧盟的法律，但是由于软件常常跨越地理位置传播和使用，Ozone 支持 GDPR 中的删除权（被遗忘权）。
 {{</jumbotron>}}
 
 <div class="alert alert-warning" role="alert">
