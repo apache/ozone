@@ -79,7 +79,6 @@ services:
     env_file:
       - ./docker-config
     environment:
-      WAITFOR: om:9874
       KERBEROS_KEYTABS: recon HTTP
     command: ["/opt/hadoop/bin/ozone","recon"]
   scm:
