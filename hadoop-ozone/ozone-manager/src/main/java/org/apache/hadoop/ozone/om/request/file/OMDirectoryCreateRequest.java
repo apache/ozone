@@ -177,9 +177,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
       List<String> missingParents = OMFileRequest.getMissingParents(
           omMetadataManager, volumeName, bucketName, keyPath.getParent());
-
-      OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
+      if (missingParents == null) {
+        // findbugs cribs about a possible null pointer deref
+        missingParents = new ArrayList<>();
+      }
 
       OmKeyInfo dirKeyInfo = null;
       if (omDirectoryResult == FILE_EXISTS ||
@@ -189,15 +190,15 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             FILE_ALREADY_EXISTS);
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {
-        dirKeyInfo = createDirectoryKeyInfo(ozoneManager, omBucketInfo,
-            volumeName, bucketName, keyName, keyArgs, baseObjId);
+        dirKeyInfo = createDirectoryKeyInfo(ozoneManager, keyName, keyArgs,
+            baseObjId, transactionLogIndex);
 
         for (String missingKey : missingParents) {
           LOG.debug("missing parent {}", missingKey);
           // what about keyArgs for parent directories? TODO
           OmKeyInfo parentKeyInfo = createDirectoryKeyInfoNoACL(ozoneManager,
-              omBucketInfo, volumeName, bucketName, missingKey, keyArgs,
-              baseObjId + objectCount);
+              missingKey, keyArgs, baseObjId + objectCount,
+              transactionLogIndex);
           objectCount++;
 
           missingParentInfos.add(parentKeyInfo);
@@ -289,23 +290,37 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   }
 
   private OmKeyInfo createDirectoryKeyInfoNoACL(OzoneManager ozoneManager,
-      OmBucketInfo omBucketInfo, String volumeName, String bucketName,
-      String keyName, KeyArgs keyArgs, long objectId) throws IOException {
-    return getDirKeyInfoBuilder(ozoneManager, omBucketInfo, volumeName,
+      String keyName, KeyArgs keyArgs, long objectId, long transactionIndex)
+      throws IOException {
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    return dirKeyInfoBuilderNoACL(ozoneManager, omBucketInfo, volumeName,
         bucketName, keyName, keyArgs, objectId)
+        .setUpdateID(transactionIndex)
         .build();
   }
 
   private OmKeyInfo createDirectoryKeyInfo(OzoneManager ozoneManager,
-      OmBucketInfo omBucketInfo, String volumeName, String bucketName,
-      String keyName, KeyArgs keyArgs, long objectId) throws IOException {
-    return getDirKeyInfoBuilder(ozoneManager, omBucketInfo, volumeName,
+      String keyName, KeyArgs keyArgs, long objectId, long transactionIndex)
+      throws IOException {
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    return dirKeyInfoBuilderNoACL(ozoneManager, omBucketInfo, volumeName,
         bucketName, keyName, keyArgs, objectId)
         .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+        .setUpdateID(transactionIndex)
         .build();
   }
 
-  private OmKeyInfo.Builder getDirKeyInfoBuilder(OzoneManager ozoneManager,
+  private OmKeyInfo.Builder dirKeyInfoBuilderNoACL(OzoneManager ozoneManager,
       OmBucketInfo omBucketInfo, String volumeName, String bucketName,
       String keyName, KeyArgs keyArgs, long objectId)
       throws IOException {
@@ -326,7 +341,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
         .setFileEncryptionInfo(encryptionInfo.orNull())
         .setObjectID(objectId)
-        .setUpdateID(objectId);
+        .setUpdateID(0);
   }
 
 }
