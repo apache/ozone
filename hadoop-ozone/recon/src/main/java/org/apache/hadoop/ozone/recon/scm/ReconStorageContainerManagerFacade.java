@@ -114,7 +114,8 @@ public class ReconStorageContainerManagerFacade
     ContainerReportHandler containerReportHandler =
         new ContainerReportHandler(scmNodeManager, containerManager);
     IncrementalContainerReportHandler icrHandler =
-        new IncrementalContainerReportHandler(scmNodeManager, containerManager);
+        new ReconIncrementalContainerReportHandler(scmNodeManager,
+            containerManager, scmServiceProvider);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, containerManager);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
