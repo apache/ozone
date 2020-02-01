@@ -83,8 +83,34 @@ public class TestPipelinePlacementPolicy {
     DatanodeDetails nextNode = placementPolicy.chooseNodeBasedOnRackAwareness(
         healthyNodes, new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
         topologyWithDifRacks, anchor);
+    Assert.assertNotNull(nextNode);
     Assert.assertFalse(anchor.getNetworkLocation().equals(
         nextNode.getNetworkLocation()));
+  }
+
+  @Test
+  public void testFallBackPickNodes() {
+    List<DatanodeDetails> healthyNodes = overWriteLocationInNodes(
+        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY));
+    DatanodeDetails node;
+    try {
+      node = placementPolicy.fallBackPickNodes(healthyNodes, null);
+      Assert.assertNotNull(node);
+    } catch (SCMException e) {
+      Assert.fail("Should not reach here.");
+    }
+
+    // when input nodeSet are all excluded.
+    List<DatanodeDetails> exclude = healthyNodes;
+    try {
+      node = placementPolicy.fallBackPickNodes(healthyNodes, exclude);
+      Assert.assertNull(node);
+    } catch (SCMException e) {
+      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+          e.getResult());
+    } catch (Exception ex) {
+      Assert.fail("Should not reach here.");
+    }
   }
 
   private final static Node[] NODES = new NodeImpl[] {

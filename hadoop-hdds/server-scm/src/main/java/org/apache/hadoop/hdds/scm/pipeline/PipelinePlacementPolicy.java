@@ -208,6 +208,29 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     }
   }
 
+  // Fall back logic for node pick up.
+  DatanodeDetails fallBackPickNodes(
+      List<DatanodeDetails> nodeSet, List<DatanodeDetails> excludedNodes)
+      throws SCMException{
+    DatanodeDetails node;
+    if (excludedNodes == null || excludedNodes.isEmpty()) {
+      node = chooseNode(nodeSet);
+    } else {
+      List<DatanodeDetails> inputNodes = nodeSet.stream()
+          .filter(p -> !excludedNodes.contains(p)).collect(Collectors.toList());
+      node = chooseNode(inputNodes);
+    }
+
+    if (node == null) {
+      String msg = String.format("Unable to find fall back node in" +
+          " pipeline allocation. nodeSet size: {}", nodeSet.size());
+      LOG.warn(msg);
+      throw new SCMException(msg,
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
+    return node;
+  }
+
   /**
    * Get result set based on the pipeline placement algorithm which considers
    * network topology and rack awareness.
@@ -220,6 +243,13 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   public List<DatanodeDetails> getResultSet(
       int nodesRequired, List<DatanodeDetails> healthyNodes)
       throws SCMException {
+    if (nodesRequired != HddsProtos.ReplicationFactor.THREE.getNumber()) {
+      throw new SCMException("Nodes required number is not supported: " +
+          nodesRequired, SCMException.ResultCodes.INVALID_CAPACITY);
+    }
+
+    // Assume rack awareness is enabled.
+    boolean rackAwareness = true;
     List <DatanodeDetails> results = new ArrayList<>(nodesRequired);
     // Since nodes are widely distributed, the results should be selected
     // base on distance in topology, rack awareness and load balancing.
@@ -227,10 +257,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // First choose an anchor nodes randomly
     DatanodeDetails anchor = chooseNode(healthyNodes);
     if (anchor == null) {
-      LOG.warn("Unable to find healthy node for anchor(first) node." +
-              " Required nodes: {}, Found nodes: {}",
-          nodesRequired, results.size());
-      throw new SCMException("Unable to find required number of nodes.",
+      LOG.warn("Unable to find healthy node for anchor(first) node.");
+      throw new SCMException("Unable to find anchor node.",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
     if (LOG.isDebugEnabled()) {
@@ -241,29 +269,30 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     exclude.add(anchor);
 
     // Choose the second node on different racks from anchor.
-    DatanodeDetails nodeOnDifferentRack = chooseNodeBasedOnRackAwareness(
+    DatanodeDetails nextNode = chooseNodeBasedOnRackAwareness(
         healthyNodes, exclude,
         nodeManager.getClusterNetworkTopologyMap(), anchor);
-    if (nodeOnDifferentRack == null) {
-      LOG.warn("Pipeline Placement: Unable to find 2nd node on different " +
-          "racks that meets the criteria. Required nodes: {}, Found nodes:" +
-          " {}", nodesRequired, results.size());
-      throw new SCMException("Unable to find required number of nodes.",
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    if (nextNode == null) {
+      LOG.debug("Pipeline Placement: Unable to find 2nd node on different " +
+          "rack based on rack awareness.");
+      rackAwareness = false;
+      nextNode = fallBackPickNodes(healthyNodes, exclude);
     }
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Second node chosen: {}", nodeOnDifferentRack);
+      LOG.debug("Second node chosen: {}", nextNode);
     }
 
-    results.add(nodeOnDifferentRack);
-    exclude.add(nodeOnDifferentRack);
+    results.add(nextNode);
+    exclude.add(nextNode);
 
     // Then choose nodes close to anchor based on network topology
     int nodesToFind = nodesRequired - results.size();
     for (int x = 0; x < nodesToFind; x++) {
       // invoke the choose function defined in the derived classes.
-      DatanodeDetails pick = chooseNodeFromNetworkTopology(
-          nodeManager.getClusterNetworkTopologyMap(), anchor, exclude);
+      DatanodeDetails pick = rackAwareness
+          ? chooseNodeFromNetworkTopology(
+              nodeManager.getClusterNetworkTopologyMap(), anchor, exclude)
+          : fallBackPickNodes(healthyNodes, exclude);
       if (pick != null) {
         results.add(pick);
         exclude.add(pick);
@@ -293,6 +322,9 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   @Override
   public DatanodeDetails chooseNode(
       List<DatanodeDetails> healthyNodes) {
+    if (healthyNodes == null || healthyNodes.isEmpty()) {
+      return null;
+    }
     int firstNodeNdx = getRand().nextInt(healthyNodes.size());
     int secondNodeNdx = getRand().nextInt(healthyNodes.size());
 
