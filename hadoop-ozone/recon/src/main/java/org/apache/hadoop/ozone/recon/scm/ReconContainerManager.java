@@ -24,7 +24,10 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 
@@ -54,5 +57,30 @@ public class ReconContainerManager extends SCMContainerManager {
   protected File getContainerDBPath(Configuration conf) {
     File metaDir = ReconUtils.getReconScmDbDir(conf);
     return new File(metaDir, RECON_SCM_CONTAINER_DB);
+  }
+
+  /**
+   * Adds a new container to Recon's container manager.
+   * @param containerId id
+   * @param containerWithPipeline containerInfo with pipeline info
+   * @throws IOException on Error.
+   */
+  public void addNewContainer(long containerId,
+                              ContainerWithPipeline containerWithPipeline)
+      throws IOException {
+    ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
+    getLock().lock();
+    try {
+      getContainerStateManager().addContainerInfo(containerId, containerInfo,
+          getPipelineManager(), containerWithPipeline.getPipeline());
+      addContainerToDB(containerInfo);
+    } catch (IOException ex) {
+      getPipelineManager().removeContainerFromPipeline(
+          containerInfo.getPipelineID(),
+          new ContainerID(containerInfo.getContainerID()));
+      throw ex;
+    } finally {
+      getLock().unlock();
+    }
   }
 }

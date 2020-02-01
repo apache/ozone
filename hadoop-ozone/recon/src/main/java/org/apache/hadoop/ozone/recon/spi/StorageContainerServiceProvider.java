@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 /**
@@ -43,4 +44,13 @@ public interface StorageContainerServiceProvider {
    * @throws IOException in case of exception
    */
   Pipeline getPipeline(HddsProtos.PipelineID pipelineID) throws IOException;
+
+  /**
+   * Requests SCM for a container given ID.
+   * @param containerId containerId
+   * @return ContainerInfo + Pipeline info
+   * @throws IOException in case of any exception.
+   */
+  ContainerWithPipeline getContainerWithPipeline(long containerId)
+      throws IOException;
 }
