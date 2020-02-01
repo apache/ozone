@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
@@ -36,21 +35,28 @@ public class OMKeyPurgeResponse extends OMClientResponse {
 
   private List<String> purgeKeyList;
 
-  public OMKeyPurgeResponse(List<String> keyList,
-      @Nonnull OMResponse omResponse) {
+  public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,
+      List<String> keyList) {
     super(omResponse);
     this.purgeKeyList = keyList;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeyPurgeResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      for (String key : purgeKeyList) {
-        omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation,
-            key);
-      }
+    for (String key : purgeKeyList) {
+      omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation,
+          key);
     }
   }
 }
