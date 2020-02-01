@@ -156,7 +156,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     long deleteTrxnLogIndex = 10L;
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
-    TestOMRequestUtils.deleteKey(ozoneKey, omMetadataManager);
+    TestOMRequestUtils.deleteKey(ozoneKey, omMetadataManager, 10L);
 
     // Create the same key again with TransactionLogIndex > Delete requests
     // TransactionLogIndex

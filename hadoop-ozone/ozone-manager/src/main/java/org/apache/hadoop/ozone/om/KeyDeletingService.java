@@ -18,15 +18,19 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.protobuf.ServiceException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -38,6 +42,8 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 
 import com.google.common.annotations.VisibleForTesting;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
 
@@ -45,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.util.Preconditions;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -218,7 +225,8 @@ public class KeyDeletingService extends BackgroundService {
      * @throws IOException      on Error
      */
     public int submitPurgeKeysRequest(List<DeleteBlockGroupResult> results) {
-      List<String> purgeKeysList = new ArrayList<>();
+      Map<Pair<String, String>, List<String>> purgeKeysMapPerBucket =
+          new HashMap<>();
 
       // Put all keys to be purged in a list
       int deletedCount = 0;
@@ -226,15 +234,26 @@ public class KeyDeletingService extends BackgroundService {
         if (result.isSuccess()) {
           // Add key to PurgeKeys list.
           String deletedKey = result.getObjectKey();
-          purgeKeysList.add(deletedKey);
+          // Parse Volume and BucketName
+          addToMap(purgeKeysMapPerBucket, deletedKey);
           LOG.debug("Key {} set to be purged from OM DB", deletedKey);
           deletedCount++;
         }
       }
 
-      PurgeKeysRequest purgeKeysRequest = PurgeKeysRequest.newBuilder()
-          .addAllKeys(purgeKeysList)
-          .build();
+      PurgeKeysRequest.Builder purgeKeysRequest = PurgeKeysRequest.newBuilder();
+
+      // Add keys to PurgeKeysRequest bucket wise.
+      for (Map.Entry<Pair<String, String>, List<String>> entry :
+          purgeKeysMapPerBucket.entrySet()) {
+        Pair<String, String> volumeBucketPair = entry.getKey();
+        DeletedKeys deletedKeysInBucket = DeletedKeys.newBuilder()
+            .setVolumeName(volumeBucketPair.getLeft())
+            .setBucketName(volumeBucketPair.getRight())
+            .addAllKeys(entry.getValue())
+            .build();
+        purgeKeysRequest.addDeletedKeys(deletedKeysInBucket);
+      }
 
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(Type.PurgeKeys)
@@ -252,5 +271,22 @@ public class KeyDeletingService extends BackgroundService {
 
       return deletedCount;
     }
+  }
+
+  /**
+   * Parse Volume and Bucket Name from ObjectKey and add it to given map of
+   * keys to be purged per bucket.
+   */
+  private void addToMap(Map<Pair<String, String>, List<String>> map,
+      String objectKey) {
+    // Parse volume and bucket name
+    String[] split = objectKey.split(OM_KEY_PREFIX);
+    Preconditions.assertTrue(split.length > 3, "Volume and/or Bucket Name " +
+        "missing from Key Name.");
+    Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
+    if (!map.containsKey(volumeBucketPair)) {
+      map.put(volumeBucketPair, new ArrayList<>());
+    }
+    map.get(volumeBucketPair).add(objectKey);
   }
 }
