@@ -467,7 +467,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       LOG.debug("delete: Path is a directory: {}", f);
       key = addTrailingSlashIfNeeded(key);
 
-      if (key.equals("/")) {
+      if (key.equals("")) {
         LOG.warn("Cannot delete root directory.");
         return false;
       }
