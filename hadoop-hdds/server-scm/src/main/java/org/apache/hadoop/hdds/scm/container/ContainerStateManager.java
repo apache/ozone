@@ -301,15 +301,22 @@ public class ContainerStateManager {
         .setReplicationFactor(pipeline.getFactor())
         .setReplicationType(pipeline.getType())
         .build();
+    addContainerInfo(containerID, containerInfo, pipelineManager, pipeline);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("New container allocated: {}", containerInfo);
+    }
+    return containerInfo;
+  }
+
+  public void addContainerInfo(long containerID,
+                               ContainerInfo containerInfo,
+                               PipelineManager pipelineManager,
+                               Pipeline pipeline) throws IOException {
     Preconditions.checkNotNull(containerInfo);
     containers.addContainer(containerInfo);
     pipelineManager.addContainerToPipeline(pipeline.getId(),
         ContainerID.valueof(containerID));
     containerStateCount.incrementAndGet(containerInfo.getState());
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("New container allocated: {}", containerInfo);
-    }
-    return containerInfo;
   }
 
   /**

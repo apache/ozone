@@ -47,7 +47,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
         .setCmdType(OzoneManagerProtocolProtos.Type.AllocateBlock)
         .build();
     OMAllocateBlockResponse omAllocateBlockResponse =
-        new OMAllocateBlockResponse(omKeyInfo, clientID, omResponse);
+        new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID);
 
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
@@ -74,14 +74,14 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
         .setCmdType(OzoneManagerProtocolProtos.Type.AllocateBlock)
         .build();
     OMAllocateBlockResponse omAllocateBlockResponse =
-        new OMAllocateBlockResponse(omKeyInfo, clientID, omResponse);
+        new OMAllocateBlockResponse(omResponse, omKeyInfo, clientID);
 
     // Before calling addToDBBatch
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
     Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
-    omAllocateBlockResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omAllocateBlockResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);

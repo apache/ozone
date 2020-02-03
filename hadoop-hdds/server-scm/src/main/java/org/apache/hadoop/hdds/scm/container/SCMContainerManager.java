@@ -194,6 +194,18 @@ public class SCMContainerManager implements ContainerManager {
     return containerStateManager.getContainer(containerID);
   }
 
+  @Override
+  public boolean exists(ContainerID containerID) {
+    lock.lock();
+    try {
+      return (containerStateManager.getContainer(containerID) != null);
+    } catch (ContainerNotFoundException e) {
+      return false;
+    } finally {
+      lock.unlock();
+    }
+  }
+
   /**
    * {@inheritDoc}
    */
@@ -441,7 +453,7 @@ public class SCMContainerManager implements ContainerManager {
    * @param containerInfo
    * @throws IOException
    */
-  private void addContainerToDB(ContainerInfo containerInfo)
+  protected void addContainerToDB(ContainerInfo containerInfo)
       throws IOException {
     try {
       final byte[] containerIDBytes = Longs.toByteArray(
@@ -582,5 +594,13 @@ public class SCMContainerManager implements ContainerManager {
   protected File getContainerDBPath(Configuration conf) {
     File metaDir = ServerUtils.getScmDbDir(conf);
     return new File(metaDir, SCM_CONTAINER_DB);
+  }
+
+  protected PipelineManager getPipelineManager() {
+    return pipelineManager;
+  }
+
+  public Lock getLock() {
+    return lock;
   }
 }
