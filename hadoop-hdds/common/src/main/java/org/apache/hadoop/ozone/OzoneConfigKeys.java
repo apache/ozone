@@ -126,13 +126,13 @@ public final class OzoneConfigKeys {
       "ozone.client.stream.buffer.flush.size";
 
   public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE_DEFAULT =
-      "64MB";
+      "16MB";
 
   public static final String OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE =
       "ozone.client.stream.buffer.max.size";
 
   public static final String OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE_DEFAULT =
-      "128MB";
+      "32MB";
 
   public static final String OZONE_CLIENT_MAX_RETRIES =
       "ozone.client.max.retries";
