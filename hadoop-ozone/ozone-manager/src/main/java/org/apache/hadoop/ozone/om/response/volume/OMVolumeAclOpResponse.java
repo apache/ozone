@@ -54,16 +54,9 @@ public class OMVolumeAclOpResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if ((getOMResponse().hasAddAclResponse() &&
-        getOMResponse().getAddAclResponse().getResponse()) ||
-        (getOMResponse().hasRemoveAclResponse() &&
-            getOMResponse().getRemoveAclResponse().getResponse()) ||
-        (getOMResponse().hasSetAclResponse() &&
-            getOMResponse().getSetAclResponse().getResponse())) {
-      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
-          omVolumeArgs);
-    }
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+        omVolumeArgs);
   }
 
   @VisibleForTesting

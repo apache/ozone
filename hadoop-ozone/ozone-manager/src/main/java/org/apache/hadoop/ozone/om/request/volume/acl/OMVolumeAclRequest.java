@@ -107,13 +107,14 @@ public abstract class OMVolumeAclRequest extends OMClientRequest {
         applyAcl = false;
       }
 
-      if (applyAcl) {
-        omVolumeArgs.setUpdateID(trxnLogIndex);
-        // update cache.
-        omMetadataManager.getVolumeTable().addCacheEntry(
-            new CacheKey<>(dbVolumeKey),
-            new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
-      }
+      // We set the updateID even if applyAcl = false to catch the replay
+      // transactions.
+      omVolumeArgs.setUpdateID(trxnLogIndex);
+
+      // update cache.
+      omMetadataManager.getVolumeTable().addCacheEntry(
+          new CacheKey<>(dbVolumeKey),
+          new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
 
       omClientResponse = onSuccess(omResponse, omVolumeArgs, applyAcl);
       result = Result.SUCCESS;
