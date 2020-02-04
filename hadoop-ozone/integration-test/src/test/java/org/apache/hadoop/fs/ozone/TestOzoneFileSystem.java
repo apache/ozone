@@ -38,6 +38,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -97,6 +98,7 @@ public class TestOzoneFileSystem {
 
     testRenameDir();
     testSeekOnFileLength();
+    testDeleteRoot();
   }
 
   @After
@@ -283,6 +285,13 @@ public class TestOzoneFileSystem {
       stream.seek(fileLength);
       assertEquals(-1, stream.read());
     }
+  }
+
+  public void testDeleteRoot() throws IOException {
+    Path dir = new Path("/dir");
+    fs.mkdirs(dir);
+    assertFalse(fs.delete(new Path("/"), true));
+    assertNotNull(fs.getFileStatus(dir));
   }
 
   public void testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved()
