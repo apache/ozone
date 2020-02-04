@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
@@ -124,14 +123,28 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      // Check the OpenKeyTable if this transaction is a replay of ratis logs.
-      if (isReplay(ozoneManager, omKeyInfo.getUpdateID(), trxnLogIndex)) {
-        throw new OMReplayException();
-      }
+      // We do not check if this transaction is a replay. If OmKeyInfo
+      // exists, then we should delete it from OpenKeyTable irrespective of
+      // whether this transaction is a replay. There are 3 scenarios:
+      //   Trxn 1 : Initiate Multipart Upload request for key1
+      //            (openKey = openKey1)
+      //   Trxn 2 : Abort Multipart Upload request for opneKey1
+      //
+      // Scenario 1 : This is not a replay transaction.
+      //      omKeyInfo is not null and we proceed with the abort request to
+      //      deleted openKey1 from openKeyTable.
+      // Scenario 2 : Trxn 1 and 2 are replayed.
+      //      Replay of Trxn 1 would create openKey1 in openKeyTable as we do
+      //      not check for replay in S3InitiateMultipartUploadRequest.
+      //      Hence, we should replay Trxn 2 also to maintain consistency.
+      // Scenario 3 : Trxn 2 is replayed and not Trxn 1.
+      //      This will result in omKeyInfo == null as openKey1 would already
+      //      have been deleted from openKeyTable.
+      // So in both scenarios 1 and 2 (omKeyInfo not null), we should go
+      // ahead with this request irrespective of whether it is a replay or not.
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
-
       multipartKeyInfo.setUpdateID(trxnLogIndex);
 
       // Update cache of openKeyTable and multipartInfo table.
@@ -151,17 +164,11 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = new S3MultipartUploadAbortResponse(
-            createReplayOMResponse(omResponse));
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omClientResponse =
-            new S3MultipartUploadAbortResponse(createErrorOMResponse(
-                omResponse, exception), multipartKey, multipartKeyInfo);
-      }
+      result = Result.FAILURE;
+      exception = ex;
+      omClientResponse =
+          new S3MultipartUploadAbortResponse(createErrorOMResponse(
+              omResponse, exception), multipartKey, multipartKeyInfo);
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
@@ -175,21 +182,15 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     }
 
     // audit log
-    if (result != Result.REPLAY) {
-      auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-          OMAction.ABORT_MULTIPART_UPLOAD, buildKeyArgsAuditMap(keyArgs),
-          exception, getOmRequest().getUserInfo()));
-    }
+    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        OMAction.ABORT_MULTIPART_UPLOAD, buildKeyArgsAuditMap(keyArgs),
+        exception, getOmRequest().getUserInfo()));
 
     switch (result) {
     case SUCCESS:
       LOG.debug("Abort Multipart request is successfully completed for " +
               "KeyName {} in VolumeName/Bucket {}/{}", keyName, volumeName,
           bucketName);
-      break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}",
-          trxnLogIndex, multipartUploadAbortRequest);
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumAbortMultipartUploadFails();

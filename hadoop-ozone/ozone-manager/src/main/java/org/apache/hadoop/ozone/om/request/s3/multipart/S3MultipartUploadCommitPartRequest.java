@@ -194,6 +194,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         // Set the UpdateID to current transactionLogIndex
         multipartKeyInfo.setUpdateID(trxnLogIndex);
 
+        // OldPartKeyInfo will be deleted. Its updateID will be set in
+        // S3MultipartUplodaCommitPartResponse before being added to
+        // DeletedKeyTable.
+
         // Add to cache.
 
         // Delete from open key table and add it to multipart info table.

@@ -82,12 +82,11 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(partKeyInfo.getPartName());
 
-      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          currentKeyPartInfo, repeatedOmKeyInfo);
+      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(currentKeyPartInfo,
+          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID());
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          partKeyInfo.getPartName(),
-          repeatedOmKeyInfo);
+          partKeyInfo.getPartName(), repeatedOmKeyInfo);
     }
   }
 }
