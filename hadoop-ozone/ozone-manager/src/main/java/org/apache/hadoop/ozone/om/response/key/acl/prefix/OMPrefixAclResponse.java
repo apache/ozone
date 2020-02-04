@@ -52,25 +52,16 @@ public class OMPrefixAclResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if ((getOMResponse().hasAddAclResponse()
-        && getOMResponse().getAddAclResponse().getResponse()) ||
-        (getOMResponse().hasSetAclResponse()
-            && getOMResponse().getSetAclResponse().getResponse())) {
+    if (getOMResponse().hasRemoveAclResponse() &&
+        prefixInfo.getAcls().size() == 0) {
+      // if acl list size is zero, delete the entry.
+      omMetadataManager.getPrefixTable().deleteWithBatch(batchOperation,
+          prefixInfo.getName());
+    } else {
       omMetadataManager.getPrefixTable().putWithBatch(batchOperation,
           prefixInfo.getName(), prefixInfo);
-    } else if ((getOMResponse().hasRemoveAclResponse()
-        && getOMResponse().getRemoveAclResponse().getResponse())) {
-      if (prefixInfo.getAcls().size() == 0) {
-        // if acl list size is zero delete.
-        omMetadataManager.getPrefixTable().deleteWithBatch(batchOperation,
-            prefixInfo.getName());
-      } else {
-        omMetadataManager.getPrefixTable().putWithBatch(batchOperation,
-            prefixInfo.getName(), prefixInfo);
-      }
     }
   }
-
 }
 
 

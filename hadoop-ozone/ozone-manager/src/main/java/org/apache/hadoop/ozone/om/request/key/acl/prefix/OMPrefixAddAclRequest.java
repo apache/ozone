@@ -103,7 +103,7 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
           LOG.debug("Add acl: {} to path: {} success!", ozoneAcls,
               ozoneObj.getPath());
         } else {
-          LOG.debug("Add acl {} to path {} failed because acl already exists",
+          LOG.debug("Acl {} already exists in path {}",
               ozoneAcls, ozoneObj.getPath());
         }
       }
@@ -128,12 +128,8 @@ public class OMPrefixAddAclRequest extends OMPrefixAclRequest {
   @Override
   OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
       OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
-    OMPrefixAclOpResult operationResult = prefixManager.addAcl(ozoneObj,
-        ozoneAcls.get(0), omPrefixInfo, trxnLogIndex);
-    if (operationResult.isSuccess()) {
-      operationResult.getOmPrefixInfo().setUpdateID(trxnLogIndex);
-    }
-    return operationResult;
+    return prefixManager.addAcl(ozoneObj, ozoneAcls.get(0), omPrefixInfo,
+        trxnLogIndex);
   }
 }
 

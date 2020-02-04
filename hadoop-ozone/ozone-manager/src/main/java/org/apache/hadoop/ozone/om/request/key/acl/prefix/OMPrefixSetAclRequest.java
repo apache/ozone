@@ -97,13 +97,8 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
-        if (operationResult) {
-          LOG.debug("Set acl: {} to path: {} success!", ozoneAcls,
-              ozoneObj.getPath());
-        } else {
-          LOG.debug("Set acl {} to path {} failed", ozoneAcls,
-              ozoneObj.getPath());
-        }
+        LOG.debug("Set acl: {} to path: {} success!", ozoneAcls,
+            ozoneObj.getPath());
       }
       break;
     case REPLAY:
@@ -126,12 +121,8 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
   @Override
   OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
       OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
-    OMPrefixAclOpResult operationResult = prefixManager.setAcl(ozoneObj,
-        ozoneAcls, omPrefixInfo, trxnLogIndex);
-    if (operationResult.isSuccess()) {
-      operationResult.getOmPrefixInfo().setUpdateID(trxnLogIndex);
-    }
-    return operationResult;
+    return prefixManager.setAcl(ozoneObj, ozoneAcls, omPrefixInfo,
+        trxnLogIndex);
   }
 }
 

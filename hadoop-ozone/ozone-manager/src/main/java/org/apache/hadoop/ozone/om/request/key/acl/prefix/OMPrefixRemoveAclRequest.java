@@ -100,8 +100,7 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
           LOG.debug("Remove acl: {} to path: {} success!", ozoneAcls,
               ozoneObj.getPath());
         } else {
-          LOG.debug(
-              "Remove acl {} to path {} failed because acl does not exist",
+          LOG.debug("Acl {} not removed from path {} as it does not exist",
               ozoneAcls, ozoneObj.getPath());
         }
       }
@@ -126,12 +125,7 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
   @Override
   OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
       OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
-    OMPrefixAclOpResult operationResult = prefixManager.removeAcl(ozoneObj,
-        ozoneAcls.get(0), omPrefixInfo);
-    if (operationResult.isSuccess()) {
-      operationResult.getOmPrefixInfo().setUpdateID(trxnLogIndex);
-    }
-    return operationResult;
+    return prefixManager.removeAcl(ozoneObj, ozoneAcls.get(0), omPrefixInfo);
   }
 }
 

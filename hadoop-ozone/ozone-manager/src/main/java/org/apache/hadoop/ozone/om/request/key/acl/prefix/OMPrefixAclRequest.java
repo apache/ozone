@@ -105,27 +105,27 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
         operationResult = new OMPrefixAclOpResult(null, false);
       }
 
-      if (operationResult.isSuccess()) {
-        // As for remove acl list, for a prefix if after removing acl from
-        // the existing acl list, if list size becomes zero, delete the
-        // prefix from prefix table.
-        if (getOmRequest().hasRemoveAclRequest() &&
-            operationResult.getOmPrefixInfo().getAcls().size() == 0) {
-          omMetadataManager.getPrefixTable().addCacheEntry(
-              new CacheKey<>(prefixPath),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
-        } else {
-          // update cache.
-          omMetadataManager.getPrefixTable().addCacheEntry(
-              new CacheKey<>(prefixPath),
-              new CacheValue<>(Optional.of(operationResult.getOmPrefixInfo()),
-                  trxnLogIndex));
-        }
+      omPrefixInfo = operationResult.getOmPrefixInfo();
+      omPrefixInfo.setUpdateID(trxnLogIndex);
+
+      // As for remove acl list, for a prefix if after removing acl from
+      // the existing acl list, if list size becomes zero, delete the
+      // prefix from prefix table.
+      if (getOmRequest().hasRemoveAclRequest() &&
+          omPrefixInfo.getAcls().size() == 0) {
+        omMetadataManager.getPrefixTable().addCacheEntry(
+            new CacheKey<>(prefixPath),
+            new CacheValue<>(Optional.absent(), trxnLogIndex));
+      } else {
+        // update cache.
+        omMetadataManager.getPrefixTable().addCacheEntry(
+            new CacheKey<>(prefixPath),
+            new CacheValue<>(Optional.of(omPrefixInfo),
+                trxnLogIndex));
       }
 
       opResult  = operationResult.isSuccess();
-      omClientResponse = onSuccess(omResponse,
-          operationResult.getOmPrefixInfo(), opResult);
+      omClientResponse = onSuccess(omResponse, omPrefixInfo, opResult);
       result = Result.SUCCESS;
 
     } catch (IOException ex) {
