@@ -85,8 +85,7 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
         if (operationResult) {
           LOG.debug("Add acl: {} to path: {} success!", ozoneAcls, path);
         } else {
-          LOG.debug("Add acl {} to path {} failed because acl already exists",
-              ozoneAcls, path);
+          LOG.debug("Acl {} already exists in path {}", ozoneAcls, path);
         }
       }
       break;

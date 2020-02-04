@@ -83,12 +83,7 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
     switch (result) {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
-        if (operationResult) {
-          LOG.debug("Set acl: {} to path: {} success!", ozoneAcls, path);
-        } else {
-          LOG.debug("Set acl {} to path {} failed because acl already exists",
-              ozoneAcls, path);
-        }
+        LOG.debug("Set acl: {} to path: {} success!", ozoneAcls, path);
       }
       break;
     case REPLAY:
@@ -109,11 +104,7 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   @Override
   boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
-    boolean operationResult = omKeyInfo.setAcls(ozoneAcls);
-    if (operationResult) {
-      omKeyInfo.setUpdateID(trxnLogIndex);
-    }
-    return operationResult;
+    return omKeyInfo.setAcls(ozoneAcls);
   }
 }
 

@@ -102,13 +102,12 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       }
 
       operationResult = apply(omKeyInfo, trxnLogIndex);
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
-      if (operationResult) {
-        // update cache.
-        omMetadataManager.getKeyTable().addCacheEntry(
-            new CacheKey<>(dbKey),
-            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
-      }
+      // update cache.
+      omMetadataManager.getKeyTable().addCacheEntry(
+          new CacheKey<>(dbKey),
+          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
       result = Result.SUCCESS;

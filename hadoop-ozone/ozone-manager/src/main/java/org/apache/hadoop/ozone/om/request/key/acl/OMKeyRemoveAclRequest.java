@@ -85,8 +85,7 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
         if (operationResult) {
           LOG.debug("Remove acl: {} to path: {} success!", ozoneAcls, path);
         } else {
-          LOG.debug(
-              "Remove acl {} to path {} failed because acl already exists",
+          LOG.debug("Acl {} not removed from path {} as it does not exist",
               ozoneAcls, path);
         }
       }
@@ -109,11 +108,7 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
   @Override
   boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
-    boolean operationResult = omKeyInfo.removeAcl(ozoneAcls.get(0));
-    if (operationResult) {
-      omKeyInfo.setUpdateID(trxnLogIndex);
-    }
-    return operationResult;
+    return omKeyInfo.removeAcl(ozoneAcls.get(0));
   }
 }
 
