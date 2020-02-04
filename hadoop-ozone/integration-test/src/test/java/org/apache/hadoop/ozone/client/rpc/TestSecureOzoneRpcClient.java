@@ -168,8 +168,8 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
           keyName, ReplicationType.STAND_ALONE,
           ReplicationFactor.ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
-      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
+      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
   }
 

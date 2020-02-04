@@ -71,6 +71,7 @@ import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -95,6 +96,7 @@ import static org.junit.Assert.*;
 /**
  * Test Container servers when security is enabled.
  */
+@Ignore
 public class TestSecureContainerServer {
   static final String TEST_DIR
       = GenericTestUtils.getTestDir("dfs").getAbsolutePath() + File.separator;
