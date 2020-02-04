@@ -78,7 +78,7 @@ docker-compose logs scm
 docker-compose scale datanode=3
 {{< /highlight >}}
 
-在一个容器中打开 bash shell 后，你也可以对 [Ozone 命令行接口]({{< ref "shell/_index.md" >}})中的命令进行测试。
+在一个容器中打开 bash shell 后，你也可以对 [Ozone 命令行接口]({{< ref "shell/_index.zh.md" >}})中的命令进行测试。
 
 {{< highlight bash >}}
 docker-compose exec datanode bash
