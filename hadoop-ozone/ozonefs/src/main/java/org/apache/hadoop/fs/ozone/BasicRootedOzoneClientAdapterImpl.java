@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -196,6 +197,14 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   private OzoneBucket getBucket(String volumeStr, String bucketStr,
       boolean createIfNotExist) throws IOException {
+    Preconditions.checkNotNull(volumeStr);
+    Preconditions.checkNotNull(bucketStr);
+
+    if (!createIfNotExist && bucketStr.isEmpty()) {
+      // Make Hadoop common happy by throwing FileNotFoundException in this case
+      throw new FileNotFoundException("getBucket: Invalid arguments: "
+          + "bucket is empty string while create flag is not set.");
+    }
 
     OzoneBucket bucket;
     try {
