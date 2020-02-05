@@ -24,6 +24,7 @@ import java.util.List;
 import javax.inject.Inject;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -54,4 +55,9 @@ public class StorageContainerServiceProviderImpl
     return scmClient.getPipeline(pipelineID);
   }
 
+  @Override
+  public ContainerWithPipeline getContainerWithPipeline(long containerId)
+      throws IOException {
+    return scmClient.getContainerWithPipeline(containerId);
+  }
 }
