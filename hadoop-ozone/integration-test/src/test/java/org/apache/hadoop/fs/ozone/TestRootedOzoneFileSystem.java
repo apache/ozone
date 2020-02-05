@@ -320,7 +320,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * OFS: Test getListStatus on root.
+   * OFS: Test getFileStatus on root.
    */
   @Test
   public void testGetFileStatusRoot() throws Exception {
