@@ -439,6 +439,12 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.OBJECTS_QUERY);
     OFSPath ofsPath = new OFSPath(path);
     String key = ofsPath.getKeyName();
+    // getFileStatus is called for root
+    if (ofsPath.getVolumeName().isEmpty() &&
+        ofsPath.getBucketName().isEmpty()) {
+      // Generate a FileStatusAdapter for root
+      return rootFileStatusAdapter();
+    }
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
       OzoneFileStatus status = bucket.getFileStatus(key);
@@ -655,6 +661,22 @@ public class BasicRootedOzoneClientAdapterImpl
         status.getOwner(),
         status.getGroup(),
         status.getPath()
+    );
+  }
+
+  private FileStatusAdapter rootFileStatusAdapter() {
+    return new FileStatusAdapter(
+        0L,
+        null,
+        true,
+        (short)0,
+        0L,
+        0L,
+        0L,
+        (short)0,
+        null,
+        null,
+        null
     );
   }
 }
