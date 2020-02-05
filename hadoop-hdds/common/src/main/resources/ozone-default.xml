@@ -388,7 +388,7 @@
   </property>
   <property>
     <name>ozone.client.stream.buffer.size</name>
-    <value>16MB</value>
+    <value>4MB</value>
     <tag>OZONE, CLIENT</tag>
     <description>The size of chunks the client will send to the server.</description>
   </property>
