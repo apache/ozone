@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -414,7 +415,12 @@ public class KeyValueHandler extends Handler {
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);
 
-      // TODO "last putBlock for block" metadata => finish chunks
+      if (blockData.getMetadata().containsKey(OzoneConsts.LAST_PUT_FOR_BLOCK)) {
+        for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+          chunkManager.finishWriteChunk(kvContainer, blockData.getBlockID(),
+              ChunkInfo.getFromProtoBuf(chunkInfo));
+        }
+      }
 
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();

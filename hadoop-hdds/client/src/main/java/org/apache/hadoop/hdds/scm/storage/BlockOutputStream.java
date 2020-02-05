@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -238,7 +239,7 @@ public class BlockOutputStream extends OutputStream {
       writtenDataLength += writeLen;
       if (shouldFlush()) {
         updateFlushLength();
-        executePutBlock();
+        executePutBlock(false, false);
       }
       // Data in the bufferPool can not exceed streamBufferMaxSize
       if (isBufferPoolFull()) {
@@ -293,7 +294,7 @@ public class BlockOutputStream extends OutputStream {
         // reset the position to zero as now we will be reading the
         // next buffer in the list
         updateFlushLength();
-        executePutBlock();
+        executePutBlock(false, false);
       }
       if (writtenDataLength == streamBufferMaxSize) {
         handleFullBuffer();
@@ -359,20 +360,30 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private CompletableFuture<ContainerProtos.
-      ContainerCommandResponseProto> executePutBlock()
-      throws IOException {
+      ContainerCommandResponseProto> executePutBlock(boolean close,
+      boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
     Preconditions.checkNotNull(bufferList);
     final List<ChunkBuffer> byteBufferList = bufferList;
     bufferList = null;
-    Preconditions.checkNotNull(byteBufferList);
+    if (!force) {
+      Preconditions.checkNotNull(byteBufferList);
+    }
 
     CompletableFuture<ContainerProtos.
         ContainerCommandResponseProto> flushFuture;
     try {
+      BlockData blockData = containerBlockData.build();
+      if (close) {
+        blockData = BlockData.newBuilder(blockData)
+            .addMetadata(KeyValue.newBuilder()
+                .setKey(OzoneConsts.LAST_PUT_FOR_BLOCK)
+                .setValue(Boolean.TRUE.toString()))
+            .build();
+      }
       XceiverClientReply asyncReply =
-          putBlockAsync(xceiverClient, containerBlockData.build());
+          putBlockAsync(xceiverClient, blockData);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
@@ -382,7 +393,7 @@ public class BlockOutputStream extends OutputStream {
           throw new CompletionException(sce);
         }
         // if the ioException is not set, putBlock is successful
-        if (getIoException() == null) {
+        if (getIoException() == null && !force) {
           BlockID responseBlockID = BlockID.getFromProtobuf(
               e.getPutBlock().getCommittedBlockLength().getBlockID());
           Preconditions.checkState(blockID.get().getContainerBlockID()
@@ -426,7 +437,7 @@ public class BlockOutputStream extends OutputStream {
     if (xceiverClientManager != null && xceiverClient != null
         && bufferPool != null && bufferPool.getSize() > 0) {
       try {
-        handleFlush();
+        handleFlush(false);
       } catch (InterruptedException | ExecutionException e) {
         // just set the exception here as well in order to maintain sanctity of
         // ioException field
@@ -452,7 +463,7 @@ public class BlockOutputStream extends OutputStream {
     writeChunkToContainer(buffer.duplicate(0, buffer.position()));
   }
 
-  private void handleFlush()
+  private void handleFlush(boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
@@ -466,7 +477,9 @@ public class BlockOutputStream extends OutputStream {
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
       updateFlushLength();
-      executePutBlock();
+      executePutBlock(close, false);
+    } else if (close) {
+      executePutBlock(true, true);
     }
     waitOnFlushFutures();
     watchForCommit(false);
@@ -483,7 +496,7 @@ public class BlockOutputStream extends OutputStream {
     if (xceiverClientManager != null && xceiverClient != null
         && bufferPool != null && bufferPool.getSize() > 0) {
       try {
-        handleFlush();
+        handleFlush(true);
       } catch (InterruptedException | ExecutionException e) {
         setIoException(e);
         adjustBuffersOnException();
