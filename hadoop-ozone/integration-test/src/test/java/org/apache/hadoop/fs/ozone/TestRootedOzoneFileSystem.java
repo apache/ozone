@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -50,6 +51,7 @@ import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -280,7 +282,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * OFS: Tests mkdir on a volume and bucket that doesn't exist.
+   * OFS: Test mkdir on a volume and bucket that doesn't exist.
    */
   @Test
   public void testMkdirNonExistentVolumeBucket() throws Exception {
@@ -307,7 +309,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * OFS: Tests mkdir on a volume that doesn't exist.
+   * OFS: Test mkdir on a volume that doesn't exist.
    */
   @Test
   public void testMkdirNonExistentVolume() throws Exception {
@@ -326,10 +328,22 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Tests listStatus operation in a bucket.
+   * OFS: Test getListStatus on root.
    */
   @Test
-  public void testListStatusOnRoot() throws Exception {
+  public void testGetListStatusRoot() throws Exception {
+    Path root = new Path("/");
+    FileStatus fileStatus = fs.getFileStatus(root);
+    Assert.assertNotNull(fileStatus);
+    Assert.assertNull(fileStatus.getPath());
+    Assert.assertTrue(fileStatus.isDirectory());
+  }
+
+  /**
+   * Test listStatus operation in a bucket.
+   */
+  @Test
+  public void testListStatusInBucket() throws Exception {
     Path root = new Path("/" + volumeName + "/" + bucketName);
     Path dir1 = new Path(root, "dir1");
     Path dir12 = new Path(dir1, "dir12");
@@ -347,8 +361,8 @@ public class TestRootedOzoneFileSystem {
     // Verify that dir12 is not included in the result of the listStatus on root
     String fileStatus1 = fileStatuses[0].getPath().toUri().getPath();
     String fileStatus2 = fileStatuses[1].getPath().toUri().getPath();
-    assertFalse(fileStatus1.equals(dir12.toString()));
-    assertFalse(fileStatus2.equals(dir12.toString()));
+    assertNotEquals(fileStatus1, dir12.toString());
+    assertNotEquals(fileStatus2, dir12.toString());
   }
 
   /**

@@ -664,7 +664,14 @@ public class BasicRootedOzoneClientAdapterImpl
     );
   }
 
+  /**
+   * Generate a FileStatusAdapter for OFS root.
+   * @return FileStatusAdapter for root.
+   */
   private FileStatusAdapter rootFileStatusAdapter() {
+    // Note that most fields are mimicked from HDFS FileStatus for root,
+    //  except modification time, permission, owner and group.
+    // TODO: Revisit the return value.
     return new FileStatusAdapter(
         0L,
         null,
