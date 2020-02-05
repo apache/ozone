@@ -82,7 +82,13 @@ public class ReconServer extends GenericCli {
       LOG.info("Creating Recon Schema.");
       reconSchemaManager.createReconSchema();
 
-      httpServer = injector.getInstance(ReconHttpServer.class);
+      // TODO Remove try-catch block after HDDS-2041 is fixed.
+      // Allowing Recon server start even if HTTP server start failed
+      try {
+        httpServer = injector.getInstance(ReconHttpServer.class);
+      } catch (Exception ex) {
+        LOG.error("Error trying to start HTTP Server. ", ex);
+      }
       this.ozoneManagerServiceProvider =
           injector.getInstance(OzoneManagerServiceProvider.class);
       this.reconStorageContainerManager =
@@ -114,7 +120,10 @@ public class ReconServer extends GenericCli {
     if (!isStarted) {
       LOG.info("Starting Recon server");
       isStarted = true;
-      httpServer.start();
+      // TODO Remove null check after HDDS-2041 is fixed.
+      if (httpServer != null) {
+        httpServer.start();
+      }
       ozoneManagerServiceProvider.start();
       reconStorageContainerManager.start();
     }
