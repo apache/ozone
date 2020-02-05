@@ -364,11 +364,14 @@ public class BlockOutputStream extends OutputStream {
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
-    Preconditions.checkNotNull(bufferList);
-    final List<ChunkBuffer> byteBufferList = bufferList;
-    bufferList = null;
+    final List<ChunkBuffer> byteBufferList;
     if (!force) {
+      Preconditions.checkNotNull(bufferList);
+      byteBufferList = bufferList;
+      bufferList = null;
       Preconditions.checkNotNull(byteBufferList);
+    } else {
+      byteBufferList = null;
     }
 
     CompletableFuture<ContainerProtos.
