@@ -201,7 +201,7 @@ public class BasicRootedOzoneClientAdapterImpl
     Preconditions.checkNotNull(bucketStr);
     
     if (bucketStr.isEmpty()) {
-      // Make Hadoop common happy by throwing FileNotFoundException in this case.
+      // throw FileNotFoundException in this case to make Hadoop common happy
       throw new FileNotFoundException(
           "getBucket: Invalid argument: given bucket string is empty.");
     }
