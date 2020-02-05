@@ -323,7 +323,7 @@ public class TestRootedOzoneFileSystem {
    * OFS: Test getListStatus on root.
    */
   @Test
-  public void testGetListStatusRoot() throws Exception {
+  public void testGetFileStatusRoot() throws Exception {
     Path root = new Path("/");
     FileStatus fileStatus = fs.getFileStatus(root);
     Assert.assertNotNull(fileStatus);
