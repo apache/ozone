@@ -199,11 +199,11 @@ public class BasicRootedOzoneClientAdapterImpl
       boolean createIfNotExist) throws IOException {
     Preconditions.checkNotNull(volumeStr);
     Preconditions.checkNotNull(bucketStr);
-
-    if (!createIfNotExist && bucketStr.isEmpty()) {
-      // Make Hadoop common happy by throwing FileNotFoundException in this case
-      throw new FileNotFoundException("getBucket: Invalid arguments: "
-          + "bucket is empty string while create flag is not set.");
+    
+    if (bucketStr.isEmpty()) {
+      // Make Hadoop common happy by throwing FileNotFoundException in this case.
+      throw new FileNotFoundException(
+          "getBucket: Invalid argument: given bucket string is empty.");
     }
 
     OzoneBucket bucket;
@@ -357,11 +357,11 @@ public class BasicRootedOzoneClientAdapterImpl
     LOG.trace("creating dir for path: {}", pathStr);
     incrementCounter(Statistic.OBJECTS_CREATED);
     OFSPath ofsPath = new OFSPath(pathStr);
-    if (ofsPath.getVolumeName().length() == 0) {
+    if (ofsPath.getVolumeName().isEmpty()) {
       // Volume name unspecified, invalid param, return failure
       return false;
     }
-    if (ofsPath.getBucketName().length() == 0) {
+    if (ofsPath.getBucketName().isEmpty()) {
       // Create volume only
       objectStore.createVolume(ofsPath.getVolumeName());
       return true;
