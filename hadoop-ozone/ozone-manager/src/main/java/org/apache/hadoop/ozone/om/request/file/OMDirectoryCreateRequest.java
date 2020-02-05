@@ -143,7 +143,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     boolean acquiredLock = false;
     IOException exception = null;
     OMClientResponse omClientResponse = null;
-    Result result = null;
+    Result result = Result.FAILURE;
     try {
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
@@ -210,9 +210,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         omClientResponse = new OMDirectoryCreateResponse(
             createReplayOMResponse(omResponse));
       } else {
-        if (result == null) {
-          result = Result.FAILURE;
-        }
         exception = ex;
         omClientResponse = new OMDirectoryCreateResponse(
             createErrorOMResponse(omResponse, exception));
@@ -237,18 +234,23 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     switch (result) {
     case SUCCESS:
       omMetrics.incNumKeys();
-      LOG.debug("Directory created. Volume:{}, Bucket:{}, Key:{}", volumeName,
-          bucketName, keyName);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Directory created. Volume:{}, Bucket:{}, Key:{}", volumeName,
+            bucketName, keyName);
+      }
       break;
     case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          createDirectoryRequest);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            createDirectoryRequest);
+      }
       break;
     case DIRECTORY_ALREADY_EXISTS:
       LOG.error("Directory already exists. Volume:{}, Bucket:{}, Key{}",
           volumeName, bucketName, keyName, exception);
       break;
     case FAILURE:
+      omMetrics.incNumCreateDirectoryFails();
       LOG.error("Directory creation failed. Volume:{}, Bucket:{}, Key{}. " +
           "Exception:{}", volumeName, bucketName, keyName, exception);
       break;
