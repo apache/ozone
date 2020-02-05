@@ -680,7 +680,7 @@ public class BasicRootedOzoneClientAdapterImpl
         0L,
         0L,
         0L,
-        (short)0,
+        (short)00755,
         null,
         null,
         null

@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -329,6 +330,8 @@ public class TestRootedOzoneFileSystem {
     Assert.assertNotNull(fileStatus);
     Assert.assertNull(fileStatus.getPath());
     Assert.assertTrue(fileStatus.isDirectory());
+    Assert.assertEquals(
+        new FsPermission((short)00755), fileStatus.getPermission());
   }
 
   /**
