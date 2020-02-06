@@ -111,6 +111,8 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(bucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
     assertTrue(doubleBuffer.getFlushIterations() > 0);
+    assertTrue(metrics.getFlushTime().lastStat().mean() > 0);
+    assertTrue(metrics.getAvgFlushTransactionsInOneIteration() > 0);
 
     // Check lastAppliedIndex is updated correctly or not.
     assertEquals(bucketCount, lastAppliedIndex);
