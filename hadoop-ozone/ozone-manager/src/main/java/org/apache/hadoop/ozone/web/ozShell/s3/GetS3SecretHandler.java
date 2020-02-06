@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
 import org.apache.hadoop.security.UserGroupInformation;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -36,12 +35,6 @@ public class GetS3SecretHandler extends Handler {
 
   public static final String OZONE_GETS3SECRET_ERROR = "This command is not" +
       " supported in unsecure clusters.";
-
-  @CommandLine.Option(names = {"--om-service-id"},
-      required = false,
-      description = "OM Service ID is required to be specified for OM HA" +
-          " cluster")
-  private String omServiceID;
   /**
    * Executes getS3Secret.
    */
@@ -49,8 +42,7 @@ public class GetS3SecretHandler extends Handler {
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     try (OzoneClient client =
-        new OzoneAddress().createClientForS3Commands(ozoneConfiguration,
-            omServiceID)) {
+        new OzoneAddress().createClient(ozoneConfiguration)) {
 
       // getS3Secret works only with secured clusters
       if (ozoneConfiguration.getBoolean(OZONE_SECURITY_ENABLED_KEY, false)) {

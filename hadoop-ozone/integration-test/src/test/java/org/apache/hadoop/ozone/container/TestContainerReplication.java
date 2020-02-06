@@ -54,7 +54,6 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -62,7 +61,6 @@ import org.junit.rules.Timeout;
 /**
  * Tests ozone containers replication.
  */
-@Ignore
 public class TestContainerReplication {
   /**
    * Set the timeout for every test.

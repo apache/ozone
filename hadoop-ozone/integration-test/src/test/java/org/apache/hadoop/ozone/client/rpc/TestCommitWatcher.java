@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -60,7 +59,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Class to test CommitWatcher functionality.
  */
-@Ignore
 public class TestCommitWatcher {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
@@ -89,6 +87,7 @@ public class TestCommitWatcher {
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, "5000ms");
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.set(OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE, "NONE");
@@ -140,7 +139,7 @@ public class TestCommitWatcher {
     Assert.assertEquals(1, xceiverClient.getRefcount());
     Assert.assertTrue(xceiverClient instanceof XceiverClientRatis);
     XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
-    CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
+    CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient, 10000);
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
     List<XceiverClientReply> replies = new ArrayList<>();
     long length = 0;
@@ -214,7 +213,7 @@ public class TestCommitWatcher {
     Assert.assertEquals(1, xceiverClient.getRefcount());
     Assert.assertTrue(xceiverClient instanceof XceiverClientRatis);
     XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
-    CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
+    CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient, 10000);
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
     List<XceiverClientReply> replies = new ArrayList<>();
     long length = 0;

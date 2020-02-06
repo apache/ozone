@@ -57,7 +57,6 @@ import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -93,7 +92,6 @@ import static org.junit.Assert.fail;
  * Tests the containerStateMachine failure handling.
  */
 
-@Ignore
 public class TestContainerStateMachineFailures {
 
   private static MiniOzoneCluster cluster;

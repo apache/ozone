@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,24 +18,21 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
+import org.apache.hadoop.fs.GetSpaceUsed;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
-
-import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
+import java.util.UUID;
 
 /**
  * Tests {@link RoundRobinVolumeChoosingPolicy}.
@@ -43,47 +40,44 @@ import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
 public class TestRoundRobinVolumeChoosingPolicy {
 
   private RoundRobinVolumeChoosingPolicy policy;
-  private final List<HddsVolume> volumes = new ArrayList<>();
+  private List<HddsVolume> volumes;
+  private VolumeSet volumeSet;
 
-  private static final Configuration CONF = new Configuration();
-  private static final String BASE_DIR =
-      getTestDir(TestRoundRobinVolumeChoosingPolicy.class.getSimpleName())
-          .getAbsolutePath();
-  private static final String VOLUME_1 = BASE_DIR + "disk1";
-  private static final String VOLUME_2 = BASE_DIR + "disk2";
+  private final String baseDir = MiniDFSCluster.getBaseDirectory();
+  private final String volume1 = baseDir + "disk1";
+  private final String volume2 = baseDir + "disk2";
+
+  private static final String DUMMY_IP_ADDR = "0.0.0.0";
 
   @Before
   public void setup() throws Exception {
-    policy = new RoundRobinVolumeChoosingPolicy();
-
-    SpaceUsageSource source1 = MockSpaceUsageSource.fixed(500, 100);
-    SpaceUsageCheckFactory factory1 = MockSpaceUsageCheckFactory.of(
-        source1, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE);
-    HddsVolume vol1 = new HddsVolume.Builder(VOLUME_1)
-        .conf(CONF)
-        .usageCheckFactory(factory1)
-        .build();
-    SpaceUsageSource source2 = MockSpaceUsageSource.fixed(500, 200);
-    SpaceUsageCheckFactory factory2 = MockSpaceUsageCheckFactory.of(
-        source2, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE);
-    HddsVolume vol2 = new HddsVolume.Builder(VOLUME_2)
-        .conf(CONF)
-        .usageCheckFactory(factory2)
-        .build();
-
-    volumes.add(vol1);
-    volumes.add(vol2);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String dataDirKey = volume1 + "," + volume2;
+    conf.set(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY, dataDirKey);
+    policy = ReflectionUtils.newInstance(
+        RoundRobinVolumeChoosingPolicy.class, null);
+    volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
+    volumes = volumeSet.getVolumesList();
   }
 
   @After
   public void cleanUp() {
-    volumes.forEach(HddsVolume::shutdown);
+    if (volumeSet != null) {
+      volumeSet.shutdown();
+      volumeSet = null;
+    }
   }
 
   @Test
   public void testRRVolumeChoosingPolicy() throws Exception {
     HddsVolume hddsVolume1 = volumes.get(0);
     HddsVolume hddsVolume2 = volumes.get(1);
+
+    // Set available space in volume1 to 100L
+    setAvailableSpace(hddsVolume1, 100L);
+
+    // Set available space in volume1 to 200L
+    setAvailableSpace(hddsVolume2, 200L);
 
     Assert.assertEquals(100L, hddsVolume1.getAvailable());
     Assert.assertEquals(200L, hddsVolume2.getAvailable());
@@ -110,16 +104,34 @@ public class TestRoundRobinVolumeChoosingPolicy {
 
   @Test
   public void testRRPolicyExceptionMessage() throws Exception {
+    HddsVolume hddsVolume1 = volumes.get(0);
+    HddsVolume hddsVolume2 = volumes.get(1);
+
+    // Set available space in volume1 to 100L
+    setAvailableSpace(hddsVolume1, 100L);
+
+    // Set available space in volume1 to 200L
+    setAvailableSpace(hddsVolume2, 200L);
+
     int blockSize = 300;
     try {
       policy.chooseVolume(volumes, blockSize);
       Assert.fail("expected to throw DiskOutOfSpaceException");
     } catch(DiskOutOfSpaceException e) {
-      Assert.assertEquals("Not returning the expected message",
+      Assert.assertEquals("Not returnig the expected message",
           "Out of space: The volume with the most available space (=" + 200
               + " B) is less than the container size (=" + blockSize + " B).",
           e.getMessage());
     }
   }
 
+  private void setAvailableSpace(HddsVolume hddsVolume, long availableSpace)
+      throws IOException {
+    GetSpaceUsed scmUsageMock = Mockito.mock(GetSpaceUsed.class);
+    hddsVolume.setScmUsageForTesting(scmUsageMock);
+    // Set used space to capacity -requiredAvailableSpace so that
+    // getAvailable() returns us the specified availableSpace.
+    Mockito.when(scmUsageMock.getUsed()).thenReturn(
+        (hddsVolume.getCapacity() - availableSpace));
+  }
 }

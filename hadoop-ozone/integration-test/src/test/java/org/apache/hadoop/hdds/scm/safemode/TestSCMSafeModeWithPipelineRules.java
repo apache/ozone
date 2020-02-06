@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -45,7 +44,6 @@ import static org.junit.Assert.fail;
  * This class tests SCM Safe mode with pipeline rules.
  */
 
-@Ignore
 public class TestSCMSafeModeWithPipelineRules {
 
   private static MiniOzoneCluster cluster;

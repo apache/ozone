@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -43,7 +43,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
 /**
  * Test Node failure detection and handling in Ratis.
  */
-@Ignore
 public class TestNodeFailure {
 
   private static MiniOzoneCluster cluster;
@@ -62,12 +61,7 @@ public class TestNodeFailure {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setTimeDuration(
-        DatanodeRatisServerConfig.RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
-        10, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        DatanodeRatisServerConfig.DATANODE_RATIS_SERVER_CONFIG_PREFIX +
-        DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
+    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_KEY,
         10, TimeUnit.SECONDS);
     conf.setTimeDuration(
         ScmConfigKeys.OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT,
@@ -90,8 +84,10 @@ public class TestNodeFailure {
     // At this stage, there should be 2 pipeline one with 1 open container each.
     // Try closing the both the pipelines, one with a closed container and
     // the other with an open container.
-    timeForFailure = conf.getObject(DatanodeRatisServerConfig.class)
-        .getFollowerSlownessTimeout();
+    timeForFailure = conf.getTimeDuration(
+        OzoneConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_KEY,
+        OzoneConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_DEFAULT
+            .getDuration(), TimeUnit.MILLISECONDS);
   }
 
   /**

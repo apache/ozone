@@ -37,8 +37,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
@@ -230,13 +228,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setReplicationManagerStatusResponse(getReplicationManagerStatus(
                 request.getSeplicationManagerStatusRequest()))
             .build();
-      case GetPipeline:
-        return ScmContainerLocationResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetPipelineResponse(getPipeline(
-                request.getGetPipelineRequest()))
-            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -337,15 +328,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       HddsProtos.Pipeline protobufMessage = pipeline.getProtobufMessage();
       builder.addPipelines(protobufMessage);
     }
-    return builder.build();
-  }
-
-  public GetPipelineResponseProto getPipeline(
-      GetPipelineRequestProto request) throws IOException {
-    GetPipelineResponseProto.Builder builder = GetPipelineResponseProto
-        .newBuilder();
-    Pipeline pipeline = impl.getPipeline(request.getPipelineID());
-    builder.setPipeline(pipeline.getProtobufMessage());
     return builder.build();
   }
 

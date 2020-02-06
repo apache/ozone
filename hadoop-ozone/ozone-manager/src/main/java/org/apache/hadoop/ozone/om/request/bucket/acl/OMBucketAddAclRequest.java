@@ -90,13 +90,14 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
     omResponse.setSuccess(operationResult);
     omResponse.setAddAclResponse(AddAclResponse.newBuilder()
          .setResponse(operationResult));
-    return new OMBucketAclResponse(omResponse.build(), omBucketInfo);
+    return new OMBucketAclResponse(omBucketInfo,
+        omResponse.build());
   }
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
-    return new OMBucketAclResponse(
+    return new OMBucketAclResponse(null,
         createErrorOMResponse(omResponse, exception));
   }
 

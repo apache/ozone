@@ -1,5 +1,5 @@
 ---
-title: 在 Kubernetes 集群上部署 Ozone
+title: Ozone on Kubernetes
 weight: 22
 ---
 <!---
@@ -21,32 +21,31 @@ weight: 22
 
 
 {{< requirements >}}
- * 可用的 kubernetes 集群（LoadBalancer 和 PersistentVolume 非必需）
+ * Working kubernetes cluster (LoadBalancer, PersistentVolume are not required)
  * kubectl
 {{< /requirements >}}
 
 
-由于 _apache/ozone_ 镜像可以从 Docker Hub 获取到，K8s 上的部署过程和 Minikube 上的部署过程十分相似，唯一的区别是我们为 K8s 部署准备了专门的配置
-文件（比如，我们可以在每个 K8s 节点上部署一个 Datanode）。
+As the _apache/ozone_ docker images are available from the dockerhub the deployment process is very similar to Minikube deployment. The only big difference is that we have dedicated set of k8s files for hosted clusters (for example we can use one datanode per host)
+Deploy to kubernetes
 
+`kubernetes/examples` folder of the ozone distribution contains kubernetes deployment resource files for multiple use cases.
 
-ozone 安装包中的 `kubernetes/examples` 目录包含了为不同用例设计的 Kubernetes 部署资源文件。
-
-使用 ozone 子目录进行部署：
+To deploy to a hosted cluster use the ozone subdirectory:
 
 ```
 cd kubernetes/examples/ozone
 kubectl apply -f .
 ```
 
-用下面的命令检查结果：
+And you can check the results with
 
 ```
 kubectl get pod
-访问 ozone 服务
+Access the services
 ```
 
-现在你可以访问 ozone 的各个服务，默认情况下它们的端口并没有向外开放，不过你可以通过设置端口转发规则来开放外部访问：
+Now you can access any of the services. By default the services are not published but you can access them with port-foward rules.
 
 ```
 kubectl port-forward s3g-0 9878:9878

@@ -48,7 +48,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyCreateResponse omKeyCreateResponse =
-        new OMKeyCreateResponse(omResponse, omKeyInfo, clientID);
+        new OMKeyCreateResponse(omKeyInfo, clientID, omResponse);
 
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
@@ -73,14 +73,14 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
         .build();
 
     OMKeyCreateResponse omKeyCreateResponse =
-        new OMKeyCreateResponse(omResponse, omKeyInfo, clientID);
+        new OMKeyCreateResponse(omKeyInfo, clientID, omResponse);
 
     // Before calling addToDBBatch
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
     Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
-    omKeyCreateResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+    omKeyCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);

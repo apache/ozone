@@ -55,7 +55,6 @@ import java.util.UUID;
  */
 public class TestHeartbeatEndpointTask {
 
-  private static final String TEST_SCM_ENDPOINT = "test-scm-1:9861";
 
   @Test
   public void testheartbeatWithoutReports() throws Exception {
@@ -103,7 +102,6 @@ public class TestHeartbeatEndpointTask {
 
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
-    context.addEndpoint(TEST_SCM_ENDPOINT);
     context.addReport(NodeReportProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
@@ -135,7 +133,6 @@ public class TestHeartbeatEndpointTask {
 
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
-    context.addEndpoint(TEST_SCM_ENDPOINT);
     context.addReport(ContainerReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
@@ -167,7 +164,6 @@ public class TestHeartbeatEndpointTask {
 
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
-    context.addEndpoint(TEST_SCM_ENDPOINT);
     context.addReport(CommandStatusReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
@@ -199,7 +195,6 @@ public class TestHeartbeatEndpointTask {
 
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
-    context.addEndpoint(TEST_SCM_ENDPOINT);
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
@@ -231,7 +226,6 @@ public class TestHeartbeatEndpointTask {
 
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
-    context.addEndpoint(TEST_SCM_ENDPOINT);
     context.addReport(NodeReportProto.getDefaultInstance());
     context.addReport(ContainerReportsProto.getDefaultInstance());
     context.addReport(CommandStatusReportsProto.getDefaultInstance());
@@ -283,8 +277,6 @@ public class TestHeartbeatEndpointTask {
     EndpointStateMachine endpointStateMachine = Mockito
         .mock(EndpointStateMachine.class);
     Mockito.when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
-    Mockito.when(endpointStateMachine.getAddressString())
-        .thenReturn(TEST_SCM_ENDPOINT);
     return HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
         .setDatanodeDetails(datanodeDetails)

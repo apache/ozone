@@ -120,9 +120,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
 
-    CreateBucketRequest createBucketRequest = getOmRequest()
-        .getCreateBucketRequest();
-    BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
+    BucketInfo bucketInfo = getBucketInfoFromRequest();
 
     String volumeName = bucketInfo.getVolumeName();
     String bucketName = bucketInfo.getBucketName();
@@ -165,32 +163,14 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       //Check if bucket already exists
-      OmBucketInfo dbBucketInfo = metadataManager.getBucketTable()
-          .get(bucketKey);
-      if (dbBucketInfo != null) {
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
-            transactionLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          LOG.debug("Replayed Transaction {} ignored. Request: {}",
-              transactionLogIndex, createBucketRequest);
-          return new OMBucketCreateResponse(createReplayOMResponse(omResponse));
-        } else {
-          LOG.debug("bucket: {} already exists ", bucketName);
-          throw new OMException("Bucket already exist",
-              OMException.ResultCodes.BUCKET_ALREADY_EXISTS);
-        }
+      if (metadataManager.getBucketTable().get(bucketKey) != null) {
+        LOG.debug("bucket: {} already exists ", bucketName);
+        throw new OMException("Bucket already exist",
+            OMException.ResultCodes.BUCKET_ALREADY_EXISTS);
       }
-
-      // Add objectID and updateID
-      omBucketInfo.setObjectID(transactionLogIndex);
-      omBucketInfo.setUpdateID(transactionLogIndex);
 
       // Add default acls from volume.
       addDefaultAcls(omBucketInfo, omVolumeArgs);
-
 
       // Update table cache.
       metadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
@@ -198,12 +178,12 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());
-      omClientResponse = new OMBucketCreateResponse(omResponse.build(),
-          omBucketInfo);
+      omClientResponse = new OMBucketCreateResponse(omBucketInfo,
+          omResponse.build());
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMBucketCreateResponse(
-          createErrorOMResponse(omResponse, exception), omBucketInfo);
+      omClientResponse = new OMBucketCreateResponse(omBucketInfo,
+          createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
@@ -257,6 +237,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAclList);
     omBucketInfo.setAcls(acls);
+  }
+
+
+  private BucketInfo getBucketInfoFromRequest() {
+    CreateBucketRequest createBucketRequest =
+        getOmRequest().getCreateBucketRequest();
+    return createBucketRequest.getBucketInfo();
   }
 
   private BucketEncryptionInfoProto getBeinfo(

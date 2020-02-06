@@ -139,8 +139,8 @@ public class TestDataScrubber {
           keyName, STAND_ALONE,
           ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
 
     // wait for the container report to propagate to SCM

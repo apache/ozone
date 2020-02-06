@@ -30,6 +30,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -58,6 +59,7 @@ import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,20 +89,25 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     final String rpcType = ozoneConf
         .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
+    final TimeDuration clientRequestTimeout =
+        RatisHelper.getClientRequestTimeout(ozoneConf);
+    final int maxOutstandingRequests =
+        HddsClientUtils.getMaxOutstandingRequests(ozoneConf);
     final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
     final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(new
         SecurityConfig(ozoneConf), caCert);
     return new XceiverClientRatis(pipeline,
-        SupportedRpcType.valueOfIgnoreCase(rpcType),
-        retryPolicy, tlsConfig, ozoneConf);
+        SupportedRpcType.valueOfIgnoreCase(rpcType), maxOutstandingRequests,
+        retryPolicy, tlsConfig, clientRequestTimeout);
   }
 
   private final Pipeline pipeline;
   private final RpcType rpcType;
   private final AtomicReference<RaftClient> client = new AtomicReference<>();
+  private final int maxOutstandingRequests;
   private final RetryPolicy retryPolicy;
   private final GrpcTlsConfig tlsConfig;
-  private final Configuration ozoneConfiguration;
+  private final TimeDuration clientRequestTimeout;
 
   // Map to track commit index at every server
   private final ConcurrentHashMap<UUID, Long> commitInfoMap;
@@ -111,16 +118,17 @@ public final class XceiverClientRatis extends XceiverClientSpi {
    * Constructs a client.
    */
   private XceiverClientRatis(Pipeline pipeline, RpcType rpcType,
-      RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
-      Configuration configuration) {
+      int maxOutStandingChunks, RetryPolicy retryPolicy,
+      GrpcTlsConfig tlsConfig, TimeDuration timeout) {
     super();
     this.pipeline = pipeline;
     this.rpcType = rpcType;
+    this.maxOutstandingRequests = maxOutStandingChunks;
     this.retryPolicy = retryPolicy;
     commitInfoMap = new ConcurrentHashMap<>();
     this.tlsConfig = tlsConfig;
+    this.clientRequestTimeout = timeout;
     metrics = XceiverClientManager.getXceiverClientMetrics();
-    this.ozoneConfiguration = configuration;
   }
 
   private void updateCommitInfosMap(
@@ -167,10 +175,12 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       LOG.debug("Connecting to pipeline:{} datanode:{}", getPipeline().getId(),
           RatisHelper.toRaftPeerId(pipeline.getFirstNode()));
     }
-
+    // TODO : XceiverClient ratis should pass the config value of
+    // maxOutstandingRequests so as to set the upper bound on max no of async
+    // requests to be handled by raft client
     if (!client.compareAndSet(null,
         RatisHelper.newRaftClient(rpcType, getPipeline(), retryPolicy,
-            tlsConfig, ozoneConfiguration))) {
+            maxOutstandingRequests, tlsConfig, clientRequestTimeout))) {
       throw new IllegalStateException("Client is already connected.");
     }
   }
@@ -244,7 +254,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   }
 
   @Override
-  public XceiverClientReply watchForCommit(long index)
+  public XceiverClientReply watchForCommit(long index, long timeout)
       throws InterruptedException, ExecutionException, TimeoutException,
       IOException {
     long commitIndex = getReplicatedMinCommitIndex();
@@ -255,11 +265,14 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       clientReply.setLogIndex(commitIndex);
       return clientReply;
     }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("commit index : {} watch timeout : {}", index, timeout);
+    }
     RaftClientReply reply;
     try {
       CompletableFuture<RaftClientReply> replyFuture = getClient()
           .sendWatchAsync(index, RaftProtos.ReplicationLevel.ALL_COMMITTED);
-      replyFuture.get();
+      replyFuture.get(timeout, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       Throwable t = HddsClientUtils.checkForException(e);
       LOG.warn("3 way commit failed on pipeline {}", pipeline, e);
@@ -268,7 +281,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       }
       reply = getClient()
           .sendWatchAsync(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
-          .get();
+          .get(timeout, TimeUnit.MILLISECONDS);
       List<RaftProtos.CommitInfoProto> commitInfoProtoList =
           reply.getCommitInfos().stream()
               .filter(i -> i.getCommitIndex() < index)

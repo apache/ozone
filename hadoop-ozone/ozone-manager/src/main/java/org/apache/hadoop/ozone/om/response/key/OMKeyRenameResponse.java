@@ -18,15 +18,16 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
+import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 /**
@@ -34,75 +35,35 @@ import javax.annotation.Nonnull;
  */
 public class OMKeyRenameResponse extends OMClientResponse {
 
-  private String fromKeyName;
-  private String toKeyName;
-  private OmKeyInfo newKeyInfo;
+  private final OmKeyInfo renameKeyInfo;
+  private final String toKeyName;
+  private final String fromKeyName;
 
-  public OMKeyRenameResponse(@Nonnull OMResponse omResponse,
-      String fromKeyName, String toKeyName, @Nonnull OmKeyInfo renameKeyInfo) {
+  public OMKeyRenameResponse(@Nullable OmKeyInfo renameKeyInfo,
+      String toKeyName, String fromKeyName, @Nonnull OMResponse omResponse) {
     super(omResponse);
-    this.fromKeyName = fromKeyName;
+    this.renameKeyInfo = renameKeyInfo;
     this.toKeyName = toKeyName;
-    this.newKeyInfo = renameKeyInfo;
-  }
-
-  /**
-   * When Rename request is replayed and toKey already exists, but fromKey
-   * has not been deleted.
-   * For example, lets say we have the following sequence of transactions
-   *  Trxn 1 : Create Key1
-   *  Trnx 2 : Rename Key1 to Key2 -> Deletes Key1 and Creates Key2
-   *  Now if these transactions are replayed:
-   *  Replay Trxn 1 : Creates Key1 again as Key1 does not exist in DB
-   *  Replay Trxn 2 : Key2 is not created as it exists in DB and the request
-   *  would be deemed a replay. But Key1 is still in the DB and needs to be
-   *  deleted.
-   */
-  public OMKeyRenameResponse(@Nonnull OMResponse omResponse,
-      String fromKeyName, OmKeyInfo fromKeyInfo) {
-    super(omResponse);
     this.fromKeyName = fromKeyName;
-    this.newKeyInfo = fromKeyInfo;
-    this.toKeyName = null;
-  }
-
-  /**
-   * For when the request is not successful or it is a replay transaction.
-   * For a successful request, the other constructor should be used.
-   */
-  public OMKeyRenameResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    String volumeName = newKeyInfo.getVolumeName();
-    String bucketName = newKeyInfo.getBucketName();
-    // If toKeyName is null, then we need to only delete the fromKeyName from
-    // KeyTable. This is the case of replay where toKey exists but fromKey
-    // has not been deleted.
-    if (deleteFromKeyOnly()) {
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
-    } else if (createToKeyAndDeleteFromKey()) {
+    // For OmResponse with failure, this should do nothing. This method is
+    // not called in failure scenario in OM code.
+    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
+
       // If both from and toKeyName are equal do nothing
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
-          newKeyInfo);
+      if (!toKeyName.equals(fromKeyName)) {
+        String volumeName = renameKeyInfo.getVolumeName();
+        String bucketName = renameKeyInfo.getBucketName();
+        omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
+            omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
+        omMetadataManager.getKeyTable().putWithBatch(batchOperation,
+            omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
+            renameKeyInfo);
+      }
     }
-  }
-
-  @VisibleForTesting
-  public boolean deleteFromKeyOnly() {
-    return toKeyName == null && fromKeyName != null;
-  }
-
-  @VisibleForTesting
-  public boolean createToKeyAndDeleteFromKey() {
-    return toKeyName != null && !toKeyName.equals(fromKeyName);
   }
 }

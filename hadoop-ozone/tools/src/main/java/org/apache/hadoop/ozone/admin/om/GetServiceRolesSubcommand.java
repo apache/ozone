@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import picocli.CommandLine;
@@ -47,12 +46,8 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    try {
-      ClientProtocol client = parent.createClient(omServiceId);
-      getOmServerRoles(client.getOmRoleInfos());
-    } catch (OzoneClientException ex) {
-      System.out.printf("Error: %s", ex.getMessage());
-    }
+    ClientProtocol client = parent.createClient(omServiceId);
+    getOmServerRoles(client.getOmRoleInfos());
     return null;
   }
 

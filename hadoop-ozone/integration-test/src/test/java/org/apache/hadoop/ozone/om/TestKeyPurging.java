@@ -64,8 +64,7 @@ public class TestKeyPurging {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    // TODO enable when RATIS-788 is fixed
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setQuietMode(false);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

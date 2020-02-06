@@ -322,6 +322,15 @@ public class XceiverClientManager implements Closeable {
     )
     private long staleThreshold;
 
+    @Config(key = "max.outstanding.requests",
+        defaultValue = "100",
+        tags = {OZONE, PERFORMANCE},
+        description =
+            "Controls the maximum number of outstanding async requests that can"
+                + " be handled by the Standalone as well as Ratis client."
+    )
+    private int maxOutstandingRequests;
+
     public long getStaleThreshold(TimeUnit unit) {
       return unit.convert(staleThreshold, MILLISECONDS);
     }
@@ -334,6 +343,10 @@ public class XceiverClientManager implements Closeable {
     @VisibleForTesting
     public void setMaxSize(int maxSize) {
       this.maxSize = maxSize;
+    }
+
+    public int getMaxOutstandingRequests() {
+      return maxOutstandingRequests;
     }
 
   }

@@ -37,8 +37,6 @@ execute_robot_test s3g s3
 
 execute_robot_test scm scmcli
 
-execute_robot_test scm recon
-
 stop_docker_env
 
 generate_report

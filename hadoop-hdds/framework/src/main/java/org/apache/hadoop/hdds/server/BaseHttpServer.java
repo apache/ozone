@@ -17,29 +17,28 @@
 
 package org.apache.hadoop.hdds.server;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdds.conf.HddsConfServlet;
+import org.apache.hadoop.http.HttpConfig;
+import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.net.NetUtils;
+
+import org.eclipse.jetty.webapp.WebAppContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.servlet.http.HttpServlet;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Optional;
 import java.util.OptionalInt;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.HddsConfServlet;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.http.HttpConfig;
-import org.apache.hadoop.http.HttpServer2;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-
-import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
-import org.eclipse.jetty.webapp.WebAppContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Base class for HTTP server of the Ozone related components.
@@ -49,8 +48,6 @@ public abstract class BaseHttpServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseHttpServer.class);
   protected static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
-  protected static final String JETTY_BASETMPDIR =
-      "org.eclipse.jetty.webapp.basetempdir";
 
   private HttpServer2 httpServer;
   private final Configuration conf;
@@ -85,12 +82,12 @@ public abstract class BaseHttpServer {
           name, getSpnegoPrincipal(), getKeytabFile());
 
       final boolean xFrameEnabled = conf.getBoolean(
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED,
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED_DEFAULT);
+          DFSConfigKeys.DFS_XFRAME_OPTION_ENABLED,
+          DFSConfigKeys.DFS_XFRAME_OPTION_ENABLED_DEFAULT);
 
       final String xFrameOptionValue = conf.getTrimmed(
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE,
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE_DEFAULT);
+          DFSConfigKeys.DFS_XFRAME_OPTION_VALUE,
+          DFSConfigKeys.DFS_XFRAME_OPTION_VALUE_DEFAULT);
 
       builder.configureXFrame(xFrameEnabled).setXFrameOption(xFrameOptionValue);
 
@@ -117,13 +114,8 @@ public abstract class BaseHttpServer {
                 + "production!");
         httpServer.addServlet("profile", "/prof", ProfileServlet.class);
       }
-
-      String baseDir = conf.get(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
-      if (!StringUtils.isEmpty(baseDir)) {
-        httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
-        LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
-      }
     }
+
   }
 
   /**

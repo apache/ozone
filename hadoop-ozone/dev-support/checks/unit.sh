@@ -17,8 +17,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
 export MAVEN_OPTS="-Xmx4096m"
-mvn -B -DskipShade -Dskip.yarn -fae test -pl \!:hadoop-ozone-integration-test "$@"
-rc=$?
+mvn -B -DskipShade -Dskip.yarn -fn test -pl \!:hadoop-ozone-integration-test "$@"
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/unit"}
 mkdir -p "$REPORT_DIR"
@@ -29,4 +28,4 @@ source "$DIR/_mvn_unit_report.sh"
 if [[ -s "$REPORT_DIR/summary.txt" ]] ; then
     exit 1
 fi
-exit ${rc}
+exit 0

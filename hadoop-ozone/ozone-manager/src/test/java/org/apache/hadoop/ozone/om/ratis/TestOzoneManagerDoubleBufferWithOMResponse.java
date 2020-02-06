@@ -487,11 +487,12 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
    */
   private OMBucketDeleteResponse deleteBucket(String volumeName,
       String bucketName) {
-    return new OMBucketDeleteResponse(OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setDeleteBucketResponse(DeleteBucketResponse.newBuilder().build())
-        .build(), volumeName, bucketName);
+    return new OMBucketDeleteResponse(volumeName, bucketName,
+        OMResponse.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setDeleteBucketResponse(DeleteBucketResponse.newBuilder().build())
+            .build());
   }
 
 

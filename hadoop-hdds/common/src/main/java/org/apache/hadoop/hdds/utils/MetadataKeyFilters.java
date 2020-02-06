@@ -17,14 +17,13 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
-
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.ozone.OzoneConsts;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * An utility class to filter levelDB keys.
@@ -157,7 +156,7 @@ public final class MetadataKeyFilters {
 
       accept = !positivePrefixList.isEmpty() && positivePrefixList.stream()
           .anyMatch(prefix -> {
-            byte[] prefixBytes = StringUtils.string2Bytes(prefix);
+            byte[] prefixBytes = DFSUtil.string2Bytes(prefix);
             return prefixMatch(prefixBytes, currentKey);
           });
       if (accept) {
@@ -169,7 +168,7 @@ public final class MetadataKeyFilters {
 
       accept = !negativePrefixList.isEmpty() && negativePrefixList.stream()
           .allMatch(prefix -> {
-            byte[] prefixBytes = StringUtils.string2Bytes(prefix);
+            byte[] prefixBytes = DFSUtil.string2Bytes(prefix);
             return !prefixMatch(prefixBytes, currentKey);
           });
       if (accept) {

@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,8 +20,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
+import org.apache.hadoop.fs.GetSpaceUsed;
 import org.apache.hadoop.fs.StorageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +52,6 @@ public final class VolumeInfo {
   public static class Builder {
     private final Configuration conf;
     private final String rootDir;
-    private SpaceUsageCheckFactory usageCheckFactory;
     private StorageType storageType;
     private long configuredCapacity;
 
@@ -72,11 +70,6 @@ public final class VolumeInfo {
       return this;
     }
 
-    public Builder usageCheckFactory(SpaceUsageCheckFactory factory) {
-      this.usageCheckFactory = factory;
-      return this;
-    }
-
     public VolumeInfo build() throws IOException {
       return new VolumeInfo(this);
     }
@@ -87,7 +80,7 @@ public final class VolumeInfo {
     this.rootDir = b.rootDir;
     File root = new File(this.rootDir);
 
-    boolean succeeded = root.isDirectory() || root.mkdirs();
+    Boolean succeeded = root.isDirectory() || root.mkdirs();
 
     if (!succeeded) {
       LOG.error("Unable to create the volume root dir at : {}", root);
@@ -100,36 +93,25 @@ public final class VolumeInfo {
     this.configuredCapacity = (b.configuredCapacity != 0 ?
         b.configuredCapacity : -1);
 
-    SpaceUsageCheckFactory usageCheckFactory = b.usageCheckFactory;
-    if (usageCheckFactory == null) {
-      usageCheckFactory = SpaceUsageCheckFactory.create(b.conf);
-    }
-    SpaceUsageCheckParams checkParams =
-        usageCheckFactory.paramsFor(root);
-
-    this.usage = new VolumeUsage(checkParams);
+    this.usage = new VolumeUsage(root, b.conf);
   }
 
-  public long getCapacity() {
+  public long getCapacity() throws IOException {
     if (configuredCapacity < 0) {
       return usage.getCapacity();
     }
     return configuredCapacity;
   }
 
-  public long getAvailable() {
+  public long getAvailable() throws IOException {
     return usage.getAvailable();
   }
 
-  public long getScmUsed() {
-    return usage.getUsedSpace();
+  public long getScmUsed() throws IOException {
+    return usage.getScmUsed();
   }
 
-  void start() {
-    usage.start();
-  }
-
-  void shutdownUsageThread() {
+  protected void shutdownUsageThread() {
     usage.shutdown();
   }
 
@@ -139,6 +121,14 @@ public final class VolumeInfo {
 
   public StorageType getStorageType() {
     return this.storageType;
+  }
+
+  /**
+   * Only for testing. Do not use otherwise.
+   */
+  @VisibleForTesting
+  public void setScmUsageForTesting(GetSpaceUsed scmUsageForTest) {
+    usage.setScmUsageForTesting(scmUsageForTest);
   }
 
   /**

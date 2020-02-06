@@ -1,5 +1,5 @@
 ---
-title: 命令行接口
+title: Command Line Interface （测试）
 menu:
    main:
       weight: 3
@@ -21,7 +21,4 @@ menu:
   limitations under the License.
 -->
 
-
-{{<jumbotron title="OzoneShell">}}
-    Ozone shell 是用户与 Ozone 进行交互的主要接口，它提供了操作 Ozone 的命令行接口。
-{{</jumbotron>}}
+测试页面

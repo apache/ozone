@@ -20,8 +20,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -103,7 +102,7 @@ public class TestHddsVolumeChecker {
     LOG.info("Executing {}", testName.getMethodName());
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final HddsVolumeChecker checker =
-        new HddsVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+        new HddsVolumeChecker(new HdfsConfiguration(), new FakeTimer());
     checker.setDelegateChecker(new DummyChecker());
     final AtomicLong numCallbackInvocations = new AtomicLong(0);
 
@@ -145,7 +144,7 @@ public class TestHddsVolumeChecker {
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
     final HddsVolumeChecker checker =
-        new HddsVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+        new HddsVolumeChecker(new HdfsConfiguration(), new FakeTimer());
     checker.setDelegateChecker(new DummyChecker());
 
     Set<HddsVolume> failedVolumes = checker.checkAllVolumes(volumes);

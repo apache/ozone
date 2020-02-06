@@ -22,8 +22,8 @@ package org.apache.hadoop.hdds.utils.db;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyOptions;
@@ -184,11 +184,11 @@ public final class DBStoreBuilder {
             dbProfile.toString(), name);
       }
     }
-    addTable(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+    addTable(DFSUtil.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
         dbProfile.getColumnFamilyOptions());
     LOG.info("Using default column profile:{} for Table:{}",
         dbProfile.toString(),
-        StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY));
+        DFSUtil.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY));
   }
 
   private DBOptions getDbProfile() {

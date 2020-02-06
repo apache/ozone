@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_CHECKPOINTS_DIR_NAME;
+
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
@@ -30,8 +32,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.metrics2.util.MBeans;
 
 import com.google.common.base.Preconditions;
@@ -99,7 +101,7 @@ public class RDBStore implements DBStore {
 
       for (int x = 0; x < columnFamilyHandles.size(); x++) {
         handleTable.put(
-            StringUtils.bytes2String(columnFamilyHandles.get(x).getName()),
+            DFSUtil.bytes2String(columnFamilyHandles.get(x).getName()),
             columnFamilyHandles.get(x));
       }
 
@@ -117,8 +119,8 @@ public class RDBStore implements DBStore {
       }
 
       //create checkpoints directory if not exists.
-      checkpointsParentDir =
-              Paths.get(dbLocation.getParent(), "db.checkpoints").toString();
+      checkpointsParentDir = Paths.get(dbLocation.getParent(),
+          OM_DB_CHECKPOINTS_DIR_NAME).toString();
       File checkpointsDir = new File(checkpointsParentDir);
       if (!checkpointsDir.exists()) {
         boolean success = checkpointsDir.mkdir();
@@ -128,7 +130,7 @@ public class RDBStore implements DBStore {
       }
 
       //Initialize checkpoint manager
-      checkPointManager = new RDBCheckpointManager(db, "rdb");
+      checkPointManager = new RDBCheckpointManager(db, "om");
       rdbMetrics = RDBMetrics.create();
 
     } catch (RocksDBException e) {

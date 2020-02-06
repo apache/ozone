@@ -35,7 +35,7 @@ import java.util.Map;
 /**
  * Creates pipeline based on replication type.
  */
-public class PipelineFactory {
+public final class PipelineFactory {
 
   private Map<ReplicationType, PipelineProvider> providers;
 
@@ -47,9 +47,6 @@ public class PipelineFactory {
     providers.put(ReplicationType.RATIS,
         new RatisPipelineProvider(nodeManager, stateManager, conf,
             eventPublisher));
-  }
-
-  protected PipelineFactory() {
   }
 
   @VisibleForTesting
@@ -75,15 +72,5 @@ public class PipelineFactory {
 
   public void shutdown() {
     providers.values().forEach(provider -> provider.shutdown());
-  }
-
-  @VisibleForTesting
-  public Map<ReplicationType, PipelineProvider> getProviders() {
-    return providers;
-  }
-
-  protected void setProviders(
-      Map<ReplicationType, PipelineProvider> providers) {
-    this.providers = providers;
   }
 }

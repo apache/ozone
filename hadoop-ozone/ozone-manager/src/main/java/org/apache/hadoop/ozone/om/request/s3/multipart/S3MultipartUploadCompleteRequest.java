@@ -229,14 +229,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           // This is a newly added key, it does not have any versions.
           OmKeyLocationInfoGroup keyLocationInfoGroup = new
               OmKeyLocationInfoGroup(0, partLocationInfos);
-
-          // Get the objectID of the key from OpenKeyTable
-          OmKeyInfo dbOpenKeyInfo = omMetadataManager.getOpenKeyTable()
-              .get(multipartKey);
-
           // A newly created key, this is the first version.
-          OmKeyInfo.Builder builder =
-              new OmKeyInfo.Builder().setVolumeName(volumeName)
+          omKeyInfo = new OmKeyInfo.Builder().setVolumeName(volumeName)
               .setBucketName(bucketName).setKeyName(keyName)
               .setReplicationFactor(factor).setReplicationType(type)
               .setCreationTime(keyArgs.getModificationTime())
@@ -244,14 +238,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               .setDataSize(dataSize)
               .setOmKeyLocationInfos(
                   Collections.singletonList(keyLocationInfoGroup))
-              .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
-          // Check if db entry has ObjectID. This check is required because
-          // it is possible that between multipart key uploads and complete,
-          // we had an upgrade.
-          if (dbOpenKeyInfo.getObjectID() != 0) {
-            builder.setObjectID(dbOpenKeyInfo.getObjectID());
-          }
-          omKeyInfo = builder.build();
+              .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+              .build();
         } else {
           // Already a version exists, so we should add it as a new version.
           // But now as versioning is not supported, just following the commit
@@ -261,7 +249,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           omKeyInfo.setModificationTime(keyArgs.getModificationTime());
           omKeyInfo.setDataSize(dataSize);
         }
-        omKeyInfo.setUpdateID(transactionLogIndex);
 
         //Find all unused parts.
 

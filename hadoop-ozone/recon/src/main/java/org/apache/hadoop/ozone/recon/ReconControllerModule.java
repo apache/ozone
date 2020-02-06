@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.hdds.scm.client.ContainerOperationClient.newContainerRpcClient;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_AUTO_COMMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_CONNECTION_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_DB_DRIVER;
@@ -33,7 +32,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQ
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
@@ -41,14 +39,12 @@ import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
-import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -89,9 +85,7 @@ public class ReconControllerModule extends AbstractModule {
 
     bind(ReconTaskController.class)
         .to(ReconTaskControllerImpl.class).in(Singleton.class);
-    bind(StorageContainerServiceProvider.class)
-        .to(StorageContainerServiceProviderImpl.class).in(Singleton.class);
-    bind(ReconStorageContainerManagerFacade.class).in(Singleton.class);
+    bind(ReconStorageContainerManager.class).in(Singleton.class);
   }
 
   @Provides
@@ -108,18 +102,6 @@ public class ReconControllerModule extends AbstractModule {
       LOG.error("Error in provisioning OzoneManagerProtocol ", ioEx);
     }
     return ozoneManagerClient;
-  }
-
-  @Provides
-  StorageContainerLocationProtocol getSCMProtocol(
-      final OzoneConfiguration configuration) {
-    StorageContainerLocationProtocol storageContainerLocationProtocol = null;
-    try {
-      storageContainerLocationProtocol = newContainerRpcClient(configuration);
-    } catch (IOException e) {
-      LOG.error("Error in provisioning StorageContainerLocationProtocol ", e);
-    }
-    return storageContainerLocationProtocol;
   }
 
   @Provides

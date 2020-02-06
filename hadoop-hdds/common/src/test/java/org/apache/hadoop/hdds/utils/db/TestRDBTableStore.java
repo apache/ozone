@@ -28,7 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdfs.DFSUtil;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
@@ -49,7 +49,7 @@ import org.rocksdb.StatsLevel;
 public class TestRDBTableStore {
   private static int count = 0;
   private final List<String> families =
-      Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+      Arrays.asList(DFSUtil.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth", "Seventh",
@@ -233,7 +233,7 @@ public class TestRDBTableStore {
     rocksDBOptions.setCreateIfMissing(true);
     rocksDBOptions.setCreateMissingColumnFamilies(true);
 
-    String tableName = StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
+    String tableName = DFSUtil.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
 
     Set<TableConfig> configSet = new HashSet<>();
     TableConfig newConfig = new TableConfig(tableName,

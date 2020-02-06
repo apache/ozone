@@ -26,15 +26,18 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
@@ -48,6 +51,9 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -85,6 +91,7 @@ public class BasicRootedOzoneClientAdapterImpl
   private ReplicationType replicationType;
   private ReplicationFactor replicationFactor;
   private boolean securityEnabled;
+  private int configuredDnPort;
 
   /**
    * Create new OzoneClientAdapter implementation.
@@ -173,6 +180,9 @@ public class BasicRootedOzoneClientAdapterImpl
       proxy = objectStore.getClientProxy();
       this.replicationType = ReplicationType.valueOf(replicationTypeConf);
       this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);
+      this.configuredDnPort = conf.getInt(
+          OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+          OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
@@ -645,7 +655,61 @@ public class BasicRootedOzoneClientAdapterImpl
         status.getPermission().toShort(),
         status.getOwner(),
         status.getGroup(),
-        status.getPath()
+        status.getPath(),
+        getBlockLocations(status)
     );
+  }
+
+  /**
+   * Helper method to get List of BlockLocation from OM Key info.
+   * @param fileStatus Ozone key file status.
+   * @return list of block locations.
+   */
+  private BlockLocation[] getBlockLocations(OzoneFileStatus fileStatus) {
+
+    if (fileStatus == null) {
+      return new BlockLocation[0];
+    }
+
+    OmKeyInfo keyInfo = fileStatus.getKeyInfo();
+    if (keyInfo == null || CollectionUtils.isEmpty(
+        keyInfo.getKeyLocationVersions())) {
+      return new BlockLocation[0];
+    }
+    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups =
+        keyInfo.getKeyLocationVersions();
+    if (CollectionUtils.isEmpty(omKeyLocationInfoGroups)) {
+      return new BlockLocation[0];
+    }
+
+    OmKeyLocationInfoGroup omKeyLocationInfoGroup =
+        keyInfo.getLatestVersionLocations();
+    BlockLocation[] blockLocations = new BlockLocation[
+        omKeyLocationInfoGroup.getBlocksLatestVersionOnly().size()];
+
+    int i = 0;
+    for (OmKeyLocationInfo omKeyLocationInfo :
+        omKeyLocationInfoGroup.getBlocksLatestVersionOnly()) {
+      List<String> hostList = new ArrayList<>();
+      List<String> nameList = new ArrayList<>();
+      omKeyLocationInfo.getPipeline().getNodes()
+          .forEach(dn -> {
+            hostList.add(dn.getHostName());
+            int port = dn.getPort(
+                DatanodeDetails.Port.Name.STANDALONE).getValue();
+            if (port == 0) {
+              port = configuredDnPort;
+            }
+            nameList.add(dn.getHostName() + ":" + port);
+          });
+
+      String[] hosts = hostList.toArray(new String[hostList.size()]);
+      String[] names = nameList.toArray(new String[nameList.size()]);
+      BlockLocation blockLocation = new BlockLocation(
+          names, hosts, omKeyLocationInfo.getOffset(),
+          omKeyLocationInfo.getLength());
+      blockLocations[i++] = blockLocation;
+    }
+    return blockLocations;
   }
 }

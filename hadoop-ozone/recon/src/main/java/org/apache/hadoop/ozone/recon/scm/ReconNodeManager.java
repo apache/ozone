@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,29 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.fs;
+package org.apache.hadoop.ozone.recon.scm;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
-
-import java.io.UncheckedIOException;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 
 /**
- * Interface for implementations that can tell how much space
- * is used in a directory.
+ * Recon's version of SCM Node Manager.
+ * TODO This is just an initial implementation. Will be revisited in future.
  */
-@InterfaceAudience.Private
-@InterfaceStability.Evolving
-public interface SpaceUsageSource {
+public class ReconNodeManager extends SCMNodeManager {
 
-  /**
-   * @return space usage in bytes
-   * @throws UncheckedIOException if I/O exception occurs while calculating
-   * space use info
-   */
-  long getUsedSpace();
-
-  long getCapacity();
-
-  long getAvailable();
+  public ReconNodeManager(OzoneConfiguration conf,
+                          SCMStorageConfig scmStorageConfig,
+                          EventPublisher eventPublisher,
+                          NetworkTopology networkTopology) {
+    super(conf, scmStorageConfig, eventPublisher, networkTopology);
+  }
 }

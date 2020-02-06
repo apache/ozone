@@ -120,7 +120,6 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         multipartKeyInfo = omMetadataManager
             .getMultipartInfoTable().get(multipartKey);
 
-        multipartKeyInfo.setUpdateID(transactionLogIndex);
 
         // Update cache of openKeyTable and multipartInfo table.
         // No need to add the cache entries to delete table, as the entries

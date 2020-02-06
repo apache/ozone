@@ -39,19 +39,10 @@ import javax.annotation.Nonnull;
 public class OMKeyDeleteResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
 
-  public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo) {
+  public OMKeyDeleteResponse(@Nullable OmKeyInfo omKeyInfo,
+      @Nonnull OMResponse omResponse) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
-  }
-
-  /**
-   * For when the request is not successful or it is a replay transaction.
-   * For a successful request, the other constructor should be used.
-   */
-  public OMKeyDeleteResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override

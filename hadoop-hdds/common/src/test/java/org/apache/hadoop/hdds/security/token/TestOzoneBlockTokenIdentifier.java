@@ -45,6 +45,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
@@ -162,12 +163,12 @@ public class TestOzoneBlockTokenIdentifier {
     byte[] signedToken = signTokenAsymmetric(tokenId, privateKey);
 
 
-    Token<OzoneBlockTokenIdentifier> token = new Token(tokenId.getBytes(),
+    Token<BlockTokenIdentifier> token = new Token(tokenId.getBytes(),
         signedToken, tokenId.getKind(), new Text("host:port"));
 
     String encodeToUrlString = token.encodeToUrlString();
 
-    Token<OzoneBlockTokenIdentifier>decodedToken = new Token();
+    Token<BlockTokenIdentifier>decodedToken = new Token();
     decodedToken.decodeFromUrlString(encodeToUrlString);
 
     OzoneBlockTokenIdentifier decodedTokenId = new OzoneBlockTokenIdentifier();

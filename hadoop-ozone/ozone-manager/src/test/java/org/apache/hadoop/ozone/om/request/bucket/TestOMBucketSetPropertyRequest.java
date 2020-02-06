@@ -45,6 +45,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
+
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
         bucketName, true);
 
@@ -61,6 +62,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+
 
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
         bucketName, true);
@@ -83,6 +85,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
+
   }
 
   @Test
@@ -91,8 +94,10 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
+
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
         bucketName, true);
+
 
     OMBucketSetPropertyRequest omBucketSetPropertyRequest =
         new OMBucketSetPropertyRequest(omRequest);
@@ -118,34 +123,5 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
                 .setIsVersionEnabled(isVersionEnabled).build()))
         .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
         .setClientId(UUID.randomUUID().toString()).build();
-  }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-
-    // Create request to enable versioning
-    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
-        bucketName, true);
-    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
-        new OMBucketSetPropertyRequest(omRequest);
-
-    // Execute the original request
-    omBucketSetPropertyRequest.preExecute(ozoneManager);
-    omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
-
-    // Replay the transaction - Execute the same request again
-    OMClientResponse omClientResponse =
-        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
   }
 }
