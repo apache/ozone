@@ -80,8 +80,8 @@ public abstract class BaseHttpServer {
       // CommonConfigurationKeysPublic.HADOOP_PROMETHEUS_ENABLED when possible.
       conf.setBoolean("hadoop.prometheus.endpoint.enabled", false);
 
-      HttpServer2.Builder builder = HddsUtils.newHttpServer2BuilderForOzone(conf,
-          httpAddress, httpsAddress,
+      HttpServer2.Builder builder = HddsUtils.newHttpServer2BuilderForOzone(
+          conf, httpAddress, httpsAddress,
           name, getSpnegoPrincipal(), getKeytabFile());
 
       final boolean xFrameEnabled = conf.getBoolean(
