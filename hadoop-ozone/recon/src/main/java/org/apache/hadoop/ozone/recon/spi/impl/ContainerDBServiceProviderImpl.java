@@ -141,7 +141,7 @@ public class ContainerDBServiceProviderImpl
       this.containerKeyCountTable = containerDbStore
           .getTable(CONTAINER_KEY_COUNT_TABLE, Long.class, Long.class);
     } catch (IOException e) {
-      LOG.error("Unable to create Container Key tables." + e);
+      LOG.error("Unable to create Container Key tables. {}", e);
     }
   }
   /**

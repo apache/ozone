@@ -72,10 +72,9 @@ public abstract class ReconRestServletModule extends ServletModule {
       String resourcePath = pkg.replace(".", "/");
       URL resource = getClass().getClassLoader().getResource(resourcePath);
       if (resource != null) {
-        LOG.info("rest(" + paths + ").packages(" + pkg + ")");
+        LOG.info("rest({}).packages({})", paths, pkg);
       } else {
-        LOG.info("No Beans in '" + pkg + "' found. Requests " + paths
-            + " will fail.");
+        LOG.info("No Beans in '{}' found. Requests {} will fail.", pkg, paths);
       }
     }
 

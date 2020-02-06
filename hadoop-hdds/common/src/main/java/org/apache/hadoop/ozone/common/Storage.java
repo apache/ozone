@@ -201,20 +201,20 @@ public abstract class Storage {
     try { // check that storage exists
       if (!root.exists()) {
         // storage directory does not exist
-        LOG.warn("Storage directory " + rootPath + " does not exist");
+        LOG.warn("Storage directory {} does not exist", rootPath);
         return StorageState.NON_EXISTENT;
       }
       // or is inaccessible
       if (!root.isDirectory()) {
-        LOG.warn(rootPath + "is not a directory");
+        LOG.warn("{} is not a directory", rootPath);
         return StorageState.NON_EXISTENT;
       }
       if (!FileUtil.canWrite(root)) {
-        LOG.warn("Cannot access storage directory " + rootPath);
+        LOG.warn("Cannot access storage directory {}", rootPath);
         return StorageState.NON_EXISTENT;
       }
     } catch (SecurityException ex) {
-      LOG.warn("Cannot access storage directory " + rootPath, ex);
+      LOG.warn("Cannot access storage directory {}", rootPath, ex);
       return StorageState.NON_EXISTENT;
     }
 

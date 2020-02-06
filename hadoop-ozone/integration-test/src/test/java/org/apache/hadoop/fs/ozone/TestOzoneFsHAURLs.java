@@ -159,8 +159,8 @@ public class TestOzoneFsHAURLs {
     String omLeaderAddrKey = OmUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
     String omLeaderAddr = conf.get(omLeaderAddrKey);
-    LOG.info("OM leader: nodeId=" + omNodeId + ", " +
-        omLeaderAddrKey + "=" + omLeaderAddr);
+    LOG.info("OM leader: nodeId={}, {}={}", omNodeId, omLeaderAddrKey,
+            omLeaderAddr);
     return omLeaderAddr;
   }
 
