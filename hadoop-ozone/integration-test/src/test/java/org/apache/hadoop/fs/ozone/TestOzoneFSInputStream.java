@@ -22,18 +22,14 @@ import java.io.IOException;
 
 import java.nio.ByteBuffer;
 
-
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -63,26 +59,24 @@ public class TestOzoneFSInputStream {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 10,
-        StorageUnit.MB);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
+        .setNumDatanodes(3)
+        .setChunkSize(2) // MB
+        .setBlockSize(8) // MB
+        .setStreamBufferFlushSize(2) // MB
+        .setStreamBufferMaxSize(4) // MB
         .build();
     cluster.waitForClusterToBeReady();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
 
-    // Fetch the host and port for File System init
-    DatanodeDetails datanodeDetails = cluster.getHddsDatanodes().get(0)
-        .getDatanodeDetails();
-
     // Set the fs.defaultFS and start the filesystem
     String uri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, uri);
     fs =  FileSystem.get(conf);
-    int fileLen = 100 * 1024 * 1024;
+    int fileLen = 30 * 1024 * 1024;
     data = DFSUtil.string2Bytes(RandomStringUtils.randomAlphanumeric(fileLen));
     filePath = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
     try (FSDataOutputStream stream = fs.create(filePath)) {

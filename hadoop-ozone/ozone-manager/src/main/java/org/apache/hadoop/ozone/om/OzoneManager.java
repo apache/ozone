@@ -335,12 +335,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_OM_USER_MAX_VOLUME + " value should be greater than zero");
 
     if (omStorage.getState() != StorageState.INITIALIZED) {
-      throw new OMException("OM not initialized.",
+      throw new OMException("OM not initialized, current OM storage state: " +
+          omStorage.getState().name() + ". Please ensure 'ozone om --init' "
+          + "command is executed once before starting the OM service.",
           ResultCodes.OM_NOT_INITIALIZED);
     }
 
-    // Read configuration and set values.
     ozAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    String omSPN = UserGroupInformation.getCurrentUser().getUserName();
+    if (!ozAdmins.contains(omSPN)) {
+      ozAdmins.add(omSPN);
+    }
     omMetaDir = OMStorage.getOmDbDir(configuration);
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
@@ -1530,18 +1535,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void createVolume(OmVolumeArgs args) throws IOException {
     try {
-      if(isAclEnabled) {
-        if (!ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) && 
-            !ozAdmins.contains(ProtobufRpcEngine.Server.getRemoteUser()
-                .getUserName())) {
-          LOG.error("Only admin users are authorized to create " +
-              "Ozone volumes. User :{} is not an admin.",
-              ProtobufRpcEngine.Server.getRemoteUser().getUserName());
-          throw new OMException("Only admin users are authorized to create " +
-              "Ozone volumes.", ResultCodes.PERMISSION_DENIED);
-        }
-      }
       metrics.incNumVolumeCreates();
+      checkAdmin();
       volumeManager.createVolume(args);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_VOLUME,
           (args == null) ? null : args.toAuditMap()));
@@ -1838,16 +1833,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<OmVolumeArgs> listAllVolumes(String prefix, String prevKey, int
       maxKeys) throws IOException {
-    if(isAclEnabled) {
-      if (!ozAdmins.contains(ProtobufRpcEngine.Server.
-          getRemoteUser().getUserName())
-          && !ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-        LOG.error("Only admin users are authorized to create " +
-            "Ozone volumes.");
-        throw new OMException("Only admin users are authorized to create " +
-            "Ozone volumes.", ResultCodes.PERMISSION_DENIED);
-      }
-    }
     boolean auditSuccess = true;
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.PREV_KEY, prevKey);
@@ -1856,6 +1841,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USERNAME, null);
     try {
       metrics.incNumVolumeLists();
+      checkAdmin();
       return volumeManager.listVolumes(null, prefix, prevKey, maxKeys);
     } catch (Exception ex) {
       metrics.incNumVolumeListFails();
@@ -1867,6 +1853,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if(auditSuccess){
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_VOLUMES,
             auditMap));
+      }
+    }
+  }
+
+  private void checkAdmin() throws OMException {
+    if(isAclEnabled) {
+      if (!ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
+          !ozAdmins.contains(ProtobufRpcEngine.Server.getRemoteUser()
+              .getUserName())) {
+        LOG.error("Only admin users are authorized to create or list " +
+                "Ozone volumes. User :{} is not an admin.",
+            ProtobufRpcEngine.Server.getRemoteUser().getUserName());
+        throw new OMException("Only admin users are authorized to create " +
+            "or list Ozone volumes.", ResultCodes.PERMISSION_DENIED);
       }
     }
   }

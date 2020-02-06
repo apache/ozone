@@ -69,11 +69,12 @@ public class TestOMBucketSetPropertyResponse {
     OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
         volumeName, bucketName);
     OMBucketSetPropertyResponse omBucketCreateResponse =
-        new OMBucketSetPropertyResponse(omBucketInfo, OMResponse.newBuilder()
+        new OMBucketSetPropertyResponse(OMResponse.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
             .setStatus(OzoneManagerProtocolProtos.Status.OK)
             .setCreateBucketResponse(
-                CreateBucketResponse.newBuilder().build()).build());
+                CreateBucketResponse.newBuilder().build()).build(),
+            omBucketInfo);
 
     omBucketCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 

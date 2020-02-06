@@ -75,7 +75,7 @@ import org.slf4j.LoggerFactory;
  * per pipeline is met or not.
  *
  */
-public class SCMSafeModeManager {
+public class SCMSafeModeManager implements SafeModeManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMSafeModeManager.class);

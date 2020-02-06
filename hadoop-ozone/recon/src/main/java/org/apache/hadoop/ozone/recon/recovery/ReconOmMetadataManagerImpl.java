@@ -87,7 +87,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       addOMTablesAndCodecs(dbStoreBuilder);
       DBStore newStore = dbStoreBuilder.build();
       setStore(newStore);
-      LOG.info("Created OM DB snapshot at {}.",
+      LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
       LOG.error("Unable to initialize Recon OM DB snapshot store.",

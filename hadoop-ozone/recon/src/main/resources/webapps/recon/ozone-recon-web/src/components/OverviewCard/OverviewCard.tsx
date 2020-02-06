@@ -32,13 +32,15 @@ interface OverviewCardProps extends RouteComponentProps<any> {
   loading?: boolean;
   linkToUrl?: string;
   capacityPercent?: number;
+  error?: boolean;
 }
 
 const defaultProps = {
   hoverable: false,
   loading: false,
   capacityPercent: -1,
-  linkToUrl: ''
+  linkToUrl: '',
+  error: false
 };
 
 interface OverviewCardWrapperProps {
@@ -62,8 +64,9 @@ class OverviewCard extends React.Component<OverviewCardProps> {
   static defaultProps = defaultProps;
 
   render() {
-    let {icon, data, title, loading, hoverable, capacityPercent, linkToUrl} = this.props;
+    let {icon, data, title, loading, hoverable, capacityPercent, linkToUrl, error} = this.props;
     let meta = <Meta title={data} description={title}/>;
+    const errorClass = error ? 'card-error' : '';
     if (capacityPercent && capacityPercent > -1) {
       meta = <div className="ant-card-percentage">
         {meta}
@@ -74,7 +77,7 @@ class OverviewCard extends React.Component<OverviewCardProps> {
 
     return (
         <OverviewCardWrapper linkToUrl={linkToUrl}>
-          <Card className="overview-card" loading={loading} hoverable={hoverable}>
+          <Card className={`overview-card ${errorClass}`} loading={loading} hoverable={hoverable}>
             <Row type="flex" justify="space-between">
               <Col span={18}>
                 <Row>

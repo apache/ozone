@@ -16,6 +16,8 @@
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
+OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
@@ -123,7 +125,6 @@ CAPACITY-SCHEDULER.XML_yarn.scheduler.capacity.queue-mappings-override.enable=fa
 
 OZONE_DATANODE_SECURE_USER=root
 KEYTAB_DIR=/etc/security/keytabs
-KERBEROS_KEYTABS=dn om scm HTTP testuser s3g rm nm yarn jhs hadoop spark
 KERBEROS_KEYSTORES=hadoop
 KERBEROS_SERVER=kdc
 JAVA_HOME=/usr/lib/jvm/jre

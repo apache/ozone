@@ -126,19 +126,13 @@ public final class OzoneConfigKeys {
       "ozone.client.stream.buffer.flush.size";
 
   public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE_DEFAULT =
-      "64MB";
+      "16MB";
 
   public static final String OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE =
       "ozone.client.stream.buffer.max.size";
 
   public static final String OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE_DEFAULT =
-      "128MB";
-
-  public static final String OZONE_CLIENT_WATCH_REQUEST_TIMEOUT =
-      "ozone.client.watch.request.timeout";
-
-  public static final String OZONE_CLIENT_WATCH_REQUEST_TIMEOUT_DEFAULT =
-      "30s";
+      "32MB";
 
   public static final String OZONE_CLIENT_MAX_RETRIES =
       "ozone.client.max.retries";
@@ -269,11 +263,6 @@ public final class OzoneConfigKeys {
 
   public static final String DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
       "dfs.container.ratis.datanode.storage.dir";
-  public static final String DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_KEY =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_KEY;
-  public static final TimeDuration
-      DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT;
   public static final String DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY =
       ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY;
   public static final int DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT =
@@ -317,21 +306,11 @@ public final class OzoneConfigKeys {
       ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP;
   public static final int DFS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT =
       ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS;
-  public static final int
-      DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_NUM_PENDING_REQUESTS_DEFAULT;
   public static final String DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT =
       ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT;
   public static final String
       DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT =
       ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT;
-  public static final String DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_KEY =
-      ScmConfigKeys.DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_KEY;
-  public static final TimeDuration
-      DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_DEFAULT;
   public static final String
       DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
       ScmConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
@@ -342,12 +321,6 @@ public final class OzoneConfigKeys {
       ScmConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY;
   public static final long DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
       ScmConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
-
-  public static final String DFS_RATIS_SERVER_FAILURE_DURATION_KEY =
-      ScmConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_KEY;
-  public static final TimeDuration
-      DFS_RATIS_SERVER_FAILURE_DURATION_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_DEFAULT;
 
   public static final String HDDS_DATANODE_PLUGINS_KEY =
       "hdds.datanode.plugins";
@@ -448,6 +421,8 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_LIST_TRASH_KEYS_MAX =
       "ozone.client.list.trash.keys.max";
   public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
+
+  public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 
   /**
    * There is no need to instantiate this class.

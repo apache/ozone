@@ -204,14 +204,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.leader.num.pending.requests</name>
-    <value>4096</value>
-    <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum number of pending requests after which the leader
-      starts rejecting requests from client.
-    </description>
-  </property>
-  <property>
     <name>dfs.container.ratis.leader.pending.bytes.limit</name>
     <value>1GB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
@@ -253,14 +245,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.client.request.timeout.duration</name>
-    <value>3s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for ratis client request.It should be
-        set greater than leader election timeout in Ratis.
-    </description>
-  </property>
-  <property>
     <name>dfs.ratis.client.request.max.retries</name>
     <value>180</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
@@ -280,26 +264,11 @@
     <description>Retry Cache entry timeout for ratis server.</description>
   </property>
   <property>
-    <name>dfs.ratis.server.request.timeout.duration</name>
-    <value>3s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for ratis server request.</description>
-  </property>
-  <property>
     <name>dfs.ratis.leader.election.minimum.timeout.duration</name>
     <value>5s</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for ratis leader election.
         Default is 5s.
-    </description>
-  </property>
-  <property>
-    <name>dfs.ratis.server.failure.duration</name>
-    <value>120s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for ratis server failure detection,
-      once the threshold has reached, the ratis state machine will be informed
-      about the failure in the ratis ring
     </description>
   </property>
   <property>
@@ -419,7 +388,7 @@
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.size</name>
-    <value>64MB</value>
+    <value>16MB</value>
     <tag>OZONE, CLIENT</tag>
     <description>Size which determines at what buffer position , a partial
       flush will be initiated during write. It should be ideally a multiple
@@ -428,19 +397,11 @@
   </property>
   <property>
     <name>ozone.client.stream.buffer.max.size</name>
-    <value>128MB</value>
+    <value>32MB</value>
     <tag>OZONE, CLIENT</tag>
     <description>Size which determines at what buffer position,
       write call be blocked till acknowledgement of the first partial flush
       happens by all servers.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.watch.request.timeout</name>
-    <value>30s</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Timeout for the watch API in Ratis client to acknowledge
-      a particular request getting replayed to all servers.
     </description>
   </property>
   <property>
@@ -483,10 +444,8 @@
     <value></value>
     <tag>OM, HA</tag>
     <description>
-      Comma-separated list of OM service Ids.
-
-      If not set, the default value of "omServiceIdDefault" is assigned as the
-      OM service ID.
+      Comma-separated list of OM service Ids. This property allows the client
+      to figure out quorum of OzoneManager address.
     </description>
   </property>
   <property>
@@ -743,7 +702,7 @@
   </property>
   <property>
     <name>ozone.scm.chunk.size</name>
-    <value>16MB</value>
+    <value>4MB</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
       The chunk size for reading/writing chunk operations in bytes.
@@ -2457,6 +2416,21 @@
     <tag>OZONE, CLIENT</tag>
     <description>
       The maximum number of keys to return for a list trash request.
+    </description>
+  </property>
+  <property>
+    <name>ozone.http.basedir</name>
+    <value></value>
+    <tag>OZONE, OM, SCM, MANAGEMENT</tag>
+    <description>
+      The base dir for HTTP Jetty server to extract contents. If this property
+      is not configured, by default, Jetty will create a directory inside the
+      directory named by the java.io.tmpdir System property（/tmp by default）.
+      While in production environment, it's strongly suggested to instruct Jetty
+      to use a different parent directory by setting this property to the name
+      of the desired parent directory. The value of the property will be used to
+      set Jetty context attribute 'org.eclipse.jetty.webapp.basetempdir'.
+      The directory named by this property must exist and be writeable.
     </description>
   </property>
 </configuration>

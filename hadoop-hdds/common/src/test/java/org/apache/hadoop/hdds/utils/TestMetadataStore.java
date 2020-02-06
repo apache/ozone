@@ -16,28 +16,6 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import com.google.common.collect.Lists;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.DFSUtilClient;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.slf4j.event.Level;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -50,13 +28,32 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.test.GenericTestUtils;
+
+import com.google.common.collect.Lists;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import static org.apache.hadoop.test.PlatformAssumptions.assumeNotWindows;
+import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import static org.junit.runners.Parameterized.Parameters;
+import org.slf4j.event.Level;
 
 /**
  * Test class for ozone metadata store.
@@ -227,12 +224,12 @@ public class TestMetadataStore {
 
   private byte[] getBytes(String str) {
     return str == null ? null :
-        DFSUtilClient.string2Bytes(str);
+        StringUtils.string2Bytes(str);
   }
 
   private String getString(byte[] bytes) {
     return bytes == null ? null :
-        DFSUtilClient.bytes2String(bytes);
+        StringUtils.bytes2String(bytes);
   }
 
   @Test
@@ -420,20 +417,20 @@ public class TestMetadataStore {
   @Test
   public void testGetSequentialRangeKVs() throws IOException {
     MetadataKeyFilter suffixFilter = (preKey, currentKey, nextKey)
-        -> DFSUtil.bytes2String(currentKey).endsWith("2");
+        -> StringUtils.bytes2String(currentKey).endsWith("2");
     // Suppose to return a2 and b2
     List<Map.Entry<byte[], byte[]>> result =
         store.getRangeKVs(null, MAX_GETRANGE_LENGTH, suffixFilter);
     assertEquals(2, result.size());
-    assertEquals("a2", DFSUtil.bytes2String(result.get(0).getKey()));
-    assertEquals("b2", DFSUtil.bytes2String(result.get(1).getKey()));
+    assertEquals("a2", StringUtils.bytes2String(result.get(0).getKey()));
+    assertEquals("b2", StringUtils.bytes2String(result.get(1).getKey()));
 
     // Suppose to return just a2, because when it iterates to a3,
     // the filter no long matches and it should stop from there.
     result = store.getSequentialRangeKVs(null,
         MAX_GETRANGE_LENGTH, suffixFilter);
     assertEquals(1, result.size());
-    assertEquals("a2", DFSUtil.bytes2String(result.get(0).getKey()));
+    assertEquals("a2", StringUtils.bytes2String(result.get(0).getKey()));
   }
 
   @Test
