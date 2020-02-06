@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_SUFFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.PIPELINE_DB_SUFFIX;
 
 /**
  * Recon Server constants file.
@@ -29,8 +30,7 @@ public final class ReconConstants {
     // Never Constructed
   }
 
-  public static final String RECON_CONTAINER_DB = "recon-" +
-      CONTAINER_DB_SUFFIX;
+  public static final String RECON_CONTAINER_KEY_DB = "recon-container-key.db";
 
   public static final String CONTAINER_COUNT_KEY = "totalCount";
 
@@ -43,9 +43,14 @@ public final class ReconConstants {
   public static final String CONTAINER_KEY_COUNT_TABLE =
       "containerKeyCountTable";
 
-  public static final String FETCH_ALL = "-1";
+  // By default, limit the number of results returned
+  public static final String DEFAULT_FETCH_COUNT = "1000";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
   public static final String RECON_QUERY_LIMIT = "limit";
 
+  public static final String RECON_SCM_CONTAINER_DB =
+      "recon-" + CONTAINER_DB_SUFFIX;
+  public static final String RECON_SCM_PIPELINE_DB = "recon-"
+      + PIPELINE_DB_SUFFIX;
 }

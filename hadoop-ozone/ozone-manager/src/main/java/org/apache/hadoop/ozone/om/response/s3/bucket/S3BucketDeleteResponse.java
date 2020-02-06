@@ -19,12 +19,10 @@ package org.apache.hadoop.ozone.om.response.s3.bucket;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
@@ -34,22 +32,30 @@ public class S3BucketDeleteResponse extends OMClientResponse {
 
   private String s3BucketName;
   private String volumeName;
-  public S3BucketDeleteResponse(@Nullable String s3BucketName,
-      @Nullable String volumeName, @Nonnull OMResponse omResponse) {
+
+  public S3BucketDeleteResponse(@Nonnull OMResponse omResponse,
+      @Nonnull String s3BucketName, @Nonnull String volumeName) {
     super(omResponse);
     this.s3BucketName = s3BucketName;
     this.volumeName = volumeName;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public S3BucketDeleteResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      omMetadataManager.getBucketTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getBucketKey(volumeName, s3BucketName));
-      omMetadataManager.getS3Table().deleteWithBatch(batchOperation,
-          s3BucketName);
-    }
+    omMetadataManager.getBucketTable().deleteWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(volumeName, s3BucketName));
+    omMetadataManager.getS3Table().deleteWithBatch(batchOperation,
+        s3BucketName);
   }
 }

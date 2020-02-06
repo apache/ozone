@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-FROM elek/ozone-build:20191106-1
+FROM apache/ozone-build
 USER root
 ADD entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

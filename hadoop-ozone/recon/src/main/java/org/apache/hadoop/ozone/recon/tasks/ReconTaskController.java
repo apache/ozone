@@ -64,7 +64,12 @@ public interface ReconTaskController {
   ReconTaskStatusDao getReconTaskStatusDao();
 
   /**
-   * Stop the tasks. Start API is not needed since it is implicit.
+   * Start the task scheduler.
+   */
+  void start();
+
+  /**
+   * Stop the task scheduler.
    */
   void stop();
 }

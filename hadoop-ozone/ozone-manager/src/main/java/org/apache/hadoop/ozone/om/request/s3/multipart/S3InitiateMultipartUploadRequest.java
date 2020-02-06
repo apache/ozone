@@ -46,7 +46,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -142,10 +141,14 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // behavior is also like this, even when key exists in a bucket, user
       // can still initiate MPU.
 
-
-      multipartKeyInfo = new OmMultipartKeyInfo(
-          keyArgs.getMultipartUploadID(), keyArgs.getModificationTime(),
-          keyArgs.getType(), keyArgs.getFactor(), new HashMap<>());
+      multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+          .setUploadID(keyArgs.getMultipartUploadID())
+          .setCreationTime(keyArgs.getModificationTime())
+          .setReplicationType(keyArgs.getType())
+          .setReplicationFactor(keyArgs.getFactor())
+          .setObjectID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
@@ -158,8 +161,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
           .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
+          .setObjectID(transactionLogIndex)
+          .setUpdateID(transactionLogIndex)
           .build();
-
 
       // Add to cache
       omMetadataManager.getOpenKeyTable().addCacheEntry(
@@ -168,7 +172,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           new CacheKey<>(multipartKey),
           new CacheValue<>(Optional.of(multipartKeyInfo), transactionLogIndex));
-
 
       omClientResponse =
           new S3InitiateMultipartUploadResponse(multipartKeyInfo, omKeyInfo,

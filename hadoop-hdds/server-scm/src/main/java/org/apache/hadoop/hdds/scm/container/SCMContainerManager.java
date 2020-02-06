@@ -87,8 +87,7 @@ public class SCMContainerManager implements ContainerManager {
   public SCMContainerManager(final Configuration conf,
       PipelineManager pipelineManager) throws IOException {
 
-    final File metaDir = ServerUtils.getScmDbDir(conf);
-    final File containerDBPath = new File(metaDir, SCM_CONTAINER_DB);
+    final File containerDBPath = getContainerDBPath(conf);
     final int cacheSize = conf.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
         OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
 
@@ -193,6 +192,18 @@ public class SCMContainerManager implements ContainerManager {
   public ContainerInfo getContainer(final ContainerID containerID)
       throws ContainerNotFoundException {
     return containerStateManager.getContainer(containerID);
+  }
+
+  @Override
+  public boolean exists(ContainerID containerID) {
+    lock.lock();
+    try {
+      return (containerStateManager.getContainer(containerID) != null);
+    } catch (ContainerNotFoundException e) {
+      return false;
+    } finally {
+      lock.unlock();
+    }
   }
 
   /**
@@ -442,7 +453,7 @@ public class SCMContainerManager implements ContainerManager {
    * @param containerInfo
    * @throws IOException
    */
-  private void addContainerToDB(ContainerInfo containerInfo)
+  protected void addContainerToDB(ContainerInfo containerInfo)
       throws IOException {
     try {
       final byte[] containerIDBytes = Longs.toByteArray(
@@ -578,5 +589,18 @@ public class SCMContainerManager implements ContainerManager {
         scmContainerManagerMetrics.incNumICRReportsProcessedFailed();
       }
     }
+  }
+
+  protected File getContainerDBPath(Configuration conf) {
+    File metaDir = ServerUtils.getScmDbDir(conf);
+    return new File(metaDir, SCM_CONTAINER_DB);
+  }
+
+  protected PipelineManager getPipelineManager() {
+    return pipelineManager;
+  }
+
+  public Lock getLock() {
+    return lock;
   }
 }

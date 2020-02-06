@@ -65,6 +65,7 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
 
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration,
         sqlConfiguration, new HashSet<>());
+    reconTaskController.start();
   }
 
   @Test

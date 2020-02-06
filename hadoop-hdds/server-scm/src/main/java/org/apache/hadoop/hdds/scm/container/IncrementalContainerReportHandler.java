@@ -90,4 +90,7 @@ public class IncrementalContainerReportHandler extends
 
   }
 
+  protected NodeManager getNodeManager() {
+    return this.nodeManager;
+  }
 }

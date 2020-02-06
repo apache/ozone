@@ -1,5 +1,5 @@
 ---
-title: Concepts
+title: 概念
 date: "2017-10-10"
 menu: main
 weight: 6
@@ -23,4 +23,8 @@ weight: 6
   limitations under the License.
 -->
 
-TODO translate section
+{{<jumbotron title="Ozone 架构">}}
+
+介绍 Ozone 的整体架构，主要包括元数据层、数据层、协议、数据复制层和 Recon等概念，这些概念对于深入理解 ozone 的原理有极大帮助。
+
+{{</jumbotron>}}

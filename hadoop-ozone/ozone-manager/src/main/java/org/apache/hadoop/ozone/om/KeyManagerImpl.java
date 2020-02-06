@@ -37,7 +37,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -687,35 +686,31 @@ public class KeyManagerImpl implements KeyManager {
    */
   @VisibleForTesting
   protected void refreshPipeline(OmKeyInfo value) throws IOException {
-    if (value != null &&
-        CollectionUtils.isNotEmpty(value.getKeyLocationVersions())) {
-      Map<Long, ContainerWithPipeline> containerWithPipelineMap =
-          new HashMap<>();
-      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          // TODO: fix Some tests that may not initialize container client
-          // The production should always have containerClient initialized.
-          if (scmClient.getContainerClient() != null) {
-            try {
-              if (!containerWithPipelineMap.containsKey(k.getContainerID())) {
-                ContainerWithPipeline containerWithPipeline = scmClient
-                    .getContainerClient()
-                    .getContainerWithPipeline(k.getContainerID());
-                containerWithPipelineMap.put(k.getContainerID(),
-                    containerWithPipeline);
-              }
-            } catch (IOException ioEx) {
-              LOG.debug("Get containerPipeline failed for volume:{} bucket:{} "
-                      + "key:{}", value.getVolumeName(), value.getBucketName(),
-                  value.getKeyName(), ioEx);
-              throw new OMException(ioEx.getMessage(),
-                  SCM_GET_PIPELINE_EXCEPTION);
+    Map<Long, ContainerWithPipeline> containerWithPipelineMap = new HashMap<>();
+    for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+      for (OmKeyLocationInfo k : key.getLocationList()) {
+        // TODO: fix Some tests that may not initialize container client
+        // The production should always have containerClient initialized.
+        if (scmClient.getContainerClient() != null) {
+          try {
+            if (!containerWithPipelineMap.containsKey(k.getContainerID())) {
+              ContainerWithPipeline containerWithPipeline = scmClient
+                  .getContainerClient()
+                  .getContainerWithPipeline(k.getContainerID());
+              containerWithPipelineMap.put(k.getContainerID(),
+                  containerWithPipeline);
             }
-            ContainerWithPipeline cp =
-                containerWithPipelineMap.get(k.getContainerID());
-            if (!cp.getPipeline().equals(k.getPipeline())) {
-              k.setPipeline(cp.getPipeline());
-            }
+          } catch (IOException ioEx) {
+            LOG.debug("Get containerPipeline failed for volume:{} bucket:{} " +
+                    "key:{}", value.getVolumeName(), value.getBucketName(),
+                value.getKeyName(), ioEx);
+            throw new OMException(ioEx.getMessage(),
+                SCM_GET_PIPELINE_EXCEPTION);
+          }
+          ContainerWithPipeline cp =
+              containerWithPipelineMap.get(k.getContainerID());
+          if (!cp.getPipeline().equals(k.getPipeline())) {
+            k.setPipeline(cp.getPipeline());
           }
         }
       }
@@ -868,9 +863,9 @@ public class KeyManagerImpl implements KeyManager {
 
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
-    Preconditions.checkArgument(maxKeys < listTrashKeysMax,
+    Preconditions.checkArgument(maxKeys <= listTrashKeysMax,
         "The max keys limit specified is not less than the cluster " +
-          "allowed limit.");
+          "allowed maximum limit.");
 
     return metadataManager.listTrash(volumeName, bucketName,
      startKeyName, keyPrefix, maxKeys);
@@ -943,9 +938,13 @@ public class KeyManagerImpl implements KeyManager {
 
       long currentTime = Time.now();
       Map<Integer, PartKeyInfo> partKeyInfoMap = new HashMap<>();
-      OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
-          multipartUploadID, currentTime, keyArgs.getType(),
-          keyArgs.getFactor(), partKeyInfoMap);
+      OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+          .setUploadID(multipartUploadID)
+          .setCreationTime(currentTime)
+          .setReplicationType(keyArgs.getType())
+          .setReplicationFactor(keyArgs.getFactor())
+          .setPartKeyInfoList(partKeyInfoMap)
+          .build();
       List<OmKeyLocationInfo> locations = new ArrayList<>();
       OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
@@ -1688,9 +1687,6 @@ public class KeyManagerImpl implements KeyManager {
           volumeName, bucketName, keyName);
       OmKeyInfo fileKeyInfo = metadataManager.getKeyTable().get(fileKeyBytes);
       if (fileKeyInfo != null) {
-        if (args.getRefreshPipeline()) {
-          refreshPipeline(fileKeyInfo);
-        }
         // this is a file
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
@@ -2028,9 +2024,6 @@ public class KeyManagerImpl implements KeyManager {
       for (Map.Entry<String, OzoneFileStatus> entry : cacheKeyMap.entrySet()) {
         // No need to check if a key is deleted or not here, this is handled
         // when adding entries to cacheKeyMap from DB.
-        if (args.getRefreshPipeline()) {
-          refreshPipeline(entry.getValue().getKeyInfo());
-        }
         fileStatusList.add(entry.getValue());
         countEntries++;
         if (countEntries >= numEntries) {

@@ -30,6 +30,8 @@ public final class ReconConfigKeys {
   private ReconConfigKeys() {
   }
 
+  public static final String RECON_SCM_CONFIG_PREFIX = "ozone.recon.scmconfig";
+
   public static final String OZONE_RECON_DATANODE_ADDRESS_KEY =
       "ozone.recon.datanode.address";
   public static final String OZONE_RECON_ADDRESS_KEY =

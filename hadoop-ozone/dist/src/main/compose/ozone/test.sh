@@ -38,6 +38,10 @@ execute_robot_test scm gdpr
 
 execute_robot_test scm s3
 
+execute_robot_test scm recon
+
+execute_robot_test scm om-ratis
+
 stop_docker_env
 
 generate_report

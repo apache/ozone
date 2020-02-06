@@ -18,8 +18,39 @@ package org.apache.hadoop.ozone.recon.spi;
  * limitations under the License.
  */
 
+import java.io.IOException;
+import java.util.List;
+
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+
 /**
  * Interface to access SCM endpoints.
  */
 public interface StorageContainerServiceProvider {
+
+  /**
+   * Returns the list of active Pipelines from SCM.
+   *
+   * @return list of Pipelines
+   * @throws IOException in case of any exception
+   */
+  List<Pipeline> getPipelines() throws IOException;
+
+  /**
+   * Requests SCM for a pipeline with ID.
+   * @return pipeline if present
+   * @throws IOException in case of exception
+   */
+  Pipeline getPipeline(HddsProtos.PipelineID pipelineID) throws IOException;
+
+  /**
+   * Requests SCM for a container given ID.
+   * @param containerId containerId
+   * @return ContainerInfo + Pipeline info
+   * @throws IOException in case of any exception.
+   */
+  ContainerWithPipeline getContainerWithPipeline(long containerId)
+      throws IOException;
 }
