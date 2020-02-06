@@ -409,13 +409,6 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public Pipeline getPipeline(HddsProtos.PipelineID pipelineID)
-      throws IOException {
-    return scm.getPipelineManager().getPipeline(
-        PipelineID.getFromProtobuf(pipelineID));
-  }
-
-  @Override
   public void activatePipeline(HddsProtos.PipelineID pipelineID)
       throws IOException {
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
@@ -441,7 +434,7 @@ public class SCMClientProtocolServer implements
     PipelineManager pipelineManager = scm.getPipelineManager();
     Pipeline pipeline =
         pipelineManager.getPipeline(PipelineID.getFromProtobuf(pipelineID));
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, true);
+    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.CLOSE_PIPELINE, null)
     );

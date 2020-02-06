@@ -40,7 +40,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithMetadata implements Auditable {
+public final class OmBucketInfo extends WithMetadata implements Auditable{
   /**
    * Name of the volume in which the bucket belongs to.
    */
@@ -66,16 +66,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
    * Creation time of bucket.
    */
   private final long creationTime;
-  /**
-   * ObjectIDs are unique and immutable identifier for each object in the
-   * System.
-   */
-  private long objectID;
-  /**
-   * UpdateIDs are monotonically increasing values which are updated
-   * each time there is an update.
-   */
-  private long updateID;
 
   /**
    * Bucket encryption key info if encryption is enabled.
@@ -100,8 +90,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
                        boolean isVersionEnabled,
                        StorageType storageType,
                        long creationTime,
-                       long objectID,
-                       long updateID,
                        Map<String, String> metadata,
                        BucketEncryptionKeyInfo bekInfo) {
     this.volumeName = volumeName;
@@ -110,8 +98,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
     this.isVersionEnabled = isVersionEnabled;
     this.storageType = storageType;
     this.creationTime = creationTime;
-    this.objectID = objectID;
-    this.updateID = updateID;
     this.metadata = metadata;
     this.bekInfo = bekInfo;
   }
@@ -195,22 +181,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
   }
 
   /**
-   * Returns objectID.
-   * @return long
-   */
-  public long getObjectID() {
-    return objectID;
-  }
-
-  /**
-   * Returns updateID.
-   * @return long
-   */
-  public long getUpdateID() {
-    return updateID;
-  }
-
-  /**
    * Returns bucket encryption key info.
    * @return bucket encryption key info
    */
@@ -218,30 +188,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
     return bekInfo;
   }
 
-  /**
-   * Set the Object ID. If this value is already set then this function throws.
-   * There is a reason why we cannot use the final here. The OMBucketInfo is
-   * deserialized from the protobuf in many places in code. We need to set
-   * this object ID, after it is deserialized.
-   *
-   * @param obId - long
-   */
-  public void setObjectID(long obId) {
-    if(this.objectID != 0) {
-      throw new UnsupportedOperationException("Attempt to modify object ID " +
-          "which is not zero. Current Object ID is " + this.objectID);
-    }
-    this.objectID = obId;
-  }
-
-  /**
-   * Sets the update ID. For each modification of this object, we will set
-   * this to a value greater than the current value.
-   * @param updateID  long
-   */
-  public void setUpdateID(long updateID) {
-    this.updateID = updateID;
-  }
 
   /**
    * Returns new builder class that builds a OmBucketInfo.
@@ -279,8 +225,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
         .setStorageType(storageType)
         .setIsVersionEnabled(isVersionEnabled)
         .setCreationTime(creationTime)
-        .setObjectID(objectID)
-        .setUpdateID(updateID)
         .setBucketEncryptionKey(bekInfo != null ?
             new BucketEncryptionKeyInfo(bekInfo.getVersion(),
                 bekInfo.getSuite(), bekInfo.getKeyName()) : null);
@@ -306,8 +250,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
     private Boolean isVersionEnabled;
     private StorageType storageType;
     private long creationTime;
-    private long objectID;
-    private long updateID;
     private Map<String, String> metadata;
     private BucketEncryptionKeyInfo bekInfo;
 
@@ -358,16 +300,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
       return this;
     }
 
-    public Builder setObjectID(long obId) {
-      this.objectID = obId;
-      return this;
-    }
-
-    public Builder setUpdateID(long id) {
-      this.updateID = id;
-      return this;
-    }
-
     public Builder addMetadata(String key, String value) {
       metadata.put(key, value);
       return this;
@@ -397,8 +329,8 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
       Preconditions.checkNotNull(isVersionEnabled);
       Preconditions.checkNotNull(storageType);
 
-      return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
-          storageType, creationTime, objectID, updateID, metadata, bekInfo);
+      return new OmBucketInfo(volumeName, bucketName, acls,
+          isVersionEnabled, storageType, creationTime, metadata, bekInfo);
     }
   }
 
@@ -413,8 +345,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
         .setIsVersionEnabled(isVersionEnabled)
         .setStorageType(storageType.toProto())
         .setCreationTime(creationTime)
-        .setObjectID(objectID)
-        .setUpdateID(updateID)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata));
     if (bekInfo != null && bekInfo.getKeyName() != null) {
       bib.setBeinfo(OMPBHelper.convert(bekInfo));
@@ -436,12 +366,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
         .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
         .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
         .setCreationTime(bucketInfo.getCreationTime());
-    if (bucketInfo.hasObjectID()) {
-      obib.setObjectID(bucketInfo.getObjectID());
-    }
-    if (bucketInfo.hasUpdateID()) {
-      obib.setUpdateID(bucketInfo.getUpdateID());
-    }
     if (bucketInfo.getMetadataList() != null) {
       obib.addAllMetadata(KeyValueUtil
           .getFromProtobuf(bucketInfo.getMetadataList()));
@@ -467,8 +391,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
         Objects.equals(acls, that.acls) &&
         Objects.equals(isVersionEnabled, that.isVersionEnabled) &&
         storageType == that.storageType &&
-        objectID == that.objectID &&
-        updateID == that.updateID &&
         Objects.equals(metadata, that.metadata) &&
         Objects.equals(bekInfo, that.bekInfo);
   }

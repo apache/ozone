@@ -307,8 +307,8 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
+    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
   }
 
   @Test
@@ -322,8 +322,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
+    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
   }
 
   @Test
@@ -339,8 +339,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
+    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
   }
 
 
@@ -383,8 +383,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
+    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
+    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
     store.deleteS3Bucket(bucketName);
 
     OzoneTestUtils.expectOmException(ResultCodes.S3_BUCKET_NOT_FOUND,
@@ -704,8 +704,8 @@ public abstract class TestOzoneRpcClientAbstract {
           keyName, STAND_ALONE,
           ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 
@@ -771,8 +771,8 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, ReplicationType.RATIS, ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 
@@ -806,8 +806,8 @@ public abstract class TestOzoneRpcClientAbstract {
           keyName, ReplicationType.RATIS,
           ReplicationFactor.THREE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
     }
   }
 
@@ -848,8 +848,8 @@ public abstract class TestOzoneRpcClientAbstract {
               keyName, ReplicationType.RATIS,
               ReplicationFactor.THREE));
           Assert.assertEquals(data, new String(fileContent));
-          Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
-          Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
+          Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
+          Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
         }
         latch.countDown();
       } catch (IOException ex) {

@@ -118,6 +118,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             .setClientID(allocateBlockRequest.getClientID())
             .setKeyArgs(newKeyArgs);
 
+
+
     if (allocateBlockRequest.hasExcludeList()) {
       newAllocatedBlockRequest.setExcludeList(
           allocateBlockRequest.getExcludeList());
@@ -192,9 +194,6 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       // Set modification time.
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(transactionLogIndex);
 
       // Add to cache.
       omMetadataManager.getOpenKeyTable().addCacheEntry(

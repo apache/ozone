@@ -22,8 +22,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -122,9 +120,6 @@ public final class SCMTestUtils {
         .getRandomizedTempPath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, GenericTestUtils
         .getRandomizedTempPath());
-    conf.setClass(SpaceUsageCheckFactory.Conf.configKeyForClassName(),
-        MockSpaceUsageCheckFactory.None.class,
-        SpaceUsageCheckFactory.class);
     return conf;
   }
 

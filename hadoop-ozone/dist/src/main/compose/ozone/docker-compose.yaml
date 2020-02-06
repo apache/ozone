@@ -67,5 +67,6 @@ services:
     ports:
       - 9888:9888
     environment:
+      WAITFOR: om:9874
       <<: *replication
     command: ["ozone","recon"]

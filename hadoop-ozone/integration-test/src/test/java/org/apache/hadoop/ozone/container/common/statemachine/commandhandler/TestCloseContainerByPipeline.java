@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -56,7 +55,6 @@ import java.util.concurrent.TimeoutException;
 /**
  * Test container closing.
  */
-@Ignore
 public class TestCloseContainerByPipeline {
 
   private static MiniOzoneCluster cluster;

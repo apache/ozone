@@ -72,8 +72,8 @@ public class SCMPipelineManager implements PipelineManager {
       LoggerFactory.getLogger(SCMPipelineManager.class);
 
   private final ReadWriteLock lock;
-  private PipelineFactory pipelineFactory;
-  private PipelineStateManager stateManager;
+  private final PipelineFactory pipelineFactory;
+  private final PipelineStateManager stateManager;
   private final BackgroundPipelineCreator backgroundPipelineCreator;
   private Scheduler scheduler;
   private MetadataStore pipelineStore;
@@ -89,29 +89,19 @@ public class SCMPipelineManager implements PipelineManager {
   public SCMPipelineManager(Configuration conf, NodeManager nodeManager,
       EventPublisher eventPublisher)
       throws IOException {
-    this(conf, nodeManager, eventPublisher, null, null);
-    this.stateManager = new PipelineStateManager();
-    this.pipelineFactory = new PipelineFactory(nodeManager,
-        stateManager, conf, eventPublisher);
-    initializePipelineState();
-  }
-
-  protected SCMPipelineManager(Configuration conf, NodeManager nodeManager,
-                               EventPublisher eventPublisher,
-                               PipelineStateManager pipelineStateManager,
-                               PipelineFactory pipelineFactory)
-      throws IOException {
     this.lock = new ReentrantReadWriteLock();
     this.conf = conf;
-    this.pipelineFactory = pipelineFactory;
-    this.stateManager = pipelineStateManager;
+    this.stateManager = new PipelineStateManager();
+    this.pipelineFactory = new PipelineFactory(nodeManager, stateManager,
+        conf, eventPublisher);
     // TODO: See if thread priority needs to be set for these threads
     scheduler = new Scheduler("RatisPipelineUtilsThread", false, 1);
     this.backgroundPipelineCreator =
         new BackgroundPipelineCreator(this, scheduler, conf);
     int cacheSize = conf.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
         OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
-    final File pipelineDBPath = getPipelineDBPath(conf);
+    final File metaDir = ServerUtils.getScmDbDir(conf);
+    final File pipelineDBPath = new File(metaDir, SCM_PIPELINE_DB);
     this.pipelineStore =
         MetadataStoreBuilder.newBuilder()
             .setCreateIfMissing(true)
@@ -128,6 +118,7 @@ public class SCMPipelineManager implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+    initializePipelineState();
   }
 
   public PipelineStateManager getStateManager() {
@@ -140,7 +131,7 @@ public class SCMPipelineManager implements PipelineManager {
     pipelineFactory.setProvider(replicationType, provider);
   }
 
-  protected void initializePipelineState() throws IOException {
+  private void initializePipelineState() throws IOException {
     if (pipelineStore.isEmpty()) {
       LOG.info("No pipeline exists in current db");
       return;
@@ -205,19 +196,6 @@ public class SCMPipelineManager implements PipelineManager {
     lock.readLock().lock();
     try {
       return stateManager.getPipeline(pipelineID);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public boolean containsPipeline(PipelineID pipelineID) {
-    lock.readLock().lock();
-    try {
-      getPipeline(pipelineID);
-      return true;
-    } catch (PipelineNotFoundException e) {
-      return false;
     } finally {
       lock.readLock().unlock();
     }
@@ -352,7 +330,7 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
-    LOG.info("Destroying pipeline:{}", pipeline);
+    LOG.info("destroying pipeline:{}", pipeline);
     finalizePipeline(pipeline.getId());
     if (onTimeout) {
       long pipelineDestroyTimeoutInMillis =
@@ -487,7 +465,7 @@ public class SCMPipelineManager implements PipelineManager {
    * @param pipeline        - Pipeline to be destroyed
    * @throws IOException
    */
-  protected void destroyPipeline(Pipeline pipeline) throws IOException {
+  private void destroyPipeline(Pipeline pipeline) throws IOException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     // remove the pipeline from the pipeline manager
     removePipeline(pipeline.getId());
@@ -500,7 +478,7 @@ public class SCMPipelineManager implements PipelineManager {
    * @param pipelineId - ID of the pipeline to be removed
    * @throws IOException
    */
-  protected void removePipeline(PipelineID pipelineId) throws IOException {
+  private void removePipeline(PipelineID pipelineId) throws IOException {
     lock.writeLock().lock();
     try {
       pipelineStore.delete(pipelineId.getProtobuf().toByteArray());
@@ -540,27 +518,5 @@ public class SCMPipelineManager implements PipelineManager {
     }
     // shutdown pipeline provider.
     pipelineFactory.shutdown();
-  }
-
-  protected File getPipelineDBPath(Configuration configuration) {
-    File metaDir = ServerUtils.getScmDbDir(configuration);
-    return new File(metaDir, SCM_PIPELINE_DB);
-  }
-
-  protected ReadWriteLock getLock() {
-    return lock;
-  }
-
-  @VisibleForTesting
-  public PipelineFactory getPipelineFactory() {
-    return pipelineFactory;
-  }
-
-  protected MetadataStore getPipelineStore() {
-    return pipelineStore;
-  }
-
-  protected NodeManager getNodeManager() {
-    return nodeManager;
   }
 }

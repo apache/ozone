@@ -162,12 +162,11 @@ public class OMDBCheckpointServlet extends HttpServlet {
       LOG.info("Time taken to write the checkpoint to response output " +
           "stream: " + duration + " milliseconds");
       omMetrics.setLastCheckpointStreamingTimeTaken(duration);
-      omMetrics.incNumCheckpoints();
+
     } catch (Exception e) {
       LOG.error(
           "Unable to process metadata snapshot request. ", e);
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-      omMetrics.incNumCheckpointFails();
     } finally {
       if (checkpoint != null) {
         try {

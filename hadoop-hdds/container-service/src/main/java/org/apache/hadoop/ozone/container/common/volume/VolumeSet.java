@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -34,7 +33,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -51,8 +49,8 @@ import org.apache.hadoop.util.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import static org.apache.hadoop.hdds.DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
 import static org.apache.hadoop.util.RunJar.SHUTDOWN_HOOK_PRIORITY;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,7 +87,6 @@ public class VolumeSet {
    */
   private final ScheduledExecutorService diskCheckerservice;
   private final ScheduledFuture<?> periodicDiskChecker;
-  private final SpaceUsageCheckFactory usageCheckFactory;
 
   private static final long DISK_CHECK_INTERVAL_MINUTES = 15;
 
@@ -130,9 +127,6 @@ public class VolumeSet {
         }
       }, DISK_CHECK_INTERVAL_MINUTES, DISK_CHECK_INTERVAL_MINUTES,
         TimeUnit.MINUTES);
-
-    usageCheckFactory = SpaceUsageCheckFactory.create(conf);
-
     initializeVolumeSet();
   }
 
@@ -314,7 +308,6 @@ public class VolumeSet {
         .conf(conf)
         .datanodeUuid(datanodeUuid)
         .clusterID(clusterID)
-        .usageCheckFactory(usageCheckFactory)
         .storageType(storageType);
     return volumeBuilder.build();
   }
@@ -482,7 +475,7 @@ public class VolumeSet {
           scmUsed = volumeInfo.getScmUsed();
           remaining = volumeInfo.getAvailable();
           capacity = volumeInfo.getCapacity();
-        } catch (UncheckedIOException ex) {
+        } catch (IOException ex) {
           LOG.warn("Failed to get scmUsed and remaining for container " +
               "storage location {}", volumeInfo.getRootDir(), ex);
           // reset scmUsed and remaining if df/du failed.

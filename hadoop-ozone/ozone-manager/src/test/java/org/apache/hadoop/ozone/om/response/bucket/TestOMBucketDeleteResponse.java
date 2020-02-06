@@ -70,20 +70,19 @@ public class TestOMBucketDeleteResponse {
     OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
         volumeName, bucketName);
     OMBucketCreateResponse omBucketCreateResponse =
-        new OMBucketCreateResponse(OMResponse.newBuilder()
+        new OMBucketCreateResponse(omBucketInfo, OMResponse.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
             .setStatus(OzoneManagerProtocolProtos.Status.OK)
             .setCreateBucketResponse(
-                CreateBucketResponse.newBuilder().build()).build(),
-            omBucketInfo);
+                CreateBucketResponse.newBuilder().build()).build());
 
     OMBucketDeleteResponse omBucketDeleteResponse =
-        new OMBucketDeleteResponse(OMResponse.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
-            .setStatus(OzoneManagerProtocolProtos.Status.OK)
-            .setDeleteBucketResponse(
-                DeleteBucketResponse.getDefaultInstance()).build(),
-            volumeName, bucketName);
+        new OMBucketDeleteResponse(volumeName, bucketName,
+            OMResponse.newBuilder()
+                .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
+                .setStatus(OzoneManagerProtocolProtos.Status.OK)
+                .setDeleteBucketResponse(
+                    DeleteBucketResponse.getDefaultInstance()).build());
 
     omBucketCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
     omBucketDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);

@@ -38,18 +38,18 @@ import java.util.NavigableSet;
  * state. All the read and write operations in PipelineStateMap are protected
  * by a read write lock.
  */
-public class PipelineStateManager {
+class PipelineStateManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineStateManager.class);
 
   private final PipelineStateMap pipelineStateMap;
 
-  public PipelineStateManager() {
+  PipelineStateManager() {
     this.pipelineStateMap = new PipelineStateMap();
   }
 
-  public void addPipeline(Pipeline pipeline) throws IOException {
+  void addPipeline(Pipeline pipeline) throws IOException {
     pipelineStateMap.addPipeline(pipeline);
     LOG.info("Created pipeline {}", pipeline);
   }
@@ -157,10 +157,5 @@ public class PipelineStateManager {
       throws IOException {
     pipelineStateMap
         .updatePipelineState(pipelineID, PipelineState.DORMANT);
-  }
-
-  public void updatePipelineState(PipelineID id, PipelineState newState)
-      throws PipelineNotFoundException {
-    pipelineStateMap.updatePipelineState(id, newState);
   }
 }

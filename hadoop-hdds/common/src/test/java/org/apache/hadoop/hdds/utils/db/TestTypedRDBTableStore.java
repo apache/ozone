@@ -28,8 +28,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.google.common.base.Optional;
-
-import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 
@@ -54,7 +53,7 @@ import org.rocksdb.StatsLevel;
 public class TestTypedRDBTableStore {
   private static int count = 0;
   private final List<String> families =
-      Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+      Arrays.asList(DFSUtil.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth", "Seven", "Eighth",

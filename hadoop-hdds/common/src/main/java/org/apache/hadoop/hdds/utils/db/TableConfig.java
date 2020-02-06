@@ -19,10 +19,9 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.StringUtils;
-
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyOptions;
 
@@ -57,7 +56,7 @@ public class TableConfig {
    * @return ColumnFamilyDescriptor
    */
   public ColumnFamilyDescriptor getDescriptor() {
-    return  new ColumnFamilyDescriptor(StringUtils.string2Bytes(name),
+    return  new ColumnFamilyDescriptor(DFSUtil.string2Bytes(name),
         columnFamilyOptions);
   }
 

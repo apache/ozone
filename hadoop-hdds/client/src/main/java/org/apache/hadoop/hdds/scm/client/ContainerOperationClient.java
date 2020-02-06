@@ -107,7 +107,7 @@ public class ContainerOperationClient implements ScmClient {
     return manager;
   }
 
-  public static StorageContainerLocationProtocol newContainerRpcClient(
+  private StorageContainerLocationProtocol newContainerRpcClient(
       Configuration conf) throws IOException {
 
     Class<StorageContainerLocationProtocolPB> protocol =
@@ -280,12 +280,6 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<Pipeline> listPipelines() throws IOException {
     return storageContainerLocationClient.listPipelines();
-  }
-
-  @Override
-  public Pipeline getPipeline(HddsProtos.PipelineID pipelineID)
-      throws IOException {
-    return storageContainerLocationClient.getPipeline(pipelineID);
   }
 
   @Override

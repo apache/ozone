@@ -41,8 +41,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteBucketRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .DeleteBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
@@ -74,10 +72,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     OMRequest omRequest = getOmRequest();
-    DeleteBucketRequest deleteBucketRequest =
-        omRequest.getDeleteBucketRequest();
-    String volumeName = deleteBucketRequest.getVolumeName();
-    String bucketName = deleteBucketRequest.getBucketName();
+    String volumeName = omRequest.getDeleteBucketRequest().getVolumeName();
+    String bucketName = omRequest.getDeleteBucketRequest().getBucketName();
 
     // Generate end user response
     OMResponse.Builder omResponse = OMResponse.newBuilder()
@@ -92,8 +88,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     IOException exception = null;
 
-    boolean acquiredBucketLock = false, acquiredVolumeLock = false;
-    boolean success = true;
+    boolean acquiredBucketLock = false;
+    boolean acquiredVolumeLock = false;
     OMClientResponse omClientResponse = null;
     try {
       // check Acl
@@ -115,25 +111,13 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // with out volume creation.
       //Check if bucket exists
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
-          .get(bucketKey);
+      OmBucketInfo omBucketInfo =
+          omMetadataManager.getBucketTable().get(bucketKey);
       if (omBucketInfo == null) {
         LOG.debug("bucket: {} not found ", bucketName);
         throw new OMException("Bucket doesn't exist",
             OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
-
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omBucketInfo.getUpdateID(),
-          transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, deleteBucketRequest);
-        return new OMBucketDeleteResponse(createReplayOMResponse(omResponse));
-      }
-
       //Check if bucket is empty
       if (!omMetadataManager.isBucketEmpty(volumeName, bucketName)) {
         LOG.debug("bucket: {} is not empty ", bucketName);
@@ -151,13 +135,12 @@ public class OMBucketDeleteRequest extends OMClientRequest {
           DeleteBucketResponse.newBuilder().build());
 
       // Add to double buffer.
-      omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
-          volumeName, bucketName);
+      omClientResponse = new OMBucketDeleteResponse(volumeName, bucketName,
+          omResponse.build());
     } catch (IOException ex) {
-      success = false;
       exception = ex;
-      omClientResponse = new OMBucketDeleteResponse(
-          createErrorOMResponse(omResponse, exception), volumeName, bucketName);
+      omClientResponse = new OMBucketDeleteResponse(volumeName, bucketName,
+          createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
@@ -178,7 +161,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         auditMap, exception, userInfo));
 
     // return response.
-    if (success) {
+    if (exception == null) {
       LOG.debug("Deleted bucket:{} in volume:{}", bucketName, volumeName);
       return omClientResponse;
     } else {

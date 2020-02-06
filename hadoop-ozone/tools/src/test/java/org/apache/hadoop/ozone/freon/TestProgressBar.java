@@ -50,8 +50,7 @@ public class TestProgressBar {
 
     long maxValue = 10L;
 
-    ProgressBar progressbar =
-        new ProgressBar(stream, maxValue, currentValue, true);
+    ProgressBar progressbar = new ProgressBar(stream, maxValue, currentValue);
 
     Runnable task = () -> LongStream.range(0, maxValue)
         .forEach(counter -> numberOfKeysAdded.getAndIncrement());

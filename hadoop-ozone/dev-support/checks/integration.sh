@@ -16,14 +16,12 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+export MAVEN_OPTS="-Xmx4096m"
+mvn -B install -DskipTests
+mvn -B -fn test -pl :hadoop-ozone-integration-test "$@"
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/integration"}
 mkdir -p "$REPORT_DIR"
-
-export MAVEN_OPTS="-Xmx4096m"
-mvn -B install -DskipTests
-mvn -B -fae test -pl :hadoop-ozone-integration-test "$@" | tee $REPORT_DIR/output.log
-rc=$?
 
 # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
 source "$DIR/_mvn_unit_report.sh"
@@ -31,4 +29,4 @@ source "$DIR/_mvn_unit_report.sh"
 if [[ -s "$REPORT_DIR/summary.txt" ]] ; then
     exit 1
 fi
-exit ${rc}
+exit 0

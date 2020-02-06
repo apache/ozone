@@ -144,11 +144,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
-      // Update the block length for each block
+      //update the block length for each block
       omKeyInfo.updateLocationInfoList(locationInfoList);
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(transactionLogIndex);
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable().addCacheEntry(

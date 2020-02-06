@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -51,10 +51,10 @@ public class PipelineReportHandler implements
       PipelineReportHandler.class);
   private final PipelineManager pipelineManager;
   private final Configuration conf;
-  private final SafeModeManager scmSafeModeManager;
+  private final SCMSafeModeManager scmSafeModeManager;
   private final boolean pipelineAvailabilityCheck;
 
-  public PipelineReportHandler(SafeModeManager scmSafeModeManager,
+  public PipelineReportHandler(SCMSafeModeManager scmSafeModeManager,
       PipelineManager pipelineManager, Configuration conf) {
     Preconditions.checkNotNull(pipelineManager);
     this.scmSafeModeManager = scmSafeModeManager;
@@ -87,8 +87,8 @@ public class PipelineReportHandler implements
     }
   }
 
-  protected void processPipelineReport(PipelineReport report,
-      DatanodeDetails dn, EventPublisher publisher) throws IOException {
+  private void processPipelineReport(PipelineReport report, DatanodeDetails dn,
+      EventPublisher publisher) throws IOException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(report.getPipelineID());
     Pipeline pipeline;
     try {
@@ -102,8 +102,12 @@ public class PipelineReportHandler implements
       return;
     }
 
-    setReportedDatanode(pipeline, dn);
-    setPipelineLeaderId(report, pipeline, dn);
+    pipeline.reportDatanode(dn);
+    // ONE replica pipeline doesn't have leader flag
+    if (report.getIsLeader() ||
+        pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
+      pipeline.setLeaderId(dn.getUuid());
+    }
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
       LOGGER.info("Pipeline {} {} reported by {}", pipeline.getFactor(),
@@ -115,25 +119,5 @@ public class PipelineReportHandler implements
         }
       }
     }
-  }
-
-
-  protected void setReportedDatanode(Pipeline pipeline, DatanodeDetails dn)
-      throws IOException {
-    pipeline.reportDatanode(dn);
-  }
-
-  protected void setPipelineLeaderId(PipelineReport report,
-                                     Pipeline pipeline,
-                                     DatanodeDetails dn) {
-    // ONE replica pipeline doesn't have leader flag
-    if (report.getIsLeader() ||
-        pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
-      pipeline.setLeaderId(dn.getUuid());
-    }
-  }
-
-  protected PipelineManager getPipelineManager() {
-    return pipelineManager;
   }
 }

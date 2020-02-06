@@ -37,9 +37,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
-import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addKeyToTable;
-import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addVolumeAndBucketToDB;
-
 /**
  * Tests OMCreateKeyRequest class.
  */
@@ -66,7 +63,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         new OMKeyCreateRequest(modifiedOmRequest);
 
     // Add volume and bucket entries to DB.
-    addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
@@ -130,7 +127,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         new OMKeyCreateRequest(modifiedOmRequest);
 
     // Add volume and bucket entries to DB.
-    addVolumeAndBucketToDB(volumeName, bucketName,
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
@@ -329,47 +326,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setClientId(UUID.randomUUID().toString())
         .setCreateKeyRequest(createKeyRequest).build();
 
-  }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    KeyArgs keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setFactor(replicationFactor)
-        .setType(replicationType)
-        .build();
-
-    CreateKeyRequest.Builder req = CreateKeyRequest.newBuilder()
-        .setKeyArgs(keyArgs);
-    OMRequest originalRequest = OMRequest.newBuilder()
-        .setCreateKeyRequest(req)
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
-        .setClientId(UUID.randomUUID().toString())
-        .build();
-
-    OMKeyCreateRequest omKeyCreateRequest = new OMKeyCreateRequest(
-        originalRequest);
-
-    // Manually add volume, bucket and key to DB table
-    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
-    addKeyToTable(false, false, volumeName, bucketName, keyName, clientID,
-        replicationType, replicationFactor, 1L, omMetadataManager);
-
-    // Replay the transaction - Execute the createKey request again
-    OMClientResponse omClientResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
   }
 
 }

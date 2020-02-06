@@ -95,7 +95,8 @@ public class OzoneManagerServiceProviderImpl
 
   private OzoneManagerProtocol ozoneManagerClient;
   private final OzoneConfiguration configuration;
-  private ScheduledExecutorService scheduler;
+  private final ScheduledExecutorService scheduler =
+      Executors.newScheduledThreadPool(1);
 
   private ReconOMMetadataManager omMetadataManager;
   private ReconTaskController reconTaskController;
@@ -197,15 +198,12 @@ public class OzoneManagerServiceProviderImpl
 
   @Override
   public void start() {
-    LOG.info("Starting Ozone Manager Service Provider.");
-    scheduler = Executors.newScheduledThreadPool(1);
     registerOMDBTasks();
     try {
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
       LOG.error("Error staring Recon OM Metadata Manager.", ioEx);
     }
-    reconTaskController.start();
     long initialDelay = configuration.getTimeDuration(
         RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
         RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
@@ -222,7 +220,6 @@ public class OzoneManagerServiceProviderImpl
 
   @Override
   public void stop() throws Exception {
-    LOG.info("Stopping Ozone Manager Service Provider.");
     reconTaskController.stop();
     omMetadataManager.stop();
     scheduler.shutdownNow();
@@ -272,8 +269,8 @@ public class OzoneManagerServiceProviderImpl
       LOG.info("Got new checkpoint from OM : " +
           dbSnapshot.getCheckpointLocation());
       try {
-        omMetadataManager.updateOmDB(
-            dbSnapshot.getCheckpointLocation().toFile());
+        omMetadataManager.updateOmDB(dbSnapshot.getCheckpointLocation()
+            .toFile());
         return true;
       } catch (IOException e) {
         LOG.error("Unable to refresh Recon OM DB Snapshot. ", e);
@@ -324,7 +321,7 @@ public class OzoneManagerServiceProviderImpl
    * full snapshot from Ozone Manager.
    */
   @VisibleForTesting
-  public void syncDataFromOM() {
+  void syncDataFromOM() {
     LOG.info("Syncing data from Ozone Manager.");
     long currentSequenceNumber = getCurrentOMDBSequenceNumber();
     boolean fullSnapshot = false;

@@ -18,13 +18,30 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.server.datanode.DataNode;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.util.DiskChecker.DiskErrorException;
+import org.apache.hadoop.util.Timer;
+
+import static org.apache.hadoop.hdfs.server.datanode.DataNode.MAX_VOLUME_FAILURE_TOLERATED_LIMIT;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -32,29 +49,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
-import org.apache.hadoop.hdfs.server.datanode.DataNode;
-import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
-import org.apache.hadoop.util.DiskChecker.DiskErrorException;
-import org.apache.hadoop.util.Timer;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_DEFAULT;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Sets;
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A class that encapsulates running disk checks against each HDDS volume and
  * allows retrieving a list of failed volumes.
  */
 public class HddsVolumeChecker {
-
-  public static final int MAX_VOLUME_FAILURE_TOLERATED_LIMIT = -1;
 
   public static final Logger LOG =
       LoggerFactory.getLogger(HddsVolumeChecker.class);
@@ -86,19 +92,19 @@ public class HddsVolumeChecker {
   private final ExecutorService checkVolumeResultHandlerExecutorService;
 
   /**
-   * @param conf  Configuration object.
+   * @param conf Configuration object.
    * @param timer {@link Timer} object used for throttling checks.
    */
   public HddsVolumeChecker(Configuration conf, Timer timer)
       throws DiskErrorException {
     maxAllowedTimeForCheckMs = conf.getTimeDuration(
-        DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY,
-        DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT,
+        DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY,
+        DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
     if (maxAllowedTimeForCheckMs <= 0) {
       throw new DiskErrorException("Invalid value configured for "
-          + DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY + " - "
+          + DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY + " - "
           + maxAllowedTimeForCheckMs + " (should be > 0)");
     }
 
@@ -109,28 +115,28 @@ public class HddsVolumeChecker {
      * declaring a fatal error.
      */
     int maxVolumeFailuresTolerated = conf.getInt(
-        DFSConfigKeysLegacy.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY,
-        DFSConfigKeysLegacy.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_DEFAULT);
+        DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY,
+        DFS_DATANODE_FAILED_VOLUMES_TOLERATED_DEFAULT);
 
     minDiskCheckGapMs = conf.getTimeDuration(
-        DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY,
-        DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_MIN_GAP_DEFAULT,
+        DFSConfigKeys.DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY,
+        DFSConfigKeys.DFS_DATANODE_DISK_CHECK_MIN_GAP_DEFAULT,
         TimeUnit.MILLISECONDS);
 
     if (minDiskCheckGapMs < 0) {
       throw new DiskErrorException("Invalid value configured for "
-          + DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY + " - "
+          + DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY + " - "
           + minDiskCheckGapMs + " (should be >= 0)");
     }
 
     long diskCheckTimeout = conf.getTimeDuration(
-        DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY,
-        DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT,
+        DFSConfigKeys.DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY,
+        DFSConfigKeys.DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
     if (diskCheckTimeout < 0) {
       throw new DiskErrorException("Invalid value configured for "
-          + DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY + " - "
+          + DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY + " - "
           + diskCheckTimeout + " (should be >= 0)");
     }
 
@@ -138,8 +144,7 @@ public class HddsVolumeChecker {
 
     if (maxVolumeFailuresTolerated < MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
       throw new DiskErrorException("Invalid value configured for "
-          + DFSConfigKeysLegacy.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY
-          + " - "
+          + DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY + " - "
           + maxVolumeFailuresTolerated + " "
           + DataNode.MAX_VOLUME_FAILURES_TOLERATED_MSG);
     }
@@ -161,13 +166,14 @@ public class HddsVolumeChecker {
 
   /**
    * Run checks against all HDDS volumes.
-   * <p>
+   *
    * This check may be performed at service startup and subsequently at
    * regular intervals to detect and handle failed volumes.
    *
    * @param volumes - Set of volumes to be checked. This set must be immutable
    *                for the duration of the check else the results will be
    *                unexpected.
+   *
    * @return set of failed volumes.
    */
   public Set<HddsVolume> checkAllVolumes(Collection<HddsVolume> volumes)
@@ -233,23 +239,23 @@ public class HddsVolumeChecker {
   public interface Callback {
     /**
      * @param healthyVolumes set of volumes that passed disk checks.
-     * @param failedVolumes  set of volumes that failed disk checks.
+     * @param failedVolumes set of volumes that failed disk checks.
      */
     void call(Set<HddsVolume> healthyVolumes,
-        Set<HddsVolume> failedVolumes);
+              Set<HddsVolume> failedVolumes);
   }
 
   /**
    * Check a single volume asynchronously, returning a {@link ListenableFuture}
    * that can be used to retrieve the final result.
-   * <p>
+   *
    * If the volume cannot be referenced then it is already closed and
    * cannot be checked. No error is propagated to the callback.
    *
-   * @param volume   the volume that is to be checked.
+   * @param volume the volume that is to be checked.
    * @param callback callback to be invoked when the volume check completes.
    * @return true if the check was scheduled and the callback will be invoked.
-   * false otherwise.
+   *         false otherwise.
    */
   public boolean checkVolume(final HddsVolume volume, Callback callback) {
     if (volume == null) {
@@ -285,18 +291,19 @@ public class HddsVolumeChecker {
     private final Callback callback;
 
     /**
+     *
      * @param healthyVolumes set of healthy volumes. If the disk check is
      *                       successful, add the volume here.
-     * @param failedVolumes  set of failed volumes. If the disk check fails,
-     *                       add the volume here.
-     * @param volumeCounter  volumeCounter used to trigger callback invocation.
-     * @param callback       invoked when the volumeCounter reaches 0.
+     * @param failedVolumes set of failed volumes. If the disk check fails,
+     *                      add the volume here.
+     * @param volumeCounter volumeCounter used to trigger callback invocation.
+     * @param callback invoked when the volumeCounter reaches 0.
      */
     ResultHandler(HddsVolume volume,
-        Set<HddsVolume> healthyVolumes,
-        Set<HddsVolume> failedVolumes,
-        AtomicLong volumeCounter,
-        @Nullable Callback callback) {
+                  Set<HddsVolume> healthyVolumes,
+                  Set<HddsVolume> failedVolumes,
+                  AtomicLong volumeCounter,
+                  @Nullable Callback callback) {
       this.volume = volume;
       this.healthyVolumes = healthyVolumes;
       this.failedVolumes = failedVolumes;
@@ -359,7 +366,7 @@ public class HddsVolumeChecker {
         if (callback != null && remaining == 0) {
           callback.call(healthyVolumes, failedVolumes);
         }
-      } catch (Exception e) {
+      } catch(Exception e) {
         // Propagating this exception is unlikely to be helpful.
         LOG.warn("Unexpected exception", e);
       }
@@ -368,7 +375,7 @@ public class HddsVolumeChecker {
 
   /**
    * Shutdown the checker and its associated ExecutorService.
-   * <p>
+   *
    * See {@link ExecutorService#awaitTermination} for the interpretation
    * of the parameters.
    */
