@@ -708,8 +708,8 @@ public final class HddsUtils {
       }
     }
 
-    boolean requireClientAuth = conf.getBoolean(OZONE_CLIENT_HTTPS_NEED_AUTH_KEY,
-        OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT);
+    boolean requireClientAuth = conf.getBoolean(
+        OZONE_CLIENT_HTTPS_NEED_AUTH_KEY, OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT);
     sslConf.setBoolean(OZONE_CLIENT_HTTPS_NEED_AUTH_KEY, requireClientAuth);
     return sslConf;
   }
@@ -746,8 +746,7 @@ public final class HddsUtils {
       if (passchars != null) {
         password = new String(passchars);
       }
-    }
-    catch (IOException ioe) {
+    } catch (IOException ioe) {
       LOG.warn("Setting password to null since IOException is caught"
           + " when getting password", ioe);
 

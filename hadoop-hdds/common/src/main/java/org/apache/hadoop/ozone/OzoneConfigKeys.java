@@ -429,7 +429,6 @@ public final class OzoneConfigKeys {
       "ozone.http.policy";
   public static final String OZONE_HTTP_POLICY_DEFAULT =
       HttpConfig.Policy.HTTP_ONLY.name();
-
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
       "ozone.https.server.keystore.resource";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
@@ -444,15 +443,13 @@ public final class OzoneConfigKeys {
       "ssl.server.truststore.location";
   public static final String  OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY =
       "ssl.server.truststore.password";
-
-  public static final String  OZONE_CLIENT_HTTPS_NEED_AUTH_KEY =
-      "ozone.https.client.need.auth";
-  public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
-
   public static final String  OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY =
       "ozone.https.client.keystore.resource";
   public static final String  OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
       "ssl-client.xml";
+  public static final String  OZONE_CLIENT_HTTPS_NEED_AUTH_KEY =
+      "ozone.https.client.need-auth";
+  public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
   /**
    * There is no need to instantiate this class.
    */
