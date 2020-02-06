@@ -113,6 +113,36 @@ public class TestPipelinePlacementPolicy {
     }
   }
 
+  @Test
+  public void testRackAwarenessNotEnabledWithFallBack() throws SCMException{
+    List<DatanodeDetails> healthyNodes =
+        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
+    DatanodeDetails anchor = placementPolicy.chooseNode(healthyNodes);
+    DatanodeDetails randomNode = placementPolicy.chooseNode(healthyNodes);
+    // rack awareness is not enabled.
+    Assert.assertTrue(anchor.getNetworkLocation().equals(
+        randomNode.getNetworkLocation()));
+
+    NetworkTopology topology = new NetworkTopologyImpl(new Configuration());
+    DatanodeDetails nextNode = placementPolicy.chooseNodeBasedOnRackAwareness(
+        healthyNodes, new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
+        topology, anchor);
+    // RackAwareness should not be able to choose any node.
+    Assert.assertNull(nextNode);
+
+    // PlacementPolicy should still be able to pick a set of 3 nodes.
+    int numOfNodes = HddsProtos.ReplicationFactor.THREE.getNumber();
+    List<DatanodeDetails> results = placementPolicy
+        .getResultSet(numOfNodes, healthyNodes);
+    
+    Assert.assertEquals(numOfNodes, results.size());
+    // All nodes are on same rack.
+    Assert.assertEquals(results.get(0).getNetworkLocation(),
+        results.get(1).getNetworkLocation());
+    Assert.assertEquals(results.get(0).getNetworkLocation(),
+        results.get(2).getNetworkLocation());
+  }
+
   private final static Node[] NODES = new NodeImpl[] {
       new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
       new NodeImpl("h2", "/r1", NetConstants.NODE_COST_DEFAULT),

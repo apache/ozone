@@ -248,15 +248,18 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
           nodesRequired, SCMException.ResultCodes.INVALID_CAPACITY);
     }
 
-    // Assume rack awareness is enabled.
-    boolean rackAwareness = true;
+    // Assume rack awareness is not enabled.
+    boolean rackAwareness = false;
     List <DatanodeDetails> results = new ArrayList<>(nodesRequired);
     // Since nodes are widely distributed, the results should be selected
     // base on distance in topology, rack awareness and load balancing.
     List<DatanodeDetails> exclude = new ArrayList<>();
     // First choose an anchor nodes randomly
     DatanodeDetails anchor = chooseNode(healthyNodes);
-    if (anchor == null) {
+    if (anchor != null) {
+      results.add(anchor);
+      exclude.add(anchor);
+    } else {
       LOG.warn("Unable to find healthy node for anchor(first) node.");
       throw new SCMException("Unable to find anchor node.",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -265,30 +268,28 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       LOG.debug("First node chosen: {}", anchor);
     }
 
-    results.add(anchor);
-    exclude.add(anchor);
 
     // Choose the second node on different racks from anchor.
     DatanodeDetails nextNode = chooseNodeBasedOnRackAwareness(
         healthyNodes, exclude,
         nodeManager.getClusterNetworkTopologyMap(), anchor);
-    if (nextNode == null) {
+    if (nextNode != null) {
+      // Rack awareness is detected.
+      rackAwareness = true;
+      results.add(nextNode);
+      exclude.add(nextNode);
+    } else {
       LOG.debug("Pipeline Placement: Unable to find 2nd node on different " +
           "rack based on rack awareness.");
-      rackAwareness = false;
-      nextNode = fallBackPickNodes(healthyNodes, exclude);
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("Second node chosen: {}", nextNode);
     }
 
-    results.add(nextNode);
-    exclude.add(nextNode);
-
     // Then choose nodes close to anchor based on network topology
     int nodesToFind = nodesRequired - results.size();
     for (int x = 0; x < nodesToFind; x++) {
-      // invoke the choose function defined in the derived classes.
+      // Pick remaining nodes based on the existence of rack awareness.
       DatanodeDetails pick = rackAwareness
           ? chooseNodeFromNetworkTopology(
               nodeManager.getClusterNetworkTopologyMap(), anchor, exclude)
