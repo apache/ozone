@@ -81,8 +81,8 @@ public class BasicRootedOzoneClientAdapterImpl
       LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
 
   private OzoneClient ozoneClient;
-  private ClientProtocol proxy;
   private ObjectStore objectStore;
+  private ClientProtocol proxy;
   private ReplicationType replicationType;
   private ReplicationFactor replicationFactor;
   private boolean securityEnabled;
