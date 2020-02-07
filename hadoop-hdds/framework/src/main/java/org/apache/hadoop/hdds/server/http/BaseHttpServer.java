@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -15,28 +15,36 @@
  * the License.
  */
 
-package org.apache.hadoop.hdds.server;
+package org.apache.hadoop.hdds.server.http;
 
 import javax.servlet.http.HttpServlet;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.util.Optional;
 import java.util.OptionalInt;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.HddsConfServlet;
-import org.apache.hadoop.http.HttpConfig;
-import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.AccessControlList;
 
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_HTTPS_NEED_AUTH_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYPASSWORD_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,8 +56,8 @@ public abstract class BaseHttpServer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseHttpServer.class);
-  protected static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
-  protected static final String JETTY_BASETMPDIR =
+  static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
+  private static final String JETTY_BASETMPDIR =
       "org.eclipse.jetty.webapp.basetempdir";
 
   private HttpServer2 httpServer;
@@ -70,7 +78,7 @@ public abstract class BaseHttpServer {
   public BaseHttpServer(Configuration conf, String name) throws IOException {
     this.name = name;
     this.conf = conf;
-    policy = HddsUtils.getHttpPolicy(conf);
+    policy = getHttpPolicy(conf);
     if (isEnabled()) {
       this.httpAddress = getHttpBindAddress();
       this.httpsAddress = getHttpsBindAddress();
@@ -80,7 +88,7 @@ public abstract class BaseHttpServer {
       // CommonConfigurationKeysPublic.HADOOP_PROMETHEUS_ENABLED when possible.
       conf.setBoolean("hadoop.prometheus.endpoint.enabled", false);
 
-      HttpServer2.Builder builder = HddsUtils.newHttpServer2BuilderForOzone(
+      HttpServer2.Builder builder = newHttpServer2BuilderForOzone(
           conf, httpAddress, httpsAddress,
           name, getSpnegoPrincipal(), getKeytabFile());
 
@@ -125,6 +133,58 @@ public abstract class BaseHttpServer {
       }
     }
   }
+
+
+
+  /**
+   * Return a HttpServer.Builder that the OzoneManager/SCM/Datanode/S3Gateway/
+   * Recon to initialize their HTTP / HTTPS server.
+   */
+  public static HttpServer2.Builder newHttpServer2BuilderForOzone(
+      Configuration conf, final InetSocketAddress httpAddr,
+      final InetSocketAddress httpsAddr, String name, String spnegoUserNameKey,
+      String spnegoKeytabFileKey) throws IOException {
+    HttpConfig.Policy policy = getHttpPolicy(conf);
+
+    HttpServer2.Builder builder = new HttpServer2.Builder().setName(name)
+        .setConf(conf).setACL(new AccessControlList(conf.get(
+            OZONE_ADMINISTRATORS, " ")))
+        .setSecurityEnabled(UserGroupInformation.isSecurityEnabled())
+        .setUsernameConfKey(spnegoUserNameKey)
+        .setKeytabConfKey(spnegoKeytabFileKey);
+
+    // initialize the webserver for uploading/downloading files.
+    if (UserGroupInformation.isSecurityEnabled()) {
+      LOG.info("Starting web server as: "
+          + SecurityUtil.getServerPrincipal(conf.get(spnegoUserNameKey),
+          httpAddr.getHostName()));
+    }
+
+    if (policy.isHttpEnabled()) {
+      if (httpAddr.getPort() == 0) {
+        builder.setFindPort(true);
+      }
+
+      URI uri = URI.create("http://" + NetUtils.getHostPortString(httpAddr));
+      builder.addEndpoint(uri);
+      LOG.info("Starting Web-server for " + name + " at: " + uri);
+    }
+
+    if (policy.isHttpsEnabled() && httpsAddr != null) {
+      Configuration sslConf = loadSslConfiguration(conf);
+      loadSslConfToHttpServerBuilder(builder, sslConf);
+
+      if (httpsAddr.getPort() == 0) {
+        builder.setFindPort(true);
+      }
+
+      URI uri = URI.create("https://" + NetUtils.getHostPortString(httpsAddr));
+      builder.addEndpoint(uri);
+      LOG.info("Starting Web-server for " + name + " at: " + uri);
+    }
+    return builder;
+  }
+
 
   /**
    * Add a servlet to BaseHttpServer.
@@ -230,6 +290,99 @@ public abstract class BaseHttpServer {
       conf.set(getHttpsAddressKey(), realAddress);
       LOG.info("HTTPS server of {} listening at https://{}", name, realAddress);
     }
+  }
+
+
+  public static HttpServer2.Builder loadSslConfToHttpServerBuilder(
+      HttpServer2.Builder builder, Configuration sslConf) {
+    return builder
+        .needsClientAuth(
+            sslConf.getBoolean(OZONE_CLIENT_HTTPS_NEED_AUTH_KEY,
+                OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT))
+        .keyPassword(getPassword(sslConf, OZONE_SERVER_HTTPS_KEYPASSWORD_KEY))
+        .keyStore(sslConf.get("ssl.server.keystore.location"),
+            getPassword(sslConf, OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY),
+            sslConf.get("ssl.server.keystore.type", "jks"))
+        .trustStore(sslConf.get("ssl.server.truststore.location"),
+            getPassword(sslConf, OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY),
+            sslConf.get("ssl.server.truststore.type", "jks"))
+        .excludeCiphers(
+            sslConf.get("ssl.server.exclude.cipher.list"));
+  }
+
+
+  /**
+   * Get SPNEGO keytab Key from configuration.
+   *
+   * @param conf       Configuration
+   * @param defaultKey default key to be used for config lookup
+   * @return DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY if the key is not empty
+   * else return defaultKey
+   */
+  public static String getSpnegoKeytabKey(Configuration conf,
+      String defaultKey) {
+    String value =
+        conf.get(
+            DFSConfigKeysLegacy.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY);
+    return (value == null || value.isEmpty()) ?
+        defaultKey :
+        DFSConfigKeysLegacy.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY;
+  }
+
+  /**
+   * Leverages the Configuration.getPassword method to attempt to get
+   * passwords from the CredentialProvider API before falling back to
+   * clear text in config - if falling back is allowed.
+   *
+   * @param conf  Configuration instance
+   * @param alias name of the credential to retreive
+   * @return String credential value or null
+   */
+  static String getPassword(Configuration conf, String alias) {
+    String password = null;
+    try {
+      char[] passchars = conf.getPassword(alias);
+      if (passchars != null) {
+        password = new String(passchars);
+      }
+    } catch (IOException ioe) {
+      LOG.warn("Setting password to null since IOException is caught"
+          + " when getting password", ioe);
+
+      password = null;
+    }
+    return password;
+  }
+  /**
+   * Load HTTPS-related configuration.
+   */
+  public static Configuration loadSslConfiguration(Configuration conf) {
+    Configuration sslConf = new Configuration(false);
+
+    sslConf.addResource(conf.get(
+        OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
+        OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT));
+
+    final String[] reqSslProps = {
+        OzoneConfigKeys.OZONE_SERVER_HTTPS_TRUSTSTORE_LOCATION_KEY,
+        OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_LOCATION_KEY,
+        OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY,
+        OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYPASSWORD_KEY
+    };
+
+    // Check if the required properties are included
+    for (String sslProp : reqSslProps) {
+      if (sslConf.get(sslProp) == null) {
+        LOG.warn("SSL config " + sslProp + " is missing. If " +
+            OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY +
+            " is specified, make sure it is a relative path");
+      }
+    }
+
+    boolean requireClientAuth = conf.getBoolean(
+        OZONE_CLIENT_HTTPS_NEED_AUTH_KEY, OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT);
+    sslConf.setBoolean(OZONE_CLIENT_HTTPS_NEED_AUTH_KEY, requireClientAuth);
+    return sslConf;
   }
 
   public InetSocketAddress getHttpAddress() {
