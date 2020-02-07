@@ -21,13 +21,11 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 /**
@@ -35,27 +33,32 @@ import javax.annotation.Nonnull;
  */
 public class OMAllocateBlockResponse extends OMClientResponse {
 
-  private final OmKeyInfo omKeyInfo;
-  private final long clientID;
+  private OmKeyInfo omKeyInfo;
+  private long clientID;
 
-  public OMAllocateBlockResponse(@Nullable OmKeyInfo omKeyInfo,
-      long clientID, @Nonnull OMResponse omResponse) {
+  public OMAllocateBlockResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo, long clientID) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.clientID = clientID;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMAllocateBlockResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
-          omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), clientID);
-      omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation, openKey,
-          omKeyInfo);
-    }
+    String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), clientID);
+    omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation, openKey,
+        omKeyInfo);
   }
 }

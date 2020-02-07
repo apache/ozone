@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.hdds;
 
-import org.apache.hadoop.http.HttpConfig;
-
 /**
  * Legacy HDFS keys used by ozone.
  *
@@ -94,29 +92,8 @@ public final class DFSConfigKeysLegacy {
   public static final String DFS_METRICS_PERCENTILES_INTERVALS_KEY =
       "dfs.metrics.percentiles.intervals";
 
-  public static final String DFS_ADMIN = "dfs.cluster.administrators";
-
-  public static final boolean DFS_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
-
-  public static final String DFS_CLIENT_HTTPS_NEED_AUTH_KEY =
-      "dfs.client.https.need-auth";
-
-  public static final String DFS_SERVER_HTTPS_KEYPASSWORD_KEY =
-      "ssl.server.keystore.keypassword";
-  public static final String DFS_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY =
-      "ssl.server.keystore.password";
-  public static final String DFS_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY =
-      "ssl.server.truststore.password";
   public static final String DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY =
       "dfs.web.authentication.kerberos.keytab";
-  public static final String DFS_SERVER_HTTPS_KEYSTORE_LOCATION_KEY =
-      "ssl.server.keystore.location";
-  public static final String DFS_SERVER_HTTPS_TRUSTSTORE_LOCATION_KEY =
-      "ssl.server.truststore.location";
-  public static final String DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
-      "ssl-server.xml";
-  public static final String DFS_HTTP_POLICY_DEFAULT =
-      HttpConfig.Policy.HTTP_ONLY.name();
 
 }
 

@@ -17,15 +17,21 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
+import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 /**
  * Singleton to get access to Http related configuration.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public class HttpConfig {
+public final class HttpConfig {
+
+  private HttpConfig() {
+  }
 
   /**
    * Enum for different kind of security combinations.
@@ -53,5 +59,17 @@ public class HttpConfig {
     public boolean isHttpsEnabled() {
       return this == HTTPS_ONLY || this == HTTP_AND_HTTPS;
     }
+  }
+
+  public static Policy getHttpPolicy(Configuration conf) {
+    String policyStr = conf.get(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY,
+        OzoneConfigKeys.OZONE_HTTP_POLICY_DEFAULT);
+    HttpConfig.Policy policy = HttpConfig.Policy.fromString(policyStr);
+    if (policy == null) {
+      throw new HadoopIllegalArgumentException("Unregonized value '"
+          + policyStr + "' for " + OzoneConfigKeys.OZONE_HTTP_POLICY_KEY);
+    }
+    conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());
+    return policy;
   }
 }

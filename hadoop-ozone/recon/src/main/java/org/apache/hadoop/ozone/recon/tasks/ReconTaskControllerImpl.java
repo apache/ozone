@@ -57,7 +57,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   private Map<String, ReconDBUpdateTask> reconDBUpdateTasks;
   private ExecutorService executorService;
-  private int threadCount = 1;
+  private final int threadCount;
   private final Semaphore taskSemaphore = new Semaphore(1);
   private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
   private static final int TASK_FAILURE_THRESHOLD = 2;
@@ -70,7 +70,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     reconDBUpdateTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
-    executorService = Executors.newFixedThreadPool(threadCount);
     reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
     for (ReconDBUpdateTask task : tasks) {
       registerTask(task);
@@ -183,7 +182,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         ReconDBUpdateTask task = taskEntry.getValue();
         tasks.add(() -> task.reprocess(omMetadataManager));
       }
-
       List<Future<Pair<String, Boolean>>> results =
           executorService.invokeAll(tasks);
       for (Future<Pair<String, Boolean>> f : results) {
@@ -229,7 +227,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   @Override
+  public void start() {
+    LOG.info("Starting Recon Task Controller.");
+    executorService = Executors.newFixedThreadPool(threadCount);
+  }
+
+  @Override
   public void stop() {
+    LOG.info("Stopping Recon Task Controller.");
     this.executorService.shutdownNow();
   }
 
