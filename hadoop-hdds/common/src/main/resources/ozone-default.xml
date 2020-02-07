@@ -2433,4 +2433,80 @@
       The directory named by this property must exist and be writeable.
     </description>
   </property>
+  <property>
+    <name>ozone.http.policy</name>
+    <value>HTTP_ONLY</value>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <description>Decide if HTTPS(SSL) is supported on Ozone
+      This configures the HTTP endpoint for Ozone daemons:
+      The following values are supported:
+      - HTTP_ONLY : Service is provided only on http
+      - HTTPS_ONLY : Service is provided only on https
+      - HTTP_AND_HTTPS : Service is provided both on http and https
+    </description>
+  </property>
+  <property>
+    <name>ozone.https.client.need-auth</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value>false</value>
+    <description>
+      Whether SSL client certificate authentication is required
+    </description>
+  </property>
+  <property>
+    <name>ozone.https.client.keystore.resource</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value>ssl-client.xml</value>
+    <description>
+      Resource file from which ssl client keystore
+      information will be extracted
+    </description>
+  </property>
+  <property>
+    <name>ozone.https.server.keystore.resource</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value>ssl-server.xml</value>
+    <description>Resource file from which ssl server keystore
+      information will be extracted
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.keystore.keypassword</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>Keystore key password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.keystore.location</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Keystore location for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.keystore.password</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Keystore password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.truststore.location</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Truststore location for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.truststore.password</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Truststore password for HTTPS SSL configuration
+    </description>
+  </property>
 </configuration>

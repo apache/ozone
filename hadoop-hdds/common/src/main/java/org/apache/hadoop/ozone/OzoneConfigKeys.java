@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
+import org.apache.hadoop.http.HttpConfig;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
 
@@ -424,6 +425,31 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 
+  public static final String OZONE_HTTP_POLICY_KEY =
+      "ozone.http.policy";
+  public static final String OZONE_HTTP_POLICY_DEFAULT =
+      HttpConfig.Policy.HTTP_ONLY.name();
+  public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
+      "ozone.https.server.keystore.resource";
+  public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
+      "ssl-server.xml";
+  public static final String  OZONE_SERVER_HTTPS_KEYPASSWORD_KEY =
+      "ssl.server.keystore.keypassword";
+  public static final String  OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY =
+      "ssl.server.keystore.password";
+  public static final String  OZONE_SERVER_HTTPS_KEYSTORE_LOCATION_KEY =
+      "ssl.server.keystore.location";
+  public static final String  OZONE_SERVER_HTTPS_TRUSTSTORE_LOCATION_KEY =
+      "ssl.server.truststore.location";
+  public static final String  OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY =
+      "ssl.server.truststore.password";
+  public static final String  OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY =
+      "ozone.https.client.keystore.resource";
+  public static final String  OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
+      "ssl-client.xml";
+  public static final String  OZONE_CLIENT_HTTPS_NEED_AUTH_KEY =
+      "ozone.https.client.need-auth";
+  public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
   /**
    * There is no need to instantiate this class.
    */
