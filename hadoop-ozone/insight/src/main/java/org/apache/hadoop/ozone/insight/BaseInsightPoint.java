@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.server.PrometheusMetricsSink;
+import org.apache.hadoop.hdds.server.http.PrometheusMetricsSink;
 import org.apache.hadoop.ozone.insight.LoggerSource.Level;
 
 import com.google.protobuf.ProtocolMessageEnum;
