@@ -23,6 +23,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 
@@ -53,7 +54,7 @@ public class OzoneManagerDoubleBufferMetrics {
 
   @Metric(about = "Average number of transactions flushed in a single " +
       "iteration")
-  private MutableGaugeLong avgFlushTransactionsInOneIteration;
+  private MutableGaugeFloat avgFlushTransactionsInOneIteration;
 
 
 
@@ -103,11 +104,11 @@ public class OzoneManagerDoubleBufferMetrics {
     return flushTime;
   }
 
-  public long getAvgFlushTransactionsInOneIteration() {
+  public float getAvgFlushTransactionsInOneIteration() {
     return avgFlushTransactionsInOneIteration.value();
   }
 
-  public void setAvgFlushTransactionsInOneIteration(long count) {
+  public void setAvgFlushTransactionsInOneIteration(float count) {
     this.avgFlushTransactionsInOneIteration.set(count);
   }
 
