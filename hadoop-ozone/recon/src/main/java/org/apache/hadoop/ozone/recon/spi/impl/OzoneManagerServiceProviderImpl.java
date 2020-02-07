@@ -47,8 +47,8 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -123,7 +123,7 @@ public class OzoneManagerServiceProviderImpl
     omSnapshotDBParentDir = reconUtils.getReconDbDir(configuration,
         OZONE_RECON_OM_SNAPSHOT_DB_DIR);
 
-    HttpConfig.Policy policy = DFSUtil.getHttpPolicy(configuration);
+    HttpConfig.Policy policy = HddsUtils.getHttpPolicy(configuration);
 
     int socketTimeout = (int) configuration.getTimeDuration(
         RECON_OM_SOCKET_TIMEOUT, RECON_OM_SOCKET_TIMEOUT_DEFAULT,

@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -87,7 +87,7 @@ public class OzoneManagerSnapshotProvider {
       this.peerNodesMap.put(peerNode.getOMNodeId(), peerNode);
     }
 
-    this.httpPolicy = DFSUtil.getHttpPolicy(conf);
+    this.httpPolicy = HddsUtils.getHttpPolicy(conf);
     this.httpRequestConfig = getHttpRequestConfig(conf);
   }
 
