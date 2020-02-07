@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -80,8 +81,8 @@ public class BasicRootedOzoneClientAdapterImpl
       LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
 
   private OzoneClient ozoneClient;
-  private ClientProtocol proxy;
   private ObjectStore objectStore;
+  private ClientProtocol proxy;
   private ReplicationType replicationType;
   private ReplicationFactor replicationFactor;
   private boolean securityEnabled;
@@ -196,6 +197,14 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   private OzoneBucket getBucket(String volumeStr, String bucketStr,
       boolean createIfNotExist) throws IOException {
+    Preconditions.checkNotNull(volumeStr);
+    Preconditions.checkNotNull(bucketStr);
+    
+    if (bucketStr.isEmpty()) {
+      // throw FileNotFoundException in this case to make Hadoop common happy
+      throw new FileNotFoundException(
+          "getBucket: Invalid argument: given bucket string is empty.");
+    }
 
     OzoneBucket bucket;
     try {
@@ -348,11 +357,11 @@ public class BasicRootedOzoneClientAdapterImpl
     LOG.trace("creating dir for path: {}", pathStr);
     incrementCounter(Statistic.OBJECTS_CREATED);
     OFSPath ofsPath = new OFSPath(pathStr);
-    if (ofsPath.getVolumeName().length() == 0) {
+    if (ofsPath.getVolumeName().isEmpty()) {
       // Volume name unspecified, invalid param, return failure
       return false;
     }
-    if (ofsPath.getBucketName().length() == 0) {
+    if (ofsPath.getBucketName().isEmpty()) {
       // Create volume only
       objectStore.createVolume(ofsPath.getVolumeName());
       return true;
@@ -430,6 +439,12 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.OBJECTS_QUERY);
     OFSPath ofsPath = new OFSPath(path);
     String key = ofsPath.getKeyName();
+    // getFileStatus is called for root
+    if (ofsPath.getVolumeName().isEmpty() &&
+        ofsPath.getBucketName().isEmpty()) {
+      // Generate a FileStatusAdapter for root
+      return rootFileStatusAdapter();
+    }
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
       OzoneFileStatus status = bucket.getFileStatus(key);
@@ -646,6 +661,29 @@ public class BasicRootedOzoneClientAdapterImpl
         status.getOwner(),
         status.getGroup(),
         status.getPath()
+    );
+  }
+
+  /**
+   * Generate a FileStatusAdapter for OFS root.
+   * @return FileStatusAdapter for root.
+   */
+  private static FileStatusAdapter rootFileStatusAdapter() {
+    // Note that most fields are mimicked from HDFS FileStatus for root,
+    //  except modification time, permission, owner and group.
+    // TODO: Revisit the return value.
+    return new FileStatusAdapter(
+        0L,
+        null,
+        true,
+        (short)0,
+        0L,
+        0L,
+        0L,
+        (short)00755,
+        null,
+        null,
+        null
     );
   }
 }
