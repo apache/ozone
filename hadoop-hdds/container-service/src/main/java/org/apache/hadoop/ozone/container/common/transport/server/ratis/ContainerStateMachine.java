@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
