@@ -26,8 +26,8 @@ import java.util.OptionalInt;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.HddsConfServlet;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -70,7 +70,7 @@ public abstract class BaseHttpServer {
   public BaseHttpServer(Configuration conf, String name) throws IOException {
     this.name = name;
     this.conf = conf;
-    policy = DFSUtil.getHttpPolicy(conf);
+    policy = HddsUtils.getHttpPolicy(conf);
     if (isEnabled()) {
       this.httpAddress = getHttpBindAddress();
       this.httpsAddress = getHttpsBindAddress();
@@ -80,8 +80,8 @@ public abstract class BaseHttpServer {
       // CommonConfigurationKeysPublic.HADOOP_PROMETHEUS_ENABLED when possible.
       conf.setBoolean("hadoop.prometheus.endpoint.enabled", false);
 
-      HttpServer2.Builder builder = DFSUtil.httpServerTemplateForNNAndJN(conf,
-          httpAddress, httpsAddress,
+      HttpServer2.Builder builder = HddsUtils.newHttpServer2BuilderForOzone(
+          conf, httpAddress, httpsAddress,
           name, getSpnegoPrincipal(), getKeytabFile());
 
       final boolean xFrameEnabled = conf.getBoolean(
