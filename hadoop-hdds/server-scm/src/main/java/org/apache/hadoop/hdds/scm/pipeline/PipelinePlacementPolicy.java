@@ -278,12 +278,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       rackAwareness = true;
       results.add(nextNode);
       exclude.add(nextNode);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Second node chosen: {}", nextNode);
+      }
     } else {
-      LOG.debug("Pipeline Placement: Unable to find 2nd node on different " +
-          "rack based on rack awareness.");
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Second node chosen: {}", nextNode);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Pipeline Placement: Unable to find 2nd node on different " +
+            "rack based on rack awareness.");
+      }
     }
 
     // Then choose nodes close to anchor based on network topology
