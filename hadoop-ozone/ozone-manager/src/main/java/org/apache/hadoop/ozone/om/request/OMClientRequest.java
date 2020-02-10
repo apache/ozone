@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -247,13 +248,16 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   /**
    * Check if the transaction is a replay.
-   * @param updateID last updateID of the entity in the DB
+   * @param ozoneObj OMVolumeArgs or OMBucketInfo or OMKeyInfo object whose 
+   *                 updateID needs to be compared with
    * @param transactionID the current transaction ID
    * @return true if transactionID is less than or equal to updateID, false
    * otherwise.
    */
-  public boolean isReplay(OzoneManager om, long updateID, long transactionID) {
-    return om.isRatisEnabled() && transactionID <= updateID;
+  protected boolean isReplay(OzoneManager om, WithObjectID ozoneObj,
+      long transactionID) {
+    return om.isRatisEnabled() && ozoneObj.isUpdateIDset() &&
+        transactionID <= ozoneObj.getUpdateID();
   }
 
   /**
