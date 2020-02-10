@@ -35,28 +35,28 @@ public class OMVolumeAclOpResponse extends OMClientResponse {
 
   private OmVolumeArgs omVolumeArgs;
 
-  public OMVolumeAclOpResponse(OmVolumeArgs omVolumeArgs,
-      @Nonnull OMResponse omResponse) {
+  public OMVolumeAclOpResponse(@Nonnull OMResponse omResponse,
+      OmVolumeArgs omVolumeArgs) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMVolumeAclOpResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (getOMResponse().getSuccess()) {
-      if ((getOMResponse().hasAddAclResponse() &&
-          getOMResponse().getAddAclResponse().getResponse()) ||
-          (getOMResponse().hasRemoveAclResponse() &&
-              getOMResponse().getRemoveAclResponse().getResponse()) ||
-          (getOMResponse().hasSetAclResponse() &&
-              getOMResponse().getSetAclResponse().getResponse())) {
-        omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-            omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
-            omVolumeArgs);
-      }
-    }
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+        omVolumeArgs);
   }
 
   @VisibleForTesting
