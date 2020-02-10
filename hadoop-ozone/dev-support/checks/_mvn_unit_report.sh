@@ -43,25 +43,23 @@ find "." -name "*.hprof" \
 grep -A1 'Crashed tests' "${REPORT_DIR}/output.log" \
   | grep -v -e 'Crashed tests' -e '--' \
   | cut -f2- -d' ' \
-  | sort -u >> "${REPORT_DIR}/summary.txt"
+  | sort -u \
+  | tee -a "${REPORT_DIR}/summary.txt"
+
+#Collect of all of the report files of FAILED tests
+for failed_test in $(< ${REPORT_DIR}/summary.txt); do
+  for file in $(find "." -name "${failed_test}.txt" -or -name "${failed_test}-output.txt" -or -name "TEST-${failed_test}.xml"); do
+    dir=$(dirname "${file}")
+    dest_dir=$(_realpath --relative-to="${PWD}" "${dir}/../..") || continue
+    mkdir -p "${REPORT_DIR}/${dest_dir}"
+    cp "${file}" "${REPORT_DIR}/${dest_dir}"/
+  done
+done
 
 ## Check if Maven was killed
 if grep -q 'Killed.* mvn .* test ' "${REPORT_DIR}/output.log"; then
   echo 'Maven test run was killed' >> "${REPORT_DIR}/summary.txt"
 fi
-
-#Collect of all of the report failes of FAILED tests
-while IFS= read -r -d '' dir; do
-   while IFS=$'\n' read -r file; do
-      DIR_OF_TESTFILE=$(dirname "$file")
-      NAME_OF_TESTFILE=$(basename "$file")
-      NAME_OF_TEST="${NAME_OF_TESTFILE%.*}"
-      DESTDIRNAME=$(_realpath --relative-to="$PWD" "$DIR_OF_TESTFILE/../..") || continue
-      mkdir -p "$REPORT_DIR/$DESTDIRNAME"
-      #shellcheck disable=SC2086
-      cp -r "$DIR_OF_TESTFILE"/*$NAME_OF_TEST* "$REPORT_DIR/$DESTDIRNAME/"
-   done < <(grep -l -r FAILURE --include="*.txt" "$dir" | grep -v output.txt)
-done < <(find "." -name surefire-reports -print0)
 
 ## generate summary markdown file
 export SUMMARY_FILE="$REPORT_DIR/summary.md"
