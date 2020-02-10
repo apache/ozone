@@ -330,6 +330,8 @@ public class ReplicationManager implements MetricsSource {
 
     } catch (ContainerNotFoundException ex) {
       LOG.warn("Missing container {}.", id);
+    } catch (Exception ex) {
+      LOG.warn("Process container {} error: ", id, ex);
     } finally {
       lockManager.unlock(id);
     }
