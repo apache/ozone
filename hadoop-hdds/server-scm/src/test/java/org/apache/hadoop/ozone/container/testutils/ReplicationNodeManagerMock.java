@@ -72,7 +72,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * @return A state to number of nodes that in this state mapping
    */
   @Override
-  public Map<String, Map<String, Integer>> getNodeCount() {
+  public Map<String, Integer> getNodeCount() {
     return null;
   }
 

@@ -146,35 +146,11 @@ public class TestSCMNodeMetrics {
     cluster.getStorageContainerManager().getScmNodeManager()
         .processNodeReport(datanode.getDatanodeDetails(), nodeReport);
 
-    assertGauge("InServiceHealthyNodes", 1,
+    assertGauge("HealthyNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("InServiceStaleNodes", 0,
+    assertGauge("StaleNodes", 0,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("InServiceDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissioningHealthyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissioningStaleNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissioningDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissionedHealthyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissionedStaleNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissionedDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("EnteringMaintenanceHealthyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("EnteringMaintenanceStaleNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("EnteringMaintenanceDeadNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("InMaintenanceHealthyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("InMaintenanceStaleNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("InMaintenanceDeadNodes", 0,
+    assertGauge("DeadNodes", 0,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("DiskCapacity", 100L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
@@ -187,30 +163,6 @@ public class TestSCMNodeMetrics {
     assertGauge("SSDUsed", 0L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("SSDRemaining", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("MaintenanceDiskCapacity", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("MaintenanceDiskUsed", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("MaintenanceDiskRemaining", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("MaintenanceSSDCapacity", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("MaintenanceSSDUsed", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("MaintenanceSSDRemaining", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissionedDiskCapacity", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissionedDiskUsed", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissionedDiskRemaining", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissionedSSDCapacity", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissionedSSDUsed", 0L,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("DecommissionedSSDRemaining", 0L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
   }
 

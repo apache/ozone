@@ -243,7 +243,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, Map<String, Integer>> getNodeCount() {
+  public Map<String, Integer> getNodeCount() {
     return null;
   }
 

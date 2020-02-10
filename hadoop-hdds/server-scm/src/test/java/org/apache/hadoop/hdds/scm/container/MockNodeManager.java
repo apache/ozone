@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -472,23 +471,12 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, Map<String, Integer>> getNodeCount() {
-    Map<String, Map<String, Integer>> nodes = new HashMap<>();
-    for (NodeOperationalState opState : NodeOperationalState.values()) {
-      Map<String, Integer> states = new HashMap<>();
-      for (HddsProtos.NodeState health : HddsProtos.NodeState.values()) {
-        states.put(health.name(), 0);
-      }
-      nodes.put(opState.name(), states);
-    }
-    // At the moment MockNodeManager is not aware of decommission and
-    // maintenance states, therefore loop over all nodes and assume all nodes
-    // are IN_SERVICE. This will be fixed as part of HDDS-2673
+  public Map<String, Integer> getNodeCount() {
+    Map<String, Integer> nodeCountMap = new HashMap<String, Integer>();
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
-      nodes.get(NodeOperationalState.IN_SERVICE.name())
-          .compute(state.name(), (k, v) -> v + 1);
+      nodeCountMap.put(state.toString(), getNodeCount(null, state));
     }
-    return nodes;
+    return nodeCountMap;
   }
 
   @Override
