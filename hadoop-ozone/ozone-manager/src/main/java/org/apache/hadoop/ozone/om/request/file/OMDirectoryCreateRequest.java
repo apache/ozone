@@ -60,12 +60,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Status;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
@@ -187,6 +187,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             dirKeyInfo);
+        result = Result.SUCCESS;
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
         // Check if this is a replay of ratis logs
@@ -197,13 +198,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
           throw new OMReplayException();
         } else {
           result = Result.DIRECTORY_ALREADY_EXISTS;
-          throw new OMException("Directory " + dirKey + "already exists in " +
-              "volume/bucket: " + volumeName + "/" + bucketName,
-              DIRECTORY_ALREADY_EXISTS);
+          omResponse.setStatus(Status.DIRECTORY_ALREADY_EXISTS);
+          omClientResponse = new OMDirectoryCreateResponse(omResponse.build());
         }
       }
-
-      result = Result.SUCCESS;
     } catch (IOException ex) {
       if (ex instanceof OMReplayException) {
         result = Result.REPLAY;
@@ -246,8 +244,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       }
       break;
     case DIRECTORY_ALREADY_EXISTS:
-      LOG.error("Directory already exists. Volume:{}, Bucket:{}, Key{}",
-          volumeName, bucketName, keyName, exception);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Directory already exists. Volume:{}, Bucket:{}, Key{}",
+            volumeName, bucketName, keyName, exception);
+      }
       break;
     case FAILURE:
       omMetrics.incNumCreateDirectoryFails();

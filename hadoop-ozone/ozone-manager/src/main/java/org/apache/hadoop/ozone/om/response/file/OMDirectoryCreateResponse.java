@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
@@ -40,28 +41,28 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   private OmKeyInfo dirKeyInfo;
 
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo dirKeyInfo) {
+      @Nullable OmKeyInfo dirKeyInfo) {
     super(omResponse);
     this.dirKeyInfo = dirKeyInfo;
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
-   * For a successful request, the other constructor should be used.
+   * For when the request is not successful or it is a replay transaction or
+   * the directory already exists.
    */
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    String dirKey =
-        omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
-            dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
-        dirKeyInfo);
+    if (dirKeyInfo != null) {
+      String dirKey = omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
+          dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
+      omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
+          dirKeyInfo);
+    }
   }
 }

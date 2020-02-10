@@ -225,8 +225,6 @@ public class OMException extends IOException {
 
     CANNOT_CREATE_DIRECTORY_AT_ROOT,
 
-    DIRECTORY_ALREADY_EXISTS,
-
     REPLAY // When ratis logs are replayed.
   }
 }

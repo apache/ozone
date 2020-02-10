@@ -166,9 +166,8 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
-
-
 
 /**
  *  The client side implementation of OzoneManagerProtocol.
@@ -1434,7 +1433,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCreateDirectoryRequest(request)
         .build();
 
-    handleError(submitRequest(omRequest));
+    OMResponse omResponse = submitRequest(omRequest);
+    if (!omResponse.getStatus().equals(DIRECTORY_ALREADY_EXISTS)) {
+      // TODO: If the directory already exists, we should return false to
+      //  client. For this, the client createDirectory API needs to be
+      //  changed to return a boolean.
+      handleError(omResponse);
+    }
   }
 
   @Override
