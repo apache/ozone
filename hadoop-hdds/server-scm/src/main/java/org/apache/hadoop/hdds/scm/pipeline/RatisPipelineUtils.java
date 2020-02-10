@@ -99,6 +99,7 @@ public final class RatisPipelineUtils {
   /**
    * Return the list of pipelines who share the same set of datanodes
    * with the input pipeline.
+   *
    * @param stateManager PipelineStateManager
    * @param pipeline input pipeline
    * @return list of matched pipeline

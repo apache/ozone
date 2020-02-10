@@ -83,8 +83,64 @@ public class TestPipelinePlacementPolicy {
     DatanodeDetails nextNode = placementPolicy.chooseNodeBasedOnRackAwareness(
         healthyNodes, new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
         topologyWithDifRacks, anchor);
+    Assert.assertNotNull(nextNode);
     Assert.assertFalse(anchor.getNetworkLocation().equals(
         nextNode.getNetworkLocation()));
+  }
+
+  @Test
+  public void testFallBackPickNodes() {
+    List<DatanodeDetails> healthyNodes = overWriteLocationInNodes(
+        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY));
+    DatanodeDetails node;
+    try {
+      node = placementPolicy.fallBackPickNodes(healthyNodes, null);
+      Assert.assertNotNull(node);
+    } catch (SCMException e) {
+      Assert.fail("Should not reach here.");
+    }
+
+    // when input nodeSet are all excluded.
+    List<DatanodeDetails> exclude = healthyNodes;
+    try {
+      node = placementPolicy.fallBackPickNodes(healthyNodes, exclude);
+      Assert.assertNull(node);
+    } catch (SCMException e) {
+      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+          e.getResult());
+    } catch (Exception ex) {
+      Assert.fail("Should not reach here.");
+    }
+  }
+
+  @Test
+  public void testRackAwarenessNotEnabledWithFallBack() throws SCMException{
+    List<DatanodeDetails> healthyNodes =
+        nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
+    DatanodeDetails anchor = placementPolicy.chooseNode(healthyNodes);
+    DatanodeDetails randomNode = placementPolicy.chooseNode(healthyNodes);
+    // rack awareness is not enabled.
+    Assert.assertTrue(anchor.getNetworkLocation().equals(
+        randomNode.getNetworkLocation()));
+
+    NetworkTopology topology = new NetworkTopologyImpl(new Configuration());
+    DatanodeDetails nextNode = placementPolicy.chooseNodeBasedOnRackAwareness(
+        healthyNodes, new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
+        topology, anchor);
+    // RackAwareness should not be able to choose any node.
+    Assert.assertNull(nextNode);
+
+    // PlacementPolicy should still be able to pick a set of 3 nodes.
+    int numOfNodes = HddsProtos.ReplicationFactor.THREE.getNumber();
+    List<DatanodeDetails> results = placementPolicy
+        .getResultSet(numOfNodes, healthyNodes);
+    
+    Assert.assertEquals(numOfNodes, results.size());
+    // All nodes are on same rack.
+    Assert.assertEquals(results.get(0).getNetworkLocation(),
+        results.get(1).getNetworkLocation());
+    Assert.assertEquals(results.get(0).getNetworkLocation(),
+        results.get(2).getNetworkLocation());
   }
 
   private final static Node[] NODES = new NodeImpl[] {
