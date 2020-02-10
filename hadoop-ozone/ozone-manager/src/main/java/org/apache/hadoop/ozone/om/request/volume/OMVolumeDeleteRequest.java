@@ -103,8 +103,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       // If this is a replay, then the response has already been returned to
       // the client. So take no further action and return a dummy
       // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs.getUpdateID(),
-          transactionLogIndex)) {
+      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
         LOG.debug("Replayed Transaction {} ignored. Request: {}",
             transactionLogIndex, deleteVolumeRequest);
         return new OMVolumeDeleteResponse(createReplayOMResponse(omResponse));

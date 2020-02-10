@@ -152,8 +152,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       if (toKeyValue != null) {
 
         // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, toKeyValue.getUpdateID(),
-            trxnLogIndex)) {
+        if (isReplay(ozoneManager, toKeyValue, trxnLogIndex)) {
 
           // Check if fromKey is still in the DB and created before this
           // replay.

@@ -202,8 +202,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         // the openKey table would eventually reach the same state.
         // The reason we do not check the OpenKey table is to avoid a DB read
         // in regular non-replay scenario.
-        if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(),
-            trxnLogIndex)) {
+        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
           // Replay implies the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.
