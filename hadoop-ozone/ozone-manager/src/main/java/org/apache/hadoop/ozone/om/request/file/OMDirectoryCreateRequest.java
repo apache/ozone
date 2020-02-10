@@ -194,7 +194,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         String dirKey = omMetadataManager.getOzoneDirKey(volumeName,
             bucketName, keyName);
         OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(dirKey);
-        if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(), trxnLogIndex)) {
+        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
           throw new OMReplayException();
         } else {
           result = Result.DIRECTORY_ALREADY_EXISTS;

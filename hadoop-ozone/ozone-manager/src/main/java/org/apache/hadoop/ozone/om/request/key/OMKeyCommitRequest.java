@@ -147,7 +147,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(dbOzoneKey);
       if (dbKeyInfo != null) {
         // Check if this transaction is a replay of ratis logs
-        if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(), trxnLogIndex)) {
+        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
           // Replay implies the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.
