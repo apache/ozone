@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -311,8 +310,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Prepare OmKeyInfo and append the new blocks. This OMKeyInfo will be
-   * persisted to openKeyTable.
+   * Prepare OmKeyInfo which will be persisted to openKeyTable.
    * @return OmKeyInfo
    * @throws IOException
    */
@@ -326,9 +324,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable OmBucketInfo omBucketInfo,
       long transactionLogIndex)
       throws IOException {
-    OmKeyInfo omKeyInfo = null;
     if (keyArgs.getIsMultipartKey()) {
-      omKeyInfo = prepareMultipartKeyInfo(omMetadataManager, keyArgs,
+      return prepareMultipartKeyInfo(omMetadataManager, keyArgs,
           size, locations, encInfo, prefixManager, omBucketInfo,
           transactionLogIndex);
       //TODO args.getMetadata
@@ -345,23 +342,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
       dbKeyInfo.setUpdateID(transactionLogIndex);
-      omKeyInfo = dbKeyInfo;
+      return dbKeyInfo;
     }
 
-    if (omKeyInfo == null) {
-      // the key does not exist, create a new object.
-      // Blocks will be appended as version 0.
-      omKeyInfo = createKeyInfo(keyArgs, locations, keyArgs.getFactor(),
-          keyArgs.getType(), keyArgs.getDataSize(), encInfo, prefixManager,
-          omBucketInfo, transactionLogIndex);
-    }
-
-    // Append new blocks
-    omKeyInfo.appendNewBlocks(keyArgs.getKeyLocationsList().stream()
-        .map(OmKeyLocationInfo::getFromProtobuf)
-        .collect(Collectors.toList()), false);
-
-    return omKeyInfo;
+    // the key does not exist, create a new object.
+    // Blocks will be appended as version 0.
+    return createKeyInfo(keyArgs, locations, keyArgs.getFactor(),
+        keyArgs.getType(), keyArgs.getDataSize(), encInfo, prefixManager,
+        omBucketInfo, transactionLogIndex);
   }
 
   /**
