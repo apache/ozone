@@ -35,12 +35,10 @@ import java.util.stream.Collectors;
  * can be extended for other OzFS optimizations in future.
  */
 // TODO: support Auditable interface
-public final class OmPrefixInfo extends WithMetadata {
+public final class OmPrefixInfo extends WithObjectID {
 
   private String name;
   private List<OzoneAcl> acls;
-  private long objectID;
-  private long updateID;
 
   public OmPrefixInfo(String name, List<OzoneAcl> acls,
       Map<String, String> metadata, long objectId, long updateId) {
@@ -77,50 +75,6 @@ public final class OmPrefixInfo extends WithMetadata {
    */
   public String getName() {
     return name;
-  }
-
-  /**
-   * Set the Object ID. If this value is already set then this function throws.
-   * There is a reason why we cannot use the final here. The OMKeyInfo is
-   * deserialized from the protobuf in many places in code. We need to set
-   * this object ID, after it is deserialized.
-   *
-   * @param obId - long
-   */
-  public void setObjectID(long obId) {
-    if(this.objectID != 0) {
-      throw new UnsupportedOperationException("Attempt to modify object ID " +
-          "which is not zero. Current Object ID is " + this.objectID);
-    }
-    this.objectID = obId;
-  }
-
-  /**
-   * Sets the update ID. For each modification of this object, we will set
-   * this to a value greater than the current value.
-   * @param updateId  long
-   */
-  public void setUpdateID(long updateId) {
-    Preconditions.checkArgument(updateId >= this.updateID,
-        "Trying to set updateID to a value ({}) which is less than the " +
-            "current value ({}) for ()", updateId, this.updateID, this);
-    this.updateID = updateId;
-  }
-
-  /**
-   * Returns objectID.
-   * @return long
-   */
-  public long getObjectID() {
-    return objectID;
-  }
-
-  /**
-   * Returns updateID.
-   * @return long
-   */
-  public long getUpdateID() {
-    return updateID;
   }
 
   /**

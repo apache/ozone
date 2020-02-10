@@ -88,7 +88,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
       // Check if this transaction is a replay of ratis logs.
       if (omPrefixInfo != null) {
-        if (isReplay(ozoneManager, omPrefixInfo.getUpdateID(), trxnLogIndex)) {
+        if (isReplay(ozoneManager, omPrefixInfo, trxnLogIndex)) {
           // This is a replayed transaction. Return dummy response.
           throw new OMReplayException();
         }
