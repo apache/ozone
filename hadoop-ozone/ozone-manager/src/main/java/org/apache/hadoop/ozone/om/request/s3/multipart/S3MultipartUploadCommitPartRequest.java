@@ -140,7 +140,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             bucketName, keyName);
         OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
         if (dbKeyInfo != null) {
-          if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(), trxnLogIndex)) {
+          if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
             throw new OMReplayException();
           }
         }
@@ -149,7 +149,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             KEY_NOT_FOUND);
       } else {
         // Check the OpenKeyTable if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, omKeyInfo.getUpdateID(), trxnLogIndex)) {
+        if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
           throw new OMReplayException();
         }
       }

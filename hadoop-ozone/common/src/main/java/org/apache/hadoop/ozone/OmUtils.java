@@ -453,11 +453,6 @@ public final class OmUtils {
     return dirFile;
   }
 
-  public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
-      RepeatedOmKeyInfo repeatedOmKeyInfo) throws IOException {
-    return prepareKeyForDelete(keyInfo, repeatedOmKeyInfo, 0L);
-  }
-
   /**
    * Prepares key info to be moved to deletedTable.
    * 1. It strips GDPR metadata from key info
@@ -465,14 +460,14 @@ public final class OmUtils {
    * implies that no entry for the object key exists in deletedTable so we
    * create a new instance to include this key, else we update the existing
    * repeatedOmKeyInfo instance.
-   * 3. Set the updateID to the transactionLogIndex
+   * 3. Set the updateID to the transactionLogIndex.
    * @param keyInfo args supplied by client
    * @param repeatedOmKeyInfo key details from deletedTable
    * @param trxnLogIndex For Multipart keys, this is the transactionLogIndex
    *                     of the MultipartUploadAbort request which needs to
    *                     be set as the updateID of the partKeyInfos.
-   *                     For regular Key deletes, this value should be passed
-   *                     as 0 as the updateID is already set.
+   *                     For regular Key deletes, this value should be set to
+   *                     the same updaeID as is in keyInfo.
    * @return {@link RepeatedOmKeyInfo}
    * @throws IOException if I/O Errors when checking for key
    */
@@ -489,10 +484,8 @@ public final class OmUtils {
       keyInfo.clearFileEncryptionInfo();
     }
 
-    // If trxnLogIndex is 0, then the updateID has already been set.
-    if (trxnLogIndex != 0) {
-      keyInfo.setUpdateID(trxnLogIndex);
-    }
+    // Set the updateID
+    keyInfo.setUpdateID(trxnLogIndex);
 
     if(repeatedOmKeyInfo == null) {
       //The key doesn't exist in deletedTable, so create a new instance.

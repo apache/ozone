@@ -129,11 +129,14 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       if (omKeyInfo != null) {
         // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, omKeyInfo.getUpdateID(), trxnLogIndex)) {
+        if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
           // Replay implies the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.
           throw new OMReplayException();
+          // TODO: Check if corresponding key exists in OpenKey table as we
+          //  do not check for replay while creating Keys. If it exists,
+          //  delete the key from OpenKey table.
         }
       }
 

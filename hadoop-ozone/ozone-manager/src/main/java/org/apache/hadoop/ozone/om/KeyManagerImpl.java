@@ -815,7 +815,7 @@ public class KeyManagerImpl implements KeyManager {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           metadataManager.getDeletedTable().get(objectKey);
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(keyInfo,
-          repeatedOmKeyInfo);
+          repeatedOmKeyInfo, 0L);
       metadataManager.getKeyTable().delete(objectKey);
       metadataManager.getDeletedTable().put(objectKey, repeatedOmKeyInfo);
     } catch (OMException ex) {
@@ -1060,7 +1060,7 @@ public class KeyManagerImpl implements KeyManager {
         RepeatedOmKeyInfo repeatedOmKeyInfo =
             metadataManager.getDeletedTable().get(partName);
         repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            keyInfo, repeatedOmKeyInfo);
+            keyInfo, repeatedOmKeyInfo, 0L);
         metadataManager.getDeletedTable().put(partName, repeatedOmKeyInfo);
         throw new OMException("No such Multipart upload is with specified " +
             "uploadId " + uploadID, ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
@@ -1097,7 +1097,7 @@ public class KeyManagerImpl implements KeyManager {
                     .get(oldPartKeyInfo.getPartName());
 
             repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-                partKey, repeatedOmKeyInfo);
+                partKey, repeatedOmKeyInfo, 0L);
 
             metadataManager.getDeletedTable().put(partName, repeatedOmKeyInfo);
             metadataManager.getDeletedTable().putWithBatch(batch,
@@ -1215,7 +1215,7 @@ public class KeyManagerImpl implements KeyManager {
                     .get(partKeyInfo.getPartName());
 
             repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-                currentKeyPartInfo, repeatedOmKeyInfo);
+                currentKeyPartInfo, repeatedOmKeyInfo, 0L);
 
             metadataManager.getDeletedTable().putWithBatch(batch,
                 partKeyInfo.getPartName(), repeatedOmKeyInfo);
