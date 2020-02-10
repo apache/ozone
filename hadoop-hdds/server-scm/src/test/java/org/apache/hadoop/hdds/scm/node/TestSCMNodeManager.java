@@ -19,12 +19,10 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -55,7 +53,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -243,11 +240,6 @@ public class TestSCMNodeManager {
       Thread.sleep(4 * 1000);
       assertEquals(count, nodeManager.getNodeCount(
           NodeStatus.inServiceHealthy()));
-
-      Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
-      assertEquals(count,
-          nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
-              .get(HddsProtos.NodeState.HEALTHY.name()).intValue());
     }
   }
 
@@ -331,11 +323,6 @@ public class TestSCMNodeManager {
           .getUuid(), staleNodeList.get(0).getUuid());
       Thread.sleep(1000);
 
-      Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
-      assertEquals(1,
-          nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
-              .get(HddsProtos.NodeState.STALE.name()).intValue());
-
       // heartbeat good nodes again.
       for (DatanodeDetails dn : nodeList) {
         nodeManager.processHeartbeat(dn);
@@ -347,14 +334,10 @@ public class TestSCMNodeManager {
 
       // the stale node has been removed
       staleNodeList = nodeManager.getNodes(NodeStatus.inServiceStale());
-      nodeCounts = nodeManager.getNodeCount();
       assertEquals("Expected to find 1 stale node",
           0, nodeManager.getNodeCount(NodeStatus.inServiceStale()));
       assertEquals("Expected to find 1 stale node",
           0, staleNodeList.size());
-      assertEquals(0,
-          nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
-              .get(HddsProtos.NodeState.STALE.name()).intValue());
 
       // Check for the dead node now.
       List<DatanodeDetails> deadNodeList =
@@ -363,9 +346,6 @@ public class TestSCMNodeManager {
           nodeManager.getNodeCount(NodeStatus.inServiceDead()));
       assertEquals("Expected to find 1 dead node",
           1, deadNodeList.size());
-      assertEquals(1,
-          nodeCounts.get(HddsProtos.NodeOperationalState.IN_SERVICE.name())
-              .get(HddsProtos.NodeState.DEAD.name()).intValue());
       assertEquals("Dead node is not the expected ID", staleNode
           .getUuid(), deadNodeList.get(0).getUuid());
     }
@@ -1213,58 +1193,6 @@ public class TestSCMNodeManager {
                 .size()));
       }
     }
-  }
-
-  @Test
-  public void testGetNodeInfo()
-      throws IOException, InterruptedException, NodeNotFoundException,
-        AuthenticationException {
-    OzoneConfiguration conf = getConf();
-    final int nodeCount = 6;
-    SCMNodeManager nodeManager = createNodeManager(conf);
-
-    for (int i=0; i<nodeCount; i++) {
-      DatanodeDetails datanodeDetails =
-          MockDatanodeDetails.randomDatanodeDetails();
-      final long capacity = 2000;
-      final long used = 100;
-      final long remaining = 1900;
-      UUID dnId = datanodeDetails.getUuid();
-      String storagePath = testDir.getAbsolutePath() + "/" + dnId;
-      StorageReportProto report = TestUtils
-          .createStorageReport(dnId, storagePath, capacity, used,
-              remaining, null);
-
-      nodeManager.register(datanodeDetails, TestUtils.createNodeReport(report),
-          TestUtils.getRandomPipelineReports());
-
-      nodeManager.processHeartbeat(datanodeDetails);
-      if (i == 5) {
-        nodeManager.setNodeOperationalState(datanodeDetails,
-            HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE);
-      }
-      if (i == 3 || i == 4) {
-        nodeManager.setNodeOperationalState(datanodeDetails,
-            HddsProtos.NodeOperationalState.DECOMMISSIONED);
-      }
-    }
-    Thread.sleep(100);
-
-    Map<String, Long> stats = nodeManager.getNodeInfo();
-    // 3 IN_SERVICE nodes:
-    assertEquals(6000, stats.get("DiskCapacity").longValue());
-    assertEquals(300, stats.get("DiskUsed").longValue());
-    assertEquals(5700, stats.get("DiskRemaining").longValue());
-
-    // 2 Decommissioned nodes
-    assertEquals(4000, stats.get("DecommissionedDiskCapacity").longValue());
-    assertEquals(200, stats.get("DecommissionedDiskUsed").longValue());
-    assertEquals(3800, stats.get("DecommissionedDiskRemaining").longValue());
-
-    // 1 Maintenance node
-    assertEquals(2000, stats.get("MaintenanceDiskCapacity").longValue());
-    assertEquals(100, stats.get("MaintenanceDiskUsed").longValue());
-    assertEquals(1900, stats.get("MaintenanceDiskRemaining").longValue());
   }
 
   /**
