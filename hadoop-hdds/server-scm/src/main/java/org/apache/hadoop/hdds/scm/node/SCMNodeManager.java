@@ -482,16 +482,22 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  @Override
-  public Map<String, Integer> getNodeCount() {
-    // TODO - This does not consider decom, maint etc.
-    Map<String, Integer> nodeCountMap = new HashMap<String, Integer>();
-    for(NodeState state : NodeState.values()) {
-      // TODO - this iterate the node list once per state and needs
-      //        fixed to only perform one pass.
-      nodeCountMap.put(state.toString(), getNodeCount(null, state));
+  @Override // NodeManagerMXBean
+  public Map<String, Map<String, Integer>> getNodeCount() {
+    Map<String, Map<String, Integer>> nodes = new HashMap<>();
+    for (NodeOperationalState opState : NodeOperationalState.values()) {
+      Map<String, Integer> states = new HashMap<>();
+      for (NodeState health : NodeState.values()) {
+        states.put(health.name(), 0);
+      }
+      nodes.put(opState.name(), states);
     }
-    return nodeCountMap;
+    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      NodeStatus status = dni.getNodeStatus();
+      nodes.get(status.getOperationalState().name())
+          .compute(status.getHealth().name(), (k, v) -> v+1);
+    }
+    return nodes;
   }
 
   // We should introduce DISK, SSD, etc., notion in
