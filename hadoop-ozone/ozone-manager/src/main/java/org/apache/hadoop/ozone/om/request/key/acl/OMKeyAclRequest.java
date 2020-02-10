@@ -97,7 +97,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       // If this is a replay, then the response has already been returned to
       // the client. So take no further action and return a dummy
       // OMClientResponse.
-      if (isReplay(ozoneManager, omKeyInfo.getUpdateID(), trxnLogIndex)) {
+      if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
         throw new OMReplayException();
       }
 
