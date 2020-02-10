@@ -57,6 +57,8 @@ public class Freon extends GenericCli {
           + "and profile endpoint")
   private boolean httpServer = false;
 
+  private final boolean interactive = System.console() != null;
+
   private FreonHttpServer freonHttpServer;
   private OzoneConfiguration conf;
 
@@ -94,4 +96,7 @@ public class Freon extends GenericCli {
     new Freon().run(args);
   }
 
+  public boolean isInteractive() {
+    return interactive;
+  }
 }
