@@ -501,8 +501,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       String[] hosts = hostList.toArray(new String[hostList.size()]);
       String[] names = nameList.toArray(new String[nameList.size()]);
       BlockLocation blockLocation = new BlockLocation(
-          names, hosts, omKeyLocationInfo.getOffset(),
-          omKeyLocationInfo.getLength());
+          names, hosts, i, omKeyLocationInfo.getLength());
       blockLocations[i++] = blockLocation;
     }
     return blockLocations;
