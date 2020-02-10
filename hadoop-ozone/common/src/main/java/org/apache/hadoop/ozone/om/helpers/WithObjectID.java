@@ -76,7 +76,7 @@ public class WithObjectID extends WithMetadata {
    * @param updateId  long
    */
   public void setUpdateID(long updateId) {
-    Preconditions.checkArgument(updateId > this.updateID, String.format(
+    Preconditions.checkArgument(updateId >= this.updateID, String.format(
         "Trying to set updateID to %d which is not greater than the current " +
             "value of %d for %s", updateId, this.updateID, getObjectInfo()));
     this.updateID = updateId;
