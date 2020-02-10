@@ -37,6 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -686,31 +687,35 @@ public class KeyManagerImpl implements KeyManager {
    */
   @VisibleForTesting
   protected void refreshPipeline(OmKeyInfo value) throws IOException {
-    Map<Long, ContainerWithPipeline> containerWithPipelineMap = new HashMap<>();
-    for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo k : key.getLocationList()) {
-        // TODO: fix Some tests that may not initialize container client
-        // The production should always have containerClient initialized.
-        if (scmClient.getContainerClient() != null) {
-          try {
-            if (!containerWithPipelineMap.containsKey(k.getContainerID())) {
-              ContainerWithPipeline containerWithPipeline = scmClient
-                  .getContainerClient()
-                  .getContainerWithPipeline(k.getContainerID());
-              containerWithPipelineMap.put(k.getContainerID(),
-                  containerWithPipeline);
+    if (value != null &&
+        CollectionUtils.isNotEmpty(value.getKeyLocationVersions())) {
+      Map<Long, ContainerWithPipeline> containerWithPipelineMap =
+          new HashMap<>();
+      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+        for (OmKeyLocationInfo k : key.getLocationList()) {
+          // TODO: fix Some tests that may not initialize container client
+          // The production should always have containerClient initialized.
+          if (scmClient.getContainerClient() != null) {
+            try {
+              if (!containerWithPipelineMap.containsKey(k.getContainerID())) {
+                ContainerWithPipeline containerWithPipeline = scmClient
+                    .getContainerClient()
+                    .getContainerWithPipeline(k.getContainerID());
+                containerWithPipelineMap.put(k.getContainerID(),
+                    containerWithPipeline);
+              }
+            } catch (IOException ioEx) {
+              LOG.debug("Get containerPipeline failed for volume:{} bucket:{} "
+                      + "key:{}", value.getVolumeName(), value.getBucketName(),
+                  value.getKeyName(), ioEx);
+              throw new OMException(ioEx.getMessage(),
+                  SCM_GET_PIPELINE_EXCEPTION);
             }
-          } catch (IOException ioEx) {
-            LOG.debug("Get containerPipeline failed for volume:{} bucket:{} " +
-                    "key:{}", value.getVolumeName(), value.getBucketName(),
-                value.getKeyName(), ioEx);
-            throw new OMException(ioEx.getMessage(),
-                SCM_GET_PIPELINE_EXCEPTION);
-          }
-          ContainerWithPipeline cp =
-              containerWithPipelineMap.get(k.getContainerID());
-          if (!cp.getPipeline().equals(k.getPipeline())) {
-            k.setPipeline(cp.getPipeline());
+            ContainerWithPipeline cp =
+                containerWithPipelineMap.get(k.getContainerID());
+            if (!cp.getPipeline().equals(k.getPipeline())) {
+              k.setPipeline(cp.getPipeline());
+            }
           }
         }
       }
@@ -1687,6 +1692,9 @@ public class KeyManagerImpl implements KeyManager {
           volumeName, bucketName, keyName);
       OmKeyInfo fileKeyInfo = metadataManager.getKeyTable().get(fileKeyBytes);
       if (fileKeyInfo != null) {
+        if (args.getRefreshPipeline()) {
+          refreshPipeline(fileKeyInfo);
+        }
         // this is a file
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
@@ -2024,6 +2032,9 @@ public class KeyManagerImpl implements KeyManager {
       for (Map.Entry<String, OzoneFileStatus> entry : cacheKeyMap.entrySet()) {
         // No need to check if a key is deleted or not here, this is handled
         // when adding entries to cacheKeyMap from DB.
+        if (args.getRefreshPipeline()) {
+          refreshPipeline(entry.getValue().getKeyInfo());
+        }
         fileStatusList.add(entry.getValue());
         countEntries++;
         if (countEntries >= numEntries) {
