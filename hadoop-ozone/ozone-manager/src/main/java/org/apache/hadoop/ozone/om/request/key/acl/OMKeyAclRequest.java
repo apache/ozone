@@ -24,11 +24,13 @@ import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -51,8 +53,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     OmKeyInfo omKeyInfo = null;
 
@@ -66,6 +67,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
     String bucket = null;
     String key = null;
     boolean operationResult = false;
+    Result result = null;
     try {
       ObjectParser objectParser = new ObjectParser(getPath(),
           ObjectType.KEY);
@@ -91,25 +93,38 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
         throw new OMException(OMException.ResultCodes.KEY_NOT_FOUND);
       }
 
-      operationResult = apply(omKeyInfo);
-
-      if (operationResult) {
-        // update cache.
-        omMetadataManager.getKeyTable().addCacheEntry(
-            new CacheKey<>(dbKey),
-            new CacheValue<>(Optional.of(omKeyInfo), transactionLogIndex));
+      // Check if this transaction is a replay of ratis logs.
+      // If this is a replay, then the response has already been returned to
+      // the client. So take no further action and return a dummy
+      // OMClientResponse.
+      if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
+        throw new OMReplayException();
       }
 
-      omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
+      operationResult = apply(omKeyInfo, trxnLogIndex);
+      omKeyInfo.setUpdateID(trxnLogIndex);
 
+      // update cache.
+      omMetadataManager.getKeyTable().addCacheEntry(
+          new CacheKey<>(dbKey),
+          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+
+      omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
+      result = Result.SUCCESS;
     } catch (IOException ex) {
-      exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      if (ex instanceof OMReplayException) {
+        result = Result.REPLAY;
+        omClientResponse = onReplay(omResponse);
+      } else {
+        result = Result.FAILURE;
+        exception = ex;
+        omClientResponse = onFailure(omResponse, ex);
+      }
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
+            omDoubleBufferHelper.add(omClientResponse,
+                trxnLogIndex));
       }
       if (lockAcquired) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
@@ -117,8 +132,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       }
     }
 
-
-    onComplete(operationResult, exception);
+    onComplete(result, operationResult, exception, trxnLogIndex);
 
     return omClientResponse;
   }
@@ -154,8 +168,14 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @param exception
    * @return OMClientResponse
    */
-  abstract OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception);
+  OMClientResponse onFailure(OMResponse.Builder omResponse,
+      IOException exception) {
+    return new OMKeyAclResponse(createErrorOMResponse(omResponse, exception));
+  }
+
+  OMClientResponse onReplay(OMResponse.Builder omResponse) {
+    return new OMKeyAclResponse(createReplayOMResponse(omResponse));
+  }
 
   /**
    * Completion hook for final processing before return without lock.
@@ -163,13 +183,14 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * @param operationResult
    * @param exception
    */
-  abstract void onComplete(boolean operationResult, IOException exception);
+  abstract void onComplete(Result result, boolean operationResult,
+      IOException exception, long trxnLogIndex);
 
   /**
    * Apply the acl operation, if successfully completed returns true,
    * else false.
    * @param omKeyInfo
    */
-  abstract boolean apply(OmKeyInfo omKeyInfo);
+  abstract boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex);
 }
 
