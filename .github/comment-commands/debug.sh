@@ -14,14 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#doc: Show all the available comment commands
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-echo "Available commands:"
-DOCTAG="#"
-DOCTAG="${DOCTAG}doc"
-for command in "$DIR"/*.sh; do
-  COMMAND_NAME="$(basename "$command" | sed 's/.sh//g')"
-  if [ "$COMMAND_NAME" != "debug" ]; then
-    printf " * /**%s** %s\n" "$COMMAND_NAME" "$(grep $DOCTAG "$command" | sed "s/$DOCTAG//g")"
-  fi
-done
+#doc: Show current event json to debug problems
+
+cat "$GITHUB_EVENT_PATH"

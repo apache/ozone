@@ -18,8 +18,7 @@
 LABEL="$1"
 URL="$(jq -r '.issue.url' "$GITHUB_EVENT_PATH")/labels"
 curl -s -o /dev/null \
-       -X POST \
-       --data "$(jq --arg value "$LABEL" -n '{labels: [ $value ]}')" \
-       --header "authorization: Bearer $GITHUB_TOKEN" \
-       "$URL"
-
+  -X POST \
+  --data "$(jq --arg value "$LABEL" -n '{labels: [ $value ]}')" \
+  --header "authorization: Bearer $GITHUB_TOKEN" \
+  "$URL"
