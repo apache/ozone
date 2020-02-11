@@ -312,6 +312,9 @@ enum Status {
     SCM_GET_PIPELINE_EXCEPTION = 57;
     INVALID_BUCKET_NAME = 58;
 
+    CANNOT_CREATE_DIRECTORY_AT_ROOT = 59;
+    DIRECTORY_ALREADY_EXISTS = 60;
+
     // When transactions are replayed
     REPLAY = 100;
 }

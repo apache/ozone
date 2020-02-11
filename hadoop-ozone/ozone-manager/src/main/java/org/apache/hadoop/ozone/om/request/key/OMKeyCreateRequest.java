@@ -288,8 +288,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           createKeyRequest);
       break;
     case FAILURE:
-      LOG.error("Key create failed. Volume:{}, Bucket:{}, Key{}. Exception:{}",
-          volumeName, bucketName, keyName, exception);
+      LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key{}. " +
+              "Exception:{}", volumeName, bucketName, keyName, exception);
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyCreateRequest: {}",
