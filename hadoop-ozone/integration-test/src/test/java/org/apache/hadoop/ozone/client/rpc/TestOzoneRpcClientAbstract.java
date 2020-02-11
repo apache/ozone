@@ -331,7 +331,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Instant testStartTime = Instant.now();
     String userName = "ozone/localhost@EXAMPLE.COM";
     String bucketName = UUID.randomUUID().toString();
-    String s3VolumeName = OzoneS3Util.getVolumeName(userName);
+    String s3VolumeName = OzoneS3Util.getS3Username(userName);
     store.createS3Bucket(s3VolumeName, bucketName);
     String volumeName = store.getOzoneVolumeName(bucketName);
     assertEquals(volumeName, "s3" + s3VolumeName);
