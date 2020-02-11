@@ -16,7 +16,15 @@
 
 #doc: add new empty commit to trigger new CI build
 
+PR_URL=$(jq -r '.issue.pull_request.url' "$GITHUB_EVENT_PATH")
+read -r REPO_URL BRANCH <<<"$(curl "$PR_URL" | jq -r '.head.repo.ssh_url + " " + .head.ref')"
+
+git fetch "$REPO_URL" "$BRANCH"
+git checkout FETCH_HEAD
+
 git config --global user.email "noreply@github.com"
 git config --global user.name "GitHub"
+
 git commit --allow-empty -m "retest build"
 git push origin
+git push $REPO_URL HEAD:$BRANCH
