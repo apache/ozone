@@ -32,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -200,7 +201,8 @@ public class HddsVolumeChecker {
         allVolumes.add(v);
         Futures.addCallback(olf.get(),
             new ResultHandler(v, healthyVolumes, failedVolumes,
-                numVolumes, (ignored1, ignored2) -> latch.countDown()));
+                numVolumes, (ignored1, ignored2) -> latch.countDown()),
+            MoreExecutors.directExecutor());
       } else {
         if (numVolumes.decrementAndGet() == 0) {
           latch.countDown();
