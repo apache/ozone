@@ -16,6 +16,6 @@
 
 #doc: Show current event json to debug problems
 
-echo "test error"
-#cat "$GITHUB_EVENT_PATH"
-exit $
+echo "\`\`\`"
+cat "$GITHUB_EVENT_PATH"
+echo "\`\`\`"

@@ -15,7 +15,6 @@
 # limitations under the License.
 
 #doc: Dismiss all the blocking reviews by github-actions bot
-
 MESSAGE="Blocking review request is removed."
 URL="$(jq -r '.issue.pull_request.url' "$GITHUB_EVENT_PATH")/reviews"
 curl -s -o /dev/null "$URL" |
