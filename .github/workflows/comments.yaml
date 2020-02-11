@@ -1,4 +1,4 @@
-name: Comment Commands
+name: comment-commands
 
 on:
   issue_comment:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   process-comment:
-    name: Process commands
+    name: check-comment
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
