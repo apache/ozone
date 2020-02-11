@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+set -x
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 BODY=$(jq -r .comment.body "$GITHUB_EVENT_PATH")
 LINES=$(printf "%s" "$BODY" | wc -l)
@@ -25,18 +25,22 @@ if [ "$LINES" == "0" ]; then
     if [ -f "$SCRIPT_DIR/comment-commands/$COMMAND.sh" ]; then
       RESPONSE=$("$SCRIPT_DIR/comment-commands/$COMMAND.sh" "${ARGS[@]}")
       EXIT_CODE=$!
-      if [ $EXIT_CODE != 0 ]; then
+      if [[ $EXIT_CODE != 0 ]]; then
         RESPONSE="Script execution \"$BODY\" has been failed with exit code $EXIT_CODE. Please check the output of the github actions to get more information."
       fi
     else
       RESPONSE="No such command. \`$COMMAND\` $("$SCRIPT_DIR/comment-commands/help.sh")"
     fi
-    set +x #do not display the GITHUB_TOKEN
-    COMMENTS_URL=$(jq -r .issue.comments_url "$GITHUB_EVENT_PATH")
-    curl -s \
-      --data "$(jq --arg body "$RESPONSE" -n '{body: $body}')" \
-      --header "authorization: Bearer $GITHUB_TOKEN" \
-      --header 'content-type: application/json' \
-      "$COMMENTS_URL"
+    if [ "$GITHUB_TOKEN" ]; then
+      set +x #do not display the GITHUB_TOKEN
+      COMMENTS_URL=$(jq -r .issue.comments_url "$GITHUB_EVENT_PATH")
+      curl -s \
+        --data "$(jq --arg body "$RESPONSE" -n '{body: $body}')" \
+        --header "authorization: Bearer $GITHUB_TOKEN" \
+        --header 'content-type: application/json' \
+        "$COMMENTS_URL"
+    else
+      echo "$RESPONSE"
+    fi
   fi
 fi
