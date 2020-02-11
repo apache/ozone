@@ -197,6 +197,8 @@ public class OMException extends IOException {
 
     NOT_A_FILE,
 
+    PATH_TOO_LONG,
+
     PERMISSION_DENIED, // Error codes used during acl validation
 
     TIMEOUT, // Error codes used during acl validation

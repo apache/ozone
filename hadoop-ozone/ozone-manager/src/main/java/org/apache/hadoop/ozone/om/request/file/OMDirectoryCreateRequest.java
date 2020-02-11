@@ -29,6 +29,7 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -69,6 +70,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PATH_TOO_LONG;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
@@ -169,14 +171,18 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
       // Need to check if any files exist in the given path, if they exist we
       // cannot create a directory with the given key.
-      OMFileRequest.OMDirectoryResult omDirectoryResult =
-          OMFileRequest.verifyFilesInPath(omMetadataManager,
-          volumeName, bucketName, keyName, keyPath);
-      long baseObjId = OMFileRequest.getObjIdFromTxId(trxnLogIndex);
+      OMFileRequest.OMPathInfo omPathInfo =
+          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
+              bucketName, keyName, keyPath);
+      OMFileRequest.OMDirectoryResult omDirectoryResult = omPathInfo.getDirectoryResult();
+      List<String> missingParents = omPathInfo.getMissingParents();
+
+      ImmutablePair<Long, Long> objIdRange = OMFileRequest
+          .getObjIdRangeFromTxId(trxnLogIndex);
+      long baseObjId = objIdRange.getLeft().longValue();
+      long maxObjId = objIdRange.getRight().longValue();
       long objectCount = 1;
 
-      List<String> missingParents = OMFileRequest.getMissingParents(
-          omMetadataManager, volumeName, bucketName, keyPath.getParent());
       if (missingParents == null) {
         // findbugs cribs about a possible null pointer deref
         missingParents = new ArrayList<>();
@@ -191,14 +197,20 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {
         dirKeyInfo = createDirectoryKeyInfo(ozoneManager, keyName, keyArgs,
-            baseObjId, transactionLogIndex);
+            baseObjId, trxnLogIndex);
 
         for (String missingKey : missingParents) {
+          long nextObjId = baseObjId + objectCount;
+          if (nextObjId > maxObjId) {
+            throw new OMException("Unable to create directory: " + keyName
+            + " in volume/bucket: " + volumeName + "/" + bucketName,
+                PATH_TOO_LONG);
+          }
+
           LOG.debug("missing parent {}", missingKey);
           // what about keyArgs for parent directories? TODO
           OmKeyInfo parentKeyInfo = createDirectoryKeyInfoNoACL(ozoneManager,
-              missingKey, keyArgs, baseObjId + objectCount,
-              transactionLogIndex);
+              missingKey, keyArgs, nextObjId, trxnLogIndex);
           objectCount++;
 
           missingParentInfos.add(parentKeyInfo);
@@ -340,8 +352,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
         .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
         .setFileEncryptionInfo(encryptionInfo.orNull())
-        .setObjectID(objectId)
-        .setUpdateID(0);
+        .setObjectID(objectId);
   }
 
 }

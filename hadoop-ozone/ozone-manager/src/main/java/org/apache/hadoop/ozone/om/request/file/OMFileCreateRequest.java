@@ -235,7 +235,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       OMFileRequest.OMDirectoryResult omDirectoryResult =
           OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
-              bucketName, keyName, Paths.get(keyName));
+              bucketName, keyName, Paths.get(keyName)).getDirectoryResult();
 
       // Check if a file or directory exists with same key name.
       if (omDirectoryResult == FILE_EXISTS) {
