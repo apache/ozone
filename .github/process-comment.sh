@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -x
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 BODY=$(jq -r .comment.body "$GITHUB_EVENT_PATH")
 LINES=$(printf "%s" "$BODY" | wc -l)
@@ -24,9 +23,17 @@ if [ "$LINES" == "0" ]; then
     ARGS=$(echo "$BODY" | cut -d ' ' -f2-)
     if [ -f "$SCRIPT_DIR/comment-commands/$COMMAND.sh" ]; then
       RESPONSE=$("$SCRIPT_DIR/comment-commands/$COMMAND.sh" "${ARGS[@]}")
-      EXIT_CODE=$!
+      EXIT_CODE=$?
       if [[ $EXIT_CODE != 0 ]]; then
-        RESPONSE="Script execution \"$BODY\" has been failed with exit code $EXIT_CODE. Please check the output of the github actions to get more information."
+        # shellcheck disable=SC2124
+        RESPONSE="> $BODY
+        
+Script execution has been failed with exit code $EXIT_CODE. Please check the output of the github action run to get more information.
+
+\`\`\`
+$RESPONSE
+\`\`\`
+"
       fi
     else
       RESPONSE="No such command. \`$COMMAND\` $("$SCRIPT_DIR/comment-commands/help.sh")"

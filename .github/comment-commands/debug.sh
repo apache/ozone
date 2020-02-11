@@ -18,4 +18,4 @@
 
 echo "test error"
 #cat "$GITHUB_EVENT_PATH"
-exit 2
+exit $
