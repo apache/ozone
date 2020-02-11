@@ -24,11 +24,10 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
@@ -40,32 +39,36 @@ public class S3InitiateMultipartUploadResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
 
   public S3InitiateMultipartUploadResponse(
-      @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nullable OmKeyInfo omKeyInfo,
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse) {
+      @Nonnull OMResponse omResponse,
+      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
+      @Nonnull OmKeyInfo omKeyInfo) {
     super(omResponse);
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.omKeyInfo = omKeyInfo;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public S3InitiateMultipartUploadResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
+    String multipartKey =
+        omMetadataManager.getMultipartKey(omKeyInfo.getVolumeName(),
+            omKeyInfo.getBucketName(), omKeyInfo.getKeyName(),
+            omMultipartKeyInfo.getUploadID());
 
-      String multipartKey =
-          omMetadataManager.getMultipartKey(omKeyInfo.getVolumeName(),
-              omKeyInfo.getBucketName(), omKeyInfo.getKeyName(),
-              omMultipartKeyInfo.getUploadID());
-
-      omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
-          multipartKey, omKeyInfo);
-      omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
-          multipartKey, omMultipartKeyInfo);
-    }
+    omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
+        multipartKey, omKeyInfo);
+    omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
+        multipartKey, omMultipartKeyInfo);
   }
 
   @VisibleForTesting
