@@ -45,7 +45,8 @@ import picocli.CommandLine.Option;
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
-        DatanodeChunkGenerator.class},
+        DatanodeChunkGenerator.class,
+        FollowerAppendLogEntryGenerator.class},
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {

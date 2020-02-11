@@ -437,4 +437,11 @@ public class BaseFreonGenerator {
     void executeNextTask(long step) throws Exception;
   }
 
+  public AtomicLong getAttemptCounter() {
+    return attemptCounter;
+  }
+
+  public int getThreadNo() {
+    return threadNo;
+  }
 }
