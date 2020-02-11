@@ -15,7 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.protocolPB;
+package org.apache.hadoop.hdds.utils;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
