@@ -81,40 +81,48 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
     omResponse.setSuccess(operationResult);
     omResponse.setSetAclResponse(SetAclResponse.newBuilder()
         .setResponse(operationResult));
-    return new OMPrefixAclResponse(omPrefixInfo,
-        omResponse.build());
+    return new OMPrefixAclResponse(omResponse.build(), omPrefixInfo);
   }
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
-    return new OMPrefixAclResponse(null,
-        createErrorOMResponse(omResponse, exception));
+    return new OMPrefixAclResponse(createErrorOMResponse(omResponse,
+        exception));
   }
 
   @Override
   void onComplete(boolean operationResult, IOException exception,
-      OMMetrics omMetrics) {
-    if (operationResult) {
-      LOG.debug("Set acl: {} to path: {} success!", ozoneAcls,
-          ozoneObj.getPath());
-    } else {
-      omMetrics.incNumBucketUpdateFails();
-      if (exception == null) {
-        LOG.debug("Set acl {} to path {} failed", ozoneAcls,
+      OMMetrics omMetrics, Result result, long trxnLogIndex) {
+    switch (result) {
+    case SUCCESS:
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Set acl: {} to path: {} success!", ozoneAcls,
             ozoneObj.getPath());
-      } else {
-        LOG.error("Set acl {} to path {} failed!", ozoneAcls,
-            ozoneObj.getPath(), exception);
       }
+      break;
+    case REPLAY:
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            getOmRequest());
+      }
+      break;
+    case FAILURE:
+      omMetrics.incNumBucketUpdateFails();
+      LOG.error("Set acl {} to path {} failed!", ozoneAcls,
+          ozoneObj.getPath(), exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMPrefixSetAclRequest: {}",
+          getOmRequest());
     }
   }
 
   @Override
   OMPrefixAclOpResult apply(PrefixManagerImpl prefixManager,
-      OmPrefixInfo omPrefixInfo) throws IOException {
-    return prefixManager.setAcl(ozoneObj, ozoneAcls, omPrefixInfo);
+      OmPrefixInfo omPrefixInfo, long trxnLogIndex) throws IOException {
+    return prefixManager.setAcl(ozoneObj, ozoneAcls, omPrefixInfo,
+        trxnLogIndex);
   }
-
 }
 

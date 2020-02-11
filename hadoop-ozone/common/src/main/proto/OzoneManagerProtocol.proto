@@ -567,6 +567,8 @@ message PrefixInfo {
     required string name = 1;
     repeated OzoneAclInfo acls = 2;
     repeated hadoop.hdds.KeyValue metadata = 3;
+    optional uint64 objectID = 4;
+    optional uint64 updateID = 5;
 }
 
 message OzoneObj {
