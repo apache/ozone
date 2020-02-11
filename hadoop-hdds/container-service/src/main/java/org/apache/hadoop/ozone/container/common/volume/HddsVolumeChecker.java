@@ -307,7 +307,7 @@ public class HddsVolumeChecker {
     }
 
     @Override
-    public void onSuccess(@Nonnull VolumeCheckResult result) {
+    public void onSuccess(VolumeCheckResult result) {
       switch (result) {
       case HEALTHY:
       case DEGRADED:
