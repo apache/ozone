@@ -17,7 +17,6 @@
  */
 
 package org.apache.hadoop.hdds.conf;
-import org.apache.ratis.server.RaftServerConfigKeys;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
@@ -32,19 +31,19 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_SERVE
 public class DatanodeRatisServerConfig {
 
   public static final String RATIS_SERVER_REQUEST_TIMEOUT_KEY =
-      RaftServerConfigKeys.Rpc.REQUEST_TIMEOUT_KEY;
+      "rpc.request.timeout";
 
   public static final String RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY =
-      RaftServerConfigKeys.Watch.TIMEOUT_KEY;
+      "watch.timeout";
 
   public static final String RATIS_SERVER_NO_LEADER_TIMEOUT_KEY =
-      "raft.server.Notification.no-leader.timeout";
+      "Notification.no-leader.timeout";
 
   public static final String RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY =
-      RaftServerConfigKeys.Rpc.SLOWNESS_TIMEOUT_KEY;
+      "rpcslowness.timeout";
 
   public static final String RATIS_LEADER_NUM_PENDING_REQUESTS_KEY =
-      RaftServerConfigKeys.Write.ELEMENT_LIMIT_KEY;
+      "write.element-limit";
 
   @Config(key = RATIS_SERVER_REQUEST_TIMEOUT_KEY,
       defaultValue = "60s",

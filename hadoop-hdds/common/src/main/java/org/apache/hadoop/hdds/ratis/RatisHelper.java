@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -70,21 +69,13 @@ public interface RatisHelper {
   Logger LOG = LoggerFactory.getLogger(RatisHelper.class);
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
-  String HDDS_DATANODE_RATIS_PREFIX_KEY = "datanode.ratis.";
-  String HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY = "datanode.ratis.server";
-  String HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY = "datanode.ratis.client";
-  String HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY = "datanode.ratis.grpc";
-
-
-  String RATIS_SERVER_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY.substring(
-          HDDS_DATANODE_RATIS_PREFIX_KEY.length()) + "." +
-          RaftServerConfigKeys.PREFIX;
-
-  String RATIS_CLIENT_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY.substring(
-          HDDS_DATANODE_RATIS_PREFIX_KEY.length()) + "." +
-          RaftClientConfigKeys.PREFIX;
+  String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis.";
+  String HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY =
+      HDDS_DATANODE_RATIS_PREFIX_KEY + RaftServerConfigKeys.PREFIX;
+  String HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY =
+      HDDS_DATANODE_RATIS_PREFIX_KEY + RaftClientConfigKeys.PREFIX;
+  String HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY =
+      HDDS_DATANODE_RATIS_PREFIX_KEY + GrpcConfigKeys.PREFIX;
 
 
   static String toRaftPeerIdString(DatanodeDetails id) {
@@ -233,18 +224,13 @@ public interface RatisHelper {
       RaftProperties raftProperties) {
 
     // As for client we do not require server and grpc server/tls. exclude them.
-    String grpcPrefix = HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY
-        .substring(HDDS_DATANODE_RATIS_PREFIX_KEY.length());
-    String grpcTlsKey =
-        grpcPrefix + "." +GrpcConfigKeys.TLS.PREFIX;
-    String grpcServerKey = grpcPrefix + "." + GrpcConfigKeys.Server.PREFIX;
-
     Map<String, String> ratisClientConf =
         ozoneConf.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
     ratisClientConf.forEach((key, val) -> {
-      if (!(key.startsWith(RATIS_SERVER_PREFIX_KEY) ||
-          key.startsWith(grpcServerKey) || key.startsWith(grpcTlsKey))) {
-        raftProperties.set(removeDatanodePrefix(key), val);
+      if (!(key.startsWith(RaftServerConfigKeys.PREFIX) ||
+          key.startsWith(GrpcConfigKeys.TLS.PREFIX) ||
+          key.startsWith(GrpcConfigKeys.Server.PREFIX))) {
+        raftProperties.set(key, val);
       }
     });
   }
@@ -264,27 +250,10 @@ public interface RatisHelper {
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisServerConf.forEach((key, val) -> {
       // Exclude ratis client configuration.
-      if (!key.startsWith(RATIS_CLIENT_PREFIX_KEY)) {
-        raftProperties.set(removeDatanodePrefix(key), val);
+      if (!key.startsWith(RaftClientConfigKeys.PREFIX)) {
+        raftProperties.set(key, val);
       }
     });
-  }
-
-  static String removeDatanodePrefix(String key) {
-
-    if (key.startsWith("server.")) {
-      return key.replaceFirst("server.", "");
-    } else if (key.startsWith("client.")){
-      return key.replaceFirst("client.", "");
-    } else if (key.startsWith("grpc.")) {
-      return key.replaceFirst("grpc.", "");
-    } else {
-      throw new ConfigurationException("Unrecognized prefix for Ratis Conf " +
-          key +" . Prefixes allowed are " +
-          HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + ", " +
-          HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY + " ," +
-          HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY);
-    }
   }
 
 
