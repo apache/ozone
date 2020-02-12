@@ -445,6 +445,10 @@ public class BasicRootedOzoneClientAdapterImpl
         ofsPath.getBucketName().isEmpty()) {
       return getFileStatusAdapterForRoot(uri);
     }
+    // path is a volume
+    if (ofsPath.getBucketName().isEmpty()) {
+      OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+      return getFileStatusAdapterForVolume(volume, uri);
     }
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
@@ -512,9 +516,56 @@ public class BasicRootedOzoneClientAdapterImpl
 
     incrementCounter(Statistic.OBJECTS_LIST);
     OFSPath ofsPath = new OFSPath(pathStr);
-    // TODO: Subject to change in HDDS-2928.
-    String keyName = ofsPath.getKeyName();
     OFSPath ofsStartPath = new OFSPath(startPath);
+
+    // listStatus root
+    if (ofsPath.getVolumeName().isEmpty()
+        && ofsPath.getBucketName().isEmpty()) {
+      LOG.debug("! listStatus. pathStr=" + pathStr +
+          ", getVolumeName=" + ofsStartPath.getVolumeName());
+      // list volumes for user
+      Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
+          username, null, ofsStartPath.getVolumeName());
+      List<FileStatusAdapter> res = new ArrayList<>();
+      // TODO: Test continuation
+      while (iter.hasNext() && res.size() <= numEntries) {
+        OzoneVolume volume = iter.next();
+        res.add(getFileStatusAdapterForVolume(volume, uri));
+        if (recursive) {
+          String next = volume.getName();
+          // TODO: Check startPath
+          res.addAll(listStatus(next, recursive, startPath,
+              numEntries - res.size(), uri, workingDir, username));
+        }
+      }
+      return res;
+    }
+
+    // listStatus volume
+    if (ofsPath.getBucketName().isEmpty()) {
+      LOG.debug("! listStatus. pathStr=" + pathStr +
+          ", getBucketName=" + ofsStartPath.getBucketName());
+      // list buckets in volume
+      String volumeStr = ofsPath.getVolumeName();
+      OzoneVolume volume = objectStore.getVolume(volumeStr);
+      Iterator<? extends OzoneBucket> iter = volume.listBuckets(
+          null, ofsStartPath.getBucketName());
+      List<FileStatusAdapter> res = new ArrayList<>();
+      // TODO: Test continuation
+      while (iter.hasNext() && res.size() <= numEntries) {
+        OzoneBucket bucket = iter.next();
+        res.add(getFileStatusAdapterForBucket(bucket, uri, username));
+        if (recursive) {
+          String next = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
+          // TODO: Check startPath
+          res.addAll(listStatus(next, recursive, startPath,
+              numEntries - res.size(), uri, workingDir, username));
+        }
+      }
+      return res;
+    }
+
+    String keyName = ofsPath.getKeyName();
     // Internally we need startKey to be passed into bucket.listStatus
     String startKey = ofsStartPath.getKeyName();
     try {
@@ -662,6 +713,61 @@ public class BasicRootedOzoneClientAdapterImpl
         status.getOwner(),
         status.getGroup(),
         status.getPath()
+    );
+  }
+
+  /**
+   * Generate a FileStatusAdapter for a volume.
+   * @param ozoneVolume OzoneVolume object
+   * @param uri Full URI to OFS root.
+   * @return FileStatusAdapter for a volume.
+   */
+  private static FileStatusAdapter getFileStatusAdapterForVolume(
+      OzoneVolume ozoneVolume, URI uri) {
+    String pathStr = uri.toString() +
+        OZONE_URI_DELIMITER + ozoneVolume.getName();
+    LOG.debug("getFileStatusAdapterForVolume(pathStr=" + pathStr);
+    Path path = new Path(pathStr);
+    return new FileStatusAdapter(
+        0L,
+        path,
+        true,
+        (short)0,
+        0L,
+        ozoneVolume.getCreationTime().getEpochSecond() * 1000,
+        0L,
+        (short)00755,  // Default directory permission, derive from ACLs later?
+        ozoneVolume.getOwner(),
+        ozoneVolume.getAdmin(),  // TODO: Get group of whom?
+        path
+    );
+  }
+
+  /**
+   * Generate a FileStatusAdapter for a bucket.
+   * @param ozoneBucket OzoneBucket object.
+   * @param uri Full URI to OFS root.
+   * @return FileStatusAdapter for a bucket.
+   */
+  private static FileStatusAdapter getFileStatusAdapterForBucket(
+      OzoneBucket ozoneBucket, URI uri, String username) {
+    String pathStr = uri.toString() +
+        OZONE_URI_DELIMITER + ozoneBucket.getVolumeName() +
+        OZONE_URI_DELIMITER + ozoneBucket.getName();
+    LOG.debug("getFileStatusAdapterForBucket(pathStr=" + pathStr);
+    Path path = new Path(pathStr);
+    return new FileStatusAdapter(
+        0L,
+        path,
+        true,
+        (short)0,
+        0L,
+        ozoneBucket.getCreationTime().getEpochSecond() * 1000,
+        0L,
+        (short)00755,  // Default directory permission, derive from ACLs later?
+        username,  // TODO: owner and group.
+        username,
+        path
     );
   }
 
