@@ -58,6 +58,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
@@ -439,11 +440,11 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.OBJECTS_QUERY);
     OFSPath ofsPath = new OFSPath(path);
     String key = ofsPath.getKeyName();
-    // getFileStatus is called for root
+    // path is root
     if (ofsPath.getVolumeName().isEmpty() &&
         ofsPath.getBucketName().isEmpty()) {
-      // Generate a FileStatusAdapter for root
-      return rootFileStatusAdapter();
+      return getFileStatusAdapterForRoot(uri);
+    }
     }
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
@@ -666,15 +667,16 @@ public class BasicRootedOzoneClientAdapterImpl
 
   /**
    * Generate a FileStatusAdapter for OFS root.
+   * @param uri Full URI to OFS root.
    * @return FileStatusAdapter for root.
    */
-  private static FileStatusAdapter rootFileStatusAdapter() {
+  private static FileStatusAdapter getFileStatusAdapterForRoot(URI uri) {
     // Note that most fields are mimicked from HDFS FileStatus for root,
     //  except modification time, permission, owner and group.
-    // TODO: Revisit the return value.
+    Path path = new Path(uri.toString() + OZONE_URI_DELIMITER);
     return new FileStatusAdapter(
         0L,
-        new Path("/"),
+        path,
         true,
         (short)0,
         0L,
