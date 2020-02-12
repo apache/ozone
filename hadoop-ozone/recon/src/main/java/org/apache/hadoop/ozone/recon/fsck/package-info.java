@@ -16,35 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.server;
-
-import java.io.IOException;
-
-import org.apache.hadoop.hdds.scm.block.BlockManager;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-
 /**
- * Interface for the SCM Facade class that can be used by a passive SCM like
- * Recon to tweak implementation.
+ * This package defines the persistence interfaces for Recon SQL DB.
  */
-public interface OzoneStorageContainerManager {
-
-  void start() throws IOException;
-
-  void stop();
-
-  void join();
-
-  NodeManager getScmNodeManager();
-
-  BlockManager getScmBlockManager();
-
-  PipelineManager getPipelineManager();
-
-  ContainerManager getContainerManager();
-
-  ReplicationManager getReplicationManager();
-}
+package org.apache.hadoop.ozone.recon.fsck;

@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.hadoop.ozone.recon.schema.ReconInternalSchemaDefinition;
+import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.jooq.Configuration;
@@ -59,8 +59,8 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
     sqlConfiguration = getInjector()
         .getInstance(Configuration.class);
 
-    ReconInternalSchemaDefinition schemaDefinition = getInjector().
-        getInstance(ReconInternalSchemaDefinition.class);
+    ReconTaskSchemaDefinition schemaDefinition = getInjector().
+        getInstance(ReconTaskSchemaDefinition.class);
     schemaDefinition.initializeSchema();
 
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration,

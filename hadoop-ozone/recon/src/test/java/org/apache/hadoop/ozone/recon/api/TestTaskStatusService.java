@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.recon.api;
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
 import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
-import org.hadoop.ozone.recon.schema.ReconInternalSchemaDefinition;
+import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.jooq.Configuration;
@@ -54,8 +54,8 @@ public class TestTaskStatusService extends AbstractSqlDatabaseTest {
         bind(TaskStatusService.class).toInstance(taskStatusService);
       }
     });
-    ReconInternalSchemaDefinition schemaDefinition = getInjector().
-        getInstance(ReconInternalSchemaDefinition.class);
+    ReconTaskSchemaDefinition schemaDefinition = getInjector().
+        getInstance(ReconTaskSchemaDefinition.class);
     schemaDefinition.initializeSchema();
   }
 

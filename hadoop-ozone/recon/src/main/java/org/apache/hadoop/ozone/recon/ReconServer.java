@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.recon;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
@@ -43,7 +43,7 @@ public class ReconServer extends GenericCli {
   private ReconHttpServer httpServer;
   private ContainerDBServiceProvider containerDBServiceProvider;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
-  private ReconStorageContainerManagerFacade reconStorageContainerManager;
+  private OzoneStorageContainerManager reconStorageContainerManager;
 
   private volatile boolean isStarted = false;
 
@@ -86,7 +86,7 @@ public class ReconServer extends GenericCli {
       this.ozoneManagerServiceProvider =
           injector.getInstance(OzoneManagerServiceProvider.class);
       this.reconStorageContainerManager =
-          injector.getInstance(ReconStorageContainerManagerFacade.class);
+          injector.getInstance(OzoneStorageContainerManager.class);
       LOG.info("Recon server initialized successfully!");
 
     } catch (Exception e) {

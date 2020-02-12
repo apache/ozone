@@ -34,6 +34,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
@@ -91,7 +92,8 @@ public class ReconControllerModule extends AbstractModule {
         .to(ReconTaskControllerImpl.class).in(Singleton.class);
     bind(StorageContainerServiceProvider.class)
         .to(StorageContainerServiceProviderImpl.class).in(Singleton.class);
-    bind(ReconStorageContainerManagerFacade.class).in(Singleton.class);
+    bind(OzoneStorageContainerManager.class)
+        .to(ReconStorageContainerManagerFacade.class).in(Singleton.class);
   }
 
   @Provides

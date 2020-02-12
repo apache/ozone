@@ -51,7 +51,9 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.recon.fsck.MissingContainerTask;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,9 +77,12 @@ public class ReconStorageContainerManagerFacade
   private NetworkTopology clusterMap;
   private StorageContainerServiceProvider scmServiceProvider;
 
+  private MissingContainerTask missingContainerTracker;
+
   @Inject
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
-      StorageContainerServiceProvider scmServiceProvider)
+      StorageContainerServiceProvider scmServiceProvider,
+      Configuration sqlConfiguration)
       throws IOException {
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -91,7 +96,6 @@ public class ReconStorageContainerManagerFacade
     this.pipelineManager =
         new ReconPipelineManager(conf, scmNodeManager, eventQueue);
     this.containerManager = new ReconContainerManager(conf, pipelineManager);
-
     this.scmServiceProvider = scmServiceProvider;
     initializePipelinesFromScm();
 
@@ -129,6 +133,8 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT, icrHandler);
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
+
+    startMissingContainerTracker(sqlConfiguration);
   }
 
   /**
@@ -181,6 +187,7 @@ public class ReconStorageContainerManagerFacade
    */
   public void stop() {
     getDatanodeProtocolServer().stop();
+    missingContainerTracker.stop();
     try {
       LOG.info("Stopping SCM Event Queue.");
       eventQueue.close();
@@ -205,6 +212,15 @@ public class ReconStorageContainerManagerFacade
       LOG.error("Exception encountered while getting pipelines from SCM.",
           ioEx);
     }
+  }
+
+  /**
+   * Start the missing container tracker thread.
+   * @param sqlConfiguration SQL table to dump the data into.
+   */
+  private void startMissingContainerTracker(Configuration sqlConfiguration) {
+    missingContainerTracker = new MissingContainerTask(this, sqlConfiguration);
+    missingContainerTracker.start();
   }
 
   @Override
