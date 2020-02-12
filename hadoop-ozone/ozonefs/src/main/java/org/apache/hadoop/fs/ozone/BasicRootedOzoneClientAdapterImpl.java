@@ -674,7 +674,7 @@ public class BasicRootedOzoneClientAdapterImpl
     // TODO: Revisit the return value.
     return new FileStatusAdapter(
         0L,
-        null,
+        new Path("/"),
         true,
         (short)0,
         0L,
