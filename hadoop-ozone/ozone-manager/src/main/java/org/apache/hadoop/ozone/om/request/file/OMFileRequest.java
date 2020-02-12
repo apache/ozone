@@ -108,9 +108,14 @@ public final class OMFileRequest {
   public static ImmutablePair<Long, Long> getObjIdRangeFromTxId(long id) {
     long baseId = id << TRANSACTION_ID_SHIFT;
     long maxId = baseId + ((1 << TRANSACTION_ID_SHIFT) - 1);
-    return new ImmutablePair<>(new Long(baseId), new Long(maxId));
+    return new ImmutablePair<>(baseId, maxId);
   }
 
+  /**
+   * Class to return the results from verifyFilesInPath.
+   * Includes the list of missing intermediate directories and
+   * the directory search result code.
+   */
   public static class OMPathInfo {
     private OMDirectoryResult directoryResult;
     private List<String> missingParents;
