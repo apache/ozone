@@ -133,8 +133,7 @@ public class S3BucketDeleteRequest extends OMVolumeRequest {
           // If this is a replay, then the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.
-          if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
-              transactionLogIndex)) {
+          if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
             LOG.debug("Replayed Transaction {} ignored. Request: {}",
                 transactionLogIndex, s3DeleteBucketRequest);
             return new S3BucketDeleteResponse(

@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,7 +146,10 @@ public class OzoneManagerDoubleBuffer {
               }
             });
 
+            long startTime = Time.monotonicNowNanos();
             omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            ozoneManagerDoubleBufferMetrics.updateFlushTime(
+                Time.monotonicNowNanos() - startTime);
           }
 
           // Complete futures first and then do other things. So, that
@@ -248,6 +252,10 @@ public class OzoneManagerDoubleBuffer {
     ozoneManagerDoubleBufferMetrics.incrTotalNumOfFlushOperations();
     ozoneManagerDoubleBufferMetrics.incrTotalSizeOfFlushedTransactions(
         flushedTransactionsSize);
+    ozoneManagerDoubleBufferMetrics.setAvgFlushTransactionsInOneIteration(
+        (float) ozoneManagerDoubleBufferMetrics
+            .getTotalNumOfFlushedTransactions() /
+            ozoneManagerDoubleBufferMetrics.getTotalNumOfFlushOperations());
     if (maxFlushedTransactionsInOneIteration < flushedTransactionsSize) {
       maxFlushedTransactionsInOneIteration = flushedTransactionsSize;
       ozoneManagerDoubleBufferMetrics

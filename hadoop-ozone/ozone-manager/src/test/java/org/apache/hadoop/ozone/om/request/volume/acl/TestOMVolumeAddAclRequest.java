@@ -119,4 +119,37 @@ public class TestOMVolumeAddAclRequest extends TestOMVolumeRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omResponse.getStatus());
   }
+
+  @Test
+  public void testReplayRequest() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String ownerName = "user1";
+
+    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+
+    OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
+
+    OMRequest originalRequest = TestOMRequestUtils.createVolumeAddAclRequest(
+        volumeName, acl);
+
+    OMVolumeAddAclRequest omVolumeAddAclRequest = new OMVolumeAddAclRequest(
+        originalRequest);
+    omVolumeAddAclRequest.preExecute(ozoneManager);
+
+    OMClientResponse omClientResponse = omVolumeAddAclRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    // Replay the original request
+    OMClientResponse replayResponse = omVolumeAddAclRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+        replayResponse.getOMResponse().getStatus());
+  }
 }

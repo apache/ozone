@@ -15,24 +15,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.server;
+package org.apache.hadoop.hdds.server.http;
 
-import com.codahale.metrics.MetricRegistry;
-import io.prometheus.client.dropwizard.DropwizardExports;
-import io.prometheus.client.dropwizard.samplebuilder.DefaultSampleBuilder;
+import java.io.IOException;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.eclipse.jetty.servlet.DefaultServlet;
 
 /**
- * Collect Dropwizard metrics, but rename ratis specific metrics.
+ * General servlet which is admin-authorized.
+ *
  */
-public class RatisDropwizardExports extends DropwizardExports {
+public class AdminAuthorizedServlet extends DefaultServlet {
 
-  /**
-   * Creates a new DropwizardExports with a {@link DefaultSampleBuilder}.
-   *
-   * @param registry a metric registry to export in prometheus.
-   */
-  public RatisDropwizardExports(MetricRegistry registry) {
-    super(registry, new RatisNameRewriteSampleBuilder());
+  private static final long serialVersionUID = 1L;
+
+  @Override
+  protected void doGet(HttpServletRequest request, HttpServletResponse response)
+      throws ServletException, IOException {
+    // Do the authorization
+    if (HttpServer2.hasAdministratorAccess(getServletContext(), request,
+        response)) {
+      // Authorization is done. Just call super.
+      super.doGet(request, response);
+    }
   }
-
 }

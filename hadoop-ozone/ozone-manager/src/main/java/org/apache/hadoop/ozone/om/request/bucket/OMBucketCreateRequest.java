@@ -169,8 +169,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
           .get(bucketKey);
       if (dbBucketInfo != null) {
         // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
-            transactionLogIndex)) {
+        if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
           // Replay implies the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.
