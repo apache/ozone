@@ -68,6 +68,7 @@ public class TestRootedOzoneFileSystem {
   private String bucketName;
   // Store path commonly used by tests that test functionality within a bucket
   private Path testBucketPath;
+  private String rootPath;
 
   @Before
   public void init() throws Exception {
@@ -85,7 +86,7 @@ public class TestRootedOzoneFileSystem {
     String testBucketStr = "/" + volumeName + "/" + bucketName;
     testBucketPath = new Path(testBucketStr);
 
-    String rootPath = String.format("%s://%s/",
+    rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
 
     // Set the fs.defaultFS and start the filesystem
@@ -328,7 +329,7 @@ public class TestRootedOzoneFileSystem {
     Path root = new Path("/");
     FileStatus fileStatus = fs.getFileStatus(root);
     Assert.assertNotNull(fileStatus);
-    Assert.assertNull(fileStatus.getPath());
+    Assert.assertEquals(new Path(rootPath), fileStatus.getPath());
     Assert.assertTrue(fileStatus.isDirectory());
     Assert.assertEquals(
         new FsPermission((short)00755), fileStatus.getPermission());
