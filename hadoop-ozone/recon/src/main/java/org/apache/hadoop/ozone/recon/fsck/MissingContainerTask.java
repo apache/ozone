@@ -55,11 +55,12 @@ public class MissingContainerTask {
     this.scm = scm;
     this.missingContainersDao = new MissingContainersDao(sqlConfiguration);
     this.reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
+    String taskName = getClass().getSimpleName();
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-        getClass().getName(), 0L, 0L);
-    if (!reconTaskStatusDao.existsById(getClass().getName())) {
+        taskName, 0L, 0L);
+    if (!reconTaskStatusDao.existsById(taskName)) {
       reconTaskStatusDao.insert(reconTaskStatusRecord);
-      LOG.info("Registered {} task ", getClass().getName());
+      LOG.info("Registered {} task ", taskName);
     }
   }
 
