@@ -40,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -59,6 +60,10 @@ public final class DBStoreBuilder {
       LoggerFactory.getLogger(DBStoreBuilder.class);
   public static final Logger ROCKS_DB_LOGGER =
       LoggerFactory.getLogger(RocksDB.class);
+
+  private static final String DEFAULT_COLUMN_FAMILY_NAME =
+      StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
+
   private Set<TableConfig> tables;
   private DBProfile dbProfile;
   private DBOptions rocksDBOption;
@@ -117,6 +122,12 @@ public final class DBStoreBuilder {
 
   public DBStoreBuilder addTable(String tableName, ColumnFamilyOptions option)
       throws IOException {
+    LOG.debug("using custom profile for table: {}", tableName);
+    return addTableDefinition(tableName, option);
+  }
+
+  private DBStoreBuilder addTableDefinition(String tableName,
+      ColumnFamilyOptions option) throws IOException {
     TableConfig tableConfig = new TableConfig(tableName, option);
     if (!tables.add(tableConfig)) {
       String message = "Unable to add the table: " + tableName +
@@ -124,7 +135,6 @@ public final class DBStoreBuilder {
       LOG.error(message);
       throw new IOException(message);
     }
-    LOG.info("using custom profile for table: {}", tableName);
     return this;
   }
 
@@ -174,21 +184,16 @@ public final class DBStoreBuilder {
       dbProfile = this.configuration.getEnum(HDDS_DB_PROFILE,
           HDDS_DEFAULT_DB_PROFILE);
     }
+    LOG.debug("default profile:{}", dbProfile);
   }
 
   private void processTables() throws IOException {
-    if (tableNames.size() > 0) {
-      for (String name : tableNames) {
-        addTable(name, dbProfile.getColumnFamilyOptions());
-        LOG.info("Using default column profile:{} for Table:{}",
-            dbProfile.toString(), name);
-      }
+    List<String> list = new ArrayList<>(tableNames);
+    list.add(DEFAULT_COLUMN_FAMILY_NAME);
+    for (String name : list) {
+      LOG.debug("using default profile for table:{}", name);
+      addTableDefinition(name, dbProfile.getColumnFamilyOptions());
     }
-    addTable(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-        dbProfile.getColumnFamilyOptions());
-    LOG.info("Using default column profile:{} for Table:{}",
-        dbProfile.toString(),
-        StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY));
   }
 
   private DBOptions getDbProfile() {
@@ -211,13 +216,13 @@ public final class DBStoreBuilder {
             LOG.info("Using Configs from {}.ini file", dbname);
           }
         } catch (IOException ex) {
-          LOG.info("Unable to read ROCKDB config", ex);
+          LOG.info("Unable to read RocksDB config from {}", dbname, ex);
         }
       }
     }
 
     if (option == null) {
-      LOG.info("Using default options. {}", dbProfile.toString());
+      LOG.debug("Using default options: {}", dbProfile);
       option = dbProfile.getDBOptions();
     }
 
