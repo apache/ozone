@@ -307,24 +307,29 @@ public class HddsVolumeChecker {
     }
 
     @Override
-    public void onSuccess(VolumeCheckResult result) {
-      switch (result) {
-      case HEALTHY:
-      case DEGRADED:
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Volume {} is {}.", volume, result);
+    public void onSuccess(@Nullable VolumeCheckResult result) {
+      if (result == null) {
+        LOG.error("Unexpected empty health check result for volume {}", volume);
+        markHealthy();
+      } else {
+        switch (result) {
+        case HEALTHY:
+        case DEGRADED:
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Volume {} is {}.", volume, result);
+          }
+          markHealthy();
+          break;
+        case FAILED:
+          LOG.warn("Volume {} detected as being unhealthy", volume);
+          markFailed();
+          break;
+        default:
+          LOG.error("Unexpected health check result {} for volume {}", result,
+              volume);
+          markHealthy();
+          break;
         }
-        markHealthy();
-        break;
-      case FAILED:
-        LOG.warn("Volume {} detected as being unhealthy", volume);
-        markFailed();
-        break;
-      default:
-        LOG.error("Unexpected health check result {} for volume {}",
-            result, volume);
-        markHealthy();
-        break;
       }
       cleanup();
     }
