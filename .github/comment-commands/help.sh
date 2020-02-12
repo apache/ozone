@@ -20,7 +20,7 @@ echo "Available commands:"
 DOCTAG="#"
 DOCTAG="${DOCTAG}doc"
 for command in "$DIR"/*.sh; do
-  COMMAND_NAME="$(basename "$command" | sed 's/.sh//g')"
+  COMMAND_NAME="$(basename "$command" | sed 's/\.sh$//')"
   if [ "$COMMAND_NAME" != "debug" ]; then
     printf " * /**%s** %s\n" "$COMMAND_NAME" "$(grep $DOCTAG "$command" | sed "s/$DOCTAG//g")"
   fi
