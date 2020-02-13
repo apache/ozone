@@ -27,6 +27,9 @@
 #define _XOPEN_SOURCE 700
 #endif
 
+#include <libgen.h>                                                             
+#include <stdlib.h>                                                             
+
 #include <fuse3/fuse.h>
 #include <stdio.h>
 #include <ctime>
@@ -495,13 +498,23 @@ bool FailureInjectorFs::CheckForInjectedError(
     string op,
     int *injected_error)
 {
+    char *mpath = strdup(path.c_str());
     if (mFailureInjector == NULL) {
         return false;
     }
+
     auto failures = mFailureInjector->GetFailures(path, op);
-    if (failures == NULL) {
-        return false;
+    while (failures == NULL) {
+        // Check if failures are injected in any of the parent directories.
+        char *dir = dirname(mpath);
+        failures = mFailureInjector->GetFailures(string(dir), op);
+        if ((failures == NULL) && (strcmp(dir, ".") || strcmp(dir, "/"))) {
+            free(mpath);
+            return false;
+        }
+        mpath = dir;
     }
+    free(mpath);
 
     *injected_error = 0;
     useconds_t delay = 1;
