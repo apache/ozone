@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -17,14 +17,16 @@
 #doc: add new empty commit to trigger new CI build
 
 PR_URL=$(jq -r '.issue.pull_request.url' "$GITHUB_EVENT_PATH")
-read -r REPO_URL BRANCH <<<"$(curl "$PR_URL" | jq -r '.head.repo.ssh_url + " " + .head.ref')"
+read -r REPO_URL BRANCH <<<"$(curl "$PR_URL" | jq -r '.head.repo.clone_url + " " + .head.ref' | sed "s/github.com/$GITHUB_ACTOR:$GITHUB_TOKEN@github.com/g")"
 
 git fetch "$REPO_URL" "$BRANCH"
 git checkout FETCH_HEAD
 
-git config --global user.email "noreply@github.com"
-git config --global user.name "GitHub"
+export GIT_COMMITTER_EMAIL="noreply@github.com"
+export GIT_COMMITTER_NAME="GitHub actions"
 
-git commit --allow-empty -m "retest build"
-git push origin
-git push $REPO_URL HEAD:$BRANCH
+export GIT_AUTHOR_EMAIL="noreply@github.com"
+export GIT_AUTHOR_NAME="GitHub actions"
+
+echo git commit --allow-empty -m "empty commit to retest build"
+echo git push $REPO_URL HEAD:$BRANCH
