@@ -54,6 +54,8 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
 
+  public static final String HDDS_DB_PROFILE = "hdds.db.profile";
+
   // Once a container usage crosses this threshold, it is eligible for
   // closing.
   public static final String HDDS_CONTAINER_CLOSE_THRESHOLD =
