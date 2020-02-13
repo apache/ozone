@@ -493,4 +493,42 @@ public class TestRootedOzoneFileSystem {
     GenericTestUtils.assertExceptionContains("KEY_NOT_FOUND", ex);
   }
 
+  /**
+   * OFS: Test recursive listStatus on root.
+   */
+  @Test
+  public void testListStatusRootAndVolumeNonRecursive() throws Exception {
+    String volume1 = getRandomNonExistVolumeName();
+    String bucket1 = "bucket-" + RandomStringUtils.randomNumeric(5);
+    Path bucketPath1 = new Path("/" + volume1 + "/" + bucket1);
+    Path dir1 = new Path(bucketPath1, "dir1");
+    Path subdir1 = new Path(dir1, "subdir1");
+    fs.mkdirs(subdir1);
+    Path dir2 = new Path(bucketPath1, "dir2");
+    fs.mkdirs(dir2);
+
+    String volume2 = getRandomNonExistVolumeName();
+    String bucket2 = "bucket-" + RandomStringUtils.randomNumeric(5);
+    Path bucketPath2 = new Path("/" + volume2 + "/" + bucket2);
+    Path dir3 = new Path(bucketPath2, "dir3");
+    Path subdir2 = new Path(dir3, "subdir2");
+    fs.mkdirs(subdir2);
+    Path dir4 = new Path(bucketPath2, "dir4");
+    fs.mkdirs(dir4);
+
+    // bucket
+    FileStatus[] fileStatuses = ofs.listStatus(bucketPath1);
+    Assert.assertEquals(2, fileStatuses.length);
+
+    // volume
+    Path volume = new Path("/" + volume1);
+    FileStatus[] fileStatusesVolume = ofs.listStatus(volume);
+    Assert.assertEquals(1, fileStatusesVolume.length);
+
+    // root
+    Path root = new Path("/");
+    FileStatus[] fileStatusesRoot = ofs.listStatus(root);
+    Assert.assertEquals(2, fileStatusesRoot.length);
+  }
+
 }
