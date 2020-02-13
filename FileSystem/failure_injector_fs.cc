@@ -877,7 +877,6 @@ void FailureInjectorFs::load_operations() {
 #endif
 
     mFuseOperationsVec.copy_file_range = NULL;
-    mFuseOperationsVec.lseek       = FailureInjectorFs::fifs_lseek;
 }
 
 const struct fuse_operations *FailureInjectorFs::getOperations() {

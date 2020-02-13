@@ -15,13 +15,19 @@ Linux
 
 Dependencies
 -------------
-libfuse
-libgrpc
-cmake
+- libfuse3
+	yum install fuse3.x86_64 fuse3-devel.x86_64 fuse3-libs.x86_64
+- protobuf 2.5 or higher
+- grpc
+	built/installed from sources
+- cmake 3.14
+	built/installed from sources
+- cppunit & cppunit-devel
 
 Installation                                                                    
 ------------ 
-Goto Build subdirectory
+mkdir Build 
+cd Build
 do 'cmake ..'
 do 'make'
 
