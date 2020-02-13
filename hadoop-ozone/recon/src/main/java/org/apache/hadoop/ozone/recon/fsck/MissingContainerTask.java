@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.fsck;
 
 import java.util.Set;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -50,7 +49,7 @@ public class MissingContainerTask {
   private OzoneStorageContainerManager scm;
   private MissingContainersDao missingContainersDao;
   private ReconTaskStatusDao reconTaskStatusDao;
-  private final static long interval = 5 * 60 * 1000L;
+  private static final long INTERVAL = 5 * 60 * 1000L;
 
   private Thread fsckMonitor;
   private volatile boolean running;
@@ -109,7 +108,7 @@ public class MissingContainerTask {
         LOG.info("Missing Container Monitor Thread took {} milliseconds for" +
                 " processing {} containers.", Time.monotonicNow() - start,
             containerIds.size());
-        wait(interval);
+        wait(INTERVAL);
       }
     } catch (Throwable t) {
       // When we get runtime exception, we should terminate SCM.
