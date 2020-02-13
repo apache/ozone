@@ -57,12 +57,15 @@
 #include <sstream>
 #include <strings.h>
 #include <thread>
+#include <cstdio>
 
 using NoiseInjector::FailureInjector;
 using NoiseInjector::RunGrpcService;
 
 using namespace std;
 using namespace NoiseInjector::FileSystem;
+
+#define LOGFILE "/var/log/noise_injector_log.txt"
 
 struct fuse_operations FailureInjectorFs::mFuseOperationsVec;
 FailureInjector *FailureInjectorFs::mFailureInjector = NULL;
@@ -108,6 +111,8 @@ void *FailureInjectorFs::fifs_init(
     (void) conn;
     cfg->use_ino = 1;
     
+    std::freopen(LOGFILE, "w", stdout);
+
     /* 
      * Pick up changes from lower filesystem right away. This is
      * also necessary for better hardlink support. When the kernel
@@ -508,7 +513,7 @@ bool FailureInjectorFs::CheckForInjectedError(
         // Check if failures are injected in any of the parent directories.
         char *dir = dirname(mpath);
         failures = mFailureInjector->GetFailures(string(dir), op);
-        if ((failures == NULL) && (strcmp(dir, ".") || strcmp(dir, "/"))) {
+        if ((failures == NULL) && (!strcmp(dir, ".") || !strcmp(dir, "/"))) {
             free(mpath);
             return false;
         }
