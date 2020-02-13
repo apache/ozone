@@ -17,6 +17,7 @@
 #doc: Dismiss all the blocking reviews by github-actions bot
 MESSAGE="Blocking review request is removed."
 URL="$(jq -r '.issue.pull_request.url' "$GITHUB_EVENT_PATH")/reviews"
+set +x #GITHUB_TOKEN
 curl -s "$URL" |
   jq -r '.[] | [.user.login, .id] | @tsv' |
   grep github-actions |

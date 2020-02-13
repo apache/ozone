@@ -15,6 +15,7 @@
 # limitations under the License.
 
 #doc: add new empty commit to trigger new CI build
+set +x #GITHUB_TOKEN
 
 PR_URL=$(jq -r '.issue.pull_request.url' "$GITHUB_EVENT_PATH")
 read -r REPO_URL BRANCH <<<"$(curl "$PR_URL" | jq -r '.head.repo.clone_url + " " + .head.ref' | sed "s/github.com/$GITHUB_ACTOR:$GITHUB_TOKEN@github.com/g")"
