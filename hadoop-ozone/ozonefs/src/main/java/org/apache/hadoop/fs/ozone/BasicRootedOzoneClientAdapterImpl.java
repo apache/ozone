@@ -492,6 +492,57 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
+   * Helper for OFS listStatus on root.
+   */
+  private List<FileStatusAdapter> listStatusRoot(
+      boolean recursive, String startPath, long numEntries,
+      URI uri, Path workingDir, String username) throws IOException {
+    OFSPath ofsStartPath = new OFSPath(startPath);
+    // list volumes for user
+    Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
+        username, null, ofsStartPath.getVolumeName());
+    List<FileStatusAdapter> res = new ArrayList<>();
+    // TODO: Test continuation
+    while (iter.hasNext() && res.size() <= numEntries) {
+      OzoneVolume volume = iter.next();
+      res.add(getFileStatusAdapterForVolume(volume, uri));
+      if (recursive) {
+        String next = volume.getName();
+        // TODO: Check startPath
+        res.addAll(listStatus(next, recursive, startPath,
+            numEntries - res.size(), uri, workingDir, username));
+      }
+    }
+    return res;
+  }
+
+  /**
+   * Helper for OFS listStatus on a volume.
+   */
+  private List<FileStatusAdapter> listStatusVolume(String volumeStr,
+      boolean recursive, String startPath, long numEntries,
+      URI uri, Path workingDir, String username) throws IOException {
+    OFSPath ofsStartPath = new OFSPath(startPath);
+    // list buckets in volume
+    OzoneVolume volume = objectStore.getVolume(volumeStr);
+    Iterator<? extends OzoneBucket> iter = volume.listBuckets(
+        null, ofsStartPath.getBucketName());
+    List<FileStatusAdapter> res = new ArrayList<>();
+    // TODO: Test continuation
+    while (iter.hasNext() && res.size() <= numEntries) {
+      OzoneBucket bucket = iter.next();
+      res.add(getFileStatusAdapterForBucket(bucket, uri, username));
+      if (recursive) {
+        String next = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
+        // TODO: Check startPath
+        res.addAll(listStatus(next, recursive, startPath,
+            numEntries - res.size(), uri, workingDir, username));
+      }
+    }
+    return res;
+  }
+
+  /**
    * OFS listStatus implementation.
    *
    * @param pathStr Path for the listStatus to operate on.
@@ -516,57 +567,22 @@ public class BasicRootedOzoneClientAdapterImpl
 
     incrementCounter(Statistic.OBJECTS_LIST);
     OFSPath ofsPath = new OFSPath(pathStr);
-    OFSPath ofsStartPath = new OFSPath(startPath);
 
     // listStatus root
     if (ofsPath.getVolumeName().isEmpty()
         && ofsPath.getBucketName().isEmpty()) {
-      LOG.debug("! listStatus. pathStr=" + pathStr +
-          ", getVolumeName=" + ofsStartPath.getVolumeName());
-      // list volumes for user
-      Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
-          username, null, ofsStartPath.getVolumeName());
-      List<FileStatusAdapter> res = new ArrayList<>();
-      // TODO: Test continuation
-      while (iter.hasNext() && res.size() <= numEntries) {
-        OzoneVolume volume = iter.next();
-        res.add(getFileStatusAdapterForVolume(volume, uri));
-        if (recursive) {
-          String next = volume.getName();
-          // TODO: Check startPath
-          res.addAll(listStatus(next, recursive, startPath,
-              numEntries - res.size(), uri, workingDir, username));
-        }
-      }
-      return res;
+      return listStatusRoot(
+          recursive, startPath, numEntries, uri, workingDir, username);
     }
-
     // listStatus volume
     if (ofsPath.getBucketName().isEmpty()) {
-      LOG.debug("! listStatus. pathStr=" + pathStr +
-          ", getBucketName=" + ofsStartPath.getBucketName());
-      // list buckets in volume
-      String volumeStr = ofsPath.getVolumeName();
-      OzoneVolume volume = objectStore.getVolume(volumeStr);
-      Iterator<? extends OzoneBucket> iter = volume.listBuckets(
-          null, ofsStartPath.getBucketName());
-      List<FileStatusAdapter> res = new ArrayList<>();
-      // TODO: Test continuation
-      while (iter.hasNext() && res.size() <= numEntries) {
-        OzoneBucket bucket = iter.next();
-        res.add(getFileStatusAdapterForBucket(bucket, uri, username));
-        if (recursive) {
-          String next = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
-          // TODO: Check startPath
-          res.addAll(listStatus(next, recursive, startPath,
-              numEntries - res.size(), uri, workingDir, username));
-        }
-      }
-      return res;
+      return listStatusVolume(ofsPath.getVolumeName(),
+          recursive, startPath, numEntries, uri, workingDir, username);
     }
 
     String keyName = ofsPath.getKeyName();
     // Internally we need startKey to be passed into bucket.listStatus
+    OFSPath ofsStartPath = new OFSPath(startPath);
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
