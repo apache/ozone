@@ -29,5 +29,5 @@ export GIT_COMMITTER_NAME="GitHub actions"
 export GIT_AUTHOR_EMAIL="noreply@github.com"
 export GIT_AUTHOR_NAME="GitHub actions"
 
-git commit --allow-empty -m "empty commit to retest build"
+git commit --allow-empty -m "empty commit to retest build" > /dev/null
 git push $REPO_URL HEAD:$BRANCH
