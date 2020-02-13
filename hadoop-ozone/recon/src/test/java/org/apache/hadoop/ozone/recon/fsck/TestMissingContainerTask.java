@@ -46,9 +46,8 @@ import org.junit.Test;
  */
 public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
 
-
   @Test
-  public void testRun() throws IOException, SQLException {
+  public void testRun() throws IOException, SQLException, InterruptedException {
     Configuration sqlConfiguration =
         getInjector().getInstance((Configuration.class));
 
@@ -80,7 +79,8 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
 
     MissingContainerTask missingContainerTask =
         new MissingContainerTask(scmMock, sqlConfiguration);
-    missingContainerTask.run();
+    missingContainerTask.start();
+    Thread.sleep(5000L);
 
     all = missingContainersTableHandle.findAll();
     Assert.assertEquals(1, all.size());

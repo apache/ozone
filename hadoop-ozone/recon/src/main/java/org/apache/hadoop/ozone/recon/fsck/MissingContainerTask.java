@@ -20,11 +20,15 @@ package org.apache.hadoop.ozone.recon.fsck;
 
 import java.util.Set;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.util.ExitUtil;
+import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
@@ -46,6 +50,7 @@ public class MissingContainerTask {
   private OzoneStorageContainerManager scm;
   private MissingContainersDao missingContainersDao;
   private ReconTaskStatusDao reconTaskStatusDao;
+  private final static long interval = 5 * 60 * 1000L;
 
   private Thread fsckMonitor;
   private volatile boolean running;
@@ -90,30 +95,50 @@ public class MissingContainerTask {
     }
   }
 
-  public void run() {
-    long currentTime = System.currentTimeMillis();
-    ContainerManager containerManager = scm.getContainerManager();
-    containerManager.getContainerIDs().forEach(containerID -> {
-      try {
-        Set<ContainerReplica> containerReplicas =
-            containerManager.getContainerReplicas(containerID);
-        if (CollectionUtils.isEmpty(containerReplicas)) {
-          if (!missingContainersDao.existsById(containerID.getId())) {
-            MissingContainers newRecord =
-                new MissingContainers(containerID.getId(), currentTime);
-            missingContainersDao.insert(newRecord);
-          }
-        } else {
-          if (missingContainersDao.existsById(containerID.getId())) {
-            missingContainersDao.deleteById(containerID.getId());
-          }
-        }
-        reconTaskStatusDao.update(new ReconTaskStatus(getClass().getName(),
-            System.currentTimeMillis(), 0L));
-      } catch (ContainerNotFoundException e) {
-        LOG.error("Container not found while finding missing containers", e);
+  public synchronized void run() {
+    try {
+      while (running) {
+        long start = Time.monotonicNow();
+        long currentTime = System.currentTimeMillis();
+        ContainerManager containerManager = scm.getContainerManager();
+        final Set<ContainerID> containerIds =
+            containerManager.getContainerIDs();
+        containerManager.getContainerIDs().forEach(containerID ->
+            processContainer(containerID, currentTime));
+
+        LOG.info("Missing Container Monitor Thread took {} milliseconds for" +
+                " processing {} containers.", Time.monotonicNow() - start,
+            containerIds.size());
+        wait(interval);
       }
-    });
+    } catch (Throwable t) {
+      // When we get runtime exception, we should terminate SCM.
+      LOG.error("Exception in Replication Monitor Thread.", t);
+      ExitUtil.terminate(1, t);
+    }
+  }
+
+  private void processContainer(ContainerID containerID, long currentTime) {
+    try {
+      ContainerManager containerManager = scm.getContainerManager();
+      Set<ContainerReplica> containerReplicas =
+          containerManager.getContainerReplicas(containerID);
+      if (CollectionUtils.isEmpty(containerReplicas)) {
+        if (!missingContainersDao.existsById(containerID.getId())) {
+          MissingContainers newRecord =
+              new MissingContainers(containerID.getId(), currentTime);
+          missingContainersDao.insert(newRecord);
+        }
+      } else {
+        if (missingContainersDao.existsById(containerID.getId())) {
+          missingContainersDao.deleteById(containerID.getId());
+        }
+      }
+      reconTaskStatusDao.update(new ReconTaskStatus(getClass().getName(),
+          System.currentTimeMillis(), 0L));
+    } catch (ContainerNotFoundException e) {
+      LOG.error("Container not found while finding missing containers", e);
+    }
   }
 
   public boolean isRunning() {
