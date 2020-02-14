@@ -42,7 +42,9 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.client.RaftClientConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcFactory;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
@@ -54,12 +56,11 @@ import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig.DATANODE_RATIS_SERVER_CONFIG_PREFIX;
 
 /**
  * Ratis helper methods.
@@ -67,16 +68,14 @@ import static org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig.DATANODE_RA
 public interface RatisHelper {
   Logger LOG = LoggerFactory.getLogger(RatisHelper.class);
 
-  // Ratis Client and Grpc header regex filters.
-  String RATIS_CLIENT_HEADER_REGEX = "raft\\.client\\.([a-z\\.]+)";
-  String RATIS_GRPC_CLIENT_HEADER_REGEX = "raft\\.grpc\\.(?!server|tls)" +
-      "([a-z\\.]+)";
-
-  // Ratis Server header regex filter.
-  String RATIS_SERVER_HEADER_REGEX = "datanode\\.ratis\\.raft\\.server\\" +
-      ".([a-z\\.]+)";
-  String RATIS_SERVER_GRPC_HEADER_REGEX = "datanode\\.ratis\\.raft\\.grpc\\" +
-      ".([a-z\\.]+)";
+  // Prefix for Ratis Server GRPC and Ratis client conf.
+  String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis.";
+  String HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY =
+      HDDS_DATANODE_RATIS_PREFIX_KEY + RaftServerConfigKeys.PREFIX;
+  String HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY =
+      HDDS_DATANODE_RATIS_PREFIX_KEY + RaftClientConfigKeys.PREFIX;
+  String HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY =
+      HDDS_DATANODE_RATIS_PREFIX_KEY + GrpcConfigKeys.PREFIX;
 
 
   static String toRaftPeerIdString(DatanodeDetails id) {
@@ -201,9 +200,6 @@ public interface RatisHelper {
     // Set the ratis client headers which are matching with regex.
     createRaftClientProperties(ozoneConfiguration, properties);
 
-    // Set the ratis grpc client headers which are matching with regex.
-    createRaftGrpcProperties(ozoneConfiguration, properties);
-
     RaftClient.Builder builder =  RaftClient.newBuilder()
         .setRaftGroup(group)
         .setLeaderId(leader)
@@ -218,58 +214,52 @@ public interface RatisHelper {
   }
 
   /**
-   * Set all the properties matching with regex RATIS_CLIENT_HEADER_REGEX in
+   * Set all the properties matching with regex
+   * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
    * ozone configuration object and configure it to RaftProperties.
    * @param ozoneConf
    * @param raftProperties
    */
   static void createRaftClientProperties(Configuration ozoneConf,
       RaftProperties raftProperties) {
-    Map<String, String> ratisClientConf =
-        ozoneConf.getValByRegex(RATIS_CLIENT_HEADER_REGEX);
-    ratisClientConf.forEach((key, val) -> raftProperties.set(key, val));
-  }
 
-  /**
-   * Set all the properties matching with regex
-   * {@link RatisHelper#RATIS_GRPC_CLIENT_HEADER_REGEX} in ozone
-   * configuration object and configure it to RaftProperties.
-   * @param ozoneConf
-   * @param raftProperties
-   */
-  static void createRaftGrpcProperties(Configuration ozoneConf,
-      RaftProperties raftProperties) {
+    // As for client we do not require server and grpc server/tls. exclude them.
     Map<String, String> ratisClientConf =
-        ozoneConf.getValByRegex(RATIS_GRPC_CLIENT_HEADER_REGEX);
-    ratisClientConf.forEach((key, val) -> raftProperties.set(key, val));
-  }
-
-  static void createRaftServerGrpcProperties(Configuration ozoneConf,
-      RaftProperties raftProperties) {
-    Map<String, String> ratisClientConf =
-        ozoneConf.getValByRegex(RATIS_SERVER_GRPC_HEADER_REGEX);
-    ratisClientConf.forEach((key, val) -> raftProperties.set(
-        removeDatanodePrefix(key), val));
+        ozoneConf.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
+    ratisClientConf.forEach((key, val) -> {
+      if (!(key.startsWith(RaftServerConfigKeys.PREFIX) ||
+          key.startsWith(GrpcConfigKeys.TLS.PREFIX) ||
+          key.startsWith(GrpcConfigKeys.Server.PREFIX))) {
+        raftProperties.set(key, val);
+      }
+    });
   }
 
 
   /**
-   * Set all the properties matching with regex
-   * {@link RatisHelper#RATIS_SERVER_HEADER_REGEX} in ozone configuration
-   * object and configure it to RaftProperties.
+   * Set all the properties matching with prefix
+   * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
+   * ozone configuration object and configure it to RaftProperties.
    * @param ozoneConf
    * @param raftProperties
    */
   static void createRaftServerProperties(Configuration ozoneConf,
        RaftProperties raftProperties) {
+
     Map<String, String> ratisServerConf =
-        ozoneConf.getValByRegex(RATIS_SERVER_HEADER_REGEX);
-    ratisServerConf.forEach((key, val) -> raftProperties.set(
-        removeDatanodePrefix(key), val));
+        getDatanodeRatisPrefixProps(ozoneConf);
+    ratisServerConf.forEach((key, val) -> {
+      // Exclude ratis client configuration.
+      if (!key.startsWith(RaftClientConfigKeys.PREFIX)) {
+        raftProperties.set(key, val);
+      }
+    });
   }
 
-  static String removeDatanodePrefix(String key) {
-    return key.replaceFirst(DATANODE_RATIS_SERVER_CONFIG_PREFIX, "");
+
+  static Map<String, String> getDatanodeRatisPrefixProps(
+      Configuration configuration) {
+    return configuration.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
   }
 
   // For External gRPC client to server with gRPC TLS.
