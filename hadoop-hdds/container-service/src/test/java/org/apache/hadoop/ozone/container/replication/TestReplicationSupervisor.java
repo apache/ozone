@@ -38,7 +38,7 @@ import org.junit.Test;
 
 import javax.annotation.Nonnull;
 
-import static com.google.common.util.concurrent.MoreExecutors.sameThreadExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
 
 /**
@@ -115,7 +115,7 @@ public class TestReplicationSupervisor {
   public void failureHandling() {
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(
-        __ -> throwingReplicator, sameThreadExecutor());
+        __ -> throwingReplicator, newDirectExecutorService());
 
     try {
       //WHEN
@@ -159,7 +159,7 @@ public class TestReplicationSupervisor {
 
   private ReplicationSupervisor supervisorWithSuccessfulReplicator() {
     return supervisorWith(supervisor -> new FakeReplicator(supervisor, set),
-        sameThreadExecutor());
+        newDirectExecutorService());
   }
 
   private ReplicationSupervisor supervisorWith(
