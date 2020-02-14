@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -41,7 +42,6 @@ import org.apache.ratis.protocol.GroupMismatchException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -57,7 +57,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
  */
-@Ignore
 public class TestOzoneClientRetriesOnException {
 
   private static MiniOzoneCluster cluster;
@@ -87,9 +86,9 @@ public class TestOzoneClientRetriesOnException {
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
-   // conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
     conf.set(OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE, "NONE");
     conf.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_RETRIES, 3);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 3);
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
@@ -189,6 +188,7 @@ public class TestOzoneClientRetriesOnException {
       XceiverClientSpi xceiverClient =
           xceiverClientManager.acquireClient(pipeline);
       if (!containerList.contains(containerID)) {
+        containerList.add(containerID);
         xceiverClient.sendCommand(ContainerTestHelper
             .getCreateContainerRequest(containerID, pipeline));
       }
@@ -199,15 +199,23 @@ public class TestOzoneClientRetriesOnException {
     Assert.assertTrue(stream instanceof BlockOutputStream);
     BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
     TestHelper.waitForContainerClose(key, cluster);
+    // Ensure that blocks for the key have been allocated to atleast 3 different
+    // containers so that write request will be tried on 3 different blocks
+    // of 3 different containers and it will finally fail as it will hit
+    // the max retry count of 3.
+    Assert.assertTrue(containerList.size() >= 3);
     try {
       key.write(data1);
       Assert.fail("Expected exception not thrown");
     } catch (IOException ioe) {
       Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
-          .getIoException()) instanceof ContainerNotOpenException);
-      Assert.assertTrue(ioe.getMessage().contains(
-          "Retry request failed. retries get failed due to exceeded maximum "
-              + "allowed retries number: 3"));
+              .getIoException()) instanceof ContainerNotOpenException);
+      IOException e =  (IOException)HddsClientUtils.checkForException(ioe);
+      Assert.assertTrue(ioe.
+              getMessage().contains(
+              "Retry request failed. " +
+                      "retries get failed due to exceeded maximum " +
+                      "allowed retries number: 3"));
     }
     try {
       key.flush();
