@@ -21,7 +21,6 @@ import io.opentracing.Scope;
 import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.web.ozShell.Shell;
-import org.apache.hadoop.ozone.web.ozShell.bucket.S3BucketMapping;
 import picocli.CommandLine.Command;
 
 /**
