@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -379,11 +379,27 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT)) {
       localPort = 0;
     }
-    GrpcTlsConfig tlsConfig = RatisHelper.createTlsServerConfigForDN(
+    GrpcTlsConfig tlsConfig = createTlsServerConfigForDN(
           new SecurityConfig(ozoneConf), caClient);
 
     return new XceiverServerRatis(datanodeDetails, localPort, dispatcher,
         containerController, context, tlsConfig, ozoneConf);
+  }
+
+  // For gRPC server running DN container service with gPRC TLS
+  // No mTLS as the channel is shared for for external client, which
+  // does not have SCM CA issued certificates.
+  // In summary:
+  // authenticate from server to client is via TLS.
+  // authenticate from client to server is via block token (or container token).
+  static GrpcTlsConfig createTlsServerConfigForDN(SecurityConfig conf,
+      CertificateClient caClient) {
+    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      return new GrpcTlsConfig(
+          caClient.getPrivateKey(), caClient.getCertificate(),
+          null, false);
+    }
+    return null;
   }
 
   @Override
