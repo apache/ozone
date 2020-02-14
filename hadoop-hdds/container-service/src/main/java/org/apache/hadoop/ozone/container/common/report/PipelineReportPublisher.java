@@ -21,7 +21,7 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 
 import java.util.concurrent.TimeUnit;
 

@@ -16,7 +16,12 @@
  * limitations under the License.
  *
  */
+
 /**
- Helpers for Certificates.
+ * This package contains common routines used in creating an x509 based identity
+ * framework for HDDS.
  */
-package org.apache.hadoop.hdds.security.x509.certificate.utils;
+package org.apache.hadoop.hdds.utils;
+/**
+ * Generic server side utilities.
+ */

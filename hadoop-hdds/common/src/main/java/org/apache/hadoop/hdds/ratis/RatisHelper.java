@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.Collections;
@@ -33,11 +32,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import org.apache.ratis.RaftConfigKeys;
@@ -274,38 +269,9 @@ public interface RatisHelper {
     return tlsConfig;
   }
 
-  // For Internal gRPC client from SCM to DN with gRPC TLS
-  static GrpcTlsConfig createTlsClientConfigForSCM(SecurityConfig conf,
-      CertificateServer certificateServer) throws IOException {
-    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      try {
-        X509Certificate caCert =
-            CertificateCodec.getX509Certificate(
-                certificateServer.getCACertificate());
-        return new GrpcTlsConfig(null, null,
-            caCert, false);
-      } catch (CertificateException ex) {
-        throw new SCMSecurityException("Fail to find SCM CA certificate.", ex);
-      }
-    }
-    return null;
-  }
 
-  // For gRPC server running DN container service with gPRC TLS
-  // No mTLS as the channel is shared for for external client, which
-  // does not have SCM CA issued certificates.
-  // In summary:
-  // authenticate from server to client is via TLS.
-  // authenticate from client to server is via block token (or container token).
-  static GrpcTlsConfig createTlsServerConfigForDN(SecurityConfig conf,
-      CertificateClient caClient)  {
-    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      return new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          null, false);
-    }
-    return null;
-  }
+
+
 
   static RetryPolicy createRetryPolicy(Configuration conf) {
     int maxRetryCount =

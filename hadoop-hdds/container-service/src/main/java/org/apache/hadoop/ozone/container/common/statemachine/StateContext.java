@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.commands
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import static java.lang.Math.min;
-import static org.apache.hadoop.hdds.scm.HddsServerUtil.getScmHeartbeatInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
