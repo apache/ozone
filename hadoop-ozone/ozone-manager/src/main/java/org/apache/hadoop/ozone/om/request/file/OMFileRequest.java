@@ -101,7 +101,20 @@ public final class OMFileRequest {
   }
 
   /**
-   * generate the valid object id range from the transaction id.
+   * Get the valid base object id given the transaction id.
+   * @param id of the transaction
+   * @return base object id allocated against the transaction
+   */
+  public static long getObjIDFromTxId(long id) {
+    return getObjIdRangeFromTxId(id).getLeft();
+  }
+
+  /**
+   * Generate the valid object id range for the transaction id.
+   * The transaction id is left shifted by 8 bits -
+   * creating space to create (2^8 - 1) object ids in every request.
+   * maxId (right element of Immutable pair) represents the largest
+   * object id allocation possible inside the transaction.
    * @param id
    * @return object id range
    */

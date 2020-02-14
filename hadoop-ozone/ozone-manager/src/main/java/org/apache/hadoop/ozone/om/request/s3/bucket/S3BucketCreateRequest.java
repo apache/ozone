@@ -341,8 +341,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
    */
   private OmVolumeArgs createOmVolumeArgs(String volumeName, String userName,
       long creationTime, long transactionLogIndex) throws IOException {
-    long objectID = OMFileRequest.getObjIdRangeFromTxId(transactionLogIndex)
-        .getLeft();
+    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
     OmVolumeArgs.Builder builder = OmVolumeArgs.newBuilder()
         .setAdminName(S3_ADMIN_NAME).setVolume(volumeName)
         .setQuotaInBytes(OzoneConsts.MAX_QUOTA_IN_BYTES)

@@ -59,8 +59,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     String adminName = "user1";
     String ownerName = "user1";
     long txLogIndex = 1;
-    long expectedObjId = OMFileRequest.getObjIdRangeFromTxId(txLogIndex)
-        .getLeft();
+    long expectedObjId = OMFileRequest.getObjIDFromTxId(txLogIndex);
 
     OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
         ownerName);
@@ -111,8 +110,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
     omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
     long txLogIndex = 2;
-    long expectedObjId = OMFileRequest.getObjIdRangeFromTxId(txLogIndex)
-        .getLeft();
+    long expectedObjId = OMFileRequest.getObjIDFromTxId(txLogIndex);
 
     OMClientResponse omClientResponse =
         omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex,

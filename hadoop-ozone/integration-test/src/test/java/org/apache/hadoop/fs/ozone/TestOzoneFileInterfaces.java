@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -224,37 +225,55 @@ public class TestOzoneFileInterfaces {
   @Test
   public void testDirectory() throws IOException {
     String leafName = RandomStringUtils.randomAlphanumeric(5);
+    OMMetadataManager metadataManager = cluster.getOzoneManager()
+        .getMetadataManager();
 
     String lev1dir = "abc";
     Path lev1path = createPath("/" + lev1dir);
+    String lev1key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev1path));
     String lev2dir = "def";
     Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
-    FileStatus lev1status;
-    FileStatus lev2status;
+    String lev2key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev2path));
+
+    FileStatus rootChild;
     FileStatus rootstatus;
     FileStatus leafstatus;
-    FileStatus rootChild;
 
     Path leaf = createPath("/" + lev1dir + "/" + lev2dir + "/" + leafName);
+    String leafKey = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(leaf));
 
     // verify prefix directories and the leaf, do not already exist
-    lev1status = verifyDirectory(lev1path);
-    lev2status = verifyDirectory(lev2path);
-    assertTrue((lev1status == null) && (lev2status == null));
-    leafstatus = verifyDirectory(leaf);
-    assertTrue(leafstatus == null);
+    assertTrue(metadataManager.getKeyTable().get(lev1key) == null);
+    assertTrue(metadataManager.getKeyTable().get(lev2key) == null);
+    assertTrue(metadataManager.getKeyTable().get(leafKey) == null);
 
     assertTrue("Makedirs returned with false for the path " + leaf,
         fs.mkdirs(leaf));
 
     // verify the leaf directory got created.
-    leafstatus = verifyDirectory(leaf);
+    leafstatus = getDirectoryStat(leaf);
     assertTrue(leafstatus != null);
 
     if (cluster.getOzoneManager().createPrefixEntries()) {
+      FileStatus lev1status;
+      FileStatus lev2status;
+
       // verify prefix directories got created when creating the leaf directory.
-      lev1status = verifyDirectory(lev1path);
-      lev2status = verifyDirectory(lev2path);
+      String kn = metadataManager.getKeyTable().get(lev2key).getKeyName();
+      assertTrue(kn.equals("abc/def/"));
+      assertTrue(metadataManager
+          .getKeyTable()
+          .get(lev1key)
+          .getKeyName().equals("abc/"));
+      assertTrue(metadataManager
+          .getKeyTable()
+          .get(lev2key)
+          .getKeyName().equals("abc/def/"));
+      lev1status = getDirectoryStat(lev1path);
+      lev2status = getDirectoryStat(lev2path);
       assertTrue((lev1status != null) && (lev2status != null));
       rootChild = lev1status;
     } else {
@@ -262,7 +281,7 @@ public class TestOzoneFileInterfaces {
     }
 
     // check the root directory
-    rootstatus = verifyDirectory(createPath("/"));
+    rootstatus = getDirectoryStat(createPath("/"));
     assertTrue(rootstatus != null);
 
     // root directory listing should contain the lev1 prefix directory
@@ -426,7 +445,7 @@ public class TestOzoneFileInterfaces {
    * @return null indicates FILE_NOT_FOUND, else the FileStatus
    * @throws IOException
    */
-  private FileStatus verifyDirectory(Path path) throws IOException {
+  private FileStatus getDirectoryStat(Path path) throws IOException {
 
     FileStatus status = null;
 

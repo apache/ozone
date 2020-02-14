@@ -241,8 +241,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
         long transactionLogIndex) {
-    long objectID = OMFileRequest.getObjIdRangeFromTxId(transactionLogIndex)
-        .getLeft();
+    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
 
     return new OmKeyInfo.Builder()
         .setVolumeName(keyArgs.getVolumeName())

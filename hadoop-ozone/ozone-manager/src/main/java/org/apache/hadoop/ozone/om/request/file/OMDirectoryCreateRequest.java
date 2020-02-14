@@ -177,8 +177,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       OMFileRequest.OMDirectoryResult omDirectoryResult =
           omPathInfo.getDirectoryResult();
       List<String> missingParents = omPathInfo.getMissingParents();
-      long baseObjId = OMFileRequest.getObjIdRangeFromTxId(trxnLogIndex)
-          .getLeft();
+      long baseObjId = OMFileRequest.getObjIDFromTxId(trxnLogIndex);
 
       OmKeyInfo dirKeyInfo = null;
       if (omDirectoryResult == FILE_EXISTS ||

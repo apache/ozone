@@ -185,8 +185,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       // Add objectID and updateID
-      long objectId = OMFileRequest.getObjIdRangeFromTxId(transactionLogIndex)
-          .getLeft();
+      long objectId = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
       omBucketInfo.setObjectID(objectId);
       omBucketInfo.setUpdateID(transactionLogIndex);
 

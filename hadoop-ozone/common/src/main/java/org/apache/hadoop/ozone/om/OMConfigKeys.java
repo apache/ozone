@@ -231,7 +231,7 @@ public final class OMConfigKeys {
 
   //Ozone FS Config parameters.
   public static final String OZONE_FS_CREATE_PREFIX_DIRECTORIES =
-      "ozone.fs.prefix.create";
+      "ozone.manager.fs.prefix.create";
   public static final Boolean OZONE_FS_CREATE_PREFIX_DIRECTORIES_DEFAULT =
       Boolean.TRUE;
 }

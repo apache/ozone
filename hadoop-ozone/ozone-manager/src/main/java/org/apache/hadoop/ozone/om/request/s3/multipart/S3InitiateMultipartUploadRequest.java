@@ -113,8 +113,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     OmMultipartKeyInfo multipartKeyInfo = null;
     OmKeyInfo omKeyInfo = null;
     Result result = null;
-    long objectID = OMFileRequest.getObjIdRangeFromTxId(transactionLogIndex)
-        .getLeft();
+    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
 
     OMResponse.Builder omResponse = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.InitiateMultiPartUpload)

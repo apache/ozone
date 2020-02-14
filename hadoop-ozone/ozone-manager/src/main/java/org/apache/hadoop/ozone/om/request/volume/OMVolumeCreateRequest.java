@@ -115,8 +115,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     Map<String, String> auditMap = new HashMap<>();
     Collection<String> ozAdmins = ozoneManager.getOzoneAdmins();
     try {
-      long objectID = OMFileRequest.getObjIdRangeFromTxId(transactionLogIndex)
-          .getLeft();
+      long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
       omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
       // when you create a volume, we set both Object ID and update ID to the
       // same ratis transaction ID. The Object ID will never change, but update
