@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.web.ozShell.OzoneShell;
@@ -69,6 +70,7 @@ public class TestOzoneShellHA {
   public Timeout testTimeout = new Timeout(300000);
 
   private static File baseDir;
+  private static File testFile;
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
   private static OzoneShell ozoneShell = null;
@@ -97,6 +99,11 @@ public class TestOzoneShellHA {
         TestOzoneShellHA.class.getSimpleName());
     baseDir = new File(path);
     baseDir.mkdirs();
+
+    testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
+    testFile.getParentFile().mkdirs();
+    testFile.createNewFile();
+
     ozoneShell = new OzoneShell();
 
     // Init HA cluster
@@ -272,6 +279,35 @@ public class TestOzoneShellHA {
   }
 
   /**
+   * Helper function to generate keys for testing shell command of keys.
+   */
+  private void generateKeys(String volumeName, String bucketName) {
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId + volumeName};
+    execute(ozoneShell, args);
+
+    args = new String[] {
+        "bucket", "create", "o3://" + omServiceId + volumeName + bucketName};
+    execute(ozoneShell, args);
+
+    String keyName = volumeName + bucketName +
+        OzoneConsts.OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 100; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+  }
+
+  /**
+   * Helper function to get nums of keys from info of listing command.
+   */
+  private int getNumOfKeys() {
+    return out.toString().split("key").length - 1;
+  }
+
+  /**
    * Tests ozone sh command URI parsing with volume and bucket create commands.
    */
   @Test
@@ -329,5 +365,32 @@ public class TestOzoneShellHA {
     args = new String[] {
         "bucket", "create", "o3://" + omServiceId + "/volume/bucket"};
     execute(ozoneShell, args);
+  }
+
+  /**
+   * Test ozone shell list command.
+   */
+  @Test
+  public void testOzoneShCmdList() {
+    generateKeys("/volume4", "/bucket");
+    final String destinationBucket = "o3://" + omServiceId + "/volume4/bucket";
+
+    // Test case 1: test listing keys
+    // ozone sh key list /volume4/bucket
+    // Expectation: Get list including all keys.
+    String[] args = new String[] {"key", "list", destinationBucket};
+    out.reset();
+    execute(ozoneShell, args);
+    Assert.assertEquals(100, getNumOfKeys());
+
+    // Test case 2: test listing keys for setting --start with last key.
+    // ozone sh key list --start=key99 /volume4/bucket
+    // Expectation: Get empty list.
+    final String startKey = "--start=key99";
+    args = new String[] {"key", "list", startKey, destinationBucket};
+    out.reset();
+    execute(ozoneShell, args);
+    Assert.assertEquals(0, out.size());
+    Assert.assertEquals(0, getNumOfKeys());
   }
 }

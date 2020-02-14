@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.server;
+package org.apache.hadoop.hdds.server.http;
 
 import java.util.ArrayList;
 import java.util.Arrays;

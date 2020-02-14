@@ -17,15 +17,10 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV4;
-import org.apache.hadoop.ozone.s3.header.Credential;
-import org.apache.kerby.util.Hex;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import javax.annotation.PostConstruct;
+import javax.enterprise.context.RequestScoped;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MultivaluedMap;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
@@ -37,34 +32,77 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV4;
+import org.apache.hadoop.ozone.s3.header.Credential;
+
+import com.google.common.annotations.VisibleForTesting;
 import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import org.apache.kerby.util.Hex;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Parser to process AWS v4 auth request. Creates string to sign and auth
  * header. For more details refer to AWS documentation https://docs.aws
  * .amazon.com/general/latest/gr/sigv4-create-canonical-request.html.
  **/
-public class AWSV4AuthParser implements AWSAuthParser {
+@RequestScoped
+public class AWSV4SignatureProcessor implements SignatureProcessor {
 
   private final static Logger LOG =
-      LoggerFactory.getLogger(AWSV4AuthParser.class);
-  private MultivaluedMap<String, String> headerMap;
+      LoggerFactory.getLogger(AWSV4SignatureProcessor.class);
+
+  @Context
+  private ContainerRequestContext context;
+
+  private Map<String, String> headers;
   private MultivaluedMap<String, String> queryMap;
   private String uri;
   private String method;
   private AuthorizationHeaderV4 v4Header;
   private String stringToSign;
-  private String amzContentPayload;
 
-  public AWSV4AuthParser(ContainerRequestContext context)
-      throws OS3Exception {
-    this.headerMap = context.getHeaders();
+  @PostConstruct
+  public void init()
+      throws Exception {
+    LOG.info("Initializing request header parser");
+
+    //header map is MUTABLE. It's better to save it here. (with lower case
+    // keys!!!)
+    this.headers = new LowerCaseKeyStringMap(new HashMap<>());
+    for (Entry<String, List<String>> headerEntry : context.getHeaders()
+        .entrySet()) {
+      if (0 < headerEntry.getValue().size()) {
+        String headerKey = headerEntry.getKey();
+        if (headers.containsKey(headerKey)) {
+          //mutiple headers from the same type are combined
+          headers.put(headerKey,
+              headers.get(headerKey) + "," + headerEntry.getValue().get(0));
+        } else {
+          headers.put(headerKey, headerEntry.getValue().get(0));
+        }
+      }
+    }
+    //in case of the HeaderPreprocessor executed before us, let's restore the
+    // original content type.
+    if (headers.containsKey(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE)) {
+      headers.put(HeaderPreprocessor.CONTENT_TYPE,
+          headers.get(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE));
+    }
+
+
     this.queryMap = context.getUriInfo().getQueryParameters();
     try {
       this.uri = new URI(context.getUriInfo().getRequestUri()
@@ -75,9 +113,12 @@ public class AWSV4AuthParser implements AWSAuthParser {
     }
 
     this.method = context.getMethod();
-    v4Header = new AuthorizationHeaderV4(
-        headerMap.getFirst(AUTHORIZATION_HEADER));
+    if (v4Header == null) {
+      v4Header = new AuthorizationHeaderV4(headers.get(AUTHORIZATION_HEADER));
+    }
+    parse();
   }
+
 
   public void parse() throws Exception {
     StringBuilder strToSign = new StringBuilder();
@@ -95,7 +136,7 @@ public class AWSV4AuthParser implements AWSAuthParser {
     //    HashedCanonicalRequest
     String algorithm, requestDateTime, credentialScope, canonicalRequest;
     algorithm = v4Header.getAlgorithm();
-    requestDateTime = headerMap.getFirst(X_AMAZ_DATE);
+    requestDateTime = headers.get(X_AMAZ_DATE);
     Credential credential = v4Header.getCredentialObj();
     credentialScope = String.format("%s/%s/%s/%s", credential.getDate(),
         credential.getAwsRegion(), credential.getAwsService(),
@@ -115,15 +156,16 @@ public class AWSV4AuthParser implements AWSAuthParser {
     }
 
     if (LOG.isTraceEnabled()) {
-      headerMap.keySet().forEach(k -> LOG.trace("Header:{},value:{}", k,
-          headerMap.get(k)));
+      headers.keySet().forEach(k -> LOG.trace("Header:{},value:{}", k,
+          headers.get(k)));
     }
 
     LOG.debug("StringToSign:[{}]", strToSign);
     stringToSign = strToSign.toString();
   }
 
-  private String buildCanonicalRequest() throws OS3Exception {
+  @VisibleForTesting
+  public String buildCanonicalRequest() throws OS3Exception {
     Iterable<String> parts = split("/", uri);
     List<String> encParts = new ArrayList<>();
     for (String p : parts) {
@@ -136,36 +178,28 @@ public class AWSV4AuthParser implements AWSAuthParser {
     StringBuilder canonicalHeaders = new StringBuilder();
 
     for (String header : v4Header.getSignedHeaders()) {
-      List<String> headerValue = new ArrayList<>();
       canonicalHeaders.append(header.toLowerCase());
       canonicalHeaders.append(":");
-      for (String originalHeader : headerMap.keySet()) {
-        if (originalHeader.toLowerCase().equals(header)) {
-          headerValue.add(headerMap.getFirst(originalHeader).trim());
-        }
-      }
+      if (headers.containsKey(header)) {
+        String headerValue = headers.get(header);
+        canonicalHeaders.append(headerValue);
+        canonicalHeaders.append(NEWLINE);
 
-      if (headerValue.size() == 0) {
+        // Set for testing purpose only to skip date and host validation.
+        validateSignedHeader(header, headerValue);
+
+      } else {
         throw new RuntimeException("Header " + header + " not present in " +
-            "request");
+            "request but requested to be signed.");
       }
-      if (headerValue.size() > 1) {
-        Collections.sort(headerValue);
-      }
-
-      // Set for testing purpose only to skip date and host validation.
-      validateSignedHeader(header, headerValue.get(0));
-
-      canonicalHeaders.append(join(",", headerValue));
-      canonicalHeaders.append(NEWLINE);
     }
 
     String payloadHash;
     if (UNSIGNED_PAYLOAD.equals(
-        headerMap.get(X_AMZ_CONTENT_SHA256))) {
+        headers.get(X_AMZ_CONTENT_SHA256))) {
       payloadHash = UNSIGNED_PAYLOAD;
     } else {
-      payloadHash = headerMap.getFirst(X_AMZ_CONTENT_SHA256);
+      payloadHash = headers.get(X_AMZ_CONTENT_SHA256);
     }
 
     String signedHeaderStr = v4Header.getSignedHeaderString();
@@ -301,4 +335,91 @@ public class AWSV4AuthParser implements AWSAuthParser {
   public String getStringToSign() throws Exception {
     return stringToSign;
   }
+
+  @VisibleForTesting
+  public void setContext(ContainerRequestContext context) {
+    this.context = context;
+  }
+
+  @VisibleForTesting
+  public void setV4Header(
+      AuthorizationHeaderV4 v4Header) {
+    this.v4Header = v4Header;
+  }
+
+  /**
+   * A simple map which forces lower case key usage.
+   */
+  public static class LowerCaseKeyStringMap implements Map<String, String> {
+
+    private HashMap<String, String> delegate;
+
+    public LowerCaseKeyStringMap(
+        HashMap<String, String> delegate) {
+      this.delegate = delegate;
+    }
+
+    @Override
+    public int size() {
+      return delegate.size();
+    }
+
+    @Override
+    public boolean isEmpty() {
+      return delegate.isEmpty();
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+      return delegate.containsKey(key.toString().toLowerCase());
+    }
+
+    @Override
+    public boolean containsValue(Object value) {
+      return delegate.containsValue(value);
+    }
+
+    @Override
+    public String get(Object key) {
+      return delegate.get(key.toString().toLowerCase());
+    }
+
+    @Override
+    public String put(String key, String value) {
+      return delegate.put(key.toLowerCase(), value);
+    }
+
+    @Override
+    public String remove(Object key) {
+      return delegate.remove(key.toString());
+    }
+
+    @Override
+    public void putAll(Map<? extends String, ? extends String> m) {
+      for (Entry<? extends String, ? extends String> entry : m.entrySet()) {
+        put(entry.getKey().toLowerCase(), entry.getValue());
+      }
+    }
+
+    @Override
+    public void clear() {
+      delegate.clear();
+    }
+
+    @Override
+    public Set<String> keySet() {
+      return delegate.keySet();
+    }
+
+    @Override
+    public Collection<String> values() {
+      return delegate.values();
+    }
+
+    @Override
+    public Set<Entry<String, String>> entrySet() {
+      return delegate.entrySet();
+    }
+  }
+
 }

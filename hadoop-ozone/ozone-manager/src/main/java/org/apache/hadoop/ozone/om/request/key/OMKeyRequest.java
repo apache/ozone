@@ -82,18 +82,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
 
-  /**
-   * Stores the result of request execution in
-   * OMClientRequest#validateAndUpdateCache.
-   */
-  public enum Result {
-    SUCCESS, // The request was executed successfully
-
-    REPLAY, // The request is a replay and was ignored
-
-    FAILURE // The request failed and exception was thrown
-  }
-
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
   }

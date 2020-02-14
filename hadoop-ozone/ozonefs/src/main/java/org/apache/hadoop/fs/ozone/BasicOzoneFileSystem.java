@@ -438,6 +438,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     LOG.trace("delete() path:{} recursive:{}", f, recursive);
     try {
       DeleteIterator iterator = new DeleteIterator(f, recursive);
+
+      if (f.isRoot()) {
+        LOG.warn("Cannot delete root directory.");
+        return false;
+      }
+
       return iterator.iterate();
     } catch (FileNotFoundException e) {
       if (LOG.isDebugEnabled()) {
@@ -465,12 +471,6 @@ public class BasicOzoneFileSystem extends FileSystem {
 
     if (status.isDirectory()) {
       LOG.debug("delete: Path is a directory: {}", f);
-      key = addTrailingSlashIfNeeded(key);
-
-      if (key.equals("/")) {
-        LOG.warn("Cannot delete root directory.");
-        return false;
-      }
 
       result = innerDelete(f, recursive);
     } else {

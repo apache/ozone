@@ -102,8 +102,8 @@ public class TestS3MultipartResponse {
                 .setKeyName(keyName)
                 .setMultipartUploadID(multipartUploadID)).build();
 
-    return new S3InitiateMultipartUploadResponse(multipartKeyInfo, omKeyInfo,
-            omResponse);
+    return new S3InitiateMultipartUploadResponse(omResponse, multipartKeyInfo,
+        omKeyInfo);
   }
 
   public S3MultipartUploadAbortResponse createS3AbortMPUResponse(
@@ -116,8 +116,8 @@ public class TestS3MultipartResponse {
         .setAbortMultiPartUploadResponse(
             MultipartUploadAbortResponse.newBuilder().build()).build();
 
-    return new S3MultipartUploadAbortResponse(multipartKey, omMultipartKeyInfo,
-            omResponse);
+    return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
+        omMultipartKeyInfo);
   }
 
 

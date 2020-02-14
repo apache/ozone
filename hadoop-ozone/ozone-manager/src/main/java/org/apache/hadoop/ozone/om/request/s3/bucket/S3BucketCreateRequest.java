@@ -156,8 +156,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
             .get(omBucketKey);
         if (dbBucketInfo != null) {
           // Check if this transaction is a replay of ratis logs.
-          if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
-              trxnLogIndex)) {
+          if (isReplay(ozoneManager, dbBucketInfo, trxnLogIndex)) {
             // Replay implies the response has already been returned to
             // the client. So take no further action and return a dummy
             // OMClientResponse.

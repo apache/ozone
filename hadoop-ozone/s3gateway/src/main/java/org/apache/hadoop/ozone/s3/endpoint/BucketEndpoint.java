@@ -53,7 +53,7 @@ import org.apache.hadoop.ozone.s3.util.S3StorageType;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
-import static org.apache.hadoop.ozone.s3.util.OzoneS3Util.getVolumeName;
+import static org.apache.hadoop.ozone.s3.util.OzoneS3Util.getS3Username;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
@@ -202,8 +202,7 @@ public class BucketEndpoint extends EndpointBase {
   public Response put(@PathParam("bucket") String bucketName, @Context
       HttpHeaders httpHeaders) throws IOException, OS3Exception {
 
-    String volumeName = getVolumeName(getAuthenticationHeaderParser().
-        getAccessKeyID());
+    String volumeName = getS3Username(getSignatureProcessor().getAwsAccessId());
 
     try {
       String location = createS3Bucket(volumeName, bucketName);

@@ -193,7 +193,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             bucketName, keyName);
         OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
         if (dbKeyInfo != null) {
-          if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(), trxnLogIndex)) {
+          if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
             // This transaction is a replay. Send replay response.
             throw new OMReplayException();
           }
@@ -205,7 +205,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Check if this transaction is a replay of ratis logs.
       // Check the updateID of the openKey to verify that it is not greater
       // than the current transactionLogIndex
-      if (isReplay(ozoneManager, openKeyInfo.getUpdateID(), trxnLogIndex)) {
+      if (isReplay(ozoneManager, openKeyInfo, trxnLogIndex)) {
         // This transaction is a replay. Send replay response.
         throw new OMReplayException();
       }
