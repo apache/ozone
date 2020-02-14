@@ -16,40 +16,34 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.conf;
-
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigType;
+package org.apache.hadoop.hdds.conf;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
+import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY;
 
 /**
  * Datanode Ratis server Configuration.
  */
-@ConfigGroup(prefix = "datanode.ratis")
+@ConfigGroup(prefix = HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY)
 public class DatanodeRatisServerConfig {
 
-  public static final String DATANODE_RATIS_SERVER_CONFIG_PREFIX = "datanode" +
-      ".ratis.";
-
   public static final String RATIS_SERVER_REQUEST_TIMEOUT_KEY =
-      "raft.server.rpc.request.timeout";
+      "rpc.request.timeout";
 
   public static final String RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY =
-      "raft.server.watch.timeout";
+      "watch.timeout";
 
   public static final String RATIS_SERVER_NO_LEADER_TIMEOUT_KEY =
-      "raft.server.no-leader.timeout";
+      "Notification.no-leader.timeout";
 
   public static final String RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY =
-      "raft.server.rpcslowness.timeout";
+      "rpcslowness.timeout";
 
   public static final String RATIS_LEADER_NUM_PENDING_REQUESTS_KEY =
-      "raft.server.write.element-limit";
+      "write.element-limit";
 
   @Config(key = RATIS_SERVER_REQUEST_TIMEOUT_KEY,
       defaultValue = "60s",

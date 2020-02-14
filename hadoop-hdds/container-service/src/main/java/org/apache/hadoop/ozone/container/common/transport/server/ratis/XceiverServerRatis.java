@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
@@ -263,9 +263,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // Set properties starting with prefix raft.server
     RatisHelper.createRaftServerProperties(conf, properties);
-
-    // Set properties starting with prefix raft.grpc
-    RatisHelper.createRaftServerGrpcProperties(conf, properties);
 
     return properties;
   }
