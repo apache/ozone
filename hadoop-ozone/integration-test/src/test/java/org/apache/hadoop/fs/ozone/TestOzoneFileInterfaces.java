@@ -262,8 +262,6 @@ public class TestOzoneFileInterfaces {
       FileStatus lev2status;
 
       // verify prefix directories got created when creating the leaf directory.
-      String kn = metadataManager.getKeyTable().get(lev2key).getKeyName();
-      assertTrue(kn.equals("abc/def/"));
       assertTrue(metadataManager
           .getKeyTable()
           .get(lev1key)
@@ -456,7 +454,6 @@ public class TestOzoneFileInterfaces {
     }
     assertTrue("The created path is not directory.", status.isDirectory());
 
-    assertTrue(status.isDirectory());
     assertEquals(FsPermission.getDirDefault(), status.getPermission());
     verifyOwnerGroup(status);
 

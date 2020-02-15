@@ -176,8 +176,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
               bucketName, keyName, keyPath);
       OMFileRequest.OMDirectoryResult omDirectoryResult =
           omPathInfo.getDirectoryResult();
-      List<String> missingParents = omPathInfo.getMissingParents();
-      long baseObjId = OMFileRequest.getObjIDFromTxId(trxnLogIndex);
 
       OmKeyInfo dirKeyInfo = null;
       if (omDirectoryResult == FILE_EXISTS ||
@@ -187,6 +185,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             FILE_ALREADY_EXISTS);
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {
+        List<String> missingParents = omPathInfo.getMissingParents();
+        long baseObjId = OMFileRequest.getObjIDFromTxId(trxnLogIndex);
+
         dirKeyInfo = createDirectoryKeyInfo(ozoneManager, keyName, keyArgs,
             baseObjId, trxnLogIndex);
 
@@ -272,7 +273,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             INVALID_KEY_NAME);
       }
 
-      LOG.debug("missing parent {}", missingKey);
+      LOG.debug("missing parent {} getting added to KeyTable", missingKey);
       // what about keyArgs for parent directories? TODO
       OmKeyInfo parentKeyInfo = createDirectoryKeyInfoNoACL(ozoneManager,
           missingKey, keyArgs, nextObjId, trxnLogIndex);

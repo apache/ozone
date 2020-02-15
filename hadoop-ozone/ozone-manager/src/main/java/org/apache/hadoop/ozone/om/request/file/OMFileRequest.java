@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 
@@ -106,7 +107,7 @@ public final class OMFileRequest {
    * @return base object id allocated against the transaction
    */
   public static long getObjIDFromTxId(long id) {
-    return getObjIdRangeFromTxId(id).getLeft();
+    return id << TRANSACTION_ID_SHIFT;
   }
 
   /**
@@ -119,9 +120,12 @@ public final class OMFileRequest {
    * @return object id range
    */
   public static ImmutablePair<Long, Long> getObjIdRangeFromTxId(long id) {
-    long baseId = id << TRANSACTION_ID_SHIFT;
-    long maxId = baseId + ((1 << TRANSACTION_ID_SHIFT) - 1);
-    return new ImmutablePair<>(baseId, maxId);
+    long baseId = getObjIDFromTxId(id);
+    // 1 less than the baseId for the next transaction
+    long maxAvailableId = getObjIDFromTxId(id+1) - 1;
+    Preconditions.checkState(maxAvailableId >= baseId,
+        "max available id must be atleast equal to the base id.");
+    return new ImmutablePair<>(baseId, maxAvailableId);
   }
 
   /**
