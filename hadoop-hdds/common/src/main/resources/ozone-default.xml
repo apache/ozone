@@ -712,7 +712,7 @@
       maps to the network packet sizes and file write operations in the
       client to datanode protocol.
 
-      When this parameter is tuned flow control window parameter should be
+      When tuning this parameter, flow control window parameter should be
       tuned accordingly. Refer to
       hdds.ratis.raft.grpc.flow.control.window for more information.
     </description>
