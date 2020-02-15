@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import org.apache.ratis.grpc.GrpcConfigKeys;
-
 import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
