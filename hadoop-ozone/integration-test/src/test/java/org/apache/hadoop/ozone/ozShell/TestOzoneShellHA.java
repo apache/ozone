@@ -402,7 +402,7 @@ public class TestOzoneShellHA {
   public void testS3PathCommand() throws Exception {
 
     String s3Bucket = "b12345";
-    cluster.getClient().getObjectStore().createS3Bucket(
+    cluster.getRpcClient().getObjectStore().createS3Bucket(
         UserGroupInformation.getCurrentUser().getUserName(), s3Bucket);
 
     String[] args = new String[] {"path", s3Bucket,
@@ -413,7 +413,7 @@ public class TestOzoneShellHA {
 
 
     String volumeName =
-        cluster.getClient().getObjectStore().getOzoneVolumeName(s3Bucket);
+        cluster.getRpcClient().getObjectStore().getOzoneVolumeName(s3Bucket);
 
     String ozoneFsUri = String.format("%s://%s.%s", OzoneConsts
         .OZONE_URI_SCHEME, s3Bucket, volumeName);
