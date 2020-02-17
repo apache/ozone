@@ -59,7 +59,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests the containerStateMachine failure handling.
  */
-@Ignore
 public class TestContainerStateMachine {
 
   private MiniOzoneCluster cluster;
@@ -176,6 +175,7 @@ public class TestContainerStateMachine {
       key.write(("ratis" + i).getBytes());
       key.flush();
       key.write(("ratis" + i).getBytes());
+      key.close();
     }
 
     RatisServerConfiguration ratisServerConfiguration =
@@ -199,6 +199,7 @@ public class TestContainerStateMachine {
       key.write(("ratis" + i).getBytes());
       key.flush();
       key.write(("ratis" + i).getBytes());
+      key.close();
     }
     stateMachine =
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);
