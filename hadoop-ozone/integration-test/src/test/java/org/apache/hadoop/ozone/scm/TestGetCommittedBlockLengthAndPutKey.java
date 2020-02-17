@@ -52,7 +52,6 @@ import org.junit.Test;
 /**
  * Test Container calls.
  */
-@Ignore
 public class TestGetCommittedBlockLengthAndPutKey {
 
   private static MiniOzoneCluster cluster;
