@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
-    OZONE_SCM_CLIENT_ADDRESS_KEY;
-
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
@@ -30,12 +27,12 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.container.ContainerCommands;
 import org.apache.hadoop.hdds.scm.cli.pipeline.PipelineCommands;
-import org.apache.hadoop.hdds.scm.client.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.util.NativeCodeLoader;
 
 import org.apache.commons.lang3.StringUtils;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -89,6 +86,8 @@ public class SCMCLI extends GenericCli {
       throws IOException {
     OzoneConfiguration ozoneConf = createOzoneConfiguration();
     checkAndSetSCMAddressArg(ozoneConf);
+
+
     return new ContainerOperationClient(ozoneConf);
   }
 

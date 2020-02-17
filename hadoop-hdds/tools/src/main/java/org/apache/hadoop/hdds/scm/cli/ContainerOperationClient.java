@@ -15,28 +15,31 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.client;
+package org.apache.hadoop.hdds.scm.cli;
 
-import com.google.common.base.Preconditions;
+import javax.net.SocketFactory;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.List;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ReadContainerResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.Client;
@@ -45,18 +48,14 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.net.SocketFactory;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.List;
-
+import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.hdds.HddsUtils.getScmSecurityClient;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class provides the client-facing APIs of container operations.
@@ -74,7 +73,7 @@ public class ContainerOperationClient implements ScmClient {
 
   public ContainerOperationClient(Configuration conf) throws IOException {
     storageContainerLocationClient = newContainerRpcClient(conf);
-    xceiverClientManager = newXCeiverClientManager(conf);
+    this.xceiverClientManager = newXCeiverClientManager(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     boolean useRatis = conf.getBoolean(
@@ -160,7 +159,7 @@ public class ContainerOperationClient implements ScmClient {
   /**
    * Create a container over pipeline specified by the SCM.
    *
-   * @param client - Client to communicate with Datanodes.
+   * @param client      - Client to communicate with Datanodes.
    * @param containerId - Container ID.
    * @throws IOException
    */
@@ -179,7 +178,7 @@ public class ContainerOperationClient implements ScmClient {
   /**
    * Creates a pipeline over the machines choosen by the SCM.
    *
-   * @param client - Client
+   * @param client   - Client
    * @param pipeline - pipeline to be createdon Datanodes.
    * @throws IOException
    */
@@ -253,8 +252,8 @@ public class ContainerOperationClient implements ScmClient {
    * Returns a set of Nodes that meet a query criteria.
    *
    * @param nodeStatuses - Criteria that we want the node to have.
-   * @param queryScope - Query scope - Cluster or pool.
-   * @param poolName - if it is pool, a pool name is required.
+   * @param queryScope   - Query scope - Cluster or pool.
+   * @param poolName     - if it is pool, a pool name is required.
    * @return A set of nodes that meet the requested criteria.
    * @throws IOException
    */
@@ -346,8 +345,9 @@ public class ContainerOperationClient implements ScmClient {
 
   /**
    * Delete the container, this will release any resource it uses.
+   *
    * @param containerID - containerID.
-   * @param force - True to forcibly delete the container.
+   * @param force       - True to forcibly delete the container.
    * @throws IOException
    */
   @Override
@@ -394,6 +394,7 @@ public class ContainerOperationClient implements ScmClient {
 
   /**
    * Get meta data from an existing container.
+   *
    * @param containerID - ID of the container.
    * @return ContainerInfo - a message of protobuf which has basic info
    * of a container.
@@ -407,6 +408,7 @@ public class ContainerOperationClient implements ScmClient {
 
   /**
    * Given an id, return the pipeline associated with the container.
+   *
    * @param containerId - String Container ID
    * @return Pipeline of the existing container, corresponding to the given id.
    * @throws IOException
@@ -446,6 +448,7 @@ public class ContainerOperationClient implements ScmClient {
 
   /**
    * Get the the current usage information.
+   *
    * @param containerID - ID of the container.
    * @return the size of the given container.
    * @throws IOException
@@ -491,6 +494,5 @@ public class ContainerOperationClient implements ScmClient {
   public boolean getReplicationManagerStatus() throws IOException {
     return storageContainerLocationClient.getReplicationManagerStatus();
   }
-
 
 }

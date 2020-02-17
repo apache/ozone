@@ -19,11 +19,25 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+
+import com.google.common.base.Preconditions;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
 import org.eclipse.jetty.util.StringUtil;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyOptions;
@@ -36,33 +50,22 @@ import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DEFAULT_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
-
 /**
  * DBStore Builder.
  */
 public final class DBStoreBuilder {
+
   private static final Logger LOG =
       LoggerFactory.getLogger(DBStoreBuilder.class);
+
   public static final Logger ROCKS_DB_LOGGER =
       LoggerFactory.getLogger(RocksDB.class);
 
   private static final String DEFAULT_COLUMN_FAMILY_NAME =
       StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
+
+  // DB PKIProfile used by ROCKDB instances.
+  public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
 
   private Set<TableConfig> tables;
   private DBProfile dbProfile;

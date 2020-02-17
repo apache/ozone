@@ -15,48 +15,58 @@
  * the License.
  */
 
-package org.apache.hadoop.hdds.scm;
-
-import com.google.common.base.Strings;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.recon.ReconConfigKeys;
-import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+package org.apache.hadoop.hdds.utils;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_HEARTBEAT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_HEARTBEAT_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_DEADNODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_DEADNODE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_HEARTBEAT_LOG_WARN_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_HEARTBEAT_LOG_WARN_INTERVAL_COUNT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.HddsUtils.*;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc.Client;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.metrics2.MetricsException;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.source.JvmMetrics;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.security.UserGroupInformation;
+
+import com.google.common.base.Strings;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getSingleSCMAddress;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_LOG_WARN_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_LOG_WARN_INTERVAL_COUNT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Hdds stateless helper functions for server side components.
@@ -353,5 +363,99 @@ public final class HddsServerUtil {
     // Use default datanode id file name for file path
     return new File(dataNodeIDDirPath,
         OzoneConsts.OZONE_SCM_DATANODE_ID_FILE_DEFAULT).toString();
+  }
+
+  /**
+   * Create a scm security client.
+   * @param conf    - Ozone configuration.
+   *
+   * @return {@link SCMSecurityProtocol}
+   * @throws IOException
+   */
+  public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
+      OzoneConfiguration conf) throws IOException {
+    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
+        ProtobufRpcEngine.class);
+    long scmVersion =
+        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
+    InetSocketAddress address =
+        getScmAddressForSecurityProtocol(conf);
+    RetryPolicy retryPolicy =
+        RetryPolicies.retryForeverWithFixedSleep(
+            1000, TimeUnit.MILLISECONDS);
+    return new SCMSecurityProtocolClientSideTranslatorPB(
+        RPC.getProtocolProxy(SCMSecurityProtocolPB.class, scmVersion,
+            address, UserGroupInformation.getCurrentUser(),
+            conf, NetUtils.getDefaultSocketFactory(conf),
+            Client.getRpcTimeout(conf), retryPolicy).getProxy());
+  }
+
+
+  /**
+   * Retrieve the socket address that should be used by clients to connect
+   * to the SCM for
+   * {@link org.apache.hadoop.hdds.protocol.SCMSecurityProtocol}. If
+   * {@link ScmConfigKeys#OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY} is not defined
+   * then {@link ScmConfigKeys#OZONE_SCM_CLIENT_ADDRESS_KEY} is used. If neither
+   * is defined then {@link ScmConfigKeys#OZONE_SCM_NAMES} is used.
+   *
+   * @param conf
+   * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
+   * @throws IllegalArgumentException if configuration is not defined or invalid
+   */
+  public static InetSocketAddress getScmAddressForSecurityProtocol(
+      Configuration conf) {
+    Optional<String> host = getHostNameFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
+        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
+
+    if (!host.isPresent()) {
+      // Fallback to Ozone SCM name
+      host = Optional.of(getSingleSCMAddress(conf).getHostName());
+    }
+
+    final int port = getPortNumberFromConfigKeys(conf,
+        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY)
+        .orElse(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT);
+
+    return NetUtils.createSocketAddr(host.get() + ":" + port);
+  }
+  /**
+   * Create a scm block client, used by putKey() and getKey().
+   *
+   * @return {@link ScmBlockLocationProtocol}
+   * @throws IOException
+   */
+  public static SCMSecurityProtocol getScmSecurityClient(
+      OzoneConfiguration conf, UserGroupInformation ugi) throws IOException {
+    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
+        ProtobufRpcEngine.class);
+    long scmVersion =
+        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
+    InetSocketAddress scmSecurityProtoAdd =
+        getScmAddressForSecurityProtocol(conf);
+    return new SCMSecurityProtocolClientSideTranslatorPB(
+        RPC.getProxy(SCMSecurityProtocolPB.class, scmVersion,
+            scmSecurityProtoAdd, ugi, conf,
+            NetUtils.getDefaultSocketFactory(conf),
+            Client.getRpcTimeout(conf)));
+  }
+
+  /**
+   * Initialize hadoop metrics system for Ozone servers.
+   * @param configuration OzoneConfiguration to use.
+   * @param serverName    The logical name of the server components.
+   */
+  public static MetricsSystem initializeMetrics(
+      OzoneConfiguration configuration, String serverName) {
+    MetricsSystem metricsSystem = DefaultMetricsSystem.initialize(serverName);
+    try {
+      JvmMetrics.create(serverName,
+          configuration.get(DFSConfigKeysLegacy.DFS_METRICS_SESSION_ID_KEY),
+          DefaultMetricsSystem.instance());
+    } catch (MetricsException e) {
+      LOG.info("Metrics source JvmMetrics already added to DataNode.");
+    }
+    return metricsSystem;
   }
 }

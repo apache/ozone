@@ -18,10 +18,10 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import org.slf4j.Logger;
@@ -65,7 +65,7 @@ public class Freon extends GenericCli {
   @Override
   public void execute(String[] argv) {
     conf = createOzoneConfiguration();
-    HddsUtils.initializeMetrics(conf, "ozone-freon");
+    HddsServerUtil.initializeMetrics(conf, "ozone-freon");
     TracingUtil.initTracing("freon", conf);
     super.execute(argv);
   }
