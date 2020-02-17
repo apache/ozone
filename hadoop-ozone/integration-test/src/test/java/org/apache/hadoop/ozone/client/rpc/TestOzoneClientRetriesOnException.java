@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -25,7 +26,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.
+        ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -127,34 +129,41 @@ public class TestOzoneClientRetriesOnException {
   @Test
   public void testGroupMismatchExceptionHandling() throws Exception {
     String keyName = getKeyName();
-    OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
     int dataLength = maxFlushSize + 50;
+    OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS,
+            dataLength);
     // write data more than 1 chunk
     byte[] data1 =
-        ContainerTestHelper.getFixedLengthString(keyString, dataLength)
-            .getBytes(UTF_8);
-    key.write(data1);
+            ContainerTestHelper.getFixedLengthString(keyString, dataLength)
+                    .getBytes(UTF_8);
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
-    KeyOutputStream keyOutputStream = (KeyOutputStream)key.getOutputStream();
+    KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
     long containerID =
-        keyOutputStream.getStreamEntries().get(0).getBlockID().getContainerID();
-    OutputStream stream = keyOutputStream.getStreamEntries().get(0)
-        .getOutputStream();
-    Assert.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+            keyOutputStream.getStreamEntries().get(0).
+                    getBlockID().getContainerID();
     Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 1);
     ContainerInfo container =
-        cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerID));
+            cluster.getStorageContainerManager().getContainerManager()
+                    .getContainer(ContainerID.valueof(containerID));
     Pipeline pipeline =
-        cluster.getStorageContainerManager().getPipelineManager()
-            .getPipeline(container.getPipelineID());
-    TestHelper.waitForPipelineClose(key, cluster, true);
+            cluster.getStorageContainerManager().getPipelineManager()
+                    .getPipeline(container.getPipelineID());
+    XceiverClientSpi xceiverClient =
+            xceiverClientManager.acquireClient(pipeline);
+    xceiverClient.sendCommand(ContainerTestHelper
+            .getCreateContainerRequest(containerID, pipeline));
+    xceiverClientManager.releaseClient(xceiverClient, false);
+    key.write(data1);
+    OutputStream stream = keyOutputStream.getStreamEntries().get(0)
+            .getOutputStream();
+    Assert.assertTrue(stream instanceof BlockOutputStream);
+    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    TestHelper.waitForPipelineClose(key, cluster, false);
     key.flush();
     Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
-        .getIoException()) instanceof GroupMismatchException);
+            .getIoException()) instanceof GroupMismatchException);
     Assert.assertTrue(keyOutputStream.getExcludeList().getPipelineIds()
-        .contains(pipeline.getId()));
+            .contains(pipeline.getId()));
     Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 2);
     key.close();
     Assert.assertTrue(keyOutputStream.getStreamEntries().size() == 0);
@@ -233,7 +242,8 @@ public class TestOzoneClientRetriesOnException {
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
     return TestHelper
-        .createKey(keyName, type, size, objectStore, volumeName, bucketName);
+            .createKey(keyName, type, ReplicationFactor.ONE,
+                    size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
