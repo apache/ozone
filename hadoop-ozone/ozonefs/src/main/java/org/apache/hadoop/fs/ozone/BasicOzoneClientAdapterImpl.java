@@ -483,7 +483,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         omKeyLocationInfoGroup.getBlocksLatestVersionOnly().size()];
 
     int i = 0;
-    long offsetOfBlockInFile = 0l;
+    long offsetOfBlockInFile = 0L;
     for (OmKeyLocationInfo omKeyLocationInfo :
         omKeyLocationInfoGroup.getBlocksLatestVersionOnly()) {
       List<String> hostList = new ArrayList<>();
