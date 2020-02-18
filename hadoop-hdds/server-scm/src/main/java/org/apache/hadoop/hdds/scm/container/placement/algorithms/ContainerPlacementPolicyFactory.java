@@ -54,8 +54,8 @@ public final class ContainerPlacementPolicyFactory {
       constructor = placementClass.getDeclaredConstructor(NodeManager.class,
           Configuration.class, NetworkTopology.class, boolean.class,
           SCMContainerPlacementMetrics.class);
-      LOG.info("Create container placement policy of type " +
-          placementClass.getCanonicalName());
+      LOG.info("Create container placement policy of type {}",
+              placementClass.getCanonicalName());
     } catch (NoSuchMethodException e) {
       String msg = "Failed to find constructor(NodeManager, Configuration, " +
           "NetworkTopology, boolean) for class " +
