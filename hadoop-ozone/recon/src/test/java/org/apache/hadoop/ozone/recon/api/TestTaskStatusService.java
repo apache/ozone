@@ -51,6 +51,8 @@ public class TestTaskStatusService extends AbstractSqlDatabaseTest {
       @Override
       protected void configure() {
         taskStatusService = new TaskStatusService();
+        bind(ReconTaskStatusDao.class).
+            toInstance(new ReconTaskStatusDao(sqlConfiguration));
         bind(TaskStatusService.class).toInstance(taskStatusService);
       }
     });

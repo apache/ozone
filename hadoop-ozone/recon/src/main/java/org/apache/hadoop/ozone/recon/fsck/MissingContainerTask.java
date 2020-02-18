@@ -20,19 +20,18 @@ package org.apache.hadoop.ozone.recon.fsck;
 
 import java.util.Set;
 
+import javax.inject.Inject;
+
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.util.ExitUtil;
+import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
-import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
@@ -41,85 +40,47 @@ import org.springframework.util.CollectionUtils;
  * Class that scans the list of containers and keeps track of containers with
  * no replicas in a SQL table.
  */
-public class MissingContainerTask {
+public class MissingContainerTask extends ReconScmTask {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MissingContainerTask.class);
 
-  private OzoneStorageContainerManager scm;
+  private ContainerManager containerManager;
   private MissingContainersDao missingContainersDao;
-  private ReconTaskStatusDao reconTaskStatusDao;
   private static final long INTERVAL = 5 * 60 * 1000L;
 
-  private Thread fsckMonitor;
-  private volatile boolean running;
-
-  public MissingContainerTask(ReconStorageContainerManagerFacade scm,
-                              Configuration sqlConfiguration) {
-    this.scm = scm;
-    this.missingContainersDao = new MissingContainersDao(sqlConfiguration);
-    this.reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
-    String taskName = getClass().getSimpleName();
-    ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-        taskName, 0L, 0L);
-    if (!reconTaskStatusDao.existsById(taskName)) {
-      reconTaskStatusDao.insert(reconTaskStatusRecord);
-      LOG.info("Registered {} task ", taskName);
-    }
-  }
-
-  public void start() {
-    if (!isRunning()) {
-      LOG.info("Starting Missing Container Monitor Thread.");
-      running = true;
-      fsckMonitor = new Thread(this::run);
-      fsckMonitor.setName("MissingContainerMonitor");
-      fsckMonitor.setDaemon(true);
-      fsckMonitor.start();
-    } else {
-      LOG.info("Missing Container Monitor Thread is already running.");
-    }
-  }
-
-  /**
-   * Stops Replication Monitor thread.
-   */
-  public synchronized void stop() {
-    if (running) {
-      LOG.info("Stopping Missing Container Monitor Thread.");
-      running = false;
-      notifyAll();
-    } else {
-      LOG.info("Missing Container Monitor Thread is not running.");
-    }
+  @Inject
+  public MissingContainerTask(
+      OzoneStorageContainerManager ozoneStorageContainerManager,
+      ReconTaskStatusDao reconTaskStatusDao,
+      MissingContainersDao missingContainersDao) {
+    super(reconTaskStatusDao);
+    this.missingContainersDao = missingContainersDao;
+    this.containerManager = ozoneStorageContainerManager.getContainerManager();
   }
 
   public synchronized void run() {
     try {
-      while (running) {
+      while (canRun()) {
         long start = Time.monotonicNow();
         long currentTime = System.currentTimeMillis();
-        ContainerManager containerManager = scm.getContainerManager();
         final Set<ContainerID> containerIds =
             containerManager.getContainerIDs();
         containerManager.getContainerIDs().forEach(containerID ->
             processContainer(containerID, currentTime));
-
-        LOG.info("Missing Container Monitor Thread took {} milliseconds for" +
+        recordSingleRunCompletion();
+        LOG.info("Missing Container task Thread took {} milliseconds for" +
                 " processing {} containers.", Time.monotonicNow() - start,
             containerIds.size());
         wait(INTERVAL);
       }
     } catch (Throwable t) {
-      // When we get runtime exception, we should terminate SCM.
-      LOG.error("Exception in Replication Monitor Thread.", t);
-      ExitUtil.terminate(1, t);
+      LOG.error("Exception in Missing Container task Thread.", t);
     }
   }
 
   private void processContainer(ContainerID containerID, long currentTime) {
     try {
-      ContainerManager containerManager = scm.getContainerManager();
       Set<ContainerReplica> containerReplicas =
           containerManager.getContainerReplicas(containerID);
       if (CollectionUtils.isEmpty(containerReplicas)) {
@@ -133,20 +94,8 @@ public class MissingContainerTask {
           missingContainersDao.deleteById(containerID.getId());
         }
       }
-      reconTaskStatusDao.update(new ReconTaskStatus(getClass().getName(),
-          System.currentTimeMillis(), 0L));
     } catch (ContainerNotFoundException e) {
       LOG.error("Container not found while finding missing containers", e);
     }
-  }
-
-  public boolean isRunning() {
-    if (!running) {
-      synchronized (this) {
-        return fsckMonitor != null
-            && fsckMonitor.isAlive();
-      }
-    }
-    return true;
   }
 }

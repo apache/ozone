@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
+import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
 import org.jooq.Configuration;
 import org.junit.Assert;
@@ -77,8 +78,13 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
     List<MissingContainers> all = missingContainersTableHandle.findAll();
     Assert.assertTrue(all.isEmpty());
 
+    ReconTaskStatusDao reconTaskStatusDao =
+        new ReconTaskStatusDao(sqlConfiguration);
+    MissingContainersDao missingContainersDao =
+        new MissingContainersDao(sqlConfiguration);
     MissingContainerTask missingContainerTask =
-        new MissingContainerTask(scmMock, sqlConfiguration);
+        new MissingContainerTask(scmMock, reconTaskStatusDao,
+            missingContainersDao);
     missingContainerTask.start();
     Thread.sleep(5000L);
 

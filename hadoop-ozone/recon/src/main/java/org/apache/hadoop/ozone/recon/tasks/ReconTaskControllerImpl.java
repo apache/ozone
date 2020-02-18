@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +54,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconTaskControllerImpl.class);
 
-  private Map<String, ReconDBUpdateTask> reconDBUpdateTasks;
+  private Map<String, ReconOmTask> reconOmTasks;
   private ExecutorService executorService;
   private final int threadCount;
   private final Semaphore taskSemaphore = new Semaphore(1);
@@ -65,24 +64,24 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
   @Inject
   public ReconTaskControllerImpl(OzoneConfiguration configuration,
-                                 Configuration sqlConfiguration,
-                                 Set<ReconDBUpdateTask> tasks) {
-    reconDBUpdateTasks = new HashMap<>();
+                                 ReconTaskStatusDao reconTaskStatusDao,
+                                 Set<ReconOmTask> tasks) {
+    reconOmTasks = new HashMap<>();
     threadCount = configuration.getInt(OZONE_RECON_TASK_THREAD_COUNT_KEY,
         OZONE_RECON_TASK_THREAD_COUNT_DEFAULT);
-    reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
-    for (ReconDBUpdateTask task : tasks) {
+    this.reconTaskStatusDao = reconTaskStatusDao;
+    for (ReconOmTask task : tasks) {
       registerTask(task);
     }
   }
 
   @Override
-  public void registerTask(ReconDBUpdateTask task) {
+  public void registerTask(ReconOmTask task) {
     String taskName = task.getTaskName();
     LOG.info("Registered task {} with controller.", taskName);
 
     // Store task in Task Map.
-    reconDBUpdateTasks.put(taskName, task);
+    reconOmTasks.put(taskName, task);
     // Store Task in Task failure tracker.
     taskFailureCounter.put(taskName, new AtomicInteger(0));
     // Create DB record for the task.
@@ -110,9 +109,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
     try {
       if (!events.isEmpty()) {
         Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
-        for (Map.Entry<String, ReconDBUpdateTask> taskEntry :
-            reconDBUpdateTasks.entrySet()) {
-          ReconDBUpdateTask task = taskEntry.getValue();
+        for (Map.Entry<String, ReconOmTask> taskEntry :
+            reconOmTasks.entrySet()) {
+          ReconOmTask task = taskEntry.getValue();
           Collection<String> tables = task.getTaskTables();
           tasks.add(() -> task.process(events.filter(tables)));
         }
@@ -126,7 +125,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         if (!failedTasks.isEmpty()) {
           tasks.clear();
           for (String taskName : failedTasks) {
-            ReconDBUpdateTask task = reconDBUpdateTasks.get(taskName);
+            ReconOmTask task = reconOmTasks.get(taskName);
             Collection<String> tables = task.getTaskTables();
             tasks.add(() -> task.process(events.filter(tables)));
           }
@@ -138,7 +137,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         if (!retryFailedTasks.isEmpty()) {
           tasks.clear();
           for (String taskName : failedTasks) {
-            ReconDBUpdateTask task = reconDBUpdateTasks.get(taskName);
+            ReconOmTask task = reconOmTasks.get(taskName);
             tasks.add(() -> task.reprocess(omMetadataManager));
           }
           results = executorService.invokeAll(tasks);
@@ -165,7 +164,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           TASK_FAILURE_THRESHOLD) {
         LOG.info("Blacklisting Task since it failed retry and " +
             "reprocess more than {} times.", TASK_FAILURE_THRESHOLD);
-        reconDBUpdateTasks.remove(taskName);
+        reconOmTasks.remove(taskName);
       }
     }
   }
@@ -177,9 +176,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
     try {
       Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
-      for (Map.Entry<String, ReconDBUpdateTask> taskEntry :
-          reconDBUpdateTasks.entrySet()) {
-        ReconDBUpdateTask task = taskEntry.getValue();
+      for (Map.Entry<String, ReconOmTask> taskEntry :
+          reconOmTasks.entrySet()) {
+        ReconOmTask task = taskEntry.getValue();
         tasks.add(() -> task.reprocess(omMetadataManager));
       }
       List<Future<Pair<String, Boolean>>> results =
@@ -217,8 +216,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   @Override
-  public Map<String, ReconDBUpdateTask> getRegisteredTasks() {
-    return reconDBUpdateTasks;
+  public Map<String, ReconOmTask> getRegisteredTasks() {
+    return reconOmTasks;
   }
 
   @Override

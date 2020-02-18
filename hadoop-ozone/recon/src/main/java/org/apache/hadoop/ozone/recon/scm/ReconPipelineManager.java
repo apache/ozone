@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_PIPELINE_DB;
 
 import java.io.File;
@@ -29,6 +30,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -107,11 +109,19 @@ public class ReconPipelineManager extends SCMPipelineManager {
           .collect(Collectors.toList());
       invalidPipelines.forEach(p -> {
         PipelineID pipelineID = p.getId();
+        if (!p.getPipelineState().equals(CLOSED)) {
+          try {
+            getStateManager().updatePipelineState(pipelineID, CLOSED);
+          } catch (PipelineNotFoundException e) {
+            LOG.warn("Pipeline {} not found while updating state. ",
+                p.getId(), e);
+          }
+        }
         try {
           LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
           removePipeline(pipelineID);
         } catch (IOException e) {
-          LOG.warn("Unable to remove pipeline {}", pipelineID);
+          LOG.warn("Unable to remove pipeline {}", pipelineID, e);
         }
       });
     } finally {

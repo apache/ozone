@@ -39,6 +39,11 @@ public class ConfigurationProvider implements
     }
   }
 
+  @VisibleForTesting
+  public static void resetConfiguration() {
+    configuration = null;
+  }
+
   @Override
   public OzoneConfiguration get() {
     return configuration;

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,9 +65,7 @@ public class ReconServer extends GenericCli {
             rest("/api/*")
               .packages("org.apache.hadoop.ozone.recon.api");
           }
-        },
-        new ReconSchemaGenerationModule(),
-        new ReconTaskBindingModule());
+        }, new ReconSchemaGenerationModule());
 
     //Pass on injector to listener that does the Guice - Jersey HK2 bridging.
     ReconGuiceServletContextListener.setInjector(injector);
@@ -148,5 +147,15 @@ public class ReconServer extends GenericCli {
   @VisibleForTesting
   public OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
     return ozoneManagerServiceProvider;
+  }
+
+  @VisibleForTesting
+  public OzoneStorageContainerManager getReconStorageContainerManager() {
+    return reconStorageContainerManager;
+  }
+
+  @VisibleForTesting
+  public StorageContainerServiceProvider getStorageContainerServiceProvider() {
+    return injector.getInstance(StorageContainerServiceProvider.class);
   }
 }
