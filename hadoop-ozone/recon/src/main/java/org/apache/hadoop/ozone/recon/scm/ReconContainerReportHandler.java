@@ -69,7 +69,7 @@ public class ReconContainerReportHandler extends ContainerReportHandler {
         try {
           ContainerWithPipeline containerWithPipeline =
               scmClient.getContainerWithPipeline(id.getId());
-          LOG.info("Verified new container from SCM {} ",
+          LOG.debug("Verified new container from SCM {} ",
               containerWithPipeline.getContainerInfo().containerID());
           containerManager.addNewContainer(id.getId(), containerWithPipeline);
         } catch (IOException ioEx) {
@@ -78,7 +78,7 @@ public class ReconContainerReportHandler extends ContainerReportHandler {
           return;
         }
       }
-      LOG.info("Got container report for containerID {} ",
+      LOG.debug("Got container report for containerID {} ",
           containerReplicaProto.getContainerID());
     }
 

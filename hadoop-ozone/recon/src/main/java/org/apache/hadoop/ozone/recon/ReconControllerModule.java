@@ -107,19 +107,16 @@ public class ReconControllerModule extends AbstractModule {
   }
 
   @Provides
-  @Singleton
   ReconTaskStatusDao getReconTaskTableDao(final Configuration sqlConfig) {
     return new ReconTaskStatusDao(sqlConfig);
   }
 
   @Provides
-  @Singleton
   MissingContainersDao getMissingContainersDao(final Configuration sqlConfig) {
     return new MissingContainersDao(sqlConfig);
   }
 
   @Provides
-  @Singleton
   FileCountBySizeDao getFileCountBySizeDao(final Configuration sqlConfig) {
     return new FileCountBySizeDao(sqlConfig);
   }
