@@ -279,7 +279,7 @@ public class TestCommitWatcher {
       // just watch for a higher index so as to ensure, it does an actual
       // call to Ratis. Otherwise, it may just return in case the commitInfoMap
       // is updated to the latest index in putBlock response.
-      watcher.watchForCommit(replies.get(1).getLogIndex() + 1);
+      watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
     } catch(IOException ioe) {
       // with retry count set to lower limit and a lower watch request
       // timeout, watch request will eventually
