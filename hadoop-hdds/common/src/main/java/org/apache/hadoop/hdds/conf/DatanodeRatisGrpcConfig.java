@@ -44,4 +44,25 @@ public class DatanodeRatisGrpcConfig {
   public void setMaximumMessageSize(int maximumMessageSize) {
     this.maximumMessageSize = maximumMessageSize;
   }
+
+  @Config(key = "flow.control.window",
+      defaultValue = "5MB",
+      type = ConfigType.INT,
+      tags =  {OZONE, CLIENT, PERFORMANCE},
+      description = "This parameter tells how much data grpc client can send " +
+          "to grpc server with out receiving any ack(WINDOW_UPDATE) packet " +
+          "from server. This parameter should be set in accordance with " +
+          "chunk size. Example: If Chunk size is 4MB, considering some header" +
+          " size in to consideration, this can be set 5MB or greater. " +
+          "Tune this parameter accordingly, as when it is set with a value " +
+          "lesser than chunk size it degrades the ozone client performance.")
+  private int flowControlWindow = 5 * 1024 * 1024;
+
+  public int getFlowControlWindow() {
+    return flowControlWindow;
+  }
+
+  public void setFlowControlWindow(int flowControlWindow) {
+    this.flowControlWindow = flowControlWindow;
+  }
 }
