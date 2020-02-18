@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
  * Utility to help to generate test data.
@@ -88,8 +89,20 @@ public final class TestDataUtil {
 
   public static OzoneBucket createVolumeAndBucket(MiniOzoneCluster cluster)
       throws IOException {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-    return createVolumeAndBucket(cluster, volumeName, bucketName);
+    final int attempts = 5;
+    for (int i = 0; i < attempts; i++) {
+      try {
+        String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+        String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+        return createVolumeAndBucket(cluster, volumeName, bucketName);
+      } catch (OMException e) {
+        if (e.getResult() != OMException.ResultCodes.VOLUME_ALREADY_EXISTS &&
+            e.getResult() != OMException.ResultCodes.BUCKET_ALREADY_EXISTS) {
+          throw e;
+        }
+      }
+    }
+    throw new IllegalStateException("Could not create unique volume/bucket " +
+        "in " + attempts + " attempts");
   }
 }
