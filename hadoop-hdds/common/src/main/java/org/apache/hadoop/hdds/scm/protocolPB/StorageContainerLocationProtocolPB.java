@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.protocolPB;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerLocationProtocolProtos
     .StorageContainerLocationProtocolService;
