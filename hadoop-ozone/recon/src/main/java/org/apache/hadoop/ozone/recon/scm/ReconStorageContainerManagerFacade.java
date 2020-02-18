@@ -138,7 +138,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
 
-    reconScmTasks.add(new BackgroundPipelineSyncTask(
+    reconScmTasks.add(new PipelineSyncTask(
         this,
         scmServiceProvider,
         reconTaskStatusDao));

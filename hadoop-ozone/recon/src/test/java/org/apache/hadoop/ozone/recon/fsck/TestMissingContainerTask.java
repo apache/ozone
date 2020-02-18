@@ -38,6 +38,7 @@ import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
+import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.Test;
@@ -78,6 +79,7 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
     List<MissingContainers> all = missingContainersTableHandle.findAll();
     Assert.assertTrue(all.isEmpty());
 
+    long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao =
         new ReconTaskStatusDao(sqlConfiguration);
     MissingContainersDao missingContainersDao =
@@ -85,12 +87,19 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
     MissingContainerTask missingContainerTask =
         new MissingContainerTask(scmMock, reconTaskStatusDao,
             missingContainersDao);
+    missingContainerTask.register();
     missingContainerTask.start();
     Thread.sleep(5000L);
 
     all = missingContainersTableHandle.findAll();
     Assert.assertEquals(1, all.size());
     Assert.assertEquals(3, all.get(0).getContainerId().longValue());
+
+    ReconTaskStatus taskStatus =
+        reconTaskStatusDao.findById(missingContainerTask.getTaskName());
+    Assert.assertTrue(taskStatus.getLastUpdatedTimestamp() >
+        currentTime);
+
   }
 
   private Set<ContainerID> getMockContainerIDs(int num) {

@@ -34,17 +34,17 @@ import org.slf4j.LoggerFactory;
  * Background pipeline sync task that queries pipelines in SCM, and removes
  * any obsolete pipeline.
  */
-public class BackgroundPipelineSyncTask extends ReconScmTask {
+public class PipelineSyncTask extends ReconScmTask {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(BackgroundPipelineSyncTask.class);
+      LoggerFactory.getLogger(PipelineSyncTask.class);
 
   private StorageContainerServiceProvider scmClient;
   private ReconPipelineManager reconPipelineManager;
   private static final long INTERVAL = 10 * 60 * 1000L;
 
   @Inject
-  public BackgroundPipelineSyncTask(
+  public PipelineSyncTask(
       OzoneStorageContainerManager storageContainerManager,
       StorageContainerServiceProvider scmClient,
       ReconTaskStatusDao reconTaskStatusDao) {
@@ -60,14 +60,14 @@ public class BackgroundPipelineSyncTask extends ReconScmTask {
       while (canRun()) {
         long start = Time.monotonicNow();
         List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
-        reconPipelineManager.initializePipelines(pipelinesFromScm);
-        LOG.info("Background pipeline sync Thread took {} milliseconds.",
+        reconPipelineManager.removeInvalidPipelines(pipelinesFromScm);
+        LOG.info("Pipeline sync Thread took {} milliseconds.",
             Time.monotonicNow() - start);
         recordSingleRunCompletion();
         wait(INTERVAL);
       }
     } catch (Throwable t) {
-      LOG.error("Exception in Background pipeline sync Thread.", t);
+      LOG.error("Exception in Pipeline sync Thread.", t);
     }
   }
 }

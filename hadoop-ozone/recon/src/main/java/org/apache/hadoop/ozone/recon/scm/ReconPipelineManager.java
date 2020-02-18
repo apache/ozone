@@ -86,7 +86,6 @@ public class ReconPipelineManager extends SCMPipelineManager {
     try {
       List<Pipeline> pipelinesInHouse = getPipelines();
       LOG.info("Recon has {} pipelines in house.", pipelinesInHouse.size());
-
       for (Pipeline pipeline : pipelinesFromScm) {
         if (!containsPipeline(pipeline.getId())) {
           // New pipeline got from SCM. Recon does not know anything about it,
@@ -98,8 +97,17 @@ public class ReconPipelineManager extends SCMPipelineManager {
           getStateManager().updatePipelineState(pipeline.getId(),
               pipeline.getPipelineState());
         }
+        removeInvalidPipelines(pipelinesFromScm);
       }
+    } finally {
+      getLock().writeLock().unlock();
+    }
+  }
 
+  public void removeInvalidPipelines(List<Pipeline> pipelinesFromScm) {
+    getLock().writeLock().lock();
+    try {
+      List<Pipeline> pipelinesInHouse = getPipelines();
       // Removing pipelines in Recon that are no longer in SCM.
       // TODO Recon may need to track inactive pipelines as well. So this can be
       // removed in a followup JIRA.
@@ -119,7 +127,7 @@ public class ReconPipelineManager extends SCMPipelineManager {
         }
         try {
           LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
-          removePipeline(pipelineID);
+          finalizeAndDestroyPipeline(p, false);
         } catch (IOException e) {
           LOG.warn("Unable to remove pipeline {}", pipelineID, e);
         }
@@ -128,7 +136,6 @@ public class ReconPipelineManager extends SCMPipelineManager {
       getLock().writeLock().unlock();
     }
   }
-
   /**
    * Add a new pipeline to the pipeline metadata.
    * @param pipeline pipeline

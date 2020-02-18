@@ -87,7 +87,7 @@ public abstract class ReconScmTask {
   }
 
   protected void recordSingleRunCompletion() {
-    reconTaskStatusDao.update(new ReconTaskStatus(getClass().getName(),
+    reconTaskStatusDao.update(new ReconTaskStatus(getTaskName(),
         System.currentTimeMillis(), 0L));
   }
 
@@ -95,7 +95,7 @@ public abstract class ReconScmTask {
     return running;
   }
 
-  protected String getTaskName() {
+  public String getTaskName() {
     return getClass().getSimpleName();
   }
 
