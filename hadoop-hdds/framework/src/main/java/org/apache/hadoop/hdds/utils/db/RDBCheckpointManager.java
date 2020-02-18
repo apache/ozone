@@ -83,8 +83,8 @@ public class RDBCheckpointManager {
       Instant end = Instant.now();
 
       long duration = Duration.between(start, end).toMillis();
-      LOG.info("Created checkpoint at " + checkpointPath.toString() + " in "
-          + duration + " milliseconds");
+      LOG.info("Created checkpoint at {} in {} milliseconds",
+              checkpointPath.toString(), duration);
 
       return new RocksDBCheckpoint(
           checkpointPath,

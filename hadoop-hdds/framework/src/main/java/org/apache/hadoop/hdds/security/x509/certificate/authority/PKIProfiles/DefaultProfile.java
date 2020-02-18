@@ -251,7 +251,7 @@ public class DefaultProfile implements PKIProfile {
       return true;
     default:
       // This should not happen, since it guarded via isSupportedGeneralName.
-      LOG.error("Unexpected type in General Name (int value) : " + type);
+      LOG.error("Unexpected type in General Name (int value) : {}", type);
       return false;
     }
   }

@@ -203,9 +203,9 @@ public class OzoneManagerDoubleBuffer {
               "exception while running";
           ExitUtils.terminate(1, message, ex, LOG);
         } else {
-          LOG.info("OMDoubleBuffer flush thread " +
-              Thread.currentThread().getName() + " is interrupted and will " +
-              "exit. {}", Thread.currentThread().getName());
+          LOG.info("OMDoubleBuffer flush thread {} is interrupted and will "
+              + "exit. {}", Thread.currentThread().getName(),
+                  Thread.currentThread().getName());
         }
       } catch (IOException ex) {
         terminate(ex);

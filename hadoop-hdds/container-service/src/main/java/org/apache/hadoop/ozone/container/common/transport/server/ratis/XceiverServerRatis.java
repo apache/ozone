@@ -541,7 +541,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       msg = sb.toString();
       break;
     default:
-      LOG.error("unknown state:" + roleInfoProto.getRole());
+      LOG.error("unknown state: {}", roleInfoProto.getRole());
       throw new IllegalStateException("node" + id + " is in illegal role "
           + roleInfoProto.getRole());
     }
@@ -568,9 +568,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     if (triggerHB) {
       context.getParent().triggerHeartbeat();
     }
-    LOG.error(
-        "pipeline Action " + action.getAction() + "  on pipeline " + pipelineID
-            + ".Reason : " + action.getClosePipeline().getDetailedReason());
+    LOG.error("pipeline Action {} on pipeline {}.Reason : {}",
+            action.getAction(), pipelineID,
+            action.getClosePipeline().getDetailedReason());
   }
 
   @Override

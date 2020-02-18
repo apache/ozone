@@ -164,7 +164,7 @@ public class ProfileServlet extends HttpServlet {
 
   public Process runCmdAsync(List<String> cmd) {
     try {
-      LOG.info("Running command async: " + cmd);
+      LOG.info("Running command async: {}", cmd);
       return new ProcessBuilder(cmd).inheritIO().start();
     } catch (IOException ex) {
       throw new IllegalStateException(ex);

@@ -629,24 +629,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
         scmStorageConfig.initialize();
-        LOG.info(
-            "SCM initialization succeeded."
-                + "Current cluster id for sd="
-                + scmStorageConfig.getStorageDir()
-                + ";cid="
-                + scmStorageConfig.getClusterID());
+        LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
+                + ";cid={}", scmStorageConfig.getStorageDir(),
+                scmStorageConfig.getClusterID());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
         return false;
       }
     } else {
-      LOG.info(
-          "SCM already initialized. Reusing existing"
-              + " cluster id for sd="
-              + scmStorageConfig.getStorageDir()
-              + ";cid="
-              + scmStorageConfig.getClusterID());
+      LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
+              + ";cid={}", scmStorageConfig.getStorageDir(),
+              scmStorageConfig.getClusterID());
       return true;
     }
   }

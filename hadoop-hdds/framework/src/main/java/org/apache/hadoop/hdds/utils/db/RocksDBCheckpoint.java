@@ -77,8 +77,8 @@ public class RocksDBCheckpoint implements DBCheckpoint {
 
   @Override
   public void cleanupCheckpoint() throws IOException {
-    LOG.info("Cleaning up RocksDB checkpoint at " +
-        checkpointLocation.toString());
+    LOG.info("Cleaning up RocksDB checkpoint at {}",
+            checkpointLocation.toString());
     FileUtils.deleteDirectory(checkpointLocation.toFile());
   }
 
