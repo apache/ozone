@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.recon.api;
 import javax.inject.Inject;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
-import org.jooq.Configuration;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -36,18 +35,10 @@ import java.util.List;
 @Path("/utilization")
 @Produces(MediaType.APPLICATION_JSON)
 public class UtilizationService {
-  private FileCountBySizeDao fileCountBySizeDao;
 
   @Inject
-  private Configuration sqlConfiguration;
+  private FileCountBySizeDao fileCountBySizeDao;
 
-
-  FileCountBySizeDao getDao() {
-    if (fileCountBySizeDao == null) {
-      fileCountBySizeDao = new FileCountBySizeDao(sqlConfiguration);
-    }
-    return fileCountBySizeDao;
-  }
   /**
    * Return the file counts from Recon DB.
    * @return {@link Response}
@@ -55,7 +46,6 @@ public class UtilizationService {
   @GET
   @Path("/fileCount")
   public Response getFileCounts() {
-    fileCountBySizeDao = getDao();
     List<FileCountBySize> resultSet = fileCountBySizeDao.findAll();
     return Response.ok(resultSet).build();
   }

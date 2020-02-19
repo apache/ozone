@@ -25,6 +25,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNE
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
+import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +35,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -192,8 +195,10 @@ public class TestRecon {
         .getDb().getLatestSequenceNumber();
 
     String taskStatusResponse = makeHttpCall(taskStatusURL);
-    long reconLatestSeqNumber = getReconTaskLastUpdatedSeqNumber(
-        taskStatusResponse, 3);
+    long reconLatestSeqNumber = getReconTaskAttributeFromJson(
+        taskStatusResponse,
+        OmSnapshotRequest.name(),
+        "lastUpdatedSeqNumber");
 
     // verify sequence number after full snapshot
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
@@ -226,14 +231,16 @@ public class TestRecon {
         .getDb().getLatestSequenceNumber();
 
     taskStatusResponse = makeHttpCall(taskStatusURL);
-    reconLatestSeqNumber = getReconTaskLastUpdatedSeqNumber(
-        taskStatusResponse, 2);
+    reconLatestSeqNumber = getReconTaskAttributeFromJson(
+        taskStatusResponse, OmDeltaRequest.name(), "lastUpdatedSeqNumber");
 
     //verify sequence number after Delta Updates
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
 
-    long beforeRestartSnapShotTimeStamp =
-        getReconTaskLastUpdatedTimeStamp(taskStatusResponse, 3);
+    long beforeRestartSnapShotTimeStamp = getReconTaskAttributeFromJson(
+        taskStatusResponse,
+        OmSnapshotRequest.name(),
+        "lastUpdatedTimestamp");
 
     //restart Recon
     cluster.restartReconServer();
@@ -269,11 +276,15 @@ public class TestRecon {
         .getDb().getLatestSequenceNumber();
 
     taskStatusResponse = makeHttpCall(taskStatusURL);
-    reconLatestSeqNumber = getReconTaskLastUpdatedSeqNumber(
-        taskStatusResponse, 2);
+    reconLatestSeqNumber = getReconTaskAttributeFromJson(
+        taskStatusResponse,
+        OmDeltaRequest.name(),
+        "lastUpdatedSeqNumber");
 
     long afterRestartSnapShotTimeStamp =
-        getReconTaskLastUpdatedTimeStamp(taskStatusResponse, 3);
+        getReconTaskAttributeFromJson(taskStatusResponse,
+            OmSnapshotRequest.name(),
+            "lastUpdatedTimestamp");
 
     // verify only Delta updates were added to recon after restart.
     Assert.assertEquals(beforeRestartSnapShotTimeStamp,
@@ -283,29 +294,23 @@ public class TestRecon {
     Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
   }
 
-  private long getReconTaskLastUpdatedSeqNumber(String taskStatusResponse,
-      int taskIndex) {
-    ArrayList taskStatusList = new Gson().fromJson(
-        taskStatusResponse, ArrayList.class);
-    LinkedTreeMap deltaUpdatesEntity =
-        (LinkedTreeMap)taskStatusList.get(taskIndex);
-    return (long)(double) deltaUpdatesEntity.get("lastUpdatedSeqNumber");
-  }
-
-  private long getReconTaskLastUpdatedTimeStamp(String taskStatusResponse,
-      int taskIndex) {
-    ArrayList taskStatusList = new Gson().fromJson(
-        taskStatusResponse, ArrayList.class);
-    LinkedTreeMap deltaUpdatesEntity =
-        (LinkedTreeMap)taskStatusList.get(taskIndex);
-    return (long)(double) deltaUpdatesEntity.get("lastUpdatedTimestamp");
+  private long getReconTaskAttributeFromJson(String taskStatusResponse,
+       String taskName, String entityAttribute) {
+    ArrayList<LinkedTreeMap> taskStatusList = new Gson()
+        .fromJson(taskStatusResponse, ArrayList.class);
+    Optional<LinkedTreeMap> taskEntity =
+        taskStatusList
+            .stream()
+            .filter(task -> task.get("taskName").equals(taskName))
+            .findFirst();
+    Assert.assertTrue(taskEntity.isPresent());
+    return (long)(double) taskEntity.get().get(entityAttribute);
   }
 
   private long getReconContainerCount(String containerResponse) {
     Map map = new Gson().fromJson(containerResponse, HashMap.class);
     LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
-    return (long)(double)
-        linkedTreeMap.get("totalCount");
+    return (long)(double) linkedTreeMap.get("totalCount");
   }
 
   private LinkedTreeMap getContainerResponseMap(String containerResponse,

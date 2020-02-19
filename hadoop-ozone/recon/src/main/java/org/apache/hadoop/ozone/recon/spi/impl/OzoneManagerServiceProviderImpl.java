@@ -100,9 +100,13 @@ public class OzoneManagerServiceProviderImpl
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
   private ReconUtils reconUtils;
-  private enum OmSnapshotTaskName {
-    OM_DB_FULL_SNAPSHOT,
-    OM_DB_DELTA_UPDATES
+
+  /**
+   * OM Snapshot related task names.
+   */
+  public enum OmSnapshotTaskName {
+    OmSnapshotRequest,
+    OmDeltaRequest
   }
 
   @Inject
@@ -169,23 +173,23 @@ public class OzoneManagerServiceProviderImpl
 
   public void registerOMDBTasks() {
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-        OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name(),
+        OmSnapshotTaskName.OmDeltaRequest.name(),
         System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
     if (!reconTaskStatusDao.existsById(
-        OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name())){
+        OmSnapshotTaskName.OmDeltaRequest.name())){
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ",
-          OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name());
+          OmSnapshotTaskName.OmDeltaRequest.name());
     }
 
     reconTaskStatusRecord = new ReconTaskStatus(
-        OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name(),
+        OmSnapshotTaskName.OmSnapshotRequest.name(),
         System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
     if (!reconTaskStatusDao.existsById(
-        OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name())){
+        OmSnapshotTaskName.OmSnapshotRequest.name())){
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ",
-          OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name());
+          OmSnapshotTaskName.OmSnapshotRequest.name());
     }
   }
 
@@ -339,7 +343,7 @@ public class OzoneManagerServiceProviderImpl
             omdbUpdatesHandler);
         // Update timestamp of successful delta updates query.
         ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-            OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name(),
+            OmSnapshotTaskName.OmDeltaRequest.name(),
                 System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
         reconTaskStatusDao.update(reconTaskStatusRecord);
 
@@ -362,7 +366,7 @@ public class OzoneManagerServiceProviderImpl
         if (success) {
           ReconTaskStatus reconTaskStatusRecord =
               new ReconTaskStatus(
-                  OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name(),
+                  OmSnapshotTaskName.OmSnapshotRequest.name(),
                   System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
           reconTaskStatusDao.update(reconTaskStatusRecord);
 

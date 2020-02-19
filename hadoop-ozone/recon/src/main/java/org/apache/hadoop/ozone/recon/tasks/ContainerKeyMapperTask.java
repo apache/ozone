@@ -49,7 +49,7 @@ import com.google.inject.Inject;
  * Class to iterate over the OM DB and populate the Recon container DB with
  * the container -> Key reverse mapping.
  */
-public class ContainerKeyMapperTask implements ReconDBUpdateTask {
+public class ContainerKeyMapperTask implements ReconOmTask {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerKeyMapperTask.class);
