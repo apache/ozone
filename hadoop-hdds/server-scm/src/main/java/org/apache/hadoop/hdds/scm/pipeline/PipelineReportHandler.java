@@ -106,10 +106,8 @@ public class PipelineReportHandler implements
     setPipelineLeaderId(report, pipeline, dn);
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Pipeline {} {} reported by {}", pipeline.getFactor(),
-            pipeline.getId(), dn);
-      }
+      LOGGER.info("Pipeline {} {} reported by {}", pipeline.getFactor(),
+          pipeline.getId(), dn);
       if (pipeline.isHealthy()) {
         pipelineManager.openPipeline(pipelineID);
         if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
