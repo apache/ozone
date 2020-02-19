@@ -164,7 +164,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
           // Replay implies the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.
-          LOG.info("Replayed Transaction {} ignored. Request: {}",
+          LOG.debug("Replayed Transaction {} ignored. Request: {}",
               transactionLogIndex, createVolumeRequest);
           return new OMVolumeCreateResponse(createReplayOMResponse(omResponse));
         } else {

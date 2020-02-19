@@ -203,7 +203,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       omClientResponse = new S3InitiateMultipartUploadResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
