@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.util;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.ClassUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;

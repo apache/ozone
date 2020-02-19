@@ -22,7 +22,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.StringUtils;
 
 import org.rocksdb.ColumnFamilyHandle;
