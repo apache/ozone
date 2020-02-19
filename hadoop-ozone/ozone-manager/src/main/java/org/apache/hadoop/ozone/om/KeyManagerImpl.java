@@ -1192,9 +1192,9 @@ public class KeyManagerImpl implements KeyManager {
       // If there is no entry in openKeyTable, then there is no multipart
       // upload initiated for this key.
       if (openKeyInfo == null) {
-        LOG.error("Abort Multipart Upload Failed: volume: " + volumeName +
-            "bucket: " + bucketName + "key: " + keyName + "with error no " +
-            "such uploadID:" + uploadID);
+        LOG.error("Abort Multipart Upload Failed: volume: {} bucket: {} "
+                + "key: {} with error no such uploadID: {}", volumeName,
+                bucketName, keyName, uploadID);
         throw new OMException("Abort Multipart Upload Failed: volume: " +
             volumeName + "bucket: " + bucketName + "key: " + keyName,
             ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
@@ -2083,8 +2083,9 @@ public class KeyManagerImpl implements KeyManager {
         OzoneFileStatus fileStatus =
             getFileStatus(argsBuilder.setKeyName(keyName).build());
         if (fileStatus.isFile()) {
-          LOG.error("Unable to create directory (File already exists): volume: "
-              + volumeName + "bucket: " + bucketName + "key: " + keyName);
+          LOG.error("Unable to create directory (File already exists): "
+                  + "volume: {} bucket: {} key: {}", volumeName, bucketName,
+                  keyName);
           throw new OMException(
               "Unable to create directory at : volume: " + volumeName
                   + "bucket: " + bucketName + "key: " + keyName,

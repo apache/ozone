@@ -45,7 +45,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static java.util.Collections.unmodifiableList;
-import static org.apache.hadoop.hdds.scm.HddsServerUtil
+import static org.apache.hadoop.hdds.utils.HddsServerUtil
     .getScmRpcTimeOutInMilliseconds;
 
 /**

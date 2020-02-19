@@ -32,8 +32,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.apache.hadoop.hdds.scm.HddsServerUtil.getLogWarnInterval;
-import static org.apache.hadoop.hdds.scm.HddsServerUtil.getScmHeartbeatInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 
 /**
  * Endpoint is used as holder class that keeps state around the RPC endpoint.

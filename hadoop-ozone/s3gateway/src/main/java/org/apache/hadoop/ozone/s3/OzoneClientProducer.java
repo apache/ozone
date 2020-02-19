@@ -17,7 +17,12 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import com.google.common.annotations.VisibleForTesting;
+import javax.enterprise.context.RequestScoped;
+import javax.enterprise.inject.Produces;
+import javax.inject.Inject;
+import java.io.IOException;
+import java.net.URISyntaxException;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -27,22 +32,12 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.enterprise.context.RequestScoped;
-import javax.enterprise.inject.Produces;
-import javax.inject.Inject;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.Context;
-import java.io.IOException;
-import java.net.URISyntaxException;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
-import static org.apache.hadoop.ozone.s3.AWSAuthParser.AUTHORIZATION_HEADER;
-import static org.apache.hadoop.ozone.s3.AWSAuthParser.UTF_8;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.AUTH_PROTOCOL_NOT_SUPPORTED;
+import static org.apache.hadoop.ozone.s3.SignatureProcessor.UTF_8;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class creates the OzoneClient for the Rest endpoints.
@@ -53,8 +48,8 @@ public class OzoneClientProducer {
   private final static Logger LOG =
       LoggerFactory.getLogger(OzoneClientProducer.class);
 
-  @Context
-  private ContainerRequestContext context;
+  @Inject
+  private SignatureProcessor v4RequestParser;
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
@@ -75,36 +70,31 @@ public class OzoneClientProducer {
     try {
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
         LOG.debug("Creating s3 auth info for client.");
-        if (context.getHeaderString(AUTHORIZATION_HEADER).startsWith("AWS4")) {
-          try {
-            AWSV4AuthParser v4RequestParser = new AWSV4AuthParser(context);
-            v4RequestParser.parse();
+        try {
 
-            OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
-            identifier.setTokenType(S3AUTHINFO);
-            identifier.setStrToSign(v4RequestParser.getStringToSign());
-            identifier.setSignature(v4RequestParser.getSignature());
-            identifier.setAwsAccessId(v4RequestParser.getAwsAccessId());
-            identifier.setOwner(new Text(v4RequestParser.getAwsAccessId()));
-            if (LOG.isTraceEnabled()) {
-              LOG.trace("Adding token for service:{}", omService);
-            }
-            Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
-                identifier.getSignature().getBytes(UTF_8),
-                identifier.getKind(),
-                omService);
-            UserGroupInformation remoteUser =
-                UserGroupInformation.createRemoteUser(
-                    v4RequestParser.getAwsAccessId());
-            remoteUser.addToken(token);
-            UserGroupInformation.setLoginUser(remoteUser);
-          } catch (OS3Exception | URISyntaxException ex) {
-            LOG.error("S3 auth info creation failed.");
-            throw S3_AUTHINFO_CREATION_ERROR;
+          OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
+          identifier.setTokenType(S3AUTHINFO);
+          identifier.setStrToSign(v4RequestParser.getStringToSign());
+          identifier.setSignature(v4RequestParser.getSignature());
+          identifier.setAwsAccessId(v4RequestParser.getAwsAccessId());
+          identifier.setOwner(new Text(v4RequestParser.getAwsAccessId()));
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Adding token for service:{}", omService);
           }
-        } else {
-          throw AUTH_PROTOCOL_NOT_SUPPORTED;
+          Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
+              identifier.getSignature().getBytes(UTF_8),
+              identifier.getKind(),
+              omService);
+          UserGroupInformation remoteUser =
+              UserGroupInformation.createRemoteUser(
+                  v4RequestParser.getAwsAccessId());
+          remoteUser.addToken(token);
+          UserGroupInformation.setLoginUser(remoteUser);
+        } catch (OS3Exception | URISyntaxException ex) {
+          LOG.error("S3 auth info creation failed.");
+          throw S3_AUTHINFO_CREATION_ERROR;
         }
+
       }
     } catch (Exception e) {
       LOG.error("Error: ", e);
@@ -118,12 +108,6 @@ public class OzoneClientProducer {
     }
   }
 
-  @VisibleForTesting
-  public void setContext(ContainerRequestContext context) {
-    this.context = context;
-  }
-
-  @VisibleForTesting
   public void setOzoneConfiguration(OzoneConfiguration config) {
     this.ozoneConfiguration = config;
   }

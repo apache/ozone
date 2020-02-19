@@ -170,6 +170,7 @@ public class TestPipelineClose {
     pipelineActionHandler
         .onMessage(pipelineActionsFromDatanode, new EventQueue());
     Thread.sleep(5000);
+
     OzoneContainer ozoneContainer =
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer();

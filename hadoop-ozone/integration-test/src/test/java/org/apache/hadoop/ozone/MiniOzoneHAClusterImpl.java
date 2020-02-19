@@ -164,7 +164,7 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public void stop() {
     for (OzoneManager ozoneManager : ozoneManagers) {
       if (ozoneManager != null) {
-        LOG.info("Stopping the OzoneManager " + ozoneManager.getOMNodeId());
+        LOG.info("Stopping the OzoneManager {}", ozoneManager.getOMNodeId());
         ozoneManager.stop();
         ozoneManager.join();
       }
@@ -289,12 +289,12 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             if (i <= numOfActiveOMs) {
               om.start();
               activeOMs.add(om);
-              LOG.info("Started OzoneManager RPC server at " +
+              LOG.info("Started OzoneManager RPC server at {}",
                   om.getOmRpcServerAddr());
             } else {
               inactiveOMs.add(om);
-              LOG.info("Intialized OzoneManager at " + om.getOmRpcServerAddr()
-                  + ". This OM is currently inactive (not running).");
+              LOG.info("Intialized OzoneManager at {}. This OM is currently "
+                      + "inactive (not running).", om.getOmRpcServerAddr());
             }
           }
 
@@ -309,13 +309,13 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           for (OzoneManager om : omMap.values()) {
             om.stop();
             om.join();
-            LOG.info("Stopping OzoneManager server at " +
+            LOG.info("Stopping OzoneManager server at {}",
                 om.getOmRpcServerAddr());
           }
           omMap.clear();
           ++retryCount;
-          LOG.info("MiniOzoneHACluster port conflicts, retried " +
-              retryCount + " times");
+          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
+                  retryCount);
         }
       }
       return omMap;

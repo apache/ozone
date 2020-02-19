@@ -85,6 +85,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
         "/rack1");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(4)
+        .setTotalPipelineNumLimit(10)
         .build();
     cluster.waitForClusterToBeReady();
     metrics = getMetrics(SCMContainerPlacementMetrics.class.getSimpleName());

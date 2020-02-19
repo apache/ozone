@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.Status;
 import java.io.IOException;
 import java.util.Iterator;
 
@@ -28,12 +27,11 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.s3.commontypes.BucketMetadata;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.header.AuthenticationHeaderParser;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.s3.util.OzoneS3Util.getVolumeName;
+import static org.apache.hadoop.ozone.s3.util.OzoneS3Util.getS3Username;
 
 /**
  * Top level rest endpoint.
@@ -56,17 +54,8 @@ public class RootEndpoint extends EndpointBase {
     OzoneVolume volume;
     ListBucketResponse response = new ListBucketResponse();
 
-    AuthenticationHeaderParser authenticationHeaderParser =
-        getAuthenticationHeaderParser();
-
-    if (!authenticationHeaderParser.doesAuthenticationInfoExists()) {
-      return Response.status(Status.TEMPORARY_REDIRECT)
-          .header("Location", "/static/")
-          .build();
-    }
-    String volumeName = getVolumeName(authenticationHeaderParser.
-        getAccessKeyID());
-    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(volumeName,
+    String userName = getS3Username(getSignatureProcessor().getAwsAccessId());
+    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(userName,
         null);
 
     while (bucketIterator.hasNext()) {

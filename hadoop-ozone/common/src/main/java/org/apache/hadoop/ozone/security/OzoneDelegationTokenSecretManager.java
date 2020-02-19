@@ -529,8 +529,8 @@ public class OzoneDelegationTokenSecretManager
     @Override
     public void run() {
       LOG.info("Starting expired delegation token remover thread, "
-          + "tokenRemoverScanInterval=" + getTokenRemoverScanInterval()
-          / (60 * 1000) + " min(s)");
+          + "tokenRemoverScanInterval={} min(s)",
+              getTokenRemoverScanInterval() / (60 * 1000));
       try {
         while (isRunning()) {
           long now = Time.now();
@@ -543,7 +543,7 @@ public class OzoneDelegationTokenSecretManager
             Thread.sleep(Math.min(5000,
                 getTokenRemoverScanInterval())); // 5 seconds
           } catch (InterruptedException ie) {
-            LOG.error("ExpiredTokenRemover received " + ie);
+            LOG.error("ExpiredTokenRemover received {}", ie);
           }
         }
       } catch (Throwable t) {

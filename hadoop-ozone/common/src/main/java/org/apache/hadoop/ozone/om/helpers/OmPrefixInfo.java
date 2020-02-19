@@ -35,16 +35,18 @@ import java.util.stream.Collectors;
  * can be extended for other OzFS optimizations in future.
  */
 // TODO: support Auditable interface
-public final class OmPrefixInfo extends WithMetadata {
+public final class OmPrefixInfo extends WithObjectID {
 
   private String name;
   private List<OzoneAcl> acls;
 
   public OmPrefixInfo(String name, List<OzoneAcl> acls,
-      Map<String, String> metadata) {
+      Map<String, String> metadata, long objectId, long updateId) {
     this.name = name;
     this.acls = acls;
     this.metadata = metadata;
+    this.objectID = objectId;
+    this.updateID = updateId;
   }
 
   /**
@@ -91,6 +93,8 @@ public final class OmPrefixInfo extends WithMetadata {
     private String name;
     private List<OzoneAcl> acls;
     private Map<String, String> metadata;
+    private long objectID;
+    private long updateID;
 
     public Builder() {
       //Default values
@@ -123,13 +127,23 @@ public final class OmPrefixInfo extends WithMetadata {
       return this;
     }
 
+    public Builder setObjectID(long obId) {
+      this.objectID = obId;
+      return this;
+    }
+
+    public Builder setUpdateID(long id) {
+      this.updateID = id;
+      return this;
+    }
+
     /**
      * Constructs the OmPrefixInfo.
      * @return instance of OmPrefixInfo.
      */
     public OmPrefixInfo build() {
       Preconditions.checkNotNull(name);
-      return new OmPrefixInfo(name, acls, metadata);
+      return new OmPrefixInfo(name, acls, metadata, objectID, updateID);
     }
   }
 
@@ -195,7 +209,7 @@ public final class OmPrefixInfo extends WithMetadata {
     if (metadata != null) {
       metadata.forEach((k, v) -> metadataList.put(k, v));
     }
-    return new OmPrefixInfo(name, aclList, metadataList);
+    return new OmPrefixInfo(name, aclList, metadataList, objectID, updateID);
   }
 }
 
