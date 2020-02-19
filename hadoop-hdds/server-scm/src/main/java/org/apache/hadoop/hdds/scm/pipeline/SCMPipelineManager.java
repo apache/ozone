@@ -182,6 +182,7 @@ public class SCMPipelineManager implements PipelineManager {
               ", " + pipeline.getNodes().get(2).getUuid().toString());
         }
       }
+      return;
     case CHAINED:
       // Not supported.
     default:
