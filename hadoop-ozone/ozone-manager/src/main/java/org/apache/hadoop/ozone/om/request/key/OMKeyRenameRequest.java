@@ -210,15 +210,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
         }
 
-        // Copy fromKeyValue into toKeyValue and set objectID and updateID to
-        // current transactionLogIndex
-        toKeyValue = fromKeyValue.copyObject(false);
-        toKeyValue.setObjectID(trxnLogIndex);
-        toKeyValue.setUpdateID(trxnLogIndex);
+        fromKeyValue.setUpdateID(trxnLogIndex);
 
-        toKeyValue.setKeyName(toKeyName);
+        fromKeyValue.setKeyName(toKeyName);
         //Set modification time
-        toKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
+        fromKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
 
         // Add to cache.
         // fromKey should be deleted, toKey should be added with newly updated
@@ -229,11 +225,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
             new CacheValue<>(Optional.absent(), trxnLogIndex));
 
         keyTable.addCacheEntry(new CacheKey<>(toKey),
-            new CacheValue<>(Optional.of(toKeyValue), trxnLogIndex));
+            new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
 
         omClientResponse = new OMKeyRenameResponse(omResponse
             .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-            fromKeyName, toKeyName, toKeyValue);
+            fromKeyName, toKeyName, fromKeyValue);
 
         result = Result.SUCCESS;
       }
