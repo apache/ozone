@@ -224,7 +224,6 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
    */
   private void sendAppendLogEntryRequest(long sequence) {
     timer.time(() -> {
-      AppendEntriesReplyProto replyProto = null;
       try {
         long callId = callIdRandom.nextLong();
         inFlightMessages.put(callId);
@@ -232,8 +231,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
       } catch (Exception e) {
         LOG.error(
             "Error while sending new append entry request (HB) to the "
-                + "follower: {}",
-            replyProto, e);
+                + "follower", e);
       }
     });
   }
