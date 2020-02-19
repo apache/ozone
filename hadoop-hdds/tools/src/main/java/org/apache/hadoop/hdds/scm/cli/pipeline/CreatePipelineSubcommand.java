@@ -18,52 +18,58 @@
 
 package org.apache.hadoop.hdds.scm.cli.pipeline;
 
-import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
 
 /**
- * Handler of list pipelines command.
+ * Handler of createPipeline command.
  */
 @CommandLine.Command(
-    name = "list",
-    description = "List all active pipelines",
+    name = "create",
+    description = "create pipeline",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ListPipelinesSubcommand implements Callable<Void> {
-
+public class CreatePipelineSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private PipelineCommands parent;
 
-  @CommandLine.Option(names = {"-ffc", "--filterByFactor"},
-      description = "Filter listed pipelines by Factor(ONE/one)",
-      defaultValue = "",
-      required = false)
-  private String factor;
+  @CommandLine.Option(
+      names = {"-t", "--replicationType"},
+      description = "Replication type (STAND_ALONE, RATIS)",
+      defaultValue = "STAND_ALONE"
+  )
+  private HddsProtos.ReplicationType type
+      = HddsProtos.ReplicationType.STAND_ALONE;
 
-  @CommandLine.Option(names = {"-fst", "--filterByState"},
-      description = "Filter listed pipelines by State(OPEN/CLOSE)",
-      defaultValue = "",
-      required = false)
-  private String state;
-
+  @CommandLine.Option(
+      names = {"-f", "--replicationFactor"},
+      description = "Replication factor (ONE, THREE)",
+      defaultValue = "ONE"
+  )
+  private HddsProtos.ReplicationFactor factor
+      = HddsProtos.ReplicationFactor.ONE;
 
   @Override
   public Void call() throws Exception {
+    if (type == HddsProtos.ReplicationType.CHAINED) {
+      throw new IllegalArgumentException(type.name()
+          + " is not supported yet.");
+    }
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      if (Strings.isNullOrEmpty(factor) && Strings.isNullOrEmpty(state)) {
-        scmClient.listPipelines().forEach(System.out::println);
-      } else {
-        scmClient.listPipelines().stream()
-            .filter(p -> ((Strings.isNullOrEmpty(factor) ||
-                (p.getFactor().toString().compareToIgnoreCase(factor) == 0))
-                && (Strings.isNullOrEmpty(state) ||
-                (p.getPipelineState().toString().compareToIgnoreCase(state)
-                    == 0))))
-            .forEach(System.out::println);
+      Pipeline pipeline = scmClient.createReplicationPipeline(
+          type,
+          factor,
+          HddsProtos.NodePool.getDefaultInstance());
+
+      if (pipeline != null) {
+        System.out.println(pipeline.getId().toString() +
+            " is created. Factor: " + pipeline.getFactor() +
+            ", Type: " + pipeline.getType());
       }
       return null;
     }
