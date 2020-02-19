@@ -707,10 +707,14 @@
     <description>
       The chunk size for reading/writing chunk operations in bytes.
 
-      The chunk size defaults to 8MB. If the value configured is more than the
-      maximum size (16MB), it will be reset to the maximum size. This maps to
-      the network packet sizes and file write operations in the client to
-      datanode protocol.
+      The chunk size defaults to 4MB. If the value configured is more than the
+      maximum size (32MB), it will be reset to the maximum size (32MB). This
+      maps to the network packet sizes and file write operations in the
+      client to datanode protocol.
+
+      When tuning this parameter, flow control window parameter should be
+      tuned accordingly. Refer to
+      hdds.ratis.raft.grpc.flow.control.window for more information.
     </description>
   </property>
   <property>
@@ -776,9 +780,11 @@
     </value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
-      The full name of class which implements org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicy.
+      The full name of class which implements
+      org.apache.hadoop.hdds.scm.PlacementPolicy.
       The class decides which datanode will be used to host the container replica. If not set,
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default value.
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default
+      value.
     </description>
   </property>
   <property>
@@ -786,6 +792,35 @@
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>Number of containers per owner in a pipeline.
+    </description>
+  </property>
+  <property>
+  <name>ozone.datanode.pipeline.limit</name>
+  <value>2</value>
+  <tag>OZONE, SCM, PIPELINE</tag>
+  <description>Max number of pipelines per datanode can be engaged in.
+  </description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.pipeline.limit</name>
+    <value>0</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>Upper limit for how many pipelines can be OPEN in SCM.
+      0 as default means there is no limit. Otherwise, the number is the limit
+      of max amount of pipelines which are OPEN.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.pipeline.allocated.timeout</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      Timeout for every pipeline to stay in ALLOCATED stage. When pipeline is created,
+      it should be at OPEN stage once pipeline report is successfully received by SCM.
+      If a pipeline stays at ALLOCATED longer than the specified period of time,
+      it should be scrubbed so that new pipeline can be created.
+      This timeout is for how long pipeline can stay at ALLOCATED
+      stage until it gets scrubbed.
     </description>
   </property>
   <property>

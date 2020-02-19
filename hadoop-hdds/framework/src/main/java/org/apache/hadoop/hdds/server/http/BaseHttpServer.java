@@ -167,7 +167,7 @@ public abstract class BaseHttpServer {
 
       URI uri = URI.create("http://" + NetUtils.getHostPortString(httpAddr));
       builder.addEndpoint(uri);
-      LOG.info("Starting Web-server for " + name + " at: " + uri);
+      LOG.info("Starting Web-server for {} at: {}", name, uri);
     }
 
     if (policy.isHttpsEnabled() && httpsAddr != null) {
@@ -180,7 +180,7 @@ public abstract class BaseHttpServer {
 
       URI uri = URI.create("https://" + NetUtils.getHostPortString(httpsAddr));
       builder.addEndpoint(uri);
-      LOG.info("Starting Web-server for " + name + " at: " + uri);
+      LOG.info("Starting Web-server for {} at: {}", name, uri);
     }
     return builder;
   }
@@ -373,9 +373,9 @@ public abstract class BaseHttpServer {
     // Check if the required properties are included
     for (String sslProp : reqSslProps) {
       if (sslConf.get(sslProp) == null) {
-        LOG.warn("SSL config " + sslProp + " is missing. If " +
-            OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY +
-            " is specified, make sure it is a relative path");
+        LOG.warn("SSL config {} is missing. If {} is specified, make sure it "
+                + "is a relative path", sslProp,
+                OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY);
       }
     }
 

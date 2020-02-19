@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -187,7 +187,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
                 registry.getDropWizardMetricRegistry())));
 
     OzoneConfiguration.activate();
-    HddsUtils.initializeMetrics(conf, "HddsDatanode");
+    HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
     try {
       String hostname = HddsUtils.getHostName(conf);
       String ip = InetAddress.getByName(hostname).getHostAddress();
@@ -289,7 +289,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       PKCS10CertificationRequest csr = getCSR(config);
       // TODO: For SCM CA we should fetch certificate from multiple SCMs.
       SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-          HddsUtils.getScmSecurityClient(config);
+          HddsServerUtil.getScmSecurityClient(config);
       SCMGetCertResponseProto response = secureScmClient.
           getDataNodeCertificateChain(datanodeDetails.getProtoBufMessage(),
               getEncodedString(csr));

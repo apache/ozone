@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.hdds.scm.client.ContainerOperationClient.newContainerRpcClient;
+import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_AUTO_COMMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_CONNECTION_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_DB_DRIVER;

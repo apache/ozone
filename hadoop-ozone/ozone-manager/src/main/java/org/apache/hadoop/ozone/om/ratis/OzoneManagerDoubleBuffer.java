@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,7 +146,10 @@ public class OzoneManagerDoubleBuffer {
               }
             });
 
+            long startTime = Time.monotonicNowNanos();
             omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            ozoneManagerDoubleBufferMetrics.updateFlushTime(
+                Time.monotonicNowNanos() - startTime);
           }
 
           // Complete futures first and then do other things. So, that
@@ -199,9 +203,9 @@ public class OzoneManagerDoubleBuffer {
               "exception while running";
           ExitUtils.terminate(1, message, ex, LOG);
         } else {
-          LOG.info("OMDoubleBuffer flush thread " +
-              Thread.currentThread().getName() + " is interrupted and will " +
-              "exit. {}", Thread.currentThread().getName());
+          LOG.info("OMDoubleBuffer flush thread {} is interrupted and will "
+              + "exit. {}", Thread.currentThread().getName(),
+                  Thread.currentThread().getName());
         }
       } catch (IOException ex) {
         terminate(ex);
@@ -248,6 +252,10 @@ public class OzoneManagerDoubleBuffer {
     ozoneManagerDoubleBufferMetrics.incrTotalNumOfFlushOperations();
     ozoneManagerDoubleBufferMetrics.incrTotalSizeOfFlushedTransactions(
         flushedTransactionsSize);
+    ozoneManagerDoubleBufferMetrics.setAvgFlushTransactionsInOneIteration(
+        (float) ozoneManagerDoubleBufferMetrics
+            .getTotalNumOfFlushedTransactions() /
+            ozoneManagerDoubleBufferMetrics.getTotalNumOfFlushOperations());
     if (maxFlushedTransactionsInOneIteration < flushedTransactionsSize) {
       maxFlushedTransactionsInOneIteration = flushedTransactionsSize;
       ozoneManagerDoubleBufferMetrics

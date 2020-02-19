@@ -66,7 +66,7 @@ public class OzoneSecretStore implements Closeable {
   public OzoneManagerSecretState loadState() throws IOException {
     OzoneManagerSecretState<Integer> state = new OzoneManagerSecretState();
     int numTokens = loadTokens(state);
-    LOG.info("Loaded " + numTokens + " tokens");
+    LOG.info("Loaded {} tokens", numTokens);
     return state;
   }
 

@@ -45,6 +45,8 @@ import org.slf4j.LoggerFactory;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,11 +56,8 @@ import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.scm
-    .ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm
-    .ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_PIPELINE_DB;
 
 /**
@@ -109,8 +108,8 @@ public class SCMPipelineManager implements PipelineManager {
     scheduler = new Scheduler("RatisPipelineUtilsThread", false, 1);
     this.backgroundPipelineCreator =
         new BackgroundPipelineCreator(this, scheduler, conf);
-    int cacheSize = conf.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
-        OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
+    int cacheSize = conf.getInt(ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB,
+        ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
     final File pipelineDBPath = getPipelineDBPath(conf);
     this.pipelineStore =
         MetadataStoreBuilder.newBuilder()
@@ -175,9 +174,22 @@ public class SCMPipelineManager implements PipelineManager {
         metrics.incNumPipelineCreated();
         metrics.createPerPipelineMetrics(pipeline);
       }
+      List<Pipeline> overlapPipelines = RatisPipelineUtils
+          .checkPipelineContainSameDatanodes(stateManager, pipeline);
+      if (!overlapPipelines.isEmpty()) {
+        // Count 1 overlap at a time.
+        metrics.incNumPipelineContainSameDatanodes();
+        //TODO remove until pipeline allocation is proved equally distributed.
+        for (Pipeline overlapPipeline : overlapPipelines) {
+          LOG.info("Pipeline: " + pipeline.getId().toString() +
+              " contains same datanodes as previous pipelines: " +
+              overlapPipeline.getId().toString() + " nodeIds: " +
+              pipeline.getNodes().get(0).getUuid().toString() +
+              ", " + pipeline.getNodes().get(1).getUuid().toString() +
+              ", " + pipeline.getNodes().get(2).getUuid().toString());
+        }
+      }
       return pipeline;
-    } catch (InsufficientDatanodesException idEx) {
-      throw idEx;
     } catch (IOException ex) {
       metrics.incNumPipelineCreationFailed();
       throw ex;
@@ -188,7 +200,7 @@ public class SCMPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline createPipeline(ReplicationType type, ReplicationFactor factor,
-                                 List<DatanodeDetails> nodes) {
+      List<DatanodeDetails> nodes) {
     // This will mostly be used to create dummy pipeline for SimplePipelines.
     // We don't update the metrics for SimplePipelines.
     lock.writeLock().lock();
@@ -364,6 +376,32 @@ public class SCMPipelineManager implements PipelineManager {
           String.format("Destroy pipeline failed for pipeline:%s", pipeline));
     } else {
       destroyPipeline(pipeline);
+    }
+  }
+
+  @Override
+  public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
+      throws IOException{
+    if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
+      // Only srub pipeline for RATIS THREE pipeline
+      return;
+    }
+    Instant currentTime = Instant.now();
+    Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    List<Pipeline> needToSrubPipelines = stateManager.getPipelines(type, factor,
+        Pipeline.PipelineState.ALLOCATED).stream()
+        .filter(p -> currentTime.toEpochMilli() - p.getCreationTimestamp()
+            .toEpochMilli() >= pipelineScrubTimeoutInMills)
+        .collect(Collectors.toList());
+    for (Pipeline p : needToSrubPipelines) {
+      LOG.info("srubbing pipeline: id: " + p.getId().toString() +
+          " since it stays at ALLOCATED stage for " +
+          Duration.between(currentTime, p.getCreationTimestamp()).toMinutes() +
+          " mins.");
+      finalizeAndDestroyPipeline(p, false);
     }
   }
 

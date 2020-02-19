@@ -160,7 +160,7 @@ public class OMDBCheckpointServlet extends HttpServlet {
 
       long duration = Duration.between(start, end).toMillis();
       LOG.info("Time taken to write the checkpoint to response output " +
-          "stream: " + duration + " milliseconds");
+          "stream: {} milliseconds", duration);
       omMetrics.setLastCheckpointStreamingTimeTaken(duration);
       omMetrics.incNumCheckpoints();
     } catch (Exception e) {

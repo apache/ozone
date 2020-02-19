@@ -17,6 +17,6 @@
  *
  */
 /**
- * Certificate Utils.
+ Helpers for Certificates.
  */
 package org.apache.hadoop.hdds.security.x509.certificate.utils;

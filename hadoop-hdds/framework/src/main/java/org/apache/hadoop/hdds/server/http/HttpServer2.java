@@ -528,7 +528,7 @@ public final class HttpServer2 implements FilterContainer {
       if (null != excludeCiphers && !excludeCiphers.isEmpty()) {
         sslContextFactory.setExcludeCipherSuites(
             StringUtils.getTrimmedStrings(excludeCiphers));
-        LOG.info("Excluded Cipher List:" + excludeCiphers);
+        LOG.info("Excluded Cipher List: {}", excludeCiphers);
       }
 
       conn.addFirstConnectionFactory(new SslConnectionFactory(sslContextFactory,
@@ -613,7 +613,7 @@ public final class HttpServer2 implements FilterContainer {
 
     if (pathSpecs != null) {
       for (String path : pathSpecs) {
-        LOG.info("adding path spec: " + path);
+        LOG.info("adding path spec: {}", path);
         addFilterPathMapping(path, webAppContext);
       }
     }
@@ -789,8 +789,8 @@ public final class HttpServer2 implements FilterContainer {
    */
   public void addJerseyResourcePackage(final String packageName,
       final String pathSpec) {
-    LOG.info("addJerseyResourcePackage: packageName=" + packageName
-        + ", pathSpec=" + pathSpec);
+    LOG.info("addJerseyResourcePackage: packageName={}, pathSpec={}",
+            packageName, pathSpec);
     final ServletHolder sh = new ServletHolder(ServletContainer.class);
     sh.setInitParameter("com.sun.jersey.config.property.resourceConfigClass",
         "com.sun.jersey.api.core.PackagesResourceConfig");
@@ -866,7 +866,7 @@ public final class HttpServer2 implements FilterContainer {
     webAppContext.addServlet(holder, pathSpec);
 
     if (requireAuth && UserGroupInformation.isSecurityEnabled()) {
-      LOG.info("Adding Kerberos (SPNEGO) filter to " + name);
+      LOG.info("Adding Kerberos (SPNEGO) filter to {}", name);
       ServletHandler handler = webAppContext.getServletHandler();
       FilterMapping fmap = new FilterMapping();
       fmap.setPathSpec(pathSpec);
@@ -943,17 +943,16 @@ public final class HttpServer2 implements FilterContainer {
     FilterMapping fmap =
         getFilterMapping(name, new String[] {"*.html", "*.jsp"});
     defineFilter(webAppContext, filterHolder, fmap);
-    LOG.info(
-        "Added filter " + name + " (class=" + classname + ") to context "
-            + webAppContext.getDisplayName());
+    LOG.info("Added filter {} (class={}) to context {}", name, classname,
+            webAppContext.getDisplayName());
     fmap = getFilterMapping(name, new String[] {"/*"});
     for (Map.Entry<ServletContextHandler, Boolean> e
         : defaultContexts.entrySet()) {
       if (e.getValue()) {
         ServletContextHandler ctx = e.getKey();
         defineFilter(ctx, filterHolder, fmap);
-        LOG.info("Added filter " + name + " (class=" + classname
-            + ") to context " + ctx.getDisplayName());
+        LOG.info("Added filter {} (class={}) to context {}", name, classname,
+                ctx.getDisplayName());
       }
     }
     filterNames.add(name);
@@ -968,7 +967,7 @@ public final class HttpServer2 implements FilterContainer {
     for (ServletContextHandler ctx : defaultContexts.keySet()) {
       defineFilter(ctx, filterHolder, fmap);
     }
-    LOG.info("Added global filter '" + name + "' (class=" + classname + ")");
+    LOG.info("Added global filter '{}' (class={})", name, classname);
   }
 
   /**
@@ -1186,7 +1185,7 @@ public final class HttpServer2 implements FilterContainer {
     // failed to open w/o issuing a close first, even if the port is changed
     listener.close();
     listener.open();
-    LOG.info("Jetty bound to port " + listener.getLocalPort());
+    LOG.info("Jetty bound to port {}", listener.getLocalPort());
   }
 
   /**
@@ -1427,8 +1426,8 @@ public final class HttpServer2 implements FilterContainer {
       response.sendError(HttpServletResponse.SC_FORBIDDEN,
           "Unauthenticated users are not " +
               "authorized to access this page.");
-      LOG.warn("User " + remoteUser + " is unauthorized to access the page "
-          + request.getRequestURI() + ".");
+      LOG.warn("User {} is unauthorized to access the page {}.", remoteUser,
+              request.getRequestURI());
       return false;
     }
 
