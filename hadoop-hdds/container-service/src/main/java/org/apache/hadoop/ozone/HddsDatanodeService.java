@@ -250,31 +250,40 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
       if ("follower"
           .equalsIgnoreCase(System.getenv("OZONE_DATANODE_STANDALONE_TEST"))) {
-        String scmId = "scm-01";
-        String clusterId = "clusterId";
-        datanodeStateMachine.getContainer().start(scmId);
-        VolumeSet volumeSet =
-            getDatanodeStateMachine().getContainer().getVolumeSet();
-
-        Map<String, HddsVolume> volumeMap = volumeSet.getVolumeMap();
-
-        for (Map.Entry<String, HddsVolume> entry : volumeMap.entrySet()) {
-          HddsVolume hddsVolume = entry.getValue();
-          boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
-              clusterId, LOG);
-          if (!result) {
-            volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
-          }
-        }
+        startRatisForTest();
       }
-
-
 
     } catch (IOException e) {
       throw new RuntimeException("Can't start the HDDS datanode plugin", e);
     } catch (AuthenticationException ex) {
       throw new RuntimeException("Fail to authentication when starting" +
           " HDDS datanode plugin", ex);
+    }
+  }
+
+  /**
+   * Initialize and start Ratis server.
+   * <p>
+   * In normal case this initialization is done after the SCM registration.
+   * In can be forced to make it possible to test one, single, isolated
+   * datanode.
+   */
+  private void startRatisForTest() throws IOException {
+    String scmId = "scm-01";
+    String clusterId = "clusterId";
+    datanodeStateMachine.getContainer().start(scmId);
+    VolumeSet volumeSet =
+        getDatanodeStateMachine().getContainer().getVolumeSet();
+
+    Map<String, HddsVolume> volumeMap = volumeSet.getVolumeMap();
+
+    for (Map.Entry<String, HddsVolume> entry : volumeMap.entrySet()) {
+      HddsVolume hddsVolume = entry.getValue();
+      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
+          clusterId, LOG);
+      if (!result) {
+        volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
+      }
     }
   }
 
