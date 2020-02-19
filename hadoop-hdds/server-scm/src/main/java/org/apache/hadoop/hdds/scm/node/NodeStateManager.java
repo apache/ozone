@@ -284,6 +284,15 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Get the count of pipelines associated to single datanode.
+   * @param datanodeDetails single datanode
+   * @return number of pipelines associated with it
+   */
+  public int getPipelinesCount(DatanodeDetails datanodeDetails) {
+    return node2PipelineMap.getPipelinesCount(datanodeDetails.getUuid());
+  }
+
+  /**
    * Get information about the node.
    *
    * @param datanodeDetails DatanodeDetails
@@ -366,7 +375,7 @@ public class NodeStateManager implements Runnable, Closeable {
             // This should not happen unless someone else other than
             // NodeStateManager is directly modifying NodeStateMap and removed
             // the node entry after we got the list of UUIDs.
-            LOG.error("Inconsistent NodeStateMap! " + nodeStateMap);
+            LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
           }
         });
     return nodes;
@@ -387,7 +396,7 @@ public class NodeStateManager implements Runnable, Closeable {
             // This should not happen unless someone else other than
             // NodeStateManager is directly modifying NodeStateMap and removed
             // the node entry after we got the list of UUIDs.
-            LOG.error("Inconsistent NodeStateMap! " + nodeStateMap);
+            LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
           }
         });
     return nodes;
@@ -617,7 +626,7 @@ public class NodeStateManager implements Runnable, Closeable {
       // This should not happen unless someone else other than
       // NodeStateManager is directly modifying NodeStateMap and removed
       // the node entry after we got the list of UUIDs.
-      LOG.error("Inconsistent NodeStateMap! " + nodeStateMap);
+      LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
     }
     long processingEndTime = Time.monotonicNow();
     //If we have taken too much time for HB processing, log that information.

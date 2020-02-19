@@ -292,10 +292,30 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT =
       "ozone.scm.pipeline.owner.container.count";
   public static final int OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT = 3;
+  // Pipeline placement policy:
+  // Upper limit for how many pipelines a datanode can engage in.
+  public static final String OZONE_DATANODE_PIPELINE_LIMIT =
+          "ozone.datanode.pipeline.limit";
+  public static final int OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT = 2;
+
+  // Upper limit for how many pipelines can be created
+  // across the cluster nodes managed by SCM.
+  // Only for test purpose now.
+  public static final String OZONE_SCM_RATIS_PIPELINE_LIMIT =
+      "ozone.scm.ratis.pipeline.limit";
+  // Setting to zero by default means this limit doesn't take effect.
+  public static final int OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT = 0;
 
   public static final String
       OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY =
       "ozone.scm.keyvalue.container.deletion-choosing.policy";
+
+  // Max timeout for pipeline to stay at ALLOCATED state before scrubbed.
+  public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT =
+      "ozone.scm.pipeline.allocated.timeout";
+
+  public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT =
+      "5m";
 
   public static final String OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT =
       "ozone.scm.container.creation.lease.timeout";

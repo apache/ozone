@@ -212,10 +212,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           // Except for last part all parts should have minimum size.
           if (currentPartCount != partsListSize) {
             if (currentPartKeyInfo.getDataSize() < OM_MULTIPART_MIN_SIZE) {
-              LOG.error("MultipartUpload: " + ozoneKey + "Part number: " +
-                  partKeyInfo.getPartNumber() + "size " + currentPartKeyInfo
-                  .getDataSize() + " is less than minimum part size " +
-                  OzoneConsts.OM_MULTIPART_MIN_SIZE);
+              LOG.error("MultipartUpload: {} Part number: {} size {}  is less "
+                              + "than minimum part size {}", ozoneKey,
+                      partKeyInfo.getPartNumber(),
+                      currentPartKeyInfo.getDataSize(),
+                      OzoneConsts.OM_MULTIPART_MIN_SIZE);
               throw new OMException("Complete Multipart Upload Failed: " +
                   "Entity too small: volume: " + volumeName + "bucket: " +
                   bucketName + "key: " + keyName,

@@ -84,12 +84,12 @@ public class LevelDBStore implements MetadataStore {
     db = JniDBFactory.factory.open(dbPath, options);
     if (LOG.isDebugEnabled()) {
       LOG.debug("LevelDB successfully opened");
-      LOG.debug("[Option] cacheSize = " + options.cacheSize());
-      LOG.debug("[Option] createIfMissing = " + options.createIfMissing());
-      LOG.debug("[Option] blockSize = " + options.blockSize());
-      LOG.debug("[Option] compressionType= " + options.compressionType());
-      LOG.debug("[Option] maxOpenFiles= " + options.maxOpenFiles());
-      LOG.debug("[Option] writeBufferSize= "+ options.writeBufferSize());
+      LOG.debug("[Option] cacheSize = {}", options.cacheSize());
+      LOG.debug("[Option] createIfMissing = {}", options.createIfMissing());
+      LOG.debug("[Option] blockSize = {}", options.blockSize());
+      LOG.debug("[Option] compressionType= {}", options.compressionType());
+      LOG.debug("[Option] maxOpenFiles= {}", options.maxOpenFiles());
+      LOG.debug("[Option] writeBufferSize= {}", options.writeBufferSize());
     }
   }
 

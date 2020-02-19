@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.container.ContainerCommands;
+import org.apache.hadoop.hdds.scm.cli.datanode.DatanodeCommands;
 import org.apache.hadoop.hdds.scm.cli.pipeline.PipelineCommands;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -56,6 +57,7 @@ import picocli.CommandLine.Option;
         SafeModeCommands.class,
         ContainerCommands.class,
         PipelineCommands.class,
+        DatanodeCommands.class,
         TopologySubcommand.class,
         ReplicationManagerCommands.class
     },

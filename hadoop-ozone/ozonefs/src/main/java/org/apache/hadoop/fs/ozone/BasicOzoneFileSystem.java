@@ -139,7 +139,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       uri = new URIBuilder().setScheme(OZONE_URI_SCHEME)
           .setHost(authority)
           .build();
-      LOG.trace("Ozone URI for ozfs initialization is " + uri);
+      LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
       //isolated is the default for ozonefs-lib-legacy which includes the
       // /ozonefs.txt, otherwise the default is false. It could be overridden.
@@ -417,7 +417,7 @@ public class BasicOzoneFileSystem extends FileSystem {
         LOG.trace("Skipping deleting root directory");
         return true;
       } else {
-        LOG.trace("deleting key:" + key);
+        LOG.trace("deleting key:{}", key);
         boolean succeed = adapter.deleteObject(key);
         // if recursive delete is requested ignore the return value of
         // deleteObject and issue deletes for other keys.

@@ -602,7 +602,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     default:
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Invalid audit event status - " + result);
+        LOG.debug("Invalid audit event status - {}", result);
       }
     }
   }

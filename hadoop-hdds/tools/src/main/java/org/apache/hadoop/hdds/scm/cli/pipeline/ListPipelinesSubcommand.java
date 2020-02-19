@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.pipeline;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
@@ -53,22 +54,18 @@ public class ListPipelinesSubcommand implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      if (isNullOrEmpty(factor) && isNullOrEmpty(state)) {
+      if (Strings.isNullOrEmpty(factor) && Strings.isNullOrEmpty(state)) {
         scmClient.listPipelines().forEach(System.out::println);
       } else {
         scmClient.listPipelines().stream()
-            .filter(p -> ((isNullOrEmpty(factor) ||
+            .filter(p -> ((Strings.isNullOrEmpty(factor) ||
                 (p.getFactor().toString().compareToIgnoreCase(factor) == 0))
-                && (isNullOrEmpty(state) ||
+                && (Strings.isNullOrEmpty(state) ||
                 (p.getPipelineState().toString().compareToIgnoreCase(state)
                     == 0))))
             .forEach(System.out::println);
       }
       return null;
     }
-  }
-
-  protected static boolean isNullOrEmpty(String str) {
-    return ((str == null) || str.trim().isEmpty());
   }
 }

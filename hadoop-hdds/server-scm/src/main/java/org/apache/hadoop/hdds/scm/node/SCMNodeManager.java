@@ -512,6 +512,16 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
+   * Get the count of pipelines a datanodes is associated with.
+   * @param datanodeDetails DatanodeDetails
+   * @return The number of pipelines
+   */
+  @Override
+  public int getPipelinesCount(DatanodeDetails datanodeDetails) {
+    return nodeStateManager.getPipelinesCount(datanodeDetails);
+  }
+
+  /**
    * Add pipeline information in the NodeManager.
    *
    * @param pipeline - Pipeline to be added
@@ -643,6 +653,15 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return results;
+  }
+
+  /**
+   * Get cluster map as in network topology for this node manager.
+   * @return cluster map
+   */
+  @Override
+  public NetworkTopology getClusterNetworkTopologyMap() {
+    return clusterMap;
   }
 
   private String nodeResolve(String hostname) {
