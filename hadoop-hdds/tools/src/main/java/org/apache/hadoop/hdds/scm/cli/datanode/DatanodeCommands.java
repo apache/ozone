@@ -15,34 +15,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.cli.pipeline;
+package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.MissingSubcommandException;
 import org.apache.hadoop.hdds.scm.cli.SCMCLI;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
 
 /**
- * Subcommand to group pipeline related operations.
+ * Subcommand for datanode related operations.
  */
-@Command(
-    name = "pipeline",
-    description = "Pipeline specific operations",
+@CommandLine.Command(
+    name = "datanode",
+    description = "Datanode specific operations",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        ListPipelinesSubcommand.class,
-        ActivatePipelineSubcommand.class,
-        DeactivatePipelineSubcommand.class,
-        CreatePipelineSubcommand.class,
-        ClosePipelineSubcommand.class
+        ListInfoSubcommand.class
     })
-public class PipelineCommands implements Callable<Void> {
+public class DatanodeCommands implements Callable<Void> {
 
-  @ParentCommand
+  @CommandLine.ParentCommand
   private SCMCLI parent;
 
   public SCMCLI getParent() {
@@ -52,6 +47,6 @@ public class PipelineCommands implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     throw new MissingSubcommandException(
-        this.parent.getCmd().getSubcommands().get("pipeline"));
+        this.parent.getCmd().getSubcommands().get("datanode"));
   }
 }

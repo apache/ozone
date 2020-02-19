@@ -15,7 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container.placement.algorithms;
+
 /**
- Contains container placement policy interface definition.
- **/
+ * Contains all of the datanode related scm commands.
+ */
+package org.apache.hadoop.hdds.scm.cli.datanode;
