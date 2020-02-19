@@ -19,14 +19,16 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -41,6 +43,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.ratis.protocol.AlreadyClosedException;
 import org.apache.ratis.protocol.RaftRetryFailureException;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -55,7 +58,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
@@ -89,12 +91,21 @@ public class TestCommitWatcher {
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
-    OzoneConfiguration.of(conf)
-            .getObject(RatisClientConfig.class).setWatchRequestTimeOut(3000);
-    OzoneConfiguration.of(conf)
-            .getObject(RatisClientConfig.class).setRequestTimeOut(3000);
+    // Make sure the pipeline does not get destroyed quickly
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 10, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "rpc.request.timeout",
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "watch.request.timeout",
+            3, TimeUnit.SECONDS);
     conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 5);
     conf.setTimeDuration(
             OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY,
@@ -280,17 +291,16 @@ public class TestCommitWatcher {
       // call to Ratis. Otherwise, it may just return in case the commitInfoMap
       // is updated to the latest index in putBlock response.
       watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
+      Assert.fail("Expected exception not thrown");
     } catch(IOException ioe) {
       // with retry count set to lower limit and a lower watch request
       // timeout, watch request will eventually
-      // fail with RaftRetryFailure exception from ratis client .
-      Assert.assertTrue(HddsClientUtils.checkForException(ioe)
-              instanceof RaftRetryFailureException);
+      // fail with RaftRetryFailure exception from ratis client or the client
+      // can itself get AlreadyClosedException from the Ratis Server
+      Throwable t = HddsClientUtils.checkForException(ioe);
+      Assert.assertTrue(t instanceof RaftRetryFailureException ||
+              t instanceof AlreadyClosedException);
     }
-    long lastIndex = replies.get(1).getLogIndex();
-    // Depending on the last successfully replicated commitIndex, either we
-    // discard only 1st buffer or both buffers
-    Assert.assertTrue(ratisClient.getReplicatedMinCommitIndex() <= lastIndex);
     if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
         .getLogIndex()) {
       Assert.assertTrue(watcher.getTotalAckDataLength() == chunkSize);
