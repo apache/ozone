@@ -22,8 +22,10 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREF
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.inject.Inject;
 
@@ -51,7 +53,10 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.recon.fsck.MissingContainerTask;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
+import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,10 +79,13 @@ public class ReconStorageContainerManagerFacade
   private ContainerManager containerManager;
   private NetworkTopology clusterMap;
   private StorageContainerServiceProvider scmServiceProvider;
+  private Set<ReconScmTask> reconScmTasks = new HashSet<>();
 
   @Inject
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
-      StorageContainerServiceProvider scmServiceProvider)
+      StorageContainerServiceProvider scmServiceProvider,
+      MissingContainersDao missingContainersDao,
+      ReconTaskStatusDao reconTaskStatusDao)
       throws IOException {
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -91,7 +99,6 @@ public class ReconStorageContainerManagerFacade
     this.pipelineManager =
         new ReconPipelineManager(conf, scmNodeManager, eventQueue);
     this.containerManager = new ReconContainerManager(conf, pipelineManager);
-
     this.scmServiceProvider = scmServiceProvider;
     initializePipelinesFromScm();
 
@@ -112,7 +119,8 @@ public class ReconStorageContainerManagerFacade
         pipelineManager, containerManager);
 
     ContainerReportHandler containerReportHandler =
-        new ContainerReportHandler(scmNodeManager, containerManager);
+        new ReconContainerReportHandler(scmNodeManager, containerManager,
+            scmServiceProvider);
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(scmNodeManager,
             containerManager, scmServiceProvider);
@@ -129,6 +137,16 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT, icrHandler);
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
+
+    reconScmTasks.add(new PipelineSyncTask(
+        this,
+        scmServiceProvider,
+        reconTaskStatusDao));
+    reconScmTasks.add(new MissingContainerTask(
+        this,
+        reconTaskStatusDao,
+        missingContainersDao));
+    reconScmTasks.forEach(ReconScmTask::register);
   }
 
   /**
@@ -162,6 +180,7 @@ public class ReconStorageContainerManagerFacade
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
     getDatanodeProtocolServer().start();
+    this.reconScmTasks.forEach(ReconScmTask::start);
   }
 
   /**
@@ -181,6 +200,7 @@ public class ReconStorageContainerManagerFacade
    */
   public void stop() {
     getDatanodeProtocolServer().stop();
+    reconScmTasks.forEach(ReconScmTask::stop);
     try {
       LOG.info("Stopping SCM Event Queue.");
       eventQueue.close();
