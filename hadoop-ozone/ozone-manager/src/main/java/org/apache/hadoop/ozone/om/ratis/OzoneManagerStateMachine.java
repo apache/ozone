@@ -489,9 +489,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       } else {
         ratisTransactionMap.put(lastFlushedIndex, currentTerm);
         if (LOG.isDebugEnabled()) {
-          LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex added " +
-              "to map. Passed Term {} index {}, where as lastApplied Index " +
-              "{}", currentTerm, lastFlushedIndex, getLastAppliedTermIndex());
+          LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex " +
+              "added to map. Passed Term {} index {}, where as lastApplied " +
+              "Index {}", currentTerm, lastFlushedIndex,
+              getLastAppliedTermIndex());
         }
       }
     }
