@@ -36,7 +36,7 @@ public class BaseAppendLogGenerator extends BaseFreonGenerator {
   @Option(names = {"-r", "--raft-peer"},
       description = "Set the UUID of the raft peer managed by the datanode.",
       defaultValue = "")
-  protected String serverId = "96714307-4bd7-42b5-a65d-e1b13b4ca5c0";
+  protected String serverId;
 
   @SuppressWarnings("checkstyle:VisibilityModifier")
   @Option(names = {"-c", "--server-address"},
@@ -47,7 +47,8 @@ public class BaseAppendLogGenerator extends BaseFreonGenerator {
   protected void setServerIdFromFile(OzoneConfiguration conf) throws
       IOException {
     File idFile = new File(HddsServerUtil.getDatanodeIdFilePath(conf));
-    if (this.serverId.equals("") && idFile.exists()) {
+    if ((this.serverId == null || this.serverId.equals("")) &&
+        idFile.exists()) {
       DatanodeDetails datanodeDetails =
           DatanodeIdYaml.readDatanodeIdFile(idFile);
       this.serverId = datanodeDetails.getUuidString();
