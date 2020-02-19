@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 
 import java.io.IOException;
