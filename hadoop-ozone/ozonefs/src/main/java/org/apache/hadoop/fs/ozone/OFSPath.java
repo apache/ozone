@@ -54,8 +54,7 @@ class OFSPath {
   private String bucketName = "";
   private String mountName = "";
   private String keyName = "";
-  @VisibleForTesting
-  static final String OFS_MOUNT_NAME_TMP = "tmp";
+  private static final String OFS_MOUNT_NAME_TMP = "tmp";
   // Hard-code the volume name to tmp for the first implementation
   @VisibleForTesting
   static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";

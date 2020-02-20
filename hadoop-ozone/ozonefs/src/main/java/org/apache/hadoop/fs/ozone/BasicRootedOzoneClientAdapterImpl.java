@@ -213,7 +213,9 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
     } catch (OMException ex) {
-      if (createIfNotExist) {
+      // Note: always create bucket if volumeStr matches "tmp" so -put works
+      if (createIfNotExist ||
+          volumeStr.equals(OFSPath.OFS_MOUNT_TMP_VOLUMENAME)) {
         // Note: getBucketDetails always throws BUCKET_NOT_FOUND, even if
         // the volume doesn't exist.
         if (ex.getResult().equals(BUCKET_NOT_FOUND)) {
