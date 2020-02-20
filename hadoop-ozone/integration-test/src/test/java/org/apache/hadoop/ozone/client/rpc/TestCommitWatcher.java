@@ -44,10 +44,11 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.ratis.protocol.AlreadyClosedException;
+import org.apache.ratis.protocol.NotReplicatedException;
 import org.apache.ratis.protocol.RaftRetryFailureException;
-import org.junit.AfterClass;
+import org.junit.After;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -58,7 +59,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
+        OZONE_SCM_STALENODE_INTERVAL;
 
 /**
  * Class to test CommitWatcher functionality.
@@ -85,18 +87,25 @@ public class TestCommitWatcher {
    *
    * @throws IOException
    */
-  @BeforeClass
-  public static void init() throws Exception {
+  @Before
+  public void init() throws Exception {
     chunkSize = (int)(1 * OzoneConsts.MB);
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
     // Make sure the pipeline does not get destroyed quickly
-    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 10, TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000, TimeUnit.SECONDS);
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
+            10, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000,
+            TimeUnit.SECONDS);
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
                     DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.
+                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
             3, TimeUnit.SECONDS);
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
@@ -106,7 +115,7 @@ public class TestCommitWatcher {
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "watch.request.timeout",
             3, TimeUnit.SECONDS);
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 5);
+    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 15);
     conf.setTimeDuration(
             OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY,
             1, TimeUnit.SECONDS);
@@ -138,8 +147,8 @@ public class TestCommitWatcher {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
-  public static void shutdown() {
+  @After
+  public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -201,13 +210,16 @@ public class TestCommitWatcher {
         watcher.getFutureMap().get(new Long(chunkSize)).equals(future1));
     // wait on 2nd putBlock to complete
     future2.get();
-    Assert.assertNotNull(watcher.getFutureMap().get(new Long(2 * chunkSize)));
+    Assert.assertNotNull(watcher.getFutureMap().get(
+            new Long(2 * chunkSize)));
     Assert.assertTrue(
-        watcher.getFutureMap().get(new Long(2 * chunkSize)).equals(future2));
-    Assert.assertTrue(watcher.getCommitIndex2flushedDataMap().size() == 2);
+            watcher.getFutureMap().get(new Long(2 * chunkSize)).
+                    equals(future2));
+    Assert.assertTrue(watcher.
+            getCommitIndex2flushedDataMap().size() == 2);
     watcher.watchOnFirstIndex();
     Assert.assertFalse(watcher.getCommitIndex2flushedDataMap()
-        .containsKey(replies.get(0).getLogIndex()));
+            .containsKey(replies.get(0).getLogIndex()));
     Assert.assertFalse(watcher.getFutureMap().containsKey(chunkSize));
     Assert.assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
     watcher.watchOnLastIndex();
@@ -299,7 +311,8 @@ public class TestCommitWatcher {
       // can itself get AlreadyClosedException from the Ratis Server
       Throwable t = HddsClientUtils.checkForException(ioe);
       Assert.assertTrue(t instanceof RaftRetryFailureException ||
-              t instanceof AlreadyClosedException);
+              t instanceof AlreadyClosedException ||
+              t instanceof NotReplicatedException);
     }
     if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
         .getLogIndex()) {
