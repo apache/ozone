@@ -225,7 +225,7 @@ public class KeyOutputStream extends OutputStream {
         off += writtenLength;
       } catch (Exception e) {
         markStreamClosed();
-        throw new IOException("Allocate any more blocks for write failed", e);
+        throw new IOException(e);
       }
     }
   }
