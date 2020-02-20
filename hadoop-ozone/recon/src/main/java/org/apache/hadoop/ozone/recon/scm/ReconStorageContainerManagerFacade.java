@@ -73,7 +73,7 @@ public class ReconStorageContainerManagerFacade
   private final EventQueue eventQueue;
   private final SCMStorageConfig scmStorageConfig;
 
-  private NodeManager nodeManager;
+  private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ContainerManager containerManager;
   private NetworkTopology clusterMap;
