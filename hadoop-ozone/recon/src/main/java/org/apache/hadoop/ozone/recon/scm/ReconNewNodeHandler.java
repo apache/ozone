@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.recon.scm;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
@@ -37,8 +36,8 @@ public class ReconNewNodeHandler implements EventHandler<DatanodeDetails> {
       .getLogger(ReconNewNodeHandler.class);
   private ReconNodeManager nodeManager;
 
-  public ReconNewNodeHandler(NodeManager nodeManager) {
-    this.nodeManager = (ReconNodeManager) nodeManager;
+  public ReconNewNodeHandler(ReconNodeManager nodeManager) {
+    this.nodeManager = nodeManager;
   }
 
   @Override
@@ -47,7 +46,8 @@ public class ReconNewNodeHandler implements EventHandler<DatanodeDetails> {
     try {
       nodeManager.addNodeToDB(datanodeDetails);
     } catch (IOException e) {
-      LOG.error("Unable to add new node to Node DB.");
+      LOG.error("Unable to add new node {} to Node DB.",
+          datanodeDetails.getUuidString());
     }
   }
 }
