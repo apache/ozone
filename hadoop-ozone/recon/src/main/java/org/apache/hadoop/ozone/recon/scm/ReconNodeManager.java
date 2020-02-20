@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_NODE_DB;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
