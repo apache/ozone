@@ -159,8 +159,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
           omResponse, exception));
     }
 
-    omClientResponse.setFlushFuture(omDoubleBufferHelper.add(
-        omClientResponse, trxnLogIndex));
+    addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+        omDoubleBufferHelper);
     return omClientResponse;
   }
 }

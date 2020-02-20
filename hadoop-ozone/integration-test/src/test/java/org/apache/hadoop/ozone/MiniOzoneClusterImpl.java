@@ -297,7 +297,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       reconServer.stop();
       reconServer.join();
       reconServer = new ReconServer();
-      reconServer.run(new String[]{});
+      reconServer.execute(new String[]{});
     } catch (Exception e) {
       LOG.info("Exception while restarting Recon", e);
     }
@@ -504,7 +504,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         om.start();
 
         configureRecon();
-        ConfigurationProvider.setConfiguration(conf);
         reconServer = new ReconServer();
 
         hddsDatanodes = createHddsDatanodes(scm);
@@ -516,7 +515,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
-        reconServer.run(new String[] {});
+        reconServer.execute(new String[] {});
         return cluster;
       } catch (Exception ex) {
         stopOM(om);
@@ -750,6 +749,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     private void configureRecon() throws IOException {
+      ConfigurationProvider.resetConfiguration();
+
       TemporaryFolder tempFolder = new TemporaryFolder();
       tempFolder.create();
       File tempNewFolder = tempFolder.newFolder();
@@ -764,6 +765,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
 
       conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
+
+      ConfigurationProvider.setConfiguration(conf);
     }
   }
 }

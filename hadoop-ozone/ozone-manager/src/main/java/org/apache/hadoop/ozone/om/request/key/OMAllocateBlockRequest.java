@@ -249,6 +249,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
             "Exception:{}", volumeName, bucketName, openKeyName, exception);
       }
+    } finally {
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
     }
 
     if (result != Result.REPLAY) {
@@ -256,8 +259,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           exception, getOmRequest().getUserInfo()));
     }
 
-    omClientResponse.setFlushFuture(omDoubleBufferHelper.add(omClientResponse,
-        trxnLogIndex));
+
 
     return omClientResponse;
   }

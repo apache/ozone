@@ -50,6 +50,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.REPLAY;
+
 /**
  * OMClientRequest provides methods which every write OM request should
  * implement.
@@ -218,6 +220,26 @@ public abstract class OMClientRequest implements RequestAuditor {
     return omResponse.build();
   }
 
+  /**
+   * Add the client response to double buffer and set the flush future.
+   * For responses which has status set to REPLAY it is a no-op.
+   * @param trxIndex
+   * @param omClientResponse
+   * @param omDoubleBufferHelper
+   */
+  protected void addResponseToDoubleBuffer(long trxIndex,
+      OMClientResponse omClientResponse,
+      OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+    if (omClientResponse != null) {
+      // For replay transaction we do not need to add to double buffer, as
+      // for these transactions there is nothing needs to be done for
+      // addDBToBatch.
+      if (omClientResponse.getOMResponse().getStatus() != REPLAY) {
+        omClientResponse.setFlushFuture(
+            omDoubleBufferHelper.add(omClientResponse, trxIndex));
+      }
+    }
+  }
 
   private String exceptionErrorMessage(IOException ex) {
     if (ex instanceof OMException) {
@@ -279,7 +301,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       @Nonnull OMResponse.Builder omResponse) {
 
     omResponse.setSuccess(false);
-    omResponse.setStatus(OzoneManagerProtocolProtos.Status.REPLAY);
+    omResponse.setStatus(REPLAY);
     return omResponse.build();
   }
 }

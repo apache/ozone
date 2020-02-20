@@ -128,11 +128,8 @@ public abstract class OMVolumeAclRequest extends OMClientRequest {
         omClientResponse = onFailure(omResponse, ex);
       }
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse,
-                trxnLogIndex));
-      }
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
       if (lockAcquired) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
       }

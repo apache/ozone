@@ -147,11 +147,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeSetQuotaResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquireVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
       }

@@ -192,10 +192,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       omClientResponse = new OMBucketSetPropertyResponse(
           createErrorOMResponse(omResponse, exception), omBucketInfo);
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper.add(
-            omClientResponse, transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
