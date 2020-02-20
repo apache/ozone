@@ -292,7 +292,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
     try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
+      OzoneBucket bucket = getBucket(ofsPath, recursive);
       OzoneOutputStream ozoneOutputStream = bucket.createFile(
           key, 0, replicationType, replicationFactor, overWrite, recursive);
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());

@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.io.IOException;
 
 /**
  * Testing basic functions of utility class OFSPath.
@@ -103,11 +106,17 @@ public class TestOFSPath {
 
   @Test
   public void testParsingMount() {
+    String username = "";
+    try {
+      username = UserGroupInformation.getCurrentUser().getUserName();
+    } catch (IOException ex) {
+      Assert.fail("Unable to get current user name.");
+    }
     // Mount only
     OFSPath ofsPath = new OFSPath("/tmp/");
-    // TODO: Subject to change in HDDS-2929.
-    Assert.assertEquals("tempVolume", ofsPath.getVolumeName());
-    Assert.assertEquals("tempBucket", ofsPath.getBucketName());
+    Assert.assertEquals(
+        OFSPath.OFS_MOUNT_TMP_VOLUMENAME, ofsPath.getVolumeName());
+    Assert.assertEquals(username, ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());
     Assert.assertEquals("", ofsPath.getKeyName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());
@@ -115,9 +124,9 @@ public class TestOFSPath {
 
     // Mount with key
     ofsPath = new OFSPath("/tmp/key1");
-    // TODO: Subject to change in HDDS-2929.
-    Assert.assertEquals("tempVolume", ofsPath.getVolumeName());
-    Assert.assertEquals("tempBucket", ofsPath.getBucketName());
+    Assert.assertEquals(
+        OFSPath.OFS_MOUNT_TMP_VOLUMENAME, ofsPath.getVolumeName());
+    Assert.assertEquals(username, ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());
     Assert.assertEquals("key1", ofsPath.getKeyName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());

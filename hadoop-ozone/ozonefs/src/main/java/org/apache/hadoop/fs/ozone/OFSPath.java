@@ -17,13 +17,15 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.ParseException;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
-
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.io.IOException;
 import java.util.StringTokenizer;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -44,7 +46,7 @@ class OFSPath {
    * /vol1/buc2/dir3/key4  vol1           buc2           (empty)      dir3/key4
    * /vol1/buc2            vol1           buc2           (empty)      (empty)
    * /vol1                 vol1           (empty)        (empty)      (empty)
-   * /tmp/dir3/key4        tempVolume     tempBucket     tmp          dir3/key4
+   * /tmp/dir3/key4        tmp            <username>     tmp          dir3/key4
    *
    * Note the leading '/' doesn't matter.
    */
@@ -52,7 +54,11 @@ class OFSPath {
   private String bucketName = "";
   private String mountName = "";
   private String keyName = "";
-  private static final String OFS_MOUNT_NAME_TMP = "tmp";
+  @VisibleForTesting
+  static final String OFS_MOUNT_NAME_TMP = "tmp";
+  // Hard-code the volume name to tmp for the first implementation
+  @VisibleForTesting
+  static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
 
   OFSPath(Path path) {
     String pathStr = path.toUri().getPath();
@@ -83,10 +89,9 @@ class OFSPath {
       // TODO: Compare a keyword list instead for future expansion.
       if (firstToken.equals(OFS_MOUNT_NAME_TMP)) {
         mountName = firstToken;
-        // TODO: Retrieve volume and bucket of the mount from user protobuf.
-        //  Leave them hard-coded just for now. Will be addressed in HDDS-2929
-        volumeName = "tempVolume";
-        bucketName = "tempBucket";
+        // Future: retrieve volume and bucket from UserVolumeInfo
+        volumeName = OFS_MOUNT_TMP_VOLUMENAME;
+        bucketName = getTempMountBucketName();
       } else if (numToken >= 2) {
         // Regular volume and bucket path
         volumeName = firstToken;
@@ -173,5 +178,13 @@ class OFSPath {
    */
   public boolean isVolume() {
     return this.getBucketName().isEmpty() && !this.getVolumeName().isEmpty();
+  }
+
+  private static String getTempMountBucketName() {
+    try {
+      return UserGroupInformation.getCurrentUser().getUserName();
+    } catch (IOException ex) {
+      return "undefined";  // TODO: Better idea?
+    }
   }
 }
