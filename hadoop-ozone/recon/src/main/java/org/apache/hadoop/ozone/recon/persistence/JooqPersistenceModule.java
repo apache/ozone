@@ -63,6 +63,7 @@ public class JooqPersistenceModule extends AbstractModule {
 
     bindInterceptor(annotatedWith(Transactional.class), any(), interceptor);
     bindInterceptor(any(), annotatedWith(Transactional.class), interceptor);
+    System.setProperty("org.jooq.no-logo", "true");
   }
 
   @Provides
