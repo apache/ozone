@@ -17,11 +17,8 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Assert;
 import org.junit.Test;
-
-import java.io.IOException;
 
 /**
  * Testing basic functions of utility class OFSPath.
