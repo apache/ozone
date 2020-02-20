@@ -167,7 +167,7 @@ public class Test2WayCommitInRatis {
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       // shutdown the ratis follower
-      if (ContainerTestHelper.isRatisFollower(dn, pipeline )) {
+      if (ContainerTestHelper.isRatisFollower(dn, pipeline)) {
         cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
         break;
       }
