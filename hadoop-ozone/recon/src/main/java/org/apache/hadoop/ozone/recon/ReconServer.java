@@ -90,6 +90,7 @@ public class ReconServer extends GenericCli {
 
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
+      return null;
     }
     // Start all services
     start();
