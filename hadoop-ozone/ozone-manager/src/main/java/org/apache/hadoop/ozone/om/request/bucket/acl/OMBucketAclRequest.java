@@ -132,11 +132,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = onFailure(omResponse, ex);
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (lockAcquired) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
             bucket);

@@ -233,10 +233,8 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
       omClientResponse = new S3BucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(omDoubleBufferHelper.add(
-            omClientResponse, trxnLogIndex));
-      }
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
       if (acquiredS3Lock) {
         omMetadataManager.getLock().releaseWriteLock(
             S3_BUCKET_LOCK, s3BucketName);

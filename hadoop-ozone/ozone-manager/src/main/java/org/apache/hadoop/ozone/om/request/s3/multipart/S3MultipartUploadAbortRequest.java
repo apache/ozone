@@ -170,11 +170,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           new S3MultipartUploadAbortResponse(createErrorOMResponse(
               omResponse, exception), multipartKey, multipartKeyInfo);
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse,
-                trxnLogIndex));
-      }
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
