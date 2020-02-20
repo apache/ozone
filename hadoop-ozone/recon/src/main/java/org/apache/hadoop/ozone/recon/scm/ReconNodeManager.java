@@ -24,10 +24,12 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_NODE_DB;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -90,7 +92,8 @@ public class ReconNodeManager extends SCMNodeManager {
    * @param datanodeDetails Datanode details.
    */
   public void addNodeToDB(DatanodeDetails datanodeDetails) throws IOException {
-    byte[] nodeIdBytes = datanodeDetails.getUuidString().getBytes();
+    byte[] nodeIdBytes =
+        StringUtils.string2Bytes(datanodeDetails.getUuidString());
     byte[] nodeDetailsBytes =
         datanodeDetails.getProtoBufMessage().toByteArray();
     nodeStore.put(nodeIdBytes, nodeDetailsBytes);
