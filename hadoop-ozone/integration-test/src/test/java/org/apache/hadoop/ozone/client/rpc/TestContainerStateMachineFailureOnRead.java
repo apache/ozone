@@ -33,8 +33,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -47,6 +49,9 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -79,14 +84,28 @@ public class TestContainerStateMachineFailureOnRead {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1200, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_KEY,
+    conf.setTimeDuration(
+        DatanodeRatisServerConfig.RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
         1000, TimeUnit.SECONDS);
     conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 10);
-    conf.setTimeDuration(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT,
-        5, TimeUnit.SECONDS);
     conf.setTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_SERVER_REQUEST_TIMEOUT_DURATION_KEY,
-        5, TimeUnit.SECONDS);
+        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+            DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
+        3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+            DatanodeRatisServerConfig.
+                RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
+        3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+        RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+            "rpc.request.timeout",
+        3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+        RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+            "watch.request.timeout",
+        3, TimeUnit.SECONDS);
+
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -100,6 +119,7 @@ public class TestContainerStateMachineFailureOnRead {
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
+    Logger.getLogger(GrpcLogAppender.class).setLevel(Level.WARN);
   }
 
   @After
@@ -133,23 +153,24 @@ public class TestContainerStateMachineFailureOnRead {
     cluster.shutdownHddsDatanode(dnToStop.get().getDatanodeDetails());
 
     OmKeyLocationInfo omKeyLocationInfo;
-    try (OzoneOutputStream key = objectStore.getVolume(volumeName)
+    OzoneOutputStream key = objectStore.getVolume(volumeName)
         .getBucket(bucketName)
         .createKey("ratis", 1024, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>())) {
-      // First write and flush creates a container in the datanode
-      key.write("ratis".getBytes());
-      key.flush();
+            ReplicationFactor.THREE, new HashMap<>());
+    // First write and flush creates a container in the datanode
+    key.write("ratis".getBytes());
+    key.flush();
+    
+    //get the name of a valid container
+    KeyOutputStream groupOutputStream =
+        (KeyOutputStream) key.getOutputStream();
 
-      //get the name of a valid container
-      KeyOutputStream groupOutputStream =
-          (KeyOutputStream) key.getOutputStream();
-
-      List<OmKeyLocationInfo> locationInfoList =
-          groupOutputStream.getLocationInfoList();
-      Assert.assertEquals(1, locationInfoList.size());
-      omKeyLocationInfo = locationInfoList.get(0);
-    }
+    List<OmKeyLocationInfo> locationInfoList =
+        groupOutputStream.getLocationInfoList();
+    Assert.assertEquals(1, locationInfoList.size());
+    omKeyLocationInfo = locationInfoList.get(0);
+    key.close();
+    groupOutputStream.close();
 
     // delete the container dir from leader
     FileUtil.fullyDelete(new File(
@@ -157,7 +178,6 @@ public class TestContainerStateMachineFailureOnRead {
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
             .getContainerPath()));
-
     // Start the stopped datanode
     // Do not wait on restart since on stop will take long time due to
     // stale interval timeout for the test
