@@ -179,7 +179,7 @@ public class TestHddsVolumeChecker {
         return Optional.of(
             Futures.immediateFuture(target.check(context)));
       } catch (Exception e) {
-        LOG.info("check routine threw exception " + e);
+        LOG.info("check routine threw exception {}", e);
         return Optional.of(Futures.immediateFailedFuture(e));
       }
     }

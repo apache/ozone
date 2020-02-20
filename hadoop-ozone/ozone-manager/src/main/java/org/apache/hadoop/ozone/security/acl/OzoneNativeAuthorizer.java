@@ -16,8 +16,8 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
@@ -100,7 +100,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
       LOG.trace("Checking access for volume: {}", objInfo);
       return volumeManager.checkAccess(objInfo, context);
     case BUCKET:
-      LOG.trace("Checking access for bucket:" + objInfo);
+      LOG.trace("Checking access for bucket: {}", objInfo);
       // Skip bucket access check for CREATE acl since
       // bucket will not exist at the time of creation
       boolean bucketAccess = isACLTypeCreate
@@ -118,7 +118,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
           && bucketManager.checkAccess(objInfo, parentContext)
           && volumeManager.checkAccess(objInfo, parentContext));
     case PREFIX:
-      LOG.trace("Checking access for Prefix:" + objInfo);
+      LOG.trace("Checking access for Prefix: {}", objInfo);
       // Skip prefix access check for CREATE acl since
       // prefix will not exist at the time of creation
       boolean prefixAccess = isACLTypeCreate

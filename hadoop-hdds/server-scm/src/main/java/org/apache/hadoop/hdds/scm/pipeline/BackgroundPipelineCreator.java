@@ -110,6 +110,13 @@ class BackgroundPipelineCreator {
         // Skip this iteration for creating pipeline
         continue;
       }
+
+      try {
+        pipelineManager.scrubPipeline(type, factor);
+      } catch (IOException e) {
+        LOG.error("Error while scrubbing pipelines {}", e);
+      }
+
       while (true) {
         try {
           if (scheduler.isClosed()) {

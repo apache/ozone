@@ -32,17 +32,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -141,7 +139,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       uri = new URIBuilder().setScheme(OZONE_URI_SCHEME)
           .setHost(authority)
           .build();
-      LOG.trace("Ozone URI for ozfs initialization is " + uri);
+      LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
       //isolated is the default for ozonefs-lib-legacy which includes the
       // /ozonefs.txt, otherwise the default is false. It could be overridden.
@@ -166,7 +164,6 @@ public class BasicOzoneFileSystem extends FileSystem {
       }
       this.workingDir = new Path(OZONE_USER_DIR, this.userName)
           .makeQualified(this.uri, this.workingDir);
-
     } catch (URISyntaxException ue) {
       final String msg = "Invalid Ozone endpoint " + name;
       LOG.error(msg, ue);
@@ -420,7 +417,7 @@ public class BasicOzoneFileSystem extends FileSystem {
         LOG.trace("Skipping deleting root directory");
         return true;
       } else {
-        LOG.trace("deleting key:" + key);
+        LOG.trace("deleting key:{}", key);
         boolean succeed = adapter.deleteObject(key);
         // if recursive delete is requested ignore the return value of
         // deleteObject and issue deletes for other keys.
@@ -646,17 +643,6 @@ public class BasicOzoneFileSystem extends FileSystem {
     return fileStatus;
   }
 
-  @Override
-  public BlockLocation[] getFileBlockLocations(FileStatus fileStatus,
-                                               long start, long len)
-      throws IOException {
-    if (fileStatus instanceof LocatedFileStatus) {
-      return ((LocatedFileStatus) fileStatus).getBlockLocations();
-    } else {
-      return super.getFileBlockLocations(fileStatus, start, len);
-    }
-  }
-
   /**
    * Turn a path (relative or otherwise) into an Ozone key.
    *
@@ -798,7 +784,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       //NOOP: If not symlink symlink remains null.
     }
 
-    FileStatus fileStatus =  new FileStatus(
+    return new FileStatus(
         fileStatusAdapter.getLength(),
         fileStatusAdapter.isDir(),
         fileStatusAdapter.getBlockReplication(),
@@ -812,11 +798,5 @@ public class BasicOzoneFileSystem extends FileSystem {
         fileStatusAdapter.getPath()
     );
 
-    BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
-    if (blockLocations == null || blockLocations.length == 0) {
-      return fileStatus;
-    }
-    return new LocatedFileStatus(fileStatus, blockLocations);
   }
-
 }

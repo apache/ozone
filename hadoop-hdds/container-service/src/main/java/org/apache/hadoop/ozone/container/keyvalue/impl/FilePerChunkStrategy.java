@@ -124,7 +124,7 @@ public class FilePerChunkStrategy implements ChunkManager {
           // the checksum needs to be verified for the actual chunk file and
           // the data to be written here which should be efficient and
           // it matches we can safely return without rewriting.
-          LOG.warn("ChunkFile already exists" + chunkFile + ".Deleting it.");
+          LOG.warn("ChunkFile already exists {}. Deleting it.", chunkFile);
           FileUtil.fullyDelete(chunkFile);
         }
         if (tmpChunkFile.exists()) {
@@ -133,8 +133,8 @@ public class FilePerChunkStrategy implements ChunkManager {
           // behind garbage.
           // TODO: once the checksum support for data chunks gets plugged in,
           // instead of rewriting the chunk here, let's compare the checkSums
-          LOG.warn(
-              "tmpChunkFile already exists" + tmpChunkFile + "Overwriting it.");
+          LOG.warn("tmpChunkFile already exists {}. Overwriting it.",
+                  tmpChunkFile);
         }
         // Initially writes to temporary chunk file.
         ChunkUtils.writeData(tmpChunkFile, data, offset, len, volumeIOStats,
@@ -151,7 +151,7 @@ public class FilePerChunkStrategy implements ChunkManager {
           // reapplied. This can happen when a node restarts.
           // TODO: verify the checkSums for the existing chunkFile and the
           // chunkInfo to be committed here
-          LOG.warn("ChunkFile already exists" + chunkFile);
+          LOG.warn("ChunkFile already exists {}", chunkFile);
           return;
         }
         // While committing a chunk , just rename the tmp chunk file which has
@@ -267,7 +267,7 @@ public class FilePerChunkStrategy implements ChunkManager {
       FileUtil.fullyDelete(chunkFile);
     } else {
       LOG.error("Not Supported Operation. Trying to delete a " +
-          "chunk that is in shared file. chunk info : " + info.toString());
+          "chunk that is in shared file. chunk info : {}", info.toString());
       throw new StorageContainerException("Not Supported Operation. " +
           "Trying to delete a chunk that is in shared file. chunk info : "
           + info.toString(), UNSUPPORTED_REQUEST);
