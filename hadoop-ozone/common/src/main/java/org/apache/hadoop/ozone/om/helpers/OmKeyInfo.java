@@ -480,14 +480,6 @@ public final class OmKeyInfo extends WithObjectID {
    * Return a new copy of the object.
    */
   public OmKeyInfo copyObject() {
-    return copyObject(true);
-  }
-
-  /**
-   * Return a copy of the OMKeyInfo without setting the objectID and updateID.
-   * This is used during key renames.
-   */
-  public OmKeyInfo copyObject(boolean copyObjectID) {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -497,11 +489,9 @@ public final class OmKeyInfo extends WithObjectID {
         .setDataSize(dataSize)
         .setReplicationType(type)
         .setReplicationFactor(factor)
-        .setFileEncryptionInfo(encInfo);
+        .setFileEncryptionInfo(encInfo)
+        .setObjectID(objectID).setUpdateID(updateID);
 
-    if (copyObjectID) {
-      builder.setObjectID(objectID).setUpdateID(updateID);
-    }
 
     keyLocationVersions.forEach(keyLocationVersion -> {
       List<OmKeyLocationInfo> keyLocationInfos = new ArrayList<>();

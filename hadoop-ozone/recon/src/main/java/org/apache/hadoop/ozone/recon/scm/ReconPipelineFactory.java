@@ -48,8 +48,8 @@ public class ReconPipelineFactory extends PipelineFactory {
 
     @Override
     public Pipeline create(HddsProtos.ReplicationFactor factor){
-      LOG.warn("Trying to create pipeline in Recon, which is prohibited!");
-      return null;
+      throw new RuntimeException(
+          "Trying to create pipeline in Recon, which is prohibited!");
     }
 
     @Override

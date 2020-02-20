@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
 
 import java.util.Map;

@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 /**
  * Interface used to denote a Recon task that needs to act on OM DB events.
  */
-public interface ReconDBUpdateTask {
+public interface ReconOmTask {
 
   /**
    * Return task name.

@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 /**
  * This class contains constants for configuration keys used in S3G.

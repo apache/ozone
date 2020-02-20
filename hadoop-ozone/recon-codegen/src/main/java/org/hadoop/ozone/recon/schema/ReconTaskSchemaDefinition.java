@@ -29,17 +29,17 @@ import org.jooq.impl.SQLDataType;
 import com.google.inject.Inject;
 
 /**
- * Class used to create tables that are required for Recon's internal
+ * Class used to create tables that are required for Recon's task
  * management.
  */
-public class ReconInternalSchemaDefinition implements ReconSchemaDefinition {
+public class ReconTaskSchemaDefinition implements ReconSchemaDefinition {
 
   public static final String RECON_TASK_STATUS_TABLE_NAME =
       "recon_task_status";
   private final DataSource dataSource;
 
   @Inject
-  ReconInternalSchemaDefinition(DataSource dataSource) {
+  ReconTaskSchemaDefinition(DataSource dataSource) {
     this.dataSource = dataSource;
   }
 
