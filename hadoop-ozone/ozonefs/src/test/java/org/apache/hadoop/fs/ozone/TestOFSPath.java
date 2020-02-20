@@ -106,17 +106,12 @@ public class TestOFSPath {
 
   @Test
   public void testParsingMount() {
-    String username = "";
-    try {
-      username = UserGroupInformation.getCurrentUser().getUserName();
-    } catch (IOException ex) {
-      Assert.fail("Unable to get current user name.");
-    }
+    String bucketName = OFSPath.getTempMountBucketName(null);
     // Mount only
     OFSPath ofsPath = new OFSPath("/tmp/");
     Assert.assertEquals(
         OFSPath.OFS_MOUNT_TMP_VOLUMENAME, ofsPath.getVolumeName());
-    Assert.assertEquals(username, ofsPath.getBucketName());
+    Assert.assertEquals(bucketName, ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());
     Assert.assertEquals("", ofsPath.getKeyName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());
@@ -126,7 +121,7 @@ public class TestOFSPath {
     ofsPath = new OFSPath("/tmp/key1");
     Assert.assertEquals(
         OFSPath.OFS_MOUNT_TMP_VOLUMENAME, ofsPath.getVolumeName());
-    Assert.assertEquals(username, ofsPath.getBucketName());
+    Assert.assertEquals(bucketName, ofsPath.getBucketName());
     Assert.assertEquals("tmp", ofsPath.getMountName());
     Assert.assertEquals("key1", ofsPath.getKeyName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());

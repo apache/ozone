@@ -18,6 +18,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.ParseException;
@@ -90,7 +91,7 @@ class OFSPath {
         mountName = firstToken;
         // Future: retrieve volume and bucket from UserVolumeInfo
         volumeName = OFS_MOUNT_TMP_VOLUMENAME;
-        bucketName = getTempMountBucketName();
+        bucketName = getTempMountBucketName(null);
       } else if (numToken >= 2) {
         // Regular volume and bucket path
         volumeName = firstToken;
@@ -179,9 +180,20 @@ class OFSPath {
     return this.getBucketName().isEmpty() && !this.getVolumeName().isEmpty();
   }
 
-  private static String getTempMountBucketName() {
+  /**
+   * Get the bucket name of temp for given username.
+   * If input username String is null, will attempt to get user name from UGI.
+   * @param username Input user name String
+   * @return MD5 hash of username
+   */
+  @VisibleForTesting
+  static String getTempMountBucketName(String username) {
     try {
-      return UserGroupInformation.getCurrentUser().getUserName();
+      if (username == null) {
+        username = UserGroupInformation.getCurrentUser().getUserName();
+      }
+      // Hash the username to avoid invalid characters e.g. om/om@EXAMPLE.COM
+      return DigestUtils.md5Hex(username);
     } catch (IOException ex) {
       return "undefined";  // TODO: Better idea?
     }

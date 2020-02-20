@@ -731,16 +731,11 @@ public class TestRootedOzoneFileSystem {
     Assert.assertNotNull(vol);
 
     // Begin test
-    String username = "";
-    try {
-      username = UserGroupInformation.getCurrentUser().getUserName();
-    } catch (IOException ex) {
-      Assert.fail("Unable to get current user name.");
-    }
+    String hashedUsername = OFSPath.getTempMountBucketName(null);
 
     // Expect failure since temp bucket for current user is not created yet
     try {
-      vol.getBucket(username);
+      vol.getBucket(hashedUsername);
     } catch (OMException ex) {
       // Expect BUCKET_NOT_FOUND
       if (!ex.getResult().equals(BUCKET_NOT_FOUND)) {
@@ -759,7 +754,7 @@ public class TestRootedOzoneFileSystem {
 //    }
 
     // Verify temp bucket creation
-    OzoneBucket bucket = vol.getBucket(username);
+    OzoneBucket bucket = vol.getBucket(hashedUsername);
     Assert.assertNotNull(bucket);
     // Verify dir1 creation
     FileStatus[] fileStatuses = fs.listStatus(new Path("/tmp/"));
