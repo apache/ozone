@@ -215,11 +215,12 @@ public class TestOzoneClientRetriesOnException {
     Assert.assertTrue(containerList.size() >= 3);
     try {
       key.write(data1);
+      // ensure that write is flushed to dn
+      key.flush();
       Assert.fail("Expected exception not thrown");
     } catch (IOException ioe) {
       Assert.assertTrue(HddsClientUtils.checkForException(blockOutputStream
               .getIoException()) instanceof ContainerNotOpenException);
-      IOException e =  (IOException)HddsClientUtils.checkForException(ioe);
       Assert.assertTrue(ioe.
               getMessage().contains(
               "Retry request failed. " +
