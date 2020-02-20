@@ -26,17 +26,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Class to stub out SCM's pipeline providers. This makes sure Recon can
  * never be on the pipeline CREATE or CLOSE path.
  */
 public class ReconPipelineFactory extends PipelineFactory {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ReconPipelineFactory.class);
 
   ReconPipelineFactory() {
     ReconPipelineProvider reconMockPipelineProvider =
@@ -48,20 +43,22 @@ public class ReconPipelineFactory extends PipelineFactory {
 
     @Override
     public Pipeline create(HddsProtos.ReplicationFactor factor){
-      throw new RuntimeException(
+      // We don't expect this to be called at all. But adding this as a red
+      // flag for troubleshooting.
+      throw new UnsupportedOperationException(
           "Trying to create pipeline in Recon, which is prohibited!");
     }
 
     @Override
     public Pipeline create(HddsProtos.ReplicationFactor factor,
                            List<DatanodeDetails> nodes) {
-      LOG.warn("Trying to create pipeline in Recon, which is prohibited!");
-      return null;
+      throw new UnsupportedOperationException(
+          "Trying to create pipeline in Recon, which is prohibited!");
     }
 
     @Override
     public void close(Pipeline pipeline) {
-
+      // Do nothing in Recon.
     }
 
     @Override
