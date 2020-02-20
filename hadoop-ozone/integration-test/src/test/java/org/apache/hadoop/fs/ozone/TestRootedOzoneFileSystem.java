@@ -214,7 +214,7 @@ public class TestRootedOzoneFileSystem {
   /**
    * OFS: Helper function for tests. Return a volume name that doesn't exist.
    */
-  private String getRandomNonExistVolumeName() throws Exception {
+  private String getRandomNonExistVolumeName() throws IOException {
     final int numDigit = 5;
     long retriesLeft = Math.round(Math.pow(10, 5));
     String name = null;
@@ -231,7 +231,7 @@ public class TestRootedOzoneFileSystem {
       }
     }
     if (retriesLeft <= 0) {
-      throw new Exception(
+      Assert.fail(
           "Failed to generate random volume name that doesn't exist already.");
     }
     return name;
@@ -494,41 +494,43 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * OFS: Test recursive listStatus on root.
+   * Helper function for testListStatusRootAndVolume*.
    */
-  @Test
-  public void testListStatusRootAndVolumeNonRecursive() throws Exception {
+  private Path createRandomVolumeBucketWithDirs() throws IOException {
     String volume1 = getRandomNonExistVolumeName();
     String bucket1 = "bucket-" + RandomStringUtils.randomNumeric(5);
     Path bucketPath1 = new Path("/" + volume1 + "/" + bucket1);
+
     Path dir1 = new Path(bucketPath1, "dir1");
     Path subdir1 = new Path(dir1, "subdir1");
     fs.mkdirs(subdir1);
     Path dir2 = new Path(bucketPath1, "dir2");
     fs.mkdirs(dir2);
 
-    String volume2 = getRandomNonExistVolumeName();
-    String bucket2 = "bucket-" + RandomStringUtils.randomNumeric(5);
-    Path bucketPath2 = new Path("/" + volume2 + "/" + bucket2);
-    Path dir3 = new Path(bucketPath2, "dir3");
-    Path subdir2 = new Path(dir3, "subdir2");
-    fs.mkdirs(subdir2);
-    Path dir4 = new Path(bucketPath2, "dir4");
-    fs.mkdirs(dir4);
+    return bucketPath1;
+  }
 
-    // bucket
-    FileStatus[] fileStatuses = ofs.listStatus(bucketPath1);
-    Assert.assertEquals(2, fileStatuses.length);
+  /**
+   * OFS: Test non-recursive listStatus on root and volume.
+   */
+  @Test
+  public void testListStatusRootAndVolumeNonRecursive() throws Exception {
+    Path bucketPath1 = createRandomVolumeBucketWithDirs();
+    createRandomVolumeBucketWithDirs();
 
-    // volume
-    Path volume = new Path("/" + volume1);
-    FileStatus[] fileStatusesVolume = ofs.listStatus(volume);
-    Assert.assertEquals(1, fileStatusesVolume.length);
+    // listStatus(/volume/bucket)
+    FileStatus[] fileStatusBucket = ofs.listStatus(bucketPath1);
+    Assert.assertEquals(2, fileStatusBucket.length);
 
-    // root
+    // listStatus(volume)
+    Path volume = new Path("/" + new OFSPath(bucketPath1).getVolumeName());
+    FileStatus[] fileStatusVolume = ofs.listStatus(volume);
+    Assert.assertEquals(1, fileStatusVolume.length);
+
+    // listStatus(/)
     Path root = new Path("/");
-    FileStatus[] fileStatusesRoot = ofs.listStatus(root);
-    Assert.assertEquals(2, fileStatusesRoot.length);
+    FileStatus[] fileStatusRoot = ofs.listStatus(root);
+    Assert.assertEquals(2, fileStatusRoot.length);
   }
 
 }
