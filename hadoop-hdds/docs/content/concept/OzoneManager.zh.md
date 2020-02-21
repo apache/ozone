@@ -2,7 +2,7 @@
 title: "Ozone Manager"
 date: "2017-09-14"
 weight: 2
-summary: Ozone Manager is the principal name space service of Ozone. OM manages the life cycle of volumes, buckets and Keys.
+summary: Ozone Manager 是 Ozone 主要的命名空间服务，它管理了卷、桶和键的生命周期。
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -21,67 +21,44 @@ summary: Ozone Manager is the principal name space service of Ozone. OM manages 
   limitations under the License.
 -->
 
-Ozone Manager (OM) is the namespace manager for Ozone.
+Ozone Manager（OM）管理 Ozone 的命名空间。
 
-This means that when you want to write some data, you ask Ozone
-Manager for a block and Ozone Manager gives you a block and remembers that
-information. When you want to read that file back, you need to find the
-address of the block and Ozone Manager returns it you.
+当向 Ozone 写入数据时，你需要向 OM 请求一个块，OM 会返回一个块并记录下相关信息。当你想要读取那个文件时，你也需要先通过 OM 获取那个块的地址。
 
-Ozone Manager also allows users to organize keys under a volume and bucket.
-Volumes and buckets are part of the namespace and managed by Ozone Manager.
+OM 允许用户在卷和桶下管理键，卷和桶都是命名空间的一部分，也由 OM 管理。
 
-Each ozone volume is the root of an independent namespace under OM.
-This is very different from HDFS which provides a single rooted file system.
+每个卷都是 OM 下的一个独立命名空间的根，这一点和 HDFS 不同，HDFS 提供的是单个根目录的文件系统。
 
-Ozone's namespace is a collection of volumes or is a forest instead of a
-single rooted tree as in HDFS. This property makes it easy to deploy multiple
-OMs for scaling.
+与 HDFS 中单根的树状结构相比，Ozone 的命名空间是卷的集合，或者可以看作是个森林，因此可以非常容易地部署多个 OM 来进行扩展。
 
-## Ozone Manager Metadata
+## Ozone Manager 元数据
 
-OM maintains a list of volumes, buckets, and keys.
-For each user, it maintains a list of volumes.
-For each volume, the list of buckets and for each bucket the list of keys.
+OM 维护了卷、桶和键的列表。它为每个用户维护卷的列表，为每个卷维护桶的列表，为每个桶维护键的列表。
 
-Ozone Manager will use Apache Ratis(A Raft protocol implementation) to
-replicate Ozone Manager state. This will ensure High Availability for Ozone.
+OM 使用 Apache Ratis（Raft 协议的一种实现）来复制 OM 的状态，这为 Ozone 提供了高可用性保证。
 
 
-## Ozone Manager and Storage Container Manager
+## Ozone Manager 和 Storage Container Manager
 
-The relationship between Ozone Manager and Storage Container Manager is best
-understood if we trace what happens during a key write and key read.
+为了方便理解 OM 和 SCM 之间的关系，我们来看看写入键和读取键的过程。
 
-### Key Write
+### 写入键
 
-* To write a key to Ozone, a client tells Ozone manager that it would like to
-write a key into a bucket that lives inside a specific volume. Once Ozone
-Manager determines that you are allowed to write a key to the specified bucket,
-OM needs to allocate a block for the client to write data.
+* 为了向 Ozone 中的某个卷下的某个桶的某个键写入数据，用户需要先向 OM 发起写请求，OM 会判断该用户是否有权限写入该键，如果权限许可，OM 分配一个块用于 Ozone 客户端数据写入。
 
-* To allocate a block, Ozone Manager sends a request to Storage Container
-Manager (SCM); SCM is the manager of data nodes. SCM picks three data nodes
-into which client can write data. SCM allocates the block and returns the
-block ID to Ozone Manager.
+* OM 通过 SCM 请求分配一个块（SCM 是数据节点的管理者），SCM 选择三个数据节点，分配新块并向 OM 返回块标识。
 
-* Ozone manager records this block information in its metadata and returns the
-block and a block token (a security permission to write data to the block)
-to the client.
+* OM 在自己的元数据中记录下块的信息，然后将块和块 token（带有向该块写数据的授权）返回给用户。
 
-* The client uses the block token to prove that it is allowed to write data to
-the block and writes data to the data node.
+* 用户使用块 token 证明自己有权限向该块写入数据，并向对应的数据节点写入数据。
 
-* Once the write is complete on the data node, the client will update the block
-information on
-Ozone manager.
+* 数据写入完成后，用户会更新该块在 OM 中的信息。
 
 
-### Key Reads
+### 读取键
 
-* Key reads are simpler, the client requests the block list from the Ozone
-Manager
-* Ozone manager will return the block list and block tokens which
-allows the client to read the data from data nodes.
-* Client connects to the data  node and presents the block token and reads
-the data from the data node.
+* 键读取相对比较简单，用户首先向 OM 请求该键的块列表。
+
+* OM 返回块列表以及对应的块 token。
+
+* 用户连接数据节点，出示块 token，然后读取键数据。
