@@ -496,16 +496,16 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsStartPath = new OFSPath(startPath);
     // list volumes
     Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
-        username, null, ofsStartPath.getVolumeName());
+        username, ofsStartPath.getVolumeName(), null);
     List<FileStatusAdapter> res = new ArrayList<>();
     // TODO: Test continuation
     while (iter.hasNext() && res.size() <= numEntries) {
       OzoneVolume volume = iter.next();
       res.add(getFileStatusAdapterForVolume(volume, uri));
       if (recursive) {
-        String next = volume.getName();
+        String pathStrNextVolume = volume.getName();
         // TODO: Check startPath
-        res.addAll(listStatus(next, recursive, startPath,
+        res.addAll(listStatus(pathStrNextVolume, recursive, startPath,
             numEntries - res.size(), uri, workingDir, username));
       }
     }
@@ -516,22 +516,23 @@ public class BasicRootedOzoneClientAdapterImpl
    * Helper for OFS listStatus on a volume.
    */
   private List<FileStatusAdapter> listStatusVolume(String volumeStr,
-      boolean recursive, String startBucket, long numEntries,
+      boolean recursive, String startPath, long numEntries,
       URI uri, Path workingDir, String username) throws IOException {
 
+    OFSPath ofsStartPath = new OFSPath(startPath);
     // list buckets in the volume
     OzoneVolume volume = objectStore.getVolume(volumeStr);
     Iterator<? extends OzoneBucket> iter =
-        volume.listBuckets(null, startBucket);
+        volume.listBuckets(null, ofsStartPath.getBucketName());
     List<FileStatusAdapter> res = new ArrayList<>();
     // TODO: Test continuation
     while (iter.hasNext() && res.size() <= numEntries) {
       OzoneBucket bucket = iter.next();
       res.add(getFileStatusAdapterForBucket(bucket, uri, username));
       if (recursive) {
-        String next = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
+        String pathStrNext = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
         // TODO: Check startPath
-        res.addAll(listStatus(next, recursive, startBucket,
+        res.addAll(listStatus(pathStrNext, recursive, startPath,
             numEntries - res.size(), uri, workingDir, username));
       }
     }
