@@ -197,10 +197,10 @@
   </property>
   <property>
     <name>dfs.container.ratis.num.write.chunk.threads</name>
-    <value>60</value>
+    <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Maximum number of threads in the thread pool that Ratis
-      will use for writing chunks (60 by default).
+      will use for writing chunks (10 by default).
     </description>
   </property>
   <property>
