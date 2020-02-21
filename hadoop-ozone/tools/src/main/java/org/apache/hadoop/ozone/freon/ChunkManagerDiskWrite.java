@@ -84,12 +84,14 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       VolumeSet volumeSet =
           new VolumeSet("dnid", "clusterid", ozoneConfiguration);
 
+      Random random = new Random();
+
 
       //create a dedicated (NEW) container for each thread
       for (int i = 1; i <= getThreadNo(); i++) {
-        Random random = new Random();
 
-        long containerId = random.nextLong();
+        //use a non-negative container id
+        long containerId = random.nextLong() & 0x0F_FF_FF_FF_FF_FF_FF_FFL;
 
         KeyValueContainerData keyValueContainerData =
             new KeyValueContainerData(Math.abs(containerId),
