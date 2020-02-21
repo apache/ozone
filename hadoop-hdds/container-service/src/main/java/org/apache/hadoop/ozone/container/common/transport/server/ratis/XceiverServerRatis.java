@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentracing.Scope;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -132,6 +133,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         new ThreadPoolExecutor(numWriteChunkThreads, numWriteChunkThreads,
             100, TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(queueLimit),
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("ChunkWriter-%d")
+                .build(),
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.context = context;
     this.dispatcher = dispatcher;
