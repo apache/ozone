@@ -767,6 +767,11 @@ public class BasicRootedOzoneClientAdapterImpl
     String pathStr = uri.toString() +
         OZONE_URI_DELIMITER + ozoneBucket.getVolumeName() +
         OZONE_URI_DELIMITER + ozoneBucket.getName();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("getFileStatusAdapterForBucket: ozoneBucket={}, pathStr={}, "
+              + "username={}", ozoneBucket.getVolumeName() + OZONE_URI_DELIMITER
+              + ozoneBucket.getName(), pathStr, username);
+    }
     Path path = new Path(pathStr);
     return new FileStatusAdapter(0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
