@@ -440,13 +440,10 @@ public class BasicRootedOzoneClientAdapterImpl
     incrementCounter(Statistic.OBJECTS_QUERY);
     OFSPath ofsPath = new OFSPath(path);
     String key = ofsPath.getKeyName();
-    // path is root
-    if (ofsPath.getVolumeName().isEmpty() &&
-        ofsPath.getBucketName().isEmpty()) {
+    if (ofsPath.isRoot()) {
       return getFileStatusAdapterForRoot(uri);
     }
-    // path is a volume
-    if (ofsPath.getBucketName().isEmpty()) {
+    if (ofsPath.isVolume()) {
       OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
       return getFileStatusAdapterForVolume(volume, uri);
     }
@@ -497,8 +494,9 @@ public class BasicRootedOzoneClientAdapterImpl
   private List<FileStatusAdapter> listStatusRoot(
       boolean recursive, String startPath, long numEntries,
       URI uri, Path workingDir, String username) throws IOException {
+
     OFSPath ofsStartPath = new OFSPath(startPath);
-    // list volumes for user
+    // list volumes
     Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
         username, null, ofsStartPath.getVolumeName());
     List<FileStatusAdapter> res = new ArrayList<>();
@@ -522,8 +520,9 @@ public class BasicRootedOzoneClientAdapterImpl
   private List<FileStatusAdapter> listStatusVolume(String volumeStr,
       boolean recursive, String startPath, long numEntries,
       URI uri, Path workingDir, String username) throws IOException {
+
     OFSPath ofsStartPath = new OFSPath(startPath);
-    // list buckets in volume
+    // list buckets in the volume
     OzoneVolume volume = objectStore.getVolume(volumeStr);
     Iterator<? extends OzoneBucket> iter = volume.listBuckets(
         null, ofsStartPath.getBucketName());
