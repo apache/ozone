@@ -33,6 +33,7 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -435,8 +436,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   public FileStatusAdapter getFileStatus(String path, URI uri,
-      Path qualifiedPath, String userName)
-      throws IOException {
+      Path qualifiedPath, String userName) throws IOException {
     incrementCounter(Statistic.OBJECTS_QUERY);
     OFSPath ofsPath = new OFSPath(path);
     String key = ofsPath.getKeyName();
@@ -454,11 +454,9 @@ public class BasicRootedOzoneClientAdapterImpl
       //  BasicRootedOzoneFileSystem#getFileStatus. No need to prepend here.
       makeQualified(status, uri, qualifiedPath, userName);
       return toFileStatusAdapter(status);
-
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
-        throw new
-            FileNotFoundException(key + ": No such file or directory!");
+        throw new FileNotFoundException(key + ": No such file or directory!");
       }
       throw e;
     }
@@ -769,21 +767,12 @@ public class BasicRootedOzoneClientAdapterImpl
     String pathStr = uri.toString() +
         OZONE_URI_DELIMITER + ozoneBucket.getVolumeName() +
         OZONE_URI_DELIMITER + ozoneBucket.getName();
-    LOG.debug("getFileStatusAdapterForBucket(pathStr=" + pathStr);
     Path path = new Path(pathStr);
-    return new FileStatusAdapter(
-        0L,
-        path,
-        true,
-        (short)0,
-        0L,
-        ozoneBucket.getCreationTime().getEpochSecond() * 1000,
-        0L,
-        (short)00755,  // Default directory permission, derive from ACLs later?
-        username,  // TODO: owner and group.
-        username,
-        path
-    );
+    return new FileStatusAdapter(0L, path, true, (short)0, 0L,
+        ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
+        FsPermission.getDirDefault().toShort(),  // TODO: derive from ACLs later
+        // TODO: revisit owner and group
+        username, username, path);
   }
 
   /**
@@ -795,18 +784,10 @@ public class BasicRootedOzoneClientAdapterImpl
     // Note that most fields are mimicked from HDFS FileStatus for root,
     //  except modification time, permission, owner and group.
     Path path = new Path(uri.toString() + OZONE_URI_DELIMITER);
-    return new FileStatusAdapter(
-        0L,
-        path,
-        true,
-        (short)0,
-        0L,
-        0L,
-        0L,
-        (short)00755,
-        null,
-        null,
-        null
+    return new FileStatusAdapter(0L, path, true, (short)0, 0L,
+        System.currentTimeMillis(), 0L,
+        FsPermission.getDirDefault().toShort(),
+        null, null, null
     );
   }
 }

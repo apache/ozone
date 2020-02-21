@@ -334,8 +334,8 @@ public class TestRootedOzoneFileSystem {
     Assert.assertNotNull(fileStatus);
     Assert.assertEquals(new Path(rootPath), fileStatus.getPath());
     Assert.assertTrue(fileStatus.isDirectory());
-    Assert.assertEquals(
-        new FsPermission((short)00755), fileStatus.getPermission());
+    Assert.assertEquals(FsPermission.getDirDefault(),
+        fileStatus.getPermission());
   }
 
   /**
