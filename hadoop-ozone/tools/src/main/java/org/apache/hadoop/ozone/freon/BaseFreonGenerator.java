@@ -19,13 +19,18 @@ package org.apache.hadoop.ozone.freon;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.codahale.metrics.ScheduledReporter;
+import com.codahale.metrics.Slf4jReporter;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
@@ -252,7 +257,8 @@ public class BaseFreonGenerator {
 
     executor = Executors.newFixedThreadPool(threadNo);
 
-    progressBar = new ProgressBar(System.out, testNo, successCounter::get);
+    progressBar = new ProgressBar(System.out, testNo, successCounter::get,
+        freonCommand.isInteractive());
     progressBar.start();
 
     startTime = System.currentTimeMillis();
@@ -276,12 +282,21 @@ public class BaseFreonGenerator {
    * Print out reports from the executed tests.
    */
   public void printReport() {
-    ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).build();
+    ScheduledReporter reporter = freonCommand.isInteractive()
+        ? ConsoleReporter.forRegistry(metrics).build()
+        : Slf4jReporter.forRegistry(metrics).build();
     reporter.report();
-    System.out.println("Total execution time (sec): " + Math
-        .round((System.currentTimeMillis() - startTime) / 1000.0));
-    System.out.println("Failures: " + failureCounter.get());
-    System.out.println("Successful executions: " + successCounter.get());
+
+    List<String> messages = new LinkedList<>();
+    messages.add("Total execution time (sec): " +
+        Math.round((System.currentTimeMillis() - startTime) / 1000.0));
+    messages.add("Failures: " + failureCounter.get());
+    messages.add("Successful executions: " + successCounter.get());
+
+    Consumer<String> print = freonCommand.isInteractive()
+        ? System.out::println
+        : LOG::info;
+    messages.forEach(print);
   }
 
   /**

@@ -48,8 +48,7 @@ import javax.inject.Singleton;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.http.HttpConfig;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -101,9 +100,13 @@ public class OzoneManagerServiceProviderImpl
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
   private ReconUtils reconUtils;
-  private enum OmSnapshotTaskName {
-    OM_DB_FULL_SNAPSHOT,
-    OM_DB_DELTA_UPDATES
+
+  /**
+   * OM Snapshot related task names.
+   */
+  public enum OmSnapshotTaskName {
+    OmSnapshotRequest,
+    OmDeltaRequest
   }
 
   @Inject
@@ -123,7 +126,7 @@ public class OzoneManagerServiceProviderImpl
     omSnapshotDBParentDir = reconUtils.getReconDbDir(configuration,
         OZONE_RECON_OM_SNAPSHOT_DB_DIR);
 
-    HttpConfig.Policy policy = DFSUtil.getHttpPolicy(configuration);
+    HttpConfig.Policy policy = HttpConfig.getHttpPolicy(configuration);
 
     int socketTimeout = (int) configuration.getTimeDuration(
         RECON_OM_SOCKET_TIMEOUT, RECON_OM_SOCKET_TIMEOUT_DEFAULT,
@@ -170,23 +173,23 @@ public class OzoneManagerServiceProviderImpl
 
   public void registerOMDBTasks() {
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-        OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name(),
+        OmSnapshotTaskName.OmDeltaRequest.name(),
         System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
     if (!reconTaskStatusDao.existsById(
-        OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name())){
+        OmSnapshotTaskName.OmDeltaRequest.name())){
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ",
-          OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name());
+          OmSnapshotTaskName.OmDeltaRequest.name());
     }
 
     reconTaskStatusRecord = new ReconTaskStatus(
-        OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name(),
+        OmSnapshotTaskName.OmSnapshotRequest.name(),
         System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
     if (!reconTaskStatusDao.existsById(
-        OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name())){
+        OmSnapshotTaskName.OmSnapshotRequest.name())){
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ",
-          OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name());
+          OmSnapshotTaskName.OmSnapshotRequest.name());
     }
   }
 
@@ -340,7 +343,7 @@ public class OzoneManagerServiceProviderImpl
             omdbUpdatesHandler);
         // Update timestamp of successful delta updates query.
         ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-            OmSnapshotTaskName.OM_DB_DELTA_UPDATES.name(),
+            OmSnapshotTaskName.OmDeltaRequest.name(),
                 System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
         reconTaskStatusDao.update(reconTaskStatusRecord);
 
@@ -363,7 +366,7 @@ public class OzoneManagerServiceProviderImpl
         if (success) {
           ReconTaskStatus reconTaskStatusRecord =
               new ReconTaskStatus(
-                  OmSnapshotTaskName.OM_DB_FULL_SNAPSHOT.name(),
+                  OmSnapshotTaskName.OmSnapshotRequest.name(),
                   System.currentTimeMillis(), getCurrentOMDBSequenceNumber());
           reconTaskStatusDao.update(reconTaskStatusRecord);
 

@@ -147,11 +147,8 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
       omClientResponse = new OMRenewDelegationTokenResponse(null, -1L,
           createErrorOMResponse(omResponse, ex));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
     }
 
     if (LOG.isDebugEnabled()) {

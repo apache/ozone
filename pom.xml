@@ -78,7 +78,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>0.5.0-90cd474-SNAPSHOT</ratis.version>
+    <ratis.version>0.5.0</ratis.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
     <distMgmtSnapshotsUrl>https://repository.apache.org/content/repositories/snapshots</distMgmtSnapshotsUrl>
@@ -98,7 +98,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <failIfNoTests>false</failIfNoTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
-    <jetty.version>9.3.25.v20180904</jetty.version>
+    <jetty.version>9.4.26.v20200117</jetty.version>
     <test.exclude>_</test.exclude>
     <test.exclude.pattern>_</test.exclude.pattern>
 
@@ -157,7 +157,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <spotbugs.version>3.1.12</spotbugs.version>
     <dnsjava.version>2.1.7</dnsjava.version>
 
-    <guava.version>11.0.2</guava.version>
+    <guava.version>28.2-jre</guava.version>
     <guice.version>4.0</guice.version>
     <joda-time.version>2.9.9</joda-time.version>
 

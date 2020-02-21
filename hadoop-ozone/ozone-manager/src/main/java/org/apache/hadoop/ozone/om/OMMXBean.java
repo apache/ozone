@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
 
 /**

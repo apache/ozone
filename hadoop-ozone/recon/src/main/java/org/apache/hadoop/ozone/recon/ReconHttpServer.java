@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.recon;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.server.BaseHttpServer;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 
 import com.google.inject.Inject;
 

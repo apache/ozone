@@ -74,7 +74,7 @@ public final class OzoneManagerRatisUtils {
   private OzoneManagerRatisUtils() {
   }
   /**
-   * Create OMClientRequest which enacpsulates the OMRequest.
+   * Create OMClientRequest which encapsulates the OMRequest.
    * @param omRequest
    * @return OMClientRequest
    * @throws IOException

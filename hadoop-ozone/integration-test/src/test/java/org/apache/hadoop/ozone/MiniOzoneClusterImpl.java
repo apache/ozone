@@ -44,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -297,7 +297,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       reconServer.stop();
       reconServer.join();
       reconServer = new ReconServer();
-      reconServer.run(new String[]{});
+      reconServer.execute(new String[]{});
     } catch (Exception e) {
       LOG.info("Exception while restarting Recon", e);
     }
@@ -504,7 +504,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         om.start();
 
         configureRecon();
-        ConfigurationProvider.setConfiguration(conf);
         reconServer = new ReconServer();
 
         hddsDatanodes = createHddsDatanodes(scm);
@@ -516,7 +515,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
-        reconServer.run(new String[] {});
+        reconServer.execute(new String[] {});
         return cluster;
       } catch (Exception ex) {
         stopOM(om);
@@ -575,6 +574,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           streamBufferMaxSize.get(), streamBufferSizeUnit.get());
       conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, blockSize.get(),
           streamBufferSizeUnit.get());
+      // MiniOzoneCluster should have global pipeline upper limit.
+      conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
+          pipelineNumLimit >= DEFAULT_PIPELIME_LIMIT ?
+              pipelineNumLimit : DEFAULT_PIPELIME_LIMIT);
       configureTrace();
     }
 
@@ -746,6 +749,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     private void configureRecon() throws IOException {
+      ConfigurationProvider.resetConfiguration();
+
       TemporaryFolder tempFolder = new TemporaryFolder();
       tempFolder.create();
       File tempNewFolder = tempFolder.newFolder();
@@ -760,6 +765,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
 
       conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
+
+      ConfigurationProvider.setConfiguration(conf);
     }
   }
 }

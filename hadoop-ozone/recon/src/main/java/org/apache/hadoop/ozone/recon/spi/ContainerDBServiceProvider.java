@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.recon.spi;
 import java.io.IOException;
 import java.util.Map;
 
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.hdds.utils.db.TableIterator;

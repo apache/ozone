@@ -27,9 +27,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.s3.SignatureProcessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.header.AuthenticationHeaderParser;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -47,7 +47,7 @@ public class EndpointBase {
   private OzoneClient client;
 
   @Inject
-  private AuthenticationHeaderParser authenticationHeaderParser;
+  private SignatureProcessor signatureProcessor;
 
   protected OzoneBucket getBucket(String volumeName, String bucketName)
       throws IOException {
@@ -200,13 +200,14 @@ public class EndpointBase {
         previousBucket);
   }
 
-  public AuthenticationHeaderParser getAuthenticationHeaderParser() {
-    return authenticationHeaderParser;
+  public SignatureProcessor getSignatureProcessor() {
+    return signatureProcessor;
   }
 
   @VisibleForTesting
-  public void setAuthenticationHeaderParser(AuthenticationHeaderParser parser) {
-    this.authenticationHeaderParser = parser;
+  public void setSignatureProcessor(
+      SignatureProcessor signatureProcessor) {
+    this.signatureProcessor = signatureProcessor;
   }
 
   @VisibleForTesting

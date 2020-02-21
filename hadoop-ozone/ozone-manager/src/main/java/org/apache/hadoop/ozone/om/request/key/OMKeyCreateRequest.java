@@ -202,8 +202,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         // the openKey table would eventually reach the same state.
         // The reason we do not check the OpenKey table is to avoid a DB read
         // in regular non-replay scenario.
-        if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(),
-            trxnLogIndex)) {
+        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
           // Replay implies the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.
@@ -260,11 +259,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
             omResponse, exception));
       }
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse,
-                trxnLogIndex));
-      }
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
       if (acquireLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
@@ -289,8 +285,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           createKeyRequest);
       break;
     case FAILURE:
-      LOG.error("Key create failed. Volume:{}, Bucket:{}, Key{}. Exception:{}",
-          volumeName, bucketName, keyName, exception);
+      LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key{}. " +
+              "Exception:{}", volumeName, bucketName, keyName, exception);
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyCreateRequest: {}",
