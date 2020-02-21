@@ -81,7 +81,7 @@ public class ReconContainerReportHandler extends ContainerReportHandler {
       LOG.debug("Got container report for containerID {} ",
           containerReplicaProto.getContainerID());
     }
-
+    super.onMessage(reportFromDatanode, publisher);
   }
 
 }
