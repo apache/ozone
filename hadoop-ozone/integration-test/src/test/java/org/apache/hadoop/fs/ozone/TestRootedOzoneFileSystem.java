@@ -51,6 +51,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
 /**
@@ -86,7 +87,8 @@ public class TestRootedOzoneFileSystem {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
-    String testBucketStr = "/" + volumeName + "/" + bucketName;
+    String testBucketStr =
+        OZONE_URI_DELIMITER + volumeName + OZONE_URI_DELIMITER + bucketName;
     testBucketPath = new Path(testBucketStr);
 
     rootPath = String.format("%s://%s/",
@@ -469,7 +471,8 @@ public class TestRootedOzoneFileSystem {
     fs.mkdirs(leafInsideInterimPath);
 
     // Attempt to rename the key to a different bucket
-    Path bucket2 = new Path("/" + volumeName + "/" + bucketName + "test");
+    Path bucket2 = new Path(OZONE_URI_DELIMITER + volumeName +
+        OZONE_URI_DELIMITER + bucketName + "test");
     Path leafInTargetInAnotherBucket = new Path(bucket2, "leaf");
     try {
       fs.rename(leafInsideInterimPath, leafInTargetInAnotherBucket);
@@ -484,7 +487,7 @@ public class TestRootedOzoneFileSystem {
       throws IOException {
     String key = ofs.pathToKey(keyPath);
     if (isDirectory) {
-      key = key + "/";
+      key = key + OZONE_URI_DELIMITER;
     }
     OFSPath ofsPath = new OFSPath(key);
     String keyInBucket = ofsPath.getKeyName();
@@ -502,7 +505,8 @@ public class TestRootedOzoneFileSystem {
   private Path createRandomVolumeBucketWithDirs() throws IOException {
     String volume1 = getRandomNonExistVolumeName();
     String bucket1 = "bucket-" + RandomStringUtils.randomNumeric(5);
-    Path bucketPath1 = new Path("/" + volume1 + "/" + bucket1);
+    Path bucketPath1 = new Path(
+        OZONE_URI_DELIMITER + volume1 + OZONE_URI_DELIMITER + bucket1);
 
     Path dir1 = new Path(bucketPath1, "dir1");
     fs.mkdirs(dir1);  // Intentionally creating this "in-the-middle" dir key
@@ -521,15 +525,16 @@ public class TestRootedOzoneFileSystem {
   public void testListStatusRootAndVolumeNonRecursive() throws Exception {
     Path bucketPath1 = createRandomVolumeBucketWithDirs();
     createRandomVolumeBucketWithDirs();
-    // listStatus(/volume/bucket)
+    // listStatus("/volume/bucket")
     FileStatus[] fileStatusBucket = ofs.listStatus(bucketPath1);
     Assert.assertEquals(2, fileStatusBucket.length);
-    // listStatus(volume)
-    Path volume = new Path("/" + new OFSPath(bucketPath1).getVolumeName());
+    // listStatus("/volume")
+    Path volume = new Path(
+        OZONE_URI_DELIMITER + new OFSPath(bucketPath1).getVolumeName());
     FileStatus[] fileStatusVolume = ofs.listStatus(volume);
     Assert.assertEquals(1, fileStatusVolume.length);
-    // listStatus(/)
-    Path root = new Path("/");
+    // listStatus("/")
+    Path root = new Path(OZONE_URI_DELIMITER);
     FileStatus[] fileStatusRoot = ofs.listStatus(root);
     Assert.assertEquals(2, fileStatusRoot.length);
   }
@@ -600,13 +605,14 @@ public class TestRootedOzoneFileSystem {
   public void testListStatusRootAndVolumeRecursive() throws Exception {
     Path bucketPath1 = createRandomVolumeBucketWithDirs();
     createRandomVolumeBucketWithDirs();
-    // listStatus(/volume/bucket)
+    // listStatus("/volume/bucket")
     listStatusCheckHelper(bucketPath1);
-    // listStatus(volume)
-    Path volume = new Path("/" + new OFSPath(bucketPath1).getVolumeName());
+    // listStatus("/volume")
+    Path volume = new Path(
+        OZONE_URI_DELIMITER + new OFSPath(bucketPath1).getVolumeName());
     listStatusCheckHelper(volume);
-    // listStatus(/)
-    Path root = new Path("/");
+    // listStatus("/")
+    Path root = new Path(OZONE_URI_DELIMITER);
     listStatusCheckHelper(root);
   }
 
