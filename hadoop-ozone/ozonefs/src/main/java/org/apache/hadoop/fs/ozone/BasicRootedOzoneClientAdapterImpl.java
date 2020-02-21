@@ -516,14 +516,13 @@ public class BasicRootedOzoneClientAdapterImpl
    * Helper for OFS listStatus on a volume.
    */
   private List<FileStatusAdapter> listStatusVolume(String volumeStr,
-      boolean recursive, String startPath, long numEntries,
+      boolean recursive, String startBucket, long numEntries,
       URI uri, Path workingDir, String username) throws IOException {
 
-    OFSPath ofsStartPath = new OFSPath(startPath);
     // list buckets in the volume
     OzoneVolume volume = objectStore.getVolume(volumeStr);
-    Iterator<? extends OzoneBucket> iter = volume.listBuckets(
-        null, ofsStartPath.getBucketName());
+    Iterator<? extends OzoneBucket> iter =
+        volume.listBuckets(null, startBucket);
     List<FileStatusAdapter> res = new ArrayList<>();
     // TODO: Test continuation
     while (iter.hasNext() && res.size() <= numEntries) {
@@ -532,7 +531,7 @@ public class BasicRootedOzoneClientAdapterImpl
       if (recursive) {
         String next = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
         // TODO: Check startPath
-        res.addAll(listStatus(next, recursive, startPath,
+        res.addAll(listStatus(next, recursive, startBucket,
             numEntries - res.size(), uri, workingDir, username));
       }
     }
@@ -568,14 +567,15 @@ public class BasicRootedOzoneClientAdapterImpl
       return listStatusRoot(
           recursive, startPath, numEntries, uri, workingDir, username);
     }
+    OFSPath ofsStartPath = new OFSPath(startPath);
     if (ofsPath.isVolume()) {
+      String startBucket = ofsStartPath.getBucketName();
       return listStatusVolume(ofsPath.getVolumeName(),
-          recursive, startPath, numEntries, uri, workingDir, username);
+          recursive, startBucket, numEntries, uri, workingDir, username);
     }
 
     String keyName = ofsPath.getKeyName();
     // Internally we need startKey to be passed into bucket.listStatus
-    OFSPath ofsStartPath = new OFSPath(startPath);
     String startKey = ofsStartPath.getKeyName();
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
