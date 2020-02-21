@@ -138,11 +138,8 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
         omClientResponse = onFailure(omResponse, ex);
       }
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse,
-                trxnLogIndex));
-      }
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
       if (lockAcquired) {
         omMetadataManager.getLock().releaseWriteLock(PREFIX_LOCK,
             getOzoneObj().getPath());
