@@ -110,7 +110,7 @@ public class PipelineReportHandler implements
     if (report.getIsLeader() ||
         pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
       pipeline.setLeaderId(dn.getUuid());
-      metrics.incNumPipelineBytesWrite(pipeline, report.getBytesWrite());
+      metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {

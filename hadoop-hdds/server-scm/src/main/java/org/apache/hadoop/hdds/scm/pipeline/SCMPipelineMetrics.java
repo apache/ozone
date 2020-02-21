@@ -107,7 +107,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
         .info(getBlockAllocationMetricName(pipeline),
             "Number of blocks allocated in pipeline " + pipeline.getId()), 0L));
     numBytesWritten.put(pipeline.getId(), new MutableCounterLong(Interns
-        .info(getBytesWriteMetricName(pipeline),
+        .info(getBytesWrittenMetricName(pipeline),
             "Number of bytes written into pipeline " + pipeline.getId()), 0L));
   }
 
@@ -116,8 +116,8 @@ public final class SCMPipelineMetrics implements MetricsSource {
         .getFactor() + "-" + pipeline.getId().getId();
   }
 
-  public static String getBytesWriteMetricName(Pipeline pipeline) {
-    return "NumPipelineBytesWrite-" + pipeline.getType() + "-" + pipeline
+  public static String getBytesWrittenMetricName(Pipeline pipeline) {
+    return "NumPipelineBytesWritten-" + pipeline.getType() + "-" + pipeline
         .getFactor() + "-" + pipeline.getId().getId();
   }
 
@@ -150,11 +150,11 @@ public final class SCMPipelineMetrics implements MetricsSource {
   }
 
   /**
-   * Increments the number of bytes by delta that write into the pipeline.
+   * Increments the number of total bytes that write into the pipeline.
    */
-  void incNumPipelineBytesWrite(Pipeline pipeline, long bytes) {
+  void incNumPipelineBytesWritten(Pipeline pipeline, long bytes) {
     numBytesWritten.put(pipeline.getId(), new MutableCounterLong(
-        Interns.info(getBytesWriteMetricName(pipeline), "Number of" +
+        Interns.info(getBytesWrittenMetricName(pipeline), "Number of" +
             " bytes written into pipeline " + pipeline.getId()), bytes));
   }
 

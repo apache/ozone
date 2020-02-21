@@ -95,29 +95,28 @@ public class TestSCMPipelineBytesWrittenMetrics {
 
     OzoneKeyDetails keyDetails = bucket.getKey(keyName);
     Assert.assertEquals(keyName, keyDetails.getName());
-
     Assert.assertEquals(value.getBytes().length, keyDetails
         .getOzoneKeyLocations().get(0).getLength());
   }
 
   @Test
-  public void testNumBytesWrite() throws Exception {
+  public void testNumBytesWritten() throws Exception {
     MetricsRecordBuilder metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
     for (Pipeline pipeline : cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines()) {
       Assert.assertEquals(0L, getLongCounter(
-          SCMPipelineMetrics.getBytesWriteMetricName(pipeline), metrics));
+          SCMPipelineMetrics.getBytesWrittenMetricName(pipeline), metrics));
     }
-    int bytesWrite = 1000;
-    writeNumBytes(bytesWrite);
+    int bytesWritten = 1000;
+    writeNumBytes(bytesWritten);
     Thread.sleep(100 * 1000L);
     metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
     for (Pipeline pipeline : cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines()) {
-      Assert.assertEquals(bytesWrite, getLongCounter(
-          SCMPipelineMetrics.getBytesWriteMetricName(pipeline), metrics));
+      Assert.assertEquals(bytesWritten, getLongCounter(
+          SCMPipelineMetrics.getBytesWrittenMetricName(pipeline), metrics));
     }
   }
 

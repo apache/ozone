@@ -581,19 +581,18 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()));
   }
 
-  private long calculateBytesWriteForRelatedPipeline(
-      HddsProtos.PipelineID pipelineID) {
-    long bytesWrite = 0;
+  private long calculatePipelineBytesWritten(HddsProtos.PipelineID pipelineID) {
+    long bytesWritten = 0;
     Iterator<org.apache.hadoop.ozone.container.common.interfaces.Container<?>>
         containerIt = containerController.getContainers();
     while(containerIt.hasNext()) {
       ContainerData containerData = containerIt.next().getContainerData();
       if (containerData.getOriginPipelineId()
           .compareTo(pipelineID.getId()) == 0) {
-        bytesWrite += containerData.getWriteBytes();
+        bytesWritten += containerData.getWriteBytes();
       }
     }
-    return bytesWrite;
+    return bytesWritten;
   }
 
   @Override
@@ -607,7 +606,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         reports.add(PipelineReport.newBuilder()
             .setPipelineID(pipelineID)
             .setIsLeader(groupLeaderMap.getOrDefault(groupId, Boolean.FALSE))
-            .setBytesWrite(calculateBytesWriteForRelatedPipeline(pipelineID))
+            .setBytesWritten(calculatePipelineBytesWritten(pipelineID))
             .build());
       }
       return reports;
