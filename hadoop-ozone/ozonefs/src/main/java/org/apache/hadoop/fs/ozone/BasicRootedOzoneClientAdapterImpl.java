@@ -739,20 +739,16 @@ public class BasicRootedOzoneClientAdapterImpl
       OzoneVolume ozoneVolume, URI uri) {
     String pathStr = uri.toString() +
         OZONE_URI_DELIMITER + ozoneVolume.getName();
-    LOG.debug("getFileStatusAdapterForVolume(pathStr=" + pathStr);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("getFileStatusAdapterForVolume: ozoneVolume={}, pathStr={}",
+          ozoneVolume.getName(), pathStr);
+    }
     Path path = new Path(pathStr);
-    return new FileStatusAdapter(
-        0L,
-        path,
-        true,
-        (short)0,
-        0L,
-        ozoneVolume.getCreationTime().getEpochSecond() * 1000,
-        0L,
-        (short)00755,  // Default directory permission, derive from ACLs later?
-        ozoneVolume.getOwner(),
-        ozoneVolume.getAdmin(),  // TODO: Get group of whom?
-        path
+    return new FileStatusAdapter(0L, path, true, (short)0, 0L,
+        ozoneVolume.getCreationTime().getEpochSecond() * 1000, 0L,
+        FsPermission.getDirDefault().toShort(),
+        // TODO: Revisit owner and admin
+        ozoneVolume.getOwner(), ozoneVolume.getAdmin(), path
     );
   }
 
