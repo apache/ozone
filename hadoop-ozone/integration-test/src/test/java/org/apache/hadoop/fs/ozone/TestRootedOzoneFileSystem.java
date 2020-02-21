@@ -43,9 +43,12 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -502,6 +505,7 @@ public class TestRootedOzoneFileSystem {
     Path bucketPath1 = new Path("/" + volume1 + "/" + bucket1);
 
     Path dir1 = new Path(bucketPath1, "dir1");
+    fs.mkdirs(dir1);  // Intentionally creating this "in-the-middle" dir key
     Path subdir1 = new Path(dir1, "subdir1");
     fs.mkdirs(subdir1);
     Path dir2 = new Path(bucketPath1, "dir2");
@@ -517,20 +521,93 @@ public class TestRootedOzoneFileSystem {
   public void testListStatusRootAndVolumeNonRecursive() throws Exception {
     Path bucketPath1 = createRandomVolumeBucketWithDirs();
     createRandomVolumeBucketWithDirs();
-
     // listStatus(/volume/bucket)
     FileStatus[] fileStatusBucket = ofs.listStatus(bucketPath1);
     Assert.assertEquals(2, fileStatusBucket.length);
-
     // listStatus(volume)
     Path volume = new Path("/" + new OFSPath(bucketPath1).getVolumeName());
     FileStatus[] fileStatusVolume = ofs.listStatus(volume);
     Assert.assertEquals(1, fileStatusVolume.length);
-
     // listStatus(/)
     Path root = new Path("/");
     FileStatus[] fileStatusRoot = ofs.listStatus(root);
     Assert.assertEquals(2, fileStatusRoot.length);
+  }
+
+  /**
+   * Helper function to do FileSystem#listStatus recursively.
+   * Simulate what FsShell does, using DFS.
+   */
+  private void listStatusRecursiveHelper(Path curPath, List<FileStatus> result)
+      throws IOException {
+    FileStatus[] startList = ofs.listStatus(curPath);
+    for (FileStatus fileStatus : startList) {
+      result.add(fileStatus);
+      if (fileStatus.isDirectory()) {
+        Path nextPath = fileStatus.getPath();
+        listStatusRecursiveHelper(nextPath, result);
+      }
+    }
+  }
+
+  /**
+   * Helper function to call adapter impl for listStatus (with recursive).
+   */
+  private List<FileStatus> listStatusCallAdapterHelper(String pathStr)
+      throws IOException {
+    // FileSystem interface does not support recursive listStatus, use adapter
+    BasicRootedOzoneClientAdapterImpl adapter =
+        (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+    return adapter.listStatus(pathStr, true, "", 1000,
+        ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername())
+        .stream().map(ofs::convertFileStatus).collect(Collectors.toList());
+  }
+
+  /**
+   * Helper function to compare recursive listStatus results from adapter
+   * and (simulated) FileSystem.
+   */
+  private void listStatusCheckHelper(Path path) throws IOException {
+    // Get recursive listStatus result directly from adapter impl
+    List<FileStatus> statusesFromAdapter =
+        listStatusCallAdapterHelper(path.toString());
+    // Get recursive listStatus result with FileSystem API by simulating FsShell
+    List<FileStatus> statusesFromFS = new ArrayList<>();
+    listStatusRecursiveHelper(path, statusesFromFS);
+    // Compare. The results would be in the same order due to assumptions:
+    // 1. They are both using DFS internally;
+    // 2. They both return ordered results.
+    Assert.assertEquals(statusesFromAdapter.size(), statusesFromFS.size());
+    final int n = statusesFromFS.size();
+    for (int i = 0; i < n; i++) {
+      FileStatus statusFromAdapter = statusesFromAdapter.get(i);
+      FileStatus statusFromFS = statusesFromFS.get(i);
+      Assert.assertEquals(statusFromAdapter.getPath(), statusFromFS.getPath());
+      Assert.assertEquals(statusFromAdapter.getLen(), statusFromFS.getLen());
+      Assert.assertEquals(statusFromAdapter.isDirectory(),
+          statusFromFS.isDirectory());
+      // TODO: When HDDS-3054 is in, uncomment the lines below.
+      //  As of now the modification time almost certainly won't match.
+//      Assert.assertEquals(statusFromAdapter.getModificationTime(),
+//          statusFromFS.getModificationTime());
+    }
+  }
+
+  /**
+   * OFS: Test recursive listStatus on root and volume.
+   */
+  @Test
+  public void testListStatusRootAndVolumeRecursive() throws Exception {
+    Path bucketPath1 = createRandomVolumeBucketWithDirs();
+    createRandomVolumeBucketWithDirs();
+    // listStatus(/volume/bucket)
+    listStatusCheckHelper(bucketPath1);
+    // listStatus(volume)
+    Path volume = new Path("/" + new OFSPath(bucketPath1).getVolumeName());
+    listStatusCheckHelper(volume);
+    // listStatus(/)
+    Path root = new Path("/");
+    listStatusCheckHelper(root);
   }
 
 }
