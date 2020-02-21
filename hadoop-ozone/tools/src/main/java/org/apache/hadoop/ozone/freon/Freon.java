@@ -21,8 +21,8 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +45,8 @@ import picocli.CommandLine.Option;
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
-        DatanodeChunkGenerator.class},
+        DatanodeChunkGenerator.class,
+        ChunkManagerDiskWrite.class},
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {

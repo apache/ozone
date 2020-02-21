@@ -437,4 +437,7 @@ public class BaseFreonGenerator {
     void executeNextTask(long step) throws Exception;
   }
 
+  public int getThreadNo() {
+    return threadNo;
+  }
 }
