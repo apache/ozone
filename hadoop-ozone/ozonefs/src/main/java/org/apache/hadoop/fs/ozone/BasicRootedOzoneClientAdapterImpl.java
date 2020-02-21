@@ -564,15 +564,11 @@ public class BasicRootedOzoneClientAdapterImpl
 
     incrementCounter(Statistic.OBJECTS_LIST);
     OFSPath ofsPath = new OFSPath(pathStr);
-
-    // listStatus root
-    if (ofsPath.getVolumeName().isEmpty()
-        && ofsPath.getBucketName().isEmpty()) {
+    if (ofsPath.isRoot()) {
       return listStatusRoot(
           recursive, startPath, numEntries, uri, workingDir, username);
     }
-    // listStatus volume
-    if (ofsPath.getBucketName().isEmpty()) {
+    if (ofsPath.isVolume()) {
       return listStatusVolume(ofsPath.getVolumeName(),
           recursive, startPath, numEntries, uri, workingDir, username);
     }
