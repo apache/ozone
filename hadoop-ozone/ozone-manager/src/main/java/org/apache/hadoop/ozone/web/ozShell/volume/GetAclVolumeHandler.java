@@ -37,7 +37,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
  * Get acl handler for volume.
  */
 @Command(name = "getacl",
-    description = "List all acls.")
+    description = "List all ACLs.")
 public class GetAclVolumeHandler extends Handler {
 
   @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
@@ -45,7 +45,7 @@ public class GetAclVolumeHandler extends Handler {
 
   @CommandLine.Option(names = {"--store", "-s"},
       required = false,
-      description = "store type. i.e OZONE or S3")
+      description = "Store type. i.e OZONE or S3")
   private String storeType;
 
   /**
