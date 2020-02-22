@@ -2012,8 +2012,14 @@ public class KeyManagerImpl implements KeyManager {
               } else {
                 // if entry is a directory
                 if (!deletedKeySet.contains(entryInDb)) {
-                  cacheKeyMap.put(entryInDb,
-                      new OzoneFileStatus(immediateChild));
+                  if (!entryKeyName.equals(immediateChild)) {
+                    cacheKeyMap.put(entryInDb,
+                        new OzoneFileStatus(immediateChild));
+                  } else {
+                    // If entryKeyName matches dir name, we have the info
+                    cacheKeyMap.put(entryInDb,
+                        new OzoneFileStatus(value, 0, true));
+                  }
                   countEntries++;
                 }
                 // skip the other descendants of this child directory.
