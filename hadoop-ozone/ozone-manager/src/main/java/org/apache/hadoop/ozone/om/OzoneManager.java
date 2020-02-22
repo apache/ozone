@@ -1078,8 +1078,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
     if (configuration.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false)) {
-      //All the Ratis metrics (registered from now) will be published via JMX and
-      //via the prometheus exporter (used by the /prom servlet
+      // All the Ratis metrics (registered from now) will be published via JMX
+      // and via the prometheus exporter (used by the /prom servlet
       MetricRegistries.global()
           .addReporterRegistration(MetricsReporting.jmxReporter());
       MetricRegistries.global().addReporterRegistration(
