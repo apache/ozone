@@ -1979,7 +1979,6 @@ public class KeyManagerImpl implements KeyManager {
       // First, find key in TableCache
       listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
           recursive, cacheKeyMap, deletedKeySet);
-
       // Then, find key in DB
       String seekKeyInDb =
           metadataManager.getOzoneKey(volumeName, bucketName, startKey);
