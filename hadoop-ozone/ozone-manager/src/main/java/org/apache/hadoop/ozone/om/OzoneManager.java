@@ -1076,14 +1076,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void start() throws IOException {
     omClientProtocolMetrics.register();
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
-    //All the Ratis metrics (registered from now) will be published via JMX and
-    //via the prometheus exporter (used by the /prom servlet
-    MetricRegistries.global()
-        .addReporterRegistration(MetricsReporting.jmxReporter());
-    MetricRegistries.global().addReporterRegistration(
-        registry -> CollectorRegistry.defaultRegistry.register(
-            new RatisDropwizardExports(
-                registry.getDropWizardMetricRegistry())));
+    if (configuration.getBoolean(
+        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false)) {
+      //All the Ratis metrics (registered from now) will be published via JMX and
+      //via the prometheus exporter (used by the /prom servlet
+      MetricRegistries.global()
+          .addReporterRegistration(MetricsReporting.jmxReporter());
+      MetricRegistries.global().addReporterRegistration(
+          registry -> CollectorRegistry.defaultRegistry.register(
+              new RatisDropwizardExports(
+                  registry.getDropWizardMetricRegistry())));
+    }
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
