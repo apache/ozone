@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -208,6 +209,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
+
+import org.apache.ratis.metrics.MetricRegistries;
+import org.apache.ratis.metrics.MetricsReporting;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
@@ -215,6 +219,8 @@ import org.apache.ratis.util.LifeCycle;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import io.prometheus.client.CollectorRegistry;
 
 /**
  * Ozone Manager is the metadata manager of ozone.
@@ -1068,13 +1074,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Start service.
    */
   public void start() throws IOException {
-
     omClientProtocolMetrics.register();
+    HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
+    if (configuration.getBoolean(
+        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false)) {
+      // All the Ratis metrics (registered from now) will be published via JMX
+      // and via the prometheus exporter (used by the /prom servlet
+      MetricRegistries.global()
+          .addReporterRegistration(MetricsReporting.jmxReporter());
+      MetricRegistries.global().addReporterRegistration(
+          registry -> CollectorRegistry.defaultRegistry.register(
+              new RatisDropwizardExports(
+                  registry.getDropWizardMetricRegistry())));
+    }
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
-
-    HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
     // Start Ratis services
     if (omRatisServer != null) {
