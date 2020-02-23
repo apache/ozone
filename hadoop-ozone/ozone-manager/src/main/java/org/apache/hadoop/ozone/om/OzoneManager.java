@@ -2780,13 +2780,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (IOException ex) {
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
-      AUDIT.logWriteFailure(
+      AUDIT.logReadFailure(
           buildAuditMessageForFailure(OMAction.GET_FILE_STATUS,
               (args == null) ? null : args.toAuditMap(), ex));
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logWriteSuccess(
+        AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(OMAction.GET_FILE_STATUS,
                 (args == null) ? null : args.toAuditMap()));
       }
