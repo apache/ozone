@@ -66,7 +66,7 @@ public class TestOzoneContainerRatis {
       String testName, RpcType rpc, int numNodes,
       CheckedBiConsumer<Long, XceiverClientSpi, Exception> test)
       throws Exception {
-    LOG.info(testName + "(rpc=" + rpc + ", numNodes=" + numNodes);
+    LOG.info("{}(rpc={}, numNodes={}", testName, rpc, numNodes);
 
     // create Ozone clusters
     final OzoneConfiguration conf = newOzoneConfiguration();
@@ -83,7 +83,7 @@ public class TestOzoneContainerRatis {
       final Pipeline pipeline = MockPipeline.createPipeline(
           CollectionUtils.as(datanodes,
               HddsDatanodeService::getDatanodeDetails));
-      LOG.info("pipeline=" + pipeline);
+      LOG.info("pipeline={}", pipeline);
 
       // Create Ratis cluster
 //      final String ratisId = "ratis1";

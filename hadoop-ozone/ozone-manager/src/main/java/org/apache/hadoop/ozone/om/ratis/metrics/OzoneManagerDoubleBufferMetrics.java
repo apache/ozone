@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.om.ratis.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
  * Class which maintains metrics related to OzoneManager DoubleBuffer.
@@ -43,6 +46,15 @@ public class OzoneManagerDoubleBufferMetrics {
       "OzoneManagerDoubleBuffer. This will provide a value which is maximum " +
       "number of transactions flushed in a single flush iteration till now.")
   private MutableCounterLong maxNumberOfTransactionsFlushedInOneIteration;
+
+  @Metric(about = "DoubleBuffer flushTime. This metrics particularly captures" +
+      " rocksdb batch commit time.")
+  private MutableRate flushTime;
+
+  @Metric(about = "Average number of transactions flushed in a single " +
+      "iteration")
+  private MutableGaugeFloat avgFlushTransactionsInOneIteration;
+
 
 
   public static OzoneManagerDoubleBufferMetrics create() {
@@ -80,6 +92,23 @@ public class OzoneManagerDoubleBufferMetrics {
 
   public long getMaxNumberOfTransactionsFlushedInOneIteration() {
     return maxNumberOfTransactionsFlushedInOneIteration.value();
+  }
+
+  public void updateFlushTime(long time) {
+    flushTime.add(time);
+  }
+
+  @VisibleForTesting
+  public MutableRate getFlushTime() {
+    return flushTime;
+  }
+
+  public float getAvgFlushTransactionsInOneIteration() {
+    return avgFlushTransactionsInOneIteration.value();
+  }
+
+  public void setAvgFlushTransactionsInOneIteration(float count) {
+    this.avgFlushTransactionsInOneIteration.set(count);
   }
 
   public void unRegister() {

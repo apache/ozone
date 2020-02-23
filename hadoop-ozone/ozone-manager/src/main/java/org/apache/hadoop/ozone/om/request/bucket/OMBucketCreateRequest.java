@@ -169,8 +169,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
           .get(bucketKey);
       if (dbBucketInfo != null) {
         // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, dbBucketInfo.getUpdateID(),
-            transactionLogIndex)) {
+        if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
           // Replay implies the response has already been returned to
           // the client. So take no further action and return a dummy
           // OMClientResponse.
@@ -205,11 +204,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
       omClientResponse = new OMBucketCreateResponse(
           createErrorOMResponse(omResponse, exception), omBucketInfo);
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
         metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);

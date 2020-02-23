@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.server;
 
 import org.apache.hadoop.hdds.function.FunctionWithServiceException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.ServiceException;

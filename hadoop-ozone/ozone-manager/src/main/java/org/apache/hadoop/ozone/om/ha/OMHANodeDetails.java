@@ -101,9 +101,9 @@ public class OMHANodeDetails {
     if (localOMServiceId == null) {
       // There is no internal om service id is being set, fall back to ozone
       // .om.service.ids.
-      LOG.info(OZONE_OM_INTERNAL_SERVICE_ID + " is not defined, falling back " +
-          "to " + OZONE_OM_SERVICE_IDS_KEY + " to find serviceID for " +
-          "OzoneManager if it is HA enabled cluster");
+      LOG.info("{} is not defined, falling back to {} to find serviceID for "
+          + "OzoneManager if it is HA enabled cluster",
+              OZONE_OM_INTERNAL_SERVICE_ID, OZONE_OM_SERVICE_IDS_KEY);
       omServiceIds = conf.getTrimmedStringCollection(
           OZONE_OM_SERVICE_IDS_KEY);
     } else {

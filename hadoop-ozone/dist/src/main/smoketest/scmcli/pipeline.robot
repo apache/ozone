@@ -25,4 +25,9 @@ Resource            ../commonlib.robot
 *** Test Cases ***
 Run list pipeline
     ${output} =         Execute          ozone scmcli pipeline list
-                        Should contain   ${output}   Type:RATIS, Factor:ONE, State:OPEN
+                        Should contain   ${output}   Type:
+                        Should contain   ${output}   Factor:ONE, State:
+
+Run create pipeline
+    ${output} =         Execute          ozone scmcli pipeline create
+                        Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE

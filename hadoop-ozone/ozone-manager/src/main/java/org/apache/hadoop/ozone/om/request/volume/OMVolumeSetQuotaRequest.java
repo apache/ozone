@@ -124,8 +124,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       // If this is a replay, then the response has already been returned to
       // the client. So take no further action and return a dummy
       // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs.getUpdateID(),
-          transactionLogIndex)) {
+      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
         LOG.debug("Replayed Transaction {} ignored. Request: {}",
             transactionLogIndex, setVolumePropertyRequest);
         return new OMVolumeSetQuotaResponse(createReplayOMResponse(omResponse));
@@ -148,11 +147,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeSetQuotaResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquireVolumeLock) {
         omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
       }

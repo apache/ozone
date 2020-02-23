@@ -26,15 +26,17 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
+
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Objects;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
@@ -58,7 +60,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.ContainerStat;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
@@ -78,9 +80,11 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -168,7 +172,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   /**
    * SCM super user.
    */
-  private final String scmUsername;
   private final Collection<String> scmAdminUsernames;
   /**
    * SCM mxbean.
@@ -319,7 +322,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);
-    scmUsername = UserGroupInformation.getCurrentUser().getUserName();
+    String scmUsername = UserGroupInformation.getCurrentUser().getUserName();
     if (!scmAdminUsernames.contains(scmUsername)) {
       scmAdminUsernames.add(scmUsername);
     }
@@ -392,7 +395,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     placementMetrics = SCMContainerPlacementMetrics.create();
-    ContainerPlacementPolicy containerPlacementPolicy =
+    PlacementPolicy containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, scmNodeManager,
             clusterMap, true, placementMetrics);
 
@@ -458,11 +461,26 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     securityProtocolServer = new SCMSecurityProtocolServer(conf,
         certificateServer);
 
-    grpcTlsConfig = RatisHelper
-        .createTlsClientConfigForSCM(new SecurityConfig(conf),
+    grpcTlsConfig = createTlsClientConfigForSCM(new SecurityConfig(conf),
             certificateServer);
   }
 
+  // For Internal gRPC client from SCM to DN with gRPC TLS
+  static GrpcTlsConfig createTlsClientConfigForSCM(SecurityConfig conf,
+      CertificateServer certificateServer) throws IOException {
+    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      try {
+        X509Certificate caCert =
+            CertificateCodec.getX509Certificate(
+                certificateServer.getCACertificate());
+        return new GrpcTlsConfig(null, null,
+            caCert, false);
+      } catch (CertificateException ex) {
+        throw new SCMSecurityException("Fail to find SCM CA certificate.", ex);
+      }
+    }
+    return null;
+  }
   /**
    * Init the metadata store based on the configurator.
    * @param conf - Config
@@ -611,24 +629,18 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmStorageConfig.setClusterId(clusterId);
         }
         scmStorageConfig.initialize();
-        LOG.info(
-            "SCM initialization succeeded."
-                + "Current cluster id for sd="
-                + scmStorageConfig.getStorageDir()
-                + ";cid="
-                + scmStorageConfig.getClusterID());
+        LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
+                + ";cid={}", scmStorageConfig.getStorageDir(),
+                scmStorageConfig.getClusterID());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
         return false;
       }
     } else {
-      LOG.info(
-          "SCM already initialized. Reusing existing"
-              + " cluster id for sd="
-              + scmStorageConfig.getStorageDir()
-              + ";cid="
-              + scmStorageConfig.getClusterID());
+      LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
+              + ";cid={}", scmStorageConfig.getStorageDir(),
+              scmStorageConfig.getClusterID());
       return true;
     }
   }
@@ -760,7 +772,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           getClientRpcAddress()));
     }
 
-    ms = HddsUtils.initializeMetrics(configuration, "StorageContainerManager");
+    ms = HddsServerUtil
+        .initializeMetrics(configuration, "StorageContainerManager");
 
     commandWatcherLeaseManager.start();
     getClientProtocolServer().start();

@@ -73,36 +73,45 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
     omResponse.setSuccess(operationResult);
     omResponse.setAddAclResponse(AddAclResponse.newBuilder()
         .setResponse(operationResult));
-    return new OMKeyAclResponse(omKeyInfo,
-        omResponse.build());
+    return new OMKeyAclResponse(omResponse.build(), omKeyInfo);
   }
 
   @Override
-  OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
-    return new OMKeyAclResponse(null,
-        createErrorOMResponse(omResponse, exception));
-  }
-
-  @Override
-  void onComplete(boolean operationResult, IOException exception) {
-    if (operationResult) {
-      LOG.debug("Add acl: {} to path: {} success!", ozoneAcls, path);
-    } else {
-      if (exception == null) {
-        LOG.debug("Add acl {} to path {} failed, because acl already exist",
-            ozoneAcls, path);
-      } else {
-        LOG.error("Add acl {} to path {} failed!", ozoneAcls, path, exception);
+  void onComplete(Result result, boolean operationResult,
+      IOException exception, long trxnLogIndex) {
+    switch (result) {
+    case SUCCESS:
+      if (LOG.isDebugEnabled()) {
+        if (operationResult) {
+          LOG.debug("Add acl: {} to path: {} success!", ozoneAcls, path);
+        } else {
+          LOG.debug("Acl {} already exists in path {}", ozoneAcls, path);
+        }
       }
+      break;
+    case REPLAY:
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            getOmRequest());
+      }
+      break;
+    case FAILURE:
+      LOG.error("Add acl {} to path {} failed!", ozoneAcls, path, exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyAddAclRequest: {}",
+          getOmRequest());
     }
   }
 
   @Override
-  boolean apply(OmKeyInfo omKeyInfo) {
+  boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
-    return omKeyInfo.addAcl(ozoneAcls.get(0));
+    boolean operationResult = omKeyInfo.addAcl(ozoneAcls.get(0));
+    if (operationResult) {
+      omKeyInfo.setUpdateID(trxnLogIndex);
+    }
+    return operationResult;
   }
-
 }
 

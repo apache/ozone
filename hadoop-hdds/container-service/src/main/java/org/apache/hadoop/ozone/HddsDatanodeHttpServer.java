@@ -21,7 +21,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.server.BaseHttpServer;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 
 /**
  * Simple http server to provide basic monitoring for hdds datanode.

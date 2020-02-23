@@ -29,14 +29,12 @@ import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.slf4j.event.Level;
 
 import java.util.UUID;
 
@@ -77,7 +75,7 @@ public class TestOMDirectoryCreateResponse {
             .build();
 
     OMDirectoryCreateResponse omDirectoryCreateResponse =
-        new OMDirectoryCreateResponse(omKeyInfo, omResponse);
+        new OMDirectoryCreateResponse(omResponse, omKeyInfo);
 
     omDirectoryCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -86,38 +84,5 @@ public class TestOMDirectoryCreateResponse {
 
     Assert.assertNotNull(omMetadataManager.getKeyTable().get(
         omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
-  }
-
-  @Test
-  public void testAddToDBBatchWithNullOmkeyInfo() throws Exception {
-
-    GenericTestUtils.setLogLevel(OMDirectoryCreateResponse.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OMDirectoryCreateResponse.LOG);
-
-
-    String volumeName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-
-    OMResponse omResponse = OMResponse.newBuilder().setCreateDirectoryResponse(
-        OzoneManagerProtocolProtos.CreateDirectoryResponse.getDefaultInstance())
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-        .build();
-
-    OMDirectoryCreateResponse omDirectoryCreateResponse =
-        new OMDirectoryCreateResponse(null, omResponse);
-
-    omDirectoryCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
-
-    // Do manual commit and see whether addToBatch is successful or not.
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
-
-    Assert.assertNull(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
-
-    Assert.assertTrue(logCapturer.getOutput().contains("Response Status is " +
-        "OK, dirKeyInfo is null"));
   }
 }

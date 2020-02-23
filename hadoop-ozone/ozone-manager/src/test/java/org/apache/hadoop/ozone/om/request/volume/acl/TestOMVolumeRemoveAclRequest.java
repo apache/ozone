@@ -75,7 +75,6 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omAddAclResponse.getStatus());
 
-
     // remove acl
     OMRequest removeAclRequest =
         TestOMRequestUtils.createVolumeRemoveAclRequest(volumeName, acl);
@@ -94,7 +93,7 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     Assert.assertEquals(acl, aclMapBeforeRemove.getAcl().get(0));
 
     OMClientResponse omClientRemoveResponse =
-        omVolumeRemoveAclRequest.validateAndUpdateCache(ozoneManager, 1,
+        omVolumeRemoveAclRequest.validateAndUpdateCache(ozoneManager, 2,
             ozoneManagerDoubleBufferHelper);
 
     OMResponse omRemoveAclResponse = omClientRemoveResponse.getOMResponse();
@@ -129,5 +128,49 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     Assert.assertNotNull(omResponse.getRemoveAclResponse());
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omResponse.getStatus());
+  }
+
+  @Test
+  public void testReplayRequest() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String ownerName = "user1";
+
+    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+
+    OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
+
+    // add acl first
+    OMRequest addAclRequest = TestOMRequestUtils.createVolumeAddAclRequest(
+        volumeName, acl);
+    OMVolumeAddAclRequest omVolumeAddAclRequest = new OMVolumeAddAclRequest(
+        addAclRequest);
+    omVolumeAddAclRequest.preExecute(ozoneManager);
+    OMClientResponse addAclResponse = omVolumeAddAclRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        addAclResponse.getOMResponse().getStatus());
+
+    // remove acl
+    OMRequest removeAclRequest = TestOMRequestUtils
+        .createVolumeRemoveAclRequest(volumeName, acl);
+    OMVolumeRemoveAclRequest omVolumeRemoveAclRequest =
+        new OMVolumeRemoveAclRequest(removeAclRequest);
+    omVolumeRemoveAclRequest.preExecute(ozoneManager);
+
+    OMClientResponse omClientResponse = omVolumeRemoveAclRequest
+        .validateAndUpdateCache(ozoneManager, 2,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    // Replay the original request
+    OMClientResponse replayResponse = omVolumeRemoveAclRequest
+        .validateAndUpdateCache(ozoneManager, 2,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+        replayResponse.getOMResponse().getStatus());
   }
 }

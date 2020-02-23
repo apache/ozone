@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 import java.util.Map;
 

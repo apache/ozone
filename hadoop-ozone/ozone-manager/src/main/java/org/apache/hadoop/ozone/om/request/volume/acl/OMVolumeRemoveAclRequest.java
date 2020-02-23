@@ -83,27 +83,40 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
 
   @Override
   OMClientResponse onSuccess(OMResponse.Builder omResponse,
-      OmVolumeArgs omVolumeArgs, boolean result){
+      OmVolumeArgs omVolumeArgs, boolean aclApplied){
     omResponse.setRemoveAclResponse(OzoneManagerProtocolProtos.RemoveAclResponse
-        .newBuilder().setResponse(result).build());
-    return new OMVolumeAclOpResponse(omVolumeArgs, omResponse.build());
+        .newBuilder().setResponse(aclApplied).build());
+    return new OMVolumeAclOpResponse(omResponse.build(), omVolumeArgs);
   }
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException ex) {
-    return new OMVolumeAclOpResponse(null,
-        createErrorOMResponse(omResponse, ex));
+    return new OMVolumeAclOpResponse(createErrorOMResponse(omResponse, ex));
   }
 
   @Override
-  void onComplete(IOException ex) {
-    if (ex == null) {
-      LOG.debug("Remove acl: {} from volume: {} success!",
-          getAcl(), getVolumeName());
-    } else {
-      LOG.error("Remove acl {} from volume {} failed!",
-          getAcl(), getVolumeName(), ex);
+  void onComplete(Result result, IOException ex, long trxnLogIndex) {
+    switch (result) {
+    case SUCCESS:
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Remove acl: {} from volume: {} success!", getAcl(),
+            getVolumeName());
+      }
+      break;
+    case REPLAY:
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            getOmRequest());
+      }
+      break;
+    case FAILURE:
+      LOG.error("Remove acl {} from volume {} failed!", getAcl(),
+          getVolumeName(), ex);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMVolumeRemoveAclRequest: {}",
+          getOmRequest());
     }
   }
 }

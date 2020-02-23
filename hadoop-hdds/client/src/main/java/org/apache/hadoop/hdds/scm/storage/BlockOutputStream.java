@@ -406,9 +406,8 @@ public class BlockOutputStream extends OutputStream {
         return e;
       }, responseExecutor).exceptionally(e -> {
         if (LOG.isDebugEnabled()) {
-          LOG.debug(
-              "putBlock failed for blockID " + blockID + " with exception " + e
-                  .getLocalizedMessage());
+          LOG.debug("putBlock failed for blockID {} with exception {}",
+                  blockID, e.getLocalizedMessage());
         }
         CompletionException ce =  new CompletionException(e);
         setIoException(ce);
