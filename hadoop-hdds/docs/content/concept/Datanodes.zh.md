@@ -2,7 +2,7 @@
 title: "数据节点"
 date: "2017-09-14"
 weight: 4
-summary: Ozone 支持 Amazon 的简易存储服务（S3）协议，你可以原封不动地在 Ozone 上使用基于 S3 客户端和 S3 SDK 的应用。
+summary: Ozone 支持 Amazon S3 协议，你可以原封不动地在 Ozone 上使用基于 S3 客户端和 S3 SDK 的应用。
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -27,7 +27,7 @@ summary: Ozone 支持 Amazon 的简易存储服务（S3）协议，你可以原�
 
 ![FunctionalOzone](ContainerMetadata.png)
 
-Ozone 的存储容器是一个自包含的超级块，容器中包含一系列的 Ozone 块，以及存储实际数据的磁盘文件，这是默认的存储容器格式。对于 Ozone 来说，容器只是提供了一个协议说明，实际的存储方式并不重要，换句话说，扩展或引入新的容器设计也是很容易的。因此，上述格式应当被看作是 Ozone 存储容器的参考实现。
+Ozone 的存储容器是一个自包含的超级块，容器中包含一系列的 Ozone 块，以及存储实际数据的磁盘文件，这是默认的存储容器格式。对于 Ozone 来说，容器只是提供了一个协议规范，它独立于具体的存储格式实现，换句话说，我们可以很容易扩展或引入新的容器实现格式。因此，上述格式应当被看作是 Ozone 存储容器的参考实现。
 
 ## 理解 Ozone 中的块和容器
 
@@ -43,9 +43,6 @@ Ozone 的存储容器是一个自包含的超级块，容器中包含一系列�
 
 ### 容器的位置发现
 
-SCM 如何获得容器的位置？方法和 HDFS 中的方法十分相似。数据节点会定期发送类似于块报告的容器报告，但比块报告的内容简洁的多，比如，对于一个存储容量为 196 TB 的单数据节点组成的集群，Ozone 大概会拥有四万个容器，相比于 HDFS 的一百五十万个块，块报告数量缩减为四十分之一。
+SCM 如何获得容器的位置？这一点和现有的 HDFS 十分相似。数据节点会定期发送类似于块报告的容器报告，容器报告比块报告的内容简洁的多，比如，对于一个存储容量为 196 TB 的集群，Ozone 大概会拥有四万个容器，相比于 HDFS 的一百五十万个块，块报告数量缩减为四十分之一。
 
-这种间接管理的方式大大地提高了 Ozone 的扩展性，SCM 需要处理的块数据大大减少，TODO
-This extra indirection helps tremendously with scaling Ozone. SCM has far
-less block data to process and the name node is a different service are
-critical to scaling Ozone.
+这种间接管理的方式大大地提高了 Ozone 的扩展性，因为 SCM 需要处理的块数据大大减少，且命名服务（OM）作为一个独特的服务主体对于扩展 Ozone 具有重要意义。
