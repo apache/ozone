@@ -689,6 +689,45 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  public boolean setReplication(Path src, short replication)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "OzoneFileSystem does not support setReplication");
+  }
+
+  @Override
+  public void setVerifyChecksum(boolean verifyChecksum) {
+    throw new UnsupportedOperationException(
+        "OzoneFileSystem does not support setVerifyChecksum");
+  }
+
+  @Override
+  public void setWriteChecksum(boolean writeChecksum) {
+    throw new UnsupportedOperationException(
+        "OzoneFileSystem does not support setWriteChecksum");
+  }
+
+  @Override
+  public void setPermission(Path p, FsPermission permission)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "OzoneFileSystem does not support setPermission");
+  }
+
+  @Override
+  public void setOwner(Path p, String username, String groupname)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "OzoneFileSystem does not support setOwner");
+  }
+
+  @Override
+  public void setTimes(Path p, long mtime, long atime) throws IOException {
+    throw new UnsupportedOperationException(
+        "OzoneFileSystem does not support setTimes");
+  }
+
+  @Override
   public String toString() {
     return "OzoneFileSystem{URI=" + uri + ", "
         + "workingDir=" + workingDir + ", "
