@@ -58,7 +58,7 @@ public class ReconContainerManager extends SCMContainerManager {
   public ReconContainerManager(
       Configuration conf, PipelineManager pipelineManager,
       EventQueue eventQueue) throws IOException {
-    super(conf, pipelineManager, eventQueue);
+    super(conf, pipelineManager);
   }
 
   @Override

@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
-import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -77,8 +76,6 @@ public class SCMContainerManager implements ContainerManager {
 
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
-  private final EventPublisher eventPublisher;
-
   /**
    * Constructs a mapping class that creates mapping between container names
    * and pipelines.
@@ -88,11 +85,10 @@ public class SCMContainerManager implements ContainerManager {
    * in MB.
    * @param conf - {@link Configuration}
    * @param pipelineManager - {@link PipelineManager}
-   * @param eventQueue
    * @throws IOException on Failure.
    */
   public SCMContainerManager(final Configuration conf,
-      PipelineManager pipelineManager, EventQueue eventQueue)
+      PipelineManager pipelineManager)
       throws IOException {
 
     final File containerDBPath = getContainerDBPath(conf);
@@ -111,7 +107,6 @@ public class SCMContainerManager implements ContainerManager {
     this.numContainerPerOwnerInPipeline = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
-    this.eventPublisher = eventQueue;
 
     loadExistingContainers();
 
@@ -133,10 +128,20 @@ public class SCMContainerManager implements ContainerManager {
         }
       } catch (PipelineNotFoundException ex) {
         LOG.warn("Found a Container {} which is in {} state with out a " +
-            "pipeline {}. Triggering Close Container.", container,
-            container.getState(), container.getPipelineID());
-        eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER,
-            container.containerID());
+            "pipeline {}. Close Container.", container, container.getState(),
+            container.getPipelineID());
+
+        // Not firing CLOSE_CONTAINER event because CloseContainer Event
+        // event queue handler is not registered by the time when we come
+        // here. So, we are calling update Container state to CLOSING, and
+        // replication manager takes care of send close commands to datanode
+        // to close containers on the datanode.
+
+        // Skipping pipeline to container removal because, we got a
+        // pipelineNotFoundException when adding container to
+        // pipeline. So, we can only update container state.
+        updateContainerState(container.containerID(),
+            HddsProtos.LifeCycleEvent.FINALIZE, true);
       }
     }
   }
@@ -340,6 +345,15 @@ public class SCMContainerManager implements ContainerManager {
       ContainerID containerID, HddsProtos.LifeCycleEvent event)
       throws IOException {
     // Should we return the updated ContainerInfo instead of LifeCycleState?
+    return updateContainerState(containerID, event, false);
+  }
+
+
+  private HddsProtos.LifeCycleState updateContainerState(
+      ContainerID containerID, HddsProtos.LifeCycleEvent event,
+      boolean skipPipelineToContainerRemove)
+      throws IOException {
+    // Should we return the updated ContainerInfo instead of LifeCycleState?
     lock.lock();
     try {
       final ContainerInfo container = containerStateManager
@@ -348,10 +362,12 @@ public class SCMContainerManager implements ContainerManager {
       containerStateManager.updateContainerState(containerID, event);
       final LifeCycleState newState = container.getState();
 
-      if (oldState == LifeCycleState.OPEN && newState != LifeCycleState.OPEN) {
-        pipelineManager
-            .removeContainerFromPipeline(container.getPipelineID(),
-                containerID);
+      if (skipPipelineToContainerRemove) {
+        if (oldState == LifeCycleState.OPEN && newState != LifeCycleState.OPEN) {
+          pipelineManager
+              .removeContainerFromPipeline(container.getPipelineID(),
+                  containerID);
+        }
       }
       final byte[] dbKey = Longs.toByteArray(containerID.getId());
       containerStore.put(dbKey, container.getProtobuf().toByteArray());
@@ -366,7 +382,6 @@ public class SCMContainerManager implements ContainerManager {
       lock.unlock();
     }
   }
-
 
     /**
      * Update deleteTransactionId according to deleteTransactionMap.
