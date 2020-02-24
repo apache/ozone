@@ -97,8 +97,7 @@ public class ReconStorageContainerManagerFacade
         conf, this, eventQueue);
     this.pipelineManager =
         new ReconPipelineManager(conf, nodeManager, eventQueue);
-    this.containerManager = new ReconContainerManager(conf, pipelineManager,
-        eventQueue);
+    this.containerManager = new ReconContainerManager(conf, pipelineManager);
     this.scmServiceProvider = scmServiceProvider;
     initializePipelinesFromScm();
 

@@ -52,12 +52,10 @@ public class ReconContainerManager extends SCMContainerManager {
    *
    * @param conf            - {@link Configuration}
    * @param pipelineManager - {@link PipelineManager}
-   * @param eventQueue
    * @throws IOException on Failure.
    */
   public ReconContainerManager(
-      Configuration conf, PipelineManager pipelineManager,
-      EventQueue eventQueue) throws IOException {
+      Configuration conf, PipelineManager pipelineManager) throws IOException {
     super(conf, pipelineManager);
   }
 
