@@ -32,8 +32,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataStore;
@@ -363,7 +361,8 @@ public class SCMContainerManager implements ContainerManager {
       final LifeCycleState newState = container.getState();
 
       if (skipPipelineToContainerRemove) {
-        if (oldState == LifeCycleState.OPEN && newState != LifeCycleState.OPEN) {
+        if (oldState == LifeCycleState.OPEN &&
+            newState != LifeCycleState.OPEN) {
           pipelineManager
               .removeContainerFromPipeline(container.getPipelineID(),
                   containerID);
