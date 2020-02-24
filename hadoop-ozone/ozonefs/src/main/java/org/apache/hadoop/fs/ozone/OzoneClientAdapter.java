@@ -41,7 +41,9 @@ public interface OzoneClientAdapter {
 
   InputStream readFile(String key) throws IOException;
 
-  OzoneFSOutputStream createFile(String key, boolean overWrite,
+  OzoneFSOutputStream createFile(String key,
+      short replication,
+      boolean overWrite,
       boolean recursive) throws IOException;
 
   void renameKey(String key, String newKeyName) throws IOException;

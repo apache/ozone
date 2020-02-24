@@ -322,6 +322,17 @@ public class TestReadWriteStatistics {
     }
   }
 
+  @Test
+  public void testIllegalReplication() throws Exception {
+    EnumSet<CreateFlag> flags = EnumSet.of(CreateFlag.OVERWRITE);
+    for(int i = 1; i <=5; i++){
+      FSDataOutputStream stream =
+          fs.createNonRecursive(aPath, null, flags, 512, (short) 2, 512, null);
+
+      assertBytesWrittenAndWriteNumOps(0, i);
+    }
+  }
+
   @Test(expected = UnsupportedOperationException.class)
   public void testsIfAppendGetsSupported() throws Exception {
     fs.append(aPath, 512, null);
@@ -399,8 +410,8 @@ public class TestReadWriteStatistics {
   }
 
   private void setupAdapterToReturnFakeOutputStreamOnCreate() throws Exception {
-    when(fakeAdapter.createFile(anyString(), anyBoolean(), anyBoolean()))
-        .thenReturn(new OzoneFSOutputStream(fakeOutputStream));
+    when(fakeAdapter.createFile(anyString(), anyShort(), anyBoolean(),
+        anyBoolean())).thenReturn(new OzoneFSOutputStream(fakeOutputStream));
   }
 
   private void setupFileSystemToUseFakeClientAdapter() throws IOException {
