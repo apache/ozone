@@ -61,8 +61,13 @@ public class StorageContainerManagerStarter extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    commonInit();
-    startScm();
+    try {
+      commonInit();
+      startScm();
+    } catch (Exception ex) {
+      LOG.error("SCM start failed with exception", ex);
+      throw ex;
+    }
     return null;
   }
 
