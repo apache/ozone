@@ -56,9 +56,9 @@ public class NodeEndpoint {
   private ReconNodeManager nodeManager;
 
   @Inject
-  NodeEndpoint(OzoneStorageContainerManager reconSCMFacade) {
+  NodeEndpoint(OzoneStorageContainerManager reconSCM) {
     this.nodeManager =
-        (ReconNodeManager) reconSCMFacade.getScmNodeManager();
+        (ReconNodeManager) reconSCM.getScmNodeManager();
   }
 
   /**
