@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
@@ -73,7 +74,7 @@ import com.google.gson.internal.LinkedTreeMap;
 /**
  * Test Ozone Recon.
  */
-public class TestRecon {
+public class TestReconWithOzoneManager {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
@@ -102,6 +103,7 @@ public class TestRecon {
 
     String reconHTTPAddress = "localhost:" + NetUtils.getFreeSocketPort();
     conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, reconHTTPAddress);
+    conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
     containerKeyServiceURL = "http://" + reconHTTPAddress + "/api/containers";
     taskStatusURL = "http://" + reconHTTPAddress + "/api/task/status";
 
