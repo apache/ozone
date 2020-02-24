@@ -131,9 +131,10 @@ public class SCMContainerManager implements ContainerManager {
 
         // Not firing CLOSE_CONTAINER event because CloseContainer Event
         // event queue handler is not registered by the time when we come
-        // here. So, we are calling update Container state to CLOSING, and
-        // replication manager takes care of send close commands to datanode
-        // to close containers on the datanode.
+        // here. So, we are calling update Container state to set
+        // container state to CLOSING, and later replication manager takes care
+        // of send close commands to datanode to close containers on the
+        // datanode.
 
         // Skipping pipeline to container removal because, we got a
         // pipelineNotFoundException when adding container to
