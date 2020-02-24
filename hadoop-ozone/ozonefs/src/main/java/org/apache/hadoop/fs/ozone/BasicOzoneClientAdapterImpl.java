@@ -185,6 +185,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
+  public short getDefaultReplication() {
+    return (short) replicationFactor.getValue();
+  }
+
+  @Override
   public void close() throws IOException {
     ozoneClient.close();
   }

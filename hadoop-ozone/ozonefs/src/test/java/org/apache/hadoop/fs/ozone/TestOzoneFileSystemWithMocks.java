@@ -22,12 +22,16 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -52,31 +56,16 @@ public class TestOzoneFileSystemWithMocks {
   @Test
   public void testFSUriWithHostPortOverrides() throws Exception {
     Configuration conf = new OzoneConfiguration();
-    OzoneClient ozoneClient = mock(OzoneClient.class);
-    ObjectStore objectStore = mock(ObjectStore.class);
-    OzoneVolume volume = mock(OzoneVolume.class);
-    OzoneBucket bucket = mock(OzoneBucket.class);
-
-    when(ozoneClient.getObjectStore()).thenReturn(objectStore);
-    when(objectStore.getVolume(eq("volume1"))).thenReturn(volume);
-    when(volume.getBucket("bucket1")).thenReturn(bucket);
-
-    PowerMockito.mockStatic(OzoneClientFactory.class);
-    PowerMockito.when(OzoneClientFactory.getRpcClient(eq("local.host"),
-        eq(5899), eq(conf))).thenReturn(ozoneClient);
-
-    UserGroupInformation ugi = mock(UserGroupInformation.class);
-    PowerMockito.mockStatic(UserGroupInformation.class);
-    PowerMockito.when(UserGroupInformation.getCurrentUser()).thenReturn(ugi);
-    when(ugi.getShortUserName()).thenReturn("user1");
+    mockObjectStore(conf, 5899);
+    mockUser();
 
     URI uri = new URI("o3fs://bucket1.volume1.local.host:5899");
 
     FileSystem fileSystem = FileSystem.get(uri, conf);
     OzoneFileSystem ozfs = (OzoneFileSystem) fileSystem;
 
-    assertEquals(ozfs.getUri().getAuthority(),
-        "bucket1.volume1.local.host:5899");
+    assertEquals("bucket1.volume1.local.host:5899",
+        ozfs.getUri().getAuthority());
     PowerMockito.verifyStatic();
     OzoneClientFactory.getRpcClient("local.host", 5899, conf);
   }
@@ -86,6 +75,25 @@ public class TestOzoneFileSystemWithMocks {
     Configuration conf = new OzoneConfiguration();
     final int omPort = OmUtils.getOmRpcPort(conf);
 
+    mockObjectStore(conf, omPort);
+
+    mockUser();
+
+    URI uri = new URI("o3fs://bucket1.volume1.local.host");
+
+    FileSystem fileSystem = FileSystem.get(uri, conf);
+    OzoneFileSystem ozfs = (OzoneFileSystem) fileSystem;
+
+    assertEquals("bucket1.volume1.local.host", ozfs.getUri().getHost());
+    // The URI doesn't contain a port number, expect -1 from getPort()
+    assertEquals(ozfs.getUri().getPort(), -1);
+    PowerMockito.verifyStatic();
+    // Check the actual port number in use
+    OzoneClientFactory.getRpcClient("local.host", omPort, conf);
+  }
+
+  private void mockObjectStore(Configuration conf, int omPort)
+      throws IOException {
     OzoneClient ozoneClient = mock(OzoneClient.class);
     ObjectStore objectStore = mock(ObjectStore.class);
     OzoneVolume volume = mock(OzoneVolume.class);
@@ -98,28 +106,33 @@ public class TestOzoneFileSystemWithMocks {
     PowerMockito.mockStatic(OzoneClientFactory.class);
     PowerMockito.when(OzoneClientFactory.getRpcClient(eq("local.host"),
         eq(omPort), eq(conf))).thenReturn(ozoneClient);
+  }
 
+  private void mockUser() throws IOException {
     UserGroupInformation ugi = mock(UserGroupInformation.class);
     PowerMockito.mockStatic(UserGroupInformation.class);
     PowerMockito.when(UserGroupInformation.getCurrentUser()).thenReturn(ugi);
     when(ugi.getShortUserName()).thenReturn("user1");
-
-    URI uri = new URI("o3fs://bucket1.volume1.local.host");
-
-    FileSystem fileSystem = FileSystem.get(uri, conf);
-    OzoneFileSystem ozfs = (OzoneFileSystem) fileSystem;
-
-    assertEquals(ozfs.getUri().getHost(), "bucket1.volume1.local.host");
-    // The URI doesn't contain a port number, expect -1 from getPort()
-    assertEquals(ozfs.getUri().getPort(), -1);
-    PowerMockito.verifyStatic();
-    // Check the actual port number in use
-    OzoneClientFactory.getRpcClient("local.host", omPort, conf);
   }
 
   @Test
   public void testFSUriHostVersionDefault() throws Exception {
     Configuration conf = new OzoneConfiguration();
+    mockObjectStore(conf);
+
+    mockUser();
+
+    URI uri = new URI("o3fs://bucket1.volume1/key");
+
+    FileSystem fileSystem = FileSystem.get(uri, conf);
+    OzoneFileSystem ozfs = (OzoneFileSystem) fileSystem;
+
+    assertEquals(ozfs.getUri().getAuthority(), "bucket1.volume1");
+    PowerMockito.verifyStatic();
+    OzoneClientFactory.getRpcClient(conf);
+  }
+
+  private void mockObjectStore(Configuration conf) throws IOException {
     OzoneClient ozoneClient = mock(OzoneClient.class);
     ObjectStore objectStore = mock(ObjectStore.class);
     OzoneVolume volume = mock(OzoneVolume.class);
@@ -132,19 +145,34 @@ public class TestOzoneFileSystemWithMocks {
     PowerMockito.mockStatic(OzoneClientFactory.class);
     PowerMockito.when(OzoneClientFactory.getRpcClient(eq(conf)))
         .thenReturn(ozoneClient);
+  }
 
-    UserGroupInformation ugi = mock(UserGroupInformation.class);
-    PowerMockito.mockStatic(UserGroupInformation.class);
-    PowerMockito.when(UserGroupInformation.getCurrentUser()).thenReturn(ugi);
-    when(ugi.getShortUserName()).thenReturn("user1");
+  @Test
+  public void testReplicationDefaultValue()
+      throws IOException, URISyntaxException {
+    Configuration conf = new OzoneConfiguration();
+    int defaultValue = conf.getInt(OzoneConfigKeys.OZONE_REPLICATION, 3);
+    mockObjectStore(conf);
+    mockUser();
 
     URI uri = new URI("o3fs://bucket1.volume1/key");
+    FileSystem fs = FileSystem.get(uri, conf);
 
-    FileSystem fileSystem = FileSystem.get(uri, conf);
-    OzoneFileSystem ozfs = (OzoneFileSystem) fileSystem;
+    assertEquals(defaultValue, fs.getDefaultReplication(new Path("/any")));
+  }
 
-    assertEquals(ozfs.getUri().getAuthority(), "bucket1.volume1");
-    PowerMockito.verifyStatic();
-    OzoneClientFactory.getRpcClient(conf);
+  @Test
+  public void testReplicationCustomValue()
+      throws IOException, URISyntaxException {
+    Configuration conf = new OzoneConfiguration();
+    short configured = 1;
+    conf.setInt(OzoneConfigKeys.OZONE_REPLICATION, configured);
+    mockObjectStore(conf);
+    mockUser();
+
+    URI uri = new URI("o3fs://bucket1.volume1/key");
+    FileSystem fs = FileSystem.get(uri, conf);
+
+    assertEquals(configured, fs.getDefaultReplication(new Path("/any")));
   }
 }

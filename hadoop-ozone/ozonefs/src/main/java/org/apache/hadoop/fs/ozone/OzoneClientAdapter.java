@@ -65,6 +65,8 @@ public interface OzoneClientAdapter {
 
   String getCanonicalServiceName();
 
+  short getDefaultReplication();
+
   FileStatusAdapter getFileStatus(String key, URI uri,
       Path qualifiedPath, String userName) throws IOException;
 
