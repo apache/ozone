@@ -21,10 +21,19 @@ Library             BuiltIn
 Resource            ../commonlib.robot
 
 *** Variables ***
-${ENDPOINT_URL}     http://recon:9888
+${ENDPOINT_URL}       http://recon:9888
+${API_ENDPOINT_URL}   http://recon:9888/api/v1
 
 *** Test Cases ***
 Recon REST API
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
-    ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}/api/containers
+    ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/containers
                         Should contain      ${result}       containers
+    ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/datanodes
+                        Should contain      ${result}       datanodes
+                        Should contain      ${result}       ozone_datanode_1.ozone_default
+                        Should contain      ${result}       ozone_datanode_2.ozone_default
+                        Should contain      ${result}       ozone_datanode_3.ozone_default
+Recon Web UI
+    ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}
+                        Should contain      ${result}       Ozone Recon

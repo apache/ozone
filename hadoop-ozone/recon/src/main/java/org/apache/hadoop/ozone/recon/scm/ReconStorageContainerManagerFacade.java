@@ -27,8 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import javax.inject.Inject;
 
+import com.google.inject.Inject;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
@@ -99,7 +99,6 @@ public class ReconStorageContainerManagerFacade
         new ReconPipelineManager(conf, nodeManager, eventQueue);
     this.containerManager = new ReconContainerManager(conf, pipelineManager);
     this.scmServiceProvider = scmServiceProvider;
-    initializePipelinesFromScm();
 
     NodeReportHandler nodeReportHandler =
         new NodeReportHandler(nodeManager);
@@ -120,6 +119,7 @@ public class ReconStorageContainerManagerFacade
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager,
             scmServiceProvider);
+
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager, scmServiceProvider);
@@ -180,6 +180,7 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
+    initializePipelinesFromScm();
     getDatanodeProtocolServer().start();
     this.reconScmTasks.forEach(ReconScmTask::start);
   }
@@ -251,5 +252,9 @@ public class ReconStorageContainerManagerFacade
   @Override
   public ReplicationManager getReplicationManager() {
     return null;
+  }
+
+  public EventQueue getEventQueue() {
+    return eventQueue;
   }
 }

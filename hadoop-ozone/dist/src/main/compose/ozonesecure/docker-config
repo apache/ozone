@@ -38,6 +38,7 @@ OZONE-SITE.XML_ozone.recon.authentication.kerberos.principal=HTTP/recon@EXAMPLE.
 OZONE-SITE.XML_ozone.recon.keytab.file=/etc/security/keytabs/HTTP.keytab
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_recon.om.snapshot.task.initial.delay=20s
+OZONE-SITE.XML_ozone.recon.address=recon:9891
 
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true
