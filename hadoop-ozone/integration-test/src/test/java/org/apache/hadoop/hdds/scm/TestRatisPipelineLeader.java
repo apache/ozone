@@ -38,11 +38,13 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * Test pipeline leader information is correctly used.
  */
+@Ignore("HDDS-3038")
 public class TestRatisPipelineLeader {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
