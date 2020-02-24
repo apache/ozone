@@ -39,6 +39,8 @@ Run ozoneFS tests
                         Execute               ozone fs -copyFromLocal NOTICE.txt o3fs://bucket1.fstest/testdir/deep/
     ${result} =         Execute               ozone sh key list o3://om/fstest/bucket1 | jq -r '.name'
                         Should contain    ${result}         NOTICE.txt
+    ${result} =         Execute               ozone sh key info o3://om/fstest/bucket1/testdir/deep/NOTICE.txt | jq -r '.replicationFactor'
+                        Should Be Equal   ${result}         3
 
                         Execute               ozone fs -put NOTICE.txt o3fs://bucket1.fstest/testdir/deep/PUTFILE.txt
     ${result} =         Execute               ozone sh key list o3://om/fstest/bucket1 | jq -r '.name'
