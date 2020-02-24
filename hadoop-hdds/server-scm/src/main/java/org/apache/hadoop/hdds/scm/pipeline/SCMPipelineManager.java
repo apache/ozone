@@ -160,11 +160,13 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   private void recordMetricsForPipeline(Pipeline pipeline) {
+    metrics.incNumPipelineAllocated();
+    if (pipeline.isOpen()) {
+      metrics.incNumPipelineCreated();
+      metrics.createPerPipelineMetrics(pipeline);
+    }
     switch (pipeline.getType()) {
     case STAND_ALONE:
-      if (pipeline.isOpen()) {
-        metrics.createPerPipelineMetrics(pipeline);
-      }
       return;
     case RATIS:
       List<Pipeline> overlapPipelines = RatisPipelineUtils
@@ -201,11 +203,6 @@ public class SCMPipelineManager implements PipelineManager {
           pipeline.getProtobufMessage().toByteArray());
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
-      metrics.incNumPipelineAllocated();
-      if (pipeline.isOpen()) {
-        metrics.incNumPipelineCreated();
-        metrics.createPerPipelineMetrics(pipeline);
-      }
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {
