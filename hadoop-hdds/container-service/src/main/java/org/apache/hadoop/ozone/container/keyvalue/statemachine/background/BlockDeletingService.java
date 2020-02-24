@@ -185,7 +185,7 @@ public class BlockDeletingService extends BackgroundService {
           long containerBCSID = containerData.getBlockCommitSequenceId();
           if (minReplicatedIndex >= 0 && minReplicatedIndex < containerBCSID) {
             LOG.warn("Close Container log Index {} is not replicated across all"
-                    + "the servers in the pipeline {} as the min replicated "
+                    + " the servers in the pipeline {} as the min replicated "
                     + "index is {}. Deletion is not allowed in this container "
                     + "yet.", containerBCSID,
                 containerData.getOriginPipelineId(), minReplicatedIndex);
