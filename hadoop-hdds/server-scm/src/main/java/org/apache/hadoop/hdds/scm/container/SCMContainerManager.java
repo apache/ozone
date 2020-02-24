@@ -24,13 +24,17 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataStore;
@@ -73,6 +77,8 @@ public class SCMContainerManager implements ContainerManager {
 
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
+  private final EventPublisher eventPublisher;
+
   /**
    * Constructs a mapping class that creates mapping between container names
    * and pipelines.
@@ -82,10 +88,12 @@ public class SCMContainerManager implements ContainerManager {
    * in MB.
    * @param conf - {@link Configuration}
    * @param pipelineManager - {@link PipelineManager}
+   * @param eventQueue
    * @throws IOException on Failure.
    */
   public SCMContainerManager(final Configuration conf,
-      PipelineManager pipelineManager) throws IOException {
+      PipelineManager pipelineManager, EventQueue eventQueue)
+      throws IOException {
 
     final File containerDBPath = getContainerDBPath(conf);
     final int cacheSize = conf.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
@@ -103,6 +111,7 @@ public class SCMContainerManager implements ContainerManager {
     this.numContainerPerOwnerInPipeline = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
+    this.eventPublisher = eventQueue;
 
     loadExistingContainers();
 
@@ -117,9 +126,17 @@ public class SCMContainerManager implements ContainerManager {
           ContainerInfoProto.PARSER.parseFrom(entry.getValue()));
       Preconditions.checkNotNull(container);
       containerStateManager.loadContainer(container);
-      if (container.getState() == LifeCycleState.OPEN) {
-        pipelineManager.addContainerToPipeline(container.getPipelineID(),
-            ContainerID.valueof(container.getContainerID()));
+      try {
+        if (container.getState() == LifeCycleState.OPEN) {
+          pipelineManager.addContainerToPipeline(container.getPipelineID(),
+              ContainerID.valueof(container.getContainerID()));
+        }
+      } catch (PipelineNotFoundException ex) {
+        LOG.warn("Found a Container {} which is in {} state with out a " +
+            "pipeline {}. Triggering Close Container.", container,
+            container.getState(), container.getPipelineID());
+        eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER,
+            container.containerID());
       }
     }
   }

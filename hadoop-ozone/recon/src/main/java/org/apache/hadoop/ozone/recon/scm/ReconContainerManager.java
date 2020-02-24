@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,11 +52,13 @@ public class ReconContainerManager extends SCMContainerManager {
    *
    * @param conf            - {@link Configuration}
    * @param pipelineManager - {@link PipelineManager}
+   * @param eventQueue
    * @throws IOException on Failure.
    */
   public ReconContainerManager(
-      Configuration conf, PipelineManager pipelineManager) throws IOException {
-    super(conf, pipelineManager);
+      Configuration conf, PipelineManager pipelineManager,
+      EventQueue eventQueue) throws IOException {
+    super(conf, pipelineManager, eventQueue);
   }
 
   @Override

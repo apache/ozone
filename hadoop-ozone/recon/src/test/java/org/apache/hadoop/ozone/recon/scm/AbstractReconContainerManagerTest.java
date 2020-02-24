@@ -60,7 +60,8 @@ public class AbstractReconContainerManagerTest {
     NodeManager nodeManager =
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
     pipelineManager = new ReconPipelineManager(conf, nodeManager, eventQueue);
-    containerManager = new ReconContainerManager(conf, pipelineManager);
+    containerManager = new ReconContainerManager(conf, pipelineManager,
+        eventQueue);
   }
 
   @After

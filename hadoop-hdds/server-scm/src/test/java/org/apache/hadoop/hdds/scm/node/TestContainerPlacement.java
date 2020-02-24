@@ -108,7 +108,7 @@ public class TestContainerPlacement {
         OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
     PipelineManager pipelineManager =
         new SCMPipelineManager(config, scmNodeManager, eventQueue);
-    return new SCMContainerManager(config, pipelineManager);
+    return new SCMContainerManager(config, pipelineManager, eventQueue);
 
   }
 

@@ -95,9 +95,11 @@ public class TestSCMContainerManager {
       throw new IOException("Unable to create test directory path");
     }
     nodeManager = new MockNodeManager(true, 10);
+    EventQueue eventQueue = new EventQueue();
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue());
-    containerManager = new SCMContainerManager(conf, pipelineManager);
+        new SCMPipelineManager(conf, nodeManager, eventQueue);
+    containerManager = new SCMContainerManager(conf, pipelineManager,
+        eventQueue);
     xceiverClientManager = new XceiverClientManager(conf);
     replicationFactor = SCMTestUtils.getReplicationFactor(conf);
     replicationType = SCMTestUtils.getReplicationType(conf);
