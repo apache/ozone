@@ -19,12 +19,16 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_DB_JDBC_URL;
 
 import java.io.File;
@@ -757,9 +761,24 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           tempNewFolder.getAbsolutePath());
       conf.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, tempNewFolder
           .getAbsolutePath());
+      conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+          tempNewFolder.getAbsolutePath());
+      conf.set(OZONE_RECON_SCM_DB_DIR,
+          tempNewFolder.getAbsolutePath());
 
       conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:" +
           tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
+
+      int httpPort = reconHttpPort.orElse(0);
+      conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:" + httpPort);
+
+      int rpcPort = NetUtils.getFreeSocketPort();
+      if (reconDatanodePort.isPresent()) {
+        rpcPort = reconDatanodePort.get();
+      }
+      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:" + rpcPort);
+      conf.set(OZONE_RECON_ADDRESS_KEY, "0.0.0.0:" + rpcPort);
+
       ConfigurationProvider.setConfiguration(conf);
     }
   }

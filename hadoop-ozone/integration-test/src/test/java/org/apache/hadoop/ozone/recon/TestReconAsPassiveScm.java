@@ -21,20 +21,14 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
 import java.util.Optional;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -49,7 +43,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -71,20 +64,12 @@ public class TestReconAsPassiveScm {
 
   @Before
   public void init() throws Exception {
-    File dir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
-    String reconHTTPAddress = "localhost:" + NetUtils.getFreeSocketPort();
-    conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, reconHTTPAddress);
-
     int reconDnPort = NetUtils.getFreeSocketPort();
-    conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:" + reconDnPort);
-    conf.set(OZONE_RECON_ADDRESS_KEY, "0.0.0.0:" + reconDnPort);
-    conf.set(OZONE_RECON_SCM_DB_DIR,
-        temporaryFolder.newFolder().getAbsolutePath());
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "10s");
     conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "10s");
-    cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
+    cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
+        .setReconDatanodePort(reconDnPort).build();
     cluster.waitForClusterToBeReady();
   }
 
