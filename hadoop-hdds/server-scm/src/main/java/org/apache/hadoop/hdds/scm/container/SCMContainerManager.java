@@ -360,7 +360,7 @@ public class SCMContainerManager implements ContainerManager {
       containerStateManager.updateContainerState(containerID, event);
       final LifeCycleState newState = container.getState();
 
-      if (skipPipelineToContainerRemove) {
+      if (!skipPipelineToContainerRemove) {
         if (oldState == LifeCycleState.OPEN &&
             newState != LifeCycleState.OPEN) {
           pipelineManager
