@@ -234,7 +234,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   @Override
   public void stop() {
     LOG.info("Stopping Recon Task Controller.");
-    this.executorService.shutdownNow();
+    if (this.executorService != null) {
+      this.executorService.shutdownNow();
+    }
   }
 
   /**
