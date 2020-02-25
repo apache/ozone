@@ -70,19 +70,21 @@ public class ReconIncrementalContainerReportHandler
         final DatanodeDetails dd = report.getDatanodeDetails();
         final ContainerID id = ContainerID.valueof(
             replicaProto.getContainerID());
-        if (!getContainerManager().exists(id)) {
-          LOG.info("New container {} got from {}.", id,
-              report.getDatanodeDetails());
-          try {
-            ContainerWithPipeline containerWithPipeline =
-                scmClient.getContainerWithPipeline(id.getId());
-            LOG.info("Verified new container from SCM {} ",
-                containerWithPipeline.getContainerInfo().containerID());
-            containerManager.addNewContainer(id.getId(), containerWithPipeline);
-          } catch (IOException ioEx) {
-            LOG.error("Exception while getting new container info from SCM",
-                ioEx);
-            return;
+        synchronized (getContainerManager()) {
+          if (!getContainerManager().exists(id)) {
+            LOG.info("New container {} got from {}.", id,
+                report.getDatanodeDetails());
+            try {
+              ContainerWithPipeline containerWithPipeline =
+                  scmClient.getContainerWithPipeline(id.getId());
+              LOG.info("Verified new container from SCM {} ",
+                  containerWithPipeline.getContainerInfo().containerID());
+              containerManager.addNewContainer(id.getId(),
+                  containerWithPipeline);
+            } catch (IOException ioEx) {
+              LOG.error("Exception while handling new container {}", id, ioEx);
+              return;
+            }
           }
         }
         getNodeManager().addContainer(dd, id);
