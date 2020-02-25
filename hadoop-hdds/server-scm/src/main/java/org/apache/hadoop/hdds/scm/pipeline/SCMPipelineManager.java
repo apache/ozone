@@ -153,6 +153,8 @@ public class SCMPipelineManager implements PipelineManager {
           .newBuilder(HddsProtos.Pipeline.PARSER.parseFrom(entry.getValue()));
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.setState(
           HddsProtos.PipelineState.PIPELINE_ALLOCATED).build());
+      // When SCM is restarted, set Creation time with current time.
+      pipeline.setCreationTimestamp(Instant.now());
       Preconditions.checkNotNull(pipeline);
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);

@@ -27,8 +27,6 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.junit.Assert;
 import org.junit.Assume;
-import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -46,7 +44,6 @@ import static org.junit.Assert.assertTrue;
 /**
  * Test for RatisPipelineProvider.
  */
-@Ignore("HDDS-3036")
 public class TestRatisPipelineProvider {
 
   private static final HddsProtos.ReplicationType REPLICATION_TYPE =
@@ -56,10 +53,9 @@ public class TestRatisPipelineProvider {
   private PipelineProvider provider;
   private PipelineStateManager stateManager;
   private OzoneConfiguration conf;
-  private int maxPipelinePerNode = 2;
 
-  @Before
-  public void init() throws Exception {
+
+  public void init(int maxPipelinePerNode) throws Exception {
     nodeManager = new MockNodeManager(true, 10);
     conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
@@ -92,7 +88,8 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
-  public void testCreatePipelineWithFactor() throws IOException {
+  public void testCreatePipelineWithFactor() throws Exception {
+    init(1);
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline = provider.create(factor);
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
@@ -110,12 +107,14 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
-  public void testCreatePipelineWithFactorThree() throws IOException {
+  public void testCreatePipelineWithFactorThree() throws Exception {
+    init(1);
     createPipelineAndAssertions(HddsProtos.ReplicationFactor.THREE);
   }
 
   @Test
-  public void testCreatePipelineWithFactorOne() throws IOException {
+  public void testCreatePipelineWithFactorOne() throws Exception {
+    init(1);
     createPipelineAndAssertions(HddsProtos.ReplicationFactor.ONE);
   }
 
@@ -128,7 +127,8 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
-  public void testCreatePipelineWithNodes() {
+  public void testCreatePipelineWithNodes() throws Exception {
+    init(1);
     HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
     Pipeline pipeline =
         provider.create(factor, createListOfNodes(factor.getNumber()));
@@ -142,7 +142,9 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
-  public void testCreateFactorTHREEPipelineWithSameDatanodes() {
+  public void testCreateFactorTHREEPipelineWithSameDatanodes()
+      throws Exception {
+    init(2);
     List<DatanodeDetails> healthyNodes = nodeManager
         .getNodes(HddsProtos.NodeState.HEALTHY).stream()
         .limit(3).collect(Collectors.toList());
@@ -156,7 +158,10 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
-  public void testCreatePipelinesDnExclude() throws IOException {
+  public void testCreatePipelinesDnExclude() throws Exception {
+
+    int maxPipelinePerNode = 2;
+    init(maxPipelinePerNode);
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
 
