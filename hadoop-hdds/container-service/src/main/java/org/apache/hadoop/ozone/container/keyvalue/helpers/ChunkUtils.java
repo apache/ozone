@@ -240,9 +240,13 @@ public final class ChunkUtils {
    * @return - File.
    */
   public static File getChunkFile(KeyValueContainerData containerData,
-                                  ChunkInfo info) throws
-      StorageContainerException {
+      ChunkInfo info) throws StorageContainerException {
+    File chunksLoc = verifyChunkDirExists(containerData);
+    return chunksLoc.toPath().resolve(info.getChunkName()).toFile();
+  }
 
+  public static File verifyChunkDirExists(KeyValueContainerData containerData)
+      throws StorageContainerException {
     Preconditions.checkNotNull(containerData, "Container data can't be null");
 
     String chunksPath = containerData.getChunksPath();
@@ -257,8 +261,7 @@ public final class ChunkUtils {
       throw new StorageContainerException("Unable to get Chunks directory.",
           UNABLE_TO_FIND_DATA_DIR);
     }
-
-    return chunksLoc.toPath().resolve(info.getChunkName()).toFile();
+    return chunksLoc;
   }
 
   /**

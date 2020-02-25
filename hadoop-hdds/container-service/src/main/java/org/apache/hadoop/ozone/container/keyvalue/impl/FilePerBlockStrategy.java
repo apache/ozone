@@ -186,9 +186,10 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   private static File getChunkFile(
-      KeyValueContainerData containerData, BlockID blockID) {
-    return new File(containerData.getChunksPath(),
-        blockID.getLocalID() + ".block");
+      KeyValueContainerData containerData, BlockID blockID)
+      throws StorageContainerException {
+    File chunkDir = ChunkUtils.verifyChunkDirExists(containerData);
+    return new File(chunkDir, blockID.getLocalID() + ".block");
   }
 
   private static final class OpenFiles {
