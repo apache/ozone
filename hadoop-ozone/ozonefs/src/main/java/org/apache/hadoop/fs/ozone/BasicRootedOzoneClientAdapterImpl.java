@@ -33,6 +33,7 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,6 +59,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
@@ -434,16 +436,16 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   public FileStatusAdapter getFileStatus(String path, URI uri,
-      Path qualifiedPath, String userName)
-      throws IOException {
+      Path qualifiedPath, String userName) throws IOException {
     incrementCounter(Statistic.OBJECTS_QUERY);
     OFSPath ofsPath = new OFSPath(path);
     String key = ofsPath.getKeyName();
-    // getFileStatus is called for root
-    if (ofsPath.getVolumeName().isEmpty() &&
-        ofsPath.getBucketName().isEmpty()) {
-      // Generate a FileStatusAdapter for root
-      return rootFileStatusAdapter();
+    if (ofsPath.isRoot()) {
+      return getFileStatusAdapterForRoot(uri);
+    }
+    if (ofsPath.isVolume()) {
+      OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+      return getFileStatusAdapterForVolume(volume, uri);
     }
     try {
       OzoneBucket bucket = getBucket(ofsPath, false);
@@ -452,11 +454,9 @@ public class BasicRootedOzoneClientAdapterImpl
       //  BasicRootedOzoneFileSystem#getFileStatus. No need to prepend here.
       makeQualified(status, uri, qualifiedPath, userName);
       return toFileStatusAdapter(status);
-
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
-        throw new
-            FileNotFoundException(key + ": No such file or directory!");
+        throw new FileNotFoundException(key + ": No such file or directory!");
       }
       throw e;
     }
@@ -487,6 +487,59 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
+   * Helper for OFS listStatus on root.
+   */
+  private List<FileStatusAdapter> listStatusRoot(
+      boolean recursive, String startPath, long numEntries,
+      URI uri, Path workingDir, String username) throws IOException {
+
+    OFSPath ofsStartPath = new OFSPath(startPath);
+    // list volumes
+    Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
+        username, ofsStartPath.getVolumeName(), null);
+    List<FileStatusAdapter> res = new ArrayList<>();
+    // TODO: Test continuation
+    while (iter.hasNext() && res.size() <= numEntries) {
+      OzoneVolume volume = iter.next();
+      res.add(getFileStatusAdapterForVolume(volume, uri));
+      if (recursive) {
+        String pathStrNextVolume = volume.getName();
+        // TODO: Check startPath
+        res.addAll(listStatus(pathStrNextVolume, recursive, startPath,
+            numEntries - res.size(), uri, workingDir, username));
+      }
+    }
+    return res;
+  }
+
+  /**
+   * Helper for OFS listStatus on a volume.
+   */
+  private List<FileStatusAdapter> listStatusVolume(String volumeStr,
+      boolean recursive, String startPath, long numEntries,
+      URI uri, Path workingDir, String username) throws IOException {
+
+    OFSPath ofsStartPath = new OFSPath(startPath);
+    // list buckets in the volume
+    OzoneVolume volume = objectStore.getVolume(volumeStr);
+    Iterator<? extends OzoneBucket> iter =
+        volume.listBuckets(null, ofsStartPath.getBucketName());
+    List<FileStatusAdapter> res = new ArrayList<>();
+    // TODO: Test continuation
+    while (iter.hasNext() && res.size() <= numEntries) {
+      OzoneBucket bucket = iter.next();
+      res.add(getFileStatusAdapterForBucket(bucket, uri, username));
+      if (recursive) {
+        String pathStrNext = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
+        // TODO: Check startPath
+        res.addAll(listStatus(pathStrNext, recursive, startPath,
+            numEntries - res.size(), uri, workingDir, username));
+      }
+    }
+    return res;
+  }
+
+  /**
    * OFS listStatus implementation.
    *
    * @param pathStr Path for the listStatus to operate on.
@@ -511,9 +564,18 @@ public class BasicRootedOzoneClientAdapterImpl
 
     incrementCounter(Statistic.OBJECTS_LIST);
     OFSPath ofsPath = new OFSPath(pathStr);
-    // TODO: Subject to change in HDDS-2928.
-    String keyName = ofsPath.getKeyName();
+    if (ofsPath.isRoot()) {
+      return listStatusRoot(
+          recursive, startPath, numEntries, uri, workingDir, username);
+    }
     OFSPath ofsStartPath = new OFSPath(startPath);
+    if (ofsPath.isVolume()) {
+      String startBucket = ofsStartPath.getBucketName();
+      return listStatusVolume(ofsPath.getVolumeName(),
+          recursive, startBucket, numEntries, uri, workingDir, username);
+    }
+
+    String keyName = ofsPath.getKeyName();
     // Internally we need startKey to be passed into bucket.listStatus
     String startKey = ofsStartPath.getKeyName();
     try {
@@ -665,25 +727,65 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
+   * Generate a FileStatusAdapter for a volume.
+   * @param ozoneVolume OzoneVolume object
+   * @param uri Full URI to OFS root.
+   * @return FileStatusAdapter for a volume.
+   */
+  private static FileStatusAdapter getFileStatusAdapterForVolume(
+      OzoneVolume ozoneVolume, URI uri) {
+    String pathStr = uri.toString() +
+        OZONE_URI_DELIMITER + ozoneVolume.getName();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("getFileStatusAdapterForVolume: ozoneVolume={}, pathStr={}",
+          ozoneVolume.getName(), pathStr);
+    }
+    Path path = new Path(pathStr);
+    return new FileStatusAdapter(0L, path, true, (short)0, 0L,
+        ozoneVolume.getCreationTime().getEpochSecond() * 1000, 0L,
+        FsPermission.getDirDefault().toShort(),
+        // TODO: Revisit owner and admin
+        ozoneVolume.getOwner(), ozoneVolume.getAdmin(), path
+    );
+  }
+
+  /**
+   * Generate a FileStatusAdapter for a bucket.
+   * @param ozoneBucket OzoneBucket object.
+   * @param uri Full URI to OFS root.
+   * @return FileStatusAdapter for a bucket.
+   */
+  private static FileStatusAdapter getFileStatusAdapterForBucket(
+      OzoneBucket ozoneBucket, URI uri, String username) {
+    String pathStr = uri.toString() +
+        OZONE_URI_DELIMITER + ozoneBucket.getVolumeName() +
+        OZONE_URI_DELIMITER + ozoneBucket.getName();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("getFileStatusAdapterForBucket: ozoneBucket={}, pathStr={}, "
+              + "username={}", ozoneBucket.getVolumeName() + OZONE_URI_DELIMITER
+              + ozoneBucket.getName(), pathStr, username);
+    }
+    Path path = new Path(pathStr);
+    return new FileStatusAdapter(0L, path, true, (short)0, 0L,
+        ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
+        FsPermission.getDirDefault().toShort(),  // TODO: derive from ACLs later
+        // TODO: revisit owner and group
+        username, username, path);
+  }
+
+  /**
    * Generate a FileStatusAdapter for OFS root.
+   * @param uri Full URI to OFS root.
    * @return FileStatusAdapter for root.
    */
-  private static FileStatusAdapter rootFileStatusAdapter() {
+  private static FileStatusAdapter getFileStatusAdapterForRoot(URI uri) {
     // Note that most fields are mimicked from HDFS FileStatus for root,
     //  except modification time, permission, owner and group.
-    // TODO: Revisit the return value.
-    return new FileStatusAdapter(
-        0L,
-        null,
-        true,
-        (short)0,
-        0L,
-        0L,
-        0L,
-        (short)00755,
-        null,
-        null,
-        null
+    Path path = new Path(uri.toString() + OZONE_URI_DELIMITER);
+    return new FileStatusAdapter(0L, path, true, (short)0, 0L,
+        System.currentTimeMillis(), 0L,
+        FsPermission.getDirDefault().toShort(),
+        null, null, null
     );
   }
 }

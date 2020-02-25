@@ -142,4 +142,20 @@ class OFSPath {
   public boolean isInSameBucketAs(OFSPath p2) {
     return isInSameBucketAsInternal(this, p2);
   }
+
+  /**
+   * If both volume and bucket names are empty, the given path is root.
+   * i.e. /
+   */
+  public boolean isRoot() {
+    return this.getVolumeName().isEmpty() && this.getBucketName().isEmpty();
+  }
+
+  /**
+   * If bucket name is empty but volume name is not, the given path is volume.
+   * e.g. /volume1
+   */
+  public boolean isVolume() {
+    return this.getBucketName().isEmpty() && !this.getVolumeName().isEmpty();
+  }
 }
