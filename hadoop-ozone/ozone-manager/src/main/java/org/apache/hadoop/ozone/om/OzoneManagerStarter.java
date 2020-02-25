@@ -61,8 +61,13 @@ public class OzoneManagerStarter extends GenericCli {
      * if someone runs "ozone om" with no parameters, this is the method
      * which runs and starts the OM.
      */
-    commonInit();
-    startOm();
+    try {
+      commonInit();
+      startOm();
+    } catch (Exception ex) {
+      LOG.error("OM start failed with exception", ex);
+      throw ex;
+    }
     return null;
   }
 

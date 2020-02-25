@@ -130,7 +130,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
    * Increments number of blocks allocated for the pipeline.
    */
   void incNumBlocksAllocated(PipelineID pipelineID) {
-    Optional.of(numBlocksAllocated.get(pipelineID)).ifPresent(
+    Optional.ofNullable(numBlocksAllocated.get(pipelineID)).ifPresent(
         MutableCounterLong::incr);
   }
 
