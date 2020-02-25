@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentracing.Scope;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
