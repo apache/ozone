@@ -39,7 +39,6 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -74,7 +73,6 @@ public class TestRatisPipelineLeader {
             HddsProtos.ReplicationFactor.THREE);
     Assert.assertFalse(pipelines.isEmpty());
     Pipeline ratisPipeline = pipelines.iterator().next();
-//    GenericTestUtils.waitFor(ratisPipeline::isHealthy, 100, 20000);
     Assert.assertTrue(ratisPipeline.isHealthy());
     // Verify correct leader info populated
     verifyLeaderInfo(ratisPipeline);
