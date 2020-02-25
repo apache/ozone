@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm;
 import java.util.List;
 import java.util.Optional;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -44,7 +45,6 @@ import org.junit.Test;
 /**
  * Test pipeline leader information is correctly used.
  */
-@Ignore("HDDS-3038")
 public class TestRatisPipelineLeader {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -52,6 +52,7 @@ public class TestRatisPipelineLeader {
   @BeforeClass
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, "100ms");
     cluster = MiniOzoneCluster
         .newBuilder(conf)
         .setNumDatanodes(3)
@@ -69,16 +70,17 @@ public class TestRatisPipelineLeader {
   @Test(timeout = 120000)
   public void testLeaderIdUsedOnFirstCall() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelines();
-    Optional<Pipeline> ratisPipeline = pipelines.stream().filter(p ->
-        p.getType().equals(HddsProtos.ReplicationType.RATIS)).findFirst();
-    Assert.assertTrue(ratisPipeline.isPresent());
-    Assert.assertTrue(ratisPipeline.get().isHealthy());
+        .getPipelineManager().getPipelines(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
+    Assert.assertFalse(pipelines.isEmpty());
+    Pipeline ratisPipeline = pipelines.iterator().next();
+//    GenericTestUtils.waitFor(ratisPipeline::isHealthy, 100, 20000);
+    Assert.assertTrue(ratisPipeline.isHealthy());
     // Verify correct leader info populated
-    verifyLeaderInfo(ratisPipeline.get());
+    verifyLeaderInfo(ratisPipeline);
     // Verify client connects to Leader without NotLeaderException
     XceiverClientRatis xceiverClientRatis =
-        XceiverClientRatis.newXceiverClientRatis(ratisPipeline.get(), conf);
+        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf);
     Logger.getLogger(GrpcClientProtocolService.class).setLevel(Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(GrpcClientProtocolService.LOG);
@@ -93,19 +95,19 @@ public class TestRatisPipelineLeader {
   @Test(timeout = 120000)
   public void testLeaderIdAfterLeaderChange() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelines();
-    Optional<Pipeline> ratisPipeline = pipelines.stream().filter(p ->
-        p.getType().equals(HddsProtos.ReplicationType.RATIS)).findFirst();
-    Assert.assertTrue(ratisPipeline.isPresent());
-    Assert.assertTrue(ratisPipeline.get().isHealthy());
+        .getPipelineManager().getPipelines(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE);
+    Assert.assertFalse(pipelines.isEmpty());
+    Pipeline ratisPipeline = pipelines.iterator().next();
+    Assert.assertTrue(ratisPipeline.isHealthy());
     Optional<HddsDatanodeService> dnToStop =
         cluster.getHddsDatanodes().stream().filter(s ->
             !s.getDatanodeStateMachine().getDatanodeDetails().getUuid().equals(
-                ratisPipeline.get().getLeaderId())).findAny();
+                ratisPipeline.getLeaderId())).findAny();
     Assert.assertTrue(dnToStop.isPresent());
     dnToStop.get().stop();
-    GenericTestUtils.waitFor(() -> ratisPipeline.get().isHealthy(), 300, 5000);
-    verifyLeaderInfo(ratisPipeline.get());
+    Thread.sleep(2000); // wait long enough based on HB interval
+    verifyLeaderInfo(ratisPipeline);
   }
 
   private void verifyLeaderInfo(Pipeline ratisPipeline) throws Exception {
