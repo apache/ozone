@@ -81,7 +81,7 @@ public class TestOzoneManagerRestart {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 1);
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     cluster =  MiniOzoneCluster.newBuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)

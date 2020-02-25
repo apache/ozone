@@ -630,6 +630,7 @@ public class SCMPipelineManager implements PipelineManager {
     this.isInSafeMode.set(safeModeStatus);
   }
 
+  @Override
   public boolean getSafeModeStatus() {
     return this.isInSafeMode.get();
   }
