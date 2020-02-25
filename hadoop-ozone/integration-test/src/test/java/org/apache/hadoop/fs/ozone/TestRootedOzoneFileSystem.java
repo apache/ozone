@@ -43,11 +43,15 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
 /**
@@ -68,6 +72,7 @@ public class TestRootedOzoneFileSystem {
   private String bucketName;
   // Store path commonly used by tests that test functionality within a bucket
   private Path testBucketPath;
+  private String rootPath;
 
   @Before
   public void init() throws Exception {
@@ -82,10 +87,11 @@ public class TestRootedOzoneFileSystem {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     volumeName = bucket.getVolumeName();
     bucketName = bucket.getName();
-    String testBucketStr = "/" + volumeName + "/" + bucketName;
+    String testBucketStr =
+        OZONE_URI_DELIMITER + volumeName + OZONE_URI_DELIMITER + bucketName;
     testBucketPath = new Path(testBucketStr);
 
-    String rootPath = String.format("%s://%s/",
+    rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
 
     // Set the fs.defaultFS and start the filesystem
@@ -213,7 +219,7 @@ public class TestRootedOzoneFileSystem {
   /**
    * OFS: Helper function for tests. Return a volume name that doesn't exist.
    */
-  private String getRandomNonExistVolumeName() throws Exception {
+  private String getRandomNonExistVolumeName() throws IOException {
     final int numDigit = 5;
     long retriesLeft = Math.round(Math.pow(10, 5));
     String name = null;
@@ -230,7 +236,7 @@ public class TestRootedOzoneFileSystem {
       }
     }
     if (retriesLeft <= 0) {
-      throw new Exception(
+      Assert.fail(
           "Failed to generate random volume name that doesn't exist already.");
     }
     return name;
@@ -328,10 +334,10 @@ public class TestRootedOzoneFileSystem {
     Path root = new Path("/");
     FileStatus fileStatus = fs.getFileStatus(root);
     Assert.assertNotNull(fileStatus);
-    Assert.assertNull(fileStatus.getPath());
+    Assert.assertEquals(new Path(rootPath), fileStatus.getPath());
     Assert.assertTrue(fileStatus.isDirectory());
-    Assert.assertEquals(
-        new FsPermission((short)00755), fileStatus.getPermission());
+    Assert.assertEquals(FsPermission.getDirDefault(),
+        fileStatus.getPermission());
   }
 
   /**
@@ -465,7 +471,8 @@ public class TestRootedOzoneFileSystem {
     fs.mkdirs(leafInsideInterimPath);
 
     // Attempt to rename the key to a different bucket
-    Path bucket2 = new Path("/" + volumeName + "/" + bucketName + "test");
+    Path bucket2 = new Path(OZONE_URI_DELIMITER + volumeName +
+        OZONE_URI_DELIMITER + bucketName + "test");
     Path leafInTargetInAnotherBucket = new Path(bucket2, "leaf");
     try {
       fs.rename(leafInsideInterimPath, leafInTargetInAnotherBucket);
@@ -480,7 +487,7 @@ public class TestRootedOzoneFileSystem {
       throws IOException {
     String key = ofs.pathToKey(keyPath);
     if (isDirectory) {
-      key = key + "/";
+      key = key + OZONE_URI_DELIMITER;
     }
     OFSPath ofsPath = new OFSPath(key);
     String keyInBucket = ofsPath.getKeyName();
@@ -490,6 +497,123 @@ public class TestRootedOzoneFileSystem {
 
   private void assertKeyNotFoundException(IOException ex) {
     GenericTestUtils.assertExceptionContains("KEY_NOT_FOUND", ex);
+  }
+
+  /**
+   * Helper function for testListStatusRootAndVolume*.
+   */
+  private Path createRandomVolumeBucketWithDirs() throws IOException {
+    String volume1 = getRandomNonExistVolumeName();
+    String bucket1 = "bucket-" + RandomStringUtils.randomNumeric(5);
+    Path bucketPath1 = new Path(
+        OZONE_URI_DELIMITER + volume1 + OZONE_URI_DELIMITER + bucket1);
+
+    Path dir1 = new Path(bucketPath1, "dir1");
+    fs.mkdirs(dir1);  // Intentionally creating this "in-the-middle" dir key
+    Path subdir1 = new Path(dir1, "subdir1");
+    fs.mkdirs(subdir1);
+    Path dir2 = new Path(bucketPath1, "dir2");
+    fs.mkdirs(dir2);
+
+    return bucketPath1;
+  }
+
+  /**
+   * OFS: Test non-recursive listStatus on root and volume.
+   */
+  @Test
+  public void testListStatusRootAndVolumeNonRecursive() throws Exception {
+    Path bucketPath1 = createRandomVolumeBucketWithDirs();
+    createRandomVolumeBucketWithDirs();
+    // listStatus("/volume/bucket")
+    FileStatus[] fileStatusBucket = ofs.listStatus(bucketPath1);
+    Assert.assertEquals(2, fileStatusBucket.length);
+    // listStatus("/volume")
+    Path volume = new Path(
+        OZONE_URI_DELIMITER + new OFSPath(bucketPath1).getVolumeName());
+    FileStatus[] fileStatusVolume = ofs.listStatus(volume);
+    Assert.assertEquals(1, fileStatusVolume.length);
+    // listStatus("/")
+    Path root = new Path(OZONE_URI_DELIMITER);
+    FileStatus[] fileStatusRoot = ofs.listStatus(root);
+    Assert.assertEquals(2, fileStatusRoot.length);
+  }
+
+  /**
+   * Helper function to do FileSystem#listStatus recursively.
+   * Simulate what FsShell does, using DFS.
+   */
+  private void listStatusRecursiveHelper(Path curPath, List<FileStatus> result)
+      throws IOException {
+    FileStatus[] startList = ofs.listStatus(curPath);
+    for (FileStatus fileStatus : startList) {
+      result.add(fileStatus);
+      if (fileStatus.isDirectory()) {
+        Path nextPath = fileStatus.getPath();
+        listStatusRecursiveHelper(nextPath, result);
+      }
+    }
+  }
+
+  /**
+   * Helper function to call adapter impl for listStatus (with recursive).
+   */
+  private List<FileStatus> listStatusCallAdapterHelper(String pathStr)
+      throws IOException {
+    // FileSystem interface does not support recursive listStatus, use adapter
+    BasicRootedOzoneClientAdapterImpl adapter =
+        (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+    return adapter.listStatus(pathStr, true, "", 1000,
+        ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername())
+        .stream().map(ofs::convertFileStatus).collect(Collectors.toList());
+  }
+
+  /**
+   * Helper function to compare recursive listStatus results from adapter
+   * and (simulated) FileSystem.
+   */
+  private void listStatusCheckHelper(Path path) throws IOException {
+    // Get recursive listStatus result directly from adapter impl
+    List<FileStatus> statusesFromAdapter =
+        listStatusCallAdapterHelper(path.toString());
+    // Get recursive listStatus result with FileSystem API by simulating FsShell
+    List<FileStatus> statusesFromFS = new ArrayList<>();
+    listStatusRecursiveHelper(path, statusesFromFS);
+    // Compare. The results would be in the same order due to assumptions:
+    // 1. They are both using DFS internally;
+    // 2. They both return ordered results.
+    Assert.assertEquals(statusesFromAdapter.size(), statusesFromFS.size());
+    final int n = statusesFromFS.size();
+    for (int i = 0; i < n; i++) {
+      FileStatus statusFromAdapter = statusesFromAdapter.get(i);
+      FileStatus statusFromFS = statusesFromFS.get(i);
+      Assert.assertEquals(statusFromAdapter.getPath(), statusFromFS.getPath());
+      Assert.assertEquals(statusFromAdapter.getLen(), statusFromFS.getLen());
+      Assert.assertEquals(statusFromAdapter.isDirectory(),
+          statusFromFS.isDirectory());
+      // TODO: When HDDS-3054 is in, uncomment the lines below.
+      //  As of now the modification time almost certainly won't match.
+//      Assert.assertEquals(statusFromAdapter.getModificationTime(),
+//          statusFromFS.getModificationTime());
+    }
+  }
+
+  /**
+   * OFS: Test recursive listStatus on root and volume.
+   */
+  @Test
+  public void testListStatusRootAndVolumeRecursive() throws Exception {
+    Path bucketPath1 = createRandomVolumeBucketWithDirs();
+    createRandomVolumeBucketWithDirs();
+    // listStatus("/volume/bucket")
+    listStatusCheckHelper(bucketPath1);
+    // listStatus("/volume")
+    Path volume = new Path(
+        OZONE_URI_DELIMITER + new OFSPath(bucketPath1).getVolumeName());
+    listStatusCheckHelper(volume);
+    // listStatus("/")
+    Path root = new Path(OZONE_URI_DELIMITER);
+    listStatusCheckHelper(root);
   }
 
 }
