@@ -196,11 +196,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             createErrorOMResponse(omResponse, exception));
       }
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse,
-                trxnLogIndex));
-      }
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
 
       if(bucketLockAcquired) {
         omMetadataManager.getLock().releaseLock(BUCKET_LOCK, volumeName,

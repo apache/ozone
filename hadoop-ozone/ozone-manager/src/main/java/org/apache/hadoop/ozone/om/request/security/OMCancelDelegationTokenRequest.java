@@ -100,11 +100,8 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
       omClientResponse = new OMCancelDelegationTokenResponse(null,
           createErrorOMResponse(omResponse, ex));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
     }
 
     if (LOG.isDebugEnabled()) {

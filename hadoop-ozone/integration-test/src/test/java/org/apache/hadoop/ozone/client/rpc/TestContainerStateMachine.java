@@ -40,7 +40,6 @@ import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -58,7 +57,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
 /**
  * Tests the containerStateMachine failure handling.
  */
-@Ignore
 public class TestContainerStateMachine {
 
   private MiniOzoneCluster cluster;
@@ -175,6 +173,7 @@ public class TestContainerStateMachine {
       key.write(("ratis" + i).getBytes());
       key.flush();
       key.write(("ratis" + i).getBytes());
+      key.close();
     }
 
     RatisServerConfiguration ratisServerConfiguration =
@@ -198,6 +197,7 @@ public class TestContainerStateMachine {
       key.write(("ratis" + i).getBytes());
       key.flush();
       key.write(("ratis" + i).getBytes());
+      key.close();
     }
     stateMachine =
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);

@@ -184,11 +184,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeSetOwnerResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredUserLocks) {
         omMetadataManager.getLock().releaseMultiUserLock(newOwner, oldOwner);
       }

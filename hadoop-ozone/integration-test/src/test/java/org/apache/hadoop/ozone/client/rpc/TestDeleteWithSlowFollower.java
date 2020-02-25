@@ -54,7 +54,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -73,7 +72,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
  * Tests delete key operation with a slow follower in the datanode
  * pipeline.
  */
-@Ignore
 public class TestDeleteWithSlowFollower {
 
   private static MiniOzoneCluster cluster;
@@ -106,8 +104,10 @@ public class TestDeleteWithSlowFollower {
     // never gets initiated early at Datanode in the test.
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000, TimeUnit.SECONDS);
+    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000,
+            TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000,
+            TimeUnit.SECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, 2000,
         TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
@@ -120,6 +120,23 @@ public class TestDeleteWithSlowFollower {
         RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
         DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
         1000, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.
+                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "rpc.request.timeout",
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "watch.request.timeout",
+            3, TimeUnit.SECONDS);
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         1, TimeUnit.SECONDS);
     conf.setQuietMode(false);
@@ -165,10 +182,10 @@ public class TestDeleteWithSlowFollower {
    */
   @Test
   public void testDeleteKeyWithSlowFollower() throws Exception {
-
+    String keyName = "ratis";
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 0, ReplicationType.RATIS,
+            .createKey(keyName, 0, ReplicationType.RATIS,
                 ReplicationFactor.THREE, new HashMap<>());
     byte[] testData = "ratis".getBytes();
     // First write and flush creates a container in the datanode
@@ -223,7 +240,7 @@ public class TestDeleteWithSlowFollower {
             .getStateMachine(leader, pipeline);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
         setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName("ratis")
+        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
         .build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
     BlockID blockID =
@@ -244,7 +261,9 @@ public class TestDeleteWithSlowFollower {
     long numPendingDeletionBlocks = containerData.getNumPendingDeletionBlocks();
     BlockData blockData =
         keyValueHandler.getBlockManager().getBlock(container, blockID);
-    cluster.getOzoneManager().deleteKey(keyArgs);
+    //cluster.getOzoneManager().deleteKey(keyArgs);
+    client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
+            deleteKey("ratis");
     GenericTestUtils.waitFor(() -> {
       return
           dnStateMachine.getCommandDispatcher().getDeleteBlocksCommandHandler()

@@ -121,11 +121,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
         omClientResponse = onFailure(omResponse, ex);
       }
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse,
-                trxnLogIndex));
-      }
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
       if (lockAcquired) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
             bucket);

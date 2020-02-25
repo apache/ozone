@@ -19,7 +19,7 @@
 package org.apache.hadoop.hdds.utils;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter;
 
 import java.io.Closeable;

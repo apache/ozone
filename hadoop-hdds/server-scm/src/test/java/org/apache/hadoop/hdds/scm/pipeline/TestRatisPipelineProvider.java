@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -45,6 +46,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Test for RatisPipelineProvider.
  */
+@Ignore("HDDS-3036")
 public class TestRatisPipelineProvider {
 
   private static final HddsProtos.ReplicationType REPLICATION_TYPE =

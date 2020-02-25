@@ -16,25 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon;
-
-import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
-import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
-import org.apache.hadoop.ozone.recon.tasks.ReconDBUpdateTask;
-
-import com.google.inject.AbstractModule;
-import com.google.inject.multibindings.Multibinder;
-
 /**
- * Binds the various Recon Tasks.
+ * This package defines the persistence interfaces for Recon SQL DB.
  */
-public class ReconTaskBindingModule extends AbstractModule {
-
-  @Override
-  protected void configure() {
-    Multibinder<ReconDBUpdateTask> taskBinder =
-        Multibinder.newSetBinder(binder(), ReconDBUpdateTask.class);
-    taskBinder.addBinding().to(ContainerKeyMapperTask.class);
-    taskBinder.addBinding().to(FileSizeCountTask.class);
-  }
-}
+package org.apache.hadoop.ozone.recon.fsck;
