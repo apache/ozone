@@ -94,8 +94,8 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
    * Set SafeMode status based on
    * {@link org.apache.hadoop.hdds.scm.events.SCMEvents#SAFE_MODE_STATUS}.
    *
-   * Inform BlockManager, ScmClientProtocolServer and replicationAcitivity
-   * status about safeMode status.
+   * Inform BlockManager, ScmClientProtocolServer, ScmPipeline Manager and
+   * Replication Manager status about safeMode status.
    *
    * @param safeModeStatus
    * @param publisher
@@ -106,6 +106,7 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
     isInSafeMode.set(safeModeStatus.getSafeModeStatus());
     scmClientProtocolServer.setSafeModeStatus(isInSafeMode.get());
     scmBlockManager.setSafeModeStatus(isInSafeMode.get());
+    scmPipelineManager.setSafeModeStatus(isInSafeMode.get());
 
     if (!isInSafeMode.get()) {
       final Thread safeModeExitThread = new Thread(() -> {
@@ -115,28 +116,13 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
           Thread.currentThread().interrupt();
         }
         replicationManager.start();
-        cleanupPipelines();
+        scmPipelineManager.triggerPipelineCreation();
       });
 
       safeModeExitThread.setDaemon(true);
       safeModeExitThread.start();
     }
 
-  }
-
-  private void cleanupPipelines() {
-    List<Pipeline> pipelineList = scmPipelineManager.getPipelines();
-    pipelineList.forEach((pipeline) -> {
-      try {
-        if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED &&
-            pipeline.isAllocationTimeout()) {
-          scmPipelineManager.finalizeAndDestroyPipeline(pipeline, false);
-        }
-      } catch (IOException ex) {
-        LOG.error("Finalize and destroy pipeline failed for pipeline "
-            + pipeline.toString(), ex);
-      }
-    });
   }
 
   public boolean getSafeModeStatus() {
