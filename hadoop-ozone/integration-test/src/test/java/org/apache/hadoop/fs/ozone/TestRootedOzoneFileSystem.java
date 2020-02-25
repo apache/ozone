@@ -21,6 +21,7 @@ package org.apache.hadoop.fs.ozone;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -43,8 +44,11 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -67,6 +71,7 @@ public class TestRootedOzoneFileSystem {
   private static FileSystem fs;
   private static RootedOzoneFileSystem ofs;
   private static ObjectStore objectStore;
+  private static BasicRootedOzoneClientAdapterImpl adapter;
 
   private String volumeName;
   private String bucketName;
@@ -101,6 +106,7 @@ public class TestRootedOzoneFileSystem {
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
     fs = FileSystem.get(conf);
     ofs = (RootedOzoneFileSystem) fs;
+    adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
   }
 
   @After
@@ -501,6 +507,9 @@ public class TestRootedOzoneFileSystem {
 
   /**
    * Helper function for testListStatusRootAndVolume*.
+   * Each call creates one volume, one bucket under that volume,
+   * two dir under that bucket, one subdir under one of the dirs,
+   * and one file under the subdir.
    */
   private Path createRandomVolumeBucketWithDirs() throws IOException {
     String volume1 = getRandomNonExistVolumeName();
@@ -514,6 +523,11 @@ public class TestRootedOzoneFileSystem {
     fs.mkdirs(subdir1);
     Path dir2 = new Path(bucketPath1, "dir2");
     fs.mkdirs(dir2);
+
+    try (FSDataOutputStream stream =
+        ofs.create(new Path(dir2, "file1"))) {
+      stream.write(1);
+    }
 
     return bucketPath1;
   }
@@ -556,14 +570,11 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Helper function to call adapter impl for listStatus (with recursive).
+   * Helper function to call adapter impl for listStatus.
    */
-  private List<FileStatus> listStatusCallAdapterHelper(String pathStr)
-      throws IOException {
-    // FileSystem interface does not support recursive listStatus, use adapter
-    BasicRootedOzoneClientAdapterImpl adapter =
-        (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
-    return adapter.listStatus(pathStr, true, "", 1000,
+  private List<FileStatus> listStatusCallAdapterHelper(String pathStr,
+      boolean recursive, String startPath, long numEntries) throws IOException {
+    return adapter.listStatus(pathStr, recursive, startPath, numEntries,
         ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername())
         .stream().map(ofs::convertFileStatus).collect(Collectors.toList());
   }
@@ -574,8 +585,8 @@ public class TestRootedOzoneFileSystem {
    */
   private void listStatusCheckHelper(Path path) throws IOException {
     // Get recursive listStatus result directly from adapter impl
-    List<FileStatus> statusesFromAdapter =
-        listStatusCallAdapterHelper(path.toString());
+    List<FileStatus> statusesFromAdapter = listStatusCallAdapterHelper(
+        path.toString(), true, "", 1000);
     // Get recursive listStatus result with FileSystem API by simulating FsShell
     List<FileStatus> statusesFromFS = new ArrayList<>();
     listStatusRecursiveHelper(path, statusesFromFS);
@@ -602,7 +613,7 @@ public class TestRootedOzoneFileSystem {
    * OFS: Test recursive listStatus on root and volume.
    */
   @Test
-  public void testListStatusRootAndVolumeRecursive() throws Exception {
+  public void testListStatusRootAndVolumeRecursive() throws IOException {
     Path bucketPath1 = createRandomVolumeBucketWithDirs();
     createRandomVolumeBucketWithDirs();
     // listStatus("/volume/bucket")
@@ -614,6 +625,70 @@ public class TestRootedOzoneFileSystem {
     // listStatus("/")
     Path root = new Path(OZONE_URI_DELIMITER);
     listStatusCheckHelper(root);
+  }
+
+  /**
+   * Helper function. FileSystem#listStatus on steroid: Supports recursion,
+   * start path and custom listing page size.
+   * @param f Given path
+   * @param recursive List contents inside subdirectories
+   * @param startPath Starting path of the batch
+   * @param numEntries Max number of entries in result
+   * @return Array of the statuses of the files/directories in the given path
+   * @throws IOException See specific implementation
+   */
+  private FileStatus[] listStatusCustomized(Path f, boolean recursive,
+      String startPath, int numEntries) throws IOException {
+    Assert.assertTrue(numEntries > 0);
+    LinkedList<FileStatus> statuses = new LinkedList<>();
+    List<FileStatus> tmpStatusList;
+    do {
+      tmpStatusList = listStatusCallAdapterHelper(f.toString(), recursive,
+          startPath, numEntries);
+      if (!tmpStatusList.isEmpty()) {
+        statuses.addAll(tmpStatusList);
+        startPath = statuses.getLast().getPath().toString();
+      }
+    } while (tmpStatusList.size() == numEntries);
+    return statuses.toArray(new FileStatus[0]);
+  }
+
+  @Test
+  public void testListStatusRootAndVolumeContinuation() throws IOException,
+      URISyntaxException {
+    for (int i = 0; i < 5; i++) {
+      createRandomVolumeBucketWithDirs();
+    }
+    // Similar to recursive option, we can't test continuation directly with
+    // FileSystem because we can't change LISTING_PAGE_SIZE. Use adapter instead
+
+    // listStatus("/")
+    FileStatus[] fileStatusesOver = listStatusCustomized(
+        new Path("/"), false, "", 8);
+    // There are only 5 volumes
+    Assert.assertEquals(5, fileStatusesOver.length);
+
+    FileStatus[] fileStatusesExact = listStatusCustomized(
+        new Path("/"), false, "", 5);
+    Assert.assertEquals(5, fileStatusesExact.length);
+
+    FileStatus[] fileStatusesLimit1 = listStatusCustomized(
+        new Path("/"), false, "", 3);
+    // Should only return 3 volumes even though there are more than that due to
+    // the specified limit
+    Assert.assertEquals(3, fileStatusesLimit1.length);
+
+    // Get the last one as the startPath
+    String nextStartPath = fileStatusesLimit1[fileStatusesLimit1.length - 1]
+        .getPath().toString();
+    String removedHostNameStartPath = new URI(nextStartPath).getPath();
+    FileStatus[] fileStatusesLimit2 = listStatusCustomized(
+        new Path("/"), false,
+        removedHostNameStartPath, 3);
+    // Note: as the time of writing this test, OmMetadataManagerImpl#listVolumes
+    //  excludes startVolume (startPath) from the result. Might change.
+    Assert.assertEquals(fileStatusesOver.length,
+        fileStatusesLimit1.length + fileStatusesLimit2.length);
   }
 
 }
