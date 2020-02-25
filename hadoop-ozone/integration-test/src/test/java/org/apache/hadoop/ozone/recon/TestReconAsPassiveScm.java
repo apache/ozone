@@ -27,6 +27,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Date;
 import java.util.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -66,8 +67,8 @@ public class TestReconAsPassiveScm {
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     int reconDnPort = NetUtils.getFreeSocketPort();
-    conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "10s");
-    conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "10s");
+    conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
+    conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .setReconDatanodePort(reconDnPort).build();
     cluster.waitForClusterToBeReady();
@@ -193,6 +194,7 @@ public class TestReconAsPassiveScm {
           .exists(ContainerID.valueof(containerID));
       Thread.sleep(5000);
     }
-    assertTrue(containerPresentInRecon);
+    assertTrue(String.format("Container present in Recon at %s",
+            new Date(System.currentTimeMillis())), containerPresentInRecon);
   }
 }
