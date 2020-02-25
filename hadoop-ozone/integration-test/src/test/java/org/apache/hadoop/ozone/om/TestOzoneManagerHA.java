@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.time.Instant;
@@ -34,6 +35,7 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -96,7 +98,12 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.apache.ratis.server.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
 import static org.junit.Assert.fail;
+
+import javax.management.MBeanInfo;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario.
@@ -1083,8 +1090,6 @@ public class TestOzoneManagerHA {
     Assert.assertTrue(removeAcl);
   }
 
-
-
   @Test
   public void testOMRatisSnapshot() throws Exception {
     String userName = "user" + RandomStringUtils.randomNumeric(5);
@@ -1316,6 +1321,21 @@ public class TestOzoneManagerHA {
 
     validateVolumesList(userName, expectedVolumes);
 
+  }
+
+  @Test
+  public void testJMXMetrics() throws Exception {
+    // Verify any one ratis metric is exposed by JMX MBeanServer
+    OzoneManagerRatisServer ratisServer =
+        cluster.getOzoneManager(0).getOmRatisServer();
+    ObjectName oname = new ObjectName(RATIS_APPLICATION_NAME_METRICS, "name",
+        RATIS_APPLICATION_NAME_METRICS + ".log_worker." +
+            ratisServer.getRaftPeerId().toString() + ".flushCount");
+    MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+    MBeanInfo mBeanInfo = mBeanServer.getMBeanInfo(oname);
+    Assert.assertNotNull(mBeanInfo);
+    Object flushCount = mBeanServer.getAttribute(oname, "Count");
+    Assert.assertTrue((long) flushCount >= 0);
   }
 
   private void validateVolumesList(String userName,

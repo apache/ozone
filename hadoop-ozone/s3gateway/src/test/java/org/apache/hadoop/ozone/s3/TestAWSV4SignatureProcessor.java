@@ -40,7 +40,7 @@ public class TestAWSV4SignatureProcessor {
 
     MultivaluedMap<String, String> headers = new MultivaluedHashMap<>();
     headers.putSingle("Content-Length", "123");
-    headers.putSingle("Host", "123");
+    headers.putSingle("Host", "0.0.0.0:9878");
     headers.putSingle("X-AMZ-Content-Sha256", "Content-SHA");
     headers.putSingle("X-AMZ-Date", "123");
     headers.putSingle("Content-Type", "ozone/mpu");
@@ -97,7 +97,7 @@ public class TestAWSV4SignatureProcessor {
             + "123\n"
             + "20181009/us-east-1/s3/aws4_request\n"
             +
-            "21478b9cf7d628717e9029a93c4ddc35bb38cf50669ada529b94673b23ff23e2",
+            "f20d4de80af2271545385e8d4c7df608cae70a791c69b97aab1527ed93a0d665",
         parser.getStringToSign());
   }
 }

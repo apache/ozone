@@ -66,7 +66,7 @@ public class MissingContainerTask extends ReconScmTask {
         long currentTime = System.currentTimeMillis();
         final Set<ContainerID> containerIds =
             containerManager.getContainerIDs();
-        containerManager.getContainerIDs().forEach(containerID ->
+        containerIds.forEach(containerID ->
             processContainer(containerID, currentTime));
         recordSingleRunCompletion();
         LOG.info("Missing Container task Thread took {} milliseconds for" +

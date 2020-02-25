@@ -41,9 +41,11 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentracing.Scope;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -72,6 +74,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -579,15 +582,32 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()));
   }
 
+  private long calculatePipelineBytesWritten(HddsProtos.PipelineID pipelineID) {
+    long bytesWritten = 0;
+    Iterator<org.apache.hadoop.ozone.container.common.interfaces.Container<?>>
+        containerIt = containerController.getContainers();
+    while(containerIt.hasNext()) {
+      ContainerData containerData = containerIt.next().getContainerData();
+      if (containerData.getOriginPipelineId()
+          .compareTo(pipelineID.getId()) == 0) {
+        bytesWritten += containerData.getWriteBytes();
+      }
+    }
+    return bytesWritten;
+  }
+
   @Override
   public List<PipelineReport> getPipelineReport() {
     try {
       Iterable<RaftGroupId> gids = server.getGroupIds();
       List<PipelineReport> reports = new ArrayList<>();
       for (RaftGroupId groupId : gids) {
+        HddsProtos.PipelineID pipelineID = PipelineID
+            .valueOf(groupId.getUuid()).getProtobuf();
         reports.add(PipelineReport.newBuilder()
-            .setPipelineID(PipelineID.valueOf(groupId.getUuid()).getProtobuf())
+            .setPipelineID(pipelineID)
             .setIsLeader(groupLeaderMap.getOrDefault(groupId, Boolean.FALSE))
+            .setBytesWritten(calculatePipelineBytesWritten(pipelineID))
             .build());
       }
       return reports;
@@ -743,7 +763,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
     for (int i = 0; i < executors.length; i++) {
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
-          .setNameFormat("ChunkExecutor-" + i + "-%s")
+          .setDaemon(true)
+          .setNameFormat("ChunkWriter-" + i + "-%d")
           .build();
       BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
       executors[i] = new ThreadPoolExecutor(1, 1,

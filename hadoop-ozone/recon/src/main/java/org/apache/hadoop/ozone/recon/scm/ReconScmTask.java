@@ -41,15 +41,18 @@ public abstract class ReconScmTask {
   }
 
   public void register() {
-    String taskName = getClass().getSimpleName();
-    ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
-        taskName, 0L, 0L);
+    String taskName = getTaskName();
     if (!reconTaskStatusDao.existsById(taskName)) {
+      ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
+          taskName, 0L, 0L);
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ", taskName);
     }
   }
 
+  /**
+   * Start underlying start thread.
+   */
   public synchronized void start() {
     if (!isRunning()) {
       LOG.info("Starting {} Thread.", getTaskName());
@@ -64,7 +67,7 @@ public abstract class ReconScmTask {
   }
 
   /**
-   * Stops Replication Monitor thread.
+   * Stop underlying task thread.
    */
   public synchronized void stop() {
     if (running) {

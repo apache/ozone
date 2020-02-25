@@ -36,7 +36,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
  * Set acl handler for volume.
  */
 @Command(name = "setacl",
-    description = "Set acls.")
+    description = "Set one or more ACLs, replacing the existing ones.")
 public class SetAclVolumeHandler extends Handler {
 
   @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
@@ -44,22 +44,22 @@ public class SetAclVolumeHandler extends Handler {
 
   @CommandLine.Option(names = {"--acls", "-al"},
       required = true,
-      description = "Comma separated acls." +
-          "r = READ," +
-          "w = WRITE," +
-          "c = CREATE," +
-          "d = DELETE," +
-          "l = LIST," +
-          "a = ALL," +
-          "n = NONE," +
-          "x = READ_AC," +
-          "y = WRITE_AC" +
-          "Ex user:user1:rw,user:user2:a,group:hadoop:a")
+      description = "A comma separated list of ACLs to be set.\n" +
+          "Ex: user:user1:rw,user:user2:a,group:hadoop:a\n" +
+          "r = READ, " +
+          "w = WRITE, " +
+          "c = CREATE, " +
+          "d = DELETE, " +
+          "l = LIST, " +
+          "a = ALL, " +
+          "n = NONE, " +
+          "x = READ_ACL, " +
+          "y = WRITE_ACL.")
   private String acls;
 
   @CommandLine.Option(names = {"--store", "-s"},
       required = false,
-      description = "store type. i.e OZONE or S3")
+      description = "Store type. i.e OZONE or S3")
   private String storeType;
 
   /**
@@ -67,7 +67,8 @@ public class SetAclVolumeHandler extends Handler {
    */
   @Override
   public Void call() throws Exception {
-    Objects.requireNonNull(acls, "New acls to be added not specified.");
+    Objects.requireNonNull(acls,
+        "You need to specify one or more ACLs to be set.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
     try (OzoneClient client =
@@ -93,8 +94,8 @@ public class SetAclVolumeHandler extends Handler {
           OzoneAcl.parseAcls(acls));
 
       String message = result
-          ? ("Acl set successfully.")
-          : ("Acl already set.");
+          ? ("ACL(s) set successfully.")
+          : ("ACL(s) already set.");
 
       System.out.println(message);
     }

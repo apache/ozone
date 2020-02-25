@@ -118,7 +118,11 @@ public class MutableVolumeSet implements VolumeSet {
     this.volumeSetRWLock = new ReentrantReadWriteLock();
     this.volumeChecker = getVolumeChecker(conf);
     this.diskCheckerservice = Executors.newScheduledThreadPool(
-        1, r -> new Thread(r, "Periodic HDDS volume checker"));
+        1, r -> {
+            Thread t = new Thread(r, "Periodic HDDS volume checker");
+            t.setDaemon(true);
+            return t;
+        });
     this.periodicDiskChecker =
       diskCheckerservice.scheduleWithFixedDelay(() -> {
         try {

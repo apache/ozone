@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
-import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
@@ -74,7 +73,7 @@ public class ReconStorageContainerManagerFacade
   private final EventQueue eventQueue;
   private final SCMStorageConfig scmStorageConfig;
 
-  private NodeManager scmNodeManager;
+  private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ContainerManager containerManager;
   private NetworkTopology clusterMap;
@@ -92,18 +91,18 @@ public class ReconStorageContainerManagerFacade
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
-    this.scmNodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+    this.nodeManager =
+        new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager =
-        new ReconPipelineManager(conf, scmNodeManager, eventQueue);
+        new ReconPipelineManager(conf, nodeManager, eventQueue);
     this.containerManager = new ReconContainerManager(conf, pipelineManager);
     this.scmServiceProvider = scmServiceProvider;
     initializePipelinesFromScm();
 
     NodeReportHandler nodeReportHandler =
-        new NodeReportHandler(scmNodeManager);
+        new NodeReportHandler(nodeManager);
 
     SafeModeManager safeModeManager = new ReconSafeModeManager();
     ReconPipelineReportHandler pipelineReportHandler =
@@ -114,19 +113,20 @@ public class ReconStorageContainerManagerFacade
         new PipelineActionHandler(pipelineManager, conf);
 
     StaleNodeHandler staleNodeHandler =
-        new StaleNodeHandler(scmNodeManager, pipelineManager, conf);
-    DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
+        new StaleNodeHandler(nodeManager, pipelineManager, conf);
+    DeadNodeHandler deadNodeHandler = new DeadNodeHandler(nodeManager,
         pipelineManager, containerManager);
 
     ContainerReportHandler containerReportHandler =
-        new ReconContainerReportHandler(scmNodeManager, containerManager,
+        new ReconContainerReportHandler(nodeManager, containerManager,
             scmServiceProvider);
     IncrementalContainerReportHandler icrHandler =
-        new ReconIncrementalContainerReportHandler(scmNodeManager,
+        new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager, scmServiceProvider);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, containerManager);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
+    ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
 
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
@@ -137,6 +137,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.INCREMENTAL_CONTAINER_REPORT, icrHandler);
     eventQueue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
+    eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
 
     reconScmTasks.add(new PipelineSyncTask(
         this,
@@ -207,7 +208,7 @@ public class ReconStorageContainerManagerFacade
     } catch (Exception ex) {
       LOG.error("SCM Event Queue stop failed", ex);
     }
-    IOUtils.cleanupWithLogger(LOG, scmNodeManager);
+    IOUtils.cleanupWithLogger(LOG, nodeManager);
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
   }
@@ -229,7 +230,7 @@ public class ReconStorageContainerManagerFacade
 
   @Override
   public NodeManager getScmNodeManager() {
-    return scmNodeManager;
+    return nodeManager;
   }
 
   @Override
