@@ -219,7 +219,8 @@ public class AWSV4SignatureProcessor implements SignatureProcessor {
     switch (header) {
     case HOST:
       try {
-        URI hostUri = new URI(headerValue);
+        String schema = context.getUriInfo().getRequestUri().getScheme();
+        URI hostUri = new URI(schema + "://" + headerValue);
         InetAddress.getByName(hostUri.getHost());
         // TODO: Validate if current request is coming from same host.
       } catch (UnknownHostException|URISyntaxException e) {
