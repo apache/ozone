@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.junit.Assert;
 import org.junit.Assume;
-import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -143,7 +142,8 @@ public class TestRatisPipelineProvider {
   }
 
   @Test
-  public void testCreateFactorTHREEPipelineWithSameDatanodes() throws Exception {
+  public void testCreateFactorTHREEPipelineWithSameDatanodes()
+      throws Exception {
     init(2);
     List<DatanodeDetails> healthyNodes = nodeManager
         .getNodes(HddsProtos.NodeState.HEALTHY).stream()
