@@ -46,6 +46,7 @@ import picocli.CommandLine.Option;
         SameKeyReader.class,
         S3KeyGenerator.class,
         DatanodeChunkGenerator.class,
+        FollowerAppendLogEntryGenerator.class,
         ChunkManagerDiskWrite.class},
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
