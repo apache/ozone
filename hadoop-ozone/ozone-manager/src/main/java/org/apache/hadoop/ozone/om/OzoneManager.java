@@ -2787,14 +2787,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
           args.getVolumeName(), args.getBucketName(), args.getKeyName());
     }
-    LOG.trace("getFileStatus initiated for " + args.getKeyName());
     boolean auditSuccess = true;
     try {
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args);
     } catch (IOException ex) {
-      LOG.trace("getFileStatus for " + args.getKeyName()
-          + " caught exception : " + ex);
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
       AUDIT.logReadFailure(

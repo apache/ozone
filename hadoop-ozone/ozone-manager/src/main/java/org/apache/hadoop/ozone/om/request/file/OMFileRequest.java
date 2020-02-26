@@ -158,7 +158,7 @@ public final class OMFileRequest {
   public static class OMPathInfo {
     private OMDirectoryResult directoryResult;
     private List<String> missingParents;
-    List<OzoneAcl> acls;
+    private List<OzoneAcl> acls;
 
     public OMPathInfo(List missingParents, OMDirectoryResult result,
         List<OzoneAcl> aclList) {
