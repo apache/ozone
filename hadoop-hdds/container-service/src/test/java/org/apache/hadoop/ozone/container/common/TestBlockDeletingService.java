@@ -43,8 +43,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background
-    .BlockDeletingService;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
@@ -55,7 +54,6 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.BeforeClass;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -68,9 +66,11 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
-import static org.mockito.Matchers.any;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests to test block deleting service.
@@ -327,13 +327,13 @@ public class TestBlockDeletingService {
   }
 
   private OzoneContainer mockDependencies(ContainerSet containerSet) {
-    OzoneContainer ozoneContainer = Mockito.mock(OzoneContainer.class);
-    Mockito.when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
-    Mockito.when(ozoneContainer.getWriteChannel()).thenReturn(null);
-    ContainerDispatcher dispatcher = Mockito.mock(ContainerDispatcher.class);
-    Mockito.when(ozoneContainer.getDispatcher()).thenReturn(dispatcher);
-    handler = Mockito.mock(KeyValueHandler.class);
-    Mockito.when(dispatcher.getHandler(any())).thenReturn(handler);
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    when(ozoneContainer.getWriteChannel()).thenReturn(null);
+    ContainerDispatcher dispatcher = mock(ContainerDispatcher.class);
+    when(ozoneContainer.getDispatcher()).thenReturn(dispatcher);
+    handler = mock(KeyValueHandler.class);
+    when(dispatcher.getHandler(any())).thenReturn(handler);
     return ozoneContainer;
   }
 
