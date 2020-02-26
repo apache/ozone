@@ -40,6 +40,7 @@ import java.io.File;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 
 /**
@@ -111,6 +112,8 @@ public interface GuiceInjectorUtilsForTests {
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR,
         temporaryFolder.newFolder().getAbsolutePath());
     configuration.set(OZONE_RECON_DB_DIR, temporaryFolder.newFolder()
+        .getAbsolutePath());
+    configuration.set(OZONE_RECON_SCM_DB_DIR, temporaryFolder.newFolder()
         .getAbsolutePath());
     return configuration;
   }

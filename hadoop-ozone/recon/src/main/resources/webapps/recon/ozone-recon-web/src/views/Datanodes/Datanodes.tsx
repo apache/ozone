@@ -19,17 +19,19 @@
 import React from 'react';
 import axios from 'axios';
 import {Table, Icon, Progress} from 'antd';
-import prettyBytes from 'pretty-bytes';
+import filesize from 'filesize';
 import './Datanodes.less';
-import {PaginationConfig} from "antd/lib/pagination";
+import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
-import {getCapacityPercent} from "utils/common";
+import {getCapacityPercent} from 'utils/common';
+import Tooltip from 'antd/lib/tooltip';
+import {FilledIcon} from 'utils/themeIcons';
 
 export type DatanodeStatus = "HEALTHY" | "STALE" | "DEAD" | "DECOMMISSIONING" | "DECOMMISSIONED";
+const size = filesize.partial({standard: 'iec', round: 1});
 
 interface StorageReport {
-  storageLocation: string;
-  total: number;
+  capacity: number;
   used: number;
   remaining: number;
 }
@@ -38,7 +40,7 @@ interface DatanodeResponse {
   hostname: string;
   state: DatanodeStatus;
   lastHeartbeat: number;
-  storageReport: StorageReport[];
+  storageReport: StorageReport;
   pipelineIDs: string[];
   containers: number;
 }
@@ -54,6 +56,7 @@ interface Datanode {
   lastHeartbeat: number;
   storageUsed: number;
   storageTotal: number;
+  storageRemaining: number;
   pipelines: string[];
   containers: number;
 }
@@ -81,39 +84,60 @@ const COLUMNS = [
     title: 'Status',
     dataIndex: 'state',
     key: 'state',
-    render: (text: DatanodeStatus) => renderDatanodeStatus(text)
+    render: (text: DatanodeStatus) => renderDatanodeStatus(text),
+    sorter: (a: Datanode, b: Datanode) => a.state.localeCompare(b.state)
   },
   {
     title: 'Hostname',
     dataIndex: 'hostname',
-    key: 'hostname'
+    key: 'hostname',
+    sorter: (a: Datanode, b: Datanode) => a.hostname.localeCompare(b.hostname),
+    defaultSortOrder: 'ascend' as const
   },
   {
     title: 'Storage Capacity',
     dataIndex: 'storageUsed',
     key: 'storageUsed',
-    render: (text: string, record: Datanode) => <div className="storage-cell-container">
-      <div>{prettyBytes(record.storageUsed)} / {prettyBytes(record.storageTotal)}</div>
-      <Progress strokeLinecap="square" percent={getCapacityPercent(record.storageUsed, record.storageTotal)}
-                className="capacity-bar" strokeWidth={3}/>
-    </div>
+    sorter: (a: Datanode, b: Datanode) => a.storageRemaining - b.storageRemaining,
+    render: (text: string, record: Datanode) => {
+      const nonOzoneUsed = record.storageTotal - record.storageRemaining - record.storageUsed;
+      const totalUsed = record.storageTotal - record.storageRemaining;
+      const tooltip = <div>
+        <p><Icon component={FilledIcon} className="ozone-used-bg"/> Ozone Used ({size(record.storageUsed)})</p>
+        <p><Icon component={FilledIcon} className="non-ozone-used-bg"/> Non Ozone Used ({size(nonOzoneUsed)})</p>
+        <p><Icon component={FilledIcon} className="remaining-bg"/> Remaining ({size(record.storageRemaining)})</p>
+      </div>;
+      return <div className="storage-cell-container">
+        <Tooltip title={tooltip} placement="bottomLeft">
+          <div>{size(record.storageUsed)} + {size(nonOzoneUsed)} / {size(record.storageTotal)}</div>
+          <Progress strokeLinecap="square"
+                    percent={getCapacityPercent(totalUsed, record.storageTotal)}
+                    successPercent={getCapacityPercent(record.storageUsed, record.storageTotal)}
+                    className="capacity-bar" strokeWidth={3}/>
+        </Tooltip>
+      </div>
+    }
   },
   {
     title: 'Last Heartbeat',
     dataIndex: 'lastHeartbeat',
     key: 'lastHeartbeat',
-    render: (heartbeat: number) => moment(heartbeat).format('lll')
+    sorter: (a: Datanode, b: Datanode) => a.lastHeartbeat - b.lastHeartbeat,
+    render: (heartbeat: number) => {
+      return heartbeat > 0 ? moment(heartbeat).format('lll') : 'NA';
+    }
   },
   {
     title: 'Pipeline ID(s)',
     dataIndex: 'pipelines',
     key: 'pipelines',
-    render: (pipelines: string[]) => <div>{pipelines.map(pipeline => <div>{pipeline}</div>)}</div>
+    render: (pipelines: string[]) => <div>{pipelines.map((pipeline, index) => <div key={index}>{pipeline}</div>)}</div>
   },
   {
     title: 'Containers',
     dataIndex: 'containers',
-    key: 'containers'
+    key: 'containers',
+    sorter: (a: Datanode, b: Datanode) => a.containers - b.containers
   }
 ];
 
@@ -138,18 +162,13 @@ export class Datanodes extends React.Component<any, DatanodesState> {
       const totalCount = datanodesResponse.totalCount;
       const datanodes: DatanodeResponse[] = datanodesResponse.datanodes;
       const dataSource: Datanode[] = datanodes.map(datanode => {
-        const storageTotal = datanode.storageReport.reduce((sum: number, storageReport) => {
-          return sum  + storageReport.total;
-        }, 0);
-        const storageUsed = datanode.storageReport.reduce((sum: number, storageReport) => {
-          return sum  + storageReport.used;
-        }, 0);
         return {
           hostname: datanode.hostname,
           state: datanode.state,
           lastHeartbeat: datanode.lastHeartbeat,
-          storageUsed,
-          storageTotal,
+          storageUsed: datanode.storageReport.used,
+          storageTotal: datanode.storageReport.capacity,
+          storageRemaining: datanode.storageReport.remaining,
           pipelines: datanode.pipelineIDs,
           containers: datanode.containers
         }

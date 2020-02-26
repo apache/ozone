@@ -76,9 +76,12 @@ public class ReconContainerManager extends SCMContainerManager {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     getLock().lock();
     try {
-      getContainerStateManager().addContainerInfo(containerId, containerInfo,
-          getPipelineManager(), containerWithPipeline.getPipeline());
-      addContainerToDB(containerInfo);
+      if (getPipelineManager().containsPipeline(
+          containerWithPipeline.getPipeline().getId())) {
+        getContainerStateManager().addContainerInfo(containerId, containerInfo,
+            getPipelineManager(), containerWithPipeline.getPipeline());
+        addContainerToDB(containerInfo);
+      }
     } catch (IOException ex) {
       LOG.info("Exception while adding container {} .",
           containerInfo.containerID(), ex);

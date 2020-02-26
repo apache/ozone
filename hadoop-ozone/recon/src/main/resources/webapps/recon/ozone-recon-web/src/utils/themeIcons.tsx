@@ -16,36 +16,18 @@
  * limitations under the License.
  */
 
-@progress-gray: #d0d0d0;
-@progress-blue: #1890ff;
-@progress-green: #52c41a;
+import * as React from 'react';
 
-.datanodes-container {
-  .content-div {
-    .storage-cell-container {
-      position: relative;
-      .capacity-bar {
-        .ant-progress-text {
-          font-size: 0.8em;
-        }
-        .ant-progress-inner {
-          background-color: @progress-gray;
-        }
-        position: absolute;
-        bottom: -12px;
-      }
-    }
+export class FilledIcon extends React.Component {
+  render() {
+    const path =
+        'M864 64H160C107 64 64 107 64 160v' +
+        '704c0 53 43 96 96 96h704c53 0 96-43 96-96V16' +
+        '0c0-53-43-96-96-96z';
+    return (
+        <svg {...(this.props as any)} viewBox="0 0 1024 1024">
+          <path d={path} />
+        </svg>
+    );
   }
-}
-
-.ozone-used-bg {
-  color: @progress-green;
-}
-
-.non-ozone-used-bg {
-  color: @progress-blue;
-}
-
-.remaining-bg {
-  color: @progress-gray;
 }

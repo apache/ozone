@@ -102,8 +102,9 @@ public class TestRecon {
 
     String reconHTTPAddress = "localhost:" + NetUtils.getFreeSocketPort();
     conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, reconHTTPAddress);
-    containerKeyServiceURL = "http://" + reconHTTPAddress + "/api/containers";
-    taskStatusURL = "http://" + reconHTTPAddress + "/api/task/status";
+    containerKeyServiceURL = "http://" + reconHTTPAddress + "/api/v1" +
+        "/containers";
+    taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
 
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
