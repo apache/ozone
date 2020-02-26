@@ -25,7 +25,10 @@ import java.util.List;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
@@ -35,6 +38,8 @@ import javax.annotation.Nonnull;
  */
 public final class OMFileRequest {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMFileRequest.class);
   private static final long TRANSACTION_ID_SHIFT = 8;
 
   private OMFileRequest() {
@@ -59,6 +64,7 @@ public final class OMFileRequest {
     String dirNameFromDetails = omMetadataManager.getOzoneDirKey(volumeName,
         bucketName, keyName);
     List<String> missing = new ArrayList<>();
+    List<OzoneAcl> inheritAcls = new ArrayList<>();
     OMDirectoryResult result = OMDirectoryResult.NONE;
 
     while (keyPath != null) {
@@ -84,6 +90,10 @@ public final class OMFileRequest {
           result = OMDirectoryResult.DIRECTORY_EXISTS;
         } else {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
+          inheritAcls = omMetadataManager.getKeyTable().get(dbDirKeyName)
+              .getAcls();
+          LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
+              + inheritAcls);
         }
       } else {
         if (!dbDirKeyName.equals(dirNameFromDetails)) {
@@ -92,13 +102,25 @@ public final class OMFileRequest {
       }
 
       if (result != OMDirectoryResult.NONE) {
-        return new OMPathInfo(missing, result);
+
+        LOG.trace("verifyFiles in Path : " + "/" + volumeName
+            + "/" + bucketName + "/" + keyName + ":" + result);
+        return new OMPathInfo(missing, result, inheritAcls);
       }
       keyPath = keyPath.getParent();
     }
 
+    if (inheritAcls.isEmpty()) {
+      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+      inheritAcls = omMetadataManager.getBucketTable().get(bucketKey).getAcls();
+      LOG.trace("Acls inherited from bucket " + bucketName + " are : "
+          + inheritAcls);
+    }
+
+    LOG.trace("verifyFiles in Path : " + volumeName + "/" + bucketName + "/"
+        + keyName + ":" + result);
     // Found no files/ directories in the given path.
-    return new OMPathInfo(missing, OMDirectoryResult.NONE);
+    return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls);
   }
 
   /**
@@ -136,10 +158,13 @@ public final class OMFileRequest {
   public static class OMPathInfo {
     private OMDirectoryResult directoryResult;
     private List<String> missingParents;
+    List<OzoneAcl> acls;
 
-    public OMPathInfo(List missingParents, OMDirectoryResult result) {
+    public OMPathInfo(List missingParents, OMDirectoryResult result,
+        List<OzoneAcl> aclList) {
       this.missingParents = missingParents;
       directoryResult = result;
+      this.acls = aclList;
     }
 
     public List getMissingParents() {
@@ -148,6 +173,10 @@ public final class OMFileRequest {
 
     public OMDirectoryResult getDirectoryResult() {
       return directoryResult;
+    }
+
+    public List<OzoneAcl> getAcls() {
+      return acls;
     }
   }
 

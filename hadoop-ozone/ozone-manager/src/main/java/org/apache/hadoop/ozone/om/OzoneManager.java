@@ -1627,8 +1627,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setAclRights(aclType)
         .build();
     if (!accessAuthorizer.checkAccess(obj, context)) {
-      LOG.warn("User {} doesn't have {} permission to access {}",
-          ugi.getUserName(), aclType, resType);
+      LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
+          ugi.getUserName(), aclType, resType, vol, bucket, key);
       throw new OMException("User " + ugi.getUserName() + " doesn't " +
           "have " + aclType + " permission to access " + resType,
           ResultCodes.PERMISSION_DENIED);
@@ -2787,11 +2787,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
           args.getVolumeName(), args.getBucketName(), args.getKeyName());
     }
+    LOG.trace("getFileStatus initiated for " + args.getKeyName());
     boolean auditSuccess = true;
     try {
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args);
     } catch (IOException ex) {
+      LOG.trace("getFileStatus for " + args.getKeyName()
+          + " caught exception : " + ex);
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
       AUDIT.logReadFailure(
