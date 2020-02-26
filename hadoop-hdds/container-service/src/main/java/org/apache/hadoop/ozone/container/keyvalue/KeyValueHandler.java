@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -30,6 +31,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -1029,6 +1031,18 @@ public class KeyValueHandler extends Handler {
   public void deleteContainer(Container container, boolean force)
       throws IOException {
     deleteInternal(container, force);
+  }
+
+  @Override
+  public void deleteBlock(Container container, BlockData blockData)
+      throws IOException {
+    chunkManager.deleteChunks(container, blockData);
+    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+      ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
+      }
+    }
   }
 
   private void deleteInternal(Container container, boolean force)

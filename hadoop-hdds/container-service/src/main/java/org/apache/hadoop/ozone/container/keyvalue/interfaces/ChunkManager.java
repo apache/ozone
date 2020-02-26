@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.keyvalue.interfaces;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
@@ -82,6 +83,9 @@ public interface ChunkManager {
    * @throws StorageContainerException
    */
   void deleteChunk(Container container, BlockID blockID, ChunkInfo info) throws
+      StorageContainerException;
+
+  void deleteChunks(Container container, BlockData blockData) throws
       StorageContainerException;
 
   // TODO : Support list operations.

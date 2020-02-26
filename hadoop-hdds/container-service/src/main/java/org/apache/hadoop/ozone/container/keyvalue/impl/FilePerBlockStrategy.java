@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -149,33 +150,13 @@ public class FilePerBlockStrategy implements ChunkManager {
   @Override
   public void deleteChunk(Container container, BlockID blockID, ChunkInfo info)
       throws StorageContainerException {
+    deleteChunk(container, blockID, info, true);
+  }
 
-    checkLayoutVersion(container);
-
-    Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
-    KeyValueContainerData containerData = (KeyValueContainerData) container
-        .getContainerData();
-
-    File chunkFile = getChunkFile(containerData, blockID);
-
-    // if the chunk file does not exist, it might have already been deleted.
-    // The call might be because of reapply of transactions on datanode
-    // restart.
-    if (!chunkFile.exists()) {
-      LOG.warn("Chunk file doe not exist. {}", info);
-      return;
-    }
-
-    long fileLength = chunkFile.length();
-    if ((info.getOffset() == 0) && (info.getLen() == fileLength)) {
-      FileUtil.fullyDelete(chunkFile);
-    } else {
-      String msg = String.format(
-          "Trying to delete partial chunk %s from file %s with length %s",
-          info, chunkFile, fileLength);
-      LOG.error(msg);
-      throw new StorageContainerException(msg, UNSUPPORTED_REQUEST);
-    }
+  @Override
+  public void deleteChunks(Container container, BlockData blockData)
+      throws StorageContainerException {
+    deleteChunk(container, blockData.getBlockID(), null, false);
   }
 
   @Override
@@ -183,6 +164,47 @@ public class FilePerBlockStrategy implements ChunkManager {
       ChunkInfo info) throws IOException {
     File chunkFile = getChunkFile(container.getContainerData(), blockID);
     files.close(chunkFile);
+  }
+
+  private void deleteChunk(Container container, BlockID blockID,
+      ChunkInfo info, boolean verifyLength)
+      throws StorageContainerException {
+    checkLayoutVersion(container);
+
+    Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
+    KeyValueContainerData containerData = (KeyValueContainerData) container
+        .getContainerData();
+
+    File file = getChunkFile(containerData, blockID);
+
+    // if the chunk file does not exist, it might have already been deleted.
+    // The call might be because of reapply of transactions on datanode
+    // restart.
+    if (!file.exists()) {
+      LOG.warn("Block file to be deleted does not exist: {}", file);
+      return;
+    }
+
+    if (verifyLength) {
+      Preconditions.checkNotNull(info, "Chunk info cannot be null for single " +
+          "chunk delete");
+      checkFullDelete(info, file);
+    }
+
+    FileUtil.fullyDelete(file);
+    LOG.info("Deleted block file: {}", file);
+  }
+
+  private static void checkFullDelete(ChunkInfo info, File chunkFile)
+      throws StorageContainerException {
+    long fileLength = chunkFile.length();
+    if ((info.getOffset() > 0) || (info.getLen() != fileLength)) {
+      String msg = String.format(
+          "Trying to delete partial chunk %s from file %s with length %s",
+          info, chunkFile, fileLength);
+      LOG.error(msg);
+      throw new StorageContainerException(msg, UNSUPPORTED_REQUEST);
+    }
   }
 
   private static File getChunkFile(

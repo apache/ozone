@@ -21,8 +21,10 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
@@ -98,6 +100,19 @@ public class ChunkManagerDispatcher implements ChunkManager {
     selectHandler(container)
         .deleteChunk(container, blockID, info);
     container.getContainerData().decrBytesUsed(info.getLen());
+  }
+
+  @Override
+  public void deleteChunks(Container container, BlockData blockData)
+      throws StorageContainerException {
+
+    Preconditions.checkNotNull(blockData, "Block data cannot be null.");
+
+    selectHandler(container).deleteChunks(container, blockData);
+
+    container.getContainerData().decrBytesUsed(
+        blockData.getChunks().stream()
+            .mapToLong(ContainerProtos.ChunkInfo::getLen).sum());
   }
 
   @Override

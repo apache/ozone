@@ -22,9 +22,12 @@ import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdfs.server.diskbalancer.DiskBalancerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -271,6 +274,19 @@ public class FilePerChunkStrategy implements ChunkManager {
       throw new StorageContainerException("Not Supported Operation. " +
           "Trying to delete a chunk that is in shared file. chunk info : "
           + info.toString(), UNSUPPORTED_REQUEST);
+    }
+  }
+
+  @Override
+  public void deleteChunks(Container container, BlockData blockData)
+      throws StorageContainerException {
+    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+      try {
+        deleteChunk(container, blockData.getBlockID(), ChunkInfo.getFromProtoBuf(chunkInfo));
+      } catch (IOException e) {
+        throw new StorageContainerException(
+            e, ContainerProtos.Result.INVALID_ARGUMENT);
+      }
     }
   }
 

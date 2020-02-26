@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -80,6 +81,12 @@ public class ChunkManagerDummyImpl implements ChunkManager {
   @Override
   public void deleteChunk(Container container, BlockID blockID,
       ChunkInfo info) {
+    // no-op (stats are handled in ChunkManagerImpl)
+  }
+
+  @Override
+  public void deleteChunks(Container container, BlockData blockData)
+      throws StorageContainerException {
     // no-op (stats are handled in ChunkManagerImpl)
   }
 }
