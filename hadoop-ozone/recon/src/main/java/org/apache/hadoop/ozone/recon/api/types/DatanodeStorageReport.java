@@ -6,46 +6,40 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.recon.api.types;
 
-@progress-gray: #d0d0d0;
-@progress-blue: #1890ff;
-@progress-green: #52c41a;
+/**
+ * Metadata object that contains storage report of a Datanode.
+ */
+public class DatanodeStorageReport {
+  private long capacity;
+  private long used;
+  private long remaining;
 
-.datanodes-container {
-  .content-div {
-    .storage-cell-container {
-      position: relative;
-      .capacity-bar {
-        .ant-progress-text {
-          font-size: 0.8em;
-        }
-        .ant-progress-inner {
-          background-color: @progress-gray;
-        }
-        position: absolute;
-        bottom: -12px;
-      }
-    }
+  public DatanodeStorageReport(long capacity, long used, long remaining) {
+    this.capacity = capacity;
+    this.used = used;
+    this.remaining = remaining;
   }
-}
 
-.ozone-used-bg {
-  color: @progress-green;
-}
+  public long getCapacity() {
+    return capacity;
+  }
 
-.non-ozone-used-bg {
-  color: @progress-blue;
-}
+  public long getUsed() {
+    return used;
+  }
 
-.remaining-bg {
-  color: @progress-gray;
+  public long getRemaining() {
+    return remaining;
+  }
 }
