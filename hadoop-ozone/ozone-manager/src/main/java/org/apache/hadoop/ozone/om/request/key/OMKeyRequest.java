@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +56,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.nfs.nfs3.FileHandle;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
@@ -256,7 +259,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
         .setObjectID(transactionLogIndex)
         .setUpdateID(transactionLogIndex)
+        .setFileHandleInfo(generateKeyHandle(keyArgs))
         .build();
+  }
+
+  static public String generateKeyHandle(@Nonnull KeyArgs keyArgs) {
+    // For now lets just make it a unique key
+    StringBuilder builder =
+        new StringBuilder().append(keyArgs.getKeyName())
+            .append(OZONE_URI_DELIMITER)
+            .append(Time.monotonicNow());
+    return  builder.toString();
   }
 
   private List< OzoneAcl > getAclsForKey(KeyArgs keyArgs,

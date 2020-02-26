@@ -282,6 +282,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
         .setObjectID(transactionLogIndex)
         .setUpdateID(transactionLogIndex)
+        .setFileHandleInfo(generateKeyHandle(keyArgs))
         .build();
   }
 

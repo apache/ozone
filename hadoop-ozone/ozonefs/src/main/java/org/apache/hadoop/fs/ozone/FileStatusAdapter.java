@@ -46,12 +46,14 @@ public final class FileStatusAdapter {
   private final String group;
   private final Path symlink;
   private final BlockLocation[] blockLocations;
+  private final String fileHandleInfo;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public FileStatusAdapter(long length, Path path, boolean isdir,
       short blockReplication, long blocksize, long modificationTime,
       long accessTime, short permission, String owner,
-      String group, Path symlink, BlockLocation[] locations) {
+      String group, Path symlink, BlockLocation[] locations,
+      String fileHandleInfo) {
     this.length = length;
     this.path = path;
     this.isdir = isdir;
@@ -64,6 +66,7 @@ public final class FileStatusAdapter {
     this.group = group;
     this.symlink = symlink;
     this.blockLocations = locations.clone();
+    this.fileHandleInfo = fileHandleInfo;
   }
 
   public Path getPath() {
@@ -115,4 +118,5 @@ public final class FileStatusAdapter {
     return blockLocations;
   }
 
+  public String getFileHandleInfo() { return fileHandleInfo; }
 }

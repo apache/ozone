@@ -52,6 +52,9 @@ public final class OmKeyInfo extends WithObjectID {
   private HddsProtos.ReplicationType type;
   private HddsProtos.ReplicationFactor factor;
   private FileEncryptionInfo encInfo;
+  private long objectID;
+  private long updateID;
+  private String fileHandleInfo;
 
   /**
    * ACL Information.
@@ -66,7 +69,7 @@ public final class OmKeyInfo extends WithObjectID {
       HddsProtos.ReplicationFactor factor,
       Map<String, String> metadata,
       FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-      long objectID, long updateID) {
+      long objectID, long updateID, String fileHandleInfo) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -92,6 +95,7 @@ public final class OmKeyInfo extends WithObjectID {
     this.acls = acls;
     this.objectID = objectID;
     this.updateID = updateID;
+    this.fileHandleInfo = fileHandleInfo;
   }
 
   public String getVolumeName() {
@@ -137,6 +141,38 @@ public final class OmKeyInfo extends WithObjectID {
 
   public void updateModifcationTime() {
     this.modificationTime = Time.monotonicNow();
+  }
+
+  /**
+   * Sets the update ID. For each modification of this object, we will set
+   * this to a value greater than the current value.
+   * @param updateId  long
+   */
+  public void setUpdateID(long updateId) {
+    Preconditions.checkArgument(updateId > this.updateID,
+        "Trying to set updateID to a value ({}) which is less than the " +
+            "current value ({}) for ()", updateId, this.updateID, this);
+    this.updateID = updateId;
+  }
+
+  /**
+   * Returns fileHandleInfo.
+   * @return String
+   */
+  public String getFileHandleInfo() { return fileHandleInfo;}
+
+  /**
+   * Returns objectID.
+   * @return long
+   */
+  public long getObjectID() { return objectID; }
+
+  /**
+   * Returns updateID.
+   * @return long
+   */
+  public long getUpdateID() {
+    return updateID;
   }
 
   /**
@@ -271,6 +307,7 @@ public final class OmKeyInfo extends WithObjectID {
     private List<OzoneAcl> acls;
     private long objectID;
     private long updateID;
+    private String fileHandleInfo;
 
     public Builder() {
       this.metadata = new HashMap<>();
@@ -368,6 +405,11 @@ public final class OmKeyInfo extends WithObjectID {
       return this;
     }
 
+    public Builder setFileHandleInfo(String fh) {
+      this.fileHandleInfo = fh;
+      return this;
+    }
+
     public Builder setUpdateID(long id) {
       this.updateID = id;
       return this;
@@ -377,7 +419,7 @@ public final class OmKeyInfo extends WithObjectID {
       return new OmKeyInfo(
           volumeName, bucketName, keyName, omKeyLocationInfoGroups,
           dataSize, creationTime, modificationTime, type, factor, metadata,
-          encInfo, acls, objectID, updateID);
+          encInfo, acls, objectID, updateID, fileHandleInfo);
     }
   }
 
@@ -400,7 +442,8 @@ public final class OmKeyInfo extends WithObjectID {
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
         .setObjectID(objectID)
-        .setUpdateID(updateID);
+        .setUpdateID(updateID)
+        .setFileHandleInfo(fileHandleInfo);
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
@@ -468,11 +511,13 @@ public final class OmKeyInfo extends WithObjectID {
         Objects.equals(metadata, omKeyInfo.metadata) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         objectID == omKeyInfo.objectID &&
-        updateID == omKeyInfo.updateID;
+        updateID == omKeyInfo.updateID &&
+        fileHandleInfo == omKeyInfo.fileHandleInfo;
   }
 
   @Override
   public int hashCode() {
+    // TBD: Do we expect the hashcode to change with renames ?
     return Objects.hash(volumeName, bucketName, keyName);
   }
 
@@ -490,8 +535,9 @@ public final class OmKeyInfo extends WithObjectID {
         .setReplicationType(type)
         .setReplicationFactor(factor)
         .setFileEncryptionInfo(encInfo)
-        .setObjectID(objectID).setUpdateID(updateID);
-
+        .setObjectID(objectID)
+        .setUpdateID(updateID)
+        .setFileHandleInfo(fileHandleInfo);
 
     keyLocationVersions.forEach(keyLocationVersion -> {
       List<OmKeyLocationInfo> keyLocationInfos = new ArrayList<>();

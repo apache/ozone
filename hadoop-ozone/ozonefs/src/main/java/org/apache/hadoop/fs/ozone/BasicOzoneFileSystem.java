@@ -47,10 +47,12 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
 
+import com.fasterxml.jackson.databind.introspect.TypeResolutionContext;
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
@@ -660,6 +662,23 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public short getDefaultReplication() {
     return adapter.getDefaultReplication();
+  }
+
+  public String getFileHandleInfo(Path f) throws IOException {
+    statistics.incrementReadOps(1);
+    LOG.trace("getFileHandleInfo() path:{}", f);
+    Path qualifiedPath = f.makeQualified(uri, workingDir);
+    String key = pathToKey(qualifiedPath);
+    String fileHandleInfo = null;
+    try {
+      fileHandleInfo = adapter.getFileStatus(key, uri, qualifiedPath,
+          getUsername()).getFileHandleInfo();
+    } catch (OMException ex) {
+      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND)) {
+        throw new FileNotFoundException("File not found. path:" + f);
+      }
+    }
+    return fileHandleInfo;
   }
 
   /**

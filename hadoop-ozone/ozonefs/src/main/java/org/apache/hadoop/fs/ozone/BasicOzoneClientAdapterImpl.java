@@ -456,7 +456,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         status.getOwner(),
         status.getGroup(),
         status.getPath(),
-        getBlockLocations(status)
+        getBlockLocations(status),
+        status.getFileHandleInfo()
     );
   }
 

@@ -69,6 +69,13 @@ public class S3InitiateMultipartUploadResponse extends OMClientResponse {
         multipartKey, omKeyInfo);
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,
         multipartKey, omMultipartKeyInfo);
+
+    omMetadataManager.getKeyIdTable().putWithBatch(batchOperation,
+        omMetadataManager.getOzoneKeyIdTableKey(
+            omKeyInfo.getFileHandleInfo()),
+        omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
+            omKeyInfo.getBucketName(),
+            omKeyInfo.getKeyName()));
   }
 
   @VisibleForTesting

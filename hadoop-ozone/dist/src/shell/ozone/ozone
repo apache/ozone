@@ -56,6 +56,7 @@ function hadoop_usage
   hadoop_add_subcommand "dtutil" client "operations related to delegation tokens"
   hadoop_add_subcommand "upgrade" client "HDFS to Ozone in-place upgrade tool"
   hadoop_add_subcommand "admin" client "Ozone admin tool"
+  hadoop_add_subcommand "nfs3" daemon "run an NFS version 3 gateway"
 
   hadoop_generate_usage "${HADOOP_SHELL_EXECNAME}" false
 }
@@ -181,6 +182,14 @@ function ozonecmd_case
     fs)
       HADOOP_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+    ;;
+    nfs3)
+      HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
+      #HADOOP_SECURE_CLASSNAME=org.apache.hadoop.hdfs.nfs.nfs3.PrivilegedNfsGatewayStarter
+      HADOOP_CLASSNAME=org.apache.hadoop.fs.ozone.nfs.nfs3.Nfs3
+      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-nfs3"
+      hadoop_deprecate_envvar HADOOP_SECURE_NFS3_LOG_DIR HADOOP_SECURE_LOG_DIR
+      hadoop_deprecate_envvar HADOOP_SECURE_NFS3_PID_DIR HADOOP_SECURE_PID_DIR
     ;;
     scmcli)
       HADOOP_CLASSNAME=org.apache.hadoop.hdds.scm.cli.SCMCLI
