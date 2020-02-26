@@ -24,6 +24,7 @@ import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -47,6 +48,9 @@ import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -239,11 +243,47 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       startPlugins();
       // Starting HDDS Daemons
       datanodeStateMachine.startDaemon();
+
+      //for standalone, follower only test we can start the datanode (==raft
+      // rings)
+      //manually. In normal case it's handled by the initial SCM handshake.
+
+      if ("follower"
+          .equalsIgnoreCase(System.getenv("OZONE_DATANODE_STANDALONE_TEST"))) {
+        startRatisForTest();
+      }
+
     } catch (IOException e) {
       throw new RuntimeException("Can't start the HDDS datanode plugin", e);
     } catch (AuthenticationException ex) {
       throw new RuntimeException("Fail to authentication when starting" +
           " HDDS datanode plugin", ex);
+    }
+  }
+
+  /**
+   * Initialize and start Ratis server.
+   * <p>
+   * In normal case this initialization is done after the SCM registration.
+   * In can be forced to make it possible to test one, single, isolated
+   * datanode.
+   */
+  private void startRatisForTest() throws IOException {
+    String scmId = "scm-01";
+    String clusterId = "clusterId";
+    datanodeStateMachine.getContainer().start(scmId);
+    VolumeSet volumeSet =
+        getDatanodeStateMachine().getContainer().getVolumeSet();
+
+    Map<String, HddsVolume> volumeMap = volumeSet.getVolumeMap();
+
+    for (Map.Entry<String, HddsVolume> entry : volumeMap.entrySet()) {
+      HddsVolume hddsVolume = entry.getValue();
+      boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
+          clusterId, LOG);
+      if (!result) {
+        volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
+      }
     }
   }
 

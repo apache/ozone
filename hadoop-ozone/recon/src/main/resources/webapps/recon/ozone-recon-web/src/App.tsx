@@ -22,7 +22,7 @@ import {Layout} from 'antd';
 import './App.less';
 import NavBar from './components/NavBar/NavBar';
 import Breadcrumbs from './components/Breadcrumbs/Breadcrumbs';
-import {BrowserRouter as Router, Switch, Route, Redirect} from 'react-router-dom';
+import {HashRouter as Router, Switch, Route, Redirect} from 'react-router-dom';
 import {routes} from './routes';
 import {MakeRouteWithSubRoutes} from './makeRouteWithSubRoutes';
 
@@ -67,7 +67,7 @@ class App extends React.Component<Props, State> {
               <Content style={{margin: '0 16px 0', overflow: 'initial'}}>
                 <Switch>
                   <Route exact path="/">
-                    <Redirect to="/Overview"/>
+                    <Redirect to="/Datanodes"/>
                   </Route>
                   {
                     routes.map(

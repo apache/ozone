@@ -96,8 +96,9 @@ public class TestReconWithOzoneManager {
 
     int reconHttpPort = NetUtils.getFreeSocketPort();
     String reconHTTPAddress = "0.0.0.0:" + reconHttpPort;
-    containerKeyServiceURL = "http://" + reconHTTPAddress + "/api/containers";
-    taskStatusURL = "http://" + reconHTTPAddress + "/api/task/status";
+    containerKeyServiceURL = "http://" + reconHTTPAddress +
+        "/api/v1/containers";
+    taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
 
     cluster =
         MiniOzoneCluster.newBuilder(conf)
@@ -134,6 +135,7 @@ public class TestReconWithOzoneManager {
    */
   private String makeHttpCall(String url)
       throws IOException {
+    System.out.println("url = " + url);
     HttpGet httpGet = new HttpGet(url);
     HttpResponse response = httpClient.execute(httpGet);
     int errorCode = response.getStatusLine().getStatusCode();
