@@ -145,7 +145,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
-      multipartKeyInfo.setUpdateID(trxnLogIndex);
+      multipartKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Update cache of openKeyTable and multipartInfo table.
       // No need to add the cache entries to delete table, as the entries
@@ -160,15 +160,15 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       omClientResponse = new S3MultipartUploadAbortResponse(
           omResponse.setAbortMultiPartUploadResponse(
               MultipartUploadAbortResponse.newBuilder()).build(),
-          multipartKey, multipartKeyInfo);
+          multipartKey, multipartKeyInfo, ozoneManager.isRatisEnabled());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse =
-          new S3MultipartUploadAbortResponse(createErrorOMResponse(
-              omResponse, exception), multipartKey, multipartKeyInfo);
+          new S3MultipartUploadAbortResponse(createErrorOMResponse(omResponse,
+              exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

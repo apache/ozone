@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR;
+
 /**
  * Interface for OM Responses, each OM response should implement this interface.
  */
@@ -59,7 +61,8 @@ public abstract class OMClientResponse {
    */
   public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    if (omResponse.getStatus() == OzoneManagerProtocolProtos.Status.OK) {
+    if (omResponse.getStatus() == OzoneManagerProtocolProtos.Status.OK ||
+        getOMResponse().getStatus() == NO_SUCH_MULTIPART_UPLOAD_ERROR) {
       addToDBBatch(omMetadataManager, batchOperation);
     }
   }

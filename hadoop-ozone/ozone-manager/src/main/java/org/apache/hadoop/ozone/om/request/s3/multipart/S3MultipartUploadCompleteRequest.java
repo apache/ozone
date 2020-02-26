@@ -274,7 +274,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           omKeyInfo.setModificationTime(keyArgs.getModificationTime());
           omKeyInfo.setDataSize(dataSize);
         }
-        omKeyInfo.setUpdateID(trxnLogIndex);
+        omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
         //Find all unused parts.
 

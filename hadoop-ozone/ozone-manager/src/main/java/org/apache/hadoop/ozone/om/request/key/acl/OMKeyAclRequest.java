@@ -102,7 +102,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       }
 
       operationResult = apply(omKeyInfo, trxnLogIndex);
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // update cache.
       omMetadataManager.getKeyTable().addCacheEntry(
@@ -187,6 +187,7 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
    * Apply the acl operation, if successfully completed returns true,
    * else false.
    * @param omKeyInfo
+   * @param trxnLogIndex
    */
   abstract boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex);
 }
