@@ -24,8 +24,10 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_NODE_DB;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.StringUtils;
@@ -35,11 +37,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +56,12 @@ public class ReconNodeManager extends SCMNodeManager {
       .getLogger(ReconNodeManager.class);
 
   private final MetadataStore nodeStore;
+
+  /**
+   * Map that contains mapping between datanodes
+   * and their last heartbeat time.
+   */
+  private Map<UUID, Long> datanodeHeartbeatMap = new HashMap<>();
 
   public ReconNodeManager(OzoneConfiguration conf,
                           SCMStorageConfig scmStorageConfig,
@@ -100,7 +110,7 @@ public class ReconNodeManager extends SCMNodeManager {
   }
 
   protected File getNodeDBPath(Configuration conf) {
-    File metaDir = ServerUtils.getScmDbDir(conf);
+    File metaDir = ReconUtils.getReconScmDbDir(conf);
     return new File(metaDir, RECON_SCM_NODE_DB);
   }
 
@@ -110,5 +120,28 @@ public class ReconNodeManager extends SCMNodeManager {
       nodeStore.close();
     }
     super.close();
+  }
+
+  /**
+   * Returns the last heartbeat time of the given node.
+   *
+   * @param datanodeDetails DatanodeDetails
+   * @return last heartbeat time
+   */
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return datanodeHeartbeatMap.getOrDefault(datanodeDetails.getUuid(), 0L);
+  }
+
+  /**
+   * Send heartbeat to indicate the datanode is alive and doing well.
+   *
+   * @param datanodeDetails - DatanodeDetailsProto.
+   * @return SCMheartbeat response.
+   */
+  @Override
+  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
+    // Update heartbeat map with current time
+    datanodeHeartbeatMap.put(datanodeDetails.getUuid(), Time.now());
+    return super.processHeartbeat(datanodeDetails);
   }
 }

@@ -18,9 +18,6 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.hadoop.ozone.web.utils.JsonUtils;
-
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -43,14 +40,6 @@ public class KeysResponse {
                       Collection<KeyMetadata> keys) {
     this.keysResponseData =
         new KeysResponseData(totalCount, keys);
-  }
-
-  public String toJsonString() {
-    try {
-      return JsonUtils.toJsonString(this);
-    } catch (IOException ignored) {
-      return null;
-    }
   }
 
   public KeysResponseData getKeysResponseData() {
