@@ -33,6 +33,20 @@ execute_robot_test scm basic/basic.robot
 
 execute_robot_test scm topology/scmcli.robot
 
+# Ensure data can be read even when a full rack
+# is stopped.
+execute_robot_test scm topology/loaddata.robot
+
+stop_containers datanode_1 datanode_2 datanode_3
+
+execute_robot_test scm topology/readdata.robot
+
+start_containers datanode_1 datanode_2 datanode_3
+
+stop_containers datanode_4 datanode_5 datanode_6
+
+execute_robot_test scm topology/readdata.robot
+
 stop_docker_env
 
 generate_report

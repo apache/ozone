@@ -124,6 +124,23 @@ execute_command_in_container(){
   set +e
 }
 
+## @description Stop a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+stop_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" stop $@
+  set +e
+}
+
+
+## @description Start a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+start_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" start $@
+  set +e
+}
+
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
