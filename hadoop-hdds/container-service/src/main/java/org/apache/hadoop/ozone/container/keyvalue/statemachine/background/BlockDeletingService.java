@@ -56,6 +56,7 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -276,8 +277,8 @@ public class BlockDeletingService extends BackgroundService {
           return crr;
         }
 
-        Handler handler =
-            ozoneContainer.getDispatcher().getHandler(container.getContainerType());
+        Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
+            .getHandler(container.getContainerType()));
 
         toDeleteBlocks.forEach(entry -> {
           String blockName = DFSUtil.bytes2String(entry.getKey());

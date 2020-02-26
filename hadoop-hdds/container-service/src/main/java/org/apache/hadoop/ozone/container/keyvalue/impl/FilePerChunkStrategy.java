@@ -24,7 +24,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.hdfs.server.diskbalancer.DiskBalancerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -280,9 +279,10 @@ public class FilePerChunkStrategy implements ChunkManager {
   @Override
   public void deleteChunks(Container container, BlockData blockData)
       throws StorageContainerException {
-    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+    for (ContainerProtos.ChunkInfo chunk : blockData.getChunks()) {
       try {
-        deleteChunk(container, blockData.getBlockID(), ChunkInfo.getFromProtoBuf(chunkInfo));
+        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunk);
+        deleteChunk(container, blockData.getBlockID(), chunkInfo);
       } catch (IOException e) {
         throw new StorageContainerException(
             e, ContainerProtos.Result.INVALID_ARGUMENT);

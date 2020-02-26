@@ -24,7 +24,6 @@ import java.io.OutputStream;
 import java.util.function.Consumer;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
