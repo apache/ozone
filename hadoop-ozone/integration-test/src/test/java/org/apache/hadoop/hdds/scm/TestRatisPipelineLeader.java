@@ -17,8 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -40,6 +43,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test pipeline leader information is correctly used.
@@ -47,6 +51,8 @@ import org.junit.Test;
 public class TestRatisPipelineLeader {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
+  private static final org.slf4j.Logger LOG =
+      LoggerFactory.getLogger(TestRatisPipelineLeader.class);
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -75,7 +81,15 @@ public class TestRatisPipelineLeader {
     Pipeline ratisPipeline = pipelines.iterator().next();
     Assert.assertTrue(ratisPipeline.isHealthy());
     // Verify correct leader info populated
-    verifyLeaderInfo(ratisPipeline);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return verifyLeaderInfo(ratisPipeline);
+      } catch (Exception e) {
+        LOG.error("Failed verifying the leader info.", e);
+        Assert.fail("Failed verifying the leader info.");
+        return false;
+      }
+    }, 200, 20000);
     // Verify client connects to Leader without NotLeaderException
     XceiverClientRatis xceiverClientRatis =
         XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf);
@@ -104,11 +118,22 @@ public class TestRatisPipelineLeader {
                 ratisPipeline.getLeaderId())).findAny();
     Assert.assertTrue(dnToStop.isPresent());
     dnToStop.get().stop();
-    Thread.sleep(2000); // wait long enough based on HB interval
-    verifyLeaderInfo(ratisPipeline);
+    // wait long enough based on leader election min timeout
+    Thread.sleep(4000 * conf.getTimeDuration(
+        DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+        5, TimeUnit.SECONDS));
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return verifyLeaderInfo(ratisPipeline);
+      } catch (Exception e) {
+        LOG.error("Failed verifying the leader info.", e);
+        Assert.fail("Failed getting leader info.");
+        return false;
+      }
+    }, 200, 20000);
   }
 
-  private void verifyLeaderInfo(Pipeline ratisPipeline) throws Exception {
+  private boolean verifyLeaderInfo(Pipeline ratisPipeline) throws Exception {
     Optional<HddsDatanodeService> hddsDatanodeService =
         cluster.getHddsDatanodes().stream().filter(s ->
             s.getDatanodeStateMachine().getDatanodeDetails().getUuid()
@@ -124,8 +149,8 @@ public class TestRatisPipelineLeader {
         RaftGroupId.valueOf(ratisPipeline.getId().getId()), 100);
     GroupInfoReply reply =
         serverRatis.getServer().getGroupInfo(groupInfoRequest);
-    Assert.assertTrue(reply.getRoleInfoProto().hasLeaderInfo());
-    Assert.assertEquals(ratisPipeline.getLeaderId().toString(),
-        reply.getRoleInfoProto().getSelf().getId().toStringUtf8());
+    return reply.getRoleInfoProto().hasLeaderInfo() &&
+        ratisPipeline.getLeaderId().toString().equals(
+            reply.getRoleInfoProto().getSelf().getId().toStringUtf8());
   }
 }
