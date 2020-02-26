@@ -46,6 +46,12 @@ public class OmBucketGenerator extends BaseFreonGenerator
       defaultValue = "vol1")
   private String volumeName;
 
+  @Option(
+      names = "--om-service-id",
+      description = "OM Service ID"
+  )
+  private String omServiceID = null;
+
   private OzoneManagerProtocol ozoneManagerClient;
 
   private Timer bucketCreationTimer;
@@ -56,8 +62,8 @@ public class OmBucketGenerator extends BaseFreonGenerator
     init();
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-
-    ozoneManagerClient = createOmClient(ozoneConfiguration);
+    
+    ozoneManagerClient = createOmClient(ozoneConfiguration, omServiceID);
 
     ensureVolumeExists(ozoneConfiguration, volumeName);
 

@@ -24,7 +24,6 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 
 import com.codahale.metrics.Timer;
 import org.apache.commons.io.IOUtils;
@@ -66,6 +65,12 @@ public class OzoneClientKeyValidator extends BaseFreonGenerator
       defaultValue = "false")
   private boolean stream;
 
+  @Option(
+      names = "--om-service-id",
+      description = "OM Service ID"
+  )
+  private String omServiceID = null;
+
   private Timer timer;
 
   private byte[] referenceDigest;
@@ -80,7 +85,7 @@ public class OzoneClientKeyValidator extends BaseFreonGenerator
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    rpcClient = OzoneClientFactory.getRpcClient(ozoneConfiguration);
+    rpcClient = createOzoneClient(omServiceID, ozoneConfiguration);
 
     readReference();
 

@@ -23,11 +23,14 @@ import java.lang.reflect.Proxy;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,9 +120,14 @@ public final class OzoneClientFactory {
       Configuration config) throws IOException {
     Preconditions.checkNotNull(omServiceId);
     Preconditions.checkNotNull(config);
-    // Won't set OZONE_OM_ADDRESS_KEY here since service id is passed directly,
-    // leaving OZONE_OM_ADDRESS_KEY value as is.
-    return getClient(getClientProtocol(config, omServiceId), config);
+    if (OmUtils.isOmHAServiceId(config, omServiceId)) {
+      return getClient(getClientProtocol(config, omServiceId), config);
+    } else {
+      throw new IOException("Service ID specified " +
+          "does not match with " + OZONE_OM_SERVICE_IDS_KEY + " defined in " +
+          "the configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
+          config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+    }
   }
 
   /**
