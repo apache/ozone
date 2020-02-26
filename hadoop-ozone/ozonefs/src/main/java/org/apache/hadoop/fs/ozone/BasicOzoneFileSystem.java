@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -671,6 +672,23 @@ public class BasicOzoneFileSystem extends FileSystem {
   @Override
   public short getDefaultReplication() {
     return adapter.getDefaultReplication();
+  }
+
+  public String getFileHandleInfo(Path f) throws IOException {
+    statistics.incrementReadOps(1);
+    LOG.trace("getFileHandleInfo() path:{}", f);
+    Path qualifiedPath = f.makeQualified(uri, workingDir);
+    String key = pathToKey(qualifiedPath);
+    String fileHandleInfo = null;
+    try {
+      fileHandleInfo = adapter.getFileStatus(key, uri, qualifiedPath,
+          getUsername()).getFileHandleInfo();
+    } catch (OMException ex) {
+      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND)) {
+        throw new FileNotFoundException("File not found. path:" + f);
+      }
+    }
+    return fileHandleInfo;
   }
 
   /**

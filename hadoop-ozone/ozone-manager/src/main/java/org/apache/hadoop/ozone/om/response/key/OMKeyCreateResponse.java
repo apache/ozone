@@ -87,6 +87,12 @@ public class OMKeyCreateResponse extends OMClientResponse {
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
     omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
         openKey, omKeyInfo);
+    // We can also persist the fileHandle to KeyIdTable.
+    omMetadataManager.getKeyIdTable().putWithBatch(batchOperation,
+        omMetadataManager.getOzoneKeyIdTableKey(
+            omKeyInfo.getFileHandleInfo()),
+        omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
+            omKeyInfo.getBucketName(), omKeyInfo.getKeyName()));
   }
 }
 

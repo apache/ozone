@@ -43,6 +43,7 @@
     <module>csi</module>
     <module>fault-injection-test</module>
     <module>insight</module>
+    <module>hadoop-ozone-nfs3</module>
   </modules>
 
   <repositories>

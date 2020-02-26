@@ -157,6 +157,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setReplicationFactor(keyArgs.getFactor())
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
+          .setFileHandleInfo(OMKeyRequest.generateKeyHandle(keyArgs))
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
@@ -172,6 +173,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
+          .setFileHandleInfo(OMKeyRequest.generateKeyHandle(keyArgs))
           .build();
 
       // Add to cache

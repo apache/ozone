@@ -736,6 +736,7 @@ message KeyInfo {
     repeated OzoneAclInfo acls = 13;
     optional uint64 objectID = 14;
     optional uint64 updateID = 15;
+    optional string fileHandleInfo = 16;
 }
 
 message RepeatedKeyInfo {
@@ -745,6 +746,7 @@ message RepeatedKeyInfo {
 message OzoneFileStatusProto {
     required hadoop.fs.FileStatusProto status = 1;
     optional KeyInfo keyInfo = 2;
+    required string fileHandleInfo = 3;
 }
 
 message GetFileStatusRequest {
@@ -991,6 +993,7 @@ message MultipartKeyInfo {
     repeated PartKeyInfo partKeyInfoList = 5;
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
+    optional string fileHandleInfo = 8;
 }
 
 message PartKeyInfo {

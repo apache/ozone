@@ -16,6 +16,11 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -28,6 +33,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -40,6 +46,7 @@ import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
+import org.apache.hadoop.nfs.nfs3.FileHandle;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
@@ -64,21 +71,15 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.UserVolumeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.eclipse.jetty.util.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
-import org.apache.commons.lang3.StringUtils;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import org.eclipse.jetty.util.StringUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Ozone metadata manager interface.
@@ -116,14 +117,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | prefixInfoTable    | prefix -> PrefixInfo                            |
    * |----------------------------------------------------------------------|
-   * |  multipartInfoTable| /volumeName/bucketName/keyName/uploadId ->...   |
+   * | multipartInfoTable | /volumeName/bucketName/keyName/uploadId ->...   |
    * |----------------------------------------------------------------------|
+   * | keyIdTable         | /volumeName/bucketName/keyId -> KeyName         |
+   * |----------------------------------------------------------------------|
+   *
+   * TBD : Renames need to be made keyIdTable aware. Also KeyId based lookups
+   * should be able to handle any possible race with renames/deletes.
+   *
    */
 
   public static final String USER_TABLE = "userTable";
   public static final String VOLUME_TABLE = "volumeTable";
   public static final String BUCKET_TABLE = "bucketTable";
   public static final String KEY_TABLE = "keyTable";
+  public static final String KEY_ID_TABLE = "keyIdTable";
   public static final String DELETED_TABLE = "deletedTable";
   public static final String OPEN_KEY_TABLE = "openKeyTable";
   public static final String S3_TABLE = "s3Table";
@@ -141,6 +149,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table volumeTable;
   private Table bucketTable;
   private Table keyTable;
+  private Table keyIdTable;
   private Table deletedTable;
   private Table openKeyTable;
   private Table s3Table;
@@ -195,6 +204,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmKeyInfo> getKeyTable() {
     return keyTable;
+  }
+
+  @Override
+  public Table<String, String> getKeyIdTable() {
+    return keyIdTable;
   }
 
   @Override
@@ -282,6 +296,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(DELEGATION_TOKEN_TABLE)
         .addTable(S3_SECRET_TABLE)
         .addTable(PREFIX_TABLE)
+        .addTable(KEY_ID_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec())
         .addCodec(RepeatedOmKeyInfo.class, new RepeatedOmKeyInfoCodec())
@@ -319,6 +334,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     keyTable = this.store.getTable(KEY_TABLE, String.class, OmKeyInfo.class);
     checkTableStatus(keyTable, KEY_TABLE);
+
+    keyIdTable = this.store.getTable(KEY_ID_TABLE, String.class,
+        String.class);
+    checkTableStatus(keyIdTable, KEY_ID_TABLE);
 
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
         RepeatedOmKeyInfo.class);
@@ -420,6 +439,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       }
     }
     return builder.toString();
+  }
+
+  @Override
+  public String getOzoneKeyIdTableKey(String uniqueKeyInfo) {
+    // Create an NFS file Handle using uniqueKeyInfo.
+    FileHandle fh = new FileHandle(uniqueKeyInfo);
+    return fh.toString();
   }
 
   @Override

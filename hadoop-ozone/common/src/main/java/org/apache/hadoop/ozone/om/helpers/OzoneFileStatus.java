@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 public class OzoneFileStatus extends FileStatus {
 
   private static final long serialVersionUID = 1L;
+  private String fileHandleInfo;
 
   transient private OmKeyInfo keyInfo;
 
@@ -43,11 +44,20 @@ public class OzoneFileStatus extends FileStatus {
     super(key.getDataSize(), isDirectory, key.getFactor().getNumber(),
         blockSize, key.getModificationTime(), getPath(key.getKeyName()));
     keyInfo = key;
+    fileHandleInfo = key.getFileHandleInfo();
   }
 
   public OzoneFileStatus(FileStatus status, OmKeyInfo key) throws IOException {
     super(status);
     keyInfo = key;
+  }
+
+  public OzoneFileStatus(FileStatus status, OmKeyInfo key,
+                         String fileHandleInfo)
+      throws IOException {
+    super(status);
+    keyInfo = key;
+    this.fileHandleInfo = fileHandleInfo;
   }
 
   // Use this constructor only for directories
@@ -57,7 +67,7 @@ public class OzoneFileStatus extends FileStatus {
 
   public OzoneFileStatusProto getProtobuf() throws IOException {
     OzoneFileStatusProto.Builder builder = OzoneFileStatusProto.newBuilder()
-        .setStatus(convert(this));
+        .setStatus(convert(this)).setFileHandleInfo(fileHandleInfo);
     if (keyInfo != null) {
       builder.setKeyInfo(keyInfo.getProtobuf());
     }
@@ -66,8 +76,14 @@ public class OzoneFileStatus extends FileStatus {
 
   public static OzoneFileStatus getFromProtobuf(OzoneFileStatusProto response)
       throws IOException {
-    return new OzoneFileStatus(convert(response.getStatus()),
+    if (response.hasFileHandleInfo()) {
+      return new OzoneFileStatus(convert(response.getStatus()),
+        OmKeyInfo.getFromProtobuf(response.getKeyInfo()),
+        response.getFileHandleInfo());
+    } else {
+      return new OzoneFileStatus(convert(response.getStatus()),
         OmKeyInfo.getFromProtobuf(response.getKeyInfo()));
+    }
   }
 
   public static Path getPath(String keyName) {
@@ -109,6 +125,10 @@ public class OzoneFileStatus extends FileStatus {
 
   public OmKeyInfo getKeyInfo() {
     return keyInfo;
+  }
+
+  public String getFileHandleInfo() {
+    return fileHandleInfo;
   }
 
   @Override

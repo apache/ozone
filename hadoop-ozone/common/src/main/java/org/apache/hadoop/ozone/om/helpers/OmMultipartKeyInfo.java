@@ -35,6 +35,9 @@ public class OmMultipartKeyInfo extends WithObjectID {
   private final ReplicationType replicationType;
   private final ReplicationFactor replicationFactor;
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
+  private long objectID;
+  private long updateID;
+  private String fileHandleInfo;
 
   /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
@@ -42,7 +45,8 @@ public class OmMultipartKeyInfo extends WithObjectID {
    */
   public OmMultipartKeyInfo(String id, long creationTime,
       ReplicationType replicationType, ReplicationFactor replicationFactor,
-      Map<Integer, PartKeyInfo> list, long objectID, long updateID) {
+      Map<Integer, PartKeyInfo> list, long objectID, long updateID,
+                            String fileHandleInfo) {
     this.uploadID = id;
     this.creationTime = creationTime;
     this.replicationType = replicationType;
@@ -50,7 +54,40 @@ public class OmMultipartKeyInfo extends WithObjectID {
     this.partKeyInfoList = new TreeMap<>(list);
     this.objectID = objectID;
     this.updateID = updateID;
+    this.fileHandleInfo = fileHandleInfo;
   }
+
+  /**
+   * Sets the update ID. For each modification of this object, we will set
+   * this to a value greater than the current value.
+   * @param updateID  long
+   */
+  public void setUpdateID(long updateID) {
+    this.updateID = updateID;
+  }
+
+  /**
+   * Returns objectID.
+   * @return long
+   */
+  public long getObjectID() {
+    return objectID;
+  }
+
+  /**
+   * Returns fileHandleInfo.
+   * @return String
+   */
+  public String getFileHandleInfo() { return fileHandleInfo; }
+
+  /**
+   * Returns updateID.
+   * @return long
+   */
+  public long getUpdateID() {
+    return updateID;
+  }
+
 
   /**
    * Returns the uploadID for this multi part upload of a key.
@@ -95,6 +132,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
     private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
     private long objectID;
     private long updateID;
+    private String fileHandleInfo;
 
     public Builder() {
       this.partKeyInfoList = new TreeMap<>();
@@ -139,6 +177,11 @@ public class OmMultipartKeyInfo extends WithObjectID {
       return this;
     }
 
+    public Builder setFileHandleInfo(String fh) {
+      this.fileHandleInfo = fh;
+      return this;
+    }
+
     public Builder setUpdateID(long id) {
       this.updateID = id;
       return this;
@@ -146,7 +189,8 @@ public class OmMultipartKeyInfo extends WithObjectID {
 
     public OmMultipartKeyInfo build() {
       return new OmMultipartKeyInfo(uploadID, creationTime, replicationType,
-          replicationFactor, partKeyInfoList, objectID, updateID);
+          replicationFactor, partKeyInfoList, objectID, updateID,
+          fileHandleInfo);
     }
   }
 
@@ -163,7 +207,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
     return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
         multipartKeyInfo.getCreationTime(), multipartKeyInfo.getType(),
         multipartKeyInfo.getFactor(), list, multipartKeyInfo.getObjectID(),
-        multipartKeyInfo.getUpdateID());
+        multipartKeyInfo.getUpdateID(), multipartKeyInfo.getFileHandleInfo());
   }
 
   /**
@@ -177,7 +221,8 @@ public class OmMultipartKeyInfo extends WithObjectID {
         .setType(replicationType)
         .setFactor(replicationFactor)
         .setObjectID(objectID)
-        .setUpdateID(updateID);
+        .setUpdateID(updateID)
+        .setFileHandleInfo(fileHandleInfo);
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
   }
@@ -205,7 +250,8 @@ public class OmMultipartKeyInfo extends WithObjectID {
     // For partKeyInfoList we can do shallow copy here, as the PartKeyInfo is
     // immutable here.
     return new OmMultipartKeyInfo(uploadID, creationTime, replicationType,
-        replicationFactor, new TreeMap<>(partKeyInfoList), objectID, updateID);
+        replicationFactor, new TreeMap<>(partKeyInfoList), objectID, updateID,
+        fileHandleInfo);
   }
 
 }
