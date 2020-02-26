@@ -125,12 +125,12 @@ public class SCMContainerManager implements ContainerManager {
               ContainerID.valueof(container.getContainerID()));
         }
       } catch (PipelineNotFoundException ex) {
-        LOG.warn("Found a Container {} which is in {} state with out a " +
-            "pipeline {}. Close Container.", container, container.getState(),
-            container.getPipelineID());
+        LOG.warn("Found a Container {} which is in {} state with pipeline {} " +
+                "that does not exist. Closing Container.", container,
+            container.getState(), container.getPipelineID());
 
-        // Not firing CLOSE_CONTAINER event because CloseContainer Event
-        // event queue handler is not registered by the time when we come
+        // Not firing CLOSE_CONTAINER event because CloseContainer event
+        // handler is not registered by the time when we come
         // here. So, we are calling update Container state to set
         // container state to CLOSING, and later replication manager takes care
         // of send close commands to datanode to close containers on the
