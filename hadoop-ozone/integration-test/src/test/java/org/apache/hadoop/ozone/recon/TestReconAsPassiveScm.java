@@ -70,7 +70,7 @@ public class TestReconAsPassiveScm {
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
     conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
-        .setReconDatanodePort(reconDnPort).build();
+        .includeRecon(true).setReconDatanodePort(reconDnPort).build();
     cluster.waitForClusterToBeReady();
   }
 

@@ -296,14 +296,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   @Override
   public void restartReconServer() {
-    try {
-      reconServer.stop();
-      reconServer.join();
-      reconServer = new ReconServer();
-      reconServer.execute(new String[]{});
-    } catch (Exception e) {
-      LOG.info("Exception while restarting Recon", e);
-    }
+    stopRecon(reconServer);
+    reconServer = new ReconServer();
+    reconServer.execute(new String[]{});
   }
 
   private void waitForHddsDatanodesStop() throws TimeoutException,
@@ -390,11 +385,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopOM(ozoneManager);
     stopDatanodes(hddsDatanodes);
     stopSCM(scm);
-    try {
-      stopRecon(reconServer);
-    } catch (Exception e) {
-      LOG.error("Exception while shutting down Recon.", e);
-    }
+    stopRecon(reconServer);
   }
 
   /**
@@ -467,11 +458,15 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
   }
 
-  private static void stopRecon(ReconServer reconServer) throws Exception {
-    if (reconServer != null) {
-      LOG.info("Stopping Recon");
-      reconServer.stop();
-      reconServer.join();
+  private static void stopRecon(ReconServer reconServer) {
+    try {
+      if (reconServer != null) {
+        LOG.info("Stopping Recon");
+        reconServer.stop();
+        reconServer.join();
+      }
+    } catch (Exception e) {
+      LOG.error("Exception while shutting down Recon.", e);
     }
   }
 
@@ -506,26 +501,34 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
         om.start();
 
-        configureRecon();
-        reconServer = new ReconServer();
+        if (includeRecon) {
+          configureRecon();
+          reconServer = new ReconServer();
+        }
 
         hddsDatanodes = createHddsDatanodes(scm);
 
-        MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf, om, scm,
-            hddsDatanodes, reconServer);
+        MiniOzoneClusterImpl cluster;
+
+        if (includeRecon) {
+          cluster = new MiniOzoneClusterImpl(conf, om, scm, hddsDatanodes,
+              reconServer);
+        } else {
+          cluster = new MiniOzoneClusterImpl(conf, om, scm, hddsDatanodes);
+        }
 
         cluster.setCAClient(certClient);
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
-        reconServer.execute(new String[] {});
+        if (includeRecon) {
+          reconServer.execute(new String[] {});
+        }
         return cluster;
       } catch (Exception ex) {
         stopOM(om);
-        try {
+        if (includeRecon) {
           stopRecon(reconServer);
-        } catch (Exception e) {
-          LOG.error("Exception while shutting down the Recon.", e);
         }
         if (startDataNodes) {
           stopDatanodes(hddsDatanodes);
@@ -761,11 +764,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           tempNewFolder.getAbsolutePath());
       conf.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, tempNewFolder
           .getAbsolutePath());
-      conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-          tempNewFolder.getAbsolutePath());
       conf.set(OZONE_RECON_SCM_DB_DIR,
           tempNewFolder.getAbsolutePath());
-
       conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:" +
           tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
 

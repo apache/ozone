@@ -102,6 +102,7 @@ public class TestReconWithOzoneManager {
     cluster =
         MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(1)
+            .includeRecon(true)
             .setReconHttpPort(reconHttpPort)
             .setReconDatanodePort(NetUtils.getFreeSocketPort())
             .build();

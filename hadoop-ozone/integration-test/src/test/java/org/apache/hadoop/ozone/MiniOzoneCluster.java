@@ -273,6 +273,7 @@ public interface MiniOzoneCluster {
     protected Optional<Long> streamBufferMaxSize = Optional.empty();
     protected Optional<Long> blockSize = Optional.empty();
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
+    protected boolean includeRecon = false;
     protected Optional<Integer> reconHttpPort = Optional.empty();
     protected Optional<Integer> reconDatanodePort = Optional.empty();
 
@@ -484,6 +485,11 @@ public interface MiniOzoneCluster {
 
     public Builder setReconDatanodePort(int port) {
       this.reconDatanodePort = Optional.of(port);
+      return this;
+    }
+
+    public Builder includeRecon(boolean include) {
+      this.includeRecon = include;
       return this;
     }
 
