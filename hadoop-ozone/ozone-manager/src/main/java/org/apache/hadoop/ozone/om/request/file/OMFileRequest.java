@@ -92,8 +92,8 @@ public final class OMFileRequest {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
           inheritAcls = omMetadataManager.getKeyTable().get(dbDirKeyName)
               .getAcls();
-          LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
-              + inheritAcls);
+          LOG.trace("Acls inherited from parent dir {}, are : {}",
+              dbDirKeyName, inheritAcls);
         }
       } else {
         if (!dbDirKeyName.equals(dirNameFromDetails)) {
@@ -103,8 +103,8 @@ public final class OMFileRequest {
 
       if (result != OMDirectoryResult.NONE) {
 
-        LOG.trace("verifyFiles in Path : " + "/" + volumeName
-            + "/" + bucketName + "/" + keyName + ":" + result);
+        LOG.trace("verifyFiles in Path /{}/{}/{}, result : {}", volumeName,
+            bucketName, keyName, result);
         return new OMPathInfo(missing, result, inheritAcls);
       }
       keyPath = keyPath.getParent();
@@ -113,12 +113,12 @@ public final class OMFileRequest {
     if (inheritAcls.isEmpty()) {
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       inheritAcls = omMetadataManager.getBucketTable().get(bucketKey).getAcls();
-      LOG.trace("Acls inherited from bucket " + bucketName + " are : "
-          + inheritAcls);
+      LOG.trace("Acls inherited from bucket {} are : {}", bucketName,
+          inheritAcls);
     }
 
-    LOG.trace("verifyFiles in Path : " + volumeName + "/" + bucketName + "/"
-        + keyName + ":" + result);
+    LOG.trace("verifyFiles in Path /{}/{}/{}, result : {}", volumeName,
+        bucketName, keyName, result);
     // Found no files/ directories in the given path.
     return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls);
   }
