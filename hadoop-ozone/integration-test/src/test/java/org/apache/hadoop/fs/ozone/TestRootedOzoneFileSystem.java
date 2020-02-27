@@ -745,12 +745,9 @@ public class TestRootedOzoneFileSystem {
     // Write under /tmp/, OFS will create the temp bucket if not exist
     fs.mkdirs(new Path("/tmp/dir1"));
 
-//    FSDataOutputStream stream = fs.create(new Path("/tmp/dir1/file1"));
-//    stream.write(1);
-
-//    try (FSDataOutputStream stream = fs.create(new Path("/tmp/dir1/file1"))) {
-//      stream.write(1);
-//    }
+    try (FSDataOutputStream stream = ofs.create(new Path("/tmp/dir1/file1"))) {
+      stream.write(1);
+    }
 
     // Verify temp bucket creation
     OzoneBucket bucket = vol.getBucket(hashedUsername);
@@ -760,6 +757,12 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(1, fileStatuses.length);
     Assert.assertEquals(
         "/tmp/dir1", fileStatuses[0].getPath().toUri().getPath());
+    // Verify file1 creation
+    FileStatus[] fileStatusesInDir1 =
+        fs.listStatus(new Path("/tmp/dir1"));
+    Assert.assertEquals(1, fileStatusesInDir1.length);
+    Assert.assertEquals("/tmp/dir1/file1",
+        fileStatusesInDir1[0].getPath().toUri().getPath());
   }
 
 }
