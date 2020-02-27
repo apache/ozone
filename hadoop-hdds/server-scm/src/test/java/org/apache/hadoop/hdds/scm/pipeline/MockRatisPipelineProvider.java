@@ -34,6 +34,7 @@ import java.util.List;
 public class MockRatisPipelineProvider extends RatisPipelineProvider {
 
   private boolean autoOpenPipeline;
+  private  boolean isHealthy;
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager, Configuration conf,
@@ -46,6 +47,13 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
                             PipelineStateManager stateManager,
                             Configuration conf) {
     super(nodeManager, stateManager, conf, new EventQueue());
+  }
+
+  public MockRatisPipelineProvider(NodeManager nodeManager,
+                                   PipelineStateManager stateManager,
+                                   Configuration conf, boolean isHealthy) {
+    super(nodeManager, stateManager, conf, new EventQueue());
+    this.isHealthy = isHealthy;
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
@@ -66,7 +74,7 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
       return super.create(factor);
     } else {
       Pipeline initialPipeline = super.create(factor);
-      return Pipeline.newBuilder()
+      Pipeline pipeline = Pipeline.newBuilder()
           .setId(initialPipeline.getId())
           // overwrite pipeline state to main ALLOCATED
           .setState(Pipeline.PipelineState.ALLOCATED)
@@ -74,6 +82,13 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
           .setFactor(factor)
           .setNodes(initialPipeline.getNodes())
           .build();
+      if (isHealthy) {
+        for (DatanodeDetails datanodeDetails : initialPipeline.getNodes()) {
+          pipeline.reportDatanode(datanodeDetails);
+        }
+        pipeline.setLeaderId(initialPipeline.getFirstNode().getUuid());
+      }
+      return pipeline;
     }
   }
 

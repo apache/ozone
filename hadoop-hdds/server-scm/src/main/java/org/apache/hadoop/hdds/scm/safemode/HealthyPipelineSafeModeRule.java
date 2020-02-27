@@ -41,16 +41,14 @@ import com.google.common.annotations.VisibleForTesting;
  * Once safe mode exit happens, this rules take care of writes can go
  * through in a cluster.
  */
-public class HealthyPipelineSafeModeRule
-    extends SafeModeExitRule<Pipeline>{
+public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(HealthyPipelineSafeModeRule.class);
   private int healthyPipelineThresholdCount;
   private int currentHealthyPipelineCount = 0;
   private final double healthyPipelinesPercent;
-  private final Set<PipelineID> processedPipelineIDs =
-      new HashSet<>();
+  private final Set<PipelineID> processedPipelineIDs = new HashSet<>();
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager,
@@ -121,12 +119,12 @@ public class HealthyPipelineSafeModeRule
     // create new pipelines.
     Preconditions.checkNotNull(pipeline);
     if (pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-        pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE) {
-      if (!processedPipelineIDs.contains(pipeline.getId())) {
-        getSafeModeMetrics().incCurrentHealthyPipelinesCount();
-        currentHealthyPipelineCount++;
-        processedPipelineIDs.add(pipeline.getId());
-      }
+        pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE &&
+        pipeline.isHealthy() &&
+        !processedPipelineIDs.contains(pipeline.getId())) {
+      getSafeModeMetrics().incCurrentHealthyPipelinesCount();
+      currentHealthyPipelineCount++;
+      processedPipelineIDs.add(pipeline.getId());
     }
 
     if (scmInSafeMode()) {
