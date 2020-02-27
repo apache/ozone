@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3InitiateMultipartUploadResponse;
@@ -112,6 +113,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     OmMultipartKeyInfo multipartKeyInfo = null;
     OmKeyInfo omKeyInfo = null;
     Result result = null;
+    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
 
     OMResponse.Builder omResponse = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.InitiateMultiPartUpload)
@@ -159,7 +161,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setCreationTime(keyArgs.getModificationTime())
           .setReplicationType(keyArgs.getType())
           .setReplicationFactor(keyArgs.getFactor())
-          .setObjectID(transactionLogIndex)
+          .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           .build();
 
@@ -174,7 +176,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
           .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
-          .setObjectID(transactionLogIndex)
+          .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           .build();
 
