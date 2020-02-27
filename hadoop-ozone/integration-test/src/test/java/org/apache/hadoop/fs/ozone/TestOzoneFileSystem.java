@@ -376,6 +376,7 @@ public class TestOzoneFileSystem {
     long modificationTime = fileStatuses[0].getModificationTime();
     // Check modification time in a small loop, it should always be the same
     for (int i = 0; i < 5; i++) {
+      Thread.sleep(10);
       fileStatuses = o3fs.listStatus(mdir11);
       assertEquals(modificationTime, fileStatuses[0].getModificationTime());
     }
@@ -393,6 +394,7 @@ public class TestOzoneFileSystem {
     // Check modification time in a small loop, it should be slightly larger
     // each time
     for (int i = 0; i < 5; i++) {
+      Thread.sleep(10);
       fileStatuses = o3fs.listStatus(mdir1);
       assertTrue(modificationTime <= fileStatuses[0].getModificationTime());
     }

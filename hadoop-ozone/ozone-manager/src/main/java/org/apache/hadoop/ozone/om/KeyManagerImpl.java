@@ -1963,6 +1963,7 @@ public class KeyManagerImpl implements KeyManager {
         if (fileStatus.isFile()) {
           return Collections.singletonList(fileStatus);
         }
+        // keyName is a directory
         startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       }
 
