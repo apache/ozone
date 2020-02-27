@@ -18,12 +18,17 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +37,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+
 
 /**
  * Recon server main class that stops and starts recon services.
@@ -39,6 +50,7 @@ import com.google.inject.Injector;
 public class ReconServer extends GenericCli {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconServer.class);
+  private static boolean securityEnabled = false;
   private Injector injector;
 
   private ReconHttpServer httpServer;
@@ -72,7 +84,7 @@ public class ReconServer extends GenericCli {
 
     LOG.info("Initializing Recon server...");
     try {
-
+      loginReconUserIfSecurityEnabled(ozoneConfiguration);
       this.containerDBServiceProvider =
           injector.getInstance(ContainerDBServiceProvider.class);
 
@@ -142,6 +154,51 @@ public class ReconServer extends GenericCli {
     if (reconStorageContainerManager != null) {
       reconStorageContainerManager.join();
     }
+  }
+
+  /**
+   * Logs in the Recon user if security is enabled in the configuration.
+   *
+   * @param conf OzoneConfiguration
+   * @throws IOException, AuthenticationException in case login fails.
+   */
+  private static void loginReconUserIfSecurityEnabled(OzoneConfiguration  conf)
+      throws IOException, AuthenticationException {
+    securityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
+    if (securityEnabled) {
+      loginReconUser(conf);
+    }
+  }
+
+  /**
+   * Login Recon service user if security is enabled.
+   *
+   * @param  conf OzoneConfiguration
+   * @throws IOException, AuthenticationException
+   */
+  private static void loginReconUser(OzoneConfiguration conf)
+      throws IOException, AuthenticationException {
+
+    if (SecurityUtil.getAuthenticationMethod(conf).equals(
+        UserGroupInformation.AuthenticationMethod.KERBEROS)) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Ozone security is enabled. Attempting login for Recon user. "
+                + "Principal: {}, keytab: {}", conf.get(
+            OZONE_RECON_KERBEROS_PRINCIPAL_KEY),
+            conf.get(OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY));
+      }
+
+      UserGroupInformation.setConfiguration(conf);
+
+      InetSocketAddress socAddr = HddsUtils.getReconAddresses(conf);
+      SecurityUtil.login(conf, OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
+          OZONE_RECON_KERBEROS_PRINCIPAL_KEY, socAddr.getHostName());
+    } else {
+      throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
+          conf) + " authentication method not supported. Recon user login "
+          + "failed.");
+    }
+    LOG.info("Recon login successful.");
   }
 
   @VisibleForTesting
