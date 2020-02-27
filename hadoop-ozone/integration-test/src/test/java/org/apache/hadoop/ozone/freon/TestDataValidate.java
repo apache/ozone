@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -32,21 +32,12 @@ public abstract class TestDataValidate {
 
   private static MiniOzoneCluster cluster = null;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
   static void startCluster(OzoneConfiguration conf) throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5).setTotalPipelineNumLimit(8).build();
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   static void shutdownCluster() {
     if (cluster != null) {
       cluster.shutdown();
@@ -64,24 +55,6 @@ public abstract class TestDataValidate {
     randomKeyGenerator.setFactor(ReplicationFactor.THREE);
     randomKeyGenerator.setKeySize(20971520);
     randomKeyGenerator.setValidateWrites(true);
-    randomKeyGenerator.call();
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
-  }
-
-  @Test
-  public void standaloneTestLargeKey() throws Exception {
-    RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
-    randomKeyGenerator.setNumOfVolumes(1);
-    randomKeyGenerator.setNumOfBuckets(1);
-    randomKeyGenerator.setNumOfKeys(1);
-    randomKeyGenerator.setKeySize(20971520);
-    randomKeyGenerator.setValidateWrites(true);
-    randomKeyGenerator.setType(ReplicationType.RATIS);
-    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
     randomKeyGenerator.call();
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
