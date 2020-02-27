@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -148,11 +147,6 @@ public class TestContainerStateMachineFailureOnRead {
             HddsProtos.ReplicationFactor.THREE);
     Assert.assertEquals(1, pipelines.size());
     Pipeline ratisPipeline = pipelines.iterator().next();
-    Optional<HddsDatanodeService> leaderDn =
-        cluster.getHddsDatanodes().stream().filter(
-            s -> s.getDatanodeDetails().getUuid().equals(
-                ratisPipeline.getLeaderId())).findFirst();
-    Assert.assertTrue(leaderDn.isPresent());
 
     Optional<HddsDatanodeService> dnToStop =
         cluster.getHddsDatanodes().stream().filter(
@@ -192,6 +186,17 @@ public class TestContainerStateMachineFailureOnRead {
     key.close();
     groupOutputStream.close();
 
+    Optional<HddsDatanodeService> leaderDn =
+        cluster.getHddsDatanodes().stream().filter(dn -> {
+          try {
+            return ContainerTestHelper.isRatisLeader(dn, ratisPipeline);
+          } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+          }
+        }).findFirst();
+
+    Assert.assertTrue(leaderDn.isPresent());
     // delete the container dir from leader
     FileUtil.fullyDelete(new File(
         leaderDn.get().getDatanodeStateMachine()
