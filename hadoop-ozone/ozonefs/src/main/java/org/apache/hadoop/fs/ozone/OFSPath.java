@@ -18,6 +18,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -89,9 +90,10 @@ class OFSPath {
       // TODO: Compare a keyword list instead for future expansion.
       if (firstToken.equals(OFS_MOUNT_NAME_TMP)) {
         mountName = firstToken;
-        // Future: retrieve volume and bucket from UserVolumeInfo
+        // TODO: In the future, may retrieve volume and bucket from
+        //  UserVolumeInfo on the server side. TBD.
         volumeName = OFS_MOUNT_TMP_VOLUMENAME;
-        bucketName = getTempMountBucketName(null);
+        bucketName = getTempMountBucketNameOfCurrentUser();
       } else if (numToken >= 2) {
         // Regular volume and bucket path
         volumeName = firstToken;
@@ -182,20 +184,29 @@ class OFSPath {
 
   /**
    * Get the bucket name of temp for given username.
-   * If input username String is null, will attempt to get user name from UGI.
-   * @param username Input user name String
-   * @return MD5 hash of username
+   * @param username Input user name String. Mustn't be null.
+   * @return Username MD5 hash in hex digits.
    */
   @VisibleForTesting
   static String getTempMountBucketName(String username) {
+    Preconditions.checkNotNull(username);
+    // TODO: Improve this to "slugify(username)-md5(username)" for better
+    //  readability?
+    return DigestUtils.md5Hex(username);
+  }
+
+  /**
+   * If input username String is null, will attempt to get user name from UGI.
+   * @return Username MD5 hash in hex digits.
+   */
+  @VisibleForTesting
+  static String getTempMountBucketNameOfCurrentUser() {
+    String username;
     try {
-      if (username == null) {
-        username = UserGroupInformation.getCurrentUser().getUserName();
-      }
-      // Hash the username to avoid invalid characters e.g. om/om@EXAMPLE.COM
-      return DigestUtils.md5Hex(username);
+      username = UserGroupInformation.getCurrentUser().getUserName();
     } catch (IOException ex) {
-      return "undefined";  // TODO: Better idea?
+      username = "undefined"; // TODO: Any better idea?
     }
+    return getTempMountBucketName(username);
   }
 }

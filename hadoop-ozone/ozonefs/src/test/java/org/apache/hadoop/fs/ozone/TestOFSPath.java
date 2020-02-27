@@ -103,7 +103,7 @@ public class TestOFSPath {
 
   @Test
   public void testParsingMount() {
-    String bucketName = OFSPath.getTempMountBucketName(null);
+    String bucketName = OFSPath.getTempMountBucketNameOfCurrentUser();
     // Mount only
     OFSPath ofsPath = new OFSPath("/tmp/");
     Assert.assertEquals(

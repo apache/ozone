@@ -731,7 +731,7 @@ public class TestRootedOzoneFileSystem {
     Assert.assertNotNull(vol);
 
     // Begin test
-    String hashedUsername = OFSPath.getTempMountBucketName(null);
+    String hashedUsername = OFSPath.getTempMountBucketNameOfCurrentUser();
 
     // Expect failure since temp bucket for current user is not created yet
     try {
