@@ -128,12 +128,13 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
-    OzoneConfiguration cfg = new OzoneConfiguration();
+    OzoneConfiguration confTestLoader = new OzoneConfiguration();
     // Note: FileSystem#loadFileSystems won't load OFS class due to META-INF
     //  hence this workaround.
-    cfg.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
-    Assert.assertEquals(
-        FileSystem.getFileSystemClass(OzoneConsts.OZONE_OFS_URI_SCHEME, cfg),
+    confTestLoader.set("fs.ofs.impl",
+        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    Assert.assertEquals(FileSystem.getFileSystemClass(
+        OzoneConsts.OZONE_OFS_URI_SCHEME, confTestLoader),
         RootedOzoneFileSystem.class);
   }
 
