@@ -196,7 +196,7 @@ class OFSPath {
   }
 
   /**
-   * If input username String is null, will attempt to get user name from UGI.
+   * Get the bucket name of temp for the current user from UserGroupInformation.
    * @return Username MD5 hash in hex digits.
    */
   @VisibleForTesting
