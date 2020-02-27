@@ -27,7 +27,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-import java.util.Date;
 import java.util.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,6 +40,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -135,7 +135,7 @@ public class TestReconAsPassiveScm {
 
   @Test(timeout = 120000)
   public void testReconRestart() throws Exception {
-    OzoneStorageContainerManager reconScm =
+    final OzoneStorageContainerManager reconScm =
             cluster.getReconServer().getReconStorageContainerManager();
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
@@ -145,8 +145,10 @@ public class TestReconAsPassiveScm {
     ContainerManager reconContainerManager = reconScm.getContainerManager();
     assertTrue(reconContainerManager.getContainerIDs().isEmpty());
 
-    cluster.getReconServer().stop();
-    cluster.getReconServer().join();
+    LambdaTestUtils.await(60000, 5000,
+        () -> (reconScm.getScmNodeManager().getAllNodes().size() == 3));
+
+    cluster.stopRecon();
 
     // Create container in SCM.
     ContainerInfo containerInfo =
@@ -169,8 +171,7 @@ public class TestReconAsPassiveScm {
     scmPipelineManager.finalizeAndDestroyPipeline(pipelineToClose.get(), false);
 
     // Start Recon
-    // Using restart since there is no start API in MiniOzoneCluster.
-    cluster.restartReconServer();
+    cluster.startRecon();
 
     // Verify if Recon has all the nodes on restart (even if heartbeats are
     // not yet received).
@@ -180,21 +181,14 @@ public class TestReconAsPassiveScm {
         reconNodeManager.getAllNodes().size());
 
     // Verify Recon picks up new container, close pipeline SCM actions.
-    reconScm = cluster.getReconServer().getReconStorageContainerManager();
-    PipelineManager reconPipelineManager = reconScm.getPipelineManager();
+    OzoneStorageContainerManager newReconScm =
+        cluster.getReconServer().getReconStorageContainerManager();
+    PipelineManager reconPipelineManager = newReconScm.getPipelineManager();
     assertFalse(
         reconPipelineManager.containsPipeline(pipelineToClose.get().getId()));
 
-    long startTime = System.currentTimeMillis();
-    long endTime = startTime + 60000L;
-    boolean containerPresentInRecon =
-        reconScm.getContainerManager().exists(ContainerID.valueof(containerID));
-    while (endTime > System.currentTimeMillis() && !containerPresentInRecon) {
-      containerPresentInRecon = reconScm.getContainerManager()
-          .exists(ContainerID.valueof(containerID));
-      Thread.sleep(5000);
-    }
-    assertTrue(String.format("Container present in Recon at %s",
-            new Date(System.currentTimeMillis())), containerPresentInRecon);
+    LambdaTestUtils.await(300000, 30000,
+        () -> (newReconScm.getContainerManager()
+            .exists(ContainerID.valueof(containerID))));
   }
 }

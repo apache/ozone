@@ -135,7 +135,6 @@ public class TestReconWithOzoneManager {
    */
   private String makeHttpCall(String url)
       throws IOException {
-    System.out.println("url = " + url);
     HttpGet httpGet = new HttpGet(url);
     HttpResponse response = httpClient.execute(httpGet);
     int errorCode = response.getStatusLine().getStatusCode();
@@ -155,7 +154,7 @@ public class TestReconWithOzoneManager {
   }
 
   @Test
-  public void testReconWithOzoneManager() throws Exception {
+  public void testOmDBSyncing() throws Exception {
     // add a vol, bucket and key
     addKeys(0, 1);
 

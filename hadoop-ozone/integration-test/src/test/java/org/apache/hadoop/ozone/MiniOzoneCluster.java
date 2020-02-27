@@ -243,6 +243,16 @@ public interface MiniOzoneCluster {
   void shutdownHddsDatanodes();
 
   /**
+   * Start Recon.
+   */
+  void startRecon();
+
+  /**
+   * Stop Recon.
+   */
+  void stopRecon();
+
+  /**
    * Builder class for MiniOzoneCluster.
    */
   @SuppressWarnings("visibilitymodifier")

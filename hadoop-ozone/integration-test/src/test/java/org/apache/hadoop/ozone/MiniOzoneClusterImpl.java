@@ -418,6 +418,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     });
   }
 
+  @Override
+  public void startRecon() {
+    reconServer = new ReconServer();
+    reconServer.execute(new String[]{});
+  }
+
+  @Override
+  public void stopRecon() {
+    stopRecon(reconServer);
+  }
+
   private CertificateClient getCAClient() {
     return this.caClient;
   }
