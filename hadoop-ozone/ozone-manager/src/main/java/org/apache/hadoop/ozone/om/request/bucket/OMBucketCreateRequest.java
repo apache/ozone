@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -184,7 +185,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       // Add objectID and updateID
-      omBucketInfo.setObjectID(transactionLogIndex);
+      long objectId = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
+      omBucketInfo.setObjectID(objectId);
       omBucketInfo.setUpdateID(transactionLogIndex);
 
       // Add default acls from volume.
