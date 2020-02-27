@@ -28,6 +28,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -340,12 +341,13 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
    */
   private OmVolumeArgs createOmVolumeArgs(String volumeName, String userName,
       long creationTime, long transactionLogIndex) throws IOException {
+    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
     OmVolumeArgs.Builder builder = OmVolumeArgs.newBuilder()
         .setAdminName(S3_ADMIN_NAME).setVolume(volumeName)
         .setQuotaInBytes(OzoneConsts.MAX_QUOTA_IN_BYTES)
         .setOwnerName(userName)
         .setCreationTime(creationTime)
-        .setObjectID(transactionLogIndex)
+        .setObjectID(objectID)
         .setUpdateID(transactionLogIndex);
 
     // Set default acls.
