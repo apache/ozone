@@ -68,7 +68,6 @@ import static org.mockito.Mockito.when;
 
 import javax.ws.rs.core.Response;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 
 /**
  * Test for Node Endpoint.
