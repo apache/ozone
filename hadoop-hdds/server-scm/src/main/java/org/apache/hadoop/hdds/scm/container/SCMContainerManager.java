@@ -128,17 +128,6 @@ public class SCMContainerManager implements ContainerManager {
         LOG.warn("Found a Container {} which is in {} state with pipeline {} " +
                 "that does not exist. Closing Container.", container,
             container.getState(), container.getPipelineID());
-
-        // Not firing CLOSE_CONTAINER event because CloseContainer event
-        // handler is not registered by the time when we come
-        // here. So, we are calling update Container state to set
-        // container state to CLOSING, and later replication manager takes care
-        // of send close commands to datanode to close containers on the
-        // datanode.
-
-        // Skipping pipeline to container removal because, we got a
-        // pipelineNotFoundException when adding container to
-        // pipeline. So, we can only update container state.
         updateContainerState(container.containerID(),
             HddsProtos.LifeCycleEvent.FINALIZE, true);
       }
