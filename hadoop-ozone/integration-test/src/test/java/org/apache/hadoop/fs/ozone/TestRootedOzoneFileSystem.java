@@ -44,8 +44,6 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -570,9 +568,9 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Helper function to call adapter impl for listStatus.
+   * Helper function to call listStatus in adapter implementation.
    */
-  private List<FileStatus> listStatusCallAdapterHelper(String pathStr,
+  private List<FileStatus> callAdapterListStatus(String pathStr,
       boolean recursive, String startPath, long numEntries) throws IOException {
     return adapter.listStatus(pathStr, recursive, startPath, numEntries,
         ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername())
@@ -585,7 +583,7 @@ public class TestRootedOzoneFileSystem {
    */
   private void listStatusCheckHelper(Path path) throws IOException {
     // Get recursive listStatus result directly from adapter impl
-    List<FileStatus> statusesFromAdapter = listStatusCallAdapterHelper(
+    List<FileStatus> statusesFromAdapter = callAdapterListStatus(
         path.toString(), true, "", 1000);
     // Get recursive listStatus result with FileSystem API by simulating FsShell
     List<FileStatus> statusesFromFS = new ArrayList<>();
@@ -628,8 +626,8 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Helper function. FileSystem#listStatus on steroid: Supports recursion,
-   * start path and custom listing page size.
+   * Helper function. FileSystem#listStatus on steroid:
+   * Supports recursion, start path and custom listing page size (numEntries).
    * @param f Given path
    * @param recursive List contents inside subdirectories
    * @param startPath Starting path of the batch
@@ -637,55 +635,55 @@ public class TestRootedOzoneFileSystem {
    * @return Array of the statuses of the files/directories in the given path
    * @throws IOException See specific implementation
    */
-  private FileStatus[] listStatusCustomized(Path f, boolean recursive,
+  private FileStatus[] customListStatus(Path f, boolean recursive,
       String startPath, int numEntries) throws IOException {
     Assert.assertTrue(numEntries > 0);
     LinkedList<FileStatus> statuses = new LinkedList<>();
     List<FileStatus> tmpStatusList;
     do {
-      tmpStatusList = listStatusCallAdapterHelper(f.toString(), recursive,
-          startPath, numEntries);
+      tmpStatusList = callAdapterListStatus(f.toString(), recursive,
+          startPath, numEntries - statuses.size());
       if (!tmpStatusList.isEmpty()) {
         statuses.addAll(tmpStatusList);
         startPath = statuses.getLast().getPath().toString();
       }
-    } while (tmpStatusList.size() == numEntries);
+    } while (tmpStatusList.size() == numEntries &&
+        statuses.size() < numEntries);
     return statuses.toArray(new FileStatus[0]);
   }
 
   @Test
-  public void testListStatusRootAndVolumeContinuation() throws IOException,
-      URISyntaxException {
+  public void testListStatusRootAndVolumeContinuation() throws IOException {
     for (int i = 0; i < 5; i++) {
       createRandomVolumeBucketWithDirs();
     }
     // Similar to recursive option, we can't test continuation directly with
     // FileSystem because we can't change LISTING_PAGE_SIZE. Use adapter instead
 
-    // listStatus("/")
-    FileStatus[] fileStatusesOver = listStatusCustomized(
+    // numEntries > 5
+    FileStatus[] fileStatusesOver = customListStatus(
         new Path("/"), false, "", 8);
     // There are only 5 volumes
     Assert.assertEquals(5, fileStatusesOver.length);
 
-    FileStatus[] fileStatusesExact = listStatusCustomized(
+    // numEntries = 5
+    FileStatus[] fileStatusesExact = customListStatus(
         new Path("/"), false, "", 5);
     Assert.assertEquals(5, fileStatusesExact.length);
 
-    FileStatus[] fileStatusesLimit1 = listStatusCustomized(
+    // numEntries < 5
+    FileStatus[] fileStatusesLimit1 = customListStatus(
         new Path("/"), false, "", 3);
     // Should only return 3 volumes even though there are more than that due to
     // the specified limit
     Assert.assertEquals(3, fileStatusesLimit1.length);
 
-    // Get the last one as the startPath
+    // Get the last entry in the list as startPath
     String nextStartPath = fileStatusesLimit1[fileStatusesLimit1.length - 1]
         .getPath().toString();
-    String removedHostNameStartPath = new URI(nextStartPath).getPath();
-    FileStatus[] fileStatusesLimit2 = listStatusCustomized(
-        new Path("/"), false,
-        removedHostNameStartPath, 3);
-    // Note: as the time of writing this test, OmMetadataManagerImpl#listVolumes
+    FileStatus[] fileStatusesLimit2 = customListStatus(
+        new Path("/"), false, nextStartPath, 3);
+    // Note: at the time of writing this test, OmMetadataManagerImpl#listVolumes
     //  excludes startVolume (startPath) from the result. Might change.
     Assert.assertEquals(fileStatusesOver.length,
         fileStatusesLimit1.length + fileStatusesLimit2.length);
