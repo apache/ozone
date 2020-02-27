@@ -50,7 +50,7 @@ public class ListKeyHandler extends Handler {
   private int maxKeys;
 
   @Option(names = {"--start", "-s"},
-      description = "The key to start the listing from. " +
+      description = "The key to start the listing from.\n" +
               "This will be excluded from the result.")
   private String startKey;
 
