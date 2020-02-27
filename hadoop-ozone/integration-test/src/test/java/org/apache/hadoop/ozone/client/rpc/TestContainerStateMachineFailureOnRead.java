@@ -37,8 +37,10 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -47,6 +49,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.log4j.Level;
@@ -65,10 +69,11 @@ public class TestContainerStateMachineFailureOnRead {
   private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
+  private OzoneConfiguration conf;
 
   @Before
   public void setup() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     String path = GenericTestUtils
         .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
     File baseDir = new File(path);
@@ -117,7 +122,6 @@ public class TestContainerStateMachineFailureOnRead {
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
-    //the easiest way to create an open container is creating a key
     OzoneClient client = OzoneClientFactory.getClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
@@ -143,19 +147,31 @@ public class TestContainerStateMachineFailureOnRead {
             HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE);
     Assert.assertEquals(1, pipelines.size());
+    Pipeline ratisPipeline = pipelines.iterator().next();
     Optional<HddsDatanodeService> leaderDn =
         cluster.getHddsDatanodes().stream().filter(
             s -> s.getDatanodeDetails().getUuid().equals(
-                pipelines.get(0).getLeaderId())).findFirst();
+                ratisPipeline.getLeaderId())).findFirst();
     Assert.assertTrue(leaderDn.isPresent());
 
     Optional<HddsDatanodeService> dnToStop =
         cluster.getHddsDatanodes().stream().filter(
-            s -> !s.getDatanodeDetails().getUuid().equals(
-                pipelines.get(0).getLeaderId())).findFirst();
+            s -> {
+              try {
+                return ContainerTestHelper.isRatisFollower(s, ratisPipeline);
+              } catch (Exception e) {
+                e.printStackTrace();
+                return false;
+              }
+            }).findFirst();
 
     Assert.assertTrue(dnToStop.isPresent());
     cluster.shutdownHddsDatanode(dnToStop.get().getDatanodeDetails());
+    // Verify healthy pipeline before creating key
+    XceiverClientRatis xceiverClientRatis =
+        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf);
+    xceiverClientRatis.connect();
+    TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
 
     OmKeyLocationInfo omKeyLocationInfo;
     OzoneOutputStream key = objectStore.getVolume(volumeName)
@@ -166,9 +182,8 @@ public class TestContainerStateMachineFailureOnRead {
     key.write("ratis".getBytes());
     key.flush();
     
-    //get the name of a valid container
-    KeyOutputStream groupOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+    // get the name of a valid container
+    KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
 
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
