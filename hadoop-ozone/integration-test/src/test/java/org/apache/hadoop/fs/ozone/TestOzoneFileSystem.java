@@ -357,7 +357,8 @@ public class TestOzoneFileSystem {
     GenericTestUtils.assertExceptionContains("KEY_NOT_FOUND", ex);
   }
 
-  private void testGetDirectoryModificationTime() throws IOException {
+  private void testGetDirectoryModificationTime()
+      throws IOException, InterruptedException {
     Path mdir1 = new Path("/mdir1");
     Path mdir11 = new Path(mdir1, "mdir11");
     Path mdir111 = new Path(mdir11, "mdir111");
