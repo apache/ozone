@@ -40,8 +40,8 @@ import com.google.inject.Injector;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 
 
 /**
@@ -50,7 +50,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_KE
 public class ReconServer extends GenericCli {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconServer.class);
-  private static boolean securityEnabled = false;
   private Injector injector;
 
   private ReconHttpServer httpServer;
@@ -164,8 +163,7 @@ public class ReconServer extends GenericCli {
    */
   private static void loginReconUserIfSecurityEnabled(OzoneConfiguration  conf)
       throws IOException, AuthenticationException {
-    securityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
-    if (securityEnabled) {
+    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       loginReconUser(conf);
     }
   }
