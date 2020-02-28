@@ -91,6 +91,17 @@ public class TestOFSPath {
   }
 
   @Test
+  public void testParsingWithAuthority() {
+    try {
+      new OFSPath("ofs://svc1/volume1/bucket1/dir1/");
+      Assert.fail(
+          "Should have thrown exception when parsing path with authority.");
+    } catch (Exception ignored) {
+      // Test pass
+    }
+  }
+
+  @Test
   public void testParsingMount() {
     // Mount only
     OFSPath ofsPath = new OFSPath("/tmp/");
