@@ -76,6 +76,8 @@ public class ReconIncrementalContainerReportHandler
           try {
             ContainerWithPipeline containerWithPipeline =
                 scmClient.getContainerWithPipeline(id.getId());
+            LOG.info("Verified new container from SCM {} ",
+                containerWithPipeline.getContainerInfo().containerID());
             containerManager.addNewContainer(id.getId(), containerWithPipeline);
           } catch (IOException ioEx) {
             LOG.error("Exception while getting new container info from SCM",

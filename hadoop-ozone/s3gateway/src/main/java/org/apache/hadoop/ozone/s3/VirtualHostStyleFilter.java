@@ -35,7 +35,6 @@ import java.util.Arrays;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.s3.header.AuthenticationHeaderParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,17 +57,12 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
   @Inject
   private OzoneConfiguration conf;
 
-  @Inject
-  private AuthenticationHeaderParser authenticationHeaderParser;
-
   private String[] domains;
 
   @Override
   public void filter(ContainerRequestContext requestContext) throws
       IOException {
 
-    authenticationHeaderParser.setAuthHeader(requestContext.getHeaderString(
-        HttpHeaders.AUTHORIZATION));
     domains = conf.getTrimmedStrings(OZONE_S3G_DOMAIN_NAME);
 
     if (domains.length == 0) {
@@ -161,9 +155,5 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
     }
   }
 
-  @VisibleForTesting
-  public void setAuthenticationHeaderParser(AuthenticationHeaderParser parser) {
-    this.authenticationHeaderParser = parser;
-  }
 
 }

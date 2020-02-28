@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.jooq.Configuration;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -38,7 +37,7 @@ import java.util.List;
 public class TaskStatusService {
 
   @Inject
-  private Configuration sqlConfiguration;
+  private ReconTaskStatusDao reconTaskStatusDao;
 
   /**
    * Return the list of Recon Tasks and the last successful timestamp and
@@ -48,8 +47,6 @@ public class TaskStatusService {
   @GET
   @Path("status")
   public Response getTaskTimes() {
-    ReconTaskStatusDao reconTaskStatusDao =
-        new ReconTaskStatusDao(sqlConfiguration);
     List<ReconTaskStatus> resultSet = reconTaskStatusDao.findAll();
     return Response.ok(resultSet).build();
   }

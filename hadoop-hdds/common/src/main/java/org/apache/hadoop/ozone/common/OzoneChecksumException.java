@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.common;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 /** Thrown for checksum errors. */

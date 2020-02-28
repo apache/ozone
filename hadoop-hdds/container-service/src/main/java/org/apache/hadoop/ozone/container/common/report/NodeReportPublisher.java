@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.report;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;

@@ -30,11 +30,16 @@ import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Recon's overriding implementation of SCM's Container Manager.
  */
 public class ReconContainerManager extends SCMContainerManager {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ReconContainerManager.class);
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -75,6 +80,8 @@ public class ReconContainerManager extends SCMContainerManager {
           getPipelineManager(), containerWithPipeline.getPipeline());
       addContainerToDB(containerInfo);
     } catch (IOException ex) {
+      LOG.info("Exception while adding container {} .",
+          containerInfo.containerID(), ex);
       getPipelineManager().removeContainerFromPipeline(
           containerInfo.getPipelineID(),
           new ContainerID(containerInfo.getContainerID()));

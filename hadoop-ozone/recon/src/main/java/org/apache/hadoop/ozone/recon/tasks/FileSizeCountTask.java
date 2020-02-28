@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
-import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +48,7 @@ import static org.apache.hadoop.ozone.recon.tasks.
  * files binned into ranges (1KB, 2Kb..,4MB,.., 1TB,..1PB) to the Recon
  * fileSize DB.
  */
-public class FileSizeCountTask implements ReconDBUpdateTask {
+public class FileSizeCountTask implements ReconOmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(FileSizeCountTask.class);
 
@@ -60,8 +59,8 @@ public class FileSizeCountTask implements ReconDBUpdateTask {
   private FileCountBySizeDao fileCountBySizeDao;
 
   @Inject
-  public FileSizeCountTask(Configuration sqlConfiguration) {
-    fileCountBySizeDao = new FileCountBySizeDao(sqlConfiguration);
+  public FileSizeCountTask(FileCountBySizeDao fileCountBySizeDao) {
+    this.fileCountBySizeDao = fileCountBySizeDao;
     upperBoundCount = new long[getMaxBinSize()];
   }
 

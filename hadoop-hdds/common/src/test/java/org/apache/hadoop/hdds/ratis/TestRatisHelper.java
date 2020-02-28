@@ -32,8 +32,12 @@ public class TestRatisHelper {
   public void testCreateRaftClientProperties() {
 
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set("raft.client.rpc.watch.request.timeout", "30s");
-    ozoneConfiguration.set("raft.client.rpc.request.timeout", "30s");
+    ozoneConfiguration.set("hdds.ratis.raft.client.rpc.watch" +
+        ".request.timeout", "30s");
+    ozoneConfiguration.set("hdds.ratis.raft.client.rpc.request" +
+        ".timeout", "30s");
+    ozoneConfiguration.set(
+        "hdds.ratis.raft.server.rpc.watch.request.timeout", "30s");
 
     RaftProperties raftProperties = new RaftProperties();
     RatisHelper.createRaftClientProperties(ozoneConfiguration, raftProperties);
@@ -42,21 +46,26 @@ public class TestRatisHelper {
         raftProperties.get("raft.client.rpc.watch.request.timeout"));
     Assert.assertEquals("30s",
         raftProperties.get("raft.client.rpc.request.timeout"));
+    Assert.assertNull(
+        raftProperties.get("raft.server.rpc.watch.request.timeout"));
 
   }
 
   @Test
-  public void testCreateRaftGrpcProperties() {
+  public void testCreateRaftGrpcPropertiesForClient() {
 
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set("raft.grpc.message.size.max", "30MB");
-    ozoneConfiguration.set("raft.grpc.flow.control.window", "1MB");
-    ozoneConfiguration.set("raft.grpc.tls.enabled", "true");
-    ozoneConfiguration.set("raft.grpc.tls.mutual_authn.enabled", "true");
-    ozoneConfiguration.set("raft.grpc.server.port", "100");
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.message.size.max",
+        "30MB");
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.flow.control" +
+        ".window", "1MB");
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.tls.enabled", "true");
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.tls.mutual_authn" +
+        ".enabled", "true");
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.server.port", "100");
 
     RaftProperties raftProperties = new RaftProperties();
-    RatisHelper.createRaftGrpcProperties(ozoneConfiguration, raftProperties);
+    RatisHelper.createRaftClientProperties(ozoneConfiguration, raftProperties);
 
     Assert.assertEquals("30MB",
         raftProperties.get("raft.grpc.message.size.max"));
@@ -73,19 +82,22 @@ public class TestRatisHelper {
 
 
   @Test
-  public void testCreateRaftServerGrpcProperties() {
+  public void testCreateRaftGrpcPropertiesForServer() {
 
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set("datanode.ratis.raft.grpc.message.size.max", "30MB");
-    ozoneConfiguration.set("datanode.ratis.raft.grpc.flow.control.window",
-        "1MB");
-    ozoneConfiguration.set("datanode.ratis.raft.grpc.tls.enabled", "true");
-    ozoneConfiguration.set("datanode.ratis.raft.grpc.tls.mutual_authn" +
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.message.size.max",
+        "30MB");
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.flow.control" +
+        ".window", "1MB");
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.tls.enabled",
+        "true");
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.tls.mutual_authn" +
         ".enabled", "true");
-    ozoneConfiguration.set("datanode.ratis.raft.grpc.server.port", "100");
+    ozoneConfiguration.set("hdds.ratis.raft.grpc.server.port",
+        "100");
 
     RaftProperties raftProperties = new RaftProperties();
-    RatisHelper.createRaftServerGrpcProperties(ozoneConfiguration,
+    RatisHelper.createRaftServerProperties(ozoneConfiguration,
         raftProperties);
 
     Assert.assertEquals("30MB",
@@ -106,9 +118,11 @@ public class TestRatisHelper {
 
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(
-        "datanode.ratis.raft.server.rpc.watch.request.timeout", "30s");
+        "hdds.ratis.raft.server.rpc.watch.request.timeout", "30s");
     ozoneConfiguration.set(
-        "datanode.ratis.raft.server.rpc.request.timeout", "30s");
+        "hdds.ratis.raft.server.rpc.request.timeout", "30s");
+    ozoneConfiguration.set(
+        "hdds.ratis.raft.client.rpc.request.timeout", "30s");
 
     RaftProperties raftProperties = new RaftProperties();
     RatisHelper.createRaftServerProperties(ozoneConfiguration, raftProperties);
@@ -117,6 +131,7 @@ public class TestRatisHelper {
         raftProperties.get("raft.server.rpc.watch.request.timeout"));
     Assert.assertEquals("30s",
         raftProperties.get("raft.server.rpc.request.timeout"));
+    Assert.assertNull(raftProperties.get("raft.client.rpc.request.timeout"));
 
   }
 }

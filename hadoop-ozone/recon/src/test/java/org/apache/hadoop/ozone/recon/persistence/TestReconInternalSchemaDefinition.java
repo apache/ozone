@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.hadoop.ozone.recon.schema.ReconInternalSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
+import static org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition.RECON_TASK_STATUS_TABLE_NAME;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -31,7 +31,7 @@ import javax.sql.DataSource;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.hadoop.ozone.recon.schema.ReconInternalSchemaDefinition;
+import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.jooq.Configuration;
@@ -45,8 +45,8 @@ public class TestReconInternalSchemaDefinition extends AbstractSqlDatabaseTest {
 
   @Test
   public void testSchemaCreated() throws Exception {
-    ReconInternalSchemaDefinition schemaDefinition = getInjector().getInstance(
-        ReconInternalSchemaDefinition.class);
+    ReconTaskSchemaDefinition schemaDefinition = getInjector().getInstance(
+        ReconTaskSchemaDefinition.class);
 
     schemaDefinition.initializeSchema();
 
@@ -80,8 +80,8 @@ public class TestReconInternalSchemaDefinition extends AbstractSqlDatabaseTest {
   @Test
   public void testReconTaskStatusCRUDOperations() throws Exception {
     // Verify table exists
-    ReconInternalSchemaDefinition schemaDefinition = getInjector().getInstance(
-        ReconInternalSchemaDefinition.class);
+    ReconTaskSchemaDefinition schemaDefinition = getInjector().getInstance(
+        ReconTaskSchemaDefinition.class);
 
     schemaDefinition.initializeSchema();
 

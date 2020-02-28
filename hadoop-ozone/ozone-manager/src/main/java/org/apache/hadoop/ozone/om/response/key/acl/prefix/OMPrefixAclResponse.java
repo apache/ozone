@@ -21,51 +21,47 @@ package org.apache.hadoop.ozone.om.response.key.acl.prefix;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.IOException;
 
 /**
  * Response for Prefix Acl request.
  */
 public class OMPrefixAclResponse extends OMClientResponse {
-  private final OmPrefixInfo prefixInfo;
 
-  public OMPrefixAclResponse(@Nullable OmPrefixInfo omPrefixInfo,
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse) {
+  private OmPrefixInfo prefixInfo;
+
+  public OMPrefixAclResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmPrefixInfo omPrefixInfo) {
     super(omResponse);
     this.prefixInfo = omPrefixInfo;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMPrefixAclResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // If response status is OK and success is true, add to DB batch.
-    if (getOMResponse().getSuccess()) {
-      if ((getOMResponse().hasAddAclResponse()
-          && getOMResponse().getAddAclResponse().getResponse()) ||
-          (getOMResponse().hasSetAclResponse()
-              && getOMResponse().getSetAclResponse().getResponse())) {
-        omMetadataManager.getPrefixTable().putWithBatch(batchOperation,
-            prefixInfo.getName(), prefixInfo);
-      } else if ((getOMResponse().hasRemoveAclResponse()
-          && getOMResponse().getRemoveAclResponse().getResponse())) {
-        if (prefixInfo.getAcls().size() == 0) {
-          // if acl list size is zero delete.
-          omMetadataManager.getPrefixTable().deleteWithBatch(batchOperation,
-              prefixInfo.getName());
-        } else {
-          omMetadataManager.getPrefixTable().putWithBatch(batchOperation,
-              prefixInfo.getName(), prefixInfo);
-        }
-      }
+    if (getOMResponse().hasRemoveAclResponse() &&
+        prefixInfo.getAcls().size() == 0) {
+      // if acl list size is zero, delete the entry.
+      omMetadataManager.getPrefixTable().deleteWithBatch(batchOperation,
+          prefixInfo.getName());
+    } else {
+      omMetadataManager.getPrefixTable().putWithBatch(batchOperation,
+          prefixInfo.getName(), prefixInfo);
     }
   }
-
 }
 
 

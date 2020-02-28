@@ -136,8 +136,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       }
 
       // Check if this transaction is a replay of ratis logs.
-      if (isReplay(ozoneManager, omKeyInfo.getUpdateID(),
-          trxnLogIndex)) {
+      if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
         // Replay implies the response has already been returned to
         // the client. So take no further action and return a dummy
         // OMClientResponse.
@@ -175,11 +174,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
             omResponse, exception));
       }
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse,
-                trxnLogIndex));
-      }
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+            omDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
