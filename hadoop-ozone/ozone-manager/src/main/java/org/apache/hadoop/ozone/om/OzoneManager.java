@@ -879,10 +879,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Logs in the OM use if security is enabled in the configuration.
+   * Logs in the OM user if security is enabled in the configuration.
    *
    * @param conf OzoneConfiguration
-   * @throws IOException, AuthenticationException in case login failes.
+   * @throws IOException, AuthenticationException in case login fails.
    */
   private static void loginOMUserIfSecurityEnabled(OzoneConfiguration  conf)
       throws IOException, AuthenticationException {
