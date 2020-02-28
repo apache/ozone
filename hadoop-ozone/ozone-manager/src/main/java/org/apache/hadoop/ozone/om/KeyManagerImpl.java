@@ -820,7 +820,7 @@ public class KeyManagerImpl implements KeyManager {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           metadataManager.getDeletedTable().get(objectKey);
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(keyInfo,
-          repeatedOmKeyInfo, 0L, ozoneManager.isRatisEnabled());
+          repeatedOmKeyInfo, 0L, false);
       metadataManager.getKeyTable().delete(objectKey);
       metadataManager.getDeletedTable().put(objectKey, repeatedOmKeyInfo);
     } catch (OMException ex) {
@@ -1065,8 +1065,7 @@ public class KeyManagerImpl implements KeyManager {
         RepeatedOmKeyInfo repeatedOmKeyInfo =
             metadataManager.getDeletedTable().get(partName);
         repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            keyInfo, repeatedOmKeyInfo, 0L,
-            ozoneManager.isRatisEnabled());
+            keyInfo, repeatedOmKeyInfo, 0L, false);
         metadataManager.getDeletedTable().put(partName, repeatedOmKeyInfo);
         throw new OMException("No such Multipart upload is with specified " +
             "uploadId " + uploadID, ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
@@ -1103,8 +1102,7 @@ public class KeyManagerImpl implements KeyManager {
                     .get(oldPartKeyInfo.getPartName());
 
             repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-                partKey, repeatedOmKeyInfo, 0L,
-                ozoneManager.isRatisEnabled());
+                partKey, repeatedOmKeyInfo, 0L, false);
 
             metadataManager.getDeletedTable().put(partName, repeatedOmKeyInfo);
             metadataManager.getDeletedTable().putWithBatch(batch,
@@ -1222,8 +1220,7 @@ public class KeyManagerImpl implements KeyManager {
                     .get(partKeyInfo.getPartName());
 
             repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-                currentKeyPartInfo, repeatedOmKeyInfo, 0L,
-                ozoneManager.isRatisEnabled());
+                currentKeyPartInfo, repeatedOmKeyInfo, 0L, false);
 
             metadataManager.getDeletedTable().putWithBatch(batch,
                 partKeyInfo.getPartName(), repeatedOmKeyInfo);
