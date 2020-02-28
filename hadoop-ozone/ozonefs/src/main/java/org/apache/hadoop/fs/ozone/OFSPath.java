@@ -18,8 +18,12 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.http.ParseException;
 import org.apache.yetus.audience.InterfaceAudience;
 import org.apache.yetus.audience.InterfaceStability;
+
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.StringTokenizer;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -60,6 +64,18 @@ class OFSPath {
   }
 
   private void initOFSPath(String pathStr) {
+    // pathStr should not have authority
+    try {
+      URI uri = new URI(pathStr);
+      String authority = uri.getAuthority();
+      if (authority != null && !authority.isEmpty()) {
+        throw new ParseException("Invalid path " + pathStr +
+            ". Shouldn't contain authority.");
+      }
+    } catch (URISyntaxException ex) {
+      throw new ParseException("Failed to parse path " + pathStr + " as URI.");
+    }
+    // tokenize
     StringTokenizer token = new StringTokenizer(pathStr, OZONE_URI_DELIMITER);
     int numToken = token.countTokens();
     if (numToken > 0) {

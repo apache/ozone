@@ -21,6 +21,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -496,15 +497,13 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsStartPath = new OFSPath(startPath);
     // list volumes
     Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
-        username, ofsStartPath.getVolumeName(), null);
+        username, null, ofsStartPath.getVolumeName());
     List<FileStatusAdapter> res = new ArrayList<>();
-    // TODO: Test continuation
-    while (iter.hasNext() && res.size() <= numEntries) {
+    while (iter.hasNext() && res.size() < numEntries) {
       OzoneVolume volume = iter.next();
       res.add(getFileStatusAdapterForVolume(volume, uri));
       if (recursive) {
         String pathStrNextVolume = volume.getName();
-        // TODO: Check startPath
         res.addAll(listStatus(pathStrNextVolume, recursive, startPath,
             numEntries - res.size(), uri, workingDir, username));
       }
@@ -525,13 +524,11 @@ public class BasicRootedOzoneClientAdapterImpl
     Iterator<? extends OzoneBucket> iter =
         volume.listBuckets(null, ofsStartPath.getBucketName());
     List<FileStatusAdapter> res = new ArrayList<>();
-    // TODO: Test continuation
-    while (iter.hasNext() && res.size() <= numEntries) {
+    while (iter.hasNext() && res.size() < numEntries) {
       OzoneBucket bucket = iter.next();
       res.add(getFileStatusAdapterForBucket(bucket, uri, username));
       if (recursive) {
         String pathStrNext = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
-        // TODO: Check startPath
         res.addAll(listStatus(pathStrNext, recursive, startPath,
             numEntries - res.size(), uri, workingDir, username));
       }
@@ -548,6 +545,10 @@ public class BasicRootedOzoneClientAdapterImpl
    * @param startPath Start path of next batch of result for continuation.
    *                  This takes an absolute path from OFS root. e.g.
    *                  /volumeA/bucketB/dirC/fileD
+   *                  Note startPath can optionally begin with uri, e.g.
+   *                  when uri=ofs://svc1
+   *                  startPath=ofs://svc1/volumeA/bucketB/dirC/fileD
+   *                  will be accepted, but NOT startPath=ofs://svc2/volumeA/...
    * @param numEntries Number of maximum entries in the batch.
    * @param uri URI of OFS root.
    *            Used in making the return path qualified.
@@ -563,6 +564,19 @@ public class BasicRootedOzoneClientAdapterImpl
       Path workingDir, String username) throws IOException {
 
     incrementCounter(Statistic.OBJECTS_LIST);
+    // Remove authority from startPath if it exists
+    if (startPath.startsWith(uri.toString())) {
+      try {
+        startPath = new URI(startPath).getPath();
+      } catch (URISyntaxException ex) {
+        throw new IOException(ex);
+      }
+    }
+    // Note: startPath could still have authority at this point if it's
+    //  authority doesn't match uri. This is by design. In this case,
+    //  OFSPath initializer will error out.
+    //  The goal is to refuse processing startPaths from other authorities.
+
     OFSPath ofsPath = new OFSPath(pathStr);
     if (ofsPath.isRoot()) {
       return listStatusRoot(
