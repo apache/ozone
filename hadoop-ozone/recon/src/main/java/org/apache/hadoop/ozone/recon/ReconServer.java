@@ -179,13 +179,12 @@ public class ReconServer extends GenericCli {
 
     if (SecurityUtil.getAuthenticationMethod(conf).equals(
         UserGroupInformation.AuthenticationMethod.KERBEROS)) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Ozone security is enabled. Attempting login for Recon user. "
-                + "Principal: {}, keytab: {}", conf.get(
-            OZONE_RECON_KERBEROS_PRINCIPAL_KEY),
-            conf.get(OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY));
-      }
 
+      LOG.info("Ozone security is enabled. Attempting login for Recon user. "
+              + "Principal: {}, keytab: {}", conf.get(
+          OZONE_RECON_KERBEROS_PRINCIPAL_KEY),
+          conf.get(OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY));
+      
       UserGroupInformation.setConfiguration(conf);
 
       InetSocketAddress socAddr = HddsUtils.getReconAddresses(conf);
