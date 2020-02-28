@@ -24,5 +24,6 @@ Resource            ../commonlib.robot
 
 *** Test Cases ***
 Read data from previously created key
-    ${output} =         Execute          ozone sh key get /topvol1/bucket1/key1
+    ${random} =         Generate Random String  5  [NUMBERS]
+    ${output} =         Execute          ozone sh key get /topvol1/bucket1/key1 /tmp/key1-${random}
                         Should not contain  ${output}       Failed

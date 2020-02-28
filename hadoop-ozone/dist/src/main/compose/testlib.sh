@@ -128,7 +128,7 @@ execute_command_in_container(){
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
   set -e
-  docker-compose -f "$COMPOSE_FILE" stop $@
+  docker-compose -f "$COMPOSE_FILE" --no-ansi stop $@
   set +e
 }
 
@@ -137,7 +137,7 @@ stop_containers() {
 ## @param       List of container names, eg datanode_1 datanode_2
 start_containers() {
   set -e
-  docker-compose -f "$COMPOSE_FILE" start $@
+  docker-compose -f "$COMPOSE_FILE" --no-ansi start $@
   set +e
 }
 
