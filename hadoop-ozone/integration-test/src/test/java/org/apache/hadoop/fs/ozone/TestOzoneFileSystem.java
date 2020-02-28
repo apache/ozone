@@ -87,6 +87,8 @@ public class TestOzoneFileSystem {
     testOzoneFsServiceLoader();
     o3fs = (OzoneFileSystem) fs;
 
+    testGetDirectoryModificationTime();
+
     testListStatusOnRoot();
     testListStatus();
     testListStatusOnSubDirs();
@@ -353,5 +355,49 @@ public class TestOzoneFileSystem {
 
   private void assertKeyNotFoundException(IOException ex) {
     GenericTestUtils.assertExceptionContains("KEY_NOT_FOUND", ex);
+  }
+
+  private void testGetDirectoryModificationTime()
+      throws IOException, InterruptedException {
+    Path mdir1 = new Path("/mdir1");
+    Path mdir11 = new Path(mdir1, "mdir11");
+    Path mdir111 = new Path(mdir11, "mdir111");
+    fs.mkdirs(mdir111);
+    rootItemCount++; // mdir1
+
+    // Case 1: Dir key exist on server
+    FileStatus[] fileStatuses = o3fs.listStatus(mdir11);
+    // Above listStatus result should only have one entry: mdir111
+    assertEquals(1, fileStatuses.length);
+    assertEquals(mdir111.toString(),
+        fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isDirectory());
+    // The dir key is actually created on server,
+    // so modification time should always be the same value.
+    long modificationTime = fileStatuses[0].getModificationTime();
+    // Check modification time in a small loop, it should always be the same
+    for (int i = 0; i < 5; i++) {
+      Thread.sleep(10);
+      fileStatuses = o3fs.listStatus(mdir11);
+      assertEquals(modificationTime, fileStatuses[0].getModificationTime());
+    }
+
+    // Case 2: Dir key doesn't exist on server
+    fileStatuses = o3fs.listStatus(mdir1);
+    // Above listStatus result should only have one entry: mdir11
+    assertEquals(1, fileStatuses.length);
+    assertEquals(mdir11.toString(),
+        fileStatuses[0].getPath().toUri().getPath());
+    assertTrue(fileStatuses[0].isDirectory());
+    // Since the dir key doesn't exist on server, the modification time is
+    // set to current time upon every listStatus request.
+    modificationTime = fileStatuses[0].getModificationTime();
+    // Check modification time in a small loop, it should be slightly larger
+    // each time
+    for (int i = 0; i < 5; i++) {
+      Thread.sleep(10);
+      fileStatuses = o3fs.listStatus(mdir1);
+      assertTrue(modificationTime <= fileStatuses[0].getModificationTime());
+    }
   }
 }

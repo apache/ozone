@@ -354,9 +354,11 @@ public class TestOzoneFileInterfaces {
 
     assertTrue("The created path is not directory.", omStatus.isDirectory());
 
-    // For directories, the time returned is the current time.
+    // For directories, the time returned is the current time when the dir key
+    // doesn't actually exist on server; if it exists, it will be a fixed value.
+    // In this case, the dir key exists.
     assertEquals(0, omStatus.getLen());
-    assertTrue(omStatus.getModificationTime() >= currentTime);
+    assertTrue(omStatus.getModificationTime() <= currentTime);
     assertEquals(omStatus.getPath().getName(), o3fs.pathToKey(path));
   }
 
