@@ -34,6 +34,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -218,6 +219,16 @@ public interface MiniOzoneCluster {
   void shutdownHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
+   * Start Recon.
+   */
+  void startRecon();
+
+  /**
+   * Stop Recon.
+   */
+  void stopRecon();
+
+  /**
    * Shutdown the MiniOzoneCluster and delete the storage dirs.
    */
   void shutdown();
@@ -273,6 +284,10 @@ public interface MiniOzoneCluster {
     protected Optional<Long> streamBufferMaxSize = Optional.empty();
     protected Optional<Long> blockSize = Optional.empty();
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
+    protected boolean includeRecon = false;
+    protected OptionalInt reconHttpPort = OptionalInt.empty();
+    protected OptionalInt reconDatanodePort = OptionalInt.empty();
+
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
     protected int numOfScmHandlers = 20;
@@ -471,6 +486,21 @@ public interface MiniOzoneCluster {
 
     public Builder setOMServiceId(String serviceId) {
       this.omServiceId = serviceId;
+      return this;
+    }
+
+    public Builder setReconHttpPort(int port) {
+      this.reconHttpPort = OptionalInt.of(port);
+      return this;
+    }
+
+    public Builder setReconDatanodePort(int port) {
+      this.reconDatanodePort = OptionalInt.of(port);
+      return this;
+    }
+
+    public Builder includeRecon(boolean include) {
+      this.includeRecon = include;
       return this;
     }
 
