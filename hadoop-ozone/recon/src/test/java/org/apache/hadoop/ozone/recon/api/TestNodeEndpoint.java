@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -245,11 +246,14 @@ public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
     reconScm.getDatanodeProtocolServer()
         .sendHeartbeat(heartbeatRequestProto);
 
-    response = nodeEndpoint.getDatanodes();
-    datanodesResponse =
-        (DatanodesResponse) response.getEntity();
-    datanodeMetadata = datanodesResponse.getDatanodes().iterator().next();
-    Assert.assertEquals(1, datanodeMetadata.getContainers());
+    LambdaTestUtils.await(30000, 5000, () -> {
+      Response response1 = nodeEndpoint.getDatanodes();
+      DatanodesResponse datanodesResponse1 =
+          (DatanodesResponse) response1.getEntity();
+      DatanodeMetadata datanodeMetadata1 =
+          datanodesResponse1.getDatanodes().iterator().next();
+      return (datanodeMetadata1.getContainers() == 1);
+    });
     Assert.assertEquals(1,
         reconScm.getPipelineManager()
             .getContainersInPipeline(pipeline.getId()).size());

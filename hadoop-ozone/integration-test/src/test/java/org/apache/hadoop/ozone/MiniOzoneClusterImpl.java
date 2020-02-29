@@ -19,13 +19,16 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_DB_JDBC_URL;
 
 import java.io.File;
@@ -105,9 +108,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * @throws IOException if there is an I/O error
    */
   protected MiniOzoneClusterImpl(OzoneConfiguration conf,
-      OzoneManager ozoneManager,
-      StorageContainerManager scm,
-      List<HddsDatanodeService> hddsDatanodes) {
+                                 OzoneManager ozoneManager,
+                                 StorageContainerManager scm,
+                                 List<HddsDatanodeService> hddsDatanodes) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
@@ -293,14 +296,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   @Override
   public void restartReconServer() {
-    try {
-      reconServer.stop();
-      reconServer.join();
-      reconServer = new ReconServer();
-      reconServer.execute(new String[]{});
-    } catch (Exception e) {
-      LOG.info("Exception while restarting Recon", e);
-    }
+    stopRecon(reconServer);
+    startRecon();
   }
 
   private void waitForHddsDatanodesStop() throws TimeoutException,
@@ -387,11 +384,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopOM(ozoneManager);
     stopDatanodes(hddsDatanodes);
     stopSCM(scm);
-    try {
-      stopRecon(reconServer);
-    } catch (Exception e) {
-      LOG.error("Exception while shutting down Recon.", e);
-    }
+    stopRecon(reconServer);
   }
 
   /**
@@ -422,6 +415,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         LOG.error("Exception while trying to shutdown datanodes:", e);
       }
     });
+  }
+
+  @Override
+  public void startRecon() {
+    reconServer = new ReconServer();
+    reconServer.execute(new String[]{});
+  }
+
+  @Override
+  public void stopRecon() {
+    stopRecon(reconServer);
   }
 
   private CertificateClient getCAClient() {
@@ -464,11 +468,15 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
   }
 
-  private static void stopRecon(ReconServer reconServer) throws Exception {
-    if (reconServer != null) {
-      LOG.info("Stopping Recon");
-      reconServer.stop();
-      reconServer.join();
+  private static void stopRecon(ReconServer reconServer) {
+    try {
+      if (reconServer != null) {
+        LOG.info("Stopping Recon");
+        reconServer.stop();
+        reconServer.join();
+      }
+    } catch (Exception e) {
+      LOG.error("Exception while shutting down Recon.", e);
     }
   }
 
@@ -503,26 +511,34 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
         om.start();
 
-        configureRecon();
-        reconServer = new ReconServer();
+        if (includeRecon) {
+          configureRecon();
+          reconServer = new ReconServer();
+        }
 
         hddsDatanodes = createHddsDatanodes(scm);
 
-        MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf, om, scm,
-            hddsDatanodes, reconServer);
+        MiniOzoneClusterImpl cluster;
+
+        if (includeRecon) {
+          cluster = new MiniOzoneClusterImpl(conf, om, scm, hddsDatanodes,
+              reconServer);
+        } else {
+          cluster = new MiniOzoneClusterImpl(conf, om, scm, hddsDatanodes);
+        }
 
         cluster.setCAClient(certClient);
         if (startDataNodes) {
           cluster.startHddsDatanodes();
         }
-        reconServer.execute(new String[] {});
+        if (includeRecon) {
+          reconServer.execute(new String[] {});
+        }
         return cluster;
       } catch (Exception ex) {
         stopOM(om);
-        try {
+        if (includeRecon) {
           stopRecon(reconServer);
-        } catch (Exception e) {
-          LOG.error("Exception while shutting down the Recon.", e);
         }
         if (startDataNodes) {
           stopDatanodes(hddsDatanodes);
@@ -756,15 +772,22 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       File tempNewFolder = tempFolder.newFolder();
       conf.set(OZONE_RECON_DB_DIR,
           tempNewFolder.getAbsolutePath());
-
-      File reconOmDbDir = tempFolder.newFolder();
-      conf.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
+      conf.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, tempNewFolder
           .getAbsolutePath());
-
+      conf.set(OZONE_RECON_SCM_DB_DIR,
+          tempNewFolder.getAbsolutePath());
       conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:" +
           tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
 
-      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
+      int httpPort = reconHttpPort.orElse(0);
+      conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:" + httpPort);
+
+      int rpcPort = NetUtils.getFreeSocketPort();
+      if (reconDatanodePort.isPresent()) {
+        rpcPort = reconDatanodePort.getAsInt();
+      }
+      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:" + rpcPort);
+      conf.set(OZONE_RECON_ADDRESS_KEY, "0.0.0.0:" + rpcPort);
 
       ConfigurationProvider.setConfiguration(conf);
     }
