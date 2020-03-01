@@ -294,7 +294,7 @@ public class ContainerStateManager {
         .setPipelineID(pipeline.getId())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
-        .setStateEnterTime(Time.monotonicNow())
+        .setStateEnterTime(Time.now())
         .setOwner(owner)
         .setContainerID(containerID)
         .setDeleteTransactionId(0)

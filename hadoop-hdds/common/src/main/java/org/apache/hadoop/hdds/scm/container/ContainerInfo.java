@@ -98,7 +98,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
     this.numberOfKeys = numberOfKeys;
-    this.lastUsed = Time.monotonicNow();
+    this.lastUsed = Time.now();
     this.state = state;
     this.stateEnterTime = stateEnterTime;
     this.owner = owner;
@@ -205,7 +205,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   public void updateLastUsedTime() {
-    lastUsed = Time.monotonicNow();
+    lastUsed = Time.now();
   }
 
   public HddsProtos.ContainerInfoProto getProtobuf() {
