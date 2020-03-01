@@ -247,20 +247,13 @@ public class BasicOzoneFileSystem extends FileSystem {
     statistics.incrementWriteOps(1);
     final String key = pathToKey(path);
     return createOutputStream(key,
-        replication,
-        flags.contains(CreateFlag.OVERWRITE),
-        false);
+        replication, flags.contains(CreateFlag.OVERWRITE), false);
   }
 
-  private FSDataOutputStream createOutputStream(String key,
-      short replication,
-      boolean overwrite,
-      boolean recursive) throws IOException {
-    return new FSDataOutputStream(adapter.createFile(
-        key,
-        replication,
-        overwrite,
-        recursive), statistics);
+  private FSDataOutputStream createOutputStream(String key, short replication,
+      boolean overwrite, boolean recursive) throws IOException {
+    return new FSDataOutputStream(adapter.createFile(key,
+        replication, overwrite, recursive), statistics);
   }
 
   @Override

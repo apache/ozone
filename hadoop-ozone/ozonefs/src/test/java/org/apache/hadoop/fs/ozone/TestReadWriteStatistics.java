@@ -323,14 +323,13 @@ public class TestReadWriteStatistics {
   }
 
   @Test
-  public void testIllegalReplication() throws Exception {
+  public void testSetReplication() throws Exception {
     EnumSet<CreateFlag> flags = EnumSet.of(CreateFlag.OVERWRITE);
-    for(int i = 1; i <=5; i++){
-      FSDataOutputStream stream =
-          fs.createNonRecursive(aPath, null, flags, 512, (short) 2, 512, null);
+    fs.createNonRecursive(aPath, null, flags, 512, (short) 2, 512, null);
+    assertEquals(3, fs.getFileStatus(aPath).getReplication());
+    fs.createNonRecursive(aPath, null, flags, 512, (short) 3, 512, null);
+    assertEquals(3, fs.getFileStatus(aPath).getReplication());
 
-      assertBytesWrittenAndWriteNumOps(0, i);
-    }
   }
 
   @Test(expected = UnsupportedOperationException.class)
