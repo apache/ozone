@@ -322,16 +322,6 @@ public class TestReadWriteStatistics {
     }
   }
 
-  @Test
-  public void testSetReplication() throws Exception {
-    EnumSet<CreateFlag> flags = EnumSet.of(CreateFlag.OVERWRITE);
-    fs.createNonRecursive(aPath, null, flags, 512, (short) 2, 512, null);
-    assertEquals(3, fs.getFileStatus(aPath).getReplication());
-    fs.createNonRecursive(aPath, null, flags, 512, (short) 3, 512, null);
-    assertEquals(3, fs.getFileStatus(aPath).getReplication());
-
-  }
-
   @Test(expected = UnsupportedOperationException.class)
   public void testsIfAppendGetsSupported() throws Exception {
     fs.append(aPath, 512, null);
