@@ -43,6 +43,10 @@ execute_robot_test scm topology/readdata.robot
 
 start_containers datanode_1 datanode_2 datanode_3
 
+wait_for_port datanode_1 9858 60
+wait_for_port datanode_2 9858 60
+wait_for_port datanode_3 9858 60
+
 stop_containers datanode_4 datanode_5 datanode_6
 
 execute_robot_test scm topology/readdata.robot

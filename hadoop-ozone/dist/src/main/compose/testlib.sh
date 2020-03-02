@@ -142,6 +142,35 @@ start_containers() {
 }
 
 
+## @description wait until the port is available on the given host
+## @param The host to check for the port
+## @param The port to check for
+## @param The maximum time to wait in seconds
+wait_for_port(){
+  local host=$1
+  local port=$2
+  local timeout=$3
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     set +e
+     docker-compose -f "${COMPOSE_FILE}" exec -T scm /bin/bash -c "nc -z $host $port"
+     status=$?
+     set -e
+     if [ $status -eq 0 ] ; then
+         echo "Port $port is available on $host"
+         return;
+     fi
+     echo "Port $port is not available on $host yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $host $port to become available"
+   return 1
+}
+
+
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
   docker-compose -f "$COMPOSE_FILE" --no-ansi logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
