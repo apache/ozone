@@ -30,6 +30,7 @@ import javax.annotation.Nonnull;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
@@ -175,7 +176,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     // if isRecursive is true, file would be created even if parent
     // directories does not exist.
     boolean isRecursive = createFileRequest.getIsRecursive();
-    LOG.info("File create for : " + volumeName + "/" + bucketName + "/"
+    LOG.debug("File create for : " + volumeName + "/" + bucketName + "/"
         + keyName + ":" + isRecursive);
 
     // if isOverWrite is true, file would be over written.
@@ -190,6 +191,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
     OmKeyInfo omKeyInfo = null;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
+    List<OmKeyInfo> missingParentInfos = new ArrayList<>();
 
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OMResponse.newBuilder()
@@ -235,9 +237,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
         }
       }
 
-      OMFileRequest.OMDirectoryResult omDirectoryResult =
+      OMFileRequest.OMPathInfo pathInfo =
           OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
-              bucketName, keyName, Paths.get(keyName)).getDirectoryResult();
+              bucketName, keyName, Paths.get(keyName));
+      OMFileRequest.OMDirectoryResult omDirectoryResult =
+          pathInfo.getDirectoryResult();
+      List<OzoneAcl> inheritAcls = pathInfo.getAcls();
 
       // Check if a file or directory exists with same key name.
       if (omDirectoryResult == FILE_EXISTS) {
@@ -256,39 +261,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       }
 
       if (!isRecursive) {
-        // We cannot create a file if complete parent directories don't exist.
-
-        // verifyFilesInPath, checks only the path and its parent directories.
-        // But there may be some keys below the given path. So this method
-        // checks them.
-
-        // Example:
-        // Existing keys in table
-        // a/b/c/d/e
-        // a/b/c/d/f
-        // a/b
-
-        // Take an example if given key to be created with isRecursive set
-        // to false is "a/b/c/e".
-        // There is no key in keyTable with the provided path.
-        // Check in case if there are keys exist in given path. (This can
-        // happen if keys are directly created using key requests.)
-
-        // We need to do this check only in the case of non-recursive, so
-        // not included the checks done in checkKeysUnderPath in
-        // verifyFilesInPath method, as that method is common method for
-        // directory and file create request. This also avoid's this
-        // unnecessary check which is not required for those cases.
-        if (omDirectoryResult == NONE ||
-            omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH) {
-          boolean canBeCreated = checkKeysUnderPath(omMetadataManager,
-              volumeName, bucketName, keyName);
-          if (!canBeCreated) {
-            throw new OMException("Can not create file: " + keyName +
-                " as one of parent directory is not created",
-                OMException.ResultCodes.NOT_A_FILE);
-          }
-        }
+        checkAllParentsExist(ozoneManager, keyArgs, pathInfo);
       }
 
       // do open key
@@ -305,6 +278,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
       long clientID = createFileRequest.getClientID();
       String dbOpenKeyName = omMetadataManager.getOpenKey(volumeName,
           bucketName, keyName, clientID);
+
+      if (ozoneManager.createPrefixEntries()) {
+        missingParentInfos = OMDirectoryCreateRequest
+            .getAllParentInfo(ozoneManager, keyArgs,
+                pathInfo.getMissingParents(), inheritAcls, trxnLogIndex);
+      }
 
       // Append new blocks
       omKeyInfo.appendNewBlocks(keyArgs.getKeyLocationsList().stream()
@@ -325,7 +304,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponse(omResponse.build(),
-          omKeyInfo, clientID);
+          omKeyInfo, missingParentInfos, clientID);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -377,6 +356,61 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  private void checkAllParentsExist(OzoneManager ozoneManager,
+      KeyArgs keyArgs,
+      OMFileRequest.OMPathInfo pathInfo) throws IOException {
+    Boolean canBeCreated = false;
+    String keyName = keyArgs.getKeyName();
+
+    if (ozoneManager.createPrefixEntries()) {
+      if (pathInfo.directParentExists()) {
+        canBeCreated = true;
+      }
+    } else {
+      String volumeName = keyArgs.getVolumeName();
+      String bucketName = keyArgs.getBucketName();
+
+      OMFileRequest.OMDirectoryResult omDirectoryResult =
+          pathInfo.getDirectoryResult();
+
+      // We cannot create a file if complete parent directories don't exist.
+
+      // verifyFilesInPath, checks only the path and its parent directories.
+      // But there may be some keys below the given path. So this method
+      // checks them.
+
+      // Example:
+      // Existing keys in table
+      // a/b/c/d/e
+      // a/b/c/d/f
+      // a/b
+
+      // Take an example if given key to be created with isRecursive set
+      // to false is "a/b/c/e".
+      // There is no key in keyTable with the provided path.
+      // Check in case if there are keys exist in given path. (This can
+      // happen if keys are directly created using key requests.)
+
+      // We need to do this check only in the case of non-recursive, so
+      // not included the checks done in checkKeysUnderPath in
+      // verifyFilesInPath method, as that method is common method for
+      // directory and file create request. This also avoid's this
+      // unnecessary check which is not required for those cases.
+      if (omDirectoryResult == NONE ||
+          omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH) {
+        canBeCreated =
+            checkKeysUnderPath(ozoneManager.getMetadataManager(), volumeName,
+                bucketName, keyName);
+      }
+    }
+
+    if (!canBeCreated) {
+      throw new OMException("Cannot create file : " + keyName
+          + " as one of parent directory is not created",
+          OMException.ResultCodes.NOT_A_FILE);
+    }
   }
 
   /**

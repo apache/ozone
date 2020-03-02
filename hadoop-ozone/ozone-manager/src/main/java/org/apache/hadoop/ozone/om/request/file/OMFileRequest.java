@@ -66,6 +66,13 @@ public final class OMFileRequest {
     List<String> missing = new ArrayList<>();
     List<OzoneAcl> inheritAcls = new ArrayList<>();
     OMDirectoryResult result = OMDirectoryResult.NONE;
+    boolean parentExists = false;
+    Path immediateParentPath = keyPath.getParent();
+
+    String immediateParent = null;
+    if (immediateParentPath != null) {
+      immediateParent = immediateParentPath.toString();
+    }
 
     while (keyPath != null) {
       String pathName = keyPath.toString();
@@ -95,6 +102,9 @@ public final class OMFileRequest {
           LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
               + inheritAcls);
         }
+        if (dbDirKeyName.equals(immediateParent)) {
+          parentExists = true;
+        }
       } else {
         if (!dbDirKeyName.equals(dirNameFromDetails)) {
           missing.add(keyPath.toString());
@@ -105,7 +115,7 @@ public final class OMFileRequest {
 
         LOG.trace("verifyFiles in Path : " + "/" + volumeName
             + "/" + bucketName + "/" + keyName + ":" + result);
-        return new OMPathInfo(missing, result, inheritAcls);
+        return new OMPathInfo(missing, result, inheritAcls, parentExists);
       }
       keyPath = keyPath.getParent();
     }
@@ -120,7 +130,7 @@ public final class OMFileRequest {
     LOG.trace("verifyFiles in Path : " + volumeName + "/" + bucketName + "/"
         + keyName + ":" + result);
     // Found no files/ directories in the given path.
-    return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls);
+    return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls, parentExists);
   }
 
   /**
@@ -159,12 +169,14 @@ public final class OMFileRequest {
     private OMDirectoryResult directoryResult;
     private List<String> missingParents;
     private List<OzoneAcl> acls;
+    boolean immediateParentExists;
 
     public OMPathInfo(List missingParents, OMDirectoryResult result,
-        List<OzoneAcl> aclList) {
+        List<OzoneAcl> aclList, boolean immediateParentExists) {
       this.missingParents = missingParents;
-      directoryResult = result;
+      this.directoryResult = result;
       this.acls = aclList;
+      this.immediateParentExists = immediateParentExists;
     }
 
     public List getMissingParents() {
@@ -177,6 +189,14 @@ public final class OMFileRequest {
 
     public List<OzoneAcl> getAcls() {
       return acls;
+    }
+
+    /**
+     * indicates if the immediate parent in the path already exists.
+     * @return true indicates the parent exists
+     */
+    public boolean directParentExists() {
+      return immediateParentExists;
     }
   }
 
