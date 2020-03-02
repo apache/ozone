@@ -20,6 +20,8 @@ package org.apache.hadoop.fs.ozone;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.io.IOException;
+
 /**
  * Testing basic functions of utility class OFSPath.
  */
@@ -103,7 +105,14 @@ public class TestOFSPath {
 
   @Test
   public void testParsingMount() {
-    String bucketName = OFSPath.getTempMountBucketNameOfCurrentUser();
+    String bucketName;
+    try {
+      bucketName = OFSPath.getTempMountBucketNameOfCurrentUser();
+    } catch (IOException ex) {
+      Assert.fail("Failed to get the current user name, "
+          + "thus failed to get temp bucket name.");
+      bucketName = "";  // Make javac happy
+    }
     // Mount only
     OFSPath ofsPath = new OFSPath("/tmp/");
     Assert.assertEquals(

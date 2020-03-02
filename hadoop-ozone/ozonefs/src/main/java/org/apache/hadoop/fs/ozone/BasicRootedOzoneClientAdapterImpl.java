@@ -214,8 +214,7 @@ public class BasicRootedOzoneClientAdapterImpl
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
     } catch (OMException ex) {
       // Note: always create bucket if volumeStr matches "tmp" so -put works
-      if (createIfNotExist ||
-          volumeStr.equals(OFSPath.OFS_MOUNT_TMP_VOLUMENAME)) {
+      if (createIfNotExist) {
         // Note: getBucketDetails always throws BUCKET_NOT_FOUND, even if
         // the volume doesn't exist.
         if (ex.getResult().equals(BUCKET_NOT_FOUND)) {
@@ -294,6 +293,7 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
     try {
+      // Hadoop CopyCommands class always sets recursive to true
       OzoneBucket bucket = getBucket(ofsPath, recursive);
       OzoneOutputStream ozoneOutputStream = bucket.createFile(
           key, 0, replicationType, replicationFactor, overWrite, recursive);
@@ -460,6 +460,8 @@ public class BasicRootedOzoneClientAdapterImpl
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
         throw new FileNotFoundException(key + ": No such file or directory!");
+      } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
+        throw new FileNotFoundException(key + ": Bucket doesn't exist!");
       }
       throw e;
     }

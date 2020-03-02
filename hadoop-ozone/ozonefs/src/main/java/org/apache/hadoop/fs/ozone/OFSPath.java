@@ -93,7 +93,12 @@ class OFSPath {
         // TODO: In the future, may retrieve volume and bucket from
         //  UserVolumeInfo on the server side. TBD.
         volumeName = OFS_MOUNT_TMP_VOLUMENAME;
-        bucketName = getTempMountBucketNameOfCurrentUser();
+        try {
+          bucketName = getTempMountBucketNameOfCurrentUser();
+        } catch (IOException ex) {
+          throw new ParseException(
+              "Failed to get temp bucket name for current user.");
+        }
       } else if (numToken >= 2) {
         // Regular volume and bucket path
         volumeName = firstToken;
@@ -102,7 +107,6 @@ class OFSPath {
         // Volume only
         volumeName = firstToken;
       }
-//    } else {  // TODO: Implement '/' case for ls.
     }
 
     // Compose key name
@@ -198,15 +202,10 @@ class OFSPath {
   /**
    * Get the bucket name of temp for the current user from UserGroupInformation.
    * @return Username MD5 hash in hex digits.
+   * @throws IOException When UserGroupInformation.getCurrentUser() fails.
    */
-  @VisibleForTesting
-  static String getTempMountBucketNameOfCurrentUser() {
-    String username;
-    try {
-      username = UserGroupInformation.getCurrentUser().getUserName();
-    } catch (IOException ex) {
-      username = "undefined"; // TODO: Any better idea?
-    }
+  static String getTempMountBucketNameOfCurrentUser() throws IOException {
+    String username = UserGroupInformation.getCurrentUser().getUserName();
     return getTempMountBucketName(username);
   }
 }
