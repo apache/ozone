@@ -71,6 +71,8 @@ import static org.mockito.Mockito.when;
  */
 public class TestOzoneManagerDoubleBufferWithOMResponse {
 
+  private static final int MAX_VOLUMES = 1000;
+
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private AuditLogger auditLogger;
@@ -92,7 +94,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    ozoneConfiguration.setInt(HDDS_LOCK_MAX_CONCURRENCY, 1000);
+    ozoneConfiguration.setInt(HDDS_LOCK_MAX_CONCURRENCY, 2 * MAX_VOLUMES);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -137,7 +139,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
   @Test
   public void testDoubleBuffer1000() throws Exception {
-    testDoubleBuffer(1000, 500);
+    testDoubleBuffer(MAX_VOLUMES, 500);
   }
 
   /**
@@ -385,16 +387,16 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
     GenericTestUtils.waitFor(() ->
         expectedTransactions == doubleBuffer.getFlushedTransactionCount(),
-        100, 500000);
+        100, volumeCount * 500);
 
     GenericTestUtils.waitFor(() ->
         assertRowCount(volumeCount, omMetadataManager.getVolumeTable()),
-        300, 300000);
+        300, volumeCount * 300);
 
 
     GenericTestUtils.waitFor(() ->
         assertRowCount(expectedBuckets, omMetadataManager.getBucketTable()),
-        300, 300000);
+        300, volumeCount * 300);
 
     Assert.assertTrue(doubleBuffer.getFlushIterations() > 0);
   }
