@@ -61,8 +61,7 @@ public abstract class OMClientResponse {
    */
   public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    if (omResponse.getStatus() == OzoneManagerProtocolProtos.Status.OK ||
-        getOMResponse().getStatus() == NO_SUCH_MULTIPART_UPLOAD_ERROR) {
+    if (omResponse.getStatus() == OzoneManagerProtocolProtos.Status.OK) {
       addToDBBatch(omMetadataManager, batchOperation);
     }
   }
