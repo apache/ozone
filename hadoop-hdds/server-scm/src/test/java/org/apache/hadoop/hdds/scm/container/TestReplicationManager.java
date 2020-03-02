@@ -611,7 +611,7 @@ public class TestReplicationManager {
     replicationManager.stop();
   }
 
-  private class DatanodeCommandHandler implements
+  static class DatanodeCommandHandler implements
       EventHandler<CommandForDatanode> {
 
     private AtomicInteger invocation = new AtomicInteger(0);
@@ -633,7 +633,7 @@ public class TestReplicationManager {
       return invocation.get();
     }
 
-    private int getInvocationCount(SCMCommandProto.Type type) {
+    int getInvocationCount(SCMCommandProto.Type type) {
       return commandInvocation.containsKey(type) ?
           commandInvocation.get(type).get() : 0;
     }
