@@ -215,6 +215,25 @@ public class TestOzoneFileInterfaces {
     assertEquals(statistics.getLong("objects_read").longValue(), 1);
   }
 
+  @Test
+  public void testReplication() throws IOException {
+    int stringLen = 20;
+    String data = RandomStringUtils.randomAlphanumeric(stringLen);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+
+    Path pathIllegal = createPath("/" + filePath + "illegal");
+    try (FSDataOutputStream streamIllegal = fs.create(pathIllegal, (short)2)) {
+      streamIllegal.writeBytes(data);
+    }
+    assertEquals(3, fs.getFileStatus(pathIllegal).getReplication());
+
+    Path pathLegal = createPath("/" + filePath + "legal");
+    try (FSDataOutputStream streamLegal = fs.create(pathLegal, (short)1)) {
+      streamLegal.writeBytes(data);
+    }
+    assertEquals(1, fs.getFileStatus(pathLegal).getReplication());
+  }
+
   private void verifyOwnerGroup(FileStatus fileStatus) {
     String owner = getCurrentUser();
     assertEquals(owner, fileStatus.getOwner());
