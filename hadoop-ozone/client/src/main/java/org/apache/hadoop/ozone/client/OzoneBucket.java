@@ -609,7 +609,7 @@ public class OzoneBucket extends WithMetadata {
     /**
      * Gets the next set of key list using proxy.
      * @param prevKey
-     * @return {@code List<OzoneVolume>}
+     * @return {@code List<OzoneKey>}
      */
     private List<OzoneKey> getNextListOfKeys(String prevKey) {
       try {

@@ -2197,11 +2197,11 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.keytab.file</name>
+    <name>ozone.recon.http.kerberos.keytab.file</name>
     <value/>
     <tag>RECON, SECURITY</tag>
     <description>
-      The keytab file for Kerberos authentication in Recon.
+      The keytab file for HTTP Kerberos authentication in Recon.
     </description>
   </property>
   <property>

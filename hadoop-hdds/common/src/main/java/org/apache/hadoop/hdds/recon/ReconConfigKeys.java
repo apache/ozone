@@ -41,4 +41,8 @@ public final class ReconConfigKeys {
   public static final String OZONE_RECON_DATANODE_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_RECON_DATANODE_PORT_DEFAULT = 9891;
+  public static final String OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY =
+      "ozone.recon.kerberos.keytab.file";
+  public static final String OZONE_RECON_KERBEROS_PRINCIPAL_KEY =
+      "ozone.recon.kerberos.principal";
 }

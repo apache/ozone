@@ -99,7 +99,7 @@ public class OzoneFileStatus extends FileStatus {
    */
   @Override
   public long getModificationTime(){
-    if (isDirectory()) {
+    if (isDirectory() && super.getModificationTime() == 0) {
       return System.currentTimeMillis();
     } else {
       return super.getModificationTime();

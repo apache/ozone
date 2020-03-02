@@ -72,7 +72,7 @@ public class ReconHttpServer extends BaseHttpServer {
 
   @Override
   protected String getKeytabFile() {
-    return ReconServerConfigKeys.OZONE_RECON_KEYTAB_FILE;
+    return ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE;
   }
 
   @Override

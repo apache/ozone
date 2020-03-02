@@ -215,6 +215,25 @@ public class TestOzoneFileInterfaces {
     assertEquals(statistics.getLong("objects_read").longValue(), 1);
   }
 
+  @Test
+  public void testReplication() throws IOException {
+    int stringLen = 20;
+    String data = RandomStringUtils.randomAlphanumeric(stringLen);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+
+    Path pathIllegal = createPath("/" + filePath + "illegal");
+    try (FSDataOutputStream streamIllegal = fs.create(pathIllegal, (short)2)) {
+      streamIllegal.writeBytes(data);
+    }
+    assertEquals(3, fs.getFileStatus(pathIllegal).getReplication());
+
+    Path pathLegal = createPath("/" + filePath + "legal");
+    try (FSDataOutputStream streamLegal = fs.create(pathLegal, (short)1)) {
+      streamLegal.writeBytes(data);
+    }
+    assertEquals(1, fs.getFileStatus(pathLegal).getReplication());
+  }
+
   private void verifyOwnerGroup(FileStatus fileStatus) {
     String owner = getCurrentUser();
     assertEquals(owner, fileStatus.getOwner());
@@ -354,9 +373,11 @@ public class TestOzoneFileInterfaces {
 
     assertTrue("The created path is not directory.", omStatus.isDirectory());
 
-    // For directories, the time returned is the current time.
+    // For directories, the time returned is the current time when the dir key
+    // doesn't actually exist on server; if it exists, it will be a fixed value.
+    // In this case, the dir key exists.
     assertEquals(0, omStatus.getLen());
-    assertTrue(omStatus.getModificationTime() >= currentTime);
+    assertTrue(omStatus.getModificationTime() <= currentTime);
     assertEquals(omStatus.getPath().getName(), o3fs.pathToKey(path));
   }
 
