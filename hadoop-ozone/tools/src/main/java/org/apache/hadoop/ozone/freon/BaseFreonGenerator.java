@@ -32,6 +32,8 @@ import java.util.regex.Pattern;
 import com.codahale.metrics.ScheduledReporter;
 import com.codahale.metrics.Slf4jReporter;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -337,6 +339,29 @@ public class BaseFreonGenerator {
                     Client.getRpcTimeout(ozoneConf))),
             StorageContainerLocationProtocol.class, ozoneConf);
     return client;
+  }
+
+  public static Pipeline findPipelineForTest(String pipelineId,
+      StorageContainerLocationProtocol client, Logger log) throws IOException {
+    List<Pipeline> pipelines = client.listPipelines();
+    Pipeline pipeline;
+    if (pipelineId != null && pipelineId.length() > 0) {
+      pipeline = pipelines.stream()
+          .filter(p -> p.getId().toString().equals(pipelineId))
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException(
+              "Pipeline ID is defined, but there is no such pipeline: "
+                  + pipelineId));
+    } else {
+      pipeline = pipelines.stream()
+          .filter(p -> p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException(
+              "Pipeline ID is NOT defined, and no pipeline " +
+                  "has been found with factor=THREE"));
+      log.info("Using pipeline {}", pipeline.getId());
+    }
+    return pipeline;
   }
 
   /**
