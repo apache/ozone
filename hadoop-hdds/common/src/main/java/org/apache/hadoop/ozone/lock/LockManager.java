@@ -186,21 +186,42 @@ public class LockManager<R> {
      * be removed from the activeLocks map and returned to
      * the object pool.
      */
-    return activeLocks.compute(resource, (k, v) -> {
+    ActiveLock computedLock = activeLocks.compute(resource, (k, v) -> {
       final ActiveLock lock;
+      if (v == null) {
+        return null;
+      } else {
+        lock = v;
+      }
+      lock.incrementActiveCount();
+      return lock;
+    });
+
+
+    if (computedLock == null) {
       try {
-        if (v == null) {
-          lock = lockPool.borrowObject();
-        } else {
-          lock = v;
-        }
-        lock.incrementActiveCount();
+        final ActiveLock lock2 = lockPool.borrowObject();
+        computedLock = activeLocks.compute(resource, (k, v) -> {
+          final ActiveLock lock;
+          try {
+            if (v == null) {
+              lock = lock2;
+            } else {
+              lockPool.returnObject(lock2);
+              lock = v;
+            }
+            lock.incrementActiveCount();
+          } catch (Exception ex) {
+            throw new RuntimeException(ex);
+          }
+          return lock;
+        });
       } catch (Exception ex) {
         LOG.error("Unable to obtain lock.", ex);
         throw new RuntimeException(ex);
       }
-      return lock;
-    });
+    }
+    return computedLock;
   }
 
   /**
