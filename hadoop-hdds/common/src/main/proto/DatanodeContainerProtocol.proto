@@ -316,6 +316,7 @@ message BlockData {
 // Block Messages.
 message  PutBlockRequestProto {
   required BlockData blockData = 1;
+  optional bool eof = 2;
 }
 
 message  PutBlockResponseProto {

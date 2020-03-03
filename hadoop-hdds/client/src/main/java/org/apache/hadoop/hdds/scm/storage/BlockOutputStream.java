@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -378,15 +377,8 @@ public class BlockOutputStream extends OutputStream {
         ContainerCommandResponseProto> flushFuture;
     try {
       BlockData blockData = containerBlockData.build();
-      if (close) {
-        blockData = BlockData.newBuilder(blockData)
-            .addMetadata(KeyValue.newBuilder()
-                .setKey(OzoneConsts.LAST_PUT_FOR_BLOCK)
-                .setValue(Boolean.TRUE.toString()))
-            .build();
-      }
       XceiverClientReply asyncReply =
-          putBlockAsync(xceiverClient, blockData);
+          putBlockAsync(xceiverClient, blockData, close);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
