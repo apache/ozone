@@ -93,7 +93,7 @@ import static org.junit.Assert.assertFalse;
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
-    volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
+    volumeSet = new VolumeSet(UUID.randomUUID().toString(), null, conf);
   }
 
   @After public void teardown() {

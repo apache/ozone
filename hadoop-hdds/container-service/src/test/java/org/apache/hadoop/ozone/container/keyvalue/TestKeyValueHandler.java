@@ -231,7 +231,7 @@ public class TestKeyValueHandler {
     File path = GenericTestUtils.getRandomizedTestDir();
     Configuration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
-    VolumeSet volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
+    VolumeSet volumeSet = new VolumeSet(UUID.randomUUID().toString(), null, conf);
     try {
       ContainerSet cset = new ContainerSet();
       int[] interval = new int[1];

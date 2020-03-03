@@ -96,6 +96,9 @@ public class HddsVolume
    */
   @Override
   public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+    if (!hddsRootDir.exists()) {
+      return VolumeCheckResult.FAILED;
+    }
     DiskChecker.checkDir(hddsRootDir);
     return VolumeCheckResult.HEALTHY;
   }
@@ -436,6 +439,13 @@ public class HddsVolume
    */
   public long getCommittedBytes() {
     return committedBytes.get();
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    return this == other
+        || other instanceof HddsVolume && ((HddsVolume) other).hddsRootDir
+        .equals(this.hddsRootDir);
   }
 
   /**

@@ -122,6 +122,18 @@ public class ContainerSet {
     return containerMap.size();
   }
 
+  public void handleVolumeFailures(Set<HddsVolume> failedVolumes) {
+    containerMap.values().forEach(c -> {
+      if (failedVolumes.contains(c.getContainerData().getVolume())) {
+        try {
+          c.markContainerUnhealthy();
+        } catch (StorageContainerException e) {
+          LOG.error("Failed to move container to UNHEALTHY state", e);
+        }
+      }
+    });
+  }
+
   /**
    * Return an container Iterator over {@link ContainerSet#containerMap}.
    * @return {@literal Iterator<Container<?>>}

@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume.VolumeState;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.ShutdownHookManager;
@@ -106,19 +107,23 @@ public class VolumeSet {
 
   private Runnable shutdownHook;
   private final HddsVolumeChecker volumeChecker;
+  private final OzoneContainer ozoneContainer;
 
-  public VolumeSet(String dnUuid, Configuration conf)
+  public VolumeSet(String dnUuid, OzoneContainer ozoneContainer,
+      Configuration conf)
       throws IOException {
-    this(dnUuid, null, conf);
+    this(dnUuid, null, ozoneContainer, conf);
   }
 
-  public VolumeSet(String dnUuid, String clusterID, Configuration conf)
+  public VolumeSet(String dnUuid, String clusterID,
+      OzoneContainer ozoneContainer, Configuration conf)
       throws IOException {
     this.datanodeUuid = dnUuid;
     this.clusterID = clusterID;
     this.conf = conf;
     this.volumeSetRWLock = new ReentrantReadWriteLock();
     this.volumeChecker = getVolumeChecker(conf);
+    this.ozoneContainer = ozoneContainer;
     this.diskCheckerservice = Executors.newScheduledThreadPool(
         1, r -> {
           Thread t = new Thread(r, "Periodic HDDS volume checker");
@@ -144,6 +149,11 @@ public class VolumeSet {
   HddsVolumeChecker getVolumeChecker(Configuration configuration)
       throws DiskChecker.DiskErrorException {
     return new HddsVolumeChecker(configuration, new Timer());
+  }
+
+  @VisibleForTesting
+  HddsVolumeChecker getVolumeChecker() {
+    return volumeChecker;
   }
 
   /**
@@ -215,7 +225,7 @@ public class VolumeSet {
    * Run a synchronous parallel check of all HDDS volumes, removing
    * failed volumes.
    */
-  private void checkAllVolumes() throws IOException {
+  public void checkAllVolumes() throws IOException {
     List<HddsVolume> allVolumes = getVolumesList();
     Set<HddsVolume> failedVolumes;
     try {
@@ -248,6 +258,10 @@ public class VolumeSet {
         failedVolumeMap.putIfAbsent(v.getHddsRootDir().getPath(), v);
       } finally {
         this.writeUnlock();
+      }
+
+      if (ozoneContainer != null) {
+        ozoneContainer.handleVolumeFailures(failedVolumes);
       }
 
       // TODO:

@@ -82,7 +82,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       ozoneConfiguration = createOzoneConfiguration();
 
       VolumeSet volumeSet =
-          new VolumeSet("dnid", "clusterid", ozoneConfiguration);
+          new VolumeSet("dnid", "clusterid", null, ozoneConfiguration);
 
       Random random = new Random();
 

@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -94,7 +95,7 @@ public class OzoneContainer {
       conf, StateContext context, CertificateClient certClient)
       throws IOException {
     this.config = conf;
-    this.volumeSet = new VolumeSet(datanodeDetails.getUuidString(), conf);
+    this.volumeSet = new VolumeSet(datanodeDetails.getUuidString(), this, conf);
     this.containerSet = new ContainerSet();
     this.metadataScanner = null;
 
@@ -250,6 +251,12 @@ public class OzoneContainer {
     volumeSet.shutdown();
     blockDeletingService.shutdown();
     ContainerMetrics.remove();
+  }
+
+  public void handleVolumeFailures(Set<HddsVolume> failedVolumes) {
+    if (containerSet != null) {
+      containerSet.handleVolumeFailures(failedVolumes);
+    }
   }
 
   @VisibleForTesting

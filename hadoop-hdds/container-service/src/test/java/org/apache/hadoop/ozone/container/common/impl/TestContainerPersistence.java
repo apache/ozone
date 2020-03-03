@@ -128,7 +128,7 @@ public class TestContainerPersistence {
   @Before
   public void setupPaths() throws IOException {
     containerSet = new ContainerSet();
-    volumeSet = new VolumeSet(DATANODE_UUID, conf);
+    volumeSet = new VolumeSet(DATANODE_UUID, null, conf);
     blockManager = new BlockManagerImpl(conf);
     chunkManager = new ChunkManagerImpl(true);
 

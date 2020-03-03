@@ -338,8 +338,8 @@ public class HddsVolumeChecker {
     public void onFailure(@Nonnull Throwable t) {
       Throwable exception = (t instanceof ExecutionException) ?
           t.getCause() : t;
-      LOG.warn("Exception running disk checks against volume {}",
-          volume, exception);
+      LOG.warn("Exception running disk checks against volume {} {}",
+          volume, exception, t);
       markFailed();
       cleanup();
     }

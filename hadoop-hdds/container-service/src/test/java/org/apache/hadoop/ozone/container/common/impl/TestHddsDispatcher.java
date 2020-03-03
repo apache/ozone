@@ -84,7 +84,7 @@ public class TestHddsDispatcher {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testDir);
     DatanodeDetails dd = randomDatanodeDetails();
-    VolumeSet volumeSet = new VolumeSet(dd.getUuidString(), conf);
+    VolumeSet volumeSet = new VolumeSet(dd.getUuidString(), null, conf);
 
     try {
       UUID scmId = UUID.randomUUID();
@@ -253,7 +253,7 @@ public class TestHddsDispatcher {
   private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
     ContainerSet containerSet = new ContainerSet();
-    VolumeSet volumeSet = new VolumeSet(dd.getUuidString(), conf);
+    VolumeSet volumeSet = new VolumeSet(dd.getUuidString(), null, conf);
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
     StateContext context = Mockito.mock(StateContext.class);

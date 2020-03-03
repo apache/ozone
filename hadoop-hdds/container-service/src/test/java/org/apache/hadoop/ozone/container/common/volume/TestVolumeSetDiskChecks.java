@@ -88,7 +88,7 @@ public class TestVolumeSetDiskChecks {
 
     conf = getConfWithDataNodeDirs(numVolumes);
     final VolumeSet volumeSet =
-        new VolumeSet(UUID.randomUUID().toString(), conf);
+        new VolumeSet(UUID.randomUUID().toString(), null, conf);
 
     assertThat(volumeSet.getVolumesList().size(), is(numVolumes));
     assertThat(volumeSet.getFailedVolumesList().size(), is(0));
@@ -113,7 +113,7 @@ public class TestVolumeSetDiskChecks {
 
     conf = getConfWithDataNodeDirs(numVolumes);
     final VolumeSet volumeSet = new VolumeSet(
-        UUID.randomUUID().toString(), conf) {
+        UUID.randomUUID().toString(), null, conf) {
       @Override
       HddsVolumeChecker getVolumeChecker(Configuration configuration)
           throws DiskErrorException {
@@ -137,7 +137,7 @@ public class TestVolumeSetDiskChecks {
     conf = getConfWithDataNodeDirs(numVolumes);
 
     final VolumeSet volumeSet = new VolumeSet(
-        UUID.randomUUID().toString(), conf) {
+        UUID.randomUUID().toString(), null, conf) {
       @Override
       HddsVolumeChecker getVolumeChecker(Configuration configuration)
           throws DiskErrorException {
@@ -153,7 +153,6 @@ public class TestVolumeSetDiskChecks {
   /**
    * Update configuration with the specified number of Datanode
    * storage directories.
-   * @param conf
    * @param numDirs
    */
   private Configuration getConfWithDataNodeDirs(int numDirs) {
