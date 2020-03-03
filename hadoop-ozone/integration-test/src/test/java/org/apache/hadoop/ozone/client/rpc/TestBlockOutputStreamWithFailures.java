@@ -425,7 +425,7 @@ public class TestBlockOutputStreamWithFailures {
   public void testFailureWithPrimeSizedData() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
-    int dataLength = 167;
+    int dataLength = maxFlushSize + 69;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
@@ -441,32 +441,17 @@ public class TestBlockOutputStreamWithFailures {
     Assert.assertTrue(stream instanceof BlockOutputStream);
     BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
 
-    Assert.assertEquals(2, blockOutputStream.getBufferPool().getSize());
+    Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
     Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
-    Assert.assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
-
-    Assert.assertTrue(blockOutputStream.getTotalAckDataLength() == 0);
-
-    Assert.assertTrue(
-        blockOutputStream.getCommitIndex2flushedDataMap().size() == 0);
+    Assert.assertEquals(400, blockOutputStream.getTotalDataFlushedLength());
 
     // Now do a flush. This will flush the data and update the flush length and
     // the map.
     key.flush();
 
-
-    // Since the data in the buffer is already flushed, flush here will have
-    // no impact on the counters and data structures
-
-    Assert.assertEquals(2, blockOutputStream.getBufferPool().getSize());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
-
     Assert.assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
-    // flush will make sure one more entry gets updated in the map
-    Assert.assertTrue(
-        blockOutputStream.getCommitIndex2flushedDataMap().size() == 0);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
