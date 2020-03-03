@@ -28,6 +28,8 @@ import org.apache.hadoop.ozone.protocol.ReconDatanodeProtocol;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.Service;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+
 /**
  * {@link PolicyProvider} for Recon protocols.
  */
@@ -55,6 +57,7 @@ public final class ReconPolicyProvider extends PolicyProvider {
               ReconDatanodeProtocol.class)
       };
 
+  @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public Service[] getServices() {
     return RECON_SERVICES;
