@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -439,6 +440,11 @@ public class HddsVolume
    */
   public long getCommittedBytes() {
     return committedBytes.get();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(hddsRootDir);
   }
 
   @Override

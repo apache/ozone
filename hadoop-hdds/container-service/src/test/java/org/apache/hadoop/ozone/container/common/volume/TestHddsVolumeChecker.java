@@ -224,7 +224,8 @@ public class TestHddsVolumeChecker {
 
     HddsVolumeChecker volumeChecker = volumeSet.getVolumeChecker();
     volumeChecker.setDelegateChecker(new DummyChecker());
-    File volParentDir = new File(folder.getRoot(), UUID.randomUUID().toString());
+    File volParentDir =
+        new File(folder.getRoot(), UUID.randomUUID().toString());
     volumeSet.addVolume(volParentDir.getPath());
     File volRootDir = new File(volParentDir, "hdds");
 
