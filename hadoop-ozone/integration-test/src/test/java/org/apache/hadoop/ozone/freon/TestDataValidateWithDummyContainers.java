@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -35,13 +35,8 @@ import org.slf4j.LoggerFactory;
 public class TestDataValidateWithDummyContainers
     extends TestDataValidate {
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestDataValidate.class);
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
+      LoggerFactory.getLogger(TestDataValidateWithDummyContainers.class);
+
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -60,13 +55,11 @@ public class TestDataValidateWithDummyContainers
    */
   @Test
   @Override
-  public void validateWriteTest() throws Exception {
+  @SuppressWarnings("java:S2699") // no assertion since no-op
+  public void validateWriteTest() {
     LOG.info("Skipping validateWriteTest for non-persistent containers.");
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterClass
   public static void shutdown() {
     shutdownCluster();

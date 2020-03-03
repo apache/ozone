@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Response for create directory request.
@@ -39,11 +40,18 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   public static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
   private OmKeyInfo dirKeyInfo;
+  private List<OmKeyInfo> parentKeyInfos;
+  private boolean createPrefix;
 
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
-      @Nullable OmKeyInfo dirKeyInfo) {
+      @Nullable OmKeyInfo dirKeyInfo,
+      @Nullable List<OmKeyInfo> parentKeyInfos,
+      boolean createPrefix) {
+
     super(omResponse);
     this.dirKeyInfo = dirKeyInfo;
+    this.parentKeyInfos = parentKeyInfos;
+    this.createPrefix = createPrefix;
   }
 
   /**
@@ -63,6 +71,24 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
           dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
       omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
           dirKeyInfo);
+      if (createPrefix) {
+        if (parentKeyInfos != null) {
+          for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
+            String parentKey = omMetadataManager
+                .getOzoneDirKey(parentKeyInfo.getVolumeName(),
+                    parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
+            LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
+                parentKeyInfo);
+            omMetadataManager.getKeyTable()
+                .putWithBatch(batchOperation, parentKey, parentKeyInfo);
+          }
+        }
+      }
+    } else {
+      // When directory already exists, we don't add it to cache. And it is
+      // not an error, in this case dirKeyInfo will be null.
+      LOG.debug("Response Status is OK, dirKeyInfo is null in " +
+          "OMDirectoryCreateResponse");
     }
   }
 }

@@ -39,9 +39,6 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -59,20 +56,6 @@ public class RatisPipelineProvider implements PipelineProvider {
   private final PipelinePlacementPolicy placementPolicy;
   private int pipelineNumberLimit;
   private int maxPipelinePerDatanode;
-
-  // Set parallelism at 3, as now in Ratis we create 1 and 3 node pipelines.
-  private final int parallelismForPool = 3;
-
-  private final ForkJoinPool.ForkJoinWorkerThreadFactory factory =
-      (pool -> {
-        final ForkJoinWorkerThread worker = ForkJoinPool.
-            defaultForkJoinWorkerThreadFactory.newThread(pool);
-        worker.setName("RATISCREATEPIPELINE" + worker.getPoolIndex());
-        return worker;
-      });
-
-  private final ForkJoinPool forkJoinPool = new ForkJoinPool(
-      parallelismForPool, factory, null, false);
 
   RatisPipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager, Configuration conf,
@@ -207,13 +190,6 @@ public class RatisPipelineProvider implements PipelineProvider {
 
   @Override
   public void shutdown() {
-    forkJoinPool.shutdownNow();
-    try {
-      forkJoinPool.awaitTermination(60, TimeUnit.SECONDS);
-    } catch (Exception e) {
-      LOG.error("Unexpected exception occurred during shutdown of " +
-              "RatisPipelineProvider", e);
-    }
   }
 
   /**

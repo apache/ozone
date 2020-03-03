@@ -202,6 +202,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FS_CREATE_PREFIX_DIRECTORIES;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FS_CREATE_PREFIX_DIRECTORIES_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -304,6 +306,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private boolean isNativeAuthorizerEnabled;
 
+  private boolean createPrefixDirectories;
+
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
@@ -365,7 +369,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     isRatisEnabled = configuration.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
-
+    createPrefixDirectories = conf.getBoolean(
+        OZONE_FS_CREATE_PREFIX_DIRECTORIES,
+        OZONE_FS_CREATE_PREFIX_DIRECTORIES_DEFAULT);
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
@@ -452,6 +458,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
+  }
+
+  /**
+   * Create separate entries for prefix directories in the object path.
+   * @return create directory entries if true
+   */
+  public boolean createPrefixEntries() {
+    return createPrefixDirectories;
   }
 
   /**
@@ -865,10 +879,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Logs in the OM use if security is enabled in the configuration.
+   * Logs in the OM user if security is enabled in the configuration.
    *
    * @param conf OzoneConfiguration
-   * @throws IOException, AuthenticationException in case login failes.
+   * @throws IOException, AuthenticationException in case login fails.
    */
   private static void loginOMUserIfSecurityEnabled(OzoneConfiguration  conf)
       throws IOException, AuthenticationException {
@@ -1613,8 +1627,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setAclRights(aclType)
         .build();
     if (!accessAuthorizer.checkAccess(obj, context)) {
-      LOG.warn("User {} doesn't have {} permission to access {}",
-          ugi.getUserName(), aclType, resType);
+      LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
+          ugi.getUserName(), aclType, resType, vol, bucket, key);
       throw new OMException("User " + ugi.getUserName() + " doesn't " +
           "have " + aclType + " permission to access " + resType,
           ResultCodes.PERMISSION_DENIED);

@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT;
@@ -28,7 +27,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SOCKE
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,7 +36,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -54,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
@@ -73,7 +69,7 @@ import com.google.gson.internal.LinkedTreeMap;
 /**
  * Test Ozone Recon.
  */
-public class TestRecon {
+public class TestReconWithOzoneManager {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
@@ -83,9 +79,7 @@ public class TestRecon {
 
   @BeforeClass
   public static void init() throws Exception {
-    File dir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
     int socketTimeout = (int) conf.getTimeDuration(
         RECON_OM_SOCKET_TIMEOUT, RECON_OM_SOCKET_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
@@ -100,13 +94,19 @@ public class TestRecon {
         .setConnectionRequestTimeout(connectionTimeout)
         .setSocketTimeout(connectionRequestTimeout).build();
 
-    String reconHTTPAddress = "localhost:" + NetUtils.getFreeSocketPort();
-    conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, reconHTTPAddress);
-    containerKeyServiceURL = "http://" + reconHTTPAddress + "/api/v1" +
-        "/containers";
+    int reconHttpPort = NetUtils.getFreeSocketPort();
+    String reconHTTPAddress = "0.0.0.0:" + reconHttpPort;
+    containerKeyServiceURL = "http://" + reconHTTPAddress +
+        "/api/v1/containers";
     taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
 
-    cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+    cluster =
+        MiniOzoneCluster.newBuilder(conf)
+            .setNumDatanodes(1)
+            .includeRecon(true)
+            .setReconHttpPort(reconHttpPort)
+            .setReconDatanodePort(NetUtils.getFreeSocketPort())
+            .build();
     cluster.waitForClusterToBeReady();
     metadataManager = cluster.getOzoneManager().getMetadataManager();
 
@@ -154,7 +154,7 @@ public class TestRecon {
   }
 
   @Test
-  public void testReconWithOzoneManager() throws Exception {
+  public void testOmDBSyncing() throws Exception {
     // add a vol, bucket and key
     addKeys(0, 1);
 

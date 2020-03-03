@@ -228,4 +228,10 @@ public final class OMConfigKeys {
   // hadoop-policy.xml, "*" allows all users/groups to access.
   public static final String OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL =
       "ozone.om.security.client.protocol.acl";
+
+  //Ozone FS Config parameters.
+  public static final String OZONE_FS_CREATE_PREFIX_DIRECTORIES =
+      "ozone.manager.fs.prefix.create";
+  public static final Boolean OZONE_FS_CREATE_PREFIX_DIRECTORIES_DEFAULT =
+      Boolean.TRUE;
 }

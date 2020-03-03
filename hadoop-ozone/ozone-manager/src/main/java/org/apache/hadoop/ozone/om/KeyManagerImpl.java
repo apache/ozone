@@ -1890,6 +1890,44 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   /**
+   * Helper function for listStatus to find key in TableCache.
+   */
+  private void listStatusFindKeyInTableCache(
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter,
+      String keyArgs, String startCacheKey, boolean recursive,
+      TreeMap<String, OzoneFileStatus> cacheKeyMap, Set<String> deletedKeySet) {
+
+    while (cacheIter.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
+          cacheIter.next();
+      String cacheKey = entry.getKey().getCacheKey();
+      if (cacheKey.equals(keyArgs)) {
+        continue;
+      }
+      OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
+      // cacheOmKeyInfo is null if an entry is deleted in cache
+      if (cacheOmKeyInfo != null) {
+        if (cacheKey.startsWith(startCacheKey) &&
+            cacheKey.compareTo(startCacheKey) >= 0) {
+          if (!recursive) {
+            String remainingKey = StringUtils.stripEnd(cacheKey.substring(
+                startCacheKey.length()), OZONE_URI_DELIMITER);
+            // For non-recursive, the remaining part of key can't have '/'
+            if (remainingKey.contains(OZONE_URI_DELIMITER)) {
+              continue;
+            }
+          }
+          OzoneFileStatus fileStatus = new OzoneFileStatus(
+              cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
+          cacheKeyMap.put(cacheKey, fileStatus);
+        }
+      } else {
+        deletedKeySet.add(cacheKey);
+      }
+    }
+  }
+
+  /**
    * List the status for a file or a directory and its contents.
    *
    * @param args       Key args
@@ -1925,6 +1963,7 @@ public class KeyManagerImpl implements KeyManager {
         if (fileStatus.isFile()) {
           return Collections.singletonList(fileStatus);
         }
+        // keyName is a directory
         startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       }
 
@@ -1939,35 +1978,8 @@ public class KeyManagerImpl implements KeyManager {
           metadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
       // First, find key in TableCache
-      while (cacheIter.hasNext()) {
-        Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
-            cacheIter.next();
-        String cacheKey = entry.getKey().getCacheKey();
-        if (cacheKey.equals(keyArgs)) {
-          continue;
-        }
-        OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
-        // cacheOmKeyInfo is null if an entry is deleted in cache
-        if (cacheOmKeyInfo != null) {
-          if (cacheKey.startsWith(startCacheKey) &&
-              cacheKey.compareTo(startCacheKey) >= 0) {
-            if (!recursive) {
-              String remainingKey = StringUtils.stripEnd(cacheKey.substring(
-                  startCacheKey.length()), OZONE_URI_DELIMITER);
-              // For non-recursive, the remaining part of key can't have '/'
-              if (remainingKey.contains(OZONE_URI_DELIMITER)) {
-                continue;
-              }
-            }
-            OzoneFileStatus fileStatus = new OzoneFileStatus(
-                cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
-            cacheKeyMap.put(cacheKey, fileStatus);
-          }
-        } else {
-          deletedKeySet.add(cacheKey);
-        }
-      }
-
+      listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
+          recursive, cacheKeyMap, deletedKeySet);
       // Then, find key in DB
       String seekKeyInDb =
           metadataManager.getOzoneKey(volumeName, bucketName, startKey);
@@ -1983,13 +1995,13 @@ public class KeyManagerImpl implements KeyManager {
         // Iterate through seek results
         while (iterator.hasNext() && numEntries - countEntries > 0) {
           String entryInDb = iterator.key();
-          OmKeyInfo value = iterator.value().getValue();
+          OmKeyInfo omKeyInfo = iterator.value().getValue();
           if (entryInDb.startsWith(keyArgs)) {
-            String entryKeyName = value.getKeyName();
+            String entryKeyName = omKeyInfo.getKeyName();
             if (recursive) {
               // for recursive list all the entries
               if (!deletedKeySet.contains(entryInDb)) {
-                cacheKeyMap.put(entryInDb, new OzoneFileStatus(value,
+                cacheKeyMap.put(entryInDb, new OzoneFileStatus(omKeyInfo,
                     scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
                 countEntries++;
               }
@@ -2005,15 +2017,21 @@ public class KeyManagerImpl implements KeyManager {
               if (isFile) {
                 if (!deletedKeySet.contains(entryInDb)) {
                   cacheKeyMap.put(entryInDb,
-                      new OzoneFileStatus(value, scmBlockSize, !isFile));
+                      new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
                   countEntries++;
                 }
                 iterator.next();
               } else {
                 // if entry is a directory
                 if (!deletedKeySet.contains(entryInDb)) {
-                  cacheKeyMap.put(entryInDb,
-                      new OzoneFileStatus(immediateChild));
+                  if (!entryKeyName.equals(immediateChild)) {
+                    cacheKeyMap.put(entryInDb,
+                        new OzoneFileStatus(immediateChild));
+                  } else {
+                    // If entryKeyName matches dir name, we have the info
+                    cacheKeyMap.put(entryInDb,
+                        new OzoneFileStatus(omKeyInfo, 0, true));
+                  }
                   countEntries++;
                 }
                 // skip the other descendants of this child directory.
