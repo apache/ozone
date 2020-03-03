@@ -95,6 +95,8 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+
+import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,13 +115,13 @@ public class SCMDatanodeProtocolServer implements
   /**
    * The RPC server that listens to requests from DataNodes.
    */
-  private final RPC.Server datanodeRpcServer;
+  private RPC.Server datanodeRpcServer;
 
   private final OzoneStorageContainerManager scm;
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
-  private final ProtocolMessageMetrics protocolMessageMetrics;
+  private ProtocolMessageMetrics protocolMessageMetrics;
 
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
                                    OzoneStorageContainerManager scm,
@@ -131,46 +133,24 @@ public class SCMDatanodeProtocolServer implements
 
     this.scm = scm;
     this.eventPublisher = eventPublisher;
-    final int handlerCount =
-        conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
-            OZONE_SCM_HANDLER_COUNT_DEFAULT);
 
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
 
-    RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
-        ProtobufRpcEngine.class);
-
-    protocolMessageMetrics = ProtocolMessageMetrics
-        .create("SCMDatanodeProtocol", "SCM Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
-
-    BlockingService dnProtoPbService =
-        StorageContainerDatanodeProtocolProtos
-            .StorageContainerDatanodeProtocolService
-            .newReflectiveBlockingService(
-                new StorageContainerDatanodeProtocolServerSideTranslatorPB(
-                    this, protocolMessageMetrics));
-
     InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
 
-    datanodeRpcServer =
-        startRpcServer(
-            conf,
-            datanodeRpcAddr,
-            StorageContainerDatanodeProtocolPB.class,
-            dnProtoPbService,
-            handlerCount);
+    protocolMessageMetrics = getProtocolMessageMetrics();
 
-    datanodeRpcAddress =
-        updateRPCListenAddress(
-            conf, getScmDatanodeAddressKey(), datanodeRpcAddr,
+    datanodeRpcServer = getRpcServer(conf, datanodeRpcAddr,
+        protocolMessageMetrics);
+
+    datanodeRpcAddress = updateRPCListenAddress(
+            conf, getDatanodeAddressKey(), datanodeRpcAddr,
             datanodeRpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
-      datanodeRpcServer.refreshServiceAcl(conf,
-          SCMPolicyProvider.getInstance());
+      datanodeRpcServer.refreshServiceAcl(conf, getPolicyProvider());
     }
   }
 
@@ -407,12 +387,46 @@ public class SCMDatanodeProtocolServer implements
         .replaceAll(" +", " ");
   }
 
-  protected String getScmDatanodeAddressKey() {
+  protected RPC.Server getRpcServer(OzoneConfiguration conf,
+      InetSocketAddress datanodeRpcAddr,
+      ProtocolMessageMetrics metrics) throws IOException {
+
+    final int handlerCount = conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
+        OZONE_SCM_HANDLER_COUNT_DEFAULT);
+
+    RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
+        ProtobufRpcEngine.class);
+
+    BlockingService dnProtoPbService =
+        StorageContainerDatanodeProtocolProtos
+            .StorageContainerDatanodeProtocolService
+            .newReflectiveBlockingService(
+                new StorageContainerDatanodeProtocolServerSideTranslatorPB(
+                    this, metrics));
+    return startRpcServer(
+            conf,
+            datanodeRpcAddr,
+            StorageContainerDatanodeProtocolPB.class,
+            dnProtoPbService,
+            handlerCount);
+  }
+
+  protected ProtocolMessageMetrics getProtocolMessageMetrics() {
+    return ProtocolMessageMetrics
+        .create("SCMDatanodeProtocol", "SCM Datanode protocol",
+            StorageContainerDatanodeProtocolProtos.Type.values());
+  }
+
+  protected String getDatanodeAddressKey() {
     return OZONE_SCM_DATANODE_ADDRESS_KEY;
   }
 
   protected InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
     return HddsServerUtil.getScmDataNodeBindAddress(conf);
+  }
+
+  protected PolicyProvider getPolicyProvider() {
+    return SCMPolicyProvider.getInstance();
   }
 
   /**

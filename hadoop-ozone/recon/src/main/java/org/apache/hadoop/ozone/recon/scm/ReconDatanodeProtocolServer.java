@@ -22,17 +22,31 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ozone.protocol.ReconDatanodeProtocol;
+import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
+import org.apache.hadoop.security.authorize.PolicyProvider;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
+
+import com.google.protobuf.BlockingService;
 
 /**
  * Recon's Datanode protocol server extended from SCM.
  */
-public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
+public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
+    implements ReconDatanodeProtocol {
 
   public ReconDatanodeProtocolServer(OzoneConfiguration conf,
                                      OzoneStorageContainerManager scm,
@@ -42,12 +56,49 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
   }
 
   @Override
-  protected String getScmDatanodeAddressKey() {
+  protected RPC.Server getRpcServer(OzoneConfiguration conf,
+      InetSocketAddress datanodeRpcAddr,
+      ProtocolMessageMetrics metrics) throws IOException {
+    final int handlerCount = conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
+        OZONE_SCM_HANDLER_COUNT_DEFAULT);
+
+    RPC.setProtocolEngine(conf, ReconDatanodeProtocolPB.class,
+        ProtobufRpcEngine.class);
+
+    BlockingService dnProtoPbService =
+        StorageContainerDatanodeProtocolProtos
+            .StorageContainerDatanodeProtocolService
+            .newReflectiveBlockingService(
+                new StorageContainerDatanodeProtocolServerSideTranslatorPB(
+                    this, metrics));
+
+    return startRpcServer(
+            conf,
+            datanodeRpcAddr,
+            ReconDatanodeProtocolPB.class,
+            dnProtoPbService,
+            handlerCount);
+  }
+
+  @Override
+  public ProtocolMessageMetrics getProtocolMessageMetrics() {
+    return ProtocolMessageMetrics
+        .create("ReconDatanodeProtocol", "Recon Datanode protocol",
+            StorageContainerDatanodeProtocolProtos.Type.values());
+  }
+
+  @Override
+  protected String getDatanodeAddressKey() {
     return OZONE_RECON_DATANODE_ADDRESS_KEY;
   }
 
   @Override
   public InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
     return HddsServerUtil.getReconDataNodeBindAddress(conf);
+  }
+
+  @Override
+  protected PolicyProvider getPolicyProvider() {
+    return ReconPolicyProvider.getInstance();
   }
 }

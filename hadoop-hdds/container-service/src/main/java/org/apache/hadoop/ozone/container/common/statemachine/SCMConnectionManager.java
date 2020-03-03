@@ -24,6 +24,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB
     .StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
@@ -160,22 +161,45 @@ public class SCMConnectionManager
             "Ignoring the request.");
         return;
       }
-      RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
-          ProtobufRpcEngine.class);
-      long version =
-          RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
 
-      RetryPolicy retryPolicy =
-          RetryPolicies.retryForeverWithFixedSleep(
-              sleepTime, TimeUnit.MILLISECONDS);
-      StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
-          StorageContainerDatanodeProtocolPB.class, version,
-          address, UserGroupInformation.getCurrentUser(), conf,
-          NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
-          retryPolicy).getProxy();
+      StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient;
+      if (!passiveScm) {
+        RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
+            ProtobufRpcEngine.class);
+        long version =
+            RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
 
-      StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
-          new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
+        RetryPolicy retryPolicy =
+            RetryPolicies.retryForeverWithFixedSleep(
+                sleepTime, TimeUnit.MILLISECONDS);
+
+        StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
+            StorageContainerDatanodeProtocolPB.class, version,
+            address, UserGroupInformation.getCurrentUser(), conf,
+            NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
+            retryPolicy).getProxy();
+
+        rpcClient = new StorageContainerDatanodeProtocolClientSideTranslatorPB(
+            rpcProxy);
+      } else {
+        RPC.setProtocolEngine(conf, ReconDatanodeProtocolPB.class,
+            ProtobufRpcEngine.class);
+        long version =
+            RPC.getProtocolVersion(ReconDatanodeProtocolPB.class);
+
+        RetryPolicy retryPolicy =
+            RetryPolicies.retryUpToMaximumCountWithFixedSleep(10,
+                sleepTime, TimeUnit.MILLISECONDS);
+        ReconDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
+            ReconDatanodeProtocolPB.class, version,
+            address, UserGroupInformation.getCurrentUser(), conf,
+            NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
+            retryPolicy).getProxy();
+
+        rpcClient =
+            new StorageContainerDatanodeProtocolClientSideTranslatorPB(
+                rpcProxy);
+      }
 
       EndpointStateMachine endPoint =
           new EndpointStateMachine(address, rpcClient, conf);
