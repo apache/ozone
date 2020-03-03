@@ -63,19 +63,21 @@ public class ReconContainerReportHandler extends ContainerReportHandler {
     for (ContainerReplicaProto containerReplicaProto : reportsList) {
       final ContainerID id = ContainerID.valueof(
           containerReplicaProto.getContainerID());
-      if (!getContainerManager().exists(id)) {
-        LOG.info("New container {} got from {}.", id,
-            reportFromDatanode.getDatanodeDetails());
-        try {
-          ContainerWithPipeline containerWithPipeline =
-              scmClient.getContainerWithPipeline(id.getId());
-          LOG.debug("Verified new container from SCM {} ",
-              containerWithPipeline.getContainerInfo().containerID());
-          containerManager.addNewContainer(id.getId(), containerWithPipeline);
-        } catch (IOException ioEx) {
-          LOG.error("Exception while getting new container info from SCM",
-              ioEx);
-          return;
+      synchronized (containerManager) {
+        if (!containerManager.exists(id)) {
+          LOG.info("New container {} got from {}.", id,
+              reportFromDatanode.getDatanodeDetails());
+          try {
+            ContainerWithPipeline containerWithPipeline =
+                scmClient.getContainerWithPipeline(id.getId());
+            LOG.debug("Verified new container from SCM {} ",
+                containerWithPipeline.getContainerInfo().containerID());
+            containerManager.addNewContainer(id.getId(), containerWithPipeline);
+          } catch (IOException ioEx) {
+            LOG.error("Exception while getting new container info from SCM",
+                ioEx);
+            return;
+          }
         }
       }
       LOG.debug("Got container report for containerID {} ",
