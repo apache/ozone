@@ -19,44 +19,26 @@
 package org.apache.hadoop.ozone.web.ozShell.volume;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
 
 /**
  * Executes deleteVolume call for the shell.
  */
 @Command(name = "delete",
     description = "deletes a volume if it is empty")
-public class DeleteVolumeHandler extends Handler {
+public class DeleteVolumeHandler extends VolumeHandler {
 
-  @Parameters(arity = "1..1", description = Shell.OZONE_VOLUME_URI_DESCRIPTION)
-  private String uri;
-
-  /**
-   * Executes the delete volume call.
-   */
   @Override
-  public Void call() throws Exception {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureVolumeAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+    String volumeName = address.getVolumeName();
 
-      String volumeName = address.getVolumeName();
-
-      if (isVerbose()) {
-        System.out.printf("Volume name : %s%n", volumeName);
-      }
-
-      client.getObjectStore().deleteVolume(volumeName);
-      System.out.printf("Volume %s is deleted%n", volumeName);
-    }
-
-    return null;
+    client.getObjectStore().deleteVolume(volumeName);
+    out().printf("Volume %s is deleted%n", volumeName);
   }
 }

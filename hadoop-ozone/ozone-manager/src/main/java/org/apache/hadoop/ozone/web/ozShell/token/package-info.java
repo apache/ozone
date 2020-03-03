@@ -17,10 +17,6 @@
  */
 
 /**
- * ozShell Class acts as the command line interface to the ozone Rest Client.
- */
-package org.apache.hadoop.ozone.web.ozShell.token;
-
-/**
  Ozone delegation token commands.
  **/
+package org.apache.hadoop.ozone.web.ozShell.token;

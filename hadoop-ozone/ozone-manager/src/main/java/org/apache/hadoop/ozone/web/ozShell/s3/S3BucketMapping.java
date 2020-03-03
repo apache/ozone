@@ -15,15 +15,19 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.web.ozShell.bucket;
+package org.apache.hadoop.ozone.web.ozShell.s3;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
 
 /**
  * S3Bucket mapping handler, which returns volume name and Ozone fs uri for
@@ -36,33 +40,28 @@ public class S3BucketMapping extends Handler {
   @Parameters(arity = "1..1", description = "Name of the s3 bucket.")
   private String s3BucketName;
 
-  /**
-   * Executes create bucket.
-   */
   @Override
-  public Void call() throws Exception {
+  protected OzoneAddress getAddress() throws OzoneClientException {
+    return new OzoneAddress();
+  }
 
-    OzoneAddress ozoneAddress = new OzoneAddress();
-    try (OzoneClient client =
-        ozoneAddress.createClient(createOzoneConfiguration())) {
+  @Override
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-      String mapping =
-          client.getObjectStore().getOzoneBucketMapping(s3BucketName);
-      String volumeName =
-          client.getObjectStore().getOzoneVolumeName(s3BucketName);
+    ObjectStore objectStore = client.getObjectStore();
+    String mapping = objectStore.getOzoneBucketMapping(s3BucketName);
+    String volumeName = objectStore.getOzoneVolumeName(s3BucketName);
 
-      if (isVerbose()) {
-        System.out.printf("Mapping created for S3Bucket is : %s%n", mapping);
-      }
-
-      System.out.printf("Volume name for S3Bucket is : %s%n", volumeName);
-
-      String ozoneFsUri = String.format("%s://%s.%s", OzoneConsts
-          .OZONE_URI_SCHEME, s3BucketName, volumeName);
-
-      System.out.printf("Ozone FileSystem Uri is : %s%n", ozoneFsUri);
+    if (isVerbose()) {
+      out().printf("Mapping created for S3Bucket is : %s%n", mapping);
     }
 
-    return null;
+    out().printf("Volume name for S3Bucket is : %s%n", volumeName);
+
+    String ozoneFsUri = String.format("%s://%s.%s", OzoneConsts
+        .OZONE_URI_SCHEME, s3BucketName, volumeName);
+
+    out().printf("Ozone FileSystem Uri is : %s%n", ozoneFsUri);
   }
 }

@@ -18,6 +18,6 @@
  */
 
 /**
- * Commands for Ozone keys.
+ * Helpers for ACL commands.
  */
-package org.apache.hadoop.ozone.web.ozShell.keys;
+package org.apache.hadoop.ozone.web.ozShell.acl;
