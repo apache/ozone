@@ -113,8 +113,10 @@ public class DatanodeStateMachine implements Closeable {
             .setNameFormat("Datanode State Machine Thread - %d").build());
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
-    container = new OzoneContainer(this.datanodeDetails,
-        ozoneConf, context, certClient);
+    synchronized (this) {
+      container = new OzoneContainer(this.datanodeDetails,
+          ozoneConf, context, certClient);
+    }
     dnCertClient = certClient;
     nextHB = new AtomicLong(Time.monotonicNow());
 
@@ -172,7 +174,7 @@ public class DatanodeStateMachine implements Closeable {
     return connectionManager;
   }
 
-  public OzoneContainer getContainer() {
+  public synchronized OzoneContainer getContainer() {
     return this.container;
   }
 
