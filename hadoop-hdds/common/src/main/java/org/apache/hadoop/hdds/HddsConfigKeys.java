@@ -104,9 +104,6 @@ public final class HddsConfigKeys {
   public static final double
       HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT = 0.90;
 
-  public static final String HDDS_LOCK_MAX_CONCURRENCY =
-      "hdds.lock.max.concurrency";
-  public static final int HDDS_LOCK_MAX_CONCURRENCY_DEFAULT = 100;
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.
