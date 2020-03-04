@@ -256,7 +256,9 @@ public class VolumeSet {
         // for new containers.
         failVolume(v.getHddsRootDir().getPath());
       }
-      failedVolumeListener.run();
+      if (failedVolumeListener != null) {
+        failedVolumeListener.run();
+      }
     } finally {
       this.writeUnlock();
     }
