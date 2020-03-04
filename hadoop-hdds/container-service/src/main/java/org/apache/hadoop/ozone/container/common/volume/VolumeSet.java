@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume.VolumeState;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.ShutdownHookManager;
@@ -107,23 +106,20 @@ public class VolumeSet {
 
   private Runnable shutdownHook;
   private final HddsVolumeChecker volumeChecker;
-  private final OzoneContainer ozoneContainer;
+  private Runnable failedVolumeListener;
 
-  public VolumeSet(String dnUuid, OzoneContainer ozoneContainer,
-      Configuration conf)
+  public VolumeSet(String dnUuid, Configuration conf)
       throws IOException {
-    this(dnUuid, null, ozoneContainer, conf);
+    this(dnUuid, null, conf);
   }
 
-  public VolumeSet(String dnUuid, String clusterID,
-      OzoneContainer ozoneContainer, Configuration conf)
+  public VolumeSet(String dnUuid, String clusterID, Configuration conf)
       throws IOException {
     this.datanodeUuid = dnUuid;
     this.clusterID = clusterID;
     this.conf = conf;
     this.volumeSetRWLock = new ReentrantReadWriteLock();
     this.volumeChecker = getVolumeChecker(conf);
-    this.ozoneContainer = ozoneContainer;
     this.diskCheckerservice = Executors.newScheduledThreadPool(
         1, r -> {
           Thread t = new Thread(r, "Periodic HDDS volume checker");
@@ -143,6 +139,10 @@ public class VolumeSet {
     usageCheckFactory = SpaceUsageCheckFactory.create(conf);
 
     initializeVolumeSet();
+  }
+
+  public void setFailedVolumeListener(Runnable runnable) {
+    failedVolumeListener = runnable;
   }
 
   @VisibleForTesting
@@ -249,27 +249,22 @@ public class VolumeSet {
    * @param failedVolumes
    */
   private void handleVolumeFailures(Set<HddsVolume> failedVolumes) {
-    for (HddsVolume v: failedVolumes) {
-      this.writeLock();
-      try {
+    this.writeLock();
+    try {
+      for (HddsVolume v : failedVolumes) {
         // Immediately mark the volume as failed so it is unavailable
         // for new containers.
-        volumeMap.remove(v.getHddsRootDir().getPath());
-        failedVolumeMap.putIfAbsent(v.getHddsRootDir().getPath(), v);
-      } finally {
-        this.writeUnlock();
+        failVolume(v.getHddsRootDir().getPath());
       }
-
-      if (ozoneContainer != null) {
-        ozoneContainer.handleVolumeFailures(failedVolumes);
-      }
-
-      // TODO:
-      // 1. Mark all closed containers on the volume as unhealthy.
-      // 2. Consider stopping IO on open containers and tearing down
-      //    active pipelines.
-      // 3. Handle Ratis log disk failure.
+      failedVolumeListener.run();
+    } finally {
+      this.writeUnlock();
     }
+
+    // TODO:
+    // 1. Consider stopping IO on open containers and tearing down
+    //    active pipelines.
+    // 2. Handle Ratis log disk failure.
   }
 
   /**

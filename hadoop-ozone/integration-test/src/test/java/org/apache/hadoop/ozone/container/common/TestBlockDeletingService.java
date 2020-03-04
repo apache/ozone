@@ -117,7 +117,7 @@ public class TestBlockDeletingService {
           UUID.randomUUID().toString());
       data.closeContainer();
       Container container = new KeyValueContainer(data, conf);
-      container.create(new VolumeSet(scmId, clusterID, null, conf),
+      container.create(new VolumeSet(scmId, clusterID, conf),
           new RoundRobinVolumeChoosingPolicy(), scmId);
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(

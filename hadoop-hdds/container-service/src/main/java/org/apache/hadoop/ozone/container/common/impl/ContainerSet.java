@@ -122,9 +122,9 @@ public class ContainerSet {
     return containerMap.size();
   }
 
-  public void handleVolumeFailures(Set<HddsVolume> failedVolumes) {
+  public void handleVolumeFailures() {
     containerMap.values().forEach(c -> {
-      if (failedVolumes.contains(c.getContainerData().getVolume())) {
+      if (c.getContainerData().getVolume().isFailed()) {
         try {
           c.markContainerUnhealthy();
         } catch (StorageContainerException e) {
