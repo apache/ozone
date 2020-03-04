@@ -15,11 +15,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.web.ozShell.bucket;
+package org.apache.hadoop.ozone.web.ozShell.s3;
 
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
 
 import picocli.CommandLine.Command;
@@ -31,7 +30,7 @@ import picocli.CommandLine.Parameters;
  */
 @Command(name = "path",
     description = "Returns the ozone path for S3Bucket")
-public class S3BucketMapping extends Handler {
+public class S3BucketMapping extends S3Handler {
 
   @Parameters(arity = "1..1", description = "Name of the s3 bucket.")
   private String s3BucketName;
@@ -44,7 +43,8 @@ public class S3BucketMapping extends Handler {
 
     OzoneAddress ozoneAddress = new OzoneAddress();
     try (OzoneClient client =
-        ozoneAddress.createClient(createOzoneConfiguration())) {
+        ozoneAddress.createClientForS3Commands(
+            createOzoneConfiguration(), getOmServiceID())) {
 
       String mapping =
           client.getObjectStore().getOzoneBucketMapping(s3BucketName);

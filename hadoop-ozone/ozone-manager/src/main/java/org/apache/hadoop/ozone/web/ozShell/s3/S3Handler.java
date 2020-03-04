@@ -15,40 +15,30 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 package org.apache.hadoop.ozone.web.ozShell.s3;
 
-import io.opentracing.Scope;
-import io.opentracing.util.GlobalTracer;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
-import picocli.CommandLine.Command;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.ozone.web.ozShell.Handler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 
 /**
- * Shell for s3 related operations.
+ * Common interface for S3 command handling.
  */
-@Command(name = "ozone s3",
-    description = "Shell for S3 specific operations",
-    subcommands = {
-        GetS3SecretHandler.class,
-        S3BucketMapping.class
-    })
+@CommandLine.Command(mixinStandardHelpOptions = true,
+    versionProvider = HddsVersionProvider.class)
+public class S3Handler extends Handler {
+  protected static final Logger LOG = LoggerFactory.getLogger(S3Handler.class);
 
-public class S3Shell extends Shell {
+  @CommandLine.Option(names = {"--om-service-id"},
+      required = false,
+      description = "OM Service ID is required to be specified for OM HA" +
+          " cluster")
+  private String omServiceID;
 
-  @Override
-  public void execute(String[] argv) {
-    TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    try (Scope scope = GlobalTracer.get().buildSpan("main").startActive(true)) {
-      super.execute(argv);
-    }
-  }
-
-  /**
-   * Main for the S3Shell Command handling.
-   *
-   * @param argv - System Args Strings[]
-   */
-  public static void main(String[] argv) {
-    new S3Shell().run(argv);
+  public String getOmServiceID() {
+    return omServiceID;
   }
 }
