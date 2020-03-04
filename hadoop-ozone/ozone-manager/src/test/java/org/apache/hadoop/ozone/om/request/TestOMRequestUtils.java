@@ -478,7 +478,7 @@ public final class TestOMRequestUtils {
         omMetadataManager.getDeletedTable().get(ozoneKey);
 
     repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(omKeyInfo,
-        repeatedOmKeyInfo, trxnLogIndex);
+        repeatedOmKeyInfo, trxnLogIndex, true);
 
     omMetadataManager.getDeletedTable().put(ozoneKey, repeatedOmKeyInfo);
 

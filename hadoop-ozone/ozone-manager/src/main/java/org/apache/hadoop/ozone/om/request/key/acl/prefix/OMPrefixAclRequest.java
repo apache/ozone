@@ -106,7 +106,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       }
 
       omPrefixInfo = operationResult.getOmPrefixInfo();
-      omPrefixInfo.setUpdateID(trxnLogIndex);
+      omPrefixInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // As for remove acl list, for a prefix if after removing acl from
       // the existing acl list, if list size becomes zero, delete the

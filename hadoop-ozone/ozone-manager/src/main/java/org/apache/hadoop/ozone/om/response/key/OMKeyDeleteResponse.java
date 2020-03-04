@@ -38,11 +38,13 @@ import javax.annotation.Nonnull;
  */
 public class OMKeyDeleteResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
+  private boolean isRatisEnabled;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo) {
+      @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
+    this.isRatisEnabled = isRatisEnabled;
   }
 
   /**
@@ -80,7 +82,8 @@ public class OMKeyDeleteResponse extends OMClientResponse {
         RepeatedOmKeyInfo repeatedOmKeyInfo =
             omMetadataManager.getDeletedTable().get(ozoneKey);
         repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID());
+            omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
+            isRatisEnabled);
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
             ozoneKey, repeatedOmKeyInfo);
       }

@@ -313,7 +313,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-      long transactionLogIndex)
+      long transactionLogIndex, boolean isRatisEnabled)
       throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartKeyInfo(omMetadataManager, keyArgs,
@@ -332,7 +332,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // The modification time is set in preExecute. Use the same
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
-      dbKeyInfo.setUpdateID(transactionLogIndex);
+      dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
       return dbKeyInfo;
     }
 
