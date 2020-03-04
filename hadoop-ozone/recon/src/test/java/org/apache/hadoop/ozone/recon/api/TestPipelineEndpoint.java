@@ -22,29 +22,27 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Singleton;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.GuiceInjectorUtilsForTestsImpl;
-import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
-import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
+import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
+import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -60,32 +58,31 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import javax.ws.rs.core.Response;
+
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest.getRandomPipeline;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import javax.ws.rs.core.Response;
-import java.util.UUID;
-
 /**
- * Test for Node Endpoint.
+ * Test for Pipeline Endpoint.
  */
-public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
+public class TestPipelineEndpoint extends AbstractSqlDatabaseTest {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
-  private NodeEndpoint nodeEndpoint;
+  private PipelineEndpoint pipelineEndpoint;
   private ReconStorageContainerManagerFacade reconScm;
   private boolean isSetupDone = false;
   private String pipelineId;
   private DatanodeDetails datanodeDetails;
   private GuiceInjectorUtilsForTestsImpl guiceInjectorTest =
       new GuiceInjectorUtilsForTestsImpl();
-  private long containerId = 1L;
-  private ContainerReportsProto containerReportsProto;
   private DatanodeDetailsProto datanodeDetailsProto;
+  private ContainerReportsProto containerReportsProto;
+  private long containerId = 1L;
   private Pipeline pipeline;
   private void initializeInjector() {
 
@@ -150,7 +147,7 @@ public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
       }
     });
 
-    nodeEndpoint = injector.getInstance(NodeEndpoint.class);
+    pipelineEndpoint = injector.getInstance(PipelineEndpoint.class);
     reconScm = (ReconStorageContainerManagerFacade)
         injector.getInstance(OzoneStorageContainerManager.class);
   }
@@ -163,15 +160,14 @@ public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
       isSetupDone = true;
     }
     String datanodeId = datanodeDetails.getUuid().toString();
-    containerReportsProto =
-        ContainerReportsProto.newBuilder()
-            .addReports(
-                ContainerReplicaProto.newBuilder()
-                    .setContainerID(containerId)
-                    .setState(ContainerReplicaProto.State.OPEN)
-                    .setOriginNodeId(datanodeId)
-                    .build())
-            .build();
+    containerReportsProto = ContainerReportsProto.newBuilder()
+        .addReports(
+            ContainerReplicaProto.newBuilder()
+                .setContainerID(containerId)
+                .setState(ContainerReplicaProto.State.OPEN)
+                .setOriginNodeId(datanodeId)
+                .build())
+        .build();
 
     PipelineReport pipelineReport = PipelineReport.newBuilder()
         .setPipelineID(
@@ -181,28 +177,12 @@ public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
     PipelineReportsProto pipelineReportsProto =
         PipelineReportsProto.newBuilder()
             .addPipelineReport(pipelineReport).build();
-    datanodeDetailsProto =
-        DatanodeDetailsProto.newBuilder()
-            .setHostName("host1.datanode")
-            .setUuid(datanodeId)
-            .setIpAddress("1.1.1.1")
-            .build();
-    StorageReportProto storageReportProto1 =
-        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
-            .setStorageLocation("/disk1").setScmUsed(10000).setRemaining(5400)
-            .setCapacity(25000)
-            .setStorageUuid(UUID.randomUUID().toString())
-            .setFailed(false).build();
-    StorageReportProto storageReportProto2 =
-        StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
-            .setStorageLocation("/disk2").setScmUsed(25000).setRemaining(10000)
-            .setCapacity(50000)
-        .setStorageUuid(UUID.randomUUID().toString())
-        .setFailed(false).build();
-    NodeReportProto nodeReportProto =
-        NodeReportProto.newBuilder()
-            .addStorageReport(storageReportProto1)
-            .addStorageReport(storageReportProto2).build();
+    datanodeDetailsProto = DatanodeDetailsProto.newBuilder()
+        .setHostName("host1.datanode")
+        .setUuid(datanodeId)
+        .setIpAddress("1.1.1.1")
+        .build();
+    NodeReportProto nodeReportProto = NodeReportProto.newBuilder().build();
 
     try {
       reconScm.getDatanodeProtocolServer()
@@ -216,29 +196,23 @@ public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
   }
 
   @Test
-  public void testGetDatanodes() throws Exception {
-    Response response = nodeEndpoint.getDatanodes();
-    DatanodesResponse datanodesResponse =
-        (DatanodesResponse) response.getEntity();
-    Assert.assertEquals(1, datanodesResponse.getTotalCount());
-    Assert.assertEquals(1, datanodesResponse.getDatanodes().size());
-    DatanodeMetadata datanodeMetadata =
-        datanodesResponse.getDatanodes().iterator().next();
-    Assert.assertEquals("host1.datanode", datanodeMetadata.getHostname());
-    Assert.assertEquals(75000,
-        datanodeMetadata.getDatanodeStorageReport().getCapacity());
-    Assert.assertEquals(15400,
-        datanodeMetadata.getDatanodeStorageReport().getRemaining());
-    Assert.assertEquals(35000,
-        datanodeMetadata.getDatanodeStorageReport().getUsed());
-
-    Assert.assertEquals(1, datanodeMetadata.getPipelines().size());
-    Assert.assertEquals(pipelineId,
-        datanodeMetadata.getPipelines().get(0).getPipelineID());
-    Assert.assertEquals(pipeline.getFactor().getNumber(),
-        datanodeMetadata.getPipelines().get(0).getReplicationFactor());
+  public void testGetPipelines() throws Exception {
+    Response response = pipelineEndpoint.getPipelines();
+    PipelinesResponse pipelinesResponse =
+        (PipelinesResponse) response.getEntity();
+    Assert.assertEquals(1, pipelinesResponse.getTotalCount());
+    Assert.assertEquals(1, pipelinesResponse.getPipelines().size());
+    PipelineMetadata pipelineMetadata =
+        pipelinesResponse.getPipelines().iterator().next();
+    Assert.assertEquals(1, pipelineMetadata.getDatanodes().size());
     Assert.assertEquals(pipeline.getType().toString(),
-        datanodeMetadata.getPipelines().get(0).getReplicationType());
+        pipelineMetadata.getReplicationType());
+    Assert.assertEquals(pipeline.getFactor().getNumber(),
+        pipelineMetadata.getReplicationFactor());
+    Assert.assertEquals(datanodeDetails.getHostName(),
+        pipelineMetadata.getLeaderNode());
+    Assert.assertEquals(pipeline.getId().getId(),
+        pipelineMetadata.getPipelineId());
 
     // if container report is processed first, and pipeline does not exist
     // then container is not added until the next container report is processed
@@ -251,15 +225,12 @@ public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
         .sendHeartbeat(heartbeatRequestProto);
 
     LambdaTestUtils.await(30000, 5000, () -> {
-      Response response1 = nodeEndpoint.getDatanodes();
-      DatanodesResponse datanodesResponse1 =
-          (DatanodesResponse) response1.getEntity();
-      DatanodeMetadata datanodeMetadata1 =
-          datanodesResponse1.getDatanodes().iterator().next();
-      return (datanodeMetadata1.getContainers() == 1);
+      Response response1 = pipelineEndpoint.getPipelines();
+      PipelinesResponse pipelinesResponse1 =
+          (PipelinesResponse) response1.getEntity();
+      PipelineMetadata pipelineMetadata1 =
+          pipelinesResponse1.getPipelines().iterator().next();
+      return (pipelineMetadata1.getContainers() == 1);
     });
-    Assert.assertEquals(1,
-        reconScm.getPipelineManager()
-            .getContainersInPipeline(pipeline.getId()).size());
   }
 }

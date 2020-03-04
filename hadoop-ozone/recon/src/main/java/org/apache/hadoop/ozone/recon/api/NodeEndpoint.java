@@ -22,9 +22,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
+import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -38,8 +41,8 @@ import javax.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
+import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,11 +57,13 @@ public class NodeEndpoint {
       LoggerFactory.getLogger(NodeEndpoint.class);
 
   private ReconNodeManager nodeManager;
+  private ReconPipelineManager pipelineManager;
 
   @Inject
   NodeEndpoint(OzoneStorageContainerManager reconSCM) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
+    this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
   }
 
   /**
@@ -75,9 +80,20 @@ public class NodeEndpoint {
       NodeState nodeState = nodeManager.getNodeState(datanode);
       String hostname = datanode.getHostName();
       Set<PipelineID> pipelineIDS = nodeManager.getPipelines(datanode);
-      List<UUID> pipelines = new ArrayList<>();
+      List<DatanodePipeline> pipelines = new ArrayList<>();
       for (PipelineID pipelineID: pipelineIDS) {
-        pipelines.add(pipelineID.getId());
+        try {
+          Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
+          DatanodePipeline datanodePipeline = new DatanodePipeline(
+              pipelineID.getId().toString(),
+              pipeline.getType().toString(),
+              pipeline.getFactor().getNumber()
+          );
+          pipelines.add(datanodePipeline);
+        } catch (PipelineNotFoundException ex) {
+          LOG.warn("Cannot get pipeline {} for datanode {}, pipeline not found",
+              pipelineID.getId(), hostname);
+        }
       }
       int containers;
       try {
