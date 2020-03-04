@@ -216,7 +216,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
-          ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex);
+          ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
+          ozoneManager.isRatisEnabled());
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
       long clientID = createKeyRequest.getClientID();
