@@ -144,7 +144,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       }
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Update table cache.
       omMetadataManager.getKeyTable().addCacheEntry(
@@ -159,7 +159,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyDeleteResponse(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-          omKeyInfo);
+          omKeyInfo, ozoneManager.isRatisEnabled());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
