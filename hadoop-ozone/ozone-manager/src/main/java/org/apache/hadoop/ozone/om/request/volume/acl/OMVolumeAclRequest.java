@@ -108,7 +108,7 @@ public abstract class OMVolumeAclRequest extends OMClientRequest {
 
       // We set the updateID even if applyAcl = false to catch the replay
       // transactions.
-      omVolumeArgs.setUpdateID(trxnLogIndex);
+      omVolumeArgs.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(

@@ -42,13 +42,15 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
 
   private String multipartKey;
   private OmMultipartKeyInfo omMultipartKeyInfo;
+  private boolean isRatisEnabled;
 
   public S3MultipartUploadAbortResponse(@Nonnull OMResponse omResponse,
       String multipartKey,
-      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo) {
+      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo, boolean isRatisEnabled) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
+    this.isRatisEnabled = isRatisEnabled;
   }
 
   /**
@@ -83,7 +85,7 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
           omMetadataManager.getDeletedTable().get(partKeyInfo.getPartName());
 
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(currentKeyPartInfo,
-          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID());
+          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID(), isRatisEnabled);
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           partKeyInfo.getPartName(), repeatedOmKeyInfo);
