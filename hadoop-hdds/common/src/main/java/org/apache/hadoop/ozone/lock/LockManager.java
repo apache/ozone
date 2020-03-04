@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.lock;
 
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +58,7 @@ public class LockManager<R> {
   public LockManager(final Configuration conf, boolean fair) {
     lockPool =
         new GenericObjectPool<>(new PooledLockFactory(fair));
+    lockPool.setMaxTotal(-1);
   }
 
   /**
