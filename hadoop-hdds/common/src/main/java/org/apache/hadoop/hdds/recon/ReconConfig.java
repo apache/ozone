@@ -49,7 +49,8 @@ public class ReconConfig {
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
-      description = ""
+      description = "Comma separated acls (users, groups) allowing clients " +
+          "accessing datanode container protocol"
   )
   private String acl;
 

@@ -192,7 +192,7 @@ public class ReconServer extends GenericCli {
           socAddr.getHostName());
     } else {
       throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
-          conf) + " authentication method not support. "
+          conf) + " authentication method not supported. "
           + "Recon user login failed.");
     }
     LOG.info("Recon login successful.");

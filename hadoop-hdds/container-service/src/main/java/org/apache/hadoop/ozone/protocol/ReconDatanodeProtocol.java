@@ -22,8 +22,8 @@ import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * The protocol spoken between datanodes and Recon. For specifics please the
- * Protoc file that defines the parent protocol.
+ * The protocol spoken between datanodes and Recon. For specifics please see
+ * the Protoc file that defines the parent protocol.
  */
 @KerberosInfo(serverPrincipal =
         ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY)
