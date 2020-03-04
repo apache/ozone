@@ -69,11 +69,18 @@ public class ReconContainerManager extends SCMContainerManager {
     return new File(metaDir, RECON_SCM_CONTAINER_DB);
   }
 
+  /**
+   * Check and add new container if not already present in Recon.
+   * @param containerID containerID to check.
+   * @param datanodeDetails Datanode from where we got this container.
+   * @throws IOException on Error.
+   */
   public void checkAndAddNewContainer(ContainerID containerID,
                                       DatanodeDetails datanodeDetails)
       throws IOException {
     if (!exists(containerID)) {
-      LOG.info("New container {} got from {}.", containerID, datanodeDetails);
+      LOG.info("New container {} got from {}.", containerID,
+          datanodeDetails.getHostName());
       ContainerWithPipeline containerWithPipeline =
           scmClient.getContainerWithPipeline(containerID.getId());
       LOG.debug("Verified new container from SCM {} ",

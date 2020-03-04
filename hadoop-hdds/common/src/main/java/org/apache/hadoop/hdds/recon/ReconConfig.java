@@ -31,7 +31,7 @@ public class ReconConfig {
   @Config(key = "kerberos.principal",
       type = ConfigType.STRING,
       defaultValue = "",
-      tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
+      tags = { ConfigTag.SECURITY, ConfigTag.RECON, ConfigTag.OZONE },
       description = "This Kerberos principal is used by the Recon service."
   )
   private String principal;
@@ -39,7 +39,7 @@ public class ReconConfig {
   @Config(key = "kerberos.keytab.file",
       type = ConfigType.STRING,
       defaultValue = "",
-      tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
+      tags = { ConfigTag.SECURITY, ConfigTag.RECON, ConfigTag.OZONE },
       description = "The keytab file used by Recon daemon to login as "+
           "its service principal."
   )
@@ -47,8 +47,8 @@ public class ReconConfig {
 
   @Config(key = "security.client.datanode.container.protocol.acl",
       type = ConfigType.STRING,
-      defaultValue = "",
-      tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
+      defaultValue = "*",
+      tags = { ConfigTag.SECURITY, ConfigTag.RECON, ConfigTag.OZONE },
       description = "Comma separated acls (users, groups) allowing clients " +
           "accessing datanode container protocol"
   )
@@ -68,6 +68,14 @@ public class ReconConfig {
 
   public String getKerberosKeytab() {
     return this.keytab;
+  }
+
+  public String getAcl() {
+    return acl;
+  }
+
+  public void setAcl(String acl) {
+    this.acl = acl;
   }
 
   /**

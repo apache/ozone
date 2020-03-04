@@ -28,19 +28,11 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.protocol.ReconDatanodeProtocol;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
-import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
-import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
-
-import com.google.protobuf.BlockingService;
 
 /**
  * Recon's Datanode protocol server extended from SCM.
@@ -53,31 +45,6 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
                                      EventPublisher eventPublisher)
       throws IOException {
     super(conf, scm, eventPublisher);
-  }
-
-  @Override
-  protected RPC.Server getRpcServer(OzoneConfiguration conf,
-      InetSocketAddress datanodeRpcAddr,
-      ProtocolMessageMetrics metrics) throws IOException {
-    final int handlerCount = conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
-        OZONE_SCM_HANDLER_COUNT_DEFAULT);
-
-    RPC.setProtocolEngine(conf, ReconDatanodeProtocolPB.class,
-        ProtobufRpcEngine.class);
-
-    BlockingService dnProtoPbService =
-        StorageContainerDatanodeProtocolProtos
-            .StorageContainerDatanodeProtocolService
-            .newReflectiveBlockingService(
-                new StorageContainerDatanodeProtocolServerSideTranslatorPB(
-                    this, metrics));
-
-    return startRpcServer(
-            conf,
-            datanodeRpcAddr,
-            ReconDatanodeProtocolPB.class,
-            dnProtoPbService,
-            handlerCount);
   }
 
   @Override
@@ -101,4 +68,9 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
   protected PolicyProvider getPolicyProvider() {
     return ReconPolicyProvider.getInstance();
   }
+
+  protected Class<ReconDatanodeProtocolPB> getProtocolClass() {
+    return ReconDatanodeProtocolPB.class;
+  }
+
 }

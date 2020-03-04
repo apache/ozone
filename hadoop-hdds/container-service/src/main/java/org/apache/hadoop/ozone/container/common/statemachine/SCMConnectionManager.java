@@ -131,7 +131,40 @@ public class SCMConnectionManager
    * @throws IOException
    */
   public void addSCMServer(InetSocketAddress address) throws IOException {
-    addSCMServer(address, 1000, false);
+    writeLock();
+    try {
+      if (scmMachines.containsKey(address)) {
+        LOG.warn("Trying to add an existing SCM Machine to Machines group. " +
+            "Ignoring the request.");
+        return;
+      }
+
+      RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
+          ProtobufRpcEngine.class);
+      long version =
+          RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
+
+      RetryPolicy retryPolicy =
+          RetryPolicies.retryForeverWithFixedSleep(
+              1000, TimeUnit.MILLISECONDS);
+
+      StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
+          StorageContainerDatanodeProtocolPB.class, version,
+          address, UserGroupInformation.getCurrentUser(), conf,
+          NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
+          retryPolicy).getProxy();
+
+      StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
+          new StorageContainerDatanodeProtocolClientSideTranslatorPB(
+          rpcProxy);
+
+      EndpointStateMachine endPoint =
+          new EndpointStateMachine(address, rpcClient, conf);
+      endPoint.setPassive(false);
+      scmMachines.put(address, endPoint);
+    } finally {
+      writeUnlock();
+    }
   }
 
   /**
@@ -141,19 +174,6 @@ public class SCMConnectionManager
    */
   public void addReconServer(InetSocketAddress address) throws IOException {
     LOG.info("Adding Recon Server : {}", address.toString());
-    addSCMServer(address, 60000, true);
-  }
-
-  /**
-   * Add scm server helper method.
-   * @param address address
-   * @param sleepTime sleepTime
-   * @param passiveScm flag to specify passive SCM or not. Recon is passive SCM.
-   * @throws IOException
-   */
-  private void addSCMServer(InetSocketAddress address, long sleepTime,
-                            boolean passiveScm)
-      throws IOException {
     writeLock();
     try {
       if (scmMachines.containsKey(address)) {
@@ -162,48 +182,26 @@ public class SCMConnectionManager
         return;
       }
 
-      StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient;
-      if (!passiveScm) {
-        RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
-            ProtobufRpcEngine.class);
-        long version =
-            RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
+      RPC.setProtocolEngine(conf, ReconDatanodeProtocolPB.class,
+          ProtobufRpcEngine.class);
+      long version =
+          RPC.getProtocolVersion(ReconDatanodeProtocolPB.class);
 
-        RetryPolicy retryPolicy =
-            RetryPolicies.retryForeverWithFixedSleep(
-                sleepTime, TimeUnit.MILLISECONDS);
+      RetryPolicy retryPolicy =
+          RetryPolicies.retryUpToMaximumCountWithFixedSleep(10,
+              60000, TimeUnit.MILLISECONDS);
+      ReconDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
+          ReconDatanodeProtocolPB.class, version,
+          address, UserGroupInformation.getCurrentUser(), conf,
+          NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
+          retryPolicy).getProxy();
 
-        StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
-            StorageContainerDatanodeProtocolPB.class, version,
-            address, UserGroupInformation.getCurrentUser(), conf,
-            NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
-            retryPolicy).getProxy();
-
-        rpcClient = new StorageContainerDatanodeProtocolClientSideTranslatorPB(
-            rpcProxy);
-      } else {
-        RPC.setProtocolEngine(conf, ReconDatanodeProtocolPB.class,
-            ProtobufRpcEngine.class);
-        long version =
-            RPC.getProtocolVersion(ReconDatanodeProtocolPB.class);
-
-        RetryPolicy retryPolicy =
-            RetryPolicies.retryUpToMaximumCountWithFixedSleep(10,
-                sleepTime, TimeUnit.MILLISECONDS);
-        ReconDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
-            ReconDatanodeProtocolPB.class, version,
-            address, UserGroupInformation.getCurrentUser(), conf,
-            NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
-            retryPolicy).getProxy();
-
-        rpcClient =
-            new StorageContainerDatanodeProtocolClientSideTranslatorPB(
-                rpcProxy);
-      }
+      StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
+          new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
 
       EndpointStateMachine endPoint =
           new EndpointStateMachine(address, rpcClient, conf);
-      endPoint.setPassive(passiveScm);
+      endPoint.setPassive(true);
       scmMachines.put(address, endPoint);
     } finally {
       writeUnlock();

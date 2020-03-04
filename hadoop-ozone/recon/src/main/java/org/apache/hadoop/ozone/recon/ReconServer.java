@@ -180,7 +180,7 @@ public class ReconServer extends GenericCli {
     if (SecurityUtil.getAuthenticationMethod(conf).equals(
         UserGroupInformation.AuthenticationMethod.KERBEROS)) {
       ReconConfig reconConfig = conf.getObject(ReconConfig.class);
-      LOG.info("Ozone security is enabled. Attempting login for Recon user. "
+      LOG.info("Ozone security is enabled. Attempting login for Recon service. "
               + "Principal: {}, keytab: {}",
           reconConfig.getKerberosPrincipal(),
           reconConfig.getKerberosKeytab());
@@ -193,7 +193,7 @@ public class ReconServer extends GenericCli {
     } else {
       throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
           conf) + " authentication method not supported. "
-          + "Recon user login failed.");
+          + "Recon service login failed.");
     }
     LOG.info("Recon login successful.");
   }

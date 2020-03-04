@@ -128,6 +128,8 @@ public class SCMDatanodeProtocolServer implements
                                    EventPublisher eventPublisher)
       throws IOException {
 
+    // This constructor has broken down to smaller methods so that Recon's
+    // passive SCM server can override them.
     Preconditions.checkNotNull(scm, "SCM cannot be null");
     Preconditions.checkNotNull(eventPublisher, "EventPublisher cannot be null");
 
@@ -141,8 +143,24 @@ public class SCMDatanodeProtocolServer implements
 
     protocolMessageMetrics = getProtocolMessageMetrics();
 
-    datanodeRpcServer = getRpcServer(conf, datanodeRpcAddr,
-        protocolMessageMetrics);
+    final int handlerCount = conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
+        OZONE_SCM_HANDLER_COUNT_DEFAULT);
+
+    RPC.setProtocolEngine(conf, getProtocolClass(), ProtobufRpcEngine.class);
+
+    BlockingService dnProtoPbService =
+        StorageContainerDatanodeProtocolProtos
+            .StorageContainerDatanodeProtocolService
+            .newReflectiveBlockingService(
+                new StorageContainerDatanodeProtocolServerSideTranslatorPB(
+                    this, protocolMessageMetrics));
+
+    datanodeRpcServer =  startRpcServer(
+        conf,
+        datanodeRpcAddr,
+        getProtocolClass(),
+        dnProtoPbService,
+        handlerCount);
 
     datanodeRpcAddress = updateRPCListenAddress(
             conf, getDatanodeAddressKey(), datanodeRpcAddr,
@@ -387,6 +405,14 @@ public class SCMDatanodeProtocolServer implements
         .replaceAll(" +", " ");
   }
 
+  /**
+   * Get the RPC server for this SCM server. Contains the protocol bindings.
+   * @param conf ozone conf
+   * @param datanodeRpcAddr Datanode RPC address for this server
+   * @param metrics ProtocolMessageMetrics
+   * @return RPC Server
+   * @throws IOException on error.
+   */
   protected RPC.Server getRpcServer(OzoneConfiguration conf,
       InetSocketAddress datanodeRpcAddr,
       ProtocolMessageMetrics metrics) throws IOException {
@@ -394,8 +420,7 @@ public class SCMDatanodeProtocolServer implements
     final int handlerCount = conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_DEFAULT);
 
-    RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
-        ProtobufRpcEngine.class);
+    RPC.setProtocolEngine(conf, getProtocolClass(), ProtobufRpcEngine.class);
 
     BlockingService dnProtoPbService =
         StorageContainerDatanodeProtocolProtos
@@ -406,27 +431,52 @@ public class SCMDatanodeProtocolServer implements
     return startRpcServer(
             conf,
             datanodeRpcAddr,
-            StorageContainerDatanodeProtocolPB.class,
+            getProtocolClass(),
             dnProtoPbService,
             handlerCount);
   }
 
+  /**
+   * Get the ProtocolMessageMetrics for this server.
+   * @return ProtocolMessageMetrics
+   */
   protected ProtocolMessageMetrics getProtocolMessageMetrics() {
     return ProtocolMessageMetrics
         .create("SCMDatanodeProtocol", "SCM Datanode protocol",
             StorageContainerDatanodeProtocolProtos.Type.values());
   }
 
+  /**
+   * Get Key associated with Datanode address for this server.
+   * @return
+   */
   protected String getDatanodeAddressKey() {
     return OZONE_SCM_DATANODE_ADDRESS_KEY;
   }
 
+  /**
+   * Get Datanode bind address for SCM.
+   * @param conf ozone configuration
+   * @return InetSocketAddress
+   */
   protected InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
     return HddsServerUtil.getScmDataNodeBindAddress(conf);
   }
 
+  /**
+   * Get the authorization provider for this SCM server.
+   * @return SCM policy provider.
+   */
   protected PolicyProvider getPolicyProvider() {
     return SCMPolicyProvider.getInstance();
+  }
+
+  /**
+   * Get protocol class type for this RPC Server.
+   * @return Class type.
+   */
+  protected Class getProtocolClass() {
+    return StorageContainerDatanodeProtocolPB.class;
   }
 
   /**
