@@ -183,19 +183,19 @@ public class LockManager<R> {
      * the object pool.
      */
     return activeLocks.compute(resource, (k, v) -> {
+      final ActiveLock lock;
       try {
-        final ActiveLock lock;
         if (v == null) {
           lock = lockPool.borrowObject();
         } else {
           lock = v;
         }
         lock.incrementActiveCount();
-        return lock;
       } catch (Exception ex) {
         LOG.error("Unable to obtain lock.", ex);
         throw new RuntimeException(ex);
       }
+      return lock;
     });
   }
 
