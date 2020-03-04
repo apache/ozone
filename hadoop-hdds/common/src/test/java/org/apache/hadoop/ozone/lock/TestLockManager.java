@@ -26,8 +26,6 @@ import org.junit.Test;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_LOCK_MAX_CONCURRENCY;
-
 /**
  * Test-cases to test LockManager.
  */
@@ -179,7 +177,6 @@ public class TestLockManager {
   public void testConcurrentWriteLockWithDifferentResource() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     final int count = 100;
-    conf.setInt(HDDS_LOCK_MAX_CONCURRENCY, count/4);
     final LockManager<Integer> manager = new LockManager<>(conf);
     final int sleep = 10;
     final AtomicInteger done = new AtomicInteger();

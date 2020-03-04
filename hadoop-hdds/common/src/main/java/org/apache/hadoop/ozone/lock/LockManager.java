@@ -57,12 +57,8 @@ public class LockManager<R> {
    * @param fair - true to use fair lock ordering, else non-fair lock ordering.
    */
   public LockManager(final Configuration conf, boolean fair) {
-    final int maxPoolSize = conf.getInt(
-        HddsConfigKeys.HDDS_LOCK_MAX_CONCURRENCY,
-        HddsConfigKeys.HDDS_LOCK_MAX_CONCURRENCY_DEFAULT);
     lockPool =
         new GenericObjectPool<>(new PooledLockFactory(fair));
-    lockPool.setMaxTotal(maxPoolSize);
   }
 
   /**
@@ -186,42 +182,21 @@ public class LockManager<R> {
      * be removed from the activeLocks map and returned to
      * the object pool.
      */
-    ActiveLock computedLock = activeLocks.compute(resource, (k, v) -> {
-      final ActiveLock lock;
-      if (v == null) {
-        return null;
-      } else {
-        lock = v;
-      }
-      lock.incrementActiveCount();
-      return lock;
-    });
-
-
-    if (computedLock == null) {
+    return activeLocks.compute(resource, (k, v) -> {
       try {
-        final ActiveLock lock2 = lockPool.borrowObject();
-        computedLock = activeLocks.compute(resource, (k, v) -> {
-          final ActiveLock lock;
-          try {
-            if (v == null) {
-              lock = lock2;
-            } else {
-              lockPool.returnObject(lock2);
-              lock = v;
-            }
-            lock.incrementActiveCount();
-          } catch (Exception ex) {
-            throw new RuntimeException(ex);
-          }
-          return lock;
-        });
+        final ActiveLock lock;
+        if (v == null) {
+          lock = lockPool.borrowObject();
+        } else {
+          lock = v;
+        }
+        lock.incrementActiveCount();
+        return lock;
       } catch (Exception ex) {
         LOG.error("Unable to obtain lock.", ex);
         throw new RuntimeException(ex);
       }
-    }
-    return computedLock;
+    });
   }
 
   /**
