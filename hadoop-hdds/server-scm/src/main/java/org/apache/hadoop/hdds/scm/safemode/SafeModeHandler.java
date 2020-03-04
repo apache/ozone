@@ -103,7 +103,6 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
     isInSafeMode.set(safeModeStatus.getSafeModeStatus());
     scmClientProtocolServer.setSafeModeStatus(isInSafeMode.get());
     scmBlockManager.setSafeModeStatus(isInSafeMode.get());
-    scmPipelineManager.setSafeModeStatus(isInSafeMode.get());
 
     if (!isInSafeMode.get()) {
       final Thread safeModeExitThread = new Thread(() -> {
@@ -112,6 +111,7 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
+        scmPipelineManager.setSafeModeStatus(isInSafeMode.get());
         replicationManager.start();
         scmPipelineManager.triggerPipelineCreation();
       });
