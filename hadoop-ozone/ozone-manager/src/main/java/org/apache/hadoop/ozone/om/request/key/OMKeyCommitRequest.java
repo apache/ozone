@@ -168,7 +168,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.updateLocationInfoList(locationInfoList);
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable().addCacheEntry(
