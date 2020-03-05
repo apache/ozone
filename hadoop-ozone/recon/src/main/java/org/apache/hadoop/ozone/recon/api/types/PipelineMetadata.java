@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 
 import javax.xml.bind.annotation.XmlAccessType;
@@ -117,5 +119,107 @@ public class PipelineMetadata {
 
   public int getContainers() {
     return containers;
+  }
+
+
+  /**
+   * Returns new builder class that builds a PipelineMetadata.
+   *
+   * @return Builder
+   */
+  public static Builder newBuilder() {
+    return new Builder();
+  }
+
+  /**
+   * Builder for PipelineMetadata.
+   */
+  @SuppressWarnings("checkstyle:hiddenfield")
+  public static class Builder {
+    private UUID pipelineId;
+    private PipelineState status;
+    private String leaderNode;
+    private List<String> datanodes;
+    private long lastLeaderElection;
+    private long duration;
+    private long leaderElections;
+    private String replicationType;
+    private int replicationFactor;
+    private int containers;
+
+    public Builder() {
+      //Default values
+      this.lastLeaderElection = 0L;
+      this.leaderElections = 0L;
+      this.duration = 0L;
+      this.containers = 0;
+      this.leaderNode = StringUtils.EMPTY;
+    }
+
+    /**
+     * Constructs PipelineMetadata.
+     *
+     * @return instance of PipelineMetadata.
+     */
+    public PipelineMetadata build() {
+      Preconditions.checkNotNull(pipelineId);
+      Preconditions.checkNotNull(status);
+      Preconditions.checkNotNull(datanodes);
+      Preconditions.checkNotNull(replicationType);
+
+      return new PipelineMetadata(pipelineId, status, leaderNode, datanodes,
+          lastLeaderElection, duration, leaderElections, replicationType,
+          replicationFactor, containers);
+    }
+
+    public Builder setPipelineId(UUID pipelineId) {
+      this.pipelineId = pipelineId;
+      return this;
+    }
+
+    public Builder setStatus(PipelineState status) {
+      this.status = status;
+      return this;
+    }
+
+    public Builder setLeaderNode(String leaderNode) {
+      this.leaderNode = leaderNode;
+      return this;
+    }
+
+    public Builder setDatanodes(List<String> datanodes) {
+      this.datanodes = datanodes;
+      return this;
+    }
+
+    public Builder setLastLeaderElection(long lastLeaderElection) {
+      this.lastLeaderElection = lastLeaderElection;
+      return this;
+    }
+
+    public Builder setDuration(long duration) {
+      this.duration = duration;
+      return this;
+    }
+
+    public Builder setLeaderElections(long leaderElections) {
+      this.leaderElections = leaderElections;
+      return this;
+    }
+
+    public Builder setReplicationType(String replicationType) {
+      this.replicationType = replicationType;
+      return this;
+    }
+
+    public Builder setReplicationFactor(int replicationFactor) {
+      this.replicationFactor = replicationFactor;
+      return this;
+    }
+
+    public Builder setContainers(int containers) {
+      this.containers = containers;
+      return this;
+    }
   }
 }

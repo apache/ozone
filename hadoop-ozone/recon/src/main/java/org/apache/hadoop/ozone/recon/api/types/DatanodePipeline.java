@@ -17,22 +17,24 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import java.util.UUID;
+
 /**
  * Metadata object that contains pipeline information of a Datanode.
  */
 public class DatanodePipeline {
-  private String pipelineID;
+  private UUID pipelineID;
   private String replicationType;
   private int replicationFactor;
 
-  public DatanodePipeline(String pipelineID, String replicationType,
+  public DatanodePipeline(UUID pipelineID, String replicationType,
                           int replicationFactor) {
     this.pipelineID = pipelineID;
     this.replicationType = replicationType;
     this.replicationFactor = replicationFactor;
   }
 
-  public String getPipelineID() {
+  public UUID getPipelineID() {
     return pipelineID;
   }
 

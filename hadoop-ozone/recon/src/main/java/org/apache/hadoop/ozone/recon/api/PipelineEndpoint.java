@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
@@ -33,6 +32,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,48 +64,41 @@ public class PipelineEndpoint {
     List<PipelineMetadata> pipelinesList = new ArrayList<>();
     List<Pipeline> pipelines = pipelineManager.getPipelines();
 
-    for (Pipeline pipeline : pipelines) {
-      String leaderNode;
+    pipelines.forEach(pipeline -> {
       UUID pipelineId = pipeline.getId().getId();
       List<String> datanodes = new ArrayList<>();
-      int containers;
+      PipelineMetadata.Builder builder = PipelineMetadata.newBuilder();
+      pipeline.getNodes().forEach(node -> datanodes.add(node.getHostName()));
       long duration =
           Instant.now().toEpochMilli() -
               pipeline.getCreationTimestamp().toEpochMilli();
+
       try {
-        leaderNode = pipeline.getLeaderNode().getHostName();
-      } catch (Exception e) {
-        leaderNode = "";
+        String leaderNode = pipeline.getLeaderNode().getHostName();
+        builder.setLeaderNode(leaderNode);
+      } catch (IOException ioEx) {
         LOG.warn("Cannot get leader node for pipeline {}",
-            pipelineId);
+            pipelineId, ioEx);
       }
 
       try {
-        containers = pipelineManager.getNumberOfContainers(pipeline.getId());
-      } catch (Exception ex) {
-        containers = 0;
-        LOG.warn("Cannot get containers for pipeline {} ", pipelineId);
-      }
-      for (DatanodeDetails datanode: pipeline.getNodes()) {
-        datanodes.add(datanode.getHostName());
+        int containers =
+            pipelineManager.getNumberOfContainers(pipeline.getId());
+        builder.setContainers(containers);
+      } catch (IOException ioEx) {
+        LOG.warn("Cannot get containers for pipeline {} ", pipelineId, ioEx);
       }
 
-      PipelineMetadata pipelineMetadata = new PipelineMetadata(
-          pipelineId,
-          pipeline.getPipelineState(),
-          leaderNode,
-          datanodes,
-          // TODO: Get last leader election and count of leader elections after
-          // metrics is integrated in Recon
-          0,
-          duration,
-          0,
-          pipeline.getType().toString(),
-          pipeline.getFactor().getNumber(),
-          containers
-          );
+      PipelineMetadata pipelineMetadata = builder.setPipelineId(pipelineId)
+          .setDatanodes(datanodes)
+          .setDuration(duration)
+          .setStatus(pipeline.getPipelineState())
+          .setReplicationFactor(pipeline.getFactor().getNumber())
+          .setReplicationType(pipeline.getType().toString())
+          .build();
+
       pipelinesList.add(pipelineMetadata);
-    }
+    });
 
     PipelinesResponse pipelinesResponse =
         new PipelinesResponse(pipelinesList.size(), pipelinesList);

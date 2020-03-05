@@ -75,38 +75,38 @@ public class NodeEndpoint {
     List<DatanodeMetadata> datanodes = new ArrayList<>();
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
 
-    for (DatanodeDetails datanode : datanodeDetails) {
+    datanodeDetails.forEach(datanode -> {
       DatanodeStorageReport storageReport = getStorageReport(datanode);
       NodeState nodeState = nodeManager.getNodeState(datanode);
       String hostname = datanode.getHostName();
-      Set<PipelineID> pipelineIDS = nodeManager.getPipelines(datanode);
+      Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanode);
       List<DatanodePipeline> pipelines = new ArrayList<>();
-      for (PipelineID pipelineID: pipelineIDS) {
+      pipelineIDs.forEach(pipelineID -> {
         try {
           Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
           DatanodePipeline datanodePipeline = new DatanodePipeline(
-              pipelineID.getId().toString(),
+              pipelineID.getId(),
               pipeline.getType().toString(),
               pipeline.getFactor().getNumber()
           );
           pipelines.add(datanodePipeline);
         } catch (PipelineNotFoundException ex) {
           LOG.warn("Cannot get pipeline {} for datanode {}, pipeline not found",
-              pipelineID.getId(), hostname);
+              pipelineID.getId(), hostname, ex);
         }
-      }
+      });
       int containers;
       try {
         containers = nodeManager.getContainers(datanode).size();
-      } catch (NodeNotFoundException e) {
+      } catch (NodeNotFoundException ex) {
         containers = 0;
         LOG.warn("Cannot get containers, datanode {} not found.",
-            datanode.getUuid());
+            datanode.getUuid(), ex);
       }
       long heartbeat = nodeManager.getLastHeartbeat(datanode);
       datanodes.add(new DatanodeMetadata(hostname, nodeState, heartbeat,
           storageReport, pipelines, containers));
-    }
+    });
 
     DatanodesResponse datanodesResponse =
         new DatanodesResponse(datanodes.size(), datanodes);

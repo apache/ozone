@@ -27,6 +27,7 @@ ${API_ENDPOINT_URL}   http://recon:9888/api/v1
 *** Test Cases ***
 Recon REST API
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
+                        Sleep               2s
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/containers
                         Should contain      ${result}       containers
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/datanodes
