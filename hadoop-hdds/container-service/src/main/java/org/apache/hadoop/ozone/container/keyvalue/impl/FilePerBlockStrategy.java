@@ -19,8 +19,12 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import com.google.common.base.Preconditions;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -44,9 +48,8 @@ import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.Duration;
+import java.util.concurrent.ExecutionException;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
@@ -216,11 +219,26 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private static final class OpenFiles {
 
-    private final Map<String, OpenFile> files = new ConcurrentHashMap<>();
+    private static final RemovalListener<String, OpenFile> ON_REMOVE =
+        event -> close(event.getKey(), event.getValue());
 
-    public FileChannel getChannel(File file, boolean sync) {
-      return files.computeIfAbsent(file.getAbsolutePath(),
-          any -> open(file, sync)).getChannel();
+    private final Cache<String, OpenFile> files = CacheBuilder.newBuilder()
+        .expireAfterAccess(Duration.ofMinutes(10))
+        .removalListener(ON_REMOVE)
+        .build();
+
+    public FileChannel getChannel(File file, boolean sync)
+        throws StorageContainerException {
+      try {
+        return files.get(file.getAbsolutePath(),
+            () -> open(file, sync)).getChannel();
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof IOException) {
+          throw new UncheckedIOException((IOException) e.getCause());
+        }
+        throw new StorageContainerException(e.getCause(),
+            ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+      }
     }
 
     private static OpenFile open(File file, boolean sync) {
@@ -231,16 +249,21 @@ public class FilePerBlockStrategy implements ChunkManager {
       }
     }
 
-    public void close(File file) throws IOException {
-      OpenFile openFile = files.remove(file.getAbsolutePath());
+    public void close(File file) {
+      if (file != null) {
+        files.invalidate(file.getAbsolutePath());
+      }
+    }
+
+    private static void close(String filename, OpenFile openFile) {
       if (openFile != null) {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Closing file {}", file);
+          LOG.debug("Closing file {}", filename);
         }
         openFile.close();
       } else {
         if (LOG.isDebugEnabled()) {
-          LOG.debug("File {} not open", file);
+          LOG.debug("File {} not open", filename);
         }
       }
     }
@@ -249,12 +272,10 @@ public class FilePerBlockStrategy implements ChunkManager {
   private static final class OpenFile {
 
     private final RandomAccessFile file;
-    private final Instant openedAt;
 
     private OpenFile(File file, boolean sync) throws FileNotFoundException {
       String mode = sync ? "rws" : "rw";
       this.file = new RandomAccessFile(file, mode);
-      this.openedAt = Instant.now();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Opened file {}", file);
       }
@@ -264,12 +285,12 @@ public class FilePerBlockStrategy implements ChunkManager {
       return file.getChannel();
     }
 
-    public void close() throws IOException {
-      file.close();
-    }
-
-    public Instant getFileOpenTime() {
-      return openedAt;
+    public void close() {
+      try {
+        file.close();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
     }
   }
 
