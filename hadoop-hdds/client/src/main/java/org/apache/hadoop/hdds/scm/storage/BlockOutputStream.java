@@ -358,6 +358,11 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
+  /**
+   * @param close whether putBlock is happening as part of closing the stream
+   * @param force true if no data was written since most recent putBlock and
+   *            stream is being closed
+   */
   private CompletableFuture<ContainerProtos.
       ContainerCommandResponseProto> executePutBlock(boolean close,
       boolean force) throws IOException {
@@ -457,6 +462,9 @@ public class BlockOutputStream extends OutputStream {
     writeChunkToContainer(buffer.duplicate(0, buffer.position()));
   }
 
+  /**
+   * @param close whether the flush is happening as part of closing the stream
+   */
   private void handleFlush(boolean close)
       throws IOException, InterruptedException, ExecutionException {
     checkOpen();
@@ -473,6 +481,8 @@ public class BlockOutputStream extends OutputStream {
       updateFlushLength();
       executePutBlock(close, false);
     } else if (close) {
+      // forcing an "empty" putBlock if stream is being closed without new
+      // data since latest flush - we need to send the "EOF" flag
       executePutBlock(true, true);
     }
     waitOnFlushFutures();
