@@ -337,8 +337,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
           .getStatus() == NOT_A_FILE || omFileCreateResponse.getOMResponse()
           .getStatus() == FILE_ALREADY_EXISTS);
     } else {
-      Assert.assertTrue(omFileCreateResponse.getOMResponse()
-          .getSuccess() == true);
+      Assert.assertTrue(omFileCreateResponse.getOMResponse().getSuccess());
       long id = modifiedOmRequest.getCreateFileRequest().getClientID();
 
       String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,

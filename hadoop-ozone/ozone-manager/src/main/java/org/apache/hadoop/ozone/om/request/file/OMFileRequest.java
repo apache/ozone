@@ -121,9 +121,9 @@ public final class OMFileRequest {
         LOG.trace("verifyFiles in Path : " + "/" + volumeName
             + "/" + bucketName + "/" + keyName + ":" + result);
         // if file exists, so does the parent. Assert.
-        if (result == OMDirectoryResult.FILE_EXISTS) {
-          Preconditions.checkState(parentExists == true);
-        }
+        Preconditions.checkState((result != OMDirectoryResult.FILE_EXISTS)
+            || (parentExists));
+
         return new OMPathInfo(missing, result, inheritAcls, parentExists);
       }
       keyPath = keyPath.getParent();
