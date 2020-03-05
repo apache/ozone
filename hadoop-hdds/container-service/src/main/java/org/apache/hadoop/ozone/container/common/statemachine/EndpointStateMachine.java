@@ -218,7 +218,7 @@ public class EndpointStateMachine
           "Unable to communicate to {} server at {} for past {} seconds.",
           serverName,
           getAddress().getHostString() + ":" + getAddress().getPort(),
-          TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() *
+          TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() * 10 *
                   getScmHeartbeatInterval(this.conf)), ex);
     }
 
