@@ -68,10 +68,14 @@ public final class OMFileRequest {
     OMDirectoryResult result = OMDirectoryResult.NONE;
     boolean parentExists = false;
     Path immediateParentPath = keyPath.getParent();
+    String immParentKeyName = null;
 
-    String immediateParent = null;
-    if (immediateParentPath != null) {
-      immediateParent = immediateParentPath.toString();
+    if (pathIsRootDir(immediateParentPath)) {
+      //root dir always exists
+      parentExists = true;
+    } else {
+      immParentKeyName = omMetadataManager.getOzoneDirKey(volumeName,
+          bucketName, immediateParentPath.toString());
     }
 
     while (keyPath != null) {
@@ -87,6 +91,7 @@ public final class OMFileRequest {
         // Check if this is actual file or a file in the given path
         if (dbKeyName.equals(fileNameFromDetails)) {
           result = OMDirectoryResult.FILE_EXISTS;
+          parentExists = true;
         } else {
           result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
         }
@@ -102,7 +107,7 @@ public final class OMFileRequest {
           LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
               + inheritAcls);
         }
-        if (dbDirKeyName.equals(immediateParent)) {
+        if (dbDirKeyName.equals(immParentKeyName)) {
           parentExists = true;
         }
       } else {
@@ -115,24 +120,37 @@ public final class OMFileRequest {
 
         LOG.trace("verifyFiles in Path : " + "/" + volumeName
             + "/" + bucketName + "/" + keyName + ":" + result);
+        // if file exists, so does the parent. Assert.
+        if (result == OMDirectoryResult.FILE_EXISTS) {
+          Preconditions.checkState(parentExists == true);
+        }
         return new OMPathInfo(missing, result, inheritAcls, parentExists);
       }
       keyPath = keyPath.getParent();
     }
 
     if (inheritAcls.isEmpty()) {
-      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      inheritAcls = omMetadataManager.getBucketTable().get(bucketKey).getAcls();
+      String bucketKey = omMetadataManager.getBucketKey(volumeName,
+          bucketName);
+      inheritAcls = omMetadataManager.getBucketTable().get(bucketKey)
+          .getAcls();
       LOG.trace("Acls inherited from bucket " + bucketName + " are : "
           + inheritAcls);
     }
 
     LOG.trace("verifyFiles in Path : " + volumeName + "/" + bucketName + "/"
         + keyName + ":" + result);
+    // parentExists always true if we are creating inside root dir
+    Preconditions.checkState(!pathIsRootDir(immediateParentPath)
+        || parentExists);
     // Found no files/ directories in the given path.
-    return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls, parentExists);
+    return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls,
+        parentExists);
   }
 
+  private static boolean pathIsRootDir(Path path) {
+    return (path == null);
+  }
   /**
    * Get the valid base object id given the transaction id.
    * @param id of the transaction
@@ -169,14 +187,14 @@ public final class OMFileRequest {
     private OMDirectoryResult directoryResult;
     private List<String> missingParents;
     private List<OzoneAcl> acls;
-    boolean immediateParentExists;
+    private boolean directParentExists;
 
     public OMPathInfo(List missingParents, OMDirectoryResult result,
-        List<OzoneAcl> aclList, boolean immediateParentExists) {
+        List<OzoneAcl> aclList, boolean directParentExists) {
       this.missingParents = missingParents;
       this.directoryResult = result;
       this.acls = aclList;
-      this.immediateParentExists = immediateParentExists;
+      this.directParentExists = directParentExists;
     }
 
     public List getMissingParents() {
@@ -195,8 +213,8 @@ public final class OMFileRequest {
      * indicates if the immediate parent in the path already exists.
      * @return true indicates the parent exists
      */
-    public boolean directParentExists() {
-      return immediateParentExists;
+    public boolean getDirectParentExists() {
+      return directParentExists;
     }
   }
 

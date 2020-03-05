@@ -102,6 +102,7 @@ public class TestOMKeyRequest {
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
+    when(ozoneManager.createPrefixEntries()).thenReturn(true);
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));

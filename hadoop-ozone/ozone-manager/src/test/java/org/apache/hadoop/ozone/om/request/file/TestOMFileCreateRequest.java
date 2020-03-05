@@ -225,16 +225,26 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
         "a/b/c/d", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
-    testNonRecursivePath("a/b/c", false, false, false);
-
-    // Delete child key and add a path "a/b/ to key table
-    omMetadataManager.getKeyTable().delete(omMetadataManager.getOzoneKey(
-        volumeName, bucketName, "a/b/c/d"));
-
-
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+        "a/b/c/", 0L,  HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
         "a/b/", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+        "a/", 0L,  HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+
+    // cannot create file if directory of same name exists
+    testNonRecursivePath("a/b/c", false, false, true);
+
+    // Delete child key but retain path "a/b/ in the key table
+    omMetadataManager.getKeyTable().delete(omMetadataManager.getOzoneKey(
+        volumeName, bucketName, "a/b/c/d"));
+    omMetadataManager.getKeyTable().delete(omMetadataManager.getOzoneKey(
+        volumeName, bucketName, "a/b/c/"));
+
+    // can create non-recursive because parents already exist.
     testNonRecursivePath("a/b/e", false, false, false);
   }
 
@@ -281,7 +291,13 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     // Need to add the path which starts with "c/d/e" to keyTable as this is
     // non-recursive parent should exist.
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
-        "c/d/e/h", 0L,  HddsProtos.ReplicationType.RATIS,
+        "c/", 0L,  HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+        "c/d/", 0L,  HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+        "c/d/e/", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
     testNonRecursivePath(key, false, false, false);
 
@@ -321,6 +337,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
           .getStatus() == NOT_A_FILE || omFileCreateResponse.getOMResponse()
           .getStatus() == FILE_ALREADY_EXISTS);
     } else {
+      Assert.assertTrue(omFileCreateResponse.getOMResponse()
+          .getSuccess() == true);
       long id = modifiedOmRequest.getCreateFileRequest().getClientID();
 
       String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,

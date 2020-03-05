@@ -40,7 +40,7 @@ public class OMKeyCreateResponse extends OMClientResponse {
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;
-  List<OmKeyInfo> parentKeyInfos;
+  private List<OmKeyInfo> parentKeyInfos;
 
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo,

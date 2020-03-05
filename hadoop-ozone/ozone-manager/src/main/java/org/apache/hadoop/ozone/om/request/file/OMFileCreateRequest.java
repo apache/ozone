@@ -363,17 +363,17 @@ public class OMFileCreateRequest extends OMKeyRequest {
       OMFileRequest.OMPathInfo pathInfo) throws IOException {
     Boolean canBeCreated = false;
     String keyName = keyArgs.getKeyName();
+    OMFileRequest.OMDirectoryResult omDirectoryResult =
+        pathInfo.getDirectoryResult();
 
     if (ozoneManager.createPrefixEntries()) {
-      if (pathInfo.directParentExists()) {
+      // if immediate parent exists, assume higher level directories exist.
+      if (pathInfo.getDirectParentExists()) {
         canBeCreated = true;
       }
     } else {
       String volumeName = keyArgs.getVolumeName();
       String bucketName = keyArgs.getBucketName();
-
-      OMFileRequest.OMDirectoryResult omDirectoryResult =
-          pathInfo.getDirectoryResult();
 
       // We cannot create a file if complete parent directories don't exist.
 
@@ -403,6 +403,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
         canBeCreated =
             checkKeysUnderPath(ozoneManager.getMetadataManager(), volumeName,
                 bucketName, keyName);
+      } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
+        canBeCreated = false;
+      } else {
+        canBeCreated = true;
       }
     }
 
