@@ -95,7 +95,7 @@ public class TestContainerMetrics {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, path);
       VolumeSet volumeSet = new VolumeSet(
-          datanodeDetails.getUuidString(), null, conf);
+          datanodeDetails.getUuidString(), conf);
       ContainerSet containerSet = new ContainerSet();
       DatanodeStateMachine stateMachine = Mockito.mock(
           DatanodeStateMachine.class);

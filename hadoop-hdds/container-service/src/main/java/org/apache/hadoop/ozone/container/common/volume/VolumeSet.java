@@ -225,7 +225,7 @@ public class VolumeSet {
    * Run a synchronous parallel check of all HDDS volumes, removing
    * failed volumes.
    */
-  public void checkAllVolumes() throws IOException {
+  void checkAllVolumes() throws IOException {
     List<HddsVolume> allVolumes = getVolumesList();
     Set<HddsVolume> failedVolumes;
     try {
@@ -256,13 +256,13 @@ public class VolumeSet {
         // for new containers.
         failVolume(v.getHddsRootDir().getPath());
       }
-      if (failedVolumeListener != null) {
-        failedVolumeListener.run();
-      }
     } finally {
       this.writeUnlock();
     }
 
+    if (failedVolumeListener != null) {
+      failedVolumeListener.run();
+    }
     // TODO:
     // 1. Consider stopping IO on open containers and tearing down
     //    active pipelines.

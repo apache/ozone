@@ -128,7 +128,9 @@ public class ContainerSet {
         try {
           c.markContainerUnhealthy();
         } catch (StorageContainerException e) {
-          LOG.error("Failed to move container to UNHEALTHY state", e);
+          LOG.error("Failed to move container {} to UNHEALTHY state in "
+                  + "volume {}", c.getContainerData().getContainerID(),
+              c.getContainerData().getVolume(), e);
         }
       }
     });

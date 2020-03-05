@@ -298,8 +298,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public void markContainerUnhealthy() throws StorageContainerException {
     writeLock();
     try {
-      // TODO: container should be marked UNHEALTHY in memory even if container
-      // file update fails
       updateContainerData(() ->
           containerData.setState(ContainerDataProto.State.UNHEALTHY));
     } finally {
