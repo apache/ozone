@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import javax.annotation.Nonnull;
 
 /**
- * Response for CreateBucket request.
+ * Response for CreateVolume request.
  */
 public class OMVolumeCreateResponse extends OMClientResponse {
 
