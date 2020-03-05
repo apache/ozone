@@ -93,9 +93,12 @@ public class ReconPipelineManager extends SCMPipelineManager {
           LOG.info("Adding new pipeline {} from SCM.", pipeline.getId());
           addPipeline(pipeline);
         } else {
-          // Recon already has this pipeline. Just update state.
+          // Recon already has this pipeline. Just update state and creation
+          // time.
           getStateManager().updatePipelineState(pipeline.getId(),
               pipeline.getPipelineState());
+          getPipeline(pipeline.getId()).setCreationTimestamp(
+              pipeline.getCreationTimestamp());
         }
         removeInvalidPipelines(pipelinesFromScm);
       }
