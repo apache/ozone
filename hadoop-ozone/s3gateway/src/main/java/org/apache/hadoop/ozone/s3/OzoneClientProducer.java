@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.s3;
 
-import javax.annotation.PreDestroy;
 import javax.enterprise.context.RequestScoped;
 import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
@@ -48,7 +47,6 @@ public class OzoneClientProducer {
 
   private final static Logger LOG =
       LoggerFactory.getLogger(OzoneClientProducer.class);
-  private OzoneClient client;
 
   @Inject
   private SignatureProcessor v4RequestParser;
@@ -65,13 +63,7 @@ public class OzoneClientProducer {
 
   @Produces
   public OzoneClient createClient() throws IOException {
-    client = getClient(ozoneConfiguration);
-    return client;
-  }
-  
-  @PreDestroy
-  public void destory() throws IOException {
-    client.close();
+    return getClient(ozoneConfiguration);
   }
 
   private OzoneClient getClient(OzoneConfiguration config) throws IOException {
