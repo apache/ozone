@@ -22,9 +22,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
+import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -38,8 +41,8 @@ import javax.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
+import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,11 +57,13 @@ public class NodeEndpoint {
       LoggerFactory.getLogger(NodeEndpoint.class);
 
   private ReconNodeManager nodeManager;
+  private ReconPipelineManager pipelineManager;
 
   @Inject
   NodeEndpoint(OzoneStorageContainerManager reconSCM) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
+    this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
   }
 
   /**
@@ -70,27 +75,38 @@ public class NodeEndpoint {
     List<DatanodeMetadata> datanodes = new ArrayList<>();
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
 
-    for (DatanodeDetails datanode : datanodeDetails) {
+    datanodeDetails.forEach(datanode -> {
       DatanodeStorageReport storageReport = getStorageReport(datanode);
       NodeState nodeState = nodeManager.getNodeState(datanode);
       String hostname = datanode.getHostName();
-      Set<PipelineID> pipelineIDS = nodeManager.getPipelines(datanode);
-      List<UUID> pipelines = new ArrayList<>();
-      for (PipelineID pipelineID: pipelineIDS) {
-        pipelines.add(pipelineID.getId());
-      }
+      Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanode);
+      List<DatanodePipeline> pipelines = new ArrayList<>();
+      pipelineIDs.forEach(pipelineID -> {
+        try {
+          Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
+          DatanodePipeline datanodePipeline = new DatanodePipeline(
+              pipelineID.getId(),
+              pipeline.getType().toString(),
+              pipeline.getFactor().getNumber()
+          );
+          pipelines.add(datanodePipeline);
+        } catch (PipelineNotFoundException ex) {
+          LOG.warn("Cannot get pipeline {} for datanode {}, pipeline not found",
+              pipelineID.getId(), hostname, ex);
+        }
+      });
       int containers;
       try {
         containers = nodeManager.getContainers(datanode).size();
-      } catch (NodeNotFoundException e) {
+      } catch (NodeNotFoundException ex) {
         containers = 0;
         LOG.warn("Cannot get containers, datanode {} not found.",
-            datanode.getUuid());
+            datanode.getUuid(), ex);
       }
       long heartbeat = nodeManager.getLastHeartbeat(datanode);
       datanodes.add(new DatanodeMetadata(hostname, nodeState, heartbeat,
           storageReport, pipelines, containers));
-    }
+    });
 
     DatanodesResponse datanodesResponse =
         new DatanodesResponse(datanodes.size(), datanodes);
