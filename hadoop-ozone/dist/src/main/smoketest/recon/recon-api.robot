@@ -27,7 +27,7 @@ ${API_ENDPOINT_URL}   http://recon:9888/api/v1
 *** Test Cases ***
 Recon OM APIs
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-                        Execute                             ozone freon rk --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 10
+                        Execute                             ozone freon rk --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 10 --keySize 1025
                         Sleep               90s
 
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
@@ -36,7 +36,7 @@ Recon OM APIs
                         Should contain      ${result}       \"ContainerID\":1
 
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/utilization/fileCount
-                        Should contain      ${result}       \"fileSize\":16384,\"count\":10
+                        Should contain      ${result}       \"fileSize\":2048,\"count\":10
 
 Recon SCM APIs
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/datanodes

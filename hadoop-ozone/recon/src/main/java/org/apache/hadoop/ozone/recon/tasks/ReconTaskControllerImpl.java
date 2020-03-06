@@ -217,13 +217,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   @Override
-  public void start() {
+  public synchronized void start() {
     LOG.info("Starting Recon Task Controller.");
     executorService = Executors.newFixedThreadPool(threadCount);
   }
 
   @Override
-  public void stop() {
+  public synchronized void stop() {
     LOG.info("Stopping Recon Task Controller.");
     if (this.executorService != null) {
       this.executorService.shutdownNow();
