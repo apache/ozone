@@ -45,6 +45,8 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.GuiceInjectorUtilsForTestsImpl;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
+import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
+import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -70,13 +72,14 @@ import javax.ws.rs.core.Response;
 import java.util.UUID;
 
 /**
- * Test for Node Endpoint.
+ * Test for Recon API endpoints.
  */
-public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
+public class TestEndpoints extends AbstractSqlDatabaseTest {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private NodeEndpoint nodeEndpoint;
+  private PipelineEndpoint pipelineEndpoint;
   private ReconStorageContainerManagerFacade reconScm;
   private boolean isSetupDone = false;
   private String pipelineId;
@@ -151,6 +154,7 @@ public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
     });
 
     nodeEndpoint = injector.getInstance(NodeEndpoint.class);
+    pipelineEndpoint = injector.getInstance(PipelineEndpoint.class);
     reconScm = (ReconStorageContainerManagerFacade)
         injector.getInstance(OzoneStorageContainerManager.class);
   }
@@ -232,9 +236,13 @@ public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
     Assert.assertEquals(35000,
         datanodeMetadata.getDatanodeStorageReport().getUsed());
 
-    Assert.assertEquals(1, datanodeMetadata.getPipelineIDs().size());
+    Assert.assertEquals(1, datanodeMetadata.getPipelines().size());
     Assert.assertEquals(pipelineId,
-        datanodeMetadata.getPipelineIDs().get(0).toString());
+        datanodeMetadata.getPipelines().get(0).getPipelineID().toString());
+    Assert.assertEquals(pipeline.getFactor().getNumber(),
+        datanodeMetadata.getPipelines().get(0).getReplicationFactor());
+    Assert.assertEquals(pipeline.getType().toString(),
+        datanodeMetadata.getPipelines().get(0).getReplicationType());
 
     // if container report is processed first, and pipeline does not exist
     // then container is not added until the next container report is processed
@@ -257,5 +265,44 @@ public class TestNodeEndpoint extends AbstractSqlDatabaseTest {
     Assert.assertEquals(1,
         reconScm.getPipelineManager()
             .getContainersInPipeline(pipeline.getId()).size());
+  }
+
+  @Test
+  public void testGetPipelines() throws Exception {
+    Response response = pipelineEndpoint.getPipelines();
+    PipelinesResponse pipelinesResponse =
+        (PipelinesResponse) response.getEntity();
+    Assert.assertEquals(1, pipelinesResponse.getTotalCount());
+    Assert.assertEquals(1, pipelinesResponse.getPipelines().size());
+    PipelineMetadata pipelineMetadata =
+        pipelinesResponse.getPipelines().iterator().next();
+    Assert.assertEquals(1, pipelineMetadata.getDatanodes().size());
+    Assert.assertEquals(pipeline.getType().toString(),
+        pipelineMetadata.getReplicationType());
+    Assert.assertEquals(pipeline.getFactor().getNumber(),
+        pipelineMetadata.getReplicationFactor());
+    Assert.assertEquals(datanodeDetails.getHostName(),
+        pipelineMetadata.getLeaderNode());
+    Assert.assertEquals(pipeline.getId().getId(),
+        pipelineMetadata.getPipelineId());
+
+    // if container report is processed first, and pipeline does not exist
+    // then container is not added until the next container report is processed
+    SCMHeartbeatRequestProto heartbeatRequestProto =
+        SCMHeartbeatRequestProto.newBuilder()
+            .setContainerReport(containerReportsProto)
+            .setDatanodeDetails(datanodeDetailsProto)
+            .build();
+    reconScm.getDatanodeProtocolServer()
+        .sendHeartbeat(heartbeatRequestProto);
+
+    LambdaTestUtils.await(30000, 5000, () -> {
+      Response response1 = pipelineEndpoint.getPipelines();
+      PipelinesResponse pipelinesResponse1 =
+          (PipelinesResponse) response1.getEntity();
+      PipelineMetadata pipelineMetadata1 =
+          pipelinesResponse1.getPipelines().iterator().next();
+      return (pipelineMetadata1.getContainers() == 1);
+    });
   }
 }

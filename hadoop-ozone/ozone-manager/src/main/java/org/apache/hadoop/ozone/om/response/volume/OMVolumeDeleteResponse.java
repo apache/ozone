@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import javax.annotation.Nonnull;
 
 /**
- * Response for CreateVolume request.
+ * Response for DeleteVolume request.
  */
 public class OMVolumeDeleteResponse extends OMClientResponse {
   private String volume;

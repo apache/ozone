@@ -51,7 +51,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A class that encapsulates running disk checks against each HDDS volume and
- * allows retrieving a list of failed volumes.
+ * allows retrieving a list of failed volumes. The class only detects failed
+ * volumes and handling of failed volumes is responsibility of caller.
  */
 public class HddsVolumeChecker {
 
