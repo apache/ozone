@@ -106,6 +106,7 @@ public class VolumeSet {
 
   private Runnable shutdownHook;
   private final HddsVolumeChecker volumeChecker;
+  private Runnable failedVolumeListener;
 
   public VolumeSet(String dnUuid, Configuration conf)
       throws IOException {
@@ -140,10 +141,19 @@ public class VolumeSet {
     initializeVolumeSet();
   }
 
+  public void setFailedVolumeListener(Runnable runnable) {
+    failedVolumeListener = runnable;
+  }
+
   @VisibleForTesting
   HddsVolumeChecker getVolumeChecker(Configuration configuration)
       throws DiskChecker.DiskErrorException {
     return new HddsVolumeChecker(configuration, new Timer());
+  }
+
+  @VisibleForTesting
+  HddsVolumeChecker getVolumeChecker() {
+    return volumeChecker;
   }
 
   /**
@@ -215,7 +225,7 @@ public class VolumeSet {
    * Run a synchronous parallel check of all HDDS volumes, removing
    * failed volumes.
    */
-  private void checkAllVolumes() throws IOException {
+  void checkAllVolumes() throws IOException {
     List<HddsVolume> allVolumes = getVolumesList();
     Set<HddsVolume> failedVolumes;
     try {
@@ -239,23 +249,24 @@ public class VolumeSet {
    * @param failedVolumes
    */
   private void handleVolumeFailures(Set<HddsVolume> failedVolumes) {
-    for (HddsVolume v: failedVolumes) {
-      this.writeLock();
-      try {
+    this.writeLock();
+    try {
+      for (HddsVolume v : failedVolumes) {
         // Immediately mark the volume as failed so it is unavailable
         // for new containers.
-        volumeMap.remove(v.getHddsRootDir().getPath());
-        failedVolumeMap.putIfAbsent(v.getHddsRootDir().getPath(), v);
-      } finally {
-        this.writeUnlock();
+        failVolume(v.getHddsRootDir().getPath());
       }
-
-      // TODO:
-      // 1. Mark all closed containers on the volume as unhealthy.
-      // 2. Consider stopping IO on open containers and tearing down
-      //    active pipelines.
-      // 3. Handle Ratis log disk failure.
+    } finally {
+      this.writeUnlock();
     }
+
+    if (failedVolumeListener != null) {
+      failedVolumeListener.run();
+    }
+    // TODO:
+    // 1. Consider stopping IO on open containers and tearing down
+    //    active pipelines.
+    // 2. Handle Ratis log disk failure.
   }
 
   /**
