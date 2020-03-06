@@ -125,10 +125,10 @@ public class TestSCMPipelineBytesWrittenMetrics {
     final String metricName =
         SCMPipelineMetrics.getBytesWrittenMetricName(pipeline);
     GenericTestUtils.waitFor(() -> {
-      MetricsRecordBuilder metrics =
-          getMetrics(SCMPipelineMetrics.class.getSimpleName());
-     return expectedBytesWritten == getLongCounter(metricName, metrics);
-     }, 500, 300000);
+      MetricsRecordBuilder metrics = getMetrics(
+          SCMPipelineMetrics.class.getSimpleName());
+      return expectedBytesWritten == getLongCounter(metricName, metrics);
+    }, 500, 300000);
   }
 
   @After
