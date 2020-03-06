@@ -25,16 +25,26 @@ ${ENDPOINT_URL}       http://recon:9888
 ${API_ENDPOINT_URL}   http://recon:9888/api/v1
 
 *** Test Cases ***
-Recon REST API
+Recon OM APIs
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
+                        Execute                             ozone freon rk --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 10
+                        Sleep               90s
+
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
-                        Sleep               2s
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/containers
                         Should contain      ${result}       containers
+                        Should contain      ${result}       \"ContainerID\":1
+
+    ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/utilization/fileCount
+                        Should contain      ${result}       \"fileSize\":16384,\"count\":10
+
+Recon SCM APIs
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/datanodes
                         Should contain      ${result}       datanodes
-                        Should contain      ${result}       ozone_datanode_1.ozone_default
-                        Should contain      ${result}       ozone_datanode_2.ozone_default
-                        Should contain      ${result}       ozone_datanode_3.ozone_default
+                        Should contain      ${result}       datanode_1
+                        Should contain      ${result}       datanode_2
+                        Should contain      ${result}       datanode_3
+
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/pipelines
                         Should contain      ${result}       pipelines
                         Should contain      ${result}       RATIS
