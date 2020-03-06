@@ -17,6 +17,7 @@
  */
 
 import * as React from 'react';
+import {Tooltip} from "antd";
 
 export class FilledIcon extends React.Component {
   render() {
@@ -29,5 +30,60 @@ export class FilledIcon extends React.Component {
           <path d={path} />
         </svg>
     );
+  }
+}
+
+interface RatisIconProps {
+  replicationFactor: number;
+}
+
+interface ReplicationIconProps {
+  replicationFactor: number;
+  replicationType: string;
+}
+
+export class RatisIcon extends React.PureComponent<RatisIconProps> {
+  render() {
+    const {replicationFactor} = this.props;
+    const textClass = replicationFactor >= 3 ? 'icon-text-three-dots' : 'icon-text-one-dot';
+    return (
+        <div className="ratis-icon">
+          <div className={textClass}>R</div>
+        </div>
+    )
+  }
+}
+
+export class StandaloneIcon extends React.PureComponent {
+  render() {
+    return (
+        <div className="standalone-icon">
+          <div className="icon-text-one-dot">S</div>
+        </div>
+    )
+  }
+}
+
+export class ReplicationIcon extends React.PureComponent<ReplicationIconProps> {
+  render() {
+    const {replicationType, replicationFactor} = this.props;
+    // Assign icons only for RATIS and STAND_ALONE types
+    let icon = null;
+    if (replicationType === 'RATIS') {
+      icon = <RatisIcon replicationFactor={replicationFactor}/>
+    } else if (replicationType === 'STAND_ALONE') {
+      icon = <StandaloneIcon/>
+    }
+    // Wrap the icon in a tooltip
+    if (icon) {
+      const tooltip = <div>
+        <div>Replication Type: {replicationType}</div>
+        <div>Replication Factor: {replicationFactor}</div>
+      </div>;
+      icon = <Tooltip title={tooltip} placement="right">
+        <div className="replication-icon">{icon}</div>
+      </Tooltip>;
+    }
+    return icon;
   }
 }

@@ -61,7 +61,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
 import org.mockito.Mockito;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_LOCK_MAX_CONCURRENCY;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -94,7 +93,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    ozoneConfiguration.setInt(HDDS_LOCK_MAX_CONCURRENCY, 2 * MAX_VOLUMES);
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);

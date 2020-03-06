@@ -153,7 +153,6 @@ public class TestVolumeSetDiskChecks {
   /**
    * Update configuration with the specified number of Datanode
    * storage directories.
-   * @param conf
    * @param numDirs
    */
   private Configuration getConfWithDataNodeDirs(int numDirs) {
