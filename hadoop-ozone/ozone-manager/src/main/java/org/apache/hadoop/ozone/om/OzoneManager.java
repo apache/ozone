@@ -330,10 +330,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // In case of single OM Node Service there will be no OM Node ID
     // specified, set it to value from om storage
     if (this.omNodeDetails.getOMNodeId() == null) {
-      this.omNodeDetails =
-          OMHANodeDetails.getOMNodeDetails(conf, omNodeDetails.getOMServiceId(),
-              omStorage.getOmId(), omNodeDetails.getRpcAddress(),
-              omNodeDetails.getRatisPort());
+      this.omNodeDetails = OMHANodeDetails.getOMNodeDetails(conf,
+          omNodeDetails.getOMServiceId(),
+          omStorage.getOmId(), omNodeDetails.getRpcAddress(),
+          omNodeDetails.getRatisPort());
     }
 
     loginOMUserIfSecurityEnabled(conf);
@@ -421,7 +421,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo(
         omStorage.getCurrentDir());
-
     initializeRatisServer();
 
     if (isRatisEnabled) {

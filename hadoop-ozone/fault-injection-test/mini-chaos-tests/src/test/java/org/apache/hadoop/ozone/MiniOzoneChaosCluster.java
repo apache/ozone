@@ -55,10 +55,10 @@ public abstract class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   // Number of Nodes of the service (Datanode or OM) on which chaos will be
   // unleashed
-  int numNodes;
+  private int numNodes;
 
   private FailureService failureService;
-  long failureIntervalInMS;
+  private long failureIntervalInMS;
 
   private final ScheduledExecutorService executorService;
 
@@ -106,6 +106,18 @@ public abstract class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     LOG.info("Starting MiniOzoneChaosCluster with {} OzoneManagers and {} " +
         "Datanodes, chaos on service: {}",
         numOzoneManagers, numDatanodes, failureService);
+  }
+
+  protected int getNumNodes() {
+    return numNodes;
+  }
+
+  protected void setNumNodes(int numOfNodes) {
+    this.numNodes = numOfNodes;
+  }
+
+  protected long getFailureIntervalInMS() {
+    return failureIntervalInMS;
   }
 
   /**
@@ -292,7 +304,7 @@ public abstract class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     }
 
     /**
-     * Sets OM Service ID
+     * Sets OM Service ID.
      */
     public Builder setOMServiceID(String omServiceID) {
       super.setOMServiceId(omServiceID);

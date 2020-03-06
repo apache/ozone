@@ -59,7 +59,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       LoggerFactory.getLogger(MiniOzoneHAClusterImpl.class);
 
   private Map<String, OzoneManager> ozoneManagerMap;
-  protected List<OzoneManager> ozoneManagers;
+  private List<OzoneManager> ozoneManagers;
   private String omServiceId;
 
   // Active OMs denote OMs which are up and running
@@ -159,6 +159,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   public OzoneManager getOzoneManager(String omNodeId) {
     return this.ozoneManagerMap.get(omNodeId);
+  }
+
+  public List<OzoneManager> getOzoneManagersList() {
+    return ozoneManagers;
   }
 
   /**
