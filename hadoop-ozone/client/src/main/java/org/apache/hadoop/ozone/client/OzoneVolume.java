@@ -316,7 +316,7 @@ public class OzoneVolume extends WithMetadata {
     /**
      * Gets the next set of bucket list using proxy.
      * @param prevBucket
-     * @return {@code List<OzoneVolume>}
+     * @return {@code List<OzoneBucket>}
      */
     private List<OzoneBucket> getNextListOfBuckets(String prevBucket) {
       try {

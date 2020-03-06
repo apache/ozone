@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.ratis.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -30,6 +31,8 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
  * Class which maintains metrics related to OzoneManager DoubleBuffer.
  */
 public class OzoneManagerDoubleBufferMetrics {
+
+  private static OzoneManagerDoubleBufferMetrics instance;
 
   private static final String SOURCE_NAME =
       OzoneManagerDoubleBufferMetrics.class.getSimpleName();
@@ -55,13 +58,18 @@ public class OzoneManagerDoubleBufferMetrics {
       "iteration")
   private MutableGaugeFloat avgFlushTransactionsInOneIteration;
 
-
-
-  public static OzoneManagerDoubleBufferMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        "OzoneManager DoubleBuffer Metrics",
-        new OzoneManagerDoubleBufferMetrics());
+  public synchronized static OzoneManagerDoubleBufferMetrics create() {
+    if (instance != null) {
+      return instance;
+    } else {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      OzoneManagerDoubleBufferMetrics omDoubleBufferMetrics =
+          ms.register(SOURCE_NAME,
+              "OzoneManager DoubleBuffer Metrics",
+              new OzoneManagerDoubleBufferMetrics());
+      instance = omDoubleBufferMetrics;
+      return omDoubleBufferMetrics;
+    }
   }
 
   public void incrTotalNumOfFlushOperations() {

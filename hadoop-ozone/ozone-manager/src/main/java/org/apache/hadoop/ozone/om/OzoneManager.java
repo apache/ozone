@@ -469,6 +469,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Register Ratis metrics reporters.
+   */
+  private void registerRatisMetricReporters() {
+    // All the Ratis metrics (registered from now) will be published via JMX
+    // and via the prometheus exporter (used by the /prom servlet
+    MetricRegistries.global()
+        .addReporterRegistration(MetricsReporting.jmxReporter());
+    MetricRegistries.global().addReporterRegistration(
+        registry -> CollectorRegistry.defaultRegistry.register(
+            new RatisDropwizardExports(
+                registry.getDropWizardMetricRegistry())));
+  }
+
+  /**
    * Instantiate services which are dependent on the OM DB state.
    * When OM state is reloaded, these services are re-initialized with the
    * new OM state.
@@ -1090,17 +1104,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void start() throws IOException {
     omClientProtocolMetrics.register();
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
-    if (configuration.getBoolean(
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false)) {
-      // All the Ratis metrics (registered from now) will be published via JMX
-      // and via the prometheus exporter (used by the /prom servlet
-      MetricRegistries.global()
-          .addReporterRegistration(MetricsReporting.jmxReporter());
-      MetricRegistries.global().addReporterRegistration(
-          registry -> CollectorRegistry.defaultRegistry.register(
-              new RatisDropwizardExports(
-                  registry.getDropWizardMetricRegistry())));
-    }
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
@@ -1236,6 +1239,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void initializeRatisServer() throws IOException {
     if (isRatisEnabled) {
       if (omRatisServer == null) {
+        // This needs to be done before initializing Ratis.
+        registerRatisMetricReporters();
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
             configuration, this, omNodeDetails, peerNodes);
       }

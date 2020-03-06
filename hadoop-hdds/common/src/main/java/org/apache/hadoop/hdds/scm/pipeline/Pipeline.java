@@ -128,7 +128,7 @@ public final class Pipeline {
    *
    * @param creationTimestamp
    */
-  void setCreationTimestamp(Instant creationTimestamp) {
+  public void setCreationTimestamp(Instant creationTimestamp) {
     this.creationTimestamp = creationTimestamp;
   }
 

@@ -27,6 +27,7 @@ ${API_ENDPOINT_URL}   http://recon:9888/api/v1
 *** Test Cases ***
 Recon REST API
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
+                        Sleep               2s
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/containers
                         Should contain      ${result}       containers
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/datanodes
@@ -34,6 +35,13 @@ Recon REST API
                         Should contain      ${result}       ozone_datanode_1.ozone_default
                         Should contain      ${result}       ozone_datanode_2.ozone_default
                         Should contain      ${result}       ozone_datanode_3.ozone_default
+    ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/pipelines
+                        Should contain      ${result}       pipelines
+                        Should contain      ${result}       RATIS
+                        Should contain      ${result}       OPEN
+                        Should contain      ${result}       datanode_1
+                        Should contain      ${result}       datanode_2
+                        Should contain      ${result}       datanode_3
 Recon Web UI
     ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}
                         Should contain      ${result}       Ozone Recon

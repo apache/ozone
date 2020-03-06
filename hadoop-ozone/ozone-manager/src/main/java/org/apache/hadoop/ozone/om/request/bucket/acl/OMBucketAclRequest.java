@@ -117,7 +117,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       }
 
       operationResult = omBucketAclOp.apply(ozoneAcls, omBucketInfo);
-      omBucketInfo.setUpdateID(transactionLogIndex);
+      omBucketInfo.setUpdateID(transactionLogIndex,
+          ozoneManager.isRatisEnabled());
 
       if (operationResult) {
         // update cache.

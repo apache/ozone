@@ -35,15 +35,10 @@ import java.io.IOException;
  */
 @Command(name = "path",
     description = "Returns the ozone path for S3Bucket")
-public class S3BucketMapping extends Handler {
+public class S3BucketMapping extends S3Handler {
 
   @Parameters(arity = "1..1", description = "Name of the s3 bucket.")
   private String s3BucketName;
-
-  @Override
-  protected OzoneAddress getAddress() throws OzoneClientException {
-    return new OzoneAddress();
-  }
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)

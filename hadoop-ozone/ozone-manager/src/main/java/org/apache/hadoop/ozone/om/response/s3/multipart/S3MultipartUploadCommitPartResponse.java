@@ -47,19 +47,22 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
   private OmKeyInfo deletePartKeyInfo;
   private OmMultipartKeyInfo omMultipartKeyInfo;
   private OzoneManagerProtocolProtos.PartKeyInfo oldMultipartKeyInfo;
+  private boolean isRatisEnabled;
 
 
   public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
       String multipartKey,
       String openKey, @Nonnull OmKeyInfo deletePartKeyInfo,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo) {
+      @Nonnull OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
+      boolean isRatisEnabled) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
     this.deletePartKeyInfo = deletePartKeyInfo;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.oldMultipartKeyInfo = oldPartKeyInfo;
+    this.isRatisEnabled = isRatisEnabled;
   }
 
   /**
@@ -82,7 +85,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
           omMetadataManager.getDeletedTable().get(openKey);
 
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(deletePartKeyInfo,
-          repeatedOmKeyInfo, deletePartKeyInfo.getUpdateID());
+          repeatedOmKeyInfo, deletePartKeyInfo.getUpdateID(), isRatisEnabled);
 
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
@@ -116,7 +119,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
               .get(oldMultipartKeyInfo.getPartName());
 
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(partKey,
-          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID());
+          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID(), isRatisEnabled);
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           oldMultipartKeyInfo.getPartName(), repeatedOmKeyInfo);

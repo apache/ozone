@@ -2,7 +2,7 @@
 title: "Storage Container Manager"
 date: "2017-09-14"
 weight: 3
-summary:  Storage Container Manager or SCM is the core metadata service of Ozone. SCM provides a distributed block layer for Ozone.
+summary:  Storage Container Manager（SCM）是 Ozone 的核心元数据服务，它提供了 Ozone 的分布式数据块服务层。
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -21,32 +21,20 @@ summary:  Storage Container Manager or SCM is the core metadata service of Ozone
   limitations under the License.
 -->
 
-Storage container manager provides multiple critical functions for the Ozone
-cluster.  SCM acts as the cluster manager, Certificate authority, Block
-manager and the Replica manager.
+SCM 为 Ozone 集群提供了多种重要功能，包括：集群管理、证书管理、块管理和副本管理等。
 
-{{<card title="Cluster Management" icon="tasks">}}
-SCM is in charge of creating an Ozone cluster. When an SCM is booted up via <kbd>init</kbd> command, SCM creates the cluster identity and root certificates needed for the SCM certificate authority. SCM manages the life cycle of a data node in the cluster.
+{{<card title="集群管理" icon="tasks">}}
+SCM 负责创建一个 Ozone 集群，当通过 <kbd>init</kbd> 命令启动 SCM 时，SCM 会创建集群标识以及用于担任 CA 的根证书，SCM 负责集群中数据节点生命周期管理。
 {{</card>}}
 
-{{<card title="Service Identity Management" icon="eye-open">}}
-SCM's Ceritificate authority is in
-charge of issuing identity certificates for each and every
-service in the cluster. This certificate infrastructre makes
-it easy to enable mTLS at network layer and also the block
-token infrastructure depends on this certificate infrastructure.
+{{<card title="服务身份管理" icon="eye-open">}}
+SCM 的 CA 负责向集群中的每个服务颁发身份证书，证书设施方便了网络层 mTLS 协议的启用，也为块 token 机制提供了支持。
 {{</card>}}
 
-{{<card title="Block Management" icon="th">}}
-SCM is the block manager. SCM
-allocates blocks and assigns them to data nodes. Clients
-read and write these blocks directly.
+{{<card title="块管理" icon="th">}}
+SCM 管理 Ozone 中的块，它将块分配给数据节点，用户直接读写这些块。
 {{</card>}}
 
-
-{{<card title="Replica Management" icon="link">}}
-SCM keeps track of all the block
-replicas. If there is a loss of data node or a disk, SCM
-detects it and instructs data nodes make copies of the
-missing blocks to ensure high avialablity.
+{{<card title="副本管理" icon="link">}}
+SCM 会跟踪所有块副本的状态，如果检测到数据节点宕机或磁盘异常，SCM 命令其它节点生成丢失块的新副本，以此保证高可用。
 {{</card>}}

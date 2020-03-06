@@ -15,29 +15,43 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.web.ozShell.s3;
 
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.security.UserGroupInformation;
-import picocli.CommandLine.Command;
+package org.apache.hadoop.ozone.web.ozShell.s3;
 
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
+import org.apache.hadoop.ozone.web.ozShell.Handler;
+import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
+
+import picocli.CommandLine;
+
 /**
- * Executes getsecret calls.
+ * Common interface for S3 command handling.
  */
-@Command(name = "getsecret",
-    description = "Returns s3 secret for current user")
-public class GetS3SecretHandler extends S3Handler {
+public abstract class S3Handler extends Handler {
+
+  @CommandLine.Option(names = {"--om-service-id"},
+      required = false,
+      description = "OM Service ID is required to be specified for OM HA" +
+          " cluster")
+  private String omServiceID;
+
+  public String getOmServiceID() {
+    return omServiceID;
+  }
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException {
-    if (securityEnabled("s3 getsecret")) {
-      String userName = UserGroupInformation.getCurrentUser().getUserName();
-      out().println(client.getObjectStore().getS3Secret(userName));
-    }
+  protected OzoneAddress getAddress() throws OzoneClientException {
+    return new OzoneAddress();
+  }
+
+  @Override
+  protected OzoneClient createClient(OzoneAddress address)
+      throws IOException, OzoneClientException {
+    return address.createClientForS3Commands(getConf(), omServiceID);
   }
 
 }

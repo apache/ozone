@@ -25,7 +25,7 @@ import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {getCapacityPercent} from 'utils/common';
 import Tooltip from 'antd/lib/tooltip';
-import {FilledIcon} from 'utils/themeIcons';
+import {FilledIcon, ReplicationIcon} from 'utils/themeIcons';
 
 export type DatanodeStatus = "HEALTHY" | "STALE" | "DEAD" | "DECOMMISSIONING" | "DECOMMISSIONED";
 const size = filesize.partial({standard: 'iec', round: 1});
@@ -41,7 +41,7 @@ interface DatanodeResponse {
   state: DatanodeStatus;
   lastHeartbeat: number;
   storageReport: StorageReport;
-  pipelineIDs: string[];
+  pipelines: Pipeline[];
   containers: number;
 }
 
@@ -57,8 +57,14 @@ interface Datanode {
   storageUsed: number;
   storageTotal: number;
   storageRemaining: number;
-  pipelines: string[];
+  pipelines: Pipeline[];
   containers: number;
+}
+
+interface Pipeline {
+  pipelineID: string;
+  replicationType: string;
+  replicationFactor: number;
 }
 
 interface DatanodesState {
@@ -103,9 +109,9 @@ const COLUMNS = [
       const nonOzoneUsed = record.storageTotal - record.storageRemaining - record.storageUsed;
       const totalUsed = record.storageTotal - record.storageRemaining;
       const tooltip = <div>
-        <p><Icon component={FilledIcon} className="ozone-used-bg"/> Ozone Used ({size(record.storageUsed)})</p>
-        <p><Icon component={FilledIcon} className="non-ozone-used-bg"/> Non Ozone Used ({size(nonOzoneUsed)})</p>
-        <p><Icon component={FilledIcon} className="remaining-bg"/> Remaining ({size(record.storageRemaining)})</p>
+        <div><Icon component={FilledIcon} className="ozone-used-bg"/> Ozone Used ({size(record.storageUsed)})</div>
+        <div><Icon component={FilledIcon} className="non-ozone-used-bg"/> Non Ozone Used ({size(nonOzoneUsed)})</div>
+        <div><Icon component={FilledIcon} className="remaining-bg"/> Remaining ({size(record.storageRemaining)})</div>
       </div>;
       return <div className="storage-cell-container">
         <Tooltip title={tooltip} placement="bottomLeft">
@@ -131,7 +137,17 @@ const COLUMNS = [
     title: 'Pipeline ID(s)',
     dataIndex: 'pipelines',
     key: 'pipelines',
-    render: (pipelines: string[]) => <div>{pipelines.map((pipeline, index) => <div key={index}>{pipeline}</div>)}</div>
+    render: (pipelines: Pipeline[]) => {
+      return (<div>
+        {
+          pipelines.map((pipeline, index) =>
+              <div key={index} className="pipeline-container">
+                <ReplicationIcon replicationFactor={pipeline.replicationFactor} replicationType={pipeline.replicationType}/>
+                {pipeline.pipelineID}
+              </div>)
+        }
+      </div>);
+    }
   },
   {
     title: 'Containers',
@@ -169,7 +185,7 @@ export class Datanodes extends React.Component<any, DatanodesState> {
           storageUsed: datanode.storageReport.used,
           storageTotal: datanode.storageReport.capacity,
           storageRemaining: datanode.storageReport.remaining,
-          pipelines: datanode.pipelineIDs,
+          pipelines: datanode.pipelines,
           containers: datanode.containers
         }
       });
