@@ -18,9 +18,13 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
@@ -39,10 +43,6 @@ import com.google.inject.Injector;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
-
 
 /**
  * Recon server main class that stops and starts recon services.
@@ -179,21 +179,21 @@ public class ReconServer extends GenericCli {
 
     if (SecurityUtil.getAuthenticationMethod(conf).equals(
         UserGroupInformation.AuthenticationMethod.KERBEROS)) {
-
-      LOG.info("Ozone security is enabled. Attempting login for Recon user. "
-              + "Principal: {}, keytab: {}", conf.get(
-          OZONE_RECON_KERBEROS_PRINCIPAL_KEY),
-          conf.get(OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY));
-      
+      ReconConfig reconConfig = conf.getObject(ReconConfig.class);
+      LOG.info("Ozone security is enabled. Attempting login for Recon service. "
+              + "Principal: {}, keytab: {}",
+          reconConfig.getKerberosPrincipal(),
+          reconConfig.getKerberosKeytab());
       UserGroupInformation.setConfiguration(conf);
-
       InetSocketAddress socAddr = HddsUtils.getReconAddresses(conf);
-      SecurityUtil.login(conf, OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
-          OZONE_RECON_KERBEROS_PRINCIPAL_KEY, socAddr.getHostName());
+      SecurityUtil.login(conf,
+          OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
+          OZONE_RECON_KERBEROS_PRINCIPAL_KEY,
+          socAddr.getHostName());
     } else {
       throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
-          conf) + " authentication method not supported. Recon user login "
-          + "failed.");
+          conf) + " authentication method not supported. "
+          + "Recon service login failed.");
     }
     LOG.info("Recon login successful.");
   }
