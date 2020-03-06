@@ -34,14 +34,18 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
@@ -62,6 +66,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
         Boolean.TRUE.toString());
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 10, TimeUnit.SECONDS);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -101,23 +106,29 @@ public class TestSCMPipelineBytesWrittenMetrics {
 
   @Test
   public void testNumBytesWritten() throws Exception {
-    MetricsRecordBuilder metrics =
-        getMetrics(SCMPipelineMetrics.class.getSimpleName());
-    for (Pipeline pipeline : cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelines()) {
-      Assert.assertEquals(0L, getLongCounter(
-          SCMPipelineMetrics.getBytesWrittenMetricName(pipeline), metrics));
-    }
+    checkBytesWritten(0);
     int bytesWritten = 1000;
     writeNumBytes(bytesWritten);
-    Thread.sleep(100 * 1000L);
-    metrics =
-        getMetrics(SCMPipelineMetrics.class.getSimpleName());
-    for (Pipeline pipeline : cluster.getStorageContainerManager()
-        .getPipelineManager().getPipelines()) {
-      Assert.assertEquals(bytesWritten, getLongCounter(
-          SCMPipelineMetrics.getBytesWrittenMetricName(pipeline), metrics));
-    }
+    checkBytesWritten(bytesWritten);
+
+  }
+
+  private void checkBytesWritten(long expectedBytesWritten) throws Exception {
+    // As only 3 datanodes and ozone.scm.pipeline.creation.auto.factor.one is
+    // false, so only pipeline in the system.
+    List<Pipeline> pipelines = cluster.getStorageContainerManager()
+        .getPipelineManager().getPipelines();
+
+    Assert.assertEquals(1, pipelines.size());
+    Pipeline pipeline = pipelines.get(0);
+
+    final String metricName =
+        SCMPipelineMetrics.getBytesWrittenMetricName(pipeline);
+    GenericTestUtils.waitFor(() -> {
+      MetricsRecordBuilder metrics = getMetrics(
+          SCMPipelineMetrics.class.getSimpleName());
+      return expectedBytesWritten == getLongCounter(metricName, metrics);
+    }, 500, 300000);
   }
 
   @After
