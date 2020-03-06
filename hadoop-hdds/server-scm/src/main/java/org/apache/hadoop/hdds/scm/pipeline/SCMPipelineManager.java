@@ -54,6 +54,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -84,6 +85,8 @@ public class SCMPipelineManager implements PipelineManager {
   private long pipelineWaitDefaultTimeout;
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
+
+  private final AtomicBoolean isInSafeMode;
 
   public SCMPipelineManager(Configuration conf, NodeManager nodeManager,
       EventPublisher eventPublisher)
@@ -127,6 +130,9 @@ public class SCMPipelineManager implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.isInSafeMode = new AtomicBoolean(conf.getBoolean(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT));
   }
 
   public PipelineStateManager getStateManager() {
@@ -414,7 +420,7 @@ public class SCMPipelineManager implements PipelineManager {
             .toEpochMilli() >= pipelineScrubTimeoutInMills)
         .collect(Collectors.toList());
     for (Pipeline p : needToSrubPipelines) {
-      LOG.info("srubbing pipeline: id: " + p.getId().toString() +
+      LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
           " since it stays at ALLOCATED stage for " +
           Duration.between(currentTime, p.getCreationTimestamp()).toMinutes() +
           " mins.");
@@ -618,4 +624,15 @@ public class SCMPipelineManager implements PipelineManager {
   protected NodeManager getNodeManager() {
     return nodeManager;
   }
+
+  @Override
+  public void setSafeModeStatus(boolean safeModeStatus) {
+    this.isInSafeMode.set(safeModeStatus);
+  }
+
+  @Override
+  public boolean getSafeModeStatus() {
+    return this.isInSafeMode.get();
+  }
+
 }
