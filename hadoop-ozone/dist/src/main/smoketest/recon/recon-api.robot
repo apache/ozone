@@ -32,9 +32,9 @@ Recon REST API
                         Should contain      ${result}       containers
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/datanodes
                         Should contain      ${result}       datanodes
-                        Should contain      ${result}       ozone_datanode_1.ozone_default
-                        Should contain      ${result}       ozone_datanode_2.ozone_default
-                        Should contain      ${result}       ozone_datanode_3.ozone_default
+                        Should contain      ${result}       datanode_1
+                        Should contain      ${result}       datanode_2
+                        Should contain      ${result}       datanode_3
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/pipelines
                         Should contain      ${result}       pipelines
                         Should contain      ${result}       RATIS
@@ -43,5 +43,6 @@ Recon REST API
                         Should contain      ${result}       datanode_2
                         Should contain      ${result}       datanode_3
 Recon Web UI
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}
                         Should contain      ${result}       Ozone Recon
