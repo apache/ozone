@@ -95,6 +95,7 @@ public class OzoneContainer {
       throws IOException {
     this.config = conf;
     this.volumeSet = new VolumeSet(datanodeDetails.getUuidString(), conf);
+    volumeSet.setFailedVolumeListener(this::handleVolumeFailures);
     this.containerSet = new ContainerSet();
     this.metadataScanner = null;
 
@@ -250,6 +251,12 @@ public class OzoneContainer {
     volumeSet.shutdown();
     blockDeletingService.shutdown();
     ContainerMetrics.remove();
+  }
+
+  public void handleVolumeFailures() {
+    if (containerSet != null) {
+      containerSet.handleVolumeFailures();
+    }
   }
 
   @VisibleForTesting
