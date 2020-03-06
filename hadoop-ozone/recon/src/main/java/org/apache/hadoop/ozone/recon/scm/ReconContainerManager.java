@@ -24,12 +24,14 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +42,7 @@ public class ReconContainerManager extends SCMContainerManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconContainerManager.class);
+  private StorageContainerServiceProvider scmClient;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -54,14 +57,39 @@ public class ReconContainerManager extends SCMContainerManager {
    * @throws IOException on Failure.
    */
   public ReconContainerManager(
-      Configuration conf, PipelineManager pipelineManager) throws IOException {
+      Configuration conf, PipelineManager pipelineManager,
+      StorageContainerServiceProvider scm) throws IOException {
     super(conf, pipelineManager);
+    this.scmClient = scm;
   }
 
   @Override
   protected File getContainerDBPath(Configuration conf) {
     File metaDir = ReconUtils.getReconScmDbDir(conf);
     return new File(metaDir, RECON_SCM_CONTAINER_DB);
+  }
+
+  /**
+   * Check and add new container if not already present in Recon.
+   * @param containerID containerID to check.
+   * @param datanodeDetails Datanode from where we got this container.
+   * @throws IOException on Error.
+   */
+  public void checkAndAddNewContainer(ContainerID containerID,
+                                      DatanodeDetails datanodeDetails)
+      throws IOException {
+    if (!exists(containerID)) {
+      LOG.info("New container {} got from {}.", containerID,
+          datanodeDetails.getHostName());
+      ContainerWithPipeline containerWithPipeline =
+          scmClient.getContainerWithPipeline(containerID.getId());
+      LOG.debug("Verified new container from SCM {} ",
+          containerWithPipeline.getContainerInfo().containerID());
+      // If no other client added this, go ahead and add this container.
+      if (!exists(containerID)) {
+        addNewContainer(containerID.getId(), containerWithPipeline);
+      }
+    }
   }
 
   /**

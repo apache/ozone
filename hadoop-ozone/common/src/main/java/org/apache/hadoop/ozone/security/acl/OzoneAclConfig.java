@@ -49,6 +49,9 @@ public class OzoneAclConfig {
   private String groupDefaultRights;
 
   public ACLType getUserDefaultRights() {
+    if (userDefaultRights == null) {
+      return ACLType.ALL;
+    }
     return ACLType.valueOf(userDefaultRights);
   }
 

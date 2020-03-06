@@ -97,7 +97,8 @@ public class ReconStorageContainerManagerFacade
         conf, this, eventQueue);
     this.pipelineManager =
         new ReconPipelineManager(conf, nodeManager, eventQueue);
-    this.containerManager = new ReconContainerManager(conf, pipelineManager);
+    this.containerManager = new ReconContainerManager(conf, pipelineManager,
+        scmServiceProvider);
     this.scmServiceProvider = scmServiceProvider;
 
     NodeReportHandler nodeReportHandler =
@@ -117,12 +118,11 @@ public class ReconStorageContainerManagerFacade
         pipelineManager, containerManager);
 
     ContainerReportHandler containerReportHandler =
-        new ReconContainerReportHandler(nodeManager, containerManager,
-            scmServiceProvider);
+        new ReconContainerReportHandler(nodeManager, containerManager);
 
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
-            containerManager, scmServiceProvider);
+            containerManager);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, containerManager);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();

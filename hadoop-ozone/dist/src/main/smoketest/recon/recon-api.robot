@@ -53,5 +53,6 @@ Recon SCM APIs
                         Should contain      ${result}       datanode_2
                         Should contain      ${result}       datanode_3
 Recon Web UI
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}
                         Should contain      ${result}       Ozone Recon

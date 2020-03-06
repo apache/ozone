@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.utils.LoadBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -135,6 +136,7 @@ public class TestMiniChaosOzoneCluster implements Runnable {
     CommandLine.run(new TestMiniChaosOzoneCluster(), System.err, args);
   }
 
+  @Ignore
   @Test
   public void testReadWriteWithChaosCluster() {
     cluster.startChaos(5, 10, TimeUnit.SECONDS);
