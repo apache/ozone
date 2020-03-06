@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.web.ozShell.s3;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
