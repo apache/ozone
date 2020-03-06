@@ -1753,6 +1753,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmVolumeArgs getVolumeInfo(String volume) throws IOException {
+    long begin = System.currentTimeMillis();
     if(isAclEnabled) {
       checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.READ, volume,
           null, null);
@@ -1766,12 +1767,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       metrics.incNumVolumeInfoFails();
       auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.READ_VOLUME,
+      auditMap.put("cost",
+          String.valueOf(System.currentTimeMillis() - begin) + "ms");
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.READ_VOLUME,
           auditMap, ex));
       throw ex;
     } finally {
       if(auditSuccess){
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.READ_VOLUME,
+        auditMap.put("cost",
+            String.valueOf(System.currentTimeMillis() - begin) + "ms");
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.READ_VOLUME,
             auditMap));
       }
     }
@@ -1972,6 +1977,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmBucketInfo getBucketInfo(String volume, String bucket)
       throws IOException {
+    long begin = System.currentTimeMillis();
     if(isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, volume,
           bucket, null);
@@ -1985,12 +1991,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       metrics.incNumBucketInfoFails();
       auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.READ_BUCKET,
+      auditMap.put("cost",
+          String.valueOf(System.currentTimeMillis() - begin) + "ms");
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.READ_BUCKET,
           auditMap, ex));
       throw ex;
     } finally {
       if(auditSuccess){
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.READ_BUCKET,
+        auditMap.put("cost",
+            String.valueOf(System.currentTimeMillis() - begin) + "ms");
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.READ_BUCKET,
             auditMap));
       }
     }
@@ -2130,24 +2140,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
+    long begin = System.currentTimeMillis();
     if(isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
           args.getVolumeName(), args.getBucketName(), args.getKeyName());
     }
     boolean auditSuccess = true;
+    Map<String, String> auditMap = (args == null) ? null : args.toAuditMap();
     try {
       metrics.incNumKeyLookups();
       return keyManager.lookupKey(args, getClientAddress());
     } catch (Exception ex) {
       metrics.incNumKeyLookupFails();
       auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.READ_KEY,
-          (args == null) ? null : args.toAuditMap(), ex));
+      if (auditMap != null) {
+        auditMap.put("cost",
+            String.valueOf(System.currentTimeMillis() - begin) + "ms");
+      }
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.READ_KEY,
+          auditMap, ex));
       throw ex;
     } finally {
       if(auditSuccess){
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.READ_KEY,
-            (args == null) ? null : args.toAuditMap()));
+        if (auditMap != null) {
+          auditMap.put("cost",
+              String.valueOf(System.currentTimeMillis() - begin) + "ms");
+        }
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.READ_KEY,
+            auditMap));
       }
     }
   }
@@ -2788,26 +2808,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
+    long begin = System.currentTimeMillis();
     if (isAclEnabled) {
       checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
           args.getVolumeName(), args.getBucketName(), args.getKeyName());
     }
     boolean auditSuccess = true;
+    Map<String, String> auditMap = (args == null) ? null : args.toAuditMap();
     try {
       metrics.incNumGetFileStatus();
       return keyManager.getFileStatus(args);
     } catch (IOException ex) {
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(OMAction.GET_FILE_STATUS,
-              (args == null) ? null : args.toAuditMap(), ex));
+      if (auditMap != null) {
+        auditMap.put("cost",
+            String.valueOf(System.currentTimeMillis() - begin) + "ms");
+      }
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          OMAction.GET_FILE_STATUS, auditMap, ex));
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(OMAction.GET_FILE_STATUS,
-                (args == null) ? null : args.toAuditMap()));
+        if (auditMap != null) {
+          auditMap.put("cost",
+              String.valueOf(System.currentTimeMillis() - begin) + "ms");
+        }
+        AUDIT.logWriteSuccess(
+            buildAuditMessageForSuccess(OMAction.GET_FILE_STATUS, auditMap));
       }
     }
   }
@@ -2872,24 +2900,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
+    long begin = System.currentTimeMillis();
     if(isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
           args.getVolumeName(), args.getBucketName(), args.getKeyName());
     }
     boolean auditSuccess = true;
+    Map<String, String> auditMap = (args == null) ? null : args.toAuditMap();
     try {
       metrics.incNumLookupFile();
       return keyManager.lookupFile(args, getClientAddress());
     } catch (Exception ex) {
       metrics.incNumLookupFileFails();
       auditSuccess = false;
+      if (auditMap != null) {
+        auditMap.put("cost",
+            String.valueOf(System.currentTimeMillis() - begin) + "ms");
+      }
       AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.LOOKUP_FILE,
-          (args == null) ? null : args.toAuditMap(), ex));
+          auditMap, ex));
       throw ex;
     } finally {
       if(auditSuccess){
+        if (auditMap != null) {
+          auditMap.put("cost",
+              String.valueOf(System.currentTimeMillis() - begin) + "ms");
+        }
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-            OMAction.LOOKUP_FILE, (args == null) ? null : args.toAuditMap()));
+            OMAction.LOOKUP_FILE, auditMap));
       }
     }
   }
@@ -2897,24 +2935,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries) throws IOException {
+    long begin = System.currentTimeMillis();
     if(isAclEnabled) {
       checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
           args.getVolumeName(), args.getBucketName(), args.getKeyName());
     }
     boolean auditSuccess = true;
+    Map<String, String> auditMap = (args == null) ? null : args.toAuditMap();
     try {
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey, numEntries);
     } catch (Exception ex) {
       metrics.incNumListStatusFails();
       auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_STATUS,
-          (args == null) ? null : args.toAuditMap(), ex));
+      if (auditMap != null) {
+        auditMap.put("cost",
+            String.valueOf(System.currentTimeMillis() - begin) + "ms");
+      }
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.LIST_STATUS,
+          auditMap, ex));
       throw ex;
     } finally {
       if(auditSuccess){
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-            OMAction.LIST_STATUS, (args == null) ? null : args.toAuditMap()));
+        if (auditMap != null) {
+          auditMap.put("cost",
+              String.valueOf(System.currentTimeMillis() - begin) + "ms");
+        }
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+            OMAction.LIST_STATUS, auditMap));
       }
     }
   }
