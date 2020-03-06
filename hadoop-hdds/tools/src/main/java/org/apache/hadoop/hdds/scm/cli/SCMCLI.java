@@ -84,16 +84,12 @@ public class SCMCLI extends GenericCli {
     new SCMCLI().run(argv);
   }
 
-  public ScmClient createScmClient()
-      throws IOException {
+  public ScmClient createScmClient() throws IOException {
     OzoneConfiguration ozoneConf = createOzoneConfiguration();
     checkAndSetSCMAddressArg(ozoneConf);
 
-
     return new ContainerOperationClient(ozoneConf);
   }
-
-
 
   public void checkContainerExists(ScmClient scmClient, long containerId)
       throws IOException {
