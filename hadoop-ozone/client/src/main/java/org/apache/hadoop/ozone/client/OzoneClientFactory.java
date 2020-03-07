@@ -24,6 +24,7 @@ import java.lang.reflect.Proxy;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 
@@ -31,6 +32,7 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +76,17 @@ public final class OzoneClientFactory {
   public static OzoneClient getClient(Configuration config)
       throws IOException {
     Preconditions.checkNotNull(config);
+
+    // Doing this explicitly so that when service ids are defined in the
+    // configuration, we don't fall back to default ozone.om.address defined
+    // in ozone-default.xml.
+
+    if (OmUtils.isServiceIdsDefined(config)) {
+      throw new IOException("Following ServiceID's " +
+          config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + " are" +
+          " defined in the configuration. Use the method getClient which " +
+          "takes serviceID and configuration as param");
+    }
     return getClient(getClientProtocol(config), config);
   }
 
