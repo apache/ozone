@@ -15,32 +15,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.conf;
+package org.apache.hadoop.ozone.recon.api.types;
+
+import java.util.UUID;
 
 /**
- * Available config tags.
- * <p>
- * Note: the values are defined in ozone-default.xml by hadoop.tags.custom.
+ * Metadata object that contains pipeline information of a Datanode.
  */
-public enum ConfigTag {
-  OZONE,
-  MANAGEMENT,
-  SECURITY,
-  PERFORMANCE,
-  DEBUG,
-  CLIENT,
-  SERVER,
-  OM,
-  SCM,
-  CRITICAL,
-  RATIS,
-  CONTAINER,
-  REQUIRED,
-  REST,
-  STORAGE,
-  PIPELINE,
-  STANDALONE,
-  S3GATEWAY,
-  DATANODE,
-  RECON
+public class DatanodePipeline {
+  private UUID pipelineID;
+  private String replicationType;
+  private int replicationFactor;
+
+  public DatanodePipeline(UUID pipelineID, String replicationType,
+                          int replicationFactor) {
+    this.pipelineID = pipelineID;
+    this.replicationType = replicationType;
+    this.replicationFactor = replicationFactor;
+  }
+
+  public UUID getPipelineID() {
+    return pipelineID;
+  }
+
+  public String getReplicationType() {
+    return replicationType;
+  }
+
+  public int getReplicationFactor() {
+    return replicationFactor;
+  }
 }

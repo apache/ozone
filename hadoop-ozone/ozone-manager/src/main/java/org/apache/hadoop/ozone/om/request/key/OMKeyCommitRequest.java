@@ -143,15 +143,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      // Check if OzoneKey already exists in DB
-      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(dbOzoneKey);
-      if (dbKeyInfo != null) {
-        // Check if this transaction is a replay of ratis logs
-        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          throw new OMReplayException();
+      // Revisit this logic to see how we can skip this check when ratis is
+      // enabled.
+      if (ozoneManager.isRatisEnabled()) {
+        // Check if OzoneKey already exists in DB
+        OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(dbOzoneKey);
+        if (dbKeyInfo != null) {
+          // Check if this transaction is a replay of ratis logs
+          if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
+            // Replay implies the response has already been returned to
+            // the client. So take no further action and return a dummy
+            // OMClientResponse.
+            throw new OMReplayException();
+          }
         }
       }
 
@@ -168,7 +172,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.updateLocationInfoList(locationInfoList);
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable().addCacheEntry(

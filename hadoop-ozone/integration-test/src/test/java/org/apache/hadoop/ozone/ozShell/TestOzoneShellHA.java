@@ -27,6 +27,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.web.ozShell.OzoneShell;
+import org.apache.hadoop.ozone.web.ozShell.Shell;
+import org.apache.hadoop.ozone.web.ozShell.s3.S3Shell;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -152,7 +155,7 @@ public class TestOzoneShellHA {
     System.setErr(OLD_ERR);
   }
 
-  private void execute(OzoneShell shell, String[] args) {
+  private void execute(Shell shell, String[] args) {
     LOG.info("Executing OzoneShell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
 
@@ -393,4 +396,32 @@ public class TestOzoneShellHA {
     Assert.assertEquals(0, out.size());
     Assert.assertEquals(0, getNumOfKeys());
   }
+
+
+  @Test
+  public void testS3PathCommand() throws Exception {
+
+    String s3Bucket = "b12345";
+    cluster.getRpcClient().getObjectStore().createS3Bucket(
+        UserGroupInformation.getCurrentUser().getUserName(), s3Bucket);
+
+    String[] args = new String[] {"path", s3Bucket,
+        "--om-service-id="+omServiceId};
+
+    S3Shell s3Shell = new S3Shell();
+    execute(s3Shell, args);
+
+
+    String volumeName =
+        cluster.getRpcClient().getObjectStore().getOzoneVolumeName(s3Bucket);
+
+    String ozoneFsUri = String.format("%s://%s.%s", OzoneConsts
+        .OZONE_URI_SCHEME, s3Bucket, volumeName);
+
+    Assert.assertTrue(out.toString().contains(volumeName));
+    Assert.assertTrue(out.toString().contains(ozoneFsUri));
+
+    out.reset();
+  }
+
 }

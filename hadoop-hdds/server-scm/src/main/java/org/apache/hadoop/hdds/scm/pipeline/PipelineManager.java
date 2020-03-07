@@ -112,4 +112,17 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   default void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
   }
+
+  /**
+   * Set SafeMode status.
+   *
+   * @param safeModeStatus
+   */
+  void setSafeModeStatus(boolean safeModeStatus);
+
+  /**
+   * Get SafeMode status.
+   * @return boolean
+   */
+  boolean getSafeModeStatus();
 }

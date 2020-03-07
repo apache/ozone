@@ -23,7 +23,6 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Metadata object that represents a Datanode.
@@ -43,8 +42,8 @@ public class DatanodeMetadata {
   @XmlElement(name = "storageReport")
   private DatanodeStorageReport datanodeStorageReport;
 
-  @XmlElement(name = "pipelineIDs")
-  private List<UUID> pipelineIDs;
+  @XmlElement(name = "pipelines")
+  private List<DatanodePipeline> pipelines;
 
   @XmlElement(name = "containers")
   private int containers;
@@ -53,13 +52,13 @@ public class DatanodeMetadata {
                           NodeState state,
                           long lastHeartbeat,
                           DatanodeStorageReport storageReport,
-                          List<UUID> pipelineIDs,
+                          List<DatanodePipeline> pipelines,
                           int containers) {
     this.hostname = hostname;
     this.state = state;
     this.lastHeartbeat = lastHeartbeat;
     this.datanodeStorageReport = storageReport;
-    this.pipelineIDs = pipelineIDs;
+    this.pipelines = pipelines;
     this.containers = containers;
   }
 
@@ -79,8 +78,8 @@ public class DatanodeMetadata {
     return datanodeStorageReport;
   }
 
-  public List<UUID> getPipelineIDs() {
-    return pipelineIDs;
+  public List<DatanodePipeline> getPipelines() {
+    return pipelines;
   }
 
   public int getContainers() {

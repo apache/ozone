@@ -60,7 +60,7 @@ public class PipelineSyncTask extends ReconScmTask {
       while (canRun()) {
         long start = Time.monotonicNow();
         List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
-        reconPipelineManager.removeInvalidPipelines(pipelinesFromScm);
+        reconPipelineManager.initializePipelines(pipelinesFromScm);
         LOG.info("Pipeline sync Thread took {} milliseconds.",
             Time.monotonicNow() - start);
         recordSingleRunCompletion();

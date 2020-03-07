@@ -111,10 +111,12 @@ class BackgroundPipelineCreator {
         continue;
       }
 
-      try {
-        pipelineManager.scrubPipeline(type, factor);
-      } catch (IOException e) {
-        LOG.error("Error while scrubbing pipelines {}", e);
+      if (!pipelineManager.getSafeModeStatus()) {
+        try {
+          pipelineManager.scrubPipeline(type, factor);
+        } catch (IOException e) {
+          LOG.error("Error while scrubbing pipelines {}", e);
+        }
       }
 
       while (true) {
