@@ -29,12 +29,19 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -45,6 +52,7 @@ import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -53,8 +61,10 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
@@ -65,10 +75,11 @@ public class TestRootedOzoneFileSystem {
   @Rule
   public Timeout globalTimeout = new Timeout(300_000);
 
-  private static MiniOzoneCluster cluster = null;
-  private static FileSystem fs;
-  private static RootedOzoneFileSystem ofs;
-  private static ObjectStore objectStore;
+  private OzoneConfiguration conf;
+  private MiniOzoneCluster cluster = null;
+  private FileSystem fs;
+  private RootedOzoneFileSystem ofs;
+  private ObjectStore objectStore;
   private static BasicRootedOzoneClientAdapterImpl adapter;
 
   private String volumeName;
@@ -79,7 +90,7 @@ public class TestRootedOzoneFileSystem {
 
   @Before
   public void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -117,12 +128,13 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneConfiguration confTestLoader = new OzoneConfiguration();
     // Note: FileSystem#loadFileSystems won't load OFS class due to META-INF
     //  hence this workaround.
-    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
-    Assert.assertEquals(
-        FileSystem.getFileSystemClass(OzoneConsts.OZONE_OFS_URI_SCHEME, conf),
+    confTestLoader.set("fs.ofs.impl",
+        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    Assert.assertEquals(FileSystem.getFileSystemClass(
+        OzoneConsts.OZONE_OFS_URI_SCHEME, confTestLoader),
         RootedOzoneFileSystem.class);
   }
 
@@ -661,32 +673,97 @@ public class TestRootedOzoneFileSystem {
     // FileSystem because we can't change LISTING_PAGE_SIZE. Use adapter instead
 
     // numEntries > 5
-    FileStatus[] fileStatusesOver = customListStatus(
-        new Path("/"), false, "", 8);
+    FileStatus[] fileStatusesOver = customListStatus(new Path("/"),
+        false, "", 8);
     // There are only 5 volumes
     Assert.assertEquals(5, fileStatusesOver.length);
 
     // numEntries = 5
-    FileStatus[] fileStatusesExact = customListStatus(
-        new Path("/"), false, "", 5);
+    FileStatus[] fileStatusesExact = customListStatus(new Path("/"),
+        false, "", 5);
     Assert.assertEquals(5, fileStatusesExact.length);
 
     // numEntries < 5
-    FileStatus[] fileStatusesLimit1 = customListStatus(
-        new Path("/"), false, "", 3);
+    FileStatus[] fileStatusesLimit1 = customListStatus(new Path("/"),
+        false, "", 3);
     // Should only return 3 volumes even though there are more than that due to
     // the specified limit
     Assert.assertEquals(3, fileStatusesLimit1.length);
 
     // Get the last entry in the list as startPath
-    String nextStartPath = fileStatusesLimit1[fileStatusesLimit1.length - 1]
-        .getPath().toString();
-    FileStatus[] fileStatusesLimit2 = customListStatus(
-        new Path("/"), false, nextStartPath, 3);
+    String nextStartPath =
+        fileStatusesLimit1[fileStatusesLimit1.length - 1].getPath().toString();
+    FileStatus[] fileStatusesLimit2 = customListStatus(new Path("/"),
+        false, nextStartPath, 3);
     // Note: at the time of writing this test, OmMetadataManagerImpl#listVolumes
     //  excludes startVolume (startPath) from the result. Might change.
     Assert.assertEquals(fileStatusesOver.length,
         fileStatusesLimit1.length + fileStatusesLimit2.length);
+  }
+
+   /*
+   * OFS: Test /tmp mount behavior.
+   */
+  @Test
+  public void testTempMount() throws Exception {
+    // Prep
+    // Use ClientProtocol to pass in volume ACL, ObjectStore won't do it
+    ClientProtocol proxy = objectStore.getClientProxy();
+    // Get default acl rights for user
+    OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
+    ACLType userRights = aclConfig.getUserDefaultRights();
+    // Construct ACL for world access
+    OzoneAcl aclWorldAccess = new OzoneAcl(ACLIdentityType.WORLD, "",
+        userRights, ACCESS);
+    // Construct VolumeArgs
+    VolumeArgs volumeArgs = new VolumeArgs.Builder()
+        .setAcls(Collections.singletonList(aclWorldAccess)).build();
+    // Sanity check
+    Assert.assertNull(volumeArgs.getOwner());
+    Assert.assertNull(volumeArgs.getAdmin());
+    Assert.assertNull(volumeArgs.getQuota());
+    Assert.assertEquals(0, volumeArgs.getMetadata().size());
+    Assert.assertEquals(1, volumeArgs.getAcls().size());
+    // Create volume "tmp" with world access. allow non-admin to create buckets
+    proxy.createVolume(OFSPath.OFS_MOUNT_TMP_VOLUMENAME, volumeArgs);
+
+    OzoneVolume vol = objectStore.getVolume(OFSPath.OFS_MOUNT_TMP_VOLUMENAME);
+    Assert.assertNotNull(vol);
+
+    // Begin test
+    String hashedUsername = OFSPath.getTempMountBucketNameOfCurrentUser();
+
+    // Expect failure since temp bucket for current user is not created yet
+    try {
+      vol.getBucket(hashedUsername);
+    } catch (OMException ex) {
+      // Expect BUCKET_NOT_FOUND
+      if (!ex.getResult().equals(BUCKET_NOT_FOUND)) {
+        Assert.fail("Temp bucket for current user shouldn't have been created");
+      }
+    }
+
+    // Write under /tmp/, OFS will create the temp bucket if not exist
+    fs.mkdirs(new Path("/tmp/dir1"));
+
+    try (FSDataOutputStream stream = ofs.create(new Path("/tmp/dir1/file1"))) {
+      stream.write(1);
+    }
+
+    // Verify temp bucket creation
+    OzoneBucket bucket = vol.getBucket(hashedUsername);
+    Assert.assertNotNull(bucket);
+    // Verify dir1 creation
+    FileStatus[] fileStatuses = fs.listStatus(new Path("/tmp/"));
+    Assert.assertEquals(1, fileStatuses.length);
+    Assert.assertEquals(
+        "/tmp/dir1", fileStatuses[0].getPath().toUri().getPath());
+    // Verify file1 creation
+    FileStatus[] fileStatusesInDir1 =
+        fs.listStatus(new Path("/tmp/dir1"));
+    Assert.assertEquals(1, fileStatusesInDir1.length);
+    Assert.assertEquals("/tmp/dir1/file1",
+        fileStatusesInDir1[0].getPath().toUri().getPath());
   }
 
 }
