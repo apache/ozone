@@ -538,7 +538,8 @@ public class ContainerStateMap {
   private void checkIfContainerExist(ContainerID containerID)
       throws ContainerNotFoundException {
     if (!containerMap.containsKey(containerID)) {
-      throw new ContainerNotFoundException("#" + containerID.getId());
+      throw new ContainerNotFoundException("Container with id #" +
+          containerID.getId() + " not found.");
     }
   }
 
