@@ -21,6 +21,8 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
@@ -59,17 +61,36 @@ public class OmBucketGenerator extends BaseFreonGenerator
   @Override
   public Void call() throws Exception {
 
-    init();
+    OzoneClient ozoneClient = null;
+    try {
+      init();
 
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    
-    ozoneManagerClient = createOmClient(ozoneConfiguration, omServiceID);
+      OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    ensureVolumeExists(ozoneConfiguration, volumeName);
+      ozoneManagerClient = createOmClient(ozoneConfiguration, omServiceID);
 
-    bucketCreationTimer = getMetrics().timer("bucket-create");
+      if (omServiceID != null) {
+        ozoneClient = OzoneClientFactory.getRpcClient(omServiceID,
+            ozoneConfiguration);
+      } else {
+        ozoneClient = OzoneClientFactory.getRpcClient(ozoneConfiguration);
+      }
+      ensureVolumeExists(ozoneClient, volumeName);
 
-    runTests(this::createBucket);
+      bucketCreationTimer = getMetrics().timer("bucket-create");
+
+      runTests(this::createBucket);
+
+    } finally {
+
+      if (ozoneClient != null) {
+        ozoneClient.close();
+      }
+
+      if (ozoneManagerClient != null) {
+        ozoneManagerClient.close();
+      }
+    }
 
     return null;
   }

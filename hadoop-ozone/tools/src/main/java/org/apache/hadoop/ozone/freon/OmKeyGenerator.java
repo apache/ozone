@@ -96,6 +96,10 @@ public class OmKeyGenerator extends BaseFreonGenerator
       if (rpcClient != null) {
         rpcClient.close();
       }
+
+      if (ozoneManagerClient != null) {
+        ozoneManagerClient.close();
+      }
     }
 
     return null;

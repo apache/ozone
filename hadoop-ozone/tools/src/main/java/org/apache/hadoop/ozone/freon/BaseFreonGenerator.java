@@ -400,19 +400,14 @@ public class BaseFreonGenerator {
    * Create missing target volume.
    */
   public void ensureVolumeExists(
-      OzoneConfiguration ozoneConfiguration,
+      OzoneClient rpcClient,
       String volumeName) throws IOException {
-    try (OzoneClient rpcClient = OzoneClientFactory
-        .getRpcClient(ozoneConfiguration)) {
-
-      try {
-        rpcClient.getObjectStore().getVolume(volumeName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-          rpcClient.getObjectStore().createVolume(volumeName);
-        }
+    try {
+      rpcClient.getObjectStore().getVolume(volumeName);
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+        rpcClient.getObjectStore().createVolume(volumeName);
       }
-
     }
   }
 
