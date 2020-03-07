@@ -21,7 +21,7 @@ summary: Ozone 能够与 HDFS 并存运行，本页介绍如何将 Ozone 部署�
   limitations under the License.
 -->
 
-Ozone 支持与 HDFS 并存工作，所以在已有的 HDFS 集群上部署 Ozone 比较容易。
+Ozone 支持与 HDFS 并存工作，所以在用户可以轻易的在已有的 HDFS 集群上部署 Ozone。
 
 Ozone 的容器管理组件可以在 HDFS 数据节点上运行，以插件的形式或是独立运行，下文介绍插件运行的方法。
 
@@ -46,7 +46,7 @@ export HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/*.jar
 
 
 
-让 ozone 随 HDFS 一同启动的步骤为：
+让 Ozone 随 HDFS 一同启动的步骤为：
 
  1. HDFS Namenode（从 Hadoop 中启动）
  2. HDFS Datanode (从 Hadoop 中启动，需要按照如上配置插件和 classpath）
@@ -60,5 +60,5 @@ export HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/*.jar
 ```
 
 <div class="alert alert-warning" role="alert">
-<b>注意：</b> 当前版本的 Ozone 使用 Hadoop 3.1 使用测试。
+<b>注意：</b> 当前版本的 Ozone 使用 Hadoop 3.1 测试。
 </div>
