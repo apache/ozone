@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.impl;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
 import java.util.List;
 
@@ -30,6 +31,9 @@ public enum ChunkLayOutVersion {
 
   FILE_PER_CHUNK(1, "One file per chunk"),
   FILE_PER_BLOCK(2, "One file per block");
+
+  private static final ChunkLayOutVersion
+      DEFAULT_LAYOUT = ChunkLayOutVersion.FILE_PER_BLOCK;
 
   private static final List<ChunkLayOutVersion> CHUNK_LAYOUT_VERSIONS =
       ImmutableList.copyOf(values());
@@ -65,7 +69,12 @@ public enum ChunkLayOutVersion {
    * @return the latest version.
    */
   public static ChunkLayOutVersion getConfiguredVersion(Configuration conf) {
-    return FILE_PER_BLOCK; // TODO make it configurable
+    try {
+      return conf.getEnum(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY,
+          DEFAULT_LAYOUT);
+    } catch (IllegalArgumentException e) {
+      return DEFAULT_LAYOUT;
+    }
   }
 
   /**
