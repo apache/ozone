@@ -106,7 +106,7 @@ jobs:
             args: ./hadoop-ozone/dev-support/checks/build.sh
         - run: sudo pip install robotframework
         - run: sudo chown runner -R .
-        - run: cd ./hadoop-ozone/dist/target/ozone-*-SNAPSHOT/ && mkdir .aws && sudo chown 1000 .aws 
+        - run: cd ./hadoop-ozone/dist/target/ozone-*/ && mkdir .aws && sudo chown 1000 .aws
         - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
         - uses: actions/upload-artifact@master
           if: always()
