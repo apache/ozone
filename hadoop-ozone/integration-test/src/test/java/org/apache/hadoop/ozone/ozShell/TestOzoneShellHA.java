@@ -422,8 +422,8 @@ public class TestOzoneShellHA {
     Assert.assertEquals(0, getNumOfKeys());
 
     // Part of listing buckets test.
-    generateBuckets("volume5", 100);
-    final String destinationVolume = "o3://" + omServiceId + "volume5";
+    generateBuckets("/volume5", 100);
+    final String destinationVolume = "o3://" + omServiceId + "/volume5";
 
     // Test case 1: test listing buckets.
     // ozone sh bucket list /volume5
