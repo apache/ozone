@@ -1862,16 +1862,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<OmVolumeArgs> listAllVolumes(String prefix, String prevKey, int
       maxKeys) throws IOException {
-    if(isAclEnabled) {
-      if (!ozAdmins.contains(ProtobufRpcEngine.Server.
-          getRemoteUser().getUserName())
-          && !ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
-        String errMsg = "Only admin users are authorized to" +
-            " list Ozone volumes.";
-        LOG.error(errMsg);
-        throw new OMException(errMsg, ResultCodes.PERMISSION_DENIED);
-      }
-    }
     boolean auditSuccess = true;
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.PREV_KEY, prevKey);
