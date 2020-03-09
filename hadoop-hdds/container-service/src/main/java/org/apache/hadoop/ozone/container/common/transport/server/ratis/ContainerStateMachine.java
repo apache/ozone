@@ -73,6 +73,7 @@ import org.apache.ratis.statemachine.StateMachineStorage;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -370,14 +371,15 @@ public class ContainerStateMachine extends BaseStateMachine {
     return entryProto.getStateMachineEntry().getStateMachineData();
   }
 
-  private ContainerCommandRequestProto getContainerCommandRequestProto(
-      ByteString request) throws InvalidProtocolBufferException {
+  private static ContainerCommandRequestProto getContainerCommandRequestProto(
+      RaftGroupId id, ByteString request)
+      throws InvalidProtocolBufferException {
     // TODO: We can avoid creating new builder and set pipeline Id if
     // the client is already sending the pipeline id, then we just have to
     // validate the pipeline Id.
     return ContainerCommandRequestProto.newBuilder(
         ContainerCommandRequestProto.parseFrom(request))
-        .setPipelineID(gid.getUuid().toString()).build();
+        .setPipelineID(id.getUuid().toString()).build();
   }
 
   private ContainerCommandRequestProto message2ContainerCommandRequestProto(
@@ -506,7 +508,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       metrics.incNumWriteStateMachineOps();
       long writeStateMachineStartTime = Time.monotonicNowNanos();
       ContainerCommandRequestProto requestProto =
-          getContainerCommandRequestProto(
+          getContainerCommandRequestProto(gid,
               entry.getStateMachineLogEntry().getLogData());
       WriteChunkRequestProto writeChunk =
           WriteChunkRequestProto.newBuilder(requestProto.getWriteChunk())
@@ -638,7 +640,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
     try {
       final ContainerCommandRequestProto requestProto =
-          getContainerCommandRequestProto(
+          getContainerCommandRequestProto(gid,
               entry.getStateMachineLogEntry().getLogData());
       // readStateMachineData should only be called for "write" to Ratis.
       Preconditions.checkArgument(!HddsUtils.isReadOnly(requestProto));
@@ -721,7 +723,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       applyTransactionSemaphore.acquire();
       metrics.incNumApplyTransactionsOps();
       ContainerCommandRequestProto requestProto =
-          getContainerCommandRequestProto(
+          getContainerCommandRequestProto(gid,
               trx.getStateMachineLogEntry().getLogData());
       Type cmdType = requestProto.getCmdType();
       // Make sure that in write chunk, the user data is not set
@@ -887,22 +889,30 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
+    return smProtoToString(gid, containerController, proto);
+  }
+
+  public static String smProtoToString(RaftGroupId gid,
+                                   ContainerController containerController,
+                                   StateMachineLogEntryProto proto) {
+    StringBuilder builder = new StringBuilder();
     try {
       ContainerCommandRequestProto requestProto =
-              getContainerCommandRequestProto(proto.getLogData());
+          getContainerCommandRequestProto(gid, proto.getLogData());
       long contId = requestProto.getContainerID();
 
-      switch (requestProto.getCmdType()) {
-      case WriteChunk:
+      builder.append(TextFormat.shortDebugString(requestProto));
+
+      if (containerController != null) {
         String location = containerController.getContainerLocation(contId);
-        return HddsUtils.writeChunkToString(requestProto.getWriteChunk(),
-                contId, location);
-      default:
-        return "Cmd Type:" + requestProto.getCmdType()
-          + " should not have state machine data";
+        builder.append(", container path=");
+        builder.append(location);
       }
     } catch (Throwable t) {
-      return "";
+      LOG.info("smProtoToString failed", t);
+      builder.append("smProtoToString failed with");
+      builder.append(t.getMessage());
     }
+    return builder.toString();
   }
 }
