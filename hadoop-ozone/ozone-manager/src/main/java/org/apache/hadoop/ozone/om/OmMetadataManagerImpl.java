@@ -811,8 +811,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
 
-    UserVolumeInfo volumes;
-
     if (StringUtil.isBlank(userName)) {
       // null userName represents listing all volumes in cluster.
       return listAllVolumes(prefix, startKey, maxKeys);
