@@ -42,7 +42,7 @@ import static org.junit.Assert.fail;
 /**
  * Test the HDDS server side utilities.
  */
-public class HddsServerUtilTest {
+public class TestHddsServerUtil {
 
   @Rule
   public Timeout timeout = new Timeout(300000);
