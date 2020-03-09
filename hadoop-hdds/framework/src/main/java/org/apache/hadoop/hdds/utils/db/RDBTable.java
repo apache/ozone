@@ -177,8 +177,7 @@ class RDBTable implements Table<byte[], byte[]> {
       }
       return null;
     } catch (RocksDBException e) {
-      throw toIOException(
-          "Error in accessing DB. ", e);
+      throw toIOException("Error in accessing DB. ", e);
     }
   }
 
