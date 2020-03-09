@@ -21,7 +21,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
@@ -30,8 +29,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -94,8 +91,8 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
    * Set SafeMode status based on
    * {@link org.apache.hadoop.hdds.scm.events.SCMEvents#SAFE_MODE_STATUS}.
    *
-   * Inform BlockManager, ScmClientProtocolServer and replicationAcitivity
-   * status about safeMode status.
+   * Inform BlockManager, ScmClientProtocolServer, ScmPipeline Manager and
+   * Replication Manager status about safeMode status.
    *
    * @param safeModeStatus
    * @param publisher
@@ -114,29 +111,15 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
+        scmPipelineManager.setSafeModeStatus(isInSafeMode.get());
         replicationManager.start();
-        cleanupPipelines();
+        scmPipelineManager.triggerPipelineCreation();
       });
 
       safeModeExitThread.setDaemon(true);
       safeModeExitThread.start();
     }
 
-  }
-
-  private void cleanupPipelines() {
-    List<Pipeline> pipelineList = scmPipelineManager.getPipelines();
-    pipelineList.forEach((pipeline) -> {
-      try {
-        if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED &&
-            pipeline.isAllocationTimeout()) {
-          scmPipelineManager.finalizeAndDestroyPipeline(pipeline, false);
-        }
-      } catch (IOException ex) {
-        LOG.error("Finalize and destroy pipeline failed for pipeline "
-            + pipeline.toString(), ex);
-      }
-    });
   }
 
   public boolean getSafeModeStatus() {

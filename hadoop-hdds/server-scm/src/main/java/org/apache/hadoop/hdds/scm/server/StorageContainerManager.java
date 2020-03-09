@@ -358,6 +358,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, safeModeHandler);
+
+    // Emit initial safe mode status, as now handlers are registered.
+    scmSafeModeManager.emitSafeModeStatus();
     registerMXBean();
     registerMetricsSource(this);
   }

@@ -26,11 +26,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,13 +39,10 @@ public class ReconContainerReportHandler extends ContainerReportHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconContainerReportHandler.class);
-  private StorageContainerServiceProvider scmClient;
 
   public ReconContainerReportHandler(NodeManager nodeManager,
-                                     ContainerManager containerManager,
-                                     StorageContainerServiceProvider scm) {
+                                     ContainerManager containerManager) {
     super(nodeManager, containerManager);
-    this.scmClient = scm;
   }
 
   @Override
@@ -63,22 +58,12 @@ public class ReconContainerReportHandler extends ContainerReportHandler {
     for (ContainerReplicaProto containerReplicaProto : reportsList) {
       final ContainerID id = ContainerID.valueof(
           containerReplicaProto.getContainerID());
-      synchronized (containerManager) {
-        if (!containerManager.exists(id)) {
-          LOG.info("New container {} got from {}.", id,
-              reportFromDatanode.getDatanodeDetails());
-          try {
-            ContainerWithPipeline containerWithPipeline =
-                scmClient.getContainerWithPipeline(id.getId());
-            LOG.debug("Verified new container from SCM {} ",
-                containerWithPipeline.getContainerInfo().containerID());
-            containerManager.addNewContainer(id.getId(), containerWithPipeline);
-          } catch (IOException ioEx) {
-            LOG.error("Exception while getting new container info from SCM",
-                ioEx);
-            return;
-          }
-        }
+      try {
+        containerManager.checkAndAddNewContainer(id,
+            reportFromDatanode.getDatanodeDetails());
+      } catch (IOException ioEx) {
+        LOG.error("Exception while checking and adding new container.", ioEx);
+        return;
       }
       LOG.debug("Got container report for containerID {} ",
           containerReplicaProto.getContainerID());
