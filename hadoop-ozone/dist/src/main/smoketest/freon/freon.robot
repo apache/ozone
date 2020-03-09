@@ -20,17 +20,17 @@ Resource            ../commonlib.robot
 
 *** Test Cases ***
 Freon Randomkey Generator
-    ${result} =        Execute              ozone freon rk --om-service-id=id1 --numOfVolumes=1 --numOfBuckets=1 --numOfKeys=1 --numOfThreads=1
+    ${result} =        Execute              ozone freon rk ${OM_HA_PARAM} --numOfVolumes=1 --numOfBuckets=1 --numOfKeys=1 --numOfThreads=1
                        Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   Number of Keys added: 1
 
 Freon Ozone Key Generator
-    ${result} =        Execute              ozone freon ockg --om-service-id=id1 -t=1 -n=1
+    ${result} =        Execute              ozone freon ockg ${OM_HA_PARAM} -t=1 -n=1
                        Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   Successful executions: 1
 
 Freon OM Key Generator
-    ${result} =        Execute              ozone freon omkg --om-service-id=id1 -t=1 -n=1
+    ${result} =        Execute              ozone freon omkg ${OM_HA_PARAM} -t=1 -n=1
                        Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   Successful executions: 1
 
 Freon OM Bucket Generator
-    ${result} =        Execute              ozone freon ombg --om-service-id=id1 -t=1 -n=1
+    ${result} =        Execute              ozone freon ombg ${OM_HA_PARAM} -t=1 -n=1
                        Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   Successful executions: 1
