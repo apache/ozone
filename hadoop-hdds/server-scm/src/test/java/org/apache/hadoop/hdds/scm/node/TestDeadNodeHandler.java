@@ -90,7 +90,6 @@ public class TestDeadNodeHandler {
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
     eventQueue = new EventQueue();
-    System.out.println("eventQueue = "  + eventQueue.toString());
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     pipelineManager =
