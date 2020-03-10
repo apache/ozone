@@ -357,6 +357,8 @@ public class OzoneManagerServiceProviderImpl
         // Pass on DB update events to tasks that are listening.
         reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
             omdbUpdatesHandler.getEvents()), omMetadataManager);
+      } catch (InterruptedException intEx) {
+        Thread.currentThread().interrupt();
       } catch (Exception e) {
         LOG.warn("Unable to get and apply delta updates from OM.", e);
         fullSnapshot = true;
@@ -380,6 +382,8 @@ public class OzoneManagerServiceProviderImpl
           LOG.info("Calling reprocess on Recon tasks.");
           reconTaskController.reInitializeTasks(omMetadataManager);
         }
+      } catch (InterruptedException intEx) {
+        Thread.currentThread().interrupt();
       } catch (Exception e) {
         LOG.error("Unable to update Recon's metadata with new OM DB. ", e);
       }

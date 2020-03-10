@@ -24,21 +24,24 @@ Resource            ../commonlib.robot
 ${ENDPOINT_URL}       http://recon:9888
 ${API_ENDPOINT_URL}   http://recon:9888/api/v1
 
-*** Test Cases ***
-Recon OM APIs
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-                        Execute                             ozone freon rk --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 10 --keySize 1025
-                        Sleep               90s
-
+*** Keywords ***
+Check if Recon picks up container
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/containers
-                        Should contain      ${result}       containers
                         Should contain      ${result}       \"ContainerID\":1
+
+*** Test Cases ***
+Generate Freon data
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
+                        Execute                             ozone freon rk --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 10 --keySize 1025
+
+Check if Recon picks up OM data
+    Wait Until Keyword Succeeds     70 sec      10sec       Check if Recon picks up container
 
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/utilization/fileCount
                         Should contain      ${result}       \"fileSize\":2048,\"count\":10
 
-Recon SCM APIs
+Check if Recon picks up DN heartbeats
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/datanodes
                         Should contain      ${result}       datanodes
                         Should contain      ${result}       datanode_1
@@ -52,7 +55,7 @@ Recon SCM APIs
                         Should contain      ${result}       datanode_1
                         Should contain      ${result}       datanode_2
                         Should contain      ${result}       datanode_3
-Recon Web UI
+Check if Recon Web UI is up
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}
                         Should contain      ${result}       Ozone Recon
