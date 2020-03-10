@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -111,9 +112,20 @@ public class TestBlockManager {
             pipelineManager.getStateManager(), conf, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
+    SCMContainerManager containerManager =
+        new SCMContainerManager(conf, pipelineManager);
+    SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
+        containerManager.getContainers(), pipelineManager, eventQueue) {
+      @Override
+      public void emitSafeModeStatus() {
+        // skip
+      }
+    };
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setPipelineManager(pipelineManager);
+    configurator.setContainerManager(containerManager);
+    configurator.setScmSafeModeManager(safeModeManager);
     scm = TestUtils.getScm(conf, configurator);
 
     // Initialize these fields so that the tests can pass.
@@ -126,6 +138,7 @@ public class TestBlockManager {
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     factor = HddsProtos.ReplicationFactor.THREE;
     type = HddsProtos.ReplicationType.RATIS;
+
     blockManager.setSafeModeStatus(false);
   }
 
