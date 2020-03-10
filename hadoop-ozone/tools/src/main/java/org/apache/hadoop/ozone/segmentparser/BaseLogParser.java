@@ -30,9 +30,10 @@ import java.util.function.Function;
 public abstract class BaseLogParser {
   @CommandLine.Option(names = {"-s", "--segmentPath"}, required = true,
       description = "Path of the segment file")
-  protected File segmentFile;
+  private File segmentFile;
 
-  public void parseRatisLogs(Function<RaftProtos.StateMachineLogEntryProto, String> smLogToStr) {
+  public void parseRatisLogs(
+      Function<RaftProtos.StateMachineLogEntryProto, String> smLogToStr) {
     try {
       ParseRatisLog.Builder builder = new ParseRatisLog.Builder();
       builder.setSegmentFile(segmentFile);

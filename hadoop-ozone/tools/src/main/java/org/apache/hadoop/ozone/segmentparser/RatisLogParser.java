@@ -17,14 +17,13 @@
  */
 package org.apache.hadoop.ozone.segmentparser;
 
-import io.opentracing.Scope;
-import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import picocli.CommandLine;
 
-
+/**
+ * Parse Ratis Log CLI implementation.
+ */
 @CommandLine.Command(
     name = "ratislogparser",
     description = "Shell of printing Ratis Log in understandable text",
@@ -35,17 +34,11 @@ import picocli.CommandLine;
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-/**
- * Parse Ratis Log CLI implementation.
- */
 public class RatisLogParser extends GenericCli {
 
   @Override
   public void execute(String[] argv) {
-    TracingUtil.initTracing("logparse", createOzoneConfiguration());
-    try (Scope scope = GlobalTracer.get().buildSpan("main").startActive(true)) {
-      super.execute(argv);
-    }
+    super.execute(argv);
   }
 
   public static void main(String[] args) {
