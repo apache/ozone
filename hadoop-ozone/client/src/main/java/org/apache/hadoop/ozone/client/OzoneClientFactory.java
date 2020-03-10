@@ -23,11 +23,14 @@ import java.lang.reflect.Proxy;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,26 +55,9 @@ public final class OzoneClientFactory {
    *
    * @throws IOException
    */
-  public static OzoneClient getClient() throws IOException {
+  public static OzoneClient getRpcClient() throws IOException {
     LOG.info("Creating OzoneClient with default configuration.");
-    return getClient(new OzoneConfiguration());
-  }
-
-  /**
-   * Constructs and return an OzoneClient based on the configuration object.
-   * Protocol type is decided by <code>ozone.client.protocol</code>.
-   *
-   * @param config
-   *        Configuration to be used for OzoneClient creation
-   *
-   * @return OzoneClient
-   *
-   * @throws IOException
-   */
-  public static OzoneClient getClient(Configuration config)
-      throws IOException {
-    Preconditions.checkNotNull(config);
-    return getClient(getClientProtocol(config), config);
+    return getRpcClient(new OzoneConfiguration());
   }
 
   /**
@@ -97,7 +83,7 @@ public final class OzoneClientFactory {
     Preconditions.checkNotNull(omRpcPort);
     Preconditions.checkNotNull(config);
     config.set(OZONE_OM_ADDRESS_KEY, omHost + ":" + omRpcPort);
-    return getRpcClient(config);
+    return getRpcClient(getClientProtocol(config), config);
   }
 
   /**
@@ -117,9 +103,14 @@ public final class OzoneClientFactory {
       Configuration config) throws IOException {
     Preconditions.checkNotNull(omServiceId);
     Preconditions.checkNotNull(config);
-    // Won't set OZONE_OM_ADDRESS_KEY here since service id is passed directly,
-    // leaving OZONE_OM_ADDRESS_KEY value as is.
-    return getClient(getClientProtocol(config, omServiceId), config);
+    if (OmUtils.isOmHAServiceId(config, omServiceId)) {
+      return getRpcClient(getClientProtocol(config, omServiceId), config);
+    } else {
+      throw new IOException("Service ID specified " +
+          "does not match with " + OZONE_OM_SERVICE_IDS_KEY + " defined in " +
+          "the configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
+          config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+    }
   }
 
   /**
@@ -135,7 +126,18 @@ public final class OzoneClientFactory {
   public static OzoneClient getRpcClient(Configuration config)
       throws IOException {
     Preconditions.checkNotNull(config);
-    return getClient(getClientProtocol(config), config);
+
+    // Doing this explicitly so that when service ids are defined in the
+    // configuration, we don't fall back to default ozone.om.address defined
+    // in ozone-default.xml.
+
+    if (OmUtils.isServiceIdsDefined(config)) {
+      throw new IOException("Following ServiceID's " +
+          config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + " are" +
+          " defined in the configuration. Use the method getRpcClient which " +
+          "takes serviceID and configuration as param");
+    }
+    return getRpcClient(getClientProtocol(config), config);
   }
 
   /**
@@ -147,7 +149,7 @@ public final class OzoneClientFactory {
    * @param config
    *        Configuration to be used for OzoneClient creation
    */
-  private static OzoneClient getClient(ClientProtocol clientProtocol,
+  private static OzoneClient getRpcClient(ClientProtocol clientProtocol,
                                        Configuration config) {
     OzoneClientInvocationHandler clientHandler =
         new OzoneClientInvocationHandler(clientProtocol);
