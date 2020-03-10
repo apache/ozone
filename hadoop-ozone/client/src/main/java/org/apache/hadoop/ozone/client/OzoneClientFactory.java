@@ -83,7 +83,7 @@ public final class OzoneClientFactory {
     Preconditions.checkNotNull(omRpcPort);
     Preconditions.checkNotNull(config);
     config.set(OZONE_OM_ADDRESS_KEY, omHost + ":" + omRpcPort);
-    return getRpcClient(config);
+    return getRpcClient(getClientProtocol(config), config);
   }
 
   /**
