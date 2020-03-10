@@ -24,11 +24,16 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Safe mode pre-check for SCM operations.
  * */
 public class SafeModePrecheck implements Precheck<ScmOps> {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SafeModePrecheck.class);
 
   private AtomicBoolean inSafeMode;
   public static final String PRECHECK_TYPE = "SafeModePrecheck";
@@ -64,6 +69,8 @@ public class SafeModePrecheck implements Precheck<ScmOps> {
   }
 
   public void setInSafeMode(boolean inSafeMode) {
+    LOG.info("Setting safe mode {} -> {} in {}",
+        isInSafeMode(), inSafeMode, this, new Exception("for debug"));
     this.inSafeMode.set(inSafeMode);
   }
 }

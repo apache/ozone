@@ -119,8 +119,6 @@ public class TestBlockManager {
     // Initialize these fields so that the tests can pass.
     mapping = (SCMContainerManager) scm.getContainerManager();
     blockManager = (BlockManagerImpl) scm.getScmBlockManager();
-    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS,
-        scm.getSafeModeHandler());
     DatanodeCommandHandler handler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
     CloseContainerEventHandler closeContainerHandler =
