@@ -75,28 +75,21 @@ public class OmKeyGenerator extends BaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
+    init();
 
-    OzoneClient rpcClient = null;
-    try {
-      init();
+    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-      OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-
-      rpcClient = createOzoneClient(omServiceID, ozoneConfiguration);
+    try (OzoneClient rpcClient = createOzoneClient(omServiceID,
+        ozoneConfiguration)) {
 
       ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
 
-      System.out.print("Bharat " + omServiceID);
       ozoneManagerClient = createOmClient(ozoneConfiguration, omServiceID);
 
       timer = getMetrics().timer("key-create");
 
       runTests(this::createKey);
     } finally {
-      if (rpcClient != null) {
-        rpcClient.close();
-      }
-
       if (ozoneManagerClient != null) {
         ozoneManagerClient.close();
       }

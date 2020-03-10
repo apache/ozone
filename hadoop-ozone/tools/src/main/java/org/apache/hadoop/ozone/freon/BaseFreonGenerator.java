@@ -372,17 +372,9 @@ public class BaseFreonGenerator {
   public void ensureVolumeAndBucketExist(OzoneClient rpcClient,
       String volumeName, String bucketName) throws IOException {
 
-    OzoneVolume volume = null;
-    try {
-      volume = rpcClient.getObjectStore().getVolume(volumeName);
-    } catch (OMException ex) {
-      if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-        rpcClient.getObjectStore().createVolume(volumeName);
-        volume = rpcClient.getObjectStore().getVolume(volumeName);
-      } else {
-        throw ex;
-      }
-    }
+    OzoneVolume volume;
+    ensureVolumeExists(rpcClient, volumeName);
+    volume = rpcClient.getObjectStore().getVolume(volumeName);
 
     try {
       volume.getBucket(bucketName);

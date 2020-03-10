@@ -91,13 +91,11 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
 
-    OzoneClient rpcClient = null;
-    try {
-      rpcClient = createOzoneClient(omServiceID, ozoneConfiguration);
+    try (OzoneClient rpcClient = createOzoneClient(omServiceID,
+        ozoneConfiguration)) {
       ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
       bucket = rpcClient.getObjectStore().getVolume(volumeName)
           .getBucket(bucketName);
@@ -105,10 +103,6 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
       timer = getMetrics().timer("key-create");
 
       runTests(this::createKey);
-    } finally {
-      if (rpcClient != null) {
-        rpcClient.close();
-      }
     }
     return null;
   }
