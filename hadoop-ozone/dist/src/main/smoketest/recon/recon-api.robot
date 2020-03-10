@@ -36,7 +36,7 @@ Generate Freon data
                         Execute                             ozone freon rk --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 10 --keySize 1025
 
 Check if Recon picks up OM data
-    Wait Until Keyword Succeeds     70 sec      10sec       Check if Recon picks up container
+    Wait Until Keyword Succeeds     90sec      10sec        Check if Recon picks up container
 
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/utilization/fileCount
                         Should contain      ${result}       \"fileSize\":2048,\"count\":10
