@@ -229,7 +229,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     this.ozoneConfiguration = ozoneConfiguration;
   }
 
-  public void init(OzoneConfiguration configuration) throws Exception {
+  public void init(OzoneConfiguration configuration) throws IOException {
     startTime = System.nanoTime();
     jobStartTime = System.currentTimeMillis();
     volumeCreationTime = new AtomicLong();
