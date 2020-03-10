@@ -317,8 +317,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void restartHddsDatanode(int i, boolean waitForDatanode)
       throws InterruptedException, TimeoutException {
     HddsDatanodeService datanodeService = hddsDatanodes.get(i);
-    datanodeService.stop();
-    datanodeService.join();
+    stopDatanode(datanodeService);
     // ensure same ports are used across restarts.
     OzoneConfiguration config = datanodeService.getConf();
     int currentPort = datanodeService.getDatanodeDetails()
@@ -353,7 +352,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   @Override
   public void shutdownHddsDatanode(int i) {
-    hddsDatanodes.get(i).stop();
+    stopDatanode(hddsDatanodes.get(i));
   }
 
   @Override
