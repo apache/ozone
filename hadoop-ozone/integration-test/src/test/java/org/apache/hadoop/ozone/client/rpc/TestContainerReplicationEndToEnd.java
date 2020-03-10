@@ -119,7 +119,7 @@ public class TestContainerReplicationEndToEnd {
     cluster.waitForClusterToBeReady();
     cluster.getStorageContainerManager().getReplicationManager().start();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
     volumeName = "testcontainerstatemachinefailures";

@@ -42,7 +42,6 @@ import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -305,17 +304,13 @@ public class BaseFreonGenerator {
    * Create the OM RPC client to use it for testing.
    */
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
-      OzoneConfiguration conf) throws IOException {
+      OzoneConfiguration conf, String omServiceID) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    long omVersion = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
-    InetSocketAddress omAddress = OmUtils.getOmAddressForClients(conf);
     RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
-    return new OzoneManagerProtocolClientSideTranslatorPB(
-        RPC.getProxy(OzoneManagerProtocolPB.class, omVersion, omAddress,
-            ugi, conf, NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf)), clientId);
+    return new OzoneManagerProtocolClientSideTranslatorPB(conf, clientId,
+        omServiceID, ugi);
   }
 
   public StorageContainerLocationProtocol createStorageContainerLocationClient(
@@ -374,53 +369,39 @@ public class BaseFreonGenerator {
   /**
    * Create missing target volume/bucket.
    */
-  public void ensureVolumeAndBucketExist(OzoneConfiguration ozoneConfiguration,
+  public void ensureVolumeAndBucketExist(OzoneClient rpcClient,
       String volumeName, String bucketName) throws IOException {
 
-    try (OzoneClient rpcClient = OzoneClientFactory
-        .getRpcClient(ozoneConfiguration)) {
+    OzoneVolume volume;
+    ensureVolumeExists(rpcClient, volumeName);
+    volume = rpcClient.getObjectStore().getVolume(volumeName);
 
-      OzoneVolume volume = null;
-      try {
-        volume = rpcClient.getObjectStore().getVolume(volumeName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-          rpcClient.getObjectStore().createVolume(volumeName);
-          volume = rpcClient.getObjectStore().getVolume(volumeName);
-        } else {
-          throw ex;
-        }
-      }
-
-      try {
-        volume.getBucket(bucketName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-          volume.createBucket(bucketName);
-        } else {
-          throw ex;
-        }
+    try {
+      volume.getBucket(bucketName);
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
+        volume.createBucket(bucketName);
+      } else {
+        throw ex;
       }
     }
+
   }
 
   /**
    * Create missing target volume.
    */
   public void ensureVolumeExists(
-      OzoneConfiguration ozoneConfiguration,
+      OzoneClient rpcClient,
       String volumeName) throws IOException {
-    try (OzoneClient rpcClient = OzoneClientFactory
-        .getRpcClient(ozoneConfiguration)) {
-
-      try {
-        rpcClient.getObjectStore().getVolume(volumeName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-          rpcClient.getObjectStore().createVolume(volumeName);
-        }
+    try {
+      rpcClient.getObjectStore().getVolume(volumeName);
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+        rpcClient.getObjectStore().createVolume(volumeName);
+      } else {
+        throw ex;
       }
-
     }
   }
 
@@ -468,5 +449,14 @@ public class BaseFreonGenerator {
 
   public int getThreadNo() {
     return threadNo;
+  }
+
+  protected OzoneClient createOzoneClient(String omServiceID,
+      OzoneConfiguration conf) throws Exception {
+    if (omServiceID != null) {
+      return OzoneClientFactory.getRpcClient(omServiceID, conf);
+    } else {
+      return OzoneClientFactory.getRpcClient(conf);
+    }
   }
 }

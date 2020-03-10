@@ -110,7 +110,7 @@ public class TestWatchForCommit {
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "watchforcommithandlingtest";
