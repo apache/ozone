@@ -399,6 +399,8 @@ public class BaseFreonGenerator {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         rpcClient.getObjectStore().createVolume(volumeName);
+      } else {
+        throw ex;
       }
     }
   }
