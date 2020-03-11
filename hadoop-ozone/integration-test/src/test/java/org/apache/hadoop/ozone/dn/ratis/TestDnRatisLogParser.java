@@ -27,7 +27,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.PrintStream;
 import java.util.UUID;
 
 /**
@@ -36,6 +38,8 @@ import java.util.UUID;
 public class TestDnRatisLogParser {
 
   private static MiniOzoneCluster cluster = null;
+  private final ByteArrayOutputStream out = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream err = new ByteArrayOutputStream();
 
   @Before
   public void setup() throws Exception {
@@ -43,13 +47,18 @@ public class TestDnRatisLogParser {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1).setTotalPipelineNumLimit(2).build();
     cluster.waitForClusterToBeReady();
+    System.setOut(new PrintStream(out));
+    System.setErr(new PrintStream(err));
   }
 
   @After
-  public void destroy() {
+  public void destroy() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
     }
+
+    out.close();
+    err.close();
   }
 
   @Test
@@ -66,7 +75,11 @@ public class TestDnRatisLogParser {
     Assert.assertTrue(logFile.exists());
     Assert.assertTrue(logFile.isFile());
 
-    new DatanodeRatisLogParser()
-        .parseRatisLogs(DatanodeRatisLogParser::smToContainerLogString);
+    DatanodeRatisLogParser datanodeRatisLogParser =
+        new DatanodeRatisLogParser();
+    datanodeRatisLogParser.setSegmentFile(logFile);
+    datanodeRatisLogParser.parseRatisLogs(
+        DatanodeRatisLogParser::smToContainerLogString);
+    Assert.assertTrue(out.toString().contains("Num Total Entries:"));
   }
 }

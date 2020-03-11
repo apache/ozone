@@ -30,7 +30,8 @@ import picocli.CommandLine;
     subcommands = {
         DatanodeRatisLogParser.class,
         GenericRatisLogParser.class,
-        //TODO: Add more parsers like for OM and SCM here.
+        OMRatisLogParser.class
+        //TODO: After SCM HA implementation, we can add log parser for SCM.
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
