@@ -70,16 +70,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * modification time of bucket.
    */
   private long modificationTime;
-  /**
-   * ObjectIDs are unique and immutable identifier for each object in the
-   * System.
-   */
-  private long objectID;
-  /**
-   * UpdateIDs are monotonically increasing values which are updated
-   * each time there is an update.
-   */
-  private long updateID;
 
   /**
    * Bucket encryption key info if encryption is enabled.
@@ -209,21 +199,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     return modificationTime;
   }
 
-  /**
-   * Returns objectID.
-   * @return long
-   */
-  public long getObjectID() {
-    return objectID;
-  }
-
-  /**
-   * Returns updateID.
-   * @return long
-   */
-  public long getUpdateID() {
-    return updateID;
-  }
 
   /**
    * Returns bucket encryption key info.
