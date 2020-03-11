@@ -30,6 +30,9 @@ Check if Recon picks up container
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/containers
                         Should contain      ${result}       \"ContainerID\":1
 
+    ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/utilization/fileCount
+                        Should contain      ${result}       \"fileSize\":2048,\"count\":10
+
 *** Test Cases ***
 Generate Freon data
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
@@ -37,9 +40,6 @@ Generate Freon data
 
 Check if Recon picks up OM data
     Wait Until Keyword Succeeds     90sec      10sec        Check if Recon picks up container
-
-    ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/utilization/fileCount
-                        Should contain      ${result}       \"fileSize\":2048,\"count\":10
 
 Check if Recon picks up DN heartbeats
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/datanodes
