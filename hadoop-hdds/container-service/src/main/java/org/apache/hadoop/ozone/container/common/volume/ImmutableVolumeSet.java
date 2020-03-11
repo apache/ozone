@@ -17,13 +17,43 @@
  */
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.hadoop.ozone.lock.ReadWriteLockable;
+import com.google.common.collect.ImmutableList;
 
 import java.util.List;
 
 /**
- * Set of HDDS volumes.
+ * Fixed list of HDDS volumes.
  */
-public interface VolumeSet extends ReadWriteLockable {
-  List<HddsVolume> getVolumesList();
+public final class ImmutableVolumeSet implements VolumeSet {
+
+  private final List<HddsVolume> volumes;
+
+  public ImmutableVolumeSet(HddsVolume... volumes) {
+    this.volumes = ImmutableList.copyOf(volumes);
+  }
+
+  @Override
+  public List<HddsVolume> getVolumesList() {
+    return volumes;
+  }
+
+  @Override
+  public void readLock() {
+    // no-op, immutable
+  }
+
+  @Override
+  public void readUnlock() {
+    // no-op, immutable
+  }
+
+  @Override
+  public void writeLock() {
+    // no-op, immutable
+  }
+
+  @Override
+  public void writeUnlock() {
+    // no-op, immutable
+  }
 }

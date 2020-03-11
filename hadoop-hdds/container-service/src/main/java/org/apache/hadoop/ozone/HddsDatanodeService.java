@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -272,7 +272,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     String scmId = "scm-01";
     String clusterId = "clusterId";
     datanodeStateMachine.getContainer().start(scmId);
-    VolumeSet volumeSet =
+    MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
     Map<String, HddsVolume> volumeMap = volumeSet.getVolumeMap();

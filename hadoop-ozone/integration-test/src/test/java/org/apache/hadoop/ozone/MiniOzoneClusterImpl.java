@@ -42,6 +42,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -568,6 +569,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         //set it to 1MB by default in tests
         chunkSize = Optional.of(1);
       }
+      if (!streamBufferSize.isPresent()) {
+        streamBufferSize = OptionalInt.of(chunkSize.get());
+      }
       if (!streamBufferFlushSize.isPresent()) {
         streamBufferFlushSize = Optional.of((long) chunkSize.get());
       }
@@ -583,6 +587,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
           chunkSize.get(), streamBufferSizeUnit.get());
+      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE,
+          streamBufferSize.getAsInt(), streamBufferSizeUnit.get());
       conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
           streamBufferFlushSize.get(), streamBufferSizeUnit.get());
       conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE,

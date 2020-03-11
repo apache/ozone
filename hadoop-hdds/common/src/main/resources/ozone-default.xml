@@ -387,19 +387,25 @@
     </description>
   </property>
   <property>
+    <name>ozone.client.stream.buffer.size</name>
+    <value>4MB</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>The size of chunks the client will send to the server.</description>
+  </property>
+  <property>
     <name>ozone.client.stream.buffer.flush.size</name>
     <value>16MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position , a partial
-      flush will be initiated during write. It should be ideally a multiple
-      of chunkSize.
+    <description>Size which determines at what buffer position a partial
+      flush will be initiated during write. It should be a multiple
+      of ozone.client.stream.buffer.size.
     </description>
   </property>
   <property>
     <name>ozone.client.stream.buffer.max.size</name>
     <value>32MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position,
+    <description>Size which determines at what buffer position
       write call be blocked till acknowledgement of the first partial flush
       happens by all servers.
     </description>
@@ -715,6 +721,17 @@
       When tuning this parameter, flow control window parameter should be
       tuned accordingly. Refer to
       hdds.ratis.raft.grpc.flow.control.window for more information.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.chunk.layout</name>
+    <value>FILE_PER_BLOCK</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      Chunk layout defines how chunks, blocks and containers are stored on disk.
+      Each chunk is stored separately with FILE_PER_CHUNK.  All chunks of a
+      block are stored in the same file with FILE_PER_BLOCK.  The default is
+      FILE_PER_BLOCK.
     </description>
   </property>
   <property>

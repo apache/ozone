@@ -19,7 +19,10 @@
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -42,7 +45,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentracing.Scope;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -79,8 +81,11 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.ArrayList;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -100,7 +105,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private int port;
   private final RaftServer server;
-  private ThreadPoolExecutor chunkExecutor;
+  private final List<ThreadPoolExecutor> chunkExecutors;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private ClientId clientId = ClientId.randomId();
@@ -125,25 +130,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     datanodeDetails = dd;
     this.port = port;
     RaftProperties serverProperties = newRaftProperties();
-    final int numWriteChunkThreads = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
-    final int queueLimit = OzoneConfiguration.of(conf)
-        .getObject(DatanodeRatisServerConfig.class)
-        .getLeaderNumPendingRequests();
-    chunkExecutor =
-        new ThreadPoolExecutor(numWriteChunkThreads, numWriteChunkThreads,
-            100, TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(queueLimit),
-            new ThreadFactoryBuilder()
-                .setDaemon(true)
-                .setNameFormat("ChunkWriter-%d")
-                .build(),
-            new ThreadPoolExecutor.CallerRunsPolicy());
     this.context = context;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
+    chunkExecutors = createChunkExecutors(conf);
 
     RaftServer.Builder builder =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -157,7 +148,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
     return new ContainerStateMachine(gid, dispatcher, containerController,
-        chunkExecutor, this, conf);
+        chunkExecutors, this, conf);
   }
 
   private RaftProperties newRaftProperties() {
@@ -414,7 +405,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     if (!isStarted) {
       LOG.info("Starting {} {} at port {}", getClass().getSimpleName(),
           server.getId(), getIPCPort());
-      chunkExecutor.prestartAllCoreThreads();
+      for (ThreadPoolExecutor executor : chunkExecutors) {
+        executor.prestartAllCoreThreads();
+      }
       server.start();
 
       int realPort =
@@ -443,7 +436,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         // shutdown server before the executors as while shutting down,
         // some of the tasks would be executed using the executors.
         server.close();
-        chunkExecutor.shutdown();
+        for (ExecutorService executor : chunkExecutors) {
+          executor.shutdown();
+        }
         isStarted = false;
       } catch (IOException e) {
         throw new RuntimeException(e);
@@ -757,4 +752,24 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     context.addReport(context.getParent().getContainer().getPipelineReport());
     context.getParent().triggerHeartbeat();
   }
+
+  private static List<ThreadPoolExecutor> createChunkExecutors(
+      Configuration conf) {
+    // TODO create single pool with N threads if using non-incremental chunks
+    final int threadCount = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
+    ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
+    for (int i = 0; i < executors.length; i++) {
+      ThreadFactory threadFactory = new ThreadFactoryBuilder()
+          .setDaemon(true)
+          .setNameFormat("ChunkWriter-" + i + "-%d")
+          .build();
+      BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
+      executors[i] = new ThreadPoolExecutor(1, 1,
+          0, TimeUnit.SECONDS, workQueue, threadFactory);
+    }
+    return ImmutableList.copyOf(executors);
+  }
+
 }

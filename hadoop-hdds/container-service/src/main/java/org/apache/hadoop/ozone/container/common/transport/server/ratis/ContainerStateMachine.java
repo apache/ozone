@@ -81,11 +81,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.concurrent.Executors;
@@ -138,14 +139,14 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final RaftGroupId gid;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
-  private ThreadPoolExecutor chunkExecutor;
   private final XceiverServerRatis ratisServer;
   private final ConcurrentHashMap<Long,
       CompletableFuture<ContainerCommandResponseProto>> writeChunkFutureMap;
 
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
-  private ExecutorService[] executors;
+  private final ExecutorService[] executors;
+  private final List<ThreadPoolExecutor> chunkExecutors;
   private final Map<Long, Long> applyTransactionCompletionMap;
   private final Cache<Long, ByteString> stateMachineDataCache;
   private final AtomicBoolean stateMachineHealthy;
@@ -158,12 +159,12 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
-      ContainerController containerController, ThreadPoolExecutor chunkExecutor,
+      ContainerController containerController,
+      List<ThreadPoolExecutor> chunkExecutors,
       XceiverServerRatis ratisServer, Configuration conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
-    this.chunkExecutor = chunkExecutor;
     this.ratisServer = ratisServer;
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
@@ -178,6 +179,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
         (index, data) -> new int[] {1, data.size()}, numPendingRequests,
         pendingRequestsByteLimit);
+
+    this.chunkExecutors = chunkExecutors;
+
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
     final int numContainerOpExecutors = conf.getInt(
@@ -452,7 +456,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             raftFuture.completeExceptionally(e);
             throw e;
           }
-        }, chunkExecutor);
+        }, getChunkExecutor(requestProto.getWriteChunk()));
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
@@ -496,6 +500,15 @@ public class ContainerStateMachine extends BaseStateMachine {
       return r;
     });
     return raftFuture;
+  }
+
+  private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
+    int hash = Objects.hashCode(req.getBlockID());
+    if (hash == Integer.MIN_VALUE) {
+      hash = Integer.MAX_VALUE;
+    }
+    int i = Math.abs(hash) % chunkExecutors.size();
+    return chunkExecutors.get(i);
   }
 
   /*
@@ -656,7 +669,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             future.completeExceptionally(e);
           }
           return future;
-        }, chunkExecutor);
+        }, getChunkExecutor(requestProto.getWriteChunk()));
         return future;
       } else {
         throw new IllegalStateException("Cmd type:" + requestProto.getCmdType()

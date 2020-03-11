@@ -219,7 +219,7 @@ public class TestHddsVolumeChecker {
         ContainerTestUtils.createDatanodeDetails();
     OzoneContainer ozoneContainer =
         ContainerTestUtils.getOzoneContainer(datanodeDetails, conf);
-    VolumeSet volumeSet = ozoneContainer.getVolumeSet();
+    MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
     ContainerSet containerSet = ozoneContainer.getContainerSet();
 
     HddsVolumeChecker volumeChecker = volumeSet.getVolumeChecker();

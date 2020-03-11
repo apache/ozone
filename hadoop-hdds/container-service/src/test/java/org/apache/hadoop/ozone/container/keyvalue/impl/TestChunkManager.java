@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.keyvalue;
+package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -27,13 +27,14 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerDummyImpl;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerImpl;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
@@ -48,7 +49,12 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.*;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -56,7 +62,9 @@ import static org.mockito.Mockito.mock;
 /**
  * This class is used to test ChunkManager operations.
  */
-public class TestChunkManagerImpl {
+// TODO test common behavior for various implementations
+// TODO extract implementation-specific tests
+public class TestChunkManager {
 
   private OzoneConfiguration config;
   private String scmId = UUID.randomUUID().toString();
@@ -66,7 +74,7 @@ public class TestChunkManagerImpl {
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private BlockID blockID;
-  private ChunkManagerImpl chunkManager;
+  private ChunkManagerDispatcher chunkManager;
   private ChunkInfo chunkInfo;
   private ByteBuffer data;
 
@@ -82,13 +90,13 @@ public class TestChunkManagerImpl {
         .getAbsolutePath()).conf(config).datanodeUuid(datanodeId
         .toString()).build();
 
-    volumeSet = mock(VolumeSet.class);
+    volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
-    keyValueContainerData = new KeyValueContainerData(1L,
+    keyValueContainerData = new KeyValueContainerData(1L, FILE_PER_CHUNK,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 
@@ -108,7 +116,7 @@ public class TestChunkManagerImpl {
         .getLocalID(), 0), 0, bytes.length);
 
     // Create a ChunkManager object.
-    chunkManager = new ChunkManagerImpl(true);
+    chunkManager = new ChunkManagerDispatcher(true);
   }
 
   private DispatcherContext getDispatcherContext() {
@@ -157,7 +165,7 @@ public class TestChunkManagerImpl {
   }
 
   @Test
-  public void testWriteChunkIncorrectLength() throws Exception {
+  public void testWriteChunkIncorrectLength() {
     try {
       long randomLength = 200L;
       chunkInfo = new ChunkInfo(String.format("%d.data.%d", blockID
@@ -168,8 +176,7 @@ public class TestChunkManagerImpl {
     } catch (StorageContainerException ex) {
       // As we got an exception, writeBytes should be 0.
       checkWriteIOStats(0, 0);
-      GenericTestUtils.assertExceptionContains("data array does not match " +
-          "the length ", ex);
+      GenericTestUtils.assertExceptionContains("Unexpected buffer size", ex);
       assertEquals(ContainerProtos.Result.INVALID_WRITE_SIZE, ex.getResult());
     }
   }
@@ -216,7 +223,7 @@ public class TestChunkManagerImpl {
   }
 
   @Test
-  public void testDeleteChunkUnsupportedRequest() throws Exception {
+  public void testDeleteChunkUnsupportedRequest() {
     try {
       chunkManager.writeChunk(keyValueContainer, blockID, chunkInfo, data,
           getDispatcherContext());
@@ -226,20 +233,18 @@ public class TestChunkManagerImpl {
       chunkManager.deleteChunk(keyValueContainer, blockID, chunkInfo);
       fail("testDeleteChunkUnsupportedRequest");
     } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains("Not Supported Operation.", ex);
       assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, ex.getResult());
     }
   }
 
   @Test
-  public void testReadChunkFileNotExists() throws Exception {
+  public void testReadChunkFileNotExists() {
     try {
       // trying to read a chunk, where chunk file does not exist
       chunkManager.readChunk(keyValueContainer,
           blockID, chunkInfo, getDispatcherContext());
       fail("testReadChunkFileNotExists failed");
     } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains("Chunk file can't be found", ex);
       assertEquals(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, ex.getResult());
     }
   }
@@ -270,7 +275,7 @@ public class TestChunkManagerImpl {
 
   @Test
   public void dummyManagerDoesNotWriteToFile() throws Exception {
-    ChunkManager dummy = new ChunkManagerDummyImpl(true);
+    ChunkManager dummy = new ChunkManagerDummyImpl();
     DispatcherContext ctx = new DispatcherContext.Builder()
         .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
 
@@ -281,7 +286,7 @@ public class TestChunkManagerImpl {
 
   @Test
   public void dummyManagerReadsAnyChunk() throws Exception {
-    ChunkManager dummy = new ChunkManagerDummyImpl(true);
+    ChunkManager dummy = new ChunkManagerDummyImpl();
 
     ChunkBuffer dataRead = dummy.readChunk(keyValueContainer,
         blockID, chunkInfo, getDispatcherContext());
@@ -306,22 +311,12 @@ public class TestChunkManagerImpl {
     assertEquals(expected, files.length);
   }
 
-  /**
-   * Check WriteIO stats.
-   * @param length
-   * @param opCount
-   */
   private void checkWriteIOStats(long length, long opCount) {
     VolumeIOStats volumeIOStats = hddsVolume.getVolumeIOStats();
     assertEquals(length, volumeIOStats.getWriteBytes());
     assertEquals(opCount, volumeIOStats.getWriteOpCount());
   }
 
-  /**
-   * Check ReadIO stats.
-   * @param length
-   * @param opCount
-   */
   private void checkReadIOStats(long length, long opCount) {
     VolumeIOStats volumeIOStats = hddsVolume.getVolumeIOStats();
     assertEquals(length, volumeIOStats.getReadBytes());
