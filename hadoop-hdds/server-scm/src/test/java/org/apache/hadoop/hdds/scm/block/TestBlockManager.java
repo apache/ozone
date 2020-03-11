@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +33,6 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
@@ -46,6 +44,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -77,14 +76,12 @@ public class TestBlockManager {
   private MockNodeManager nodeManager;
   private SCMPipelineManager pipelineManager;
   private BlockManagerImpl blockManager;
-  private File testDir;
   private final static long DEFAULT_BLOCK_SIZE = 128 * MB;
   private static HddsProtos.ReplicationFactor factor;
   private static HddsProtos.ReplicationType type;
-  private static EventQueue eventQueue;
+  private EventQueue eventQueue;
   private int numContainerPerOwnerInPipeline;
   private OzoneConfiguration conf;
-  private SafeModeStatus safeModeStatus = new SafeModeStatus(false);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -115,16 +112,25 @@ public class TestBlockManager {
             pipelineManager.getStateManager(), conf, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
+    SCMContainerManager containerManager =
+        new SCMContainerManager(conf, pipelineManager);
+    SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
+        containerManager.getContainers(), pipelineManager, eventQueue) {
+      @Override
+      public void emitSafeModeStatus() {
+        // skip
+      }
+    };
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setScmNodeManager(nodeManager);
     configurator.setPipelineManager(pipelineManager);
+    configurator.setContainerManager(containerManager);
+    configurator.setScmSafeModeManager(safeModeManager);
     scm = TestUtils.getScm(conf, configurator);
 
     // Initialize these fields so that the tests can pass.
     mapping = (SCMContainerManager) scm.getContainerManager();
     blockManager = (BlockManagerImpl) scm.getScmBlockManager();
-    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS,
-        scm.getSafeModeHandler());
     DatanodeCommandHandler handler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, handler);
     CloseContainerEventHandler closeContainerHandler =
@@ -132,19 +138,19 @@ public class TestBlockManager {
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     factor = HddsProtos.ReplicationFactor.THREE;
     type = HddsProtos.ReplicationType.RATIS;
+
+    blockManager.setSafeModeStatus(false);
   }
 
   @After
-  public void cleanup() throws IOException {
+  public void cleanup() {
     scm.stop();
+    scm.join();
+    eventQueue.close();
   }
 
   @Test
   public void testAllocateBlock() throws Exception {
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-    GenericTestUtils.waitFor(() -> {
-      return !blockManager.isScmInSafeMode();
-    }, 10, 1000 * 5);
     pipelineManager.createPipeline(type, factor);
     TestUtils.openAllRatisPipelines(pipelineManager);
     AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
@@ -154,10 +160,6 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockWithExclusion() throws Exception {
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-    GenericTestUtils.waitFor(() -> {
-      return !blockManager.isScmInSafeMode();
-    }, 10, 1000 * 5);
     try {
       while (true) {
         pipelineManager.createPipeline(type, factor);
@@ -188,10 +190,6 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockInParallel() throws Exception {
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-    GenericTestUtils.waitFor(() -> {
-      return !blockManager.isScmInSafeMode();
-    }, 10, 1000 * 5);
     int threadCount = 20;
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
@@ -226,10 +224,6 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateOversizedBlock() throws Exception {
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-    GenericTestUtils.waitFor(() -> {
-      return !blockManager.isScmInSafeMode();
-    }, 10, 1000 * 5);
     long size = 6 * GB;
     thrown.expectMessage("Unsupported block size");
     AllocatedBlock block = blockManager.allocateBlock(size,
@@ -239,11 +233,7 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockFailureInSafeMode() throws Exception {
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS,
-        new SafeModeStatus(true));
-    GenericTestUtils.waitFor(() -> {
-      return blockManager.isScmInSafeMode();
-    }, 10, 1000 * 5);
+    blockManager.setSafeModeStatus(true);
     // Test1: In safe mode expect an SCMException.
     thrown.expectMessage("SafeModePrecheck failed for "
         + "allocateBlock");
@@ -254,10 +244,6 @@ public class TestBlockManager {
   @Test
   public void testAllocateBlockSucInSafeMode() throws Exception {
     // Test2: Exit safe mode and then try allocateBock again.
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-    GenericTestUtils.waitFor(() -> {
-      return !blockManager.isScmInSafeMode();
-    }, 10, 1000 * 5);
     Assert.assertNotNull(blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
         type, factor, OzoneConsts.OZONE, new ExcludeList()));
   }
@@ -265,9 +251,6 @@ public class TestBlockManager {
   @Test(timeout = 10000)
   public void testMultipleBlockAllocation()
       throws IOException, TimeoutException, InterruptedException {
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-    GenericTestUtils
-        .waitFor(() -> !blockManager.isScmInSafeMode(), 10, 1000 * 5);
 
     pipelineManager.createPipeline(type, factor);
     pipelineManager.createPipeline(type, factor);
@@ -308,10 +291,6 @@ public class TestBlockManager {
   @Test(timeout = 10000)
   public void testMultipleBlockAllocationWithClosedContainer()
       throws IOException, TimeoutException, InterruptedException {
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-    GenericTestUtils
-        .waitFor(() -> !blockManager.isScmInSafeMode(), 10, 1000 * 5);
-
     // create pipelines
     for (int i = 0;
          i < nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size() / factor
@@ -362,10 +341,6 @@ public class TestBlockManager {
   @Test(timeout = 10000)
   public void testBlockAllocationWithNoAvailablePipelines()
       throws IOException, TimeoutException, InterruptedException {
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-    GenericTestUtils
-        .waitFor(() -> !blockManager.isScmInSafeMode(), 10, 1000 * 5);
-
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
       pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     }

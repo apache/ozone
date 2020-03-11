@@ -124,6 +124,7 @@ public class RpcClient implements ClientProtocol {
   private final UserGroupInformation ugi;
   private final ACLType userRights;
   private final ACLType groupRights;
+  private final int streamBufferSize;
   private final long streamBufferFlushSize;
   private final long streamBufferMaxSize;
   private final long blockSize;
@@ -176,6 +177,10 @@ public class RpcClient implements ClientProtocol {
     } else {
       chunkSize = configuredChunkSize;
     }
+    streamBufferSize = (int) conf
+        .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE,
+            OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT,
+            StorageUnit.BYTES);
     streamBufferFlushSize = (long) conf
         .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
             OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE_DEFAULT,
@@ -882,6 +887,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(openKey.getKeyInfo().getType())
             .setFactor(openKey.getKeyInfo().getFactor())
+            .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferMaxSize(streamBufferMaxSize)
             .setBlockSize(blockSize)
@@ -1184,6 +1190,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
             .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+            .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferMaxSize(streamBufferMaxSize)
             .setBlockSize(blockSize)

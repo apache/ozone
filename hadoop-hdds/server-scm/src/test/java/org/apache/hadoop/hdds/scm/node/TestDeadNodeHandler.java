@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -30,7 +33,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -59,14 +61,12 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
  * Test DeadNodeHandler.
@@ -89,7 +89,6 @@ public class TestDeadNodeHandler {
     storageDir = GenericTestUtils.getTempPath(
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
-    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 0);
     eventQueue = new EventQueue();
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
@@ -98,7 +97,7 @@ public class TestDeadNodeHandler {
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
-    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+    pipelineManager.setPipelineProvider(RATIS,
         mockRatisProvider);
     containerManager = scm.getContainerManager();
     deadNodeHandler = new DeadNodeHandler(nodeManager,
@@ -116,8 +115,7 @@ public class TestDeadNodeHandler {
   }
 
   @Test
-  @Ignore("Tracked by HDDS-2508.")
-  public void testOnMessage() throws IOException, NodeNotFoundException {
+  public void testOnMessage() throws Exception {
     //GIVEN
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
@@ -154,6 +152,8 @@ public class TestDeadNodeHandler {
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
 
+    LambdaTestUtils.await(120000, 10000,
+        () -> pipelineManager.getPipelines(RATIS, THREE).size() == 3);
     TestUtils.openAllRatisPipelines(pipelineManager);
 
     ContainerInfo container1 =

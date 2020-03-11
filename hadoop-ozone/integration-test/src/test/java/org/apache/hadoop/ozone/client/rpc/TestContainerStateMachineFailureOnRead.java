@@ -121,7 +121,7 @@ public class TestContainerStateMachineFailureOnRead {
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
-    OzoneClient client = OzoneClientFactory.getClient(conf);
+    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
     bucketName = volumeName;

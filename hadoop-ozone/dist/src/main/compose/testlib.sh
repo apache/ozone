@@ -99,7 +99,7 @@ execute_robot_test(){
   OUTPUT_PATH="$RESULT_DIR_INSIDE/robot-$OUTPUT_NAME.xml"
   # shellcheck disable=SC2068
   docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose -f "$COMPOSE_FILE" exec -T -e  SECURITY_ENABLED="${SECURITY_ENABLED}" "$CONTAINER" python -m robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+    && docker-compose -f "$COMPOSE_FILE" exec -T -e SECURITY_ENABLED="${SECURITY_ENABLED}" -e OM_HA_PARAM="${OM_HA_PARAM}" "$CONTAINER" python -m robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
   FULL_CONTAINER_NAME=$(docker-compose -f "$COMPOSE_FILE" ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
@@ -122,6 +122,52 @@ execute_command_in_container(){
   # shellcheck disable=SC2068
   docker-compose -f "$COMPOSE_FILE" exec -T "$@"
   set +e
+}
+
+## @description Stop a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+stop_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" --no-ansi stop $@
+  set +e
+}
+
+
+## @description Start a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+start_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" --no-ansi start $@
+  set +e
+}
+
+
+## @description wait until the port is available on the given host
+## @param The host to check for the port
+## @param The port to check for
+## @param The maximum time to wait in seconds
+wait_for_port(){
+  local host=$1
+  local port=$2
+  local timeout=$3
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     set +e
+     docker-compose -f "${COMPOSE_FILE}" exec -T scm /bin/bash -c "nc -z $host $port"
+     status=$?
+     set -e
+     if [ $status -eq 0 ] ; then
+         echo "Port $port is available on $host"
+         return;
+     fi
+     echo "Port $port is not available on $host yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $host $port to become available"
+   return 1
 }
 
 

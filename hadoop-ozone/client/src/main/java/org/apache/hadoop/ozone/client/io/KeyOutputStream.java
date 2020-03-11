@@ -124,16 +124,17 @@ public class KeyOutputStream extends OutputStream {
       XceiverClientManager xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationFactor factor, ReplicationType type,
-      long bufferFlushSize, long bufferMaxSize, long size, long watchTimeout,
+      int bufferSize, long bufferFlushSize, long bufferMaxSize,
+      long size, long watchTimeout,
       ChecksumType checksumType, int bytesPerChecksum,
       String uploadID, int partNumber, boolean isMultipart,
       int maxRetryCount, long retryInterval) {
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(omClient, chunkSize, requestId, factor,
-            type, bufferFlushSize, bufferMaxSize, size, watchTimeout,
-            checksumType, bytesPerChecksum, uploadID, partNumber, isMultipart,
-            info, xceiverClientManager, handler.getId());
+            type, bufferSize, bufferFlushSize, bufferMaxSize, size,
+            watchTimeout, checksumType, bytesPerChecksum, uploadID, partNumber,
+            isMultipart, info, xceiverClientManager, handler.getId());
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
     this.feInfo = info.getFileEncryptionInfo();
@@ -539,6 +540,7 @@ public class KeyOutputStream extends OutputStream {
     private String requestID;
     private ReplicationType type;
     private ReplicationFactor factor;
+    private int streamBufferSize;
     private long streamBufferFlushSize;
     private long streamBufferMaxSize;
     private long blockSize;
@@ -596,6 +598,11 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public Builder setStreamBufferSize(int size) {
+      this.streamBufferSize = size;
+      return this;
+    }
+
     public Builder setStreamBufferFlushSize(long size) {
       this.streamBufferFlushSize = size;
       return this;
@@ -638,8 +645,9 @@ public class KeyOutputStream extends OutputStream {
 
     public KeyOutputStream build() {
       return new KeyOutputStream(openHandler, xceiverManager, omClient,
-          chunkSize, requestID, factor, type, streamBufferFlushSize,
-          streamBufferMaxSize, blockSize, watchTimeout, checksumType,
+          chunkSize, requestID, factor, type,
+          streamBufferSize, streamBufferFlushSize, streamBufferMaxSize,
+          blockSize, watchTimeout, checksumType,
           bytesPerChecksum, multipartUploadID, multipartNumber, isMultipartKey,
           maxRetryCount, retryInterval);
     }

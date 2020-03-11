@@ -37,6 +37,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -115,7 +116,8 @@ public class TestTarContainerPacker {
     Files.createDirectories(dataDir);
 
     KeyValueContainerData containerData = new KeyValueContainerData(
-        id, -1, UUID.randomUUID().toString(), UUID.randomUUID().toString());
+        id, ChunkLayOutVersion.FILE_PER_CHUNK,
+        -1, UUID.randomUUID().toString(), UUID.randomUUID().toString());
     containerData.setChunksPath(dataDir.toString());
     containerData.setMetadataPath(dbDir.getParent().toString());
     containerData.setDbFile(dbDir.toFile());

@@ -387,6 +387,7 @@ public class RocksDBStore implements MetadataStore {
     }
     if (db != null) {
       db.close();
+      db = null;
     }
 
   }

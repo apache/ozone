@@ -119,7 +119,7 @@ public class Test2WayCommitInRatis {
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "watchforcommithandlingtest";
     bucketName = volumeName;

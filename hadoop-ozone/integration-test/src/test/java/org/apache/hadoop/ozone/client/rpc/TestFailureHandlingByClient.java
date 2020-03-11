@@ -126,7 +126,7 @@ public class TestFailureHandlingByClient {
         .setNumDatanodes(10).setTotalPipelineNumLimit(15).build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "datanodefailurehandlingtest";
