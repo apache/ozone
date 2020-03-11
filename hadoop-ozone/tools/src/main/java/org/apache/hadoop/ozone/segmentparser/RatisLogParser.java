@@ -28,8 +28,8 @@ import picocli.CommandLine;
     name = "ratislogparser",
     description = "Shell of printing Ratis Log in understandable text",
     subcommands = {
-        DatanodeParser.class,
-        GenericParser.class,
+        DatanodeRatisLogParser.class,
+        GenericRatisLogParser.class,
         //TODO: Add more parsers like for OM and SCM here.
     },
     versionProvider = HddsVersionProvider.class,

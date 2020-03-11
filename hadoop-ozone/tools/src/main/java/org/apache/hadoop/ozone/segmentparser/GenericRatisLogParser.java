@@ -30,7 +30,8 @@ import java.util.concurrent.Callable;
     description = "dump generic ratis segment file",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class GenericParser extends BaseLogParser implements Callable<Void> {
+public class GenericRatisLogParser extends BaseLogParser
+    implements Callable<Void> {
   @CommandLine.ParentCommand
   private RatisLogParser logParser;
 

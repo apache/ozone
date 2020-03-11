@@ -42,7 +42,7 @@ public abstract class BaseLogParser {
       ParseRatisLog prl = builder.build();
       prl.dumpSegmentFile();
     } catch (Exception e) {
-      System.out.println(DatanodeParser.class.getSimpleName()
+      System.out.println(DatanodeRatisLogParser.class.getSimpleName()
           + "failed with exception  " + e.toString());
     }
   }

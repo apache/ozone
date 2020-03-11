@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.dn.ratis;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.segmentparser.DatanodeParser;
+import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.After;
@@ -66,6 +66,7 @@ public class TestDnRatisLogParser {
     Assert.assertTrue(logFile.exists());
     Assert.assertTrue(logFile.isFile());
 
-    new DatanodeParser().parseRatisLogs(DatanodeParser::smToContainerLogString);
+    new DatanodeRatisLogParser()
+        .parseRatisLogs(DatanodeRatisLogParser::smToContainerLogString);
   }
 }

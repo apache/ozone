@@ -35,7 +35,8 @@ import java.util.concurrent.Callable;
     description = "dump datanode segment file",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class DatanodeParser extends BaseLogParser implements Callable<Void> {
+public class DatanodeRatisLogParser extends BaseLogParser
+    implements Callable<Void> {
   @CommandLine.ParentCommand
   private RatisLogParser logParser;
 
@@ -53,7 +54,7 @@ public class DatanodeParser extends BaseLogParser implements Callable<Void> {
     System.out.println("Dumping Datanode Ratis Log");
     System.out.println("Using Dummy PipelineID:" + DUMMY_PIPELINE_ID + "\n\n");
 
-    parseRatisLogs(DatanodeParser::smToContainerLogString);
+    parseRatisLogs(DatanodeRatisLogParser::smToContainerLogString);
     return null;
   }
 }
