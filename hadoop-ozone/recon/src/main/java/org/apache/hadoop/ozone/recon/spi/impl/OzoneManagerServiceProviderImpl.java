@@ -217,7 +217,13 @@ public class OzoneManagerServiceProviderImpl
         RECON_OM_SNAPSHOT_TASK_INTERVAL,
         RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-    scheduler.scheduleWithFixedDelay(this::syncDataFromOM,
+    scheduler.scheduleWithFixedDelay(() -> {
+      try {
+        syncDataFromOM();
+      } catch (Throwable t) {
+        LOG.error("Unexpected exception while syncing data from OM.", t);
+      }
+    },
         initialDelay,
         interval,
         TimeUnit.MILLISECONDS);
@@ -330,6 +336,7 @@ public class OzoneManagerServiceProviderImpl
   public void syncDataFromOM() {
     LOG.info("Syncing data from Ozone Manager.");
     long currentSequenceNumber = getCurrentOMDBSequenceNumber();
+    LOG.debug("Seq number of Recon's OM DB : {}", currentSequenceNumber);
     boolean fullSnapshot = false;
 
     if (currentSequenceNumber <= 0) {
@@ -350,8 +357,9 @@ public class OzoneManagerServiceProviderImpl
         // Pass on DB update events to tasks that are listening.
         reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
             omdbUpdatesHandler.getEvents()), omMetadataManager);
-      } catch (IOException | InterruptedException | RocksDBException e) {
+      } catch (InterruptedException intEx) {
         Thread.currentThread().interrupt();
+      } catch (Exception e) {
         LOG.warn("Unable to get and apply delta updates from OM.", e);
         fullSnapshot = true;
       }
@@ -374,9 +382,10 @@ public class OzoneManagerServiceProviderImpl
           LOG.info("Calling reprocess on Recon tasks.");
           reconTaskController.reInitializeTasks(omMetadataManager);
         }
-      } catch (IOException | InterruptedException e) {
+      } catch (InterruptedException intEx) {
         Thread.currentThread().interrupt();
-        LOG.error("Unable to update Recon's OM DB with new snapshot ", e);
+      } catch (Exception e) {
+        LOG.error("Unable to update Recon's metadata with new OM DB. ", e);
       }
     }
   }
