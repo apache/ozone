@@ -144,10 +144,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    * @param hddsDatanodes
    */
   MiniOzoneClusterImpl(OzoneConfiguration conf, StorageContainerManager scm,
-      List<HddsDatanodeService> hddsDatanodes) {
+      List<HddsDatanodeService> hddsDatanodes, ReconServer reconServer) {
     this.conf = conf;
     this.scm = scm;
     this.hddsDatanodes = hddsDatanodes;
+    this.reconServer = reconServer;
   }
 
   public OzoneConfiguration getConf() {
@@ -518,14 +519,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
         hddsDatanodes = createHddsDatanodes(scm);
 
-        MiniOzoneClusterImpl cluster;
-
-        if (includeRecon) {
-          cluster = new MiniOzoneClusterImpl(conf, om, scm, hddsDatanodes,
-              reconServer);
-        } else {
-          cluster = new MiniOzoneClusterImpl(conf, om, scm, hddsDatanodes);
-        }
+        MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf, om, scm,
+            hddsDatanodes, reconServer);
 
         cluster.setCAClient(certClient);
         if (startDataNodes) {
@@ -769,7 +764,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       GenericTestUtils.setRootLogLevel(Level.INFO);
     }
 
-    private void configureRecon() throws IOException {
+    protected void configureRecon() throws IOException {
       ConfigurationProvider.resetConfiguration();
 
       TemporaryFolder tempFolder = new TemporaryFolder();

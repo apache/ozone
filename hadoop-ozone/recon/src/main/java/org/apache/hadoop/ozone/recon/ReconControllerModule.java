@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_AUTO_COMMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_CONNECTION_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_DB_DRIVER;
@@ -140,7 +141,9 @@ public class ReconControllerModule extends AbstractModule {
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       ozoneManagerClient = new
           OzoneManagerProtocolClientSideTranslatorPB(
-          ozoneConfiguration, clientId.toString(), null, ugi);
+          ozoneConfiguration, clientId.toString(),
+          ozoneConfiguration.get(OZONE_OM_INTERNAL_SERVICE_ID),
+          ugi);
     } catch (IOException ioEx) {
       LOG.error("Error in provisioning OzoneManagerProtocol ", ioEx);
     }

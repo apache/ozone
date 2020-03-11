@@ -90,8 +90,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
-      LOG.error("Unable to initialize Recon OM DB snapshot store.",
-          ioEx);
+      LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
       initializeOmTables();
