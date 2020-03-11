@@ -247,23 +247,29 @@ public class ContainerStateManager {
       final HddsProtos.ReplicationType type,
       final HddsProtos.ReplicationFactor replicationFactor, final String owner)
       throws IOException {
-
+    final List<Pipeline> pipelines = pipelineManager
+        .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
     Pipeline pipeline;
-    try {
-      // TODO: #CLUTIL remove creation logic when all replication types and
-      // factors are handled by pipeline creator job.
-      pipeline = pipelineManager.createPipeline(type, replicationFactor);
-      pipelineManager.waitPipelineReady(pipeline.getId(), 0);
-    } catch (IOException e) {
-      final List<Pipeline> pipelines = pipelineManager
-          .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
-      if (pipelines.isEmpty()) {
-        throw new IOException("Could not allocate container. Cannot get any" +
-            " matching pipeline for Type:" + type +
-            ", Factor:" + replicationFactor + ", State:PipelineState.OPEN");
-      }
+
+    if (!pipelines.isEmpty() && replicationFactor == ReplicationFactor.THREE
+        && type == ReplicationType.RATIS) {
+      // Let background create Ratis THREE pipelines.
       pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
+    } else {
+      try {
+        pipeline = pipelineManager.createPipeline(type, replicationFactor);
+        pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+      } catch (IOException e) {
+
+        if (pipelines.isEmpty()) {
+          throw new IOException("Could not allocate container. Cannot get any" +
+              " matching pipeline for Type:" + type +
+              ", Factor:" + replicationFactor + ", State:PipelineState.OPEN");
+        }
+        pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
+      }
     }
+
     synchronized (pipeline) {
       return allocateContainer(pipelineManager, owner, pipeline);
     }
