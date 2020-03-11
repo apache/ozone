@@ -47,8 +47,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * HddsVolume represents volume in a datanode. {@link VolumeSet} maintains a
- * list of HddsVolumes, one for each volume in the Datanode.
+ * HddsVolume represents volume in a datanode. {@link MutableVolumeSet}
+ * maintains a list of HddsVolumes, one for each volume in the Datanode.
  * {@link VolumeInfo} in encompassed by this class.
  * <p>
  * The disk layout per volume is as follows:

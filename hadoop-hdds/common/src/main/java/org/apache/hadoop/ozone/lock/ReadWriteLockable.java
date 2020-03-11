@@ -15,15 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.container.common.volume;
-
-import org.apache.hadoop.ozone.lock.ReadWriteLockable;
-
-import java.util.List;
+package org.apache.hadoop.ozone.lock;
 
 /**
- * Set of HDDS volumes.
+ * Interface for objects with a read-write lock.
  */
-public interface VolumeSet extends ReadWriteLockable {
-  List<HddsVolume> getVolumesList();
+public interface ReadWriteLockable {
+  void readLock();
+
+  void readUnlock();
+
+  void writeLock();
+
+  void writeUnlock();
 }

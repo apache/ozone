@@ -18,42 +18,40 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 
-import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+
+import java.util.List;
 
 /**
  * Defines layout versions for the Chunks.
  */
+public enum ChunkLayOutVersion {
 
-public final class ChunkLayOutVersion {
+  FILE_PER_CHUNK(1, "One file per chunk"),
+  FILE_PER_BLOCK(2, "One file per block");
 
-  private final static ChunkLayOutVersion[] CHUNK_LAYOUT_VERSION_INFOS =
-      {new ChunkLayOutVersion(1, "Data without checksums.")};
+  private static final ChunkLayOutVersion
+      DEFAULT_LAYOUT = ChunkLayOutVersion.FILE_PER_BLOCK;
 
-  private int version;
-  private String description;
+  private static final List<ChunkLayOutVersion> CHUNK_LAYOUT_VERSIONS =
+      ImmutableList.copyOf(values());
 
+  private final int version;
+  private final String description;
 
-  /**
-   * Never created outside this class.
-   *
-   * @param description -- description
-   * @param version     -- version number
-   */
-  private ChunkLayOutVersion(int version, String description) {
+  ChunkLayOutVersion(int version, String description) {
     this.version = version;
     this.description = description;
   }
 
   /**
-   * Return ChunkLayOutVersion object for the chunkVersion.
-   * @param chunkVersion
-   * @return ChunkLayOutVersion
+   * Return ChunkLayOutVersion object for the numeric chunkVersion.
    */
   public static ChunkLayOutVersion getChunkLayOutVersion(int chunkVersion) {
-    Preconditions.checkArgument((chunkVersion <= ChunkLayOutVersion
-        .getLatestVersion().getVersion()));
-    for(ChunkLayOutVersion chunkLayOutVersion : CHUNK_LAYOUT_VERSION_INFOS) {
-      if(chunkLayOutVersion.getVersion() == chunkVersion) {
+    for (ChunkLayOutVersion chunkLayOutVersion : CHUNK_LAYOUT_VERSIONS) {
+      if (chunkLayOutVersion.getVersion() == chunkVersion) {
         return chunkLayOutVersion;
       }
     }
@@ -61,38 +59,40 @@ public final class ChunkLayOutVersion {
   }
 
   /**
-   * Returns all versions.
-   *
-   * @return Version info array.
+   * @return list of all versions.
    */
-  public static ChunkLayOutVersion[] getAllVersions() {
-    return CHUNK_LAYOUT_VERSION_INFOS.clone();
+  public static List<ChunkLayOutVersion> getAllVersions() {
+    return CHUNK_LAYOUT_VERSIONS;
   }
 
   /**
-   * Returns the latest version.
-   *
-   * @return versionInfo
+   * @return the latest version.
    */
-  public static ChunkLayOutVersion getLatestVersion() {
-    return CHUNK_LAYOUT_VERSION_INFOS[CHUNK_LAYOUT_VERSION_INFOS.length - 1];
+  public static ChunkLayOutVersion getConfiguredVersion(Configuration conf) {
+    try {
+      return conf.getEnum(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY,
+          DEFAULT_LAYOUT);
+    } catch (IllegalArgumentException e) {
+      return DEFAULT_LAYOUT;
+    }
   }
 
   /**
-   * Return version.
-   *
-   * @return int
+   * @return version number.
    */
   public int getVersion() {
     return version;
   }
 
   /**
-   * Returns description.
-   * @return String
+   * @return description.
    */
   public String getDescription() {
     return description;
   }
 
+  @Override
+  public String toString() {
+    return "ChunkLayout:v" + version;
+  }
 }

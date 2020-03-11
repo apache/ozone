@@ -200,9 +200,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 1,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 1,
+    Assert.assertEquals(putBlockCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 2,
+    Assert.assertEquals(totalOpCount + 3,
         metrics.getTotalOpCount());
 
     // make sure the bufferPool is empty
@@ -301,9 +301,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 1,
+    Assert.assertEquals(putBlockCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 3,
+    Assert.assertEquals(totalOpCount + 4,
         metrics.getTotalOpCount());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
@@ -396,9 +396,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 1,
+    Assert.assertEquals(putBlockCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 3,
+    Assert.assertEquals(totalOpCount + 4,
         metrics.getTotalOpCount());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
@@ -566,9 +566,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 4,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 2,
+    Assert.assertEquals(putBlockCount + 3,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 6,
+    Assert.assertEquals(totalOpCount + 7,
         metrics.getTotalOpCount());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
@@ -674,9 +674,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 5,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 3,
+    Assert.assertEquals(putBlockCount + 4,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 8,
+    Assert.assertEquals(totalOpCount + 9,
         metrics.getTotalOpCount());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());

@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -62,7 +63,8 @@ public class TestContainerDataYaml {
     String containerPath = containerID + ".container";
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
-        containerID, MAXSIZE, UUID.randomUUID().toString(),
+        containerID, FILE_PER_CHUNK, MAXSIZE,
+        UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     keyValueContainerData.setContainerDBType(CONTAINER_DB_TYPE);
     keyValueContainerData.setMetadataPath(testRoot);
@@ -102,7 +104,7 @@ public class TestContainerDataYaml {
     assertEquals(containerFile.getParent(), kvData.getChunksPath());
     assertEquals(ContainerProtos.ContainerDataProto.State.OPEN, kvData
         .getState());
-    assertEquals(1, kvData.getLayOutVersion());
+    assertEquals(FILE_PER_CHUNK, kvData.getLayOutVersion());
     assertEquals(0, kvData.getMetadata().size());
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertEquals(MAXSIZE, kvData.getMaxSize());
@@ -133,7 +135,7 @@ public class TestContainerDataYaml {
     assertEquals(containerFile.getParent(), kvData.getChunksPath());
     assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
         .getState());
-    assertEquals(1, kvData.getLayOutVersion());
+    assertEquals(FILE_PER_CHUNK, kvData.getLayOutVersion());
     assertEquals(2, kvData.getMetadata().size());
     assertEquals(VOLUME_OWNER, kvData.getMetadata().get(OzoneConsts.VOLUME));
     assertEquals(OzoneConsts.OZONE,
@@ -189,7 +191,7 @@ public class TestContainerDataYaml {
           .getChunksPath());
       assertEquals("/hdds/current/aed-fg4-hji-jkl/containerDir0/1", kvData
           .getMetadataPath());
-      assertEquals(1, kvData.getLayOutVersion());
+      assertEquals(FILE_PER_CHUNK, kvData.getLayOutVersion());
       assertEquals(2, kvData.getMetadata().size());
 
     } catch (Exception ex) {

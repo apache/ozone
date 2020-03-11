@@ -29,8 +29,9 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -67,7 +68,7 @@ public class TestKeyValueBlockIterator {
 
   private KeyValueContainer container;
   private KeyValueContainerData containerData;
-  private VolumeSet volumeSet;
+  private MutableVolumeSet volumeSet;
   private Configuration conf;
   private File testRoot;
 
@@ -90,7 +91,7 @@ public class TestKeyValueBlockIterator {
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
-    volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
+    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
   }
 
 
@@ -249,6 +250,7 @@ public class TestKeyValueBlockIterator {
       normalBlocks, int deletedBlocks) throws
       Exception {
     containerData = new KeyValueContainerData(containerId,
+        ChunkLayOutVersion.FILE_PER_CHUNK,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     container = new KeyValueContainer(containerData, conf);

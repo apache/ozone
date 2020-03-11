@@ -123,6 +123,12 @@ public final class OzoneConfigKeys {
    * */
   public static final String OZONE_ADMINISTRATORS_WILDCARD = "*";
 
+  public static final String OZONE_CLIENT_STREAM_BUFFER_SIZE =
+      "ozone.client.stream.buffer.size";
+
+  public static final String OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT =
+      "4MB";
+
   public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE =
       "ozone.client.stream.buffer.flush.size";
 

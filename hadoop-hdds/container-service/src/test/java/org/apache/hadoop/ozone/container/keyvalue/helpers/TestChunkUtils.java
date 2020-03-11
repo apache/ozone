@@ -41,11 +41,12 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
+
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.fail;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,11 +68,11 @@ public class TestChunkUtils {
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "concurrent");
     try {
-      ChunkInfo chunkInfo = new ChunkInfo(tempFile.toString(),
-          0, data.limit());
+      long len = data.limit();
+      long offset = 0;
       File file = tempFile.toFile();
       VolumeIOStats stats = new VolumeIOStats();
-      ChunkUtils.writeData(file, chunkInfo, data, stats, true);
+      ChunkUtils.writeData(file, data, offset, len, stats, true);
       int threads = 10;
       ExecutorService executor = new ThreadPoolExecutor(threads, threads,
           0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
@@ -81,12 +82,14 @@ public class TestChunkUtils {
         final int threadNumber = i;
         executor.execute(() -> {
           try {
-            ByteBuffer readBuffer = ChunkUtils.readData(file, chunkInfo, stats);
+            ByteBuffer readBuffer = ByteBuffer.allocate((int) len);
+            ChunkUtils.readData(file, readBuffer, offset, len, stats);
             LOG.info("Read data ({}): {}", threadNumber,
                 new String(readBuffer.array()));
             if (!Arrays.equals(array, readBuffer.array())) {
               failed.set(true);
             }
+            assertEquals(len, readBuffer.remaining());
           } catch (Exception e) {
             LOG.error("Failed to read data ({})", threadNumber, e);
             failed.set(true);
@@ -100,7 +103,6 @@ public class TestChunkUtils {
       } finally {
         executor.shutdownNow();
       }
-      assertEquals(threads * stats.getWriteBytes(), stats.getReadBytes());
       assertFalse(failed.get());
     } finally {
       Files.deleteIfExists(tempFile);
@@ -153,14 +155,15 @@ public class TestChunkUtils {
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
     Path tempFile = Files.createTempFile(PREFIX, "serial");
     try {
-      ChunkInfo chunkInfo = new ChunkInfo(tempFile.toString(),
-          0, data.limit());
       File file = tempFile.toFile();
       VolumeIOStats stats = new VolumeIOStats();
-      ChunkUtils.writeData(file, chunkInfo, data, stats, true);
-      ByteBuffer readBuffer = ChunkUtils.readData(file, chunkInfo, stats);
+      long len = data.limit();
+      long offset = 0;
+      ChunkUtils.writeData(file, data, offset, len, stats, true);
+      ByteBuffer readBuffer = ByteBuffer.allocate((int) len);
+      ChunkUtils.readData(file, readBuffer, offset, len, stats);
       assertArrayEquals(array, readBuffer.array());
-      assertEquals(stats.getWriteBytes(), stats.getReadBytes());
+      assertEquals(len, readBuffer.remaining());
     } catch (Exception e) {
       LOG.error("Failed to read data", e);
     } finally {
@@ -185,15 +188,20 @@ public class TestChunkUtils {
 
   @Test
   public void readMissingFile() throws Exception {
-    try {
-      ChunkInfo chunkInfo =
-          new ChunkInfo("chunk_name", 0, 123);
-      ChunkUtils
-          .readData(new File("nosuchfile"), chunkInfo, new VolumeIOStats());
-      fail("Exception is Expected");
-    } catch (StorageContainerException ex) {
-      Assert.assertEquals(UNABLE_TO_FIND_CHUNK, ex.getResult());
-    }
+    // given
+    int len = 123;
+    int offset = 0;
+    File nonExistentFile = new File("nosuchfile");
+    ByteBuffer buf = ByteBuffer.allocate(len);
+    VolumeIOStats stats = new VolumeIOStats();
+
+    // when
+    StorageContainerException e = LambdaTestUtils.intercept(
+        StorageContainerException.class,
+        () -> ChunkUtils.readData(nonExistentFile, buf, offset, len, stats));
+
+    // then
+    Assert.assertEquals(UNABLE_TO_FIND_CHUNK, e.getResult());
   }
 
 }

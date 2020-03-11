@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -75,7 +76,8 @@ public class TestCloseContainerCommandHandler {
 
     pipelineID = PipelineID.randomId();
 
-    KeyValueContainerData data = new KeyValueContainerData(CONTAINER_ID, GB,
+    KeyValueContainerData data = new KeyValueContainerData(CONTAINER_ID,
+        ChunkLayOutVersion.FILE_PER_CHUNK, GB,
         pipelineID.getId().toString(), null);
 
     container = new KeyValueContainer(data, new OzoneConfiguration());
