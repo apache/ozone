@@ -41,23 +41,28 @@ import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+
+import java.io.IOException;
+
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
 
 /**
  * Test for PipelinePlacementPolicy.
  */
 public class TestPipelinePlacementPolicy {
   private MockNodeManager nodeManager;
+  private PipelineStateManager stateManager;
   private OzoneConfiguration conf;
   private PipelinePlacementPolicy placementPolicy;
   private NetworkTopologyImpl cluster;
   private static final int PIPELINE_PLACEMENT_MAX_NODES_COUNT = 10;
+  private static final int PIPELINE_LOAD_LIMIT = 5;
 
   private List<DatanodeDetails> nodesWithOutRackAwareness = new ArrayList<>();
   private List<DatanodeDetails> nodesWithRackAwareness = new ArrayList<>();
@@ -69,9 +74,10 @@ public class TestPipelinePlacementPolicy {
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     conf = new OzoneConfiguration();
-    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 5);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
+    stateManager = new PipelineStateManager();
     placementPolicy = new PipelinePlacementPolicy(
-        nodeManager, new PipelineStateManager(), conf);
+        nodeManager, stateManager, conf);
   }
 
   private NetworkTopologyImpl initTopology() {
@@ -148,6 +154,45 @@ public class TestPipelinePlacementPolicy {
         results.get(2).getNetworkLocation());
   }
   
+  @Test
+  public void testPickLowestLoadAnchor() throws IOException{
+    List<DatanodeDetails> healthyNodes = nodeManager
+        .getNodes(HddsProtos.NodeState.HEALTHY);
+
+    int maxPipelineCount = PIPELINE_LOAD_LIMIT * healthyNodes.size()
+        / HddsProtos.ReplicationFactor.THREE.getNumber();
+    for (int i = 0; i < maxPipelineCount; i++) {
+      try {
+        List<DatanodeDetails> nodes = placementPolicy.chooseDatanodes(null,
+            null, HddsProtos.ReplicationFactor.THREE.getNumber(), 0);
+
+        Pipeline pipeline = Pipeline.newBuilder()
+            .setId(PipelineID.randomId())
+            .setState(Pipeline.PipelineState.ALLOCATED)
+            .setType(HddsProtos.ReplicationType.RATIS)
+            .setFactor(HddsProtos.ReplicationFactor.THREE)
+            .setNodes(nodes)
+            .build();
+        nodeManager.addPipeline(pipeline);
+        stateManager.addPipeline(pipeline);
+      } catch (SCMException e) {
+        break;
+      }
+    }
+
+    // Should max out pipeline usage
+    Assert.assertEquals(maxPipelineCount,
+        stateManager.getPipelines(HddsProtos.ReplicationType.RATIS).size());
+
+    // Every node should be equally using up the limit.
+    int averageLoadOnNode = maxPipelineCount *
+        HddsProtos.ReplicationFactor.THREE.getNumber() / healthyNodes.size();
+    for (DatanodeDetails node : healthyNodes) {
+      Assert.assertTrue(nodeManager.getPipelinesCount(node)
+          >= averageLoadOnNode);
+    }
+  }
+
   @Test
   public void testChooseNodeBasedOnRackAwareness() {
     List<DatanodeDetails> healthyNodes = overWriteLocationInNodes(

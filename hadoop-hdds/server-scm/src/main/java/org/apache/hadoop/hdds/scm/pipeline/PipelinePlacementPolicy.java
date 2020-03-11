@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.Node;
@@ -320,6 +319,50 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     return results;
   }
 
+  private DatanodeDetails randomPick(List<DatanodeDetails> healthyNodes) {
+    DatanodeDetails datanodeDetails;
+    int firstNodeNdx = getRand().nextInt(healthyNodes.size());
+    int secondNodeNdx = getRand().nextInt(healthyNodes.size());
+
+    // There is a possibility that both numbers will be same.
+    // if that is so, we just return the node.
+    if (firstNodeNdx == secondNodeNdx) {
+      datanodeDetails = healthyNodes.get(firstNodeNdx);
+    } else {
+      DatanodeDetails firstNodeDetails = healthyNodes.get(firstNodeNdx);
+      DatanodeDetails secondNodeDetails = healthyNodes.get(secondNodeNdx);
+      datanodeDetails = nodeManager.getPipelinesCount(firstNodeDetails)
+          >= nodeManager.getPipelinesCount(secondNodeDetails)
+          ? secondNodeDetails : firstNodeDetails;
+    }
+    return datanodeDetails;
+  }
+
+  private List<DatanodeDetails> getLowerLoadNodes(
+      List<DatanodeDetails> nodes, int num) {
+    int maxPipelineUsage = nodes.size() * heavyNodeCriteria /
+        HddsProtos.ReplicationFactor.THREE.getNumber();
+    return nodes.stream()
+        // Skip the nodes which exceeds the load limit.
+        .filter(p -> nodeManager.getPipelinesCount(p) < num - maxPipelineUsage)
+        .collect(Collectors.toList());
+  }
+
+  private DatanodeDetails lowerLoadPick(List<DatanodeDetails> healthyNodes) {
+    int curPipelineCounts =  stateManager
+        .getPipelines(HddsProtos.ReplicationType.RATIS).size();
+    DatanodeDetails datanodeDetails;
+    List<DatanodeDetails> nodes = getLowerLoadNodes(
+        healthyNodes, curPipelineCounts);
+    if (nodes.isEmpty()) {
+      // random pick node if nodes load is at same level.
+      datanodeDetails = randomPick(healthyNodes);
+    } else {
+      datanodeDetails = nodes.stream().findFirst().get();
+    }
+    return datanodeDetails;
+  }
+
   /**
    * Find a node from the healthy list and return it after removing it from the
    * list that we are operating on.
@@ -333,24 +376,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     if (healthyNodes == null || healthyNodes.isEmpty()) {
       return null;
     }
-    int firstNodeNdx = getRand().nextInt(healthyNodes.size());
-    int secondNodeNdx = getRand().nextInt(healthyNodes.size());
-
-    DatanodeDetails datanodeDetails;
-    // There is a possibility that both numbers will be same.
-    // if that is so, we just return the node.
-    if (firstNodeNdx == secondNodeNdx) {
-      datanodeDetails = healthyNodes.get(firstNodeNdx);
-    } else {
-      DatanodeDetails firstNodeDetails = healthyNodes.get(firstNodeNdx);
-      DatanodeDetails secondNodeDetails = healthyNodes.get(secondNodeNdx);
-      SCMNodeMetric firstNodeMetric =
-          nodeManager.getNodeStat(firstNodeDetails);
-      SCMNodeMetric secondNodeMetric =
-          nodeManager.getNodeStat(secondNodeDetails);
-      datanodeDetails = firstNodeMetric.isGreater(secondNodeMetric.get())
-          ? firstNodeDetails : secondNodeDetails;
-    }
+    DatanodeDetails datanodeDetails = lowerLoadPick(healthyNodes);
     healthyNodes.remove(datanodeDetails);
     return datanodeDetails;
   }
@@ -373,14 +399,14 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       return null;
     }
 
-    for (DatanodeDetails node : healthyNodes) {
-      if (excludedNodes.contains(node) ||
-          anchor.getNetworkLocation().equals(node.getNetworkLocation())) {
-        continue;
-      } else {
-        return node;
-      }
+    List<DatanodeDetails> nodesOnOtherRack = healthyNodes.stream().filter(
+        p -> !excludedNodes.contains(p)
+            && !anchor.getNetworkLocation().equals(p.getNetworkLocation()))
+        .collect(Collectors.toList());
+    if (!nodesOnOtherRack.isEmpty()) {
+      return lowerLoadPick(nodesOnOtherRack);
     }
+
     return null;
   }
 
@@ -414,6 +440,16 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     Collection<Node> excluded = new ArrayList<>();
     if (excludedNodes != null && excludedNodes.size() != 0) {
       excluded.addAll(excludedNodes);
+    }
+
+    List<DatanodeDetails> healthyNodes = nodeManager.getNodes(
+        HddsProtos.NodeState.HEALTHY);
+    List<DatanodeDetails> lowerLoadNodes = getLowerLoadNodes(healthyNodes,
+        stateManager.getPipelines(HddsProtos.ReplicationType.RATIS).size());
+    if (!lowerLoadNodes.isEmpty()) {
+      // Consider nodes with lower load first.
+      lowerLoadNodes.stream().forEach(p->healthyNodes.remove(p));
+      excludedNodes.addAll(healthyNodes);
     }
 
     Node pick = networkTopology.chooseRandom(
