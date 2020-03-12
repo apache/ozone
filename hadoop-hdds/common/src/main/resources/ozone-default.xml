@@ -2204,7 +2204,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.http.kerberos.keytab.file</name>
+    <name>ozone.recon.keytab.file</name>
     <value/>
     <tag>RECON, SECURITY</tag>
     <description>
