@@ -118,6 +118,7 @@ public class ContainerStateManager {
       HddsProtos.LifeCycleEvent> stateMachine;
 
   private final long containerSize;
+  private final boolean autoCreateRatisOne;
   private final ConcurrentHashMap<ContainerState, ContainerID> lastUsedMap;
   private final ContainerStateMap containers;
   private final AtomicLong containerCount;
@@ -149,6 +150,9 @@ public class ContainerStateManager {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
+    this.autoCreateRatisOne = configuration.getBoolean(
+            ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
     this.lastUsedMap = new ConcurrentHashMap<>();
     this.containerCount = new AtomicLong(0);
@@ -251,9 +255,13 @@ public class ContainerStateManager {
         .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
     Pipeline pipeline;
 
-    if (!pipelines.isEmpty() && replicationFactor == ReplicationFactor.THREE
-        && type == ReplicationType.RATIS) {
-      // Let background create Ratis THREE pipelines.
+    boolean bgCreateOne = (type == ReplicationType.RATIS) && replicationFactor
+        == ReplicationFactor.ONE && autoCreateRatisOne;
+    boolean bgCreateThree = (type == ReplicationType.RATIS) && replicationFactor
+        == ReplicationFactor.THREE;
+
+    if (!pipelines.isEmpty() && (bgCreateOne || bgCreateThree)) {
+      // let background create Ratis pipelines.
       pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
     } else {
       try {
