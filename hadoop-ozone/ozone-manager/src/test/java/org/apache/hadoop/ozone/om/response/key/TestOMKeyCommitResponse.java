@@ -53,7 +53,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
     OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
-        omResponse, omKeyInfo, clientID);
+        omResponse, omKeyInfo, openKey);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -79,18 +79,18 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
             .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
             .build();
 
+    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, clientID);
+
     OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
-        omResponse, omKeyInfo, clientID);
+        omResponse, omKeyInfo, openKey);
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.
     TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, omMetadataManager);
 
-    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, clientID);
     Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
-
 
     omKeyCommitResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
