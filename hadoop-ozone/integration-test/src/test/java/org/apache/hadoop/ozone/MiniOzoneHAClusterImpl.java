@@ -71,7 +71,7 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    *
    * @throws IOException if there is an I/O error
    */
-  @SuppressWarnings("parameternumber")
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
       Map<String, OzoneManager> omMap,
