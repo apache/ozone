@@ -61,8 +61,6 @@ public class TestReconWithOzoneManagerHA {
         .setNumDatanodes(1)
         .setNumOfOzoneManagers(3)
         .includeRecon(true)
-        .setReconHttpPort(NetUtils.getFreeSocketPort())
-        .setReconDatanodePort(NetUtils.getFreeSocketPort())
         .build();
     cluster.waitForClusterToBeReady();
     objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
