@@ -407,6 +407,7 @@ public class DatanodeStateMachine implements Closeable {
   public synchronized void stopDaemon() {
     try {
       supervisor.stop();
+      context.setShutdownGracefully();
       context.setState(DatanodeStates.SHUTDOWN);
       reportManager.shutdown();
       this.close();
