@@ -18,18 +18,29 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest.getRandomPipeline;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -60,7 +71,8 @@ public class AbstractReconContainerManagerTest {
     NodeManager nodeManager =
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
     pipelineManager = new ReconPipelineManager(conf, nodeManager, eventQueue);
-    containerManager = new ReconContainerManager(conf, pipelineManager);
+    containerManager = new ReconContainerManager(conf, pipelineManager,
+        getScmServiceProvider());
   }
 
   @After
@@ -81,4 +93,28 @@ public class AbstractReconContainerManagerTest {
     return containerManager;
   }
 
+  private StorageContainerServiceProvider getScmServiceProvider()
+      throws IOException {
+    Pipeline pipeline = getRandomPipeline();
+    getPipelineManager().addPipeline(pipeline);
+
+    ContainerID containerID = new ContainerID(100L);
+    ContainerInfo containerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(containerID.getId())
+            .setNumberOfKeys(10)
+            .setPipelineID(pipeline.getId())
+            .setReplicationFactor(ONE)
+            .setOwner("test")
+            .setState(OPEN)
+            .setReplicationType(STAND_ALONE)
+            .build();
+    ContainerWithPipeline containerWithPipeline =
+        new ContainerWithPipeline(containerInfo, pipeline);
+    StorageContainerServiceProvider scmServiceProviderMock = mock(
+        StorageContainerServiceProvider.class);
+    when(scmServiceProviderMock.getContainerWithPipeline(100L))
+        .thenReturn(containerWithPipeline);
+    return scmServiceProviderMock;
+  }
 }

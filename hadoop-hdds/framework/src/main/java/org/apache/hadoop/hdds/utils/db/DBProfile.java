@@ -25,6 +25,7 @@ import org.rocksdb.BloomFilter;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.CompactionStyle;
 import org.rocksdb.DBOptions;
+import org.rocksdb.LRUCache;
 
 import java.math.BigDecimal;
 
@@ -62,11 +63,11 @@ public enum DBProfile {
           .setWriteBufferSize(writeBufferSize)
           .setTableFormatConfig(
               new BlockBasedTableConfig()
-                  .setBlockCacheSize(blockCacheSize)
+                  .setBlockCache(new LRUCache(blockCacheSize))
                   .setBlockSize(blockSize)
                   .setCacheIndexAndFilterBlocks(true)
                   .setPinL0FilterAndIndexBlocksInCache(true)
-                  .setFilter(new BloomFilter()));
+                  .setFilterPolicy(new BloomFilter()));
     }
 
     @Override

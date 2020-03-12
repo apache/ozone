@@ -90,6 +90,54 @@ public class TestOmMetadataManager {
   }
 
   @Test
+  public void testListAllVolumes() throws Exception {
+    OmVolumeArgs.Builder argsBuilder =
+        OmVolumeArgs.newBuilder().setAdminName("admin");
+    String volName;
+    String ownerName;
+    for (int i = 0; i < 50; i++) {
+      ownerName = "owner" + i;
+      volName = "vola" + i;
+      OmVolumeArgs omVolumeArgs = argsBuilder.
+          setOwnerName(ownerName).setVolume(volName).build();
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+    for (int i = 0; i < 50; i++) {
+      ownerName = "owner" + i;
+      volName = "volb" + i;
+      OmVolumeArgs omVolumeArgs = argsBuilder.
+          setOwnerName(ownerName).setVolume(volName).build();
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+
+    String prefix = "";
+    String startKey = "";
+
+    // Test list all volumes
+    List<OmVolumeArgs> volListA = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListA.size(), 100);
+
+    // Test list all volumes with prefix
+    prefix = "volb";
+    List<OmVolumeArgs> volListB = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListB.size(), 50);
+
+    // Test list all volumes with setting startVolume
+    // that was not part of result.
+    prefix = "";
+    int totalVol = volListB.size();
+    int startOrder = 0;
+    startKey = "volb" + startOrder;
+    List<OmVolumeArgs> volListC = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListC.size(), totalVol - startOrder - 1);
+  }
+
+  @Test
   public void testListBuckets() throws Exception {
 
     String volumeName1 = "volumeA";

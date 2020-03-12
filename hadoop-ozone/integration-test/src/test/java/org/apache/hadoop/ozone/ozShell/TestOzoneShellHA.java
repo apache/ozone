@@ -311,6 +311,30 @@ public class TestOzoneShellHA {
   }
 
   /**
+   * Helper function to generate buckets for testing shell command of buckets.
+   */
+  private void generateBuckets(String volumeName, int numOfBuckets) {
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId + volumeName};
+    execute(ozoneShell, args);
+
+    String bucketName = volumeName + OzoneConsts.OZONE_URI_DELIMITER + "bucket";
+    for (int i = 0; i < numOfBuckets; i++) {
+      args = new String[] {
+          "bucket", "create", "o3://" + omServiceId + bucketName + i};
+      execute(ozoneShell, args);
+    }
+  }
+
+  /**
+   * Helper function to get nums of buckets from info of listing command.
+   */
+  private int getNumOfBuckets(String bucketPrefix) {
+    return out.toString().split(bucketPrefix).length - 1;
+  }
+
+
+  /**
    * Tests ozone sh command URI parsing with volume and bucket create commands.
    */
   @Test
@@ -375,6 +399,7 @@ public class TestOzoneShellHA {
    */
   @Test
   public void testOzoneShCmdList() {
+    // Part of listing keys test.
     generateKeys("/volume4", "/bucket");
     final String destinationBucket = "o3://" + omServiceId + "/volume4/bucket";
 
@@ -395,6 +420,28 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
     Assert.assertEquals(0, out.size());
     Assert.assertEquals(0, getNumOfKeys());
+
+    // Part of listing buckets test.
+    generateBuckets("/volume5", 100);
+    final String destinationVolume = "o3://" + omServiceId + "/volume5";
+
+    // Test case 1: test listing buckets.
+    // ozone sh bucket list /volume5
+    // Expectation: Get list including all buckets.
+    args = new String[] {"bucket", "list", destinationVolume};
+    out.reset();
+    execute(ozoneShell, args);
+    Assert.assertEquals(100, getNumOfBuckets("bucket"));
+
+    // Test case 2: test listing buckets for setting --start with last bucket.
+    // ozone sh bucket list /volume5 --start=bucket99 /volume5
+    // Expectation: Get empty list.
+    final String startBucket = "--start=bucket99";
+    out.reset();
+    args = new String[] {"bucket", "list", startBucket, destinationVolume};
+    execute(ozoneShell, args);
+    Assert.assertEquals(0, out.size());
+    Assert.assertEquals(0, getNumOfBuckets("bucket"));
   }
 
 

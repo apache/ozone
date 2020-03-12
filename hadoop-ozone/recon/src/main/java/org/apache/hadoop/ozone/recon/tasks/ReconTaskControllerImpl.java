@@ -32,7 +32,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -57,7 +56,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private Map<String, ReconOmTask> reconOmTasks;
   private ExecutorService executorService;
   private final int threadCount;
-  private final Semaphore taskSemaphore = new Semaphore(1);
   private Map<String, AtomicInteger> taskFailureCounter = new HashMap<>();
   private static final int TASK_FAILURE_THRESHOLD = 2;
   private ReconTaskStatusDao reconTaskStatusDao;
@@ -101,10 +99,9 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * @throws InterruptedException
    */
   @Override
-  public void consumeOMEvents(OMUpdateEventBatch events,
+  public synchronized void consumeOMEvents(OMUpdateEventBatch events,
                               OMMetadataManager omMetadataManager)
       throws InterruptedException {
-    taskSemaphore.acquire();
 
     try {
       if (!events.isEmpty()) {
@@ -148,8 +145,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       }
     } catch (ExecutionException e) {
       LOG.error("Unexpected error : ", e);
-    } finally {
-      taskSemaphore.release();
     }
   }
 
@@ -170,10 +165,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   @Override
-  public void reInitializeTasks(ReconOMMetadataManager omMetadataManager)
-      throws InterruptedException {
-    taskSemaphore.acquire();
-
+  public synchronized void reInitializeTasks(
+      ReconOMMetadataManager omMetadataManager) throws InterruptedException {
     try {
       Collection<Callable<Pair<String, Boolean>>> tasks = new ArrayList<>();
       for (Map.Entry<String, ReconOmTask> taskEntry :
@@ -197,8 +190,6 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       }
     } catch (ExecutionException e) {
       LOG.error("Unexpected error : ", e);
-    } finally {
-      taskSemaphore.release();
     }
   }
 
@@ -226,13 +217,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   @Override
-  public void start() {
+  public synchronized void start() {
     LOG.info("Starting Recon Task Controller.");
     executorService = Executors.newFixedThreadPool(threadCount);
   }
 
   @Override
-  public void stop() {
+  public synchronized void stop() {
     LOG.info("Stopping Recon Task Controller.");
     if (this.executorService != null) {
       this.executorService.shutdownNow();

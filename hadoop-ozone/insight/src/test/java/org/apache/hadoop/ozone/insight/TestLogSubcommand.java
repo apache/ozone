@@ -18,13 +18,15 @@
 package org.apache.hadoop.ozone.insight;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * Testing utility methods of the log subcommand test.
  */
-public class LogSubcommandTest {
+public class TestLogSubcommand {
 
+  @Ignore("HDDS-3144")
   @Test
   public void filterLog() {
     LogSubcommand logSubcommand = new LogSubcommand();

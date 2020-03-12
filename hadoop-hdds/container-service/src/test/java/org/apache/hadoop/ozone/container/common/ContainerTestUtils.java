@@ -26,6 +26,7 @@ import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine;
@@ -116,7 +117,9 @@ public final class ContainerTestUtils {
   public static KeyValueContainer getContainer(long containerId,
       ContainerProtos.ContainerDataProto.State state) {
     KeyValueContainerData kvData =
-        new KeyValueContainerData(containerId, (long) StorageUnit.GB.toBytes(5),
+        new KeyValueContainerData(containerId,
+            ChunkLayOutVersion.FILE_PER_CHUNK,
+            (long) StorageUnit.GB.toBytes(5),
             UUID.randomUUID().toString(), UUID.randomUUID().toString());
     kvData.setState(state);
     return new KeyValueContainer(kvData, new OzoneConfiguration());

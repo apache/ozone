@@ -42,6 +42,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -243,7 +244,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   @Override
   public OzoneClient getClient() throws IOException {
-    return OzoneClientFactory.getClient(conf);
+    return OzoneClientFactory.getRpcClient(conf);
   }
 
   @Override
@@ -317,8 +318,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void restartHddsDatanode(int i, boolean waitForDatanode)
       throws InterruptedException, TimeoutException {
     HddsDatanodeService datanodeService = hddsDatanodes.get(i);
-    datanodeService.stop();
-    datanodeService.join();
+    stopDatanode(datanodeService);
     // ensure same ports are used across restarts.
     OzoneConfiguration config = datanodeService.getConf();
     int currentPort = datanodeService.getDatanodeDetails()
@@ -353,7 +353,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
   @Override
   public void shutdownHddsDatanode(int i) {
-    hddsDatanodes.get(i).stop();
+    stopDatanode(hddsDatanodes.get(i));
   }
 
   @Override
@@ -365,7 +365,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void shutdown() {
     try {
       LOG.info("Shutting down the Mini Ozone Cluster");
-
       File baseDir = new File(GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" +
               scm.getClientProtocolServer().getScmInfo().getClusterId()));
@@ -569,6 +568,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         //set it to 1MB by default in tests
         chunkSize = Optional.of(1);
       }
+      if (!streamBufferSize.isPresent()) {
+        streamBufferSize = OptionalInt.of(chunkSize.get());
+      }
       if (!streamBufferFlushSize.isPresent()) {
         streamBufferFlushSize = Optional.of((long) chunkSize.get());
       }
@@ -584,6 +586,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
           chunkSize.get(), streamBufferSizeUnit.get());
+      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE,
+          streamBufferSize.getAsInt(), streamBufferSizeUnit.get());
       conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
           streamBufferFlushSize.get(), streamBufferSizeUnit.get());
       conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE,

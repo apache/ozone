@@ -299,7 +299,7 @@ public class ChunkInputStream extends InputStream implements Seekable {
     // Adjust the chunkInfo so that only the required bytes are read from
     // the chunk.
     final ChunkInfo adjustedChunkInfo = ChunkInfo.newBuilder(chunkInfo)
-        .setOffset(bufferOffset)
+        .setOffset(bufferOffset + chunkInfo.getOffset())
         .setLen(bufferLength)
         .build();
 
@@ -369,10 +369,11 @@ public class ChunkInputStream extends InputStream implements Seekable {
               // number of bytes in a list. Compute the index of the first
               // checksum to match with the read data
 
-              int checkumStartIndex = (int) (reqChunkInfo.getOffset() /
-                  checksumData.getBytesPerChecksum());
-              Checksum.verifyChecksum(
-                  byteString, checksumData, checkumStartIndex);
+              long relativeOffset = reqChunkInfo.getOffset() -
+                  chunkInfo.getOffset();
+              int bytesPerChecksum = checksumData.getBytesPerChecksum();
+              int startIndex = (int) (relativeOffset / bytesPerChecksum);
+              Checksum.verifyChecksum(byteString, checksumData, startIndex);
             }
           };
 

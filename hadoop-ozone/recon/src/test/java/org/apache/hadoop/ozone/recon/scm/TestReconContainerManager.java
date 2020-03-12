@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.NavigableSet;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -76,6 +78,20 @@ public class TestReconContainerManager
         pipelineManager.getContainersInPipeline(pipeline.getId());
     assertEquals(1, containersInPipeline.size());
     assertEquals(containerID, containersInPipeline.first());
+  }
+
+  @Test
+  public void testCheckAndAddNewContainer() throws IOException {
+    ContainerID containerID = new ContainerID(100L);
+    ReconContainerManager containerManager = getContainerManager();
+    assertFalse(containerManager.exists(containerID));
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+    containerManager.checkAndAddNewContainer(containerID, datanodeDetails);
+    assertTrue(containerManager.exists(containerID));
+
+    // Doing it one more time should not change any state.
+    containerManager.checkAndAddNewContainer(containerID, datanodeDetails);
+    assertTrue(containerManager.exists(containerID));
   }
 
 }

@@ -82,6 +82,7 @@ public class TestContainerDeletionChoosingPolicy {
     int numContainers = 10;
     for (int i = 0; i < numContainers; i++) {
       KeyValueContainerData data = new KeyValueContainerData(i,
+          ChunkLayOutVersion.FILE_PER_CHUNK,
           ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
       data.closeContainer();
@@ -139,6 +140,7 @@ public class TestContainerDeletionChoosingPolicy {
       long containerId = RandomUtils.nextLong();
       KeyValueContainerData data =
           new KeyValueContainerData(containerId,
+              ChunkLayOutVersion.FILE_PER_CHUNK,
               ContainerTestHelper.CONTAINER_MAX_SIZE,
               UUID.randomUUID().toString(),
               UUID.randomUUID().toString());

@@ -22,19 +22,21 @@ import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,29 +46,29 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .Result.CONTAINER_INTERNAL_ERROR;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 
 /**
  * This class is for performing chunk related operations.
  */
-public class ChunkManagerImpl implements ChunkManager {
+public class FilePerChunkStrategy implements ChunkManager {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ChunkManagerImpl.class);
+      LoggerFactory.getLogger(FilePerChunkStrategy.class);
 
   private final boolean doSyncWrite;
 
-  public ChunkManagerImpl(boolean sync) {
+  public FilePerChunkStrategy(boolean sync) {
     doSyncWrite = sync;
+  }
+
+  private static void checkLayoutVersion(Container container) {
+    Preconditions.checkArgument(
+        container.getContainerData().getLayOutVersion() == FILE_PER_CHUNK);
   }
 
   /**
@@ -79,9 +81,13 @@ public class ChunkManagerImpl implements ChunkManager {
    * @param dispatcherContext - dispatcherContextInfo
    * @throws StorageContainerException
    */
+  @Override
   public void writeChunk(Container container, BlockID blockID, ChunkInfo info,
       ChunkBuffer data, DispatcherContext dispatcherContext)
       throws StorageContainerException {
+
+    checkLayoutVersion(container);
+
     Preconditions.checkNotNull(dispatcherContext);
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
     try {
@@ -102,6 +108,8 @@ public class ChunkManagerImpl implements ChunkManager {
             info.getChunkName(), stage, chunkFile, tmpChunkFile);
       }
 
+      long len = info.getLen();
+      long offset = 0; // ignore offset in chunk info
       switch (stage) {
       case WRITE_DATA:
         if (isOverwrite) {
@@ -131,8 +139,8 @@ public class ChunkManagerImpl implements ChunkManager {
                   tmpChunkFile);
         }
         // Initially writes to temporary chunk file.
-        ChunkUtils
-            .writeData(tmpChunkFile, info, data, volumeIOStats, doSyncWrite);
+        ChunkUtils.writeData(tmpChunkFile, data, offset, len, volumeIOStats,
+            doSyncWrite);
         // No need to increment container stats here, as still data is not
         // committed here.
         break;
@@ -152,44 +160,23 @@ public class ChunkManagerImpl implements ChunkManager {
         // the same term and log index appended as the current transaction
         commitChunk(tmpChunkFile, chunkFile);
         // Increment container stats here, as we commit the data.
-        updateContainerWriteStats(container, info, isOverwrite);
+        containerData.updateWriteStats(len, isOverwrite);
         break;
       case COMBINED:
         // directly write to the chunk file
-        ChunkUtils.writeData(chunkFile, info, data, volumeIOStats, doSyncWrite);
-        updateContainerWriteStats(container, info, isOverwrite);
+        ChunkUtils.writeData(chunkFile, data, offset, len, volumeIOStats,
+            doSyncWrite);
+        containerData.updateWriteStats(len, isOverwrite);
         break;
       default:
         throw new IOException("Can not identify write operation.");
       }
     } catch (StorageContainerException ex) {
       throw ex;
-    } catch (NoSuchAlgorithmException ex) {
-      LOG.error("write data failed.", ex);
+    } catch (IOException ex) {
       throw new StorageContainerException("Internal error: ", ex,
-          NO_SUCH_ALGORITHM);
-    } catch (ExecutionException  | IOException ex) {
-      LOG.error("write data failed.", ex);
-      throw new StorageContainerException("Internal error: ", ex,
-          CONTAINER_INTERNAL_ERROR);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      LOG.error("write data failed.", e);
-      throw new StorageContainerException("Internal error: ", e,
-          CONTAINER_INTERNAL_ERROR);
+          IO_EXCEPTION);
     }
-  }
-
-  protected void updateContainerWriteStats(Container container, ChunkInfo info,
-      boolean isOverwrite) {
-    KeyValueContainerData containerData = (KeyValueContainerData) container
-        .getContainerData();
-
-    if (!isOverwrite) {
-      containerData.incrBytesUsed(info.getLen());
-    }
-    containerData.incrWriteCount();
-    containerData.incrWriteBytes(info.getLen());
   }
 
   /**
@@ -204,52 +191,50 @@ public class ChunkManagerImpl implements ChunkManager {
    * TODO: Right now we do not support partial reads and writes of chunks.
    * TODO: Explore if we need to do that for ozone.
    */
+  @Override
   public ChunkBuffer readChunk(Container container, BlockID blockID,
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
+
+    checkLayoutVersion(container);
+
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
-    ByteBuffer data;
+
     HddsVolume volume = containerData.getVolume();
     VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
-    // Checking here, which layout version the container is, and reading
-    // the chunk file in that format.
     // In version1, we verify checksum if it is available and return data
     // of the chunk file.
-    if (containerData.getLayOutVersion() == ChunkLayOutVersion
-        .getLatestVersion().getVersion()) {
+    File finalChunkFile = ChunkUtils.getChunkFile(containerData, info);
 
-      File finalChunkFile = ChunkUtils.getChunkFile(containerData, info);
-
-      List<File> possibleFiles = new ArrayList<>();
+    List<File> possibleFiles = new ArrayList<>();
+    possibleFiles.add(finalChunkFile);
+    if (dispatcherContext != null && dispatcherContext.isReadFromTmpFile()) {
+      possibleFiles.add(getTmpChunkFile(finalChunkFile, dispatcherContext));
       possibleFiles.add(finalChunkFile);
-      if (dispatcherContext != null && dispatcherContext.isReadFromTmpFile()) {
-        possibleFiles.add(getTmpChunkFile(finalChunkFile, dispatcherContext));
-        possibleFiles.add(finalChunkFile);
-      }
-
-      for (File chunkFile : possibleFiles) {
-        try {
-          data = ChunkUtils.readData(chunkFile, info, volumeIOStats);
-          containerData.incrReadCount();
-          long length = info.getLen();
-          containerData.incrReadBytes(length);
-          return ChunkBuffer.wrap(data);
-        } catch (StorageContainerException ex) {
-          //UNABLE TO FIND chunk is not a problem as we will try with the
-          //next possible location
-          if (ex.getResult() != UNABLE_TO_FIND_CHUNK) {
-            throw ex;
-          }
-        }
-      }
-      throw new StorageContainerException(
-          "Chunk file can't be found " + possibleFiles.toString(),
-          UNABLE_TO_FIND_CHUNK);
-
     }
-    return null;
+
+    long len = info.getLen();
+    long offset = 0; // ignore offset in chunk info
+    ByteBuffer data = ByteBuffer.allocate((int) len);
+
+    for (File chunkFile : possibleFiles) {
+      try {
+        ChunkUtils.readData(chunkFile, data, offset, len, volumeIOStats);
+        return ChunkBuffer.wrap(data);
+      } catch (StorageContainerException ex) {
+        //UNABLE TO FIND chunk is not a problem as we will try with the
+        //next possible location
+        if (ex.getResult() != UNABLE_TO_FIND_CHUNK) {
+          throw ex;
+        }
+        data.clear();
+      }
+    }
+    throw new StorageContainerException(
+        "Chunk file can't be found " + possibleFiles.toString(),
+        UNABLE_TO_FIND_CHUNK);
   }
 
   /**
@@ -260,47 +245,49 @@ public class ChunkManagerImpl implements ChunkManager {
    * @param info - Chunk Info
    * @throws StorageContainerException
    */
+  @Override
   public void deleteChunk(Container container, BlockID blockID, ChunkInfo info)
       throws StorageContainerException {
+
+    checkLayoutVersion(container);
+
     Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
-    // Checking here, which layout version the container is, and performing
-    // deleting chunk operation.
-    // In version1, we have only chunk file.
-    if (containerData.getLayOutVersion() == ChunkLayOutVersion
-        .getLatestVersion().getVersion()) {
-      File chunkFile = ChunkUtils.getChunkFile(containerData, info);
 
-      // if the chunk file does not exist, it might have already been deleted.
-      // The call might be because of reapply of transactions on datanode
-      // restart.
-      if (!chunkFile.exists()) {
-        LOG.warn("Chunk file doe not exist. chunk info :{}", info.toString());
-        return;
-      }
-      if ((info.getOffset() == 0) && (info.getLen() == chunkFile.length())) {
-        FileUtil.fullyDelete(chunkFile);
-        containerData.decrBytesUsed(chunkFile.length());
-      } else {
-        LOG.error("Not Supported Operation. Trying to delete a " +
-            "chunk that is in shared file. chunk info : {}", info.toString());
-        throw new StorageContainerException("Not Supported Operation. " +
-            "Trying to delete a chunk that is in shared file. chunk info : "
-            + info.toString(), UNSUPPORTED_REQUEST);
-      }
+    // In version1, we have only chunk file.
+    File chunkFile = ChunkUtils.getChunkFile(containerData, info);
+
+    // if the chunk file does not exist, it might have already been deleted.
+    // The call might be because of reapply of transactions on datanode
+    // restart.
+    if (!chunkFile.exists()) {
+      LOG.warn("Chunk file doe not exist. chunk info :" + info.toString());
+      return;
+    }
+    if (info.getLen() == chunkFile.length()) {
+      FileUtil.fullyDelete(chunkFile);
+    } else {
+      LOG.error("Not Supported Operation. Trying to delete a " +
+          "chunk that is in shared file. chunk info : {}", info.toString());
+      throw new StorageContainerException("Not Supported Operation. " +
+          "Trying to delete a chunk that is in shared file. chunk info : "
+          + info.toString(), UNSUPPORTED_REQUEST);
     }
   }
 
-  /**
-   * Shutdown the chunkManager.
-   *
-   * In the chunkManager we haven't acquired any resources, so nothing to do
-   * here.
-   */
-
-  public void shutdown() {
-    //TODO: need to revisit this during integration of container IO.
+  @Override
+  public void deleteChunks(Container container, BlockData blockData)
+      throws StorageContainerException {
+    for (ContainerProtos.ChunkInfo chunk : blockData.getChunks()) {
+      try {
+        ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunk);
+        deleteChunk(container, blockData.getBlockID(), chunkInfo);
+      } catch (IOException e) {
+        throw new StorageContainerException(
+            e, ContainerProtos.Result.INVALID_ARGUMENT);
+      }
+    }
   }
 
   /**
