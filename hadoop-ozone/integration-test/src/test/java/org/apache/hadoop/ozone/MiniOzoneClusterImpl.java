@@ -365,7 +365,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void shutdown() {
     try {
       LOG.info("Shutting down the Mini Ozone Cluster");
-
       File baseDir = new File(GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" +
               scm.getClientProtocolServer().getScmInfo().getClusterId()));
