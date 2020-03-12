@@ -124,9 +124,15 @@ public class ReconServer extends GenericCli {
     if (!isStarted) {
       LOG.info("Starting Recon server");
       isStarted = true;
-      httpServer.start();
-      ozoneManagerServiceProvider.start();
-      reconStorageContainerManager.start();
+      if (httpServer != null) {
+        httpServer.start();
+      }
+      if (ozoneManagerServiceProvider != null) {
+        ozoneManagerServiceProvider.start();
+      }
+      if (reconStorageContainerManager != null) {
+        reconStorageContainerManager.start();
+      }
     }
   }
 
@@ -159,12 +165,15 @@ public class ReconServer extends GenericCli {
    * Logs in the Recon user if security is enabled in the configuration.
    *
    * @param conf OzoneConfiguration
-   * @throws IOException, AuthenticationException in case login fails.
    */
-  private static void loginReconUserIfSecurityEnabled(OzoneConfiguration  conf)
-      throws IOException, AuthenticationException {
-    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      loginReconUser(conf);
+  private static void loginReconUserIfSecurityEnabled(
+      OzoneConfiguration  conf) {
+    try {
+      if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+        loginReconUser(conf);
+      }
+    } catch (Exception ex) {
+      LOG.error("Error login in as Recon service. ", ex);
     }
   }
 
