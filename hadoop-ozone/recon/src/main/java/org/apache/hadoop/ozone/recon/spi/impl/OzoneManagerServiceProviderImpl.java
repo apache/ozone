@@ -266,7 +266,7 @@ public class OzoneManagerServiceProviderImpl
         }
       }
     }
-    return omLeaderUrl ;
+    return omLeaderUrl;
   }
 
   /**
