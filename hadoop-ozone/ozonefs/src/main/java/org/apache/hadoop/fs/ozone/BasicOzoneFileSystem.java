@@ -27,11 +27,13 @@ import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -45,8 +47,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
+import org.apache.hadoop.ozone.web.utils.JsonUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -58,6 +64,7 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 
+import org.apache.hadoop.util.StringUtils;
 import org.apache.http.client.utils.URIBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -701,6 +708,76 @@ public class BasicOzoneFileSystem extends FileSystem {
         + "userName=" + userName + ", "
         + "statistics=" + statistics
         + "}";
+  }
+
+  /**
+   * Gets the ACL of a key.
+   *
+   * @param path Path to get
+   * @return AclStatus describing the ACL of the key
+   * @throws IOException if an ACL could not be read
+   * @throws UnsupportedOperationException if the operation is unsupported
+   *         (default outcome).
+   */
+  @Override
+  public AclStatus getAclStatus(Path path) throws IOException {
+    Map<String, List<OzoneAcl>> ozoneAcls = adapter.getAcl(pathToKey(path));
+    String userAcls =
+        JsonUtils.toJsonStringWithDefaultPrettyPrinter(
+            ozoneAcls.get(ACLIdentityType.USER.toString()));
+    String groupAcls =
+        JsonUtils.toJsonStringWithDefaultPrettyPrinter(
+            ozoneAcls.get(ACLIdentityType.GROUP.toString()));
+    return new AclStatus.Builder()
+            .owner(userAcls)
+            .group(groupAcls)
+            .build();
+  }
+
+  /**
+   * Fully replaces ACL of a key, discarding all existing entries.
+   *
+   * @param path Path to modify
+   * @param aclSpec List describing modifications, which must include entries
+   *   for user, group for compatibility with permission bits.
+   * @throws IOException if an ACL could not be modified
+   * @throws UnsupportedOperationException if the operation is unsupported
+   *         (default outcome).
+   */
+  @Override
+  public void setAcl(Path path, List<AclEntry> aclSpec) throws IOException {
+    adapter.setAcl(pathToKey(path), aclSpecToString(aclSpec));
+  }
+
+  private String toAclString(AclEntry aclEntry) {
+    StringBuilder sb = new StringBuilder();
+
+    if (aclEntry.getType() != null) {
+      sb.append(StringUtils.toLowerCase(aclEntry.getType().toString()));
+    }
+    sb.append(':');
+    if (aclEntry.getName() != null) {
+      sb.append(aclEntry.getName());
+    }
+    sb.append(':');
+    if (aclEntry.getPermission() != null) {
+      sb.append(aclEntry.getPermission().SYMBOL.replace("-", ""));
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Convert a List of AclEntries into a string
+   * @param aclSpec List of AclEntries to convert
+   * @return String representation of aclSpec
+   */
+  private String aclSpecToString(List<AclEntry> aclSpec) {
+    StringBuilder buf = new StringBuilder();
+    for ( AclEntry e : aclSpec ) {
+      buf.append(toAclString(e));
+      buf.append(",");
+    }
+    return buf.substring(0, buf.length()-1);
   }
 
   /**

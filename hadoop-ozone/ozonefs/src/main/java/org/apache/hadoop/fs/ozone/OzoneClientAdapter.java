@@ -22,9 +22,11 @@ import java.io.InputStream;
 import java.net.URI;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -51,6 +53,10 @@ public interface OzoneClientAdapter {
   boolean deleteObject(String keyName);
 
   Iterator<BasicKeyInfo> listKeys(String pathKey);
+
+  Map<String, List<OzoneAcl>> getAcl(String pathKey) throws IOException;
+
+  void setAcl(String keyName, String acls) throws IOException;
 
   List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries, URI uri,

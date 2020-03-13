@@ -22,8 +22,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -40,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -54,12 +57,17 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 
 /**
  * Basic Implementation of the OzoneFileSystem calls.
@@ -320,6 +328,37 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public Iterator<BasicKeyInfo> listKeys(String pathKey) {
     incrementCounter(Statistic.OBJECTS_LIST);
     return new IteratorAdapter(bucket.listKeys(pathKey));
+  }
+
+  @Override
+  public Map<String, List<OzoneAcl>> getAcl(String keyName) throws IOException {
+    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+        .setBucketName(bucket.getName()).setVolumeName(volume.getName())
+        .setKeyName(keyName).setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OZONE).build();
+    Map<String, List<OzoneAcl>> ozoneAcls = new HashMap<>();
+    List<OzoneAcl> userResult = new ArrayList<OzoneAcl>();
+    List<OzoneAcl> groupResult = new ArrayList<OzoneAcl>();
+
+    ozoneClient.getObjectStore().getAcl(obj).forEach(ozoneAcl -> {
+        if (ozoneAcl.getType().equals(ACLIdentityType.USER)) {
+            userResult.add(ozoneAcl);
+        } else if (ozoneAcl.getType().equals(ACLIdentityType.GROUP)) {
+            groupResult.add(ozoneAcl);
+        }
+    });
+    ozoneAcls.put(ACLIdentityType.USER.toString(),userResult);
+    ozoneAcls.put(ACLIdentityType.GROUP.toString(),groupResult);
+    return ozoneAcls;
+  }
+
+  @Override
+  public void setAcl(String keyName, String acls) throws IOException {
+    OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
+        .setBucketName(bucket.getName()).setVolumeName(volume.getName())
+        .setKeyName(keyName).setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OZONE).build();
+    ozoneClient.getObjectStore().setAcl(obj, OzoneAcl.parseAcls(acls));
   }
 
   public List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
