@@ -127,6 +127,17 @@ public class ContainerKeyMapperTask implements ReconOmTask {
           deleteOMKeyFromContainerDB(updatedKey);
           break;
 
+        case UPDATE:
+          if (omdbUpdateEvent.getOldValue() != null) {
+            deleteOMKeyFromContainerDB(
+                omdbUpdateEvent.getOldValue().getKeyName());
+          } else {
+            LOG.warn("Update event does not have the old Key Info for {}.",
+                updatedKey);
+          }
+          writeOMKeyToContainerDB(updatedKey, updatedKeyValue);
+          break;
+
         default: LOG.debug("Skipping DB update event : {}",
             omdbUpdateEvent.getAction());
         }
