@@ -52,9 +52,13 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
@@ -179,6 +183,22 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       return isNodeReady && exitSafeMode;
     }, 1000, waitForClusterToBeReadyTimeout);
+  }
+
+  /**
+   * Waits for atleast one RATIS pipeline of given factor to be reported in open
+   * state.
+   */
+  @Override
+  public void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
+                                int timeoutInMs) throws
+          TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      int openPipelineCount = scm.getPipelineManager().
+              getPipelines(HddsProtos.ReplicationType.RATIS,
+              factor, Pipeline.PipelineState.OPEN).size();
+      return openPipelineCount >= 1;
+    }, 1000, timeoutInMs);
   }
 
   /**
