@@ -132,7 +132,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- jackson versions -->
     <jackson.version>1.9.13</jackson.version>
-    <jackson2.version>2.9.9</jackson2.version>
+    <jackson2.version>2.10.3</jackson2.version>
 
     <!-- jaegertracing veresion -->
     <jaeger.version>0.34.0</jaeger.version>
@@ -911,7 +911,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
-        <version>4.0.52.Final</version>
+        <version>4.1.47.Final</version>
       </dependency>
 
       <dependency>
@@ -1339,7 +1339,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk16</artifactId>
-        <version>1.46</version>
+        <version>${bouncycastle.version}</version>
         <scope>test</scope>
       </dependency>
 
@@ -1352,7 +1352,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>com.nimbusds</groupId>
         <artifactId>nimbus-jose-jwt</artifactId>
-        <version>4.41.1</version>
+        <version>7.9</version>
         <scope>compile</scope>
         <exclusions>
           <exclusion>
