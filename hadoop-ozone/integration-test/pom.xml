@@ -176,7 +176,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </profile>
     <profile>
       <!-- 782.992 -->
-      <id>client-and-hdds</id>
+      <id>client</id>
       <build>
         <plugins>
           <plugin>
@@ -184,7 +184,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <includes>
-                <include>org.apache.hadoop.hdds.**</include>
                 <include>org.apache.hadoop.ozone.client.**</include>
               </includes>
             </configuration>
@@ -231,7 +230,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </profile>
     <profile>
       <!-- 600.157 -->
-      <id>om</id>
+      <id>hdds-om</id>
       <build>
         <plugins>
           <plugin>
@@ -239,6 +238,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <includes>
+                <include>org.apache.hadoop.hdds.**</include>
                 <include>org.apache.hadoop.ozone.om.**</include>
               </includes>
             </configuration>
