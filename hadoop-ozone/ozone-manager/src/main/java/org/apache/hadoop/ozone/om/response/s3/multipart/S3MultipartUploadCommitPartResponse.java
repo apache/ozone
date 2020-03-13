@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
