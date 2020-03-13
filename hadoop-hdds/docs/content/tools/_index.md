@@ -52,8 +52,8 @@ Admin commands:
    * **envvars** - Display computed Hadoop environment variables.
    * **getconf** -  Reads ozone config values from configuration.
    * **jmxget**  - Get JMX exported values from NameNode or DataNode.
-   * **scmcli** -  Developer only, Command Line Interface for the Storage
-   Container Manager.
+   * **admin** -  Collects admin and developer related commands related to the 
+   ozone components.
    * **genconf** -  Generate minimally required ozone configs and output to
    ozone-site.xml.
 

@@ -17,12 +17,15 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
+import java.util.concurrent.Callable;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.MissingSubcommandException;
+import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
+
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
-
-import java.util.concurrent.Callable;
 
 /**
  * Subcommand to group replication manager related operations.
@@ -40,15 +43,15 @@ import java.util.concurrent.Callable;
 public class ReplicationManagerCommands implements Callable<Void> {
 
   @ParentCommand
-  private SCMCLI parent;
+  private WithScmClient parent;
 
-  public SCMCLI getParent() {
+  public WithScmClient getParent() {
     return parent;
   }
 
   @Override
   public Void call() throws Exception {
     throw new MissingSubcommandException(
-        this.parent.getCmd().getSubcommands().get("replicationmanager"));
+        new CommandLine(new ReplicationManagerCommands()));
   }
 }

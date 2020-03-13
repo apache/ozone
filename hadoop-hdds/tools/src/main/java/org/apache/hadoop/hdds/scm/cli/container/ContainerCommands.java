@@ -17,13 +17,14 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
+import java.util.concurrent.Callable;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.MissingSubcommandException;
-import org.apache.hadoop.hdds.scm.cli.SCMCLI;
+
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
-
-import java.util.concurrent.Callable;
 
 /**
  * Subcommand to group container related operations.
@@ -43,15 +44,15 @@ import java.util.concurrent.Callable;
 public class ContainerCommands implements Callable<Void> {
 
   @ParentCommand
-  private SCMCLI parent;
+  private WithScmClient parent;
 
-  public SCMCLI getParent() {
+  public WithScmClient getParent() {
     return parent;
   }
 
   @Override
   public Void call() throws Exception {
     throw new MissingSubcommandException(
-        this.parent.getCmd().getSubcommands().get("container"));
+        new CommandLine(new ContainerCommands()));
   }
 }

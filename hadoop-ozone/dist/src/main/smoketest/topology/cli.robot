@@ -23,11 +23,10 @@ Resource            ../commonlib.robot
 
 
 *** Test Cases ***
-Run list pipeline
-    ${output} =         Execute          ozone scmcli pipeline list
-                        Should contain   ${output}   Type:
-                        Should contain   ${output}   Factor:ONE, State:
-
-Run create pipeline
-    ${output} =         Execute          ozone scmcli pipeline create
-                        Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE
+Run printTopology
+    ${output} =         Execute          ozone admin printTopology
+                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)    /rack2
+Run printTopology -o
+    ${output} =         Execute          ozone admin printTopology -o
+                        Should contain   ${output}         Location: /rack2
+                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)

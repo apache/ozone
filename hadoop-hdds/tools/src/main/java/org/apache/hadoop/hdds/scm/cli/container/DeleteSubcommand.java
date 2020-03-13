@@ -51,7 +51,7 @@ public class DeleteSubcommand implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      parent.getParent().checkContainerExists(scmClient, containerId);
+      CloseSubcommand.checkContainerExists(scmClient, containerId);
       scmClient.deleteContainer(containerId, force);
       return null;
     }

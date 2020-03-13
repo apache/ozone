@@ -17,12 +17,13 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import java.util.concurrent.Callable;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.MissingSubcommandException;
-import org.apache.hadoop.hdds.scm.cli.SCMCLI;
-import picocli.CommandLine;
+import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
 
-import java.util.concurrent.Callable;
+import picocli.CommandLine;
 
 /**
  * Subcommand for datanode related operations.
@@ -38,15 +39,15 @@ import java.util.concurrent.Callable;
 public class DatanodeCommands implements Callable<Void> {
 
   @CommandLine.ParentCommand
-  private SCMCLI parent;
+  private WithScmClient parent;
 
-  public SCMCLI getParent() {
+  public WithScmClient getParent() {
     return parent;
   }
 
   @Override
   public Void call() throws Exception {
     throw new MissingSubcommandException(
-        this.parent.getCmd().getSubcommands().get("datanode"));
+        new CommandLine(new DatanodeCommands()));
   }
 }

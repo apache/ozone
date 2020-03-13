@@ -21,9 +21,11 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.MissingSubcommandException;
+import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
@@ -46,15 +48,15 @@ public class SafeModeCommands implements Callable<Void> {
       LoggerFactory.getLogger(SafeModeCommands.class);
 
   @ParentCommand
-  private SCMCLI parent;
+  private WithScmClient parent;
 
-  public SCMCLI getParent() {
+  public WithScmClient getParent() {
     return parent;
   }
 
   @Override
   public Void call() throws Exception {
     throw new MissingSubcommandException(
-        this.parent.getCmd().getSubcommands().get("safemode"));
+        new CommandLine(new SafeModeCommands()));
   }
 }

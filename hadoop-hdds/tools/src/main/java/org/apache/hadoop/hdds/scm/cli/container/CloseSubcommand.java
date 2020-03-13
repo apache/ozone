@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
@@ -45,9 +47,17 @@ public class CloseSubcommand implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      parent.getParent().checkContainerExists(scmClient, containerId);
+      checkContainerExists(scmClient, containerId);
       scmClient.closeContainer(containerId);
       return null;
+    }
+  }
+
+  public static void checkContainerExists(ScmClient scmClient, long containerId)
+      throws IOException {
+    ContainerInfo container = scmClient.getContainer(containerId);
+    if (container == null) {
+      throw new IllegalArgumentException("No such container " + containerId);
     }
   }
 }

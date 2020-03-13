@@ -24,6 +24,6 @@ Resource            ../commonlib.robot
 
 *** Test Cases ***
 Run list datanodes
-    ${output} =         Execute          ozone scmcli datanode list
+    ${output} =         Execute          ozone admin datanode list
                         Should contain   ${output}   Datanode:
                         Should contain   ${output}   Related pipelines:
