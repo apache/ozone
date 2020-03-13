@@ -87,8 +87,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
       String openKey, @Nonnull OmKeyInfo openPartKeyInfoToBeDeleted,
       boolean isRatisEnabled) {
     super(omResponse);
-    Preconditions.checkArgument(!omResponse.getStatus().equals(
-        NO_SUCH_MULTIPART_UPLOAD_ERROR));
+    checkStatusNotOK();
     this.openKey = openKey;
     this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
     this.isRatisEnabled = isRatisEnabled;
