@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_NODE_DB;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -44,6 +40,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.util.Time;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_NODE_DB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

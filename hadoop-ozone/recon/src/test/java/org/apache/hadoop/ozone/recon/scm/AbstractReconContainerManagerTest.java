@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.junit.After;
 import org.junit.Before;
@@ -58,6 +59,7 @@ public class AbstractReconContainerManagerTest {
   private SCMStorageConfig scmStorageConfig;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
+  private DBStore store;
 
   @Before
   public void setUp() throws Exception {
@@ -65,20 +67,26 @@ public class AbstractReconContainerManagerTest {
     conf.set(OZONE_METADATA_DIRS,
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
+    store = new ReconDBDefinition().createDBStore(conf);
     scmStorageConfig = new ReconStorageConfig(conf);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     NodeManager nodeManager =
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
-    pipelineManager = new ReconPipelineManager(conf, nodeManager, eventQueue);
-    containerManager = new ReconContainerManager(conf, pipelineManager,
+    pipelineManager = new ReconPipelineManager(conf, nodeManager,
+        ReconDBDefinition.PIPELINES.getTable(store), eventQueue);
+    containerManager = new ReconContainerManager(conf,
+        ReconDBDefinition.CONTAINERS.getTable(store),
+        store,
+        pipelineManager,
         getScmServiceProvider());
   }
 
   @After
-  public void tearDown() throws IOException {
+  public void tearDown() throws Exception {
     containerManager.close();
     pipelineManager.close();
+    store.close();
   }
 
   protected OzoneConfiguration getConf() {

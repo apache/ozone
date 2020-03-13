@@ -18,13 +18,10 @@
 
 package org.apache.hadoop.ozone.genesis;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -38,7 +35,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Param;
@@ -67,7 +66,7 @@ public class BenchMarkSCM {
 
   @Setup(Level.Trial)
   public static void initialize()
-      throws IOException, AuthenticationException, InterruptedException {
+      throws Exception {
     try {
       lock.lock();
       if (scm == null) {

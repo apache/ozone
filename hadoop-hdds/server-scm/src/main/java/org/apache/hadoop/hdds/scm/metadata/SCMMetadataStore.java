@@ -22,7 +22,12 @@ import java.security.cert.X509Certificate;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import java.io.IOException;
 import com.google.common.annotations.VisibleForTesting;
+
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.protocol.proto
@@ -99,5 +104,18 @@ public interface SCMMetadataStore {
    */
   TableIterator getAllCerts(CertificateStore.CertType certType);
 
+  /**
+   * A Table that maintains all the pipeline information.
+   */
+  Table<PipelineID, Pipeline> getPipelineTable();
 
+  /**
+   * Helper to create and write batch transactions.
+   */
+  BatchOperationHandler getBatchHandler();
+
+  /**
+   * Table that maintains all the container information.
+   */
+  Table<Long, ContainerInfo> getContainerTable();
 }
