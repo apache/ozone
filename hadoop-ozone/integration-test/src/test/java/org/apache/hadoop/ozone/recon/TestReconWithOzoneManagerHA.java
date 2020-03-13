@@ -72,7 +72,7 @@ public class TestReconWithOzoneManagerHA {
         .setNumDatanodes(1)
         .setNumOfOzoneManagers(3)
         .includeRecon(true)
-          .build();
+        .build();
     cluster.waitForClusterToBeReady();
     objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
         .getObjectStore();
