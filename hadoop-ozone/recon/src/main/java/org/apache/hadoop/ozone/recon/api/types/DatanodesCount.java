@@ -15,26 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.recon.api.types;
 
-package org.apache.hadoop.ozone.recon;
-
-import com.google.inject.Injector;
-import com.google.inject.servlet.GuiceServletContextListener;
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlElement;
 
 /**
- * Servlet Context Listener that provides the Guice injector.
+ * Metadata object that contains datanode counts based on its state.
  */
-public class ReconGuiceServletContextListener
-    extends GuiceServletContextListener {
+@XmlAccessorType(XmlAccessType.FIELD)
+public class DatanodesCount {
+  @XmlElement(name = "total")
+  private int total;
 
-  private static Injector injector;
+  @XmlElement(name = "healthy")
+  private int healthy;
 
-  @Override
-  public Injector getInjector() {
-    return injector;
+  public DatanodesCount(int total, int healthy) {
+    this.total = total;
+    this.healthy = healthy;
   }
 
-  static void setInjector(Injector inj) {
-    injector = inj;
+  public int getTotal() {
+    return total;
+  }
+
+  public int getHealthy() {
+    return healthy;
   }
 }
