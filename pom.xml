@@ -111,15 +111,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- Version number for xerces used by JDiff -->
     <xerces.jdiff.version>2.11.0</xerces.jdiff.version>
 
-    <hadoop.assemblies.version>3.2.0</hadoop.assemblies.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
 
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
     <test.build.data>${test.build.dir}</test.build.data>
 
-    <!-- Used for building path to native library loaded by tests.  Projects -->
-    <!-- at different nesting levels in the source tree may need to override. -->
-    <hadoop.common.build.dir>${basedir}/../../hadoop-common-project/hadoop-common/target</hadoop.common.build.dir>
     <java.security.egd>file:///dev/urandom</java.security.egd>
 
     <!-- avro version -->
@@ -1712,11 +1708,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <!-- @argLine is filled by jacoco maven plugin. @{} means late evaluation -->
           <argLine>${maven-surefire-plugin.argLine} @{argLine}</argLine>
           <environmentVariables>
-            <HADOOP_COMMON_HOME>${hadoop.common.build.dir}</HADOOP_COMMON_HOME>
-            <!-- HADOOP_HOME required for tests on Windows to find winutils -->
-            <HADOOP_HOME>${hadoop.common.build.dir}</HADOOP_HOME>
-            <LD_LIBRARY_PATH>${env.LD_LIBRARY_PATH}:${project.build.directory}/native/target/usr/local/lib:${hadoop.common.build.dir}/native/target/usr/local/lib</LD_LIBRARY_PATH>
-            <DYLD_LIBRARY_PATH>${env.DYLD_LIBRARY_PATH}:${project.build.directory}/native/target/usr/local/lib:${hadoop.common.build.dir}/native/target/usr/local/lib</DYLD_LIBRARY_PATH>
             <MALLOC_ARENA_MAX>4</MALLOC_ARENA_MAX>
           </environmentVariables>
           <trimStackTrace>false</trimStackTrace>
