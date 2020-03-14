@@ -24,7 +24,6 @@ import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
@@ -57,13 +56,13 @@ public interface DBDefinition {
       OzoneConfiguration configuration) {
 
     File metadataDir = getDirectoryFromConfig(configuration,
-        ScmConfigKeys.OZONE_SCM_DB_DIRS, getName());
+        getLocationConfigKey(), getName());
 
-    if (metadataDir != null) {
+    if (metadataDir == null) {
 
       LOG.warn("{} is not configured. We recommend adding this setting. " +
               "Falling back to {} instead.",
-          ScmConfigKeys.OZONE_SCM_DB_DIRS, HddsConfigKeys.OZONE_METADATA_DIRS);
+          getLocationConfigKey(), HddsConfigKeys.OZONE_METADATA_DIRS);
       metadataDir = getOzoneMetaDirPath(configuration);
     }
 
