@@ -22,7 +22,7 @@ import OverviewCard from 'components/OverviewCard/OverviewCard';
 import axios from 'axios';
 import prettyBytes from 'pretty-bytes';
 import './Overview.less';
-import {StorageReport} from "types/Datanode.types";
+import {StorageReport} from "types/datanode.types";
 
 interface DatanodesCount {
   total: number;

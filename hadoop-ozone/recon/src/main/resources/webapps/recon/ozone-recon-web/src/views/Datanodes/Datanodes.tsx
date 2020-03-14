@@ -19,12 +19,12 @@
 import React from 'react';
 import axios from 'axios';
 import {Table, Icon} from 'antd';
-import './Datanodes.less';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
 import StorageBar from "components/StorageBar/StorageBar";
-import {DatanodeStatus, StorageReport} from "types/Datanode.types";
+import {DatanodeStatus, StorageReport} from "types/datanode.types";
+import './Datanodes.less';
 
 interface DatanodeResponse {
   hostname: string;

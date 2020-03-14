@@ -20,9 +20,9 @@ import React, {ReactElement} from 'react';
 import {Icon, Card, Row, Col} from 'antd';
 import {withRouter, Link} from 'react-router-dom';
 import {RouteComponentProps} from 'react-router';
-import './OverviewCard.less';
 import StorageBar from "../StorageBar/StorageBar";
-import {StorageReport} from "types/Datanode.types";
+import {StorageReport} from "types/datanode.types";
+import './OverviewCard.less';
 
 const {Meta} = Card;
 
