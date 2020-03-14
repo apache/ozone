@@ -99,9 +99,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       try {
         pipeline = stateManager.getPipeline(pid);
       } catch (PipelineNotFoundException e) {
-        LOG.error("Pipeline not found in pipeline state manager during" +
-            " pipeline creation. PipelineID: " + pid +
-            " exception: " + e.getMessage());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Pipeline not found in pipeline state manager during" +
+              " pipeline creation. PipelineID: " + pid +
+              " exception: " + e.getMessage());
+        }
         continue;
       }
       if (pipeline != null &&
@@ -292,10 +294,15 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     int nodesToFind = nodesRequired - results.size();
     for (int x = 0; x < nodesToFind; x++) {
       // Pick remaining nodes based on the existence of rack awareness.
-      DatanodeDetails pick = rackAwareness
-          ? chooseNodeFromNetworkTopology(
-              nodeManager.getClusterNetworkTopologyMap(), anchor, exclude)
-          : fallBackPickNodes(healthyNodes, exclude);
+      DatanodeDetails pick;
+      try {
+        pick = rackAwareness
+            ? chooseNodeFromNetworkTopology(
+            nodeManager.getClusterNetworkTopologyMap(), anchor, exclude)
+            : fallBackPickNodes(healthyNodes, exclude);
+      } catch (SCMException e) {
+        pick = fallBackPickNodes(healthyNodes, exclude);
+      }
       if (pick != null) {
         results.add(pick);
         exclude.add(pick);
@@ -403,7 +410,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   @VisibleForTesting
   protected DatanodeDetails chooseNodeFromNetworkTopology(
       NetworkTopology networkTopology, DatanodeDetails anchor,
-      List<DatanodeDetails> excludedNodes) {
+      List<DatanodeDetails> excludedNodes) throws SCMException {
     Preconditions.checkArgument(networkTopology != null);
 
     Collection<Node> excluded = new ArrayList<>();
@@ -414,6 +421,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     Node pick = networkTopology.chooseRandom(
         anchor.getNetworkLocation(), excluded);
     DatanodeDetails pickedNode = (DatanodeDetails) pick;
+    if (pickedNode == null) {
+      throw new SCMException("Unable to find node based on Topology.",
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+    }
     return pickedNode;
   }
 }
