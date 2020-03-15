@@ -224,8 +224,7 @@ public class ReconUtils {
    * @return Inputstream to the response of the HTTP call.
    * @throws IOException While reading the response.
    */
-  public InputStream makeHttpCall(CloseableHttpClient httpClient,
-                                         String url)
+  public InputStream makeHttpCall(CloseableHttpClient httpClient, String url)
       throws IOException {
 
     HttpGet httpGet = new HttpGet(url);

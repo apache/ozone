@@ -221,4 +221,9 @@ public class ReconServer extends GenericCli {
   public StorageContainerServiceProvider getStorageContainerServiceProvider() {
     return injector.getInstance(StorageContainerServiceProvider.class);
   }
+
+  @VisibleForTesting
+  public ContainerDBServiceProvider getContainerDBServiceProvider() {
+    return containerDBServiceProvider;
+  }
 }
