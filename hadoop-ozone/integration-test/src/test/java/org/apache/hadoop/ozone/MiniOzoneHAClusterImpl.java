@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +71,7 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    *
    * @throws IOException if there is an I/O error
    */
-
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
       Map<String, OzoneManager> omMap,
@@ -78,8 +79,9 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       List<OzoneManager> inactiveOMList,
       StorageContainerManager scm,
       List<HddsDatanodeService> hddsDatanodes,
-      String omServiceId) {
-    super(conf, scm, hddsDatanodes);
+      String omServiceId,
+      ReconServer reconServer) {
+    super(conf, scm, hddsDatanodes, reconServer);
     this.ozoneManagerMap = omMap;
     this.ozoneManagers = new ArrayList<>(omMap.values());
     this.activeOMs = activeOMList;
@@ -213,19 +215,28 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       initializeConfiguration();
       StorageContainerManager scm;
       Map<String, OzoneManager> omMap;
+      ReconServer reconServer = null;
       try {
         scm = createSCM();
         scm.start();
         omMap = createOMService();
+        if (includeRecon) {
+          configureRecon();
+          reconServer = new ReconServer();
+        }
       } catch (AuthenticationException ex) {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(scm);
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(
-          conf, omMap, activeOMs, inactiveOMs, scm, hddsDatanodes, omServiceId);
+          conf, omMap, activeOMs, inactiveOMs, scm, hddsDatanodes,
+          omServiceId, reconServer);
       if (startDataNodes) {
         cluster.startHddsDatanodes();
+      }
+      if (includeRecon) {
+        reconServer.execute(new String[] {});
       }
       return cluster;
     }
