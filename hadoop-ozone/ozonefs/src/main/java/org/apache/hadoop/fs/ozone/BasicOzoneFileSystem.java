@@ -749,7 +749,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     adapter.setAcl(pathToKey(path), aclSpecToString(aclSpec));
   }
 
-  private String toAclString(AclEntry aclEntry) {
+  public String toAclString(AclEntry aclEntry) {
     StringBuilder sb = new StringBuilder();
 
     if (aclEntry.getType() != null) {
@@ -760,6 +760,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       sb.append(aclEntry.getName());
     }
     sb.append(':');
+    // For example, change "r-x" to "rx"
     if (aclEntry.getPermission() != null) {
       sb.append(aclEntry.getPermission().SYMBOL.replace("-", ""));
     }
@@ -771,7 +772,7 @@ public class BasicOzoneFileSystem extends FileSystem {
    * @param aclSpec List of AclEntries to convert
    * @return String representation of aclSpec
    */
-  private String aclSpecToString(List<AclEntry> aclSpec) {
+  public String aclSpecToString(List<AclEntry> aclSpec) {
     StringBuilder buf = new StringBuilder();
     for ( AclEntry e : aclSpec ) {
       buf.append(toAclString(e));

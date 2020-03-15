@@ -336,7 +336,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         .setBucketName(bucket.getName()).setVolumeName(volume.getName())
         .setKeyName(keyName).setResType(OzoneObj.ResourceType.KEY)
         .setStoreType(OZONE).build();
-    Map<String, List<OzoneAcl>> ozoneAcls = new HashMap<>();
     List<OzoneAcl> userResult = new ArrayList<OzoneAcl>();
     List<OzoneAcl> groupResult = new ArrayList<OzoneAcl>();
 
@@ -347,6 +346,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
             groupResult.add(ozoneAcl);
         }
     });
+    Map<String, List<OzoneAcl>> ozoneAcls = new HashMap<>();
     ozoneAcls.put(ACLIdentityType.USER.toString(),userResult);
     ozoneAcls.put(ACLIdentityType.GROUP.toString(),groupResult);
     return ozoneAcls;

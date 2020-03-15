@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.mockito.Mockito.*;
 import static org.junit.Assert.*;
 
@@ -29,8 +33,17 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclEntryScope;
+import org.apache.hadoop.fs.permission.AclEntryType;
+import org.apache.hadoop.fs.permission.AclStatus;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.Before;
 import org.junit.Test;
+import org.powermock.core.classloader.annotations.PrepareForTest;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,14 +52,19 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Tests to check if bytes read and written and corresponding read and write
  * operation counts are accounted properly in FileSystem statistics, when the
  * FileSystem API is used to read data from Ozone.
  */
+@PrepareForTest({ OzoneClientFactory.class, BasicOzoneClientAdapterImpl.class })
 public class TestReadWriteStatistics {
 
   private Path aPath = new Path("/afile");
@@ -328,6 +346,29 @@ public class TestReadWriteStatistics {
     fail("Add tests to cover metrics changes on append!");
   }
 
+  @Test
+  public void testGetAclSeparateUserAndGroup() throws IOException {
+    AclStatus aclStatus = fs.getAclStatus(aPath);
+    String groupAcls = aclStatus.getGroup();
+    String userAcls = aclStatus.getOwner();
+
+    assertTrue(userAcls.contains("user1"));
+    assertTrue(groupAcls.contains("group1"));
+    assertTrue(groupAcls.contains("group2"));
+  }
+
+  @Test
+  public void testSetAclHdfsSpecToOzoneSpec() {
+    List<AclEntry> aclEntries = new ArrayList<>();
+    AclEntryScope aclEntryScope =  AclEntryScope.ACCESS;
+    AclEntry aclEntry = new AclEntry.Builder().setName("bruce")
+        .setPermission(FsAction.READ_EXECUTE).setScope(aclEntryScope)
+        .setType(AclEntryType.USER).build();
+    aclEntries.add(aclEntry);
+
+    assertFalse(fs.aclSpecToString(aclEntries).contains("-"));
+  }
+
   // INTERNALS
   //TODO: check on this why it is not equals to OzoneFSStorageStatistics.NAME
   // as I believe this should be the value instead of the seen one.
@@ -390,6 +431,7 @@ public class TestReadWriteStatistics {
     setupAdapterToReturnFakeOutputStreamOnCreate();
     setupFileSystemToUseFakeClientAdapter();
     initializeFS();
+    setupGetAcl();
     Arrays.fill(buff, (byte) 20);
   }
 
@@ -449,4 +491,16 @@ public class TestReadWriteStatistics {
         .when(fakeOutputStream).write(any(byte[].class), anyInt(), anyInt());
   }
 
+  private void setupGetAcl() throws IOException {
+    List<OzoneAcl> userAcl = new ArrayList<>();
+    userAcl.add(new OzoneAcl(USER, "user1", READ, ACCESS));
+    List<OzoneAcl> groupAcl = new ArrayList<>();
+    groupAcl.add(new OzoneAcl(GROUP, "group1", READ, ACCESS));
+    groupAcl.add(new OzoneAcl(GROUP, "group2", READ, ACCESS));
+    Map<String, List<OzoneAcl>> ozoneAcls = new HashMap<>();
+    ozoneAcls.put(IAccessAuthorizer.ACLIdentityType.USER.toString(), userAcl);
+    ozoneAcls.put(IAccessAuthorizer.ACLIdentityType.GROUP.toString(),groupAcl);
+
+    when(fakeAdapter.getAcl(anyString())).thenReturn(ozoneAcls);
+  }
 }
