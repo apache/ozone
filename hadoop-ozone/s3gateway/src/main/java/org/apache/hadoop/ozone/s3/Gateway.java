@@ -22,6 +22,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,7 @@ public class Gateway extends GenericCli {
   @Override
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
+    TracingUtil.initTracing("S3gateway", ozoneConfiguration);
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
     ozoneConfiguration.set("hadoop.http.authentication.type", "simple");
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
