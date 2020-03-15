@@ -778,15 +778,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:" +
           tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
 
-      int httpPort = reconHttpPort.orElse(0);
-      conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:" + httpPort);
-
-      int rpcPort = NetUtils.getFreeSocketPort();
-      if (reconDatanodePort.isPresent()) {
-        rpcPort = reconDatanodePort.getAsInt();
-      }
-      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:" + rpcPort);
-      conf.set(OZONE_RECON_ADDRESS_KEY, "0.0.0.0:" + rpcPort);
+      conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:0");
+      conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
+      conf.set(OZONE_RECON_ADDRESS_KEY, "0.0.0.0:0");
 
       ConfigurationProvider.setConfiguration(conf);
     }
