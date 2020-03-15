@@ -6,43 +6,40 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.segmentparser;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import picocli.CommandLine;
 
+import java.util.concurrent.Callable;
+
 /**
- * Parse Ratis Log CLI implementation.
+ * Command line utility to parse and dump a OM ratis segment file.
  */
 @CommandLine.Command(
-    name = "ratislogparser",
-    description = "Shell of printing Ratis Log in understandable text",
-    subcommands = {
-        DatanodeRatisLogParser.class,
-        GenericRatisLogParser.class,
-        OMRatisLogParser.class
-        //TODO: After SCM HA implementation, we can add log parser for SCM.
-    },
-    versionProvider = HddsVersionProvider.class,
-    mixinStandardHelpOptions = true)
-public class RatisLogParser extends GenericCli {
+    name = "om",
+    description = "dump om ratis segment file",
+    mixinStandardHelpOptions = true,
+    versionProvider = HddsVersionProvider.class)
+public class OMRatisLogParser extends BaseLogParser implements Callable<Void> {
 
   @Override
-  public void execute(String[] argv) {
-    super.execute(argv);
-  }
+  public Void call() throws Exception {
+    System.out.println("Dumping OM Ratis Log");
 
-  public static void main(String[] args) {
-    new RatisLogParser().run(args);
+    parseRatisLogs(OMRatisHelper::smProtoToString);
+    return null;
   }
 }
+
