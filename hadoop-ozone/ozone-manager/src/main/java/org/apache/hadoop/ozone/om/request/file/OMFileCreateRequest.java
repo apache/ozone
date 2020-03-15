@@ -19,14 +19,11 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -68,8 +65,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
@@ -189,7 +184,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
     OmKeyInfo omKeyInfo = null;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
-    List<OmKeyInfo> missingParentInfos = new ArrayList<>();
+    List<OmKeyInfo> missingParentInfos;
 
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OMResponse.newBuilder()
@@ -369,7 +364,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     if (!pathInfo.directParentExists()) {
       throw new OMException("Cannot create file : " + keyName
           + " as one of parent directory is not created",
-          OMException.ResultCodes.NOT_A_FILE);
+          OMException.ResultCodes.DIRECTORY_NOT_FOUND);
     }
   }
 }

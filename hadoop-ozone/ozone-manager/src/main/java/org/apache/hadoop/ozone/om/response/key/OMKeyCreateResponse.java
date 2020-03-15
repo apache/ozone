@@ -74,8 +74,10 @@ public class OMKeyCreateResponse extends OMClientResponse {
         String parentKey = omMetadataManager
             .getOzoneDirKey(parentKeyInfo.getVolumeName(),
                 parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
-        LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
-            parentKeyInfo);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
+              parentKeyInfo);
+        }
         omMetadataManager.getKeyTable()
             .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }

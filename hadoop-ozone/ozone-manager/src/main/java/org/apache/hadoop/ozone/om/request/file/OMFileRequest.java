@@ -70,13 +70,6 @@ public final class OMFileRequest {
     List<String> missing = new ArrayList<>();
     List<OzoneAcl> inheritAcls = new ArrayList<>();
     OMDirectoryResult result = OMDirectoryResult.NONE;
-    Path immediateParentPath = keyPath.getParent();
-    String immParentKeyName = null;
-
-    if (!pathIsRootDir(immediateParentPath)) {
-      immParentKeyName = omMetadataManager.getOzoneDirKey(volumeName,
-          bucketName, immediateParentPath.toString());
-    }
 
     while (keyPath != null) {
       String pathName = keyPath.toString();
@@ -136,9 +129,6 @@ public final class OMFileRequest {
     return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls);
   }
 
-  private static boolean pathIsRootDir(Path path) {
-    return (path == null);
-  }
   /**
    * Get the valid base object id given the transaction id.
    * @param id of the transaction
