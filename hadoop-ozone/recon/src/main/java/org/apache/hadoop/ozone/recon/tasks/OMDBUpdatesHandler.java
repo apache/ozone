@@ -104,7 +104,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       String key = codecRegistry.asObject(keyBytes, keyType);
       builder.setKey(key);
 
-      if (action.equals(PUT)) {
+      if (action == PUT) {
         Object value = codecRegistry.asObject(valueBytes, valueType);
         builder.setValue(value);
         // If a PUT key operation happens on an existing Key, it is tagged

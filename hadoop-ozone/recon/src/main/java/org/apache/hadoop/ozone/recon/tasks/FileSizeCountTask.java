@@ -252,7 +252,7 @@ public class FileSizeCountTask implements ReconOmTask {
         upperBoundCount[binIndex]--;
       } else {
         LOG.warn("Unexpected error while updating bin count. Found 0 count " +
-                "for index : {} while processing DELETE event for {}", binIndex,
+            "for index : {} while processing DELETE event for {}", binIndex,
             omKeyInfo.getKeyName());
       }
     }
