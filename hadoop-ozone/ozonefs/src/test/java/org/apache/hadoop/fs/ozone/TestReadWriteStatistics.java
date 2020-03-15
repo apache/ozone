@@ -499,7 +499,7 @@ public class TestReadWriteStatistics {
     groupAcl.add(new OzoneAcl(GROUP, "group2", READ, ACCESS));
     Map<String, List<OzoneAcl>> ozoneAcls = new HashMap<>();
     ozoneAcls.put(IAccessAuthorizer.ACLIdentityType.USER.toString(), userAcl);
-    ozoneAcls.put(IAccessAuthorizer.ACLIdentityType.GROUP.toString(),groupAcl);
+    ozoneAcls.put(IAccessAuthorizer.ACLIdentityType.GROUP.toString(), groupAcl);
 
     when(fakeAdapter.getAcl(anyString())).thenReturn(ozoneAcls);
   }

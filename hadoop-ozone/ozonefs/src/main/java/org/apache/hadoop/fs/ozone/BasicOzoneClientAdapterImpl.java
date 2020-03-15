@@ -340,15 +340,15 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     List<OzoneAcl> groupResult = new ArrayList<OzoneAcl>();
 
     ozoneClient.getObjectStore().getAcl(obj).forEach(ozoneAcl -> {
-        if (ozoneAcl.getType().equals(ACLIdentityType.USER)) {
-            userResult.add(ozoneAcl);
-        } else if (ozoneAcl.getType().equals(ACLIdentityType.GROUP)) {
+      if (ozoneAcl.getType().equals(ACLIdentityType.USER)) {
+          userResult.add(ozoneAcl);
+      } else if (ozoneAcl.getType().equals(ACLIdentityType.GROUP)) {
             groupResult.add(ozoneAcl);
-        }
+      }
     });
     Map<String, List<OzoneAcl>> ozoneAcls = new HashMap<>();
-    ozoneAcls.put(ACLIdentityType.USER.toString(),userResult);
-    ozoneAcls.put(ACLIdentityType.GROUP.toString(),groupResult);
+    ozoneAcls.put(ACLIdentityType.USER.toString(), userResult);
+    ozoneAcls.put(ACLIdentityType.GROUP.toString(), groupResult);
     return ozoneAcls;
   }
 

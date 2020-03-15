@@ -768,13 +768,14 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   /**
-   * Convert a List of AclEntries into a string
+   * Convert a List of AclEntries into a string.
+   *
    * @param aclSpec List of AclEntries to convert
    * @return String representation of aclSpec
    */
   public String aclSpecToString(List<AclEntry> aclSpec) {
     StringBuilder buf = new StringBuilder();
-    for ( AclEntry e : aclSpec ) {
+    for (AclEntry e : aclSpec) {
       buf.append(toAclString(e));
       buf.append(",");
     }
