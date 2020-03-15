@@ -57,10 +57,8 @@ Check if Recon picks up DN heartbeats
                         Should contain      ${result}       datanode_3
 
     ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/clusterState
-                        Should contain      ${result}       \"total\":3,\"healthy\":3
-                        Should contain      ${result}       \"volumes\":1
-                        Should contain      ${result}       \"buckets\":1
-                        Should contain      ${result}       \"keys\":10
+                        Should contain      ${result}       \"totalDatanodes\":3
+                        Should contain      ${result}       \"healthyDatanodes\":3
                         Should contain      ${result}       \"pipelines\":4
 
 Check if Recon Web UI is up

@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 /**
  * Class that represents the API Response structure of ClusterState.
  */
-public class ClusterStateResponse {
+public final class ClusterStateResponse {
   /**
    * Total count of the pipelines.
    */
@@ -31,10 +31,16 @@ public class ClusterStateResponse {
   private int pipelines;
 
   /**
-   * Count of datanodes.
+   * Total count of datanodes.
    */
-  @JsonProperty("datanodes")
-  private DatanodesCount datanodes;
+  @JsonProperty("totalDatanodes")
+  private int totalDatanodes;
+
+  /**
+   * Count of healthy datanodes.
+   */
+  @JsonProperty("healthyDatanodes")
+  private int healthyDatanodes;
 
   /**
    * Storage Report of the cluster.
@@ -75,13 +81,25 @@ public class ClusterStateResponse {
     return new Builder();
   }
 
+  private ClusterStateResponse(Builder b) {
+    this.buckets = b.buckets;
+    this.keys = b.keys;
+    this.pipelines = b.pipelines;
+    this.volumes = b.volumes;
+    this.totalDatanodes = b.totalDatanodes;
+    this.healthyDatanodes = b.healthyDatanodes;
+    this.storageReport = b.storageReport;
+    this.containers = b.containers;
+  }
+
   /**
    * Builder for ClusterStateResponse.
    */
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private int pipelines;
-    private DatanodesCount datanodes;
+    private int totalDatanodes;
+    private int healthyDatanodes;
     private DatanodeStorageReport storageReport;
     private int containers;
     private long volumes;
@@ -95,6 +113,8 @@ public class ClusterStateResponse {
       this.buckets = 0;
       this.keys = 0;
       this.pipelines = 0;
+      this.totalDatanodes = 0;
+      this.healthyDatanodes = 0;
     }
 
     public Builder setPipelines(int pipelines) {
@@ -102,8 +122,13 @@ public class ClusterStateResponse {
       return this;
     }
 
-    public Builder setDatanodes(DatanodesCount datanodes) {
-      this.datanodes = datanodes;
+    public Builder setTotalDatanodes(int totalDatanodes) {
+      this.totalDatanodes = totalDatanodes;
+      return this;
+    }
+
+    public Builder setHealthyDatanodes(int healthyDatanodes) {
+      this.healthyDatanodes = healthyDatanodes;
       return this;
     }
 
@@ -133,18 +158,9 @@ public class ClusterStateResponse {
     }
 
     public ClusterStateResponse build() {
-      Preconditions.checkNotNull(this.datanodes);
       Preconditions.checkNotNull(this.storageReport);
 
-      ClusterStateResponse clusterStateResponse = new ClusterStateResponse();
-      clusterStateResponse.buckets = this.buckets;
-      clusterStateResponse.keys = this.keys;
-      clusterStateResponse.pipelines = this.pipelines;
-      clusterStateResponse.volumes = this.volumes;
-      clusterStateResponse.datanodes = this.datanodes;
-      clusterStateResponse.storageReport = this.storageReport;
-      clusterStateResponse.containers = this.containers;
-      return clusterStateResponse;
+      return new ClusterStateResponse(this);
     }
   }
 
@@ -152,8 +168,12 @@ public class ClusterStateResponse {
     return pipelines;
   }
 
-  public DatanodesCount getDatanodes() {
-    return datanodes;
+  public int getTotalDatanodes() {
+    return totalDatanodes;
+  }
+
+  public int getHealthyDatanodes() {
+    return healthyDatanodes;
   }
 
   public DatanodeStorageReport getStorageReport() {

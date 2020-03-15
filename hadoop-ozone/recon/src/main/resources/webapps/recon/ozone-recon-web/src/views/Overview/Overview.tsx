@@ -24,13 +24,9 @@ import prettyBytes from 'pretty-bytes';
 import './Overview.less';
 import {StorageReport} from "types/datanode.types";
 
-interface DatanodesCount {
-  total: number;
-  healthy: number;
-}
-
 interface ClusterStateResponse {
-  datanodes: DatanodesCount;
+  totalDatanodes: number;
+  healthyDatanodes: number;
   pipelines: number;
   storageReport: StorageReport;
   containers: number;
@@ -82,7 +78,7 @@ export class Overview extends React.Component<any, OverviewState> {
       const clusterState: ClusterStateResponse = clusterStateResponse.data;
       this.setState({
         loading: false,
-        datanodes: `${clusterState.datanodes.healthy}/${clusterState.datanodes.total}`,
+        datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
         storageReport: clusterState.storageReport,
         pipelines: clusterState.pipelines,
         containers: clusterState.containers,

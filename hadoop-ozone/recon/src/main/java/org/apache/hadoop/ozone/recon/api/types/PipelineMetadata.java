@@ -31,7 +31,7 @@ import java.util.UUID;
  * Metadata object that represents a Pipeline.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-public class PipelineMetadata {
+public final class PipelineMetadata {
 
   @XmlElement(name = "pipelineId")
   private UUID pipelineId;
@@ -113,6 +113,19 @@ public class PipelineMetadata {
     return new Builder();
   }
 
+  private PipelineMetadata(Builder b) {
+    this.pipelineId = b.pipelineId;
+    this.status = b.status;
+    this.leaderNode = b.leaderNode;
+    this.datanodes = b.datanodes;
+    this.lastLeaderElection = b.lastLeaderElection;
+    this.duration = b.duration;
+    this.leaderElections = b.leaderElections;
+    this.replicationType = b.replicationType;
+    this.replicationFactor = b.replicationFactor;
+    this.containers = b.containers;
+  }
+
   /**
    * Builder for PipelineMetadata.
    */
@@ -149,19 +162,7 @@ public class PipelineMetadata {
       Preconditions.checkNotNull(datanodes);
       Preconditions.checkNotNull(replicationType);
 
-      PipelineMetadata pipelineMetadata = new PipelineMetadata();
-      pipelineMetadata.pipelineId = this.pipelineId;
-      pipelineMetadata.status = this.status;
-      pipelineMetadata.leaderNode = this.leaderNode;
-      pipelineMetadata.datanodes = this.datanodes;
-      pipelineMetadata.lastLeaderElection = this.lastLeaderElection;
-      pipelineMetadata.duration = this.duration;
-      pipelineMetadata.leaderElections = this.leaderElections;
-      pipelineMetadata.replicationType = this.replicationType;
-      pipelineMetadata.replicationFactor = this.replicationFactor;
-      pipelineMetadata.containers = this.containers;
-
-      return pipelineMetadata;
+      return new PipelineMetadata(this);
     }
 
     public Builder setPipelineId(UUID pipelineId) {

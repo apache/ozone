@@ -95,7 +95,6 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
   private long containerId = 1L;
   private ContainerReportsProto containerReportsProto;
   private DatanodeDetailsProto datanodeDetailsProto;
-  private DatanodeDetailsProto datanodeDetailsProto2;
   private Pipeline pipeline;
 
   private void initializeInjector() throws IOException {
@@ -240,12 +239,12 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
             .addStorageReport(storageReportProto1)
             .addStorageReport(storageReportProto2).build();
 
-    datanodeDetailsProto2 =
+    DatanodeDetailsProto datanodeDetailsProto2 =
         DatanodeDetailsProto.newBuilder()
-            .setHostName("host2.datanode")
-            .setUuid(datanodeId2)
-            .setIpAddress("2.2.2.2")
-            .build();
+        .setHostName("host2.datanode")
+        .setUuid(datanodeId2)
+        .setIpAddress("2.2.2.2")
+        .build();
     StorageReportProto storageReportProto3 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
             .setStorageLocation("/disk1").setScmUsed(20000).setRemaining(7800)
@@ -431,8 +430,8 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
     Assert.assertEquals(2, clusterStateResponse.getVolumes());
     Assert.assertEquals(2, clusterStateResponse.getBuckets());
     Assert.assertEquals(3, clusterStateResponse.getKeys());
-    Assert.assertEquals(2, clusterStateResponse.getDatanodes().getTotal());
-    Assert.assertEquals(2, clusterStateResponse.getDatanodes().getHealthy());
+    Assert.assertEquals(2, clusterStateResponse.getTotalDatanodes());
+    Assert.assertEquals(2, clusterStateResponse.getHealthyDatanodes());
 
     DatanodeStorageReport storageReport =
         clusterStateResponse.getStorageReport();
