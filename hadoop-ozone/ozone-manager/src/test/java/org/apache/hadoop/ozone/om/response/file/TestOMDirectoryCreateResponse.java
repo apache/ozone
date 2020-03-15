@@ -75,7 +75,7 @@ public class TestOMDirectoryCreateResponse {
             .build();
 
     OMDirectoryCreateResponse omDirectoryCreateResponse =
-        new OMDirectoryCreateResponse(omResponse, omKeyInfo, null, false);
+        new OMDirectoryCreateResponse(omResponse, omKeyInfo, null);
 
     omDirectoryCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 

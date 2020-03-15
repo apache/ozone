@@ -215,19 +215,17 @@ public class TestOzoneFileInterfaces {
     assertEquals(FsPermission.getFileDefault(), status.getPermission());
     verifyOwnerGroup(status);
 
-    if (cluster.getOzoneManager().createPrefixEntries()) {
-      FileStatus lev1status;
-      FileStatus lev2status;
+    FileStatus lev1status;
+    FileStatus lev2status;
 
-      // verify prefix directories got created when creating the file.
-      assertTrue(metadataManager.getKeyTable().get(lev1key).getKeyName()
-          .equals("l1dir/"));
-      assertTrue(metadataManager.getKeyTable().get(lev2key).getKeyName()
-          .equals("l1dir/l2dir/"));
-      lev1status = getDirectoryStat(lev1path);
-      lev2status = getDirectoryStat(lev2path);
-      assertTrue((lev1status != null) && (lev2status != null));
-    }
+    // verify prefix directories got created when creating the file.
+    assertTrue(metadataManager.getKeyTable().get(lev1key).getKeyName()
+        .equals("l1dir/"));
+    assertTrue(metadataManager.getKeyTable().get(lev2key).getKeyName()
+        .equals("l1dir/l2dir/"));
+    lev1status = getDirectoryStat(lev1path);
+    lev2status = getDirectoryStat(lev2path);
+    assertTrue((lev1status != null) && (lev2status != null));
 
     try (FSDataInputStream inputStream = fs.open(path)) {
       byte[] buffer = new byte[stringLen];
@@ -310,26 +308,22 @@ public class TestOzoneFileInterfaces {
     leafstatus = getDirectoryStat(leaf);
     assertTrue(leafstatus != null);
 
-    if (cluster.getOzoneManager().createPrefixEntries()) {
-      FileStatus lev1status;
-      FileStatus lev2status;
+    FileStatus lev1status;
+    FileStatus lev2status;
 
-      // verify prefix directories got created when creating the leaf directory.
-      assertTrue(metadataManager
-          .getKeyTable()
-          .get(lev1key)
-          .getKeyName().equals("abc/"));
-      assertTrue(metadataManager
-          .getKeyTable()
-          .get(lev2key)
-          .getKeyName().equals("abc/def/"));
-      lev1status = getDirectoryStat(lev1path);
-      lev2status = getDirectoryStat(lev2path);
-      assertTrue((lev1status != null) && (lev2status != null));
-      rootChild = lev1status;
-    } else {
-      rootChild = leafstatus;
-    }
+    // verify prefix directories got created when creating the leaf directory.
+    assertTrue(metadataManager
+        .getKeyTable()
+        .get(lev1key)
+        .getKeyName().equals("abc/"));
+    assertTrue(metadataManager
+        .getKeyTable()
+        .get(lev2key)
+        .getKeyName().equals("abc/def/"));
+    lev1status = getDirectoryStat(lev1path);
+    lev2status = getDirectoryStat(lev2path);
+    assertTrue((lev1status != null) && (lev2status != null));
+    rootChild = lev1status;
 
     // check the root directory
     rootstatus = getDirectoryStat(createPath("/"));

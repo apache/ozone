@@ -64,10 +64,6 @@ public class OMKeyCreateResponse extends OMClientResponse {
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
-    omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
-        openKey, omKeyInfo);
     /**
      * Create parent directory entries during Key Create - do not wait
      * for Key Commit request.
@@ -84,6 +80,11 @@ public class OMKeyCreateResponse extends OMClientResponse {
             .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }
     }
+
+    String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
+    omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
+        openKey, omKeyInfo);
   }
 }
 

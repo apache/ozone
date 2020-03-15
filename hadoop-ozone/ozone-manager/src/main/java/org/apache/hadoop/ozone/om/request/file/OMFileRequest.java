@@ -23,10 +23,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,14 +70,10 @@ public final class OMFileRequest {
     List<String> missing = new ArrayList<>();
     List<OzoneAcl> inheritAcls = new ArrayList<>();
     OMDirectoryResult result = OMDirectoryResult.NONE;
-    boolean parentExists = false;
     Path immediateParentPath = keyPath.getParent();
     String immParentKeyName = null;
 
-    if (pathIsRootDir(immediateParentPath)) {
-      //root dir always exists
-      parentExists = true;
-    } else {
+    if (!pathIsRootDir(immediateParentPath)) {
       immParentKeyName = omMetadataManager.getOzoneDirKey(volumeName,
           bucketName, immediateParentPath.toString());
     }
@@ -91,7 +91,6 @@ public final class OMFileRequest {
         // Check if this is actual file or a file in the given path
         if (dbKeyName.equals(fileNameFromDetails)) {
           result = OMDirectoryResult.FILE_EXISTS;
-          parentExists = true;
         } else {
           result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
         }
@@ -107,9 +106,6 @@ public final class OMFileRequest {
           LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
               + inheritAcls);
         }
-        if (dbDirKeyName.equals(immParentKeyName)) {
-          parentExists = true;
-        }
       } else {
         if (!dbDirKeyName.equals(dirNameFromDetails)) {
           missing.add(keyPath.toString());
@@ -120,11 +116,7 @@ public final class OMFileRequest {
 
         LOG.trace("verifyFiles in Path : " + "/" + volumeName
             + "/" + bucketName + "/" + keyName + ":" + result);
-        // if file exists, so does the parent. Assert.
-        Preconditions.checkState((result != OMDirectoryResult.FILE_EXISTS)
-            || (parentExists));
-
-        return new OMPathInfo(missing, result, inheritAcls, parentExists);
+        return new OMPathInfo(missing, result, inheritAcls);
       }
       keyPath = keyPath.getParent();
     }
@@ -140,12 +132,8 @@ public final class OMFileRequest {
 
     LOG.trace("verifyFiles in Path : " + volumeName + "/" + bucketName + "/"
         + keyName + ":" + result);
-    // parentExists always true if we are creating inside root dir
-    Preconditions.checkState(!pathIsRootDir(immediateParentPath)
-        || parentExists);
     // Found no files/ directories in the given path.
-    return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls,
-        parentExists);
+    return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls);
   }
 
   private static boolean pathIsRootDir(Path path) {
@@ -187,14 +175,12 @@ public final class OMFileRequest {
     private OMDirectoryResult directoryResult;
     private List<String> missingParents;
     private List<OzoneAcl> acls;
-    private boolean directParentExists;
 
     public OMPathInfo(List missingParents, OMDirectoryResult result,
-        List<OzoneAcl> aclList, boolean directParentExists) {
+        List<OzoneAcl> aclList) {
       this.missingParents = missingParents;
       this.directoryResult = result;
       this.acls = aclList;
-      this.directParentExists = directParentExists;
     }
 
     public List getMissingParents() {
@@ -213,8 +199,8 @@ public final class OMFileRequest {
      * indicates if the immediate parent in the path already exists.
      * @return true indicates the parent exists
      */
-    public boolean getDirectParentExists() {
-      return directParentExists;
+    public boolean directParentExists() {
+      return missingParents.isEmpty();
     }
   }
 
@@ -246,5 +232,36 @@ public final class OMFileRequest {
     // If we don't have any file/directory name with "a/b/c" or any
     // sub-directory or file name from the given path we return this enum value.
     NONE
+  }
+
+  /**
+   * Add entries to the Key Table cache.
+   * @param omMetadataManager
+   * @param volumeName
+   * @param bucketName
+   * @param keyInfo
+   * @param parentInfoList
+   * @param index
+   *
+   * TODO : move code to a separate utility class.
+   */
+  public static void addKeyTableCacheEntries(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName, Optional<OmKeyInfo> keyInfo,
+      Optional<List<OmKeyInfo>> parentInfoList,
+      long index) {
+    for (OmKeyInfo parentInfo : parentInfoList.get()) {
+      omMetadataManager.getKeyTable().addCacheEntry(
+          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
+              parentInfo.getKeyName())),
+          new CacheValue<>(Optional.of(parentInfo), index));
+    }
+
+    if (keyInfo.isPresent()) {
+      omMetadataManager.getKeyTable().addCacheEntry(
+          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
+                  keyInfo.get().getKeyName())),
+          new CacheValue<>(keyInfo, index));
+    }
   }
 }

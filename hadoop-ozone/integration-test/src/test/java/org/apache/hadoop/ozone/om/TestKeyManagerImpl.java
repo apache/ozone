@@ -92,13 +92,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 
 import org.apache.hadoop.util.Time;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.ExpectedException;
 import org.mockito.Mockito;
 
@@ -418,6 +412,8 @@ public class TestKeyManagerImpl {
   }
 
   @Test
+  @Ignore
+  // TODO this test relies on KeyManagerImpl.createFile which is obsolete.
   public void testCheckAccessForFileKey() throws Exception {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName("testdir/deep/NOTICE.txt")

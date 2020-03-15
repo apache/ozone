@@ -190,20 +190,19 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         long baseObjId = OMFileRequest.getObjIDFromTxId(trxnLogIndex);
         List<OzoneAcl> inheritAcls = omPathInfo.getAcls();
 
-        dirKeyInfo = createDirectoryKeyInfo(ozoneManager, keyName, keyArgs,
-            baseObjId, trxnLogIndex);
+        dirKeyInfo = createDirectoryKeyInfoWithACL(ozoneManager, keyName,
+            keyArgs, baseObjId,
+            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex);
 
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
             missingParents, inheritAcls, trxnLogIndex);
 
-        omMetadataManager.getKeyTable().addCacheEntry(
-            new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
-                dirKeyInfo.getKeyName())),
-            new CacheValue<>(Optional.of(dirKeyInfo), trxnLogIndex));
+        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
+            bucketName, Optional.of(dirKeyInfo),
+            Optional.of(missingParentInfos), trxnLogIndex);
 
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos,
-            ozoneManager.createPrefixEntries());
+            dirKeyInfo, missingParentInfos);
         result = Result.SUCCESS;
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
@@ -367,22 +366,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     return dirKeyInfoBuilderNoACL(ozoneManager, omBucketInfo, volumeName,
         bucketName, keyName, keyArgs, objectId)
         .setAcls(inheritAcls)
-        .setUpdateID(transactionIndex)
-        .build();
-  }
-
-  private static OmKeyInfo createDirectoryKeyInfo(OzoneManager ozoneManager,
-      String keyName, KeyArgs keyArgs, long objectId, long transactionIndex)
-      throws IOException {
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-
-    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
-        omMetadataManager.getBucketKey(volumeName, bucketName));
-    return dirKeyInfoBuilderNoACL(ozoneManager, omBucketInfo, volumeName,
-        bucketName, keyName, keyArgs, objectId)
-        .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
         .setUpdateID(transactionIndex)
         .build();
   }
