@@ -36,13 +36,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * This Load Generator reads and write key to an Ozone bucket.
  *
- * The defautl writes to read ratio is 10:90.
+ * The default writes to read ratio is 10:90.
  */
 public class AgedLoadGenerator implements LoadGenerator {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AgedLoadGenerator.class);
-  private static String fileSuffex = "aged";
+  private static String agedSuffix = "aged";
 
   private final AtomicInteger agedFileWrittenIndex;
   private final AtomicInteger agedFileAllocationIndex;
@@ -71,7 +71,7 @@ public class AgedLoadGenerator implements LoadGenerator {
           synchronized (agedFileAllocationIndex) {
             int index = agedFileAllocationIndex.getAndIncrement();
             ByteBuffer buffer = dataBuffer.getBuffer(index);
-            keyName = MiniOzoneLoadGenerator.getKeyName(index, fileSuffex);
+            keyName = MiniOzoneLoadGenerator.getKeyName(index, agedSuffix);
             agedLoadBucket.writeKey(buffer, keyName);
             agedFileWrittenIndex.getAndIncrement();
           }
@@ -80,7 +80,7 @@ public class AgedLoadGenerator implements LoadGenerator {
           if (index.isPresent()) {
             ByteBuffer buffer = dataBuffer.getBuffer(index.get());
             keyName =
-                MiniOzoneLoadGenerator.getKeyName(index.get(), fileSuffex);
+                MiniOzoneLoadGenerator.getKeyName(index.get(), agedSuffix);
             agedLoadBucket.readKey(buffer, keyName);
           }
         }

@@ -29,7 +29,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Load executors for Ozone, this class provides a pluggable
+ * Load executors for Ozone, this class provides a plugable
  * executor for different load generators.
  */
 public class LoadExecutors {
