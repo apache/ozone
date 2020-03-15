@@ -226,4 +226,9 @@ public class ReconServer extends GenericCli {
   public ContainerDBServiceProvider getContainerDBServiceProvider() {
     return containerDBServiceProvider;
   }
+
+  @VisibleForTesting
+  ReconHttpServer getHttpServer() {
+    return httpServer;
+  }
 }
