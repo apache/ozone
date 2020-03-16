@@ -44,6 +44,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
 
 /**
  * Tests OMFileCreateRequest.
@@ -333,9 +334,11 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
             ozoneManagerDoubleBufferHelper);
 
     if (fail) {
-      Assert.assertTrue(omFileCreateResponse.getOMResponse()
-          .getStatus() == NOT_A_FILE || omFileCreateResponse.getOMResponse()
-          .getStatus() == FILE_ALREADY_EXISTS);
+      OzoneManagerProtocolProtos.Status respStatus =
+          omFileCreateResponse.getOMResponse().getStatus();
+      Assert.assertTrue(respStatus == NOT_A_FILE
+          || respStatus == FILE_ALREADY_EXISTS
+          || respStatus == DIRECTORY_NOT_FOUND);
     } else {
       Assert.assertTrue(omFileCreateResponse.getOMResponse().getSuccess());
       long id = modifiedOmRequest.getCreateFileRequest().getClientID();
