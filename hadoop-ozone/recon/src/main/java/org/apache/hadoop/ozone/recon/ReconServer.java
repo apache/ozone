@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.recon;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -67,10 +66,8 @@ public class ReconServer extends GenericCli {
   @Override
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    Configuration.addDeprecation(
-        ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE_OLD,
-        ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE);
     ConfigurationProvider.setConfiguration(ozoneConfiguration);
+    ConfigurationProvider.addDeprecations();
 
     injector =  Guice.createInjector(new
         ReconControllerModule(),

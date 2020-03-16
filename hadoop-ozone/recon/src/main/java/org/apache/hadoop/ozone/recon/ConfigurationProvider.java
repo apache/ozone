@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Provider;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
@@ -31,6 +32,12 @@ public class ConfigurationProvider implements
     Provider<OzoneConfiguration> {
 
   private static OzoneConfiguration configuration;
+
+  static void addDeprecations() {
+    Configuration.addDeprecation(
+        ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE_OLD,
+        ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE);
+  }
 
   @VisibleForTesting
   public static void setConfiguration(OzoneConfiguration conf) {
