@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -81,6 +82,19 @@ public interface MiniOzoneCluster {
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitForClusterToBeReady() throws TimeoutException, InterruptedException;
+
+  /**
+   * Waits for atleast one RATIS pipeline of given factor to be reported in open
+   * state.
+   *
+   * @param factor replication factor
+   * @param timeoutInMs timeout value in milliseconds
+   * @throws TimeoutException In case of timeout
+   * @throws InterruptedException In case of interrupt while waiting
+   */
+  void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
+                                int timeoutInMs)
+          throws TimeoutException, InterruptedException;
 
   /**
    * Sets the timeout value after which
