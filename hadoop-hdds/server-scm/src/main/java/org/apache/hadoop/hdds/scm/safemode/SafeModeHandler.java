@@ -52,22 +52,8 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
   /**
    * SafeModeHandler, to handle the logic once we exit safe mode.
    * @param configuration
-   * @param clientProtocolServer
-   * @param blockManager
-   * @param replicationManager
    */
-  public SafeModeHandler(Configuration configuration,
-      SCMClientProtocolServer clientProtocolServer,
-      BlockManager blockManager,
-      ReplicationManager replicationManager, PipelineManager pipelineManager) {
-    Objects.requireNonNull(configuration, "Configuration cannot be null");
-    Objects.requireNonNull(clientProtocolServer, "SCMClientProtocolServer " +
-        "object cannot be null");
-    Objects.requireNonNull(blockManager, "BlockManager object cannot be null");
-    Objects.requireNonNull(replicationManager, "ReplicationManager " +
-        "object cannot be null");
-    Objects.requireNonNull(pipelineManager, "PipelineManager object cannot " +
-        "be" + "null");
+  public SafeModeHandler(Configuration configuration) {
     this.waitTime = configuration.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
@@ -77,12 +63,13 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT);
     isInSafeMode.set(safeModeEnabled);
-    immediate.add(clientProtocolServer);
-    immediate.add(blockManager);
-    delayed.add(replicationManager);
-    delayed.add(pipelineManager);
   }
 
+  /**
+   * Add any objects which should be notified immediately on a safemode status
+   * change.
+   * @param objs List of objects to be notified.
+   */
   public void notifyImmediately(SafeModeTransition...objs) {
     for (SafeModeTransition o : objs) {
       Objects.requireNonNull(o, "Only non null objects can be notified");
@@ -90,6 +77,11 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
     }
   }
 
+  /**
+   * Add any object which should be notified when safemode is ended and after
+   * the configured safemode delay.
+   * @param objs List of objects to be notified.
+   */
   public void notifyAfterDelay(SafeModeTransition...objs) {
     for (SafeModeTransition o : objs) {
       Objects.requireNonNull(o, "Only non null objects can be notified");

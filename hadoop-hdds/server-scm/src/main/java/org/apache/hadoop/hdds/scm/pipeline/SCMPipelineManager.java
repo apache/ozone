@@ -645,6 +645,8 @@ public class SCMPipelineManager implements PipelineManager {
       SCMSafeModeManager.SafeModeStatus status) {
     this.isInSafeMode.set(status.getSafeModeStatus());
     if (!status.getSafeModeStatus()) {
+      // TODO: #CLUTIL if we reenter safe mode the fixed interval pipeline
+      // creation job needs to stop
       startPipelineCreator();
       triggerPipelineCreation();
     }
