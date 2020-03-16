@@ -82,6 +82,23 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   VALUE get(KEY key) throws IOException;
 
   /**
+   * Returns the value mapped to the given key in byte array or returns null
+   * if the key is not found.
+   *
+   * This method first checks using keyMayExist, if it returns false, we are
+   * 100% sure that key does not exist in DB, so it returns null with out
+   * calling db.get. If keyMayExist return true, then we use db.get and then
+   * return the value. This method will be useful in the cases where the
+   * caller is more sure that this key does not exist in DB and keyMayExist
+   * will help here.
+   *
+   * @param key metadata key
+   * @return value in byte array or null if the key is not found.
+   * @throws IOException on Failure
+   */
+  VALUE getIfExist(KEY key) throws IOException;
+
+  /**
    * Deletes a key from the metadata store.
    *
    * @param key metadata key
