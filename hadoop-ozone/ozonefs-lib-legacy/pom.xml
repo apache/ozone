@@ -60,7 +60,7 @@
             <configuration>
               <outputDirectory>target/classes/libs</outputDirectory>
               <includeScope>compile</includeScope>
-              <excludes>META-INF/*.SF</excludes>
+              <excludes>META-INF/*.SF,module-info.class</excludes>
               <excludeArtifactIds>
                 slf4j-api,slf4j-log4j12,log4j-api,log4j-core,log4j,hadoop-ozone-filesystem
               </excludeArtifactIds>
@@ -78,8 +78,7 @@
             <phase>prepare-package</phase>
             <configuration>
               <outputDirectory>target/classes</outputDirectory>
-              <includeArtifactIds>hadoop-ozone-filesystem,hadoop-ozone-common
-              </includeArtifactIds>
+              <includeArtifactIds>hadoop-ozone-filesystem,hadoop-ozone-common</includeArtifactIds>
               <includeScope>compile</includeScope>
               <excludes>META-INF/*.SF</excludes>
               <markersDirectory>
