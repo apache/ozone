@@ -107,7 +107,7 @@ public class TestReconAsPassiveScm {
     ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainerIDs().isEmpty());
 
-    // Verify if Recon regix  stered all the nodes.
+    // Verify if all the 3 nodes are registered with Recon.
     NodeManager reconNodeManager = reconScm.getScmNodeManager();
     NodeManager scmNodeManager = scm.getScmNodeManager();
     assertEquals(scmNodeManager.getAllNodes().size(),
@@ -182,7 +182,7 @@ public class TestReconAsPassiveScm {
     assertFalse(
         reconPipelineManager.containsPipeline(pipelineToClose.get().getId()));
 
-    LambdaTestUtils.await(300000, 30000,
+    LambdaTestUtils.await(60000, 5000,
         () -> (newReconScm.getContainerManager()
             .exists(ContainerID.valueof(containerID))));
   }
