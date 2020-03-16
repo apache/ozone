@@ -323,11 +323,12 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
    */
   public String toTimeTransformedJsonString() throws IOException {
     JSONObject containerInfo = new JSONObject();
-    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-    containerInfo.put("state",this.state);
-    containerInfo.put("replicationFactor",this.replicationFactor);
-    containerInfo.put("replicationType",this.replicationType);
-    containerInfo.put("usedBytes",this.usedBytes);
+    SimpleDateFormat dateFormat =
+        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    containerInfo.put("state", this.state);
+    containerInfo.put("replicationFactor", this.replicationFactor);
+    containerInfo.put("replicationType", this.replicationType);
+    containerInfo.put("usedBytes", this.usedBytes);
     containerInfo.put("numberOfKeys", this.numberOfKeys);
     containerInfo.put("lastUsed", dateFormat.format(this.lastUsed));
     containerInfo.put("stateEnterTime", dateFormat.format(this.stateEnterTime));
