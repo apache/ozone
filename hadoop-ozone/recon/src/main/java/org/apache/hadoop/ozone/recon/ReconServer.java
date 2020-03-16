@@ -67,7 +67,6 @@ public class ReconServer extends GenericCli {
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     ConfigurationProvider.setConfiguration(ozoneConfiguration);
-    ConfigurationProvider.addDeprecations();
 
     injector =  Guice.createInjector(new
         ReconControllerModule(),

@@ -33,7 +33,7 @@ public class ConfigurationProvider implements
 
   private static OzoneConfiguration configuration;
 
-  static void addDeprecations() {
+  private static void addDeprecations() {
     Configuration.addDeprecation(
         ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE_OLD,
         ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE);
@@ -43,6 +43,7 @@ public class ConfigurationProvider implements
   public static void setConfiguration(OzoneConfiguration conf) {
     if (configuration == null) {
       ConfigurationProvider.configuration = conf;
+      ConfigurationProvider.addDeprecations();
     }
   }
 
