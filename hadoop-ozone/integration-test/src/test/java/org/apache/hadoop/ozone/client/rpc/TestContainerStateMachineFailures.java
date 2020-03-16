@@ -22,14 +22,18 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -51,23 +55,17 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.protocol.RaftRetryFailureException;
 import org.apache.ratis.protocol.StateMachineException;
 import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
-import org.junit.AfterClass;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -81,8 +79,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
     ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
-    HDDS_SCM_WATCHER_TIMEOUT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
     OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
     OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
@@ -94,7 +90,6 @@ import static org.junit.Assert.fail;
  * Tests the containerStateMachine failure handling.
  */
 
-@Ignore
 public class TestContainerStateMachineFailures {
 
   private static MiniOzoneCluster cluster;
@@ -111,35 +106,52 @@ public class TestContainerStateMachineFailures {
    *
    * @throws IOException
    */
-  @BeforeClass
-  public static void init() throws Exception {
+  @Before
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
-    path = GenericTestUtils
-        .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
-    File baseDir = new File(path);
-    baseDir.mkdirs();
-
-
+    //path = GenericTestUtils
+    //    .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
+    // File baseDir = new File(path);
+    // baseDir.mkdirs();
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 10,
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1,
         TimeUnit.SECONDS);
+
     conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
+            + ".client.request.write.timeout", 10, TimeUnit.SECONDS);
     conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
+            + ".client.request.watch.timeout", 10, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.
+                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
+            10, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "rpc.request.timeout",
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "watch.request.timeout",
+            10, TimeUnit.SECONDS);
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).setHbInterval(200)
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).setHbInterval(200)
             .build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
@@ -153,8 +165,8 @@ public class TestContainerStateMachineFailures {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
-  public static void shutdown() {
+  @After
+  public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -189,7 +201,6 @@ public class TestContainerStateMachineFailures {
       // the cluster
       key.close();
     } catch(IOException ioe) {
-      Assert.assertTrue(ioe instanceof OMException);
     }
     long containerID = omKeyLocationInfo.getContainerID();
 
@@ -207,6 +218,11 @@ public class TestContainerStateMachineFailures {
     Assert.assertTrue(dispatcher.getMissingContainerSet().isEmpty());
 
     // restart the hdds datanode, container should not in the regular set
+    OzoneConfiguration config = cluster.getHddsDatanodes().get(0).getConf();
+    final String dir = config.get
+            (OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
+            + UUID.randomUUID();
+    config.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     cluster.restartHddsDatanode(0, true);
     ozoneContainer = cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().getContainer();
@@ -264,6 +280,11 @@ public class TestContainerStateMachineFailures {
         .readContainerFile(containerFile);
     assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
 
+    OzoneConfiguration config = cluster.getHddsDatanodes().get(0).getConf();
+    final String dir = config.get
+            (OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
+            + UUID.randomUUID();
+    config.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     // restart the hdds datanode and see if the container is listed in the
     // in the missing container set and not in the regular set
     cluster.restartHddsDatanode(0, true);
@@ -339,16 +360,11 @@ public class TestContainerStateMachineFailures {
     // close container transaction will fail over Ratis and will initiate
     // a pipeline close action
 
-    // Since the applyTransaction failure is propagated to Ratis,
-    // stateMachineUpdater will it exception while taking the next snapshot
-    // and should shutdown the RaftServerImpl. The client request will fail
-    // with RaftRetryFailureException.
     try {
       xceiverClient.sendCommand(request.build());
       Assert.fail("Expected exception not thrown");
     } catch (IOException e) {
-      Assert.assertTrue(HddsClientUtils
-          .checkForException(e) instanceof RaftRetryFailureException);
+      // Exception should be thrown
     }
     // Make sure the container is marked unhealthy
     Assert.assertTrue(
@@ -585,10 +601,11 @@ public class TestContainerStateMachineFailures {
     Assert
         .assertTrue(dispatcher.getMissingContainerSet().contains(containerID));
 
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
     // write a new key
     key = objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey("ratis", 1024, ReplicationType.RATIS, ReplicationFactor.ONE,
-            new HashMap<>());
+        .createKey("ratis", 1024, ReplicationType.RATIS,
+                ReplicationFactor.ONE, new HashMap<>());
     // First write and flush creates a container in the datanode
     key.write("ratis1".getBytes());
     key.flush();
@@ -612,10 +629,6 @@ public class TestContainerStateMachineFailures {
     // corruption
     db.getStore().put(blockCommitSequenceIdKey, Longs.toByteArray(0));
     db.decrementReference();
-    // shutdown of dn will take a snapsot which will persist the valid BCSID
-    // recorded in the container2BCSIDMap in ContainerStateMachine
-    cluster.shutdownHddsDatanode(
-        cluster.getHddsDatanodes().get(0).getDatanodeDetails());
     // after the restart, there will be a mismatch in BCSID of what is recorded
     // in the and what is there in RockSDB and hence the container would be
     // marked unhealthy
