@@ -286,8 +286,6 @@ public interface MiniOzoneCluster {
     protected Optional<Long> blockSize = Optional.empty();
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
     protected boolean includeRecon = false;
-    protected OptionalInt reconHttpPort = OptionalInt.empty();
-    protected OptionalInt reconDatanodePort = OptionalInt.empty();
 
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
@@ -492,16 +490,6 @@ public interface MiniOzoneCluster {
 
     public Builder setOMServiceId(String serviceId) {
       this.omServiceId = serviceId;
-      return this;
-    }
-
-    public Builder setReconHttpPort(int port) {
-      this.reconHttpPort = OptionalInt.of(port);
-      return this;
-    }
-
-    public Builder setReconDatanodePort(int port) {
-      this.reconDatanodePort = OptionalInt.of(port);
       return this;
     }
 
