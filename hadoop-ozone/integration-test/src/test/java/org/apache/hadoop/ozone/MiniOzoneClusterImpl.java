@@ -696,11 +696,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
             ratisDir.toString());
         dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
             wrokDir.toString());
-        OzoneStorageContainerManager reconScm =
-            reconServer.getReconStorageContainerManager();
-        dnConf.set(OZONE_RECON_ADDRESS_KEY,
-            reconScm.getDatanodeRpcAddress().getHostString() + ":" +
-                reconScm.getDatanodeRpcAddress().getPort());
+        if (reconServer != null) {
+          OzoneStorageContainerManager reconScm =
+              reconServer.getReconStorageContainerManager();
+          dnConf.set(OZONE_RECON_ADDRESS_KEY,
+              reconScm.getDatanodeRpcAddress().getHostString() + ":" +
+                  reconScm.getDatanodeRpcAddress().getPort());
+        }
 
         HddsDatanodeService datanode
             = HddsDatanodeService.createHddsDatanodeService(args);
