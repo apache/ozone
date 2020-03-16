@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.GeneratedMessage;
 
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -75,10 +76,10 @@ public class StateContext {
   private final DatanodeStateMachine parent;
   private final AtomicLong stateExecutionCount;
   private final Configuration conf;
-  private final Set<String> endpoints;
-  private final Map<String, List<GeneratedMessage>> reports;
-  private final Map<String, Queue<ContainerAction>> containerActions;
-  private final Map<String, Queue<PipelineAction>> pipelineActions;
+  private final Set<InetSocketAddress> endpoints;
+  private final Map<InetSocketAddress, List<GeneratedMessage>> reports;
+  private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
+  private final Map<InetSocketAddress, Queue<PipelineAction>> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
@@ -192,7 +193,7 @@ public class StateContext {
   public void addReport(GeneratedMessage report) {
     if (report != null) {
       synchronized (reports) {
-        for (String endpoint : endpoints) {
+        for (InetSocketAddress endpoint : endpoints) {
           reports.get(endpoint).add(report);
         }
       }
@@ -207,7 +208,7 @@ public class StateContext {
    *                         heartbeat.
    */
   public void putBackReports(List<GeneratedMessage> reportsToPutBack,
-                             String endpoint) {
+                             InetSocketAddress endpoint) {
     synchronized (reports) {
       if (reports.containsKey(endpoint)){
         reports.get(endpoint).addAll(0, reportsToPutBack);
@@ -221,7 +222,8 @@ public class StateContext {
    *
    * @return List of reports
    */
-  public List<GeneratedMessage> getAllAvailableReports(String endpoint) {
+  public List<GeneratedMessage> getAllAvailableReports(
+      InetSocketAddress endpoint) {
     return getReports(endpoint, Integer.MAX_VALUE);
   }
 
@@ -231,7 +233,8 @@ public class StateContext {
    *
    * @return List of reports
    */
-  public List<GeneratedMessage> getReports(String endpoint, int maxLimit) {
+  public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
+                                           int maxLimit) {
     List<GeneratedMessage> reportsToReturn = new LinkedList<>();
     synchronized (reports) {
       List<GeneratedMessage> reportsForEndpoint = reports.get(endpoint);
@@ -253,7 +256,7 @@ public class StateContext {
    */
   public void addContainerAction(ContainerAction containerAction) {
     synchronized (containerActions) {
-      for (String endpoint : endpoints) {
+      for (InetSocketAddress endpoint : endpoints) {
         containerActions.get(endpoint).add(containerAction);
       }
     }
@@ -266,7 +269,7 @@ public class StateContext {
    */
   public void addContainerActionIfAbsent(ContainerAction containerAction) {
     synchronized (containerActions) {
-      for (String endpoint : endpoints) {
+      for (InetSocketAddress endpoint : endpoints) {
         if (!containerActions.get(endpoint).contains(containerAction)) {
           containerActions.get(endpoint).add(containerAction);
         }
@@ -280,7 +283,8 @@ public class StateContext {
    *
    * @return {@literal List<ContainerAction>}
    */
-  public List<ContainerAction> getAllPendingContainerActions(String endpoint) {
+  public List<ContainerAction> getAllPendingContainerActions(
+      InetSocketAddress endpoint) {
     return getPendingContainerAction(endpoint, Integer.MAX_VALUE);
   }
 
@@ -290,8 +294,9 @@ public class StateContext {
    *
    * @return {@literal List<ContainerAction>}
    */
-  public List<ContainerAction> getPendingContainerAction(String endpoint,
-                                                         int maxLimit) {
+  public List<ContainerAction> getPendingContainerAction(
+      InetSocketAddress endpoint,
+      int maxLimit) {
     List<ContainerAction> containerActionList = new ArrayList<>();
     synchronized (containerActions) {
       if (!containerActions.isEmpty() &&
@@ -326,7 +331,7 @@ public class StateContext {
        * action remains same on the given pipeline, it will end up adding it
        * multiple times here.
        */
-      for (String endpoint : endpoints) {
+      for (InetSocketAddress endpoint : endpoints) {
         Queue<PipelineAction> actionsForEndpoint =
             this.pipelineActions.get(endpoint);
         for (PipelineAction pipelineActionIter : actionsForEndpoint) {
@@ -349,8 +354,9 @@ public class StateContext {
    *
    * @return {@literal List<ContainerAction>}
    */
-  public List<PipelineAction> getPendingPipelineAction(String endpoint,
-                                                       int maxLimit) {
+  public List<PipelineAction> getPendingPipelineAction(
+      InetSocketAddress endpoint,
+      int maxLimit) {
     List<PipelineAction> pipelineActionList = new ArrayList<>();
     synchronized (pipelineActions) {
       if (!pipelineActions.isEmpty() &&
@@ -539,7 +545,7 @@ public class StateContext {
     return heartbeatFrequency.get();
   }
 
-  public void addEndpoint(String endpoint) {
+  public void addEndpoint(InetSocketAddress endpoint) {
     if (!endpoints.contains(endpoint)) {
       this.endpoints.add(endpoint);
       this.containerActions.put(endpoint, new LinkedList<>());
