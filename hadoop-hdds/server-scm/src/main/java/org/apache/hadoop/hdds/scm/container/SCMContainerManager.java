@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -48,7 +47,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -353,7 +351,6 @@ public class SCMContainerManager implements ContainerManager {
                   containerID);
         }
       }
-      final byte[] dbKey = Longs.toByteArray(containerID.getId());
       containerStore.put(containerID.getId(), container);
       return newState;
     } catch (ContainerNotFoundException cnfe) {
@@ -383,7 +380,6 @@ public class SCMContainerManager implements ContainerManager {
         batchHandler.initBatchOperation();
     lock.lock();
     try {
-      BatchOperation batch = new BatchOperation();
       for (Map.Entry<Long, Long> entry : deleteTransactionMap.entrySet()) {
         long containerID = entry.getKey();
 

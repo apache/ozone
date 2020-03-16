@@ -104,6 +104,7 @@ public class SCMPipelineManager implements PipelineManager {
       PipelineFactory pipelineFactory)
       throws IOException {
     this.lock = new ReentrantReadWriteLock();
+    this.pipelineStore = pipelineStore;
     this.conf = conf;
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;

@@ -69,6 +69,7 @@ public class TestSCMSafeModeManager {
 
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
+
   private DBStore dbStore;
 
   @BeforeClass
@@ -81,12 +82,16 @@ public class TestSCMSafeModeManager {
 
   @Before
   public void initDbStore() throws IOException {
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        tempDir.newFolder().getAbsolutePath());
     dbStore = new SCMDBDefinition().createDBStore(config);
   }
 
   @After
   public void destroyDbStore() throws Exception {
-    dbStore.close();
+    if (dbStore != null) {
+      dbStore.close();
+    }
   }
 
   @Test
