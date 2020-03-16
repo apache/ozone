@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest;
 import org.apache.hadoop.ozone.recon.GuiceInjectorUtilsForTestsImpl;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
-import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
@@ -76,6 +75,7 @@ import javax.ws.rs.core.Response;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 
 /**
  * Test for Recon API endpoints.
@@ -355,17 +355,7 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
 
     datanodesResponse.getDatanodes().forEach(this::testDatanodeResponse);
 
-    // if container report is processed first, and pipeline does not exist
-    // then container is not added until the next container report is processed
-    SCMHeartbeatRequestProto heartbeatRequestProto =
-        SCMHeartbeatRequestProto.newBuilder()
-            .setContainerReport(containerReportsProto)
-            .setDatanodeDetails(datanodeDetailsProto)
-            .build();
-    reconScm.getDatanodeProtocolServer()
-        .sendHeartbeat(heartbeatRequestProto);
-
-    LambdaTestUtils.await(30000, 2000, () -> {
+    waitAndCheckConditionAfterHeartbeat(() -> {
       Response response1 = nodeEndpoint.getDatanodes();
       DatanodesResponse datanodesResponse1 =
           (DatanodesResponse) response1.getEntity();
@@ -400,17 +390,7 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
     Assert.assertEquals(pipeline.getId().getId(),
         pipelineMetadata.getPipelineId());
 
-    // if container report is processed first, and pipeline does not exist
-    // then container is not added until the next container report is processed
-    SCMHeartbeatRequestProto heartbeatRequestProto =
-        SCMHeartbeatRequestProto.newBuilder()
-            .setContainerReport(containerReportsProto)
-            .setDatanodeDetails(datanodeDetailsProto)
-            .build();
-    reconScm.getDatanodeProtocolServer()
-        .sendHeartbeat(heartbeatRequestProto);
-
-    LambdaTestUtils.await(30000, 2000, () -> {
+    waitAndCheckConditionAfterHeartbeat(() -> {
       Response response1 = pipelineEndpoint.getPipelines();
       PipelinesResponse pipelinesResponse1 =
           (PipelinesResponse) response1.getEntity();
@@ -433,10 +413,16 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
     Assert.assertEquals(2, clusterStateResponse.getTotalDatanodes());
     Assert.assertEquals(2, clusterStateResponse.getHealthyDatanodes());
 
-    DatanodeStorageReport storageReport =
-        clusterStateResponse.getStorageReport();
+    waitAndCheckConditionAfterHeartbeat(() -> {
+      Response response1 = clusterStateEndpoint.getClusterState();
+      ClusterStateResponse clusterStateResponse1 =
+          (ClusterStateResponse) response1.getEntity();
+      return (clusterStateResponse1.getContainers() == 1);
+    });
+  }
 
-
+  private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)
+      throws Exception {
     // if container report is processed first, and pipeline does not exist
     // then container is not added until the next container report is processed
     SCMHeartbeatRequestProto heartbeatRequestProto =
@@ -444,14 +430,7 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(datanodeDetailsProto)
             .build();
-    reconScm.getDatanodeProtocolServer()
-        .sendHeartbeat(heartbeatRequestProto);
-
-    LambdaTestUtils.await(30000, 2000, () -> {
-      Response response1 = clusterStateEndpoint.getClusterState();
-      ClusterStateResponse clusterStateResponse1 =
-          (ClusterStateResponse) response1.getEntity();
-      return (clusterStateResponse1.getContainers() == 1);
-    });
+    reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
+    LambdaTestUtils.await(30000, 2000, check);
   }
 }
