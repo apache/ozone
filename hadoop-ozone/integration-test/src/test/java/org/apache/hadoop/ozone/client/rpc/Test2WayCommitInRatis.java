@@ -96,7 +96,7 @@ public class Test2WayCommitInRatis {
             RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
                     DatanodeRatisServerConfig.
                             RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
+            10, TimeUnit.SECONDS);
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "rpc.request.timeout",
@@ -104,12 +104,11 @@ public class Test2WayCommitInRatis {
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "watch.request.timeout",
-            3, TimeUnit.SECONDS);
+            10, TimeUnit.SECONDS);
 
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .setTotalPipelineNumLimit(1)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
@@ -117,8 +116,7 @@ public class Test2WayCommitInRatis {
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .build();
     cluster.waitForClusterToBeReady();
-    cluster.waitTobeOutOfSafeMode();
-    //the easiest way to create an open container is creating a key
+    // the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "watchforcommithandlingtest";
@@ -165,6 +163,8 @@ public class Test2WayCommitInRatis {
             xceiverClient.getPipeline()));
     reply.getResponse().get();
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
+    // wait for the container to be created on all the nodes
+    xceiverClient.watchForCommit(reply.getLogIndex());
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       // shutdown the ratis follower
       if (ContainerTestHelper.isRatisFollower(dn, pipeline)) {

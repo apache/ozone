@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -31,7 +31,7 @@ import java.util.UUID;
  * Metadata object that represents a Pipeline.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-public class PipelineMetadata {
+public final class PipelineMetadata {
 
   @XmlElement(name = "pipelineId")
   private UUID pipelineId;
@@ -62,24 +62,6 @@ public class PipelineMetadata {
 
   @XmlElement(name = "containers")
   private int containers;
-
-  @SuppressWarnings("parameternumber")
-  public PipelineMetadata(UUID pipelineId, PipelineState status,
-                          String leaderNode, List<String> datanodes,
-                          long lastLeaderElection, long duration,
-                          long leaderElections, String replicationType,
-                          int replicationFactor, int containers) {
-    this.pipelineId = pipelineId;
-    this.status = status;
-    this.leaderNode = leaderNode;
-    this.datanodes = datanodes;
-    this.lastLeaderElection = lastLeaderElection;
-    this.duration = duration;
-    this.leaderElections = leaderElections;
-    this.replicationType = replicationType;
-    this.replicationFactor = replicationFactor;
-    this.containers = containers;
-  }
 
   public UUID getPipelineId() {
     return pipelineId;
@@ -131,6 +113,19 @@ public class PipelineMetadata {
     return new Builder();
   }
 
+  private PipelineMetadata(Builder b) {
+    this.pipelineId = b.pipelineId;
+    this.status = b.status;
+    this.leaderNode = b.leaderNode;
+    this.datanodes = b.datanodes;
+    this.lastLeaderElection = b.lastLeaderElection;
+    this.duration = b.duration;
+    this.leaderElections = b.leaderElections;
+    this.replicationType = b.replicationType;
+    this.replicationFactor = b.replicationFactor;
+    this.containers = b.containers;
+  }
+
   /**
    * Builder for PipelineMetadata.
    */
@@ -148,7 +143,7 @@ public class PipelineMetadata {
     private int containers;
 
     public Builder() {
-      //Default values
+      // Default values
       this.lastLeaderElection = 0L;
       this.leaderElections = 0L;
       this.duration = 0L;
@@ -167,9 +162,7 @@ public class PipelineMetadata {
       Preconditions.checkNotNull(datanodes);
       Preconditions.checkNotNull(replicationType);
 
-      return new PipelineMetadata(pipelineId, status, leaderNode, datanodes,
-          lastLeaderElection, duration, leaderElections, replicationType,
-          replicationFactor, containers);
+      return new PipelineMetadata(this);
     }
 
     public Builder setPipelineId(UUID pipelineId) {
