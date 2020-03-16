@@ -1,12 +1,10 @@
 {
-  "stats": {
-    "datanodes": {
-      "total": 10,
-      "healthy": 9
-    },
+  "clusterState": {
+    "totalDatanodes": 10,
+    "healthyDatanodes": 9,
     "pipelines": 3,
-    "capacity": {
-      "total": 1099511627778,
+    "storageReport": {
+      "capacity": 1099511627778,
       "used": 681826058240,
       "remaining": 391915765760
     },
