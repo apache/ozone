@@ -58,8 +58,8 @@ public abstract class TestDataValidate {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5).setTotalPipelineNumLimit(8).build();
     cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady
-            (HddsProtos.ReplicationFactor.THREE, 180000);
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
+            180000);
   }
 
   static void shutdownCluster() {

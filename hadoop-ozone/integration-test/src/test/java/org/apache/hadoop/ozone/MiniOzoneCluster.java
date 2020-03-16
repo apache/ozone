@@ -92,8 +92,8 @@ public interface MiniOzoneCluster {
    * @throws TimeoutException In case of timeout
    * @throws InterruptedException In case of interrupt while waiting
    */
-  void waitForPipelineTobeReady
-  (HddsProtos.ReplicationFactor factor, int timeoutInMs)
+  void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
+                                int timeoutInMs)
           throws TimeoutException, InterruptedException;
 
   /**

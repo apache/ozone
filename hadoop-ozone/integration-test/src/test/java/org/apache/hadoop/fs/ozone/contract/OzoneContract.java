@@ -75,11 +75,11 @@ class OzoneContract extends AbstractFSContract {
                             RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
             10, TimeUnit.SECONDS);
     conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY + "." +
                     "rpc.request.timeout",
             3, TimeUnit.SECONDS);
     conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY + "." +
                     "watch.request.timeout",
             10, TimeUnit.SECONDS);
     conf.addResource(CONTRACT_XML);
@@ -87,8 +87,8 @@ class OzoneContract extends AbstractFSContract {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {
       cluster.waitForClusterToBeReady();
-      cluster.waitForPipelineTobeReady
-              (HddsProtos.ReplicationFactor.THREE, 180000);
+      cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
+              180000);
     } catch (Exception e) {
       throw new IOException(e);
     }
