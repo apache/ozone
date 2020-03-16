@@ -134,8 +134,8 @@ public abstract class AbstractOMMetadataManagerTest {
    * Write a key to OM instance.
    * @throws IOException while writing.
    */
-  public void writeDataToOm(OMMetadataManager omMetadataManager,
-                                   String key) throws IOException {
+  protected void writeDataToOm(OMMetadataManager omMetadataManager,
+                               String key) throws IOException {
 
     String omKey = omMetadataManager.getOzoneKey("sampleVol",
         "bucketOne", key);
