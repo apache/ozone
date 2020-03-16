@@ -67,7 +67,9 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
         logger.debug("{} {} request is received",
             serviceName, type.toString());
       }
-      protocolMessageMetrics.increment(type);
+
+      long startTime = System.nanoTime();
+      protocolMessageMetrics.increment(type, System.nanoTime() - startTime);
 
       RESPONSE response = methodCall.apply(request);
 
