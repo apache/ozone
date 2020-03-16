@@ -60,7 +60,7 @@ public class ListSubcommand implements Callable<Void> {
   private void outputContainerInfo(ContainerInfo containerInfo)
       throws IOException {
     // Print container report info.
-    LOG.info("{}", containerInfo.toJsonString());
+    LOG.info("{}", containerInfo.toTimeTransformedJsonString());
   }
 
   @Override

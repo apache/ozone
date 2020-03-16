@@ -29,8 +29,11 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Comparator;
+
+import net.minidev.json.JSONObject;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -310,6 +313,30 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   @Override
   public int compareTo(ContainerInfo o) {
     return this.compare(this, o);
+  }
+
+  /**
+   * Returns a modified JSON string of this object.
+   *
+   * @return String - json string
+   * @throws IOException
+   */
+  public String toTimeTransformedJsonString() throws IOException {
+    JSONObject containerInfo = new JSONObject();
+    SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    containerInfo.put("state",this.state);
+    containerInfo.put("replicationFactor",this.replicationFactor);
+    containerInfo.put("replicationType",this.replicationType);
+    containerInfo.put("usedBytes",this.usedBytes);
+    containerInfo.put("numberOfKeys", this.numberOfKeys);
+    containerInfo.put("lastUsed", dateFormat.format(this.lastUsed));
+    containerInfo.put("stateEnterTime", dateFormat.format(this.stateEnterTime));
+    containerInfo.put("owner", this.owner);
+    containerInfo.put("containerID", this.containerID);
+    containerInfo.put("deleteTransactionId", this.deleteTransactionId);
+    containerInfo.put("sequenceId", this.sequenceId);
+    containerInfo.put("open", this.isOpen());
+    return containerInfo.toString();
   }
 
   /**
