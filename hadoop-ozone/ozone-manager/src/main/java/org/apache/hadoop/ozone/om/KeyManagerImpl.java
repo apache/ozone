@@ -687,36 +687,49 @@ public class KeyManagerImpl implements KeyManager {
    */
   @VisibleForTesting
   protected void refreshPipeline(OmKeyInfo value) throws IOException {
-    if (value != null &&
-        CollectionUtils.isNotEmpty(value.getKeyLocationVersions())) {
-      Map<Long, ContainerWithPipeline> containerWithPipelineMap =
-          new HashMap<>();
-      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          // TODO: fix Some tests that may not initialize container client
-          // The production should always have containerClient initialized.
-          if (scmClient.getContainerClient() != null) {
-            try {
-              if (!containerWithPipelineMap.containsKey(k.getContainerID())) {
-                ContainerWithPipeline containerWithPipeline = scmClient
-                    .getContainerClient()
-                    .getContainerWithPipeline(k.getContainerID());
-                containerWithPipelineMap.put(k.getContainerID(),
-                    containerWithPipeline);
-              }
-            } catch (IOException ioEx) {
-              LOG.debug("Get containerPipeline failed for volume:{} bucket:{} "
+    // TODO: fix Some tests that may not initialize container client
+    // The production should always have containerClient initialized.
+    if (scmClient.getContainerClient() == null) {
+      return;
+    }
+
+    if (value == null
+            || CollectionUtils.isEmpty(value.getKeyLocationVersions())) {
+      return;
+    }
+
+    List<Long> containerIDs = new ArrayList<>();
+    for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+      for (OmKeyLocationInfo k : key.getLocationList()) {
+        Long containerID = k.getContainerID();
+        if (!containerIDs.contains(containerID)) {
+          containerIDs.add(containerID);
+        }
+      }
+    }
+
+    Map<Long, ContainerWithPipeline> containerWithPipelineMap = new HashMap<>();
+
+    try {
+      List<ContainerWithPipeline> cpList = scmClient.getContainerClient().
+              getContainerWithPipelineBatch(containerIDs);
+      for (ContainerWithPipeline cp : cpList) {
+        containerWithPipelineMap.put(
+                cp.getContainerInfo().getContainerID(), cp);
+      }
+    } catch (IOException ioEx) {
+      LOG.debug("Get containerPipeline failed for volume:{} bucket:{} "
                       + "key:{}", value.getVolumeName(), value.getBucketName(),
-                  value.getKeyName(), ioEx);
-              throw new OMException(ioEx.getMessage(),
-                  SCM_GET_PIPELINE_EXCEPTION);
-            }
-            ContainerWithPipeline cp =
+              value.getKeyName(), ioEx);
+      throw new OMException(ioEx.getMessage(), SCM_GET_PIPELINE_EXCEPTION);
+    }
+
+    for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+      for (OmKeyLocationInfo k : key.getLocationList()) {
+        ContainerWithPipeline cp =
                 containerWithPipelineMap.get(k.getContainerID());
-            if (!cp.getPipeline().equals(k.getPipeline())) {
-              k.setPipeline(cp.getPipeline());
-            }
-          }
+        if (!cp.getPipeline().equals(k.getPipeline())) {
+          k.setPipeline(cp.getPipeline());
         }
       }
     }
