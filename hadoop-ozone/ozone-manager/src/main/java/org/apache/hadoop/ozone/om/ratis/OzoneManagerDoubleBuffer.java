@@ -25,9 +25,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentracing.Scope;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,10 +138,20 @@ public class OzoneManagerDoubleBuffer {
           try(BatchOperation batchOperation = omMetadataManager.getStore()
               .initBatchOperation()) {
 
+            AtomicReference<String> lastTraceId = new AtomicReference<>();
             readyBuffer.iterator().forEachRemaining((entry) -> {
               try {
-                entry.getResponse().checkAndUpdateDB(omMetadataManager,
-                    batchOperation);
+                lastTraceId.set(entry.getResponse().getOMResponse()
+                    .getTraceID());
+                try (Scope s1 = TracingUtil.importAndCreateScope(
+                    "DB-addToWriteBatch-" + entry.getResponse()
+                        .getOMResponse().getCmdType().toString(),
+                    lastTraceId.get())){
+                  s1.span().setTag("cmd", entry.getResponse().getOMResponse()
+                      .getCmdType().toString());
+                  entry.getResponse().checkAndUpdateDB(omMetadataManager,
+                      batchOperation);
+                }
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
@@ -147,7 +160,11 @@ public class OzoneManagerDoubleBuffer {
             });
 
             long startTime = Time.monotonicNowNanos();
-            omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            try (Scope s2 = TracingUtil.importAndCreateScope(
+                "DB-commitWriteBatch", lastTraceId.get())) {
+              s2.span().setTag("BatchSize", readyBuffer.size());
+              omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            }
             ozoneManagerDoubleBufferMetrics.updateFlushTime(
                 Time.monotonicNowNanos() - startTime);
           }
@@ -172,10 +189,6 @@ public class OzoneManagerDoubleBuffer {
                     "iteration{}", flushIterations.get(),
                 flushedTransactionsSize);
           }
-
-          long lastRatisTransactionIndex =
-              readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
-                  .max(Long::compareTo).get();
 
           List<Long> flushedEpochs =
               readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
@@ -369,4 +382,3 @@ public class OzoneManagerDoubleBuffer {
   }
 
 }
-

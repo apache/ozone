@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,10 +96,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     IOException exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     String multipartKey = null;
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.AbortMultiPartUpload)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OMClientResponse omClientResponse = null;
     Result result = null;
     try {

@@ -179,9 +179,10 @@ public final class OzoneManagerRatisServer {
       StateMachineException stateMachineException =
           reply.getStateMachineException();
       if (stateMachineException != null) {
-        OMResponse.Builder omResponse = OMResponse.newBuilder();
-        omResponse.setCmdType(omRequest.getCmdType());
-        omResponse.setSuccess(false);
+        OMResponse.Builder omResponse = OMResponse.newBuilder()
+            .setCmdType(omRequest.getCmdType())
+            .setSuccess(false)
+            .setTraceID(omRequest.getTraceID());
         if (stateMachineException.getCause() != null) {
           omResponse.setMessage(stateMachineException.getCause().getMessage());
           omResponse.setStatus(
