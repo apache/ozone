@@ -102,25 +102,27 @@ public final class RegisterEndpointTask implements
   public EndpointStateMachine.EndPointStates call() throws Exception {
 
     if (getDatanodeDetails() == null) {
-      LOG.error("DatanodeDetails cannot be null in RegisterEndpoint task, " +
-          "shutting down the endpoint.");
+      LOG.error("DatanodeDetails cannot be null in RegisterEndpoint task, "
+          + "shutting down the endpoint.");
       return rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
     }
 
     rpcEndPoint.lock();
     try {
 
-      if (rpcEndPoint.getState().equals(
-          EndpointStateMachine.EndPointStates.REGISTER)) {
+      if (rpcEndPoint.getState()
+          .equals(EndpointStateMachine.EndPointStates.REGISTER)) {
         ContainerReportsProto containerReport =
             datanodeContainerManager.getController().getContainerReport();
         NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
-        PipelineReportsProto pipelineReportsProto = datanodeContainerManager.getPipelineReport();
+        PipelineReportsProto pipelineReportsProto =
+            datanodeContainerManager.getPipelineReport();
         // TODO : Add responses to the command Queue.
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
             .register(datanodeDetails.getProtoBufMessage(), nodeReport,
                 containerReport, pipelineReportsProto);
-        Preconditions.checkState(UUID.fromString(response.getDatanodeUUID()).equals(datanodeDetails.getUuid()),
+        Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
+                .equals(datanodeDetails.getUuid()),
             "Unexpected datanode ID in the response.");
         Preconditions.checkState(!StringUtils.isBlank(response.getClusterID()),
             "Invalid cluster ID in the response.");
@@ -132,7 +134,8 @@ public final class RegisterEndpointTask implements
           datanodeDetails.setNetworkName(response.getNetworkName());
           datanodeDetails.setNetworkLocation(response.getNetworkLocation());
         }
-        EndpointStateMachine.EndPointStates nextState = rpcEndPoint.getState().getNextState();
+        EndpointStateMachine.EndPointStates nextState =
+            rpcEndPoint.getState().getNextState();
         rpcEndPoint.setState(nextState);
         rpcEndPoint.zeroMissedCount();
         this.stateContext.configureHeartbeatFrequency();
