@@ -20,6 +20,6 @@ package org.apache.hadoop.hdds.scm.safemode;
  * Interface which should be implemented by any object that wishes to be
  * notified by the SafeModeManager when the safe mode state changes.
  */
-public interface SafeModeTransition {
+public interface SafeModeNotification {
   void handleSafeModeTransition(SCMSafeModeManager.SafeModeStatus status);
 }

@@ -19,10 +19,6 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.scm.block.BlockManager;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -46,8 +42,8 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
 
   private final long waitTime;
   private final AtomicBoolean isInSafeMode = new AtomicBoolean(true);
-  private final List<SafeModeTransition> immediate = new ArrayList<>();
-  private final List<SafeModeTransition> delayed = new ArrayList<>();
+  private final List<SafeModeNotification> immediate = new ArrayList<>();
+  private final List<SafeModeNotification> delayed = new ArrayList<>();
 
   /**
    * SafeModeHandler, to handle the logic once we exit safe mode.
@@ -70,8 +66,8 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
    * change.
    * @param objs List of objects to be notified.
    */
-  public void notifyImmediately(SafeModeTransition...objs) {
-    for (SafeModeTransition o : objs) {
+  public void notifyImmediately(SafeModeNotification...objs) {
+    for (SafeModeNotification o : objs) {
       Objects.requireNonNull(o, "Only non null objects can be notified");
       immediate.add(o);
     }
@@ -82,8 +78,8 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
    * the configured safemode delay.
    * @param objs List of objects to be notified.
    */
-  public void notifyAfterDelay(SafeModeTransition...objs) {
-    for (SafeModeTransition o : objs) {
+  public void notifyAfterDelay(SafeModeNotification...objs) {
+    for (SafeModeNotification o : objs) {
       Objects.requireNonNull(o, "Only non null objects can be notified");
       delayed.add(o);
     }
@@ -103,7 +99,7 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
   public void onMessage(SafeModeStatus safeModeStatus,
                         EventPublisher publisher) {
     isInSafeMode.set(safeModeStatus.getSafeModeStatus());
-    for (SafeModeTransition s : immediate) {
+    for (SafeModeNotification s : immediate) {
       s.handleSafeModeTransition(safeModeStatus);
     }
     if (!isInSafeMode.get()) {
@@ -113,7 +109,7 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
-        for (SafeModeTransition s : delayed) {
+        for (SafeModeNotification s : delayed) {
           s.handleSafeModeTransition(safeModeStatus);
         }
       });
