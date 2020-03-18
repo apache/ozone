@@ -455,7 +455,7 @@ public final class TestSecureOzoneCluster {
     logs = LogCapturer.captureLogs(Client.LOG);
     LambdaTestUtils.intercept(IOException.class, exMessage,
         () -> unsecureClient.listAllVolumes(null, null, 0));
-    assertEquals("There should ni retry on AccessControlException", 1,
+    assertEquals("There should no retry on AccessControlException", 1,
         StringUtils.countMatches(logs.getOutput(), exMessage));
   }
 
