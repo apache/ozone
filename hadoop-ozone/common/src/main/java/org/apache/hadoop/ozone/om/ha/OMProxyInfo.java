@@ -49,19 +49,19 @@ public class OMProxyInfo {
           "for node ID {} Check your ozone-site.xml file to ensure ozone " +
           "manager addresses are configured properly.",
           rpcAddress, serviceId, nodeId);
-    }
+    } else {
 
-    // This issue will be a problem with docker/kubernetes world where one of
-    // the container is killed, and that OM address will be unresolved. For now
-    // skip the unresolved OM address setting it to the token service field.
+      // This issue will be a problem with docker/kubernetes world where one of
+      // the container is killed, and that OM address will be unresolved. For now
+      // skip the unresolved OM address setting it to the token service field.
 
-    // TODo: Retry rpcAddr when unresolved during getProxy which will be used
-    //  until next fail over. Fix setting of dtService also at that time.
-    try {
-      this.dtService = SecurityUtil.buildTokenService(rpcAddr);
-    } catch (Throwable t) {
-      // As anyway, we have logged above for unresolved address skipping here.
-      this.dtService = null;
+
+      try {
+        this.dtService = SecurityUtil.buildTokenService(rpcAddr);
+      } catch (Throwable t) {
+        // As anyway, we have logged above for unresolved address skipping here.
+        this.dtService = null;
+      }
     }
   }
 
