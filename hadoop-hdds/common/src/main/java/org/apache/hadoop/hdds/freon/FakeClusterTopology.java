@@ -44,7 +44,7 @@ public class FakeClusterTopology {
 
   private List<DatanodeDetailsProto> datanodes = new ArrayList<>();
 
-  private List<Pipeline> piplines = new ArrayList<>();
+  private List<Pipeline> pipelines = new ArrayList<>();
 
   private Random random = new Random();
 
@@ -53,7 +53,7 @@ public class FakeClusterTopology {
       for (int i = 0; i < 9; i++) {
         datanodes.add(createDatanode(i));
         if ((i + 1) % 3 == 0) {
-          piplines.add(Pipeline.newBuilder()
+          pipelines.add(Pipeline.newBuilder()
               .setId(PipelineID.randomId().getProtobuf())
               .setFactor(ReplicationFactor.THREE)
               .setType(ReplicationType.RATIS)
@@ -83,7 +83,7 @@ public class FakeClusterTopology {
   }
 
   public Pipeline getRandomPipeline() {
-    return piplines.get(random.nextInt(piplines.size()));
+    return pipelines.get(random.nextInt(pipelines.size()));
   }
 
   public List<DatanodeDetailsProto> getAllDatanodes() {

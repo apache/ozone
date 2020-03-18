@@ -48,11 +48,7 @@ public final class FakeScmContainerLocationProtocolClient {
       throws IOException {
     try {
       if (req.getCmdType() == Type.QueryNode) {
-        Builder builder = NodeQueryResponseProto.newBuilder()
-            .addDatanodes(Node.newBuilder()
-                .setNodeID(FakeClusterTopology.INSTANCE.getDatanode(1))
-                .addNodeStates(NodeState.HEALTHY)
-                .build());
+        Builder builder = NodeQueryResponseProto.newBuilder();
         for (DatanodeDetailsProto datanode : FakeClusterTopology.INSTANCE
             .getAllDatanodes()) {
           builder.addDatanodes(Node.newBuilder()

@@ -41,7 +41,7 @@ public final class FakeScmBlockLocationProtocolClient {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(FakeScmBlockLocationProtocolClient.class);
 
-  public static final int BLOCK_PER_COUNTER = 1000;
+  public static final int BLOCK_PER_CONTAINER = 1000;
 
   private static AtomicLong counter = new AtomicLong();
 
@@ -74,7 +74,7 @@ public final class FakeScmBlockLocationProtocolClient {
           allocateBlockResponse.addBlocks(AllocateBlockResponse.newBuilder()
               .setPipeline(FakeClusterTopology.INSTANCE.getRandomPipeline())
               .setContainerBlockID(ContainerBlockID.newBuilder()
-                  .setContainerID(seq / BLOCK_PER_COUNTER)
+                  .setContainerID(seq / BLOCK_PER_CONTAINER)
                   .setLocalID(seq))
           );
         }
