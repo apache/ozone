@@ -169,8 +169,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
     // if isRecursive is true, file would be created even if parent
     // directories does not exist.
     boolean isRecursive = createFileRequest.getIsRecursive();
-    LOG.debug("File create for : " + volumeName + "/" + bucketName + "/"
-        + keyName + ":" + isRecursive);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("File create for : " + volumeName + "/" + bucketName + "/"
+          + keyName + ":" + isRecursive);
+    }
 
     // if isOverWrite is true, file would be over written.
     boolean isOverWrite = createFileRequest.getIsOverwrite();
