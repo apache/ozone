@@ -16,8 +16,6 @@
 -->
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Datanode2" type="Application" factoryName="Application">
-    <option name="ALTERNATIVE_JRE_PATH" value="13" />
-    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="MAIN_CLASS_NAME" value="org.apache.hadoop.ozone.HddsDatanodeService" />
     <module name="hadoop-ozone-datanode" />
     <option name="PROGRAM_PARAMETERS" value="-conf=hadoop-ozone/dev-support/intellij/ozone-site.xml --set ozone.metadata.dirs=/tmp/datanode2 --set hdds.datanode.dir=/tmp/datanode2/storage --set hdds.datanode.http-address=127.0.0.1:10021 --set dfs.container.ratis.ipc=10022 --set dfs.container.ipc=10023" />
