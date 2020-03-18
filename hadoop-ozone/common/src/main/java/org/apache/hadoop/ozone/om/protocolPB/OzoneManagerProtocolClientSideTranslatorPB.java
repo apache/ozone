@@ -301,12 +301,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private boolean isAccessControlException(Exception ex) {
     if (ex instanceof ServiceException) {
       Throwable t = ex.getCause();
-      if (t instanceof IOException) {
-        t = t.getCause();
-        if (t instanceof IOException) {
-          t = t.getCause();
-          return t instanceof AccessControlException;
+      while (t != null) {
+        if (t instanceof AccessControlException) {
+          return true;
         }
+        t = t.getCause();
       }
     }
     return false;
