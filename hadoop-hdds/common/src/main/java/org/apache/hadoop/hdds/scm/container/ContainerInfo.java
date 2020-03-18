@@ -29,7 +29,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
-import java.text.SimpleDateFormat;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 
@@ -323,15 +323,15 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
    */
   public String toTimeTransformedJsonString() throws IOException {
     JSONObject containerInfo = new JSONObject();
-    SimpleDateFormat dateFormat =
-        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     containerInfo.put("state", this.state);
     containerInfo.put("replicationFactor", this.replicationFactor);
     containerInfo.put("replicationType", this.replicationType);
     containerInfo.put("usedBytes", this.usedBytes);
     containerInfo.put("numberOfKeys", this.numberOfKeys);
-    containerInfo.put("lastUsed", dateFormat.format(this.lastUsed));
-    containerInfo.put("stateEnterTime", dateFormat.format(this.stateEnterTime));
+    containerInfo.put("lastUsed",
+        Instant.ofEpochMilli(this.lastUsed).toString());
+    containerInfo.put("stateEnterTime",
+        Instant.ofEpochMilli(this.stateEnterTime).toString());
     containerInfo.put("owner", this.owner);
     containerInfo.put("containerID", this.containerID);
     containerInfo.put("deleteTransactionId", this.deleteTransactionId);
