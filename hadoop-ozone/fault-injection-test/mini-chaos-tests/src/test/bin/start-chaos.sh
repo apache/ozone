@@ -16,7 +16,7 @@
 # limitations under the License.
 
 date=$(date +"%Y-%m-%d-%H-%M-%S-%Z")
-logfiledirectory="/tmp/${date}/"
+logfiledirectory="/tmp/chaos-${date}/"
 completesuffix="complete.log"
 chaossuffix="chaos.log"
 compilesuffix="compile.log"
@@ -49,4 +49,5 @@ mvn exec:java \
   -Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false \
   -Dio.netty.leakDetection.level=advanced \
   -Dio.netty.leakDetectionLevel=advanced \
+  -Dtest.build.data="${logfiledirectory}" \
   -Dexec.args="$*" > "${logfilename}" 2>&1
