@@ -31,6 +31,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 public class ConfigurationProvider implements
     Provider<OzoneConfiguration> {
 
+  static {
+    addDeprecations();
+  }
+
   private static OzoneConfiguration configuration;
 
   private static void addDeprecations() {
@@ -43,7 +47,6 @@ public class ConfigurationProvider implements
   public static void setConfiguration(OzoneConfiguration conf) {
     if (configuration == null) {
       ConfigurationProvider.configuration = conf;
-      ConfigurationProvider.addDeprecations();
     }
   }
 
