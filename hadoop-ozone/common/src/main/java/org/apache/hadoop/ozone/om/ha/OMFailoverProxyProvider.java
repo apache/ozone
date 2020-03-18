@@ -112,7 +112,8 @@ public class OMFailoverProxyProvider implements
           continue;
         }
 
-        OMProxyInfo omProxyInfo = new OMProxyInfo(nodeId, rpcAddrStr);
+        OMProxyInfo omProxyInfo = new OMProxyInfo(serviceId, nodeId,
+            rpcAddrStr);
 
         if (omProxyInfo.getAddress() != null) {
 
@@ -191,20 +192,19 @@ public class OMFailoverProxyProvider implements
   private Text computeDelegationTokenService() {
     // For HA, this will return "," separated address of all OM's.
     StringBuilder rpcAddress = new StringBuilder();
-    int count = 0;
+
     for (Map.Entry<String, OMProxyInfo> omProxyInfoSet :
         omProxyInfos.entrySet()) {
-      count++;
-      rpcAddress =
-          rpcAddress.append(
-              omProxyInfoSet.getValue().getDelegationTokenService());
+      Text dtService = omProxyInfoSet.getValue().getDelegationTokenService();
 
-      if (omProxyInfos.size() != count) {
-        rpcAddress.append(",");
+      // dtService can be null when during client object creation when one of
+      // the OM configured address in unreachable.
+      if (dtService != null) {
+        rpcAddress.append(",").append(rpcAddress);
       }
     }
 
-    return new Text(rpcAddress.toString());
+    return new Text(rpcAddress.toString().substring(1));
   }
 
   @Override
