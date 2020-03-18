@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.client;
 
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -170,6 +170,13 @@ public interface ScmClient extends Closeable {
    * @throws IOException in case of any exception
    */
   List<Pipeline> listPipelines() throws IOException;
+
+  /**
+   * Returns a pipeline with ID, if present.
+   * @return pipeline
+   * @throws IOException in case of exception
+   */
+  Pipeline getPipeline(HddsProtos.PipelineID pipelineID) throws IOException;
 
   /**
    * Activates the pipeline given a pipeline ID.

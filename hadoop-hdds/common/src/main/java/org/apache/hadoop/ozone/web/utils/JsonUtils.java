@@ -19,9 +19,10 @@
 package org.apache.hadoop.ozone.web.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.type.CollectionType;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.io.IOException;
 import java.util.List;
@@ -34,10 +35,14 @@ public final class JsonUtils {
   // Reuse ObjectMapper instance for improving performance.
   // ObjectMapper is thread safe as long as we always configure instance
   // before use.
-  private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final ObjectReader READER = MAPPER.readerFor(Object.class);
-  private static final ObjectWriter WRITTER =
-      MAPPER.writerWithDefaultPrettyPrinter();
+  private static final ObjectMapper MAPPER;
+  private static final ObjectWriter WRITTER;
+  static {
+    MAPPER = new ObjectMapper()
+        .registerModule(new JavaTimeModule())
+        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+    WRITTER = MAPPER.writerWithDefaultPrettyPrinter();
+  }
 
   private JsonUtils() {
     // Never constructed

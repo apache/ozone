@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -29,7 +32,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -58,10 +61,10 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client
     .AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -74,6 +77,7 @@ public class TestDeadNodeHandler {
   private SCMNodeManager nodeManager;
   private ContainerManager containerManager;
   private NodeReportHandler nodeReportHandler;
+  private SCMPipelineManager pipelineManager;
   private DeadNodeHandler deadNodeHandler;
   private EventPublisher publisher;
   private EventQueue eventQueue;
@@ -88,12 +92,12 @@ public class TestDeadNodeHandler {
     eventQueue = new EventQueue();
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
-    SCMPipelineManager manager =
+    pipelineManager =
         (SCMPipelineManager)scm.getPipelineManager();
     PipelineProvider mockRatisProvider =
-        new MockRatisPipelineProvider(nodeManager, manager.getStateManager(),
-            conf);
-    manager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        new MockRatisPipelineProvider(nodeManager,
+            pipelineManager.getStateManager(), conf);
+    pipelineManager.setPipelineProvider(RATIS,
         mockRatisProvider);
     containerManager = scm.getContainerManager();
     deadNodeHandler = new DeadNodeHandler(nodeManager,
@@ -111,12 +115,11 @@ public class TestDeadNodeHandler {
   }
 
   @Test
-  @Ignore("Tracked by HDDS-2508.")
-  public void testOnMessage() throws IOException, NodeNotFoundException {
+  public void testOnMessage() throws Exception {
     //GIVEN
-    DatanodeDetails datanode1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails datanode2 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails datanode3 = TestUtils.randomDatanodeDetails();
+    DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails datanode3 = MockDatanodeDetails.randomDatanodeDetails();
 
     String storagePath = GenericTestUtils.getRandomizedTempPath()
         .concat("/" + datanode1.getUuidString());
@@ -135,19 +138,23 @@ public class TestDeadNodeHandler {
     nodeManager.register(datanode3,
         TestUtils.createNodeReport(storageOne), null);
 
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
 
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
-    nodeManager.register(TestUtils.randomDatanodeDetails(),
+    nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
+
+    LambdaTestUtils.await(120000, 10000,
+        () -> pipelineManager.getPipelines(RATIS, THREE).size() == 3);
+    TestUtils.openAllRatisPipelines(pipelineManager);
 
     ContainerInfo container1 =
         TestUtils.allocateContainer(containerManager);

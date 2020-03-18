@@ -69,7 +69,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     omMetadataManager =
         new OmMetadataManagerImpl(configuration);
     OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
-      lastAppliedIndex = index;
+      lastAppliedIndex = index.get(index.size() - 1);
     };
     doubleBuffer = new OzoneManagerDoubleBuffer(omMetadataManager,
         ozoneManagerRatisSnapshot);
@@ -111,6 +111,13 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(bucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
     assertTrue(doubleBuffer.getFlushIterations() > 0);
+    assertTrue(metrics.getFlushTime().lastStat().mean() > 0);
+    assertTrue(metrics.getAvgFlushTransactionsInOneIteration() > 0);
+
+    // Assert there is only instance of OM Double Metrics.
+    OzoneManagerDoubleBufferMetrics metricsCopy =
+        OzoneManagerDoubleBufferMetrics.create();
+    assertEquals(metrics, metricsCopy);
 
     // Check lastAppliedIndex is updated correctly or not.
     assertEquals(bucketCount, lastAppliedIndex);

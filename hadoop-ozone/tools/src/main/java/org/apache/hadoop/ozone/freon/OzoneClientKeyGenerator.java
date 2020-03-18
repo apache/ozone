@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.OutputStream;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -26,7 +27,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 
 import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
@@ -59,7 +59,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   @Option(names = {"-s", "--size"},
       description = "Size of the generated key (in bytes)",
       defaultValue = "10240")
-  private int keySize;
+  private long keySize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used to generated the key content.",
@@ -72,10 +72,17 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   )
   private ReplicationFactor factor = ReplicationFactor.THREE;
 
+  @Option(
+      names = "--om-service-id",
+      description = "OM Service ID"
+  )
+  private String omServiceID = null;
+
   private Timer timer;
 
   private OzoneBucket bucket;
   private ContentGenerator contentGenerator;
+  private Map<String, String> metadata;
 
   @Override
   public Void call() throws Exception {
@@ -84,33 +91,28 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    ensureVolumeAndBucketExist(ozoneConfiguration, volumeName, bucketName);
-
     contentGenerator = new ContentGenerator(keySize, bufferSize);
+    metadata = new HashMap<>();
 
-    try (OzoneClient rpcClient = OzoneClientFactory
-        .getRpcClient(ozoneConfiguration)) {
-
-      bucket =
-          rpcClient.getObjectStore().getVolume(volumeName)
-              .getBucket(bucketName);
+    try (OzoneClient rpcClient = createOzoneClient(omServiceID,
+        ozoneConfiguration)) {
+      ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
+      bucket = rpcClient.getObjectStore().getVolume(volumeName)
+          .getBucket(bucketName);
 
       timer = getMetrics().timer("key-create");
 
       runTests(this::createKey);
-
     }
     return null;
   }
 
   private void createKey(long counter) throws Exception {
+    final String key = generateObjectName(counter);
 
     timer.time(() -> {
-      try (OutputStream stream = bucket
-          .createKey(generateObjectName(counter), keySize,
-              ReplicationType.RATIS,
-              factor,
-              new HashMap<>())) {
+      try (OutputStream stream = bucket.createKey(key, keySize,
+              ReplicationType.RATIS, factor, metadata)) {
         contentGenerator.write(stream);
         stream.flush();
       }

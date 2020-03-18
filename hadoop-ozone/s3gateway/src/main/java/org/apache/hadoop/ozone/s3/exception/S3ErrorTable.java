@@ -46,8 +46,8 @@ public final class S3ErrorTable {
       new OS3Exception("AuthProtocolNotSupported", "Auth protocol used for" +
           " this request is not supported.", HTTP_BAD_REQUEST);
 
-  public static final OS3Exception S3_TOKEN_CREATION_ERROR =
-      new OS3Exception("InvalidRequest", "Error creating s3 token creation.",
+  public static final OS3Exception S3_AUTHINFO_CREATION_ERROR =
+      new OS3Exception("InvalidRequest", "Error creating s3 auth info.",
           HTTP_BAD_REQUEST);
 
   public static final OS3Exception BUCKET_NOT_EMPTY = new OS3Exception(
@@ -75,6 +75,10 @@ public final class S3ErrorTable {
       "NoSuchUpload", "The specified multipart upload does not exist. The " +
       "upload ID might be invalid, or the multipart upload might have " +
       "been aborted or completed.", HTTP_NOT_FOUND);
+
+  public static final OS3Exception INVALID_BUCKET_NAME = new OS3Exception(
+      "InvalidBucketName", "The specified bucket is not valid.",
+      HTTP_BAD_REQUEST);
 
   public static final OS3Exception INVALID_PART = new OS3Exception(
       "InvalidPart", "One or more of the specified parts could not be found." +

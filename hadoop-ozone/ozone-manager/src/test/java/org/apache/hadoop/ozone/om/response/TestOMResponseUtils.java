@@ -67,18 +67,18 @@ public final class TestOMResponseUtils {
         .setVolume(volumeName).setCreationTime(Time.now()).build();
 
     OMVolumeCreateResponse omVolumeCreateResponse =
-        new OMVolumeCreateResponse(omVolumeArgs, userVolumeInfo, omResponse);
+        new OMVolumeCreateResponse(omResponse, omVolumeArgs, userVolumeInfo);
 
 
     OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
         volumeName, s3BucketName);
     OMBucketCreateResponse omBucketCreateResponse =
-        new OMBucketCreateResponse(omBucketInfo, omResponse);
+        new OMBucketCreateResponse(omResponse, omBucketInfo);
 
     String s3Mapping = S3BucketCreateRequest.formatS3MappingName(volumeName,
         s3BucketName);
     return
-        new S3BucketCreateResponse(omVolumeCreateResponse,
-            omBucketCreateResponse, s3BucketName, s3Mapping, omResponse);
+        new S3BucketCreateResponse(omResponse, omVolumeCreateResponse,
+            omBucketCreateResponse, s3BucketName, s3Mapping);
   }
 }

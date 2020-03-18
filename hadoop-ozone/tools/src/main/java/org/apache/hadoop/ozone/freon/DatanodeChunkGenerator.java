@@ -95,45 +95,49 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
           "Datanode chunk generator is not supported in secure environment");
     }
 
-    StorageContainerLocationProtocol scmLocationClient =
-        createStorageContainerLocationClient(ozoneConf);
-    List<Pipeline> pipelines = scmLocationClient.listPipelines();
+    try (StorageContainerLocationProtocol scmLocationClient =
+        createStorageContainerLocationClient(ozoneConf)) {
+      List<Pipeline> pipelines = scmLocationClient.listPipelines();
+      Pipeline pipeline;
+      if (pipelineId != null && pipelineId.length() > 0) {
+        pipeline = pipelines.stream()
+            .filter(p -> p.getId().toString().equals(pipelineId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Pipeline ID is defined, but there is no such pipeline: "
+                    + pipelineId));
 
-    Pipeline pipeline;
-    if (pipelineId != null && pipelineId.length() > 0) {
-      pipeline = pipelines.stream()
-          .filter(p -> p.getId().toString().equals(pipelineId))
-          .findFirst()
-          .orElseThrow(() -> new IllegalArgumentException(
-              "Pipeline ID is defined, but there is no such pipeline: "
-                  + pipelineId));
+      } else {
+        pipeline = pipelines.stream()
+            .filter(p -> p.getFactor() == ReplicationFactor.THREE)
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException(
+                "Pipeline ID is NOT defined, and no pipeline " +
+                    "has been found with factor=THREE"));
+        LOG.info("Using pipeline {}", pipeline.getId());
+      }
 
-    } else {
-      pipeline = pipelines.stream()
-          .filter(p -> p.getFactor() == ReplicationFactor.THREE)
-          .findFirst()
-          .orElseThrow(() -> new IllegalArgumentException(
-              "Pipeline ID is NOT defined, and no pipeline has been found with "
-                  + "factor=THREE"));
-      LOG.info("Using pipeline {}", pipeline.getId().toString());
+      try (XceiverClientManager xceiverClientManager =
+               new XceiverClientManager(ozoneConf)) {
+        xceiverClientSpi = xceiverClientManager.acquireClient(pipeline);
 
+        timer = getMetrics().timer("chunk-write");
+
+        byte[] data = RandomStringUtils.randomAscii(chunkSize)
+            .getBytes(StandardCharsets.UTF_8);
+
+        dataToWrite = ByteString.copyFrom(data);
+
+        Checksum checksum = new Checksum(ChecksumType.CRC32, chunkSize);
+        checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();
+
+        runTests(this::writeChunk);
+      }
+    } finally {
+      if (xceiverClientSpi != null) {
+        xceiverClientSpi.close();
+      }
     }
-
-    xceiverClientSpi =
-        new XceiverClientManager(ozoneConf).acquireClient(pipeline);
-
-    timer = getMetrics().timer("chunk-write");
-
-    byte[] data = RandomStringUtils.randomAscii(chunkSize)
-        .getBytes(StandardCharsets.UTF_8);
-
-    dataToWrite = ByteString.copyFrom(data);
-
-    Checksum checksum = new Checksum(ChecksumType.CRC32, chunkSize);
-    checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();
-
-    runTests(this::writeChunk);
-
     return null;
   }
 
@@ -149,7 +153,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
 
     ChunkInfo chunkInfo = ChunkInfo.newBuilder()
         .setChunkName(getPrefix() + "_testdata_chunk_" + stepNo)
-        .setOffset(0)
+        .setOffset((stepNo / 20) * chunkSize)
         .setLen(chunkSize)
         .setChecksumData(checksumProtobuf)
         .build();
@@ -177,7 +181,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
         XceiverClientReply xceiverClientReply =
             xceiverClientSpi.sendCommandAsync(request);
         xceiverClientSpi
-            .watchForCommit(xceiverClientReply.getLogIndex(), 1000L);
+            .watchForCommit(xceiverClientReply.getLogIndex());
 
       } else {
         xceiverClientSpi.sendCommand(request);

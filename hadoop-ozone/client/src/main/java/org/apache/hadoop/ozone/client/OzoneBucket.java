@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -93,7 +94,7 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Creation time of the bucket.
    */
-  private long creationTime;
+  private Instant creationTime;
 
   /**
    * Bucket Encryption key name if bucket encryption is enabled.
@@ -140,7 +141,7 @@ public class OzoneBucket extends WithMetadata {
     this.storageType = storageType;
     this.versioning = versioning;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    this.creationTime = creationTime;
+    this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
     this.encryptionKeyName = encryptionKeyName;
   }
@@ -163,7 +164,7 @@ public class OzoneBucket extends WithMetadata {
     this.storageType = storageType;
     this.versioning = versioning;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    this.creationTime = creationTime;
+    this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
   }
 
@@ -180,7 +181,7 @@ public class OzoneBucket extends WithMetadata {
     this.defaultReplicationType = defaultReplicationType;
     this.storageType = storageType;
     this.versioning = versioning;
-    this.creationTime = creationTime;
+    this.creationTime = Instant.ofEpochMilli(creationTime);
     this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(name)
         .setVolumeName(volumeName)
@@ -240,7 +241,7 @@ public class OzoneBucket extends WithMetadata {
    *
    * @return creation time of the bucket
    */
-  public long getCreationTime() {
+  public Instant getCreationTime() {
     return creationTime;
   }
 
@@ -590,10 +591,8 @@ public class OzoneBucket extends WithMetadata {
 
     @Override
     public boolean hasNext() {
-      if(!currentIterator.hasNext()) {
-        currentIterator = getNextListOfKeys(
-            currentValue != null ? currentValue.getName() : null)
-            .iterator();
+      if(!currentIterator.hasNext() && currentValue != null) {
+        currentIterator = getNextListOfKeys(currentValue.getName()).iterator();
       }
       return currentIterator.hasNext();
     }
@@ -610,7 +609,7 @@ public class OzoneBucket extends WithMetadata {
     /**
      * Gets the next set of key list using proxy.
      * @param prevKey
-     * @return {@code List<OzoneVolume>}
+     * @return {@code List<OzoneKey>}
      */
     private List<OzoneKey> getNextListOfKeys(String prevKey) {
       try {

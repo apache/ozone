@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.response.bucket.acl.OMBucketAclResponse;
 import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -40,6 +41,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -47,6 +50,9 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * Base class for Bucket acl request.
  */
 public abstract class OMBucketAclRequest extends OMClientRequest {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMBucketAclRequest.class);
 
   private BooleanBiFunction<List<OzoneAcl>, OmBucketInfo> omBucketAclOp;
 
@@ -100,7 +106,19 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
         throw new OMException(OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
 
+      // Check if this transaction is a replay of ratis logs.
+      // If this is a replay, then the response has already been returned to
+      // the client. So take no further action and return a dummy
+      // OMClientResponse.
+      if (isReplay(ozoneManager, omBucketInfo, transactionLogIndex)) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}",
+            transactionLogIndex, getOmRequest());
+        return new OMBucketAclResponse(createReplayOMResponse(omResponse));
+      }
+
       operationResult = omBucketAclOp.apply(ozoneAcls, omBucketInfo);
+      omBucketInfo.setUpdateID(transactionLogIndex,
+          ozoneManager.isRatisEnabled());
 
       if (operationResult) {
         // update cache.
@@ -115,11 +133,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = onFailure(omResponse, ex);
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (lockAcquired) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
             bucket);

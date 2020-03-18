@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.Rule;
 import org.junit.Test;
@@ -29,6 +32,8 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
@@ -37,6 +42,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
@@ -216,5 +222,45 @@ public class TestHddsClientUtils {
     conf.set(OZONE_SCM_NAMES, scmHost);
     thrown.expect(IllegalArgumentException.class);
     HddsUtils.getScmAddressForClients(conf);
+  }
+
+  @Test
+  public void testVerifyResourceName() {
+    final String validName = "my-bucket.01";
+    HddsClientUtils.verifyResourceName(validName);
+
+    final String shortestValidName = StringUtils.repeat("a",
+        OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH);
+    HddsClientUtils.verifyResourceName(shortestValidName);
+
+    // various kinds of invalid names
+    final String ipaddr = "192.68.1.1";
+    final String dotDash = "not.-a-name";
+    final String dashDot = "not-a-.name";
+    final String dotDot = "not..a-name";
+    final String upperCase = "notAname";
+    final String endDot = "notaname.";
+    final String startDot = ".notaname";
+    final String tooShort = StringUtils.repeat("a",
+        OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH - 1);
+
+    List<String> invalidNames = new ArrayList<>();
+    invalidNames.add(ipaddr);
+    invalidNames.add(dotDash);
+    invalidNames.add(dashDot);
+    invalidNames.add(dotDot);
+    invalidNames.add(upperCase);
+    invalidNames.add(endDot);
+    invalidNames.add(startDot);
+    invalidNames.add(tooShort);
+
+    for (String name : invalidNames) {
+      try {
+        HddsClientUtils.verifyResourceName(name);
+        fail("Did not reject invalid string [" + name + "] as a name");
+      } catch (IllegalArgumentException e) {
+        // throwing up on an invalid name. we're good
+      }
+    }
   }
 }

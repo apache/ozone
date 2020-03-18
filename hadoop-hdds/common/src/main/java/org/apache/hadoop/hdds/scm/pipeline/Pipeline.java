@@ -19,11 +19,15 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -55,6 +59,8 @@ public final class Pipeline {
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
   // Current reported Leader for the pipeline
   private UUID leaderId;
+  // Timestamp for pipeline upon creation
+  private Instant creationTimestamp;
 
   /**
    * The immutable properties of pipeline object is used in
@@ -69,6 +75,7 @@ public final class Pipeline {
     this.factor = factor;
     this.state = state;
     this.nodeStatus = nodeStatus;
+    this.creationTimestamp = Instant.now();
   }
 
   /**
@@ -108,6 +115,24 @@ public final class Pipeline {
   }
 
   /**
+   * Return the creation time of pipeline.
+   *
+   * @return Creation Timestamp
+   */
+  public Instant getCreationTimestamp() {
+    return creationTimestamp;
+  }
+
+  /**
+   * Set the creation timestamp. Only for protobuf now.
+   *
+   * @param creationTimestamp
+   */
+  public void setCreationTimestamp(Instant creationTimestamp) {
+    this.creationTimestamp = creationTimestamp;
+  }
+
+  /**
    * Return the pipeline leader's UUID.
    *
    * @return DatanodeDetails.UUID.
@@ -132,6 +157,42 @@ public final class Pipeline {
     return new ArrayList<>(nodeStatus.keySet());
   }
 
+  /**
+   * Return an immutable set of nodes which form this pipeline.
+   * @return Set of DatanodeDetails
+   */
+  public Set<DatanodeDetails> getNodeSet() {
+    return Collections.unmodifiableSet(nodeStatus.keySet());
+  }
+
+  /**
+   * Check if the input pipeline share the same set of datanodes.
+   * @param pipeline
+   * @return true if the input pipeline shares the same set of datanodes.
+   */
+  public boolean sameDatanodes(Pipeline pipeline) {
+    return getNodeSet().equals(pipeline.getNodeSet());
+  }
+
+  /**
+   * Returns the leader if found else defaults to closest node.
+   *
+   * @return {@link DatanodeDetails}
+   */
+  public DatanodeDetails getLeaderNode() throws IOException {
+    if (nodeStatus.isEmpty()) {
+      throw new IOException(String.format("Pipeline=%s is empty", id));
+    }
+    Optional<DatanodeDetails> datanodeDetails =
+        nodeStatus.keySet().stream().filter(d ->
+            d.getUuid().equals(leaderId)).findFirst();
+    if (datanodeDetails.isPresent()) {
+      return datanodeDetails.get();
+    } else {
+      return getClosestNode();
+    }
+  }
+
   public DatanodeDetails getFirstNode() throws IOException {
     if (nodeStatus.isEmpty()) {
       throw new IOException(String.format("Pipeline=%s is empty", id));
@@ -153,6 +214,11 @@ public final class Pipeline {
 
   public boolean isOpen() {
     return state == PipelineState.OPEN;
+  }
+
+  public boolean isAllocationTimeout() {
+    //TODO: define a system property to control the timeout value
+    return false;
   }
 
   public void setNodesInOrder(List<DatanodeDetails> nodes) {
@@ -196,6 +262,7 @@ public final class Pipeline {
         .setFactor(factor)
         .setState(PipelineState.getProtobuf(state))
         .setLeaderID(leaderId != null ? leaderId.toString() : "")
+        .setCreationTimeStamp(creationTimestamp.toEpochMilli())
         .addAllMembers(nodeStatus.keySet().stream()
             .map(DatanodeDetails::getProtoBufMessage)
             .collect(Collectors.toList()));
@@ -213,8 +280,7 @@ public final class Pipeline {
         }
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Serialize pipeline {} with nodesInOrder{ }", id.toString(),
-            nodes);
+        LOG.debug("Serialize pipeline {} with nodesInOrder {}", id, nodes);
       }
     }
     return builder.build();
@@ -232,6 +298,7 @@ public final class Pipeline {
         .setNodes(pipeline.getMembersList().stream()
             .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList()))
         .setNodesInOrder(pipeline.getMemberOrdersList())
+        .setCreateTimestamp(pipeline.getCreationTimeStamp())
         .build();
   }
 
@@ -274,6 +341,8 @@ public final class Pipeline {
     b.append(", Type:").append(getType());
     b.append(", Factor:").append(getFactor());
     b.append(", State:").append(getPipelineState());
+    b.append(", leaderId:").append(getLeaderId());
+    b.append(", CreationTimestamp").append(getCreationTimestamp());
     b.append("]");
     return b.toString();
   }
@@ -298,6 +367,7 @@ public final class Pipeline {
     private List<Integer> nodeOrder = null;
     private List<DatanodeDetails> nodesInOrder = null;
     private UUID leaderId = null;
+    private Instant creationTimestamp = null;
 
     public Builder() {}
 
@@ -309,6 +379,7 @@ public final class Pipeline {
       this.nodeStatus = pipeline.nodeStatus;
       this.nodesInOrder = pipeline.nodesInOrder.get();
       this.leaderId = pipeline.getLeaderId();
+      this.creationTimestamp = pipeline.getCreationTimestamp();
     }
 
     public Builder setId(PipelineID id1) {
@@ -347,6 +418,11 @@ public final class Pipeline {
       return this;
     }
 
+    public Builder setCreateTimestamp(long createTimestamp) {
+      this.creationTimestamp = Instant.ofEpochMilli(createTimestamp);
+      return this;
+    }
+
     public Pipeline build() {
       Preconditions.checkNotNull(id);
       Preconditions.checkNotNull(type);
@@ -355,6 +431,10 @@ public final class Pipeline {
       Preconditions.checkNotNull(nodeStatus);
       Pipeline pipeline = new Pipeline(id, type, factor, state, nodeStatus);
       pipeline.setLeaderId(leaderId);
+      // overwrite with original creationTimestamp
+      if (creationTimestamp != null) {
+        pipeline.setCreationTimestamp(creationTimestamp);
+      }
 
       if (nodeOrder != null && !nodeOrder.isEmpty()) {
         // This branch is for build from ProtoBuf
@@ -373,7 +453,7 @@ public final class Pipeline {
         }
         if (LOG.isDebugEnabled()) {
           LOG.debug("Deserialize nodesInOrder {} in pipeline {}",
-              nodesWithOrder, id.toString());
+              nodesWithOrder, id);
         }
         pipeline.setNodesInOrder(nodesWithOrder);
       } else if (nodesInOrder != null){

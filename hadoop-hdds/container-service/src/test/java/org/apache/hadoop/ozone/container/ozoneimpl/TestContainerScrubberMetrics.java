@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -29,11 +30,14 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -83,6 +87,20 @@ public class TestContainerScrubberMetrics {
   }
 
   @Test
+  public void testContainerMetaDataScrubberMetricsUnregisters() {
+    ContainerMetadataScanner subject =
+        new ContainerMetadataScanner(conf, controller);
+    String name = subject.getMetrics().getName();
+
+    assertNotNull(DefaultMetricsSystem.instance().getSource(name));
+
+    subject.shutdown();
+    subject.run();
+
+    assertNull(DefaultMetricsSystem.instance().getSource(name));
+  }
+
+  @Test
   public void testContainerDataScrubberMetrics() {
     ContainerDataScanner subject =
         new ContainerDataScanner(conf, controller, vol);
@@ -92,6 +110,21 @@ public class TestContainerScrubberMetrics {
     assertEquals(1, metrics.getNumScanIterations());
     assertEquals(2, metrics.getNumContainersScanned());
     assertEquals(1, metrics.getNumUnHealthyContainers());
+  }
+
+  @Test
+  public void testContainerDataScrubberMetricsUnregisters() throws IOException {
+    HddsVolume volume = new HddsVolume.Builder("/").failedVolume(true).build();
+    ContainerDataScanner subject =
+        new ContainerDataScanner(conf, controller, volume);
+    String name = subject.getMetrics().getName();
+
+    assertNotNull(DefaultMetricsSystem.instance().getSource(name));
+
+    subject.shutdown();
+    subject.run();
+
+    assertNull(DefaultMetricsSystem.instance().getSource(name));
   }
 
   private ContainerController mockContainerController() {

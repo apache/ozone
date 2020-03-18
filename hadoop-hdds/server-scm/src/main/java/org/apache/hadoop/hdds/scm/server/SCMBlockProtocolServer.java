@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license
  * agreements. See the NOTICE file distributed with this work for additional
@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
-import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
 
 import com.google.common.collect.Maps;
@@ -65,6 +65,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_AD
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
+import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -336,29 +337,26 @@ public class SCMBlockProtocolServer implements
   @Override
   public AuditMessage buildAuditMessageForSuccess(
       AuditAction op, Map<String, String> auditMap) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.SUCCESS.toString())
-        .withException(null)
+        .withResult(AuditEventStatus.SUCCESS)
         .build();
   }
 
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op, Map<String,
       String> auditMap, Throwable throwable) {
+
     return new AuditMessage.Builder()
-        .setUser((Server.getRemoteUser() == null) ? null :
-            Server.getRemoteUser().getUserName())
-        .atIp((Server.getRemoteIp() == null) ? null :
-            Server.getRemoteIp().getHostAddress())
-        .forOperation(op.getAction())
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.FAILURE.toString())
+        .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
   }

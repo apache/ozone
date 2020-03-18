@@ -26,9 +26,9 @@ import java.util.Map.Entry;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.client.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.server.PrometheusMetricsSink;
+import org.apache.hadoop.hdds.server.http.PrometheusMetricsSink;
 import org.apache.hadoop.ozone.insight.LoggerSource.Level;
 
 import com.google.protobuf.ProtocolMessageEnum;
@@ -58,9 +58,12 @@ public abstract class BaseInsightPoint implements InsightPoint {
    * List the related loggers.
    *
    * @param verbose true if verbose logging is requested.
+   * @param filters additional key value pair to further filter the output.
+   *                (eg. datanode=123-2323-datanode-id)
    */
   @Override
-  public List<LoggerSource> getRelatedLoggers(boolean verbose) {
+  public List<LoggerSource> getRelatedLoggers(boolean verbose,
+      Map<String, String> filters) {
     List<LoggerSource> loggers = new ArrayList<>();
     return loggers;
   }

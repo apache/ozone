@@ -22,6 +22,8 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -31,7 +33,7 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
-import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -120,6 +122,9 @@ public final class SCMTestUtils {
         .getRandomizedTempPath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, GenericTestUtils
         .getRandomizedTempPath());
+    conf.setClass(SpaceUsageCheckFactory.Conf.configKeyForClassName(),
+        MockSpaceUsageCheckFactory.None.class,
+        SpaceUsageCheckFactory.class);
     return conf;
   }
 

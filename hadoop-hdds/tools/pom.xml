@@ -36,11 +36,30 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-server-framework</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-container-service</artifactId>
+    </dependency>
+    <dependency>
+      <artifactId>ratis-tools</artifactId>
+      <groupId>org.apache.ratis</groupId>
+      <version>${ratis.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.ratis</groupId>
+          <artifactId>ratis-examples</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>commons-cli</groupId>

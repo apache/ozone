@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.util.ClassUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

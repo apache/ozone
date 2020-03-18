@@ -42,19 +42,23 @@ Start OM
     [arguments]             ${OM_HOST}
                             Set Global Variable             ${HOST}                 ${OM_HOST}
                             Open Connection And Log In
-                            Execute Command                 /opt/startOM.sh --restart
-    ${startupMsg} =         Execute Command                 sudo ps aux | grep om
+    ${rc1} =                Execute Command                 /opt/startOM.sh --restart       return_stdout=False    return_rc=True
+                            Should Be Equal As Integers     ${rc1}                  0
+    ${startMsg}  ${rc2} =   Execute Command                 sudo ps aux | grep om           return_rc=True
+                            Should Be Equal As Integers     ${rc2}                  0
                             Close Connection
-                            Should Contain                  ${startupMsg}           OzoneManagerStarter
+                            Should Contain                  ${startMsg}             OzoneManagerStarter
 
 Stop OM
     [arguments]             ${OM_HOST}
                             Set Global Variable             ${HOST}                 ${OM_HOST}
                             Open Connection And Log In
-                            Execute Command                 /opt/stopOM.sh
-    ${shutdownMsg} =        Execute Command                 sudo ps aux | grep om
+    ${rc1} =                Execute Command                 /opt/stopOM.sh                  return_stdout=False    return_rc=True
+                            Should Be Equal As Integers     ${rc1}                  0
+    ${stopMsg}  ${rc2} =    Execute Command                 sudo ps aux | grep om           return_rc=True
+                            Should Be Equal As Integers     ${rc2}                  0
                             Close Connection
-                            Should Not Contain              ${shutdownMsg}          OzoneManagerStarter
+                            Should Not Contain              ${stopMsg}              OzoneManagerStarter
 
 Create volume and bucket
     Execute                 ozone sh volume create o3://${OM_SERVICE_ID}/${VOLUME}
@@ -66,14 +70,14 @@ Write Test File
     ${fileName} =           Catenate                SEPARATOR=              ${WRITE_FILE_COUNT}       .txt
                             Copy File               ${TEST_FILE}            ${fileName}
                             Execute                 ozone fs -copyFromLocal ${fileName} o3fs://${BUCKET}.${VOLUME}.${OM_SERVICE_ID}/
-    ${result} =             Execute                 ozone sh key list o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} | grep -v WARN | jq -r '.name'
+    ${result} =             Execute                 ozone sh key list o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} | jq -r '.name'
                             Should contain          ${result}               ${fileName}
                             Remove File             ${fileName}
 
 Put Key
     [arguments]             ${FILE}                 ${KEY}
                             Execute                 ozone sh key put o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${KEY} ${FILE}
-    ${result} =             Execute                 ozone sh key info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${KEY} | grep -Ev 'Removed|WARN|DEBUG|ERROR|INFO|TRACE' | jq -r '. | select(.name=="${KEY}")'
+    ${result} =             Execute                 ozone sh key info o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET}/${KEY} | jq -r '. | select(.name=="${KEY}")'
                             Should contain          ${result}               creationTime
 
 Put Multiple Keys
@@ -99,12 +103,14 @@ Get Ratis Logs
     [arguments]             ${OM_HOST}
                             Set Global Variable     ${HOST}                 ${OM_HOST}
                             Open Connection And Log In
-    ${gorupId} =            Execute Command         ls ${RATIS_DIR} | grep -v 'snapshot'
-                            LOG                     Ratis GroupId: ${gorupId}
-    ${currDir} =            Catenate                SEPARATOR=              ${RATIS_DIR}    /    ${gorupId}    /current/
+    ${groupId}   ${rc} =    Execute Command         ls ${RATIS_DIR} | grep -v 'snapshot'         return_rc=True
+                            Should Be Equal As Integers                     ${rc}                0
+                            LOG                     Ratis GroupId: ${groupId}
+    ${currDir} =            Catenate                SEPARATOR=              ${RATIS_DIR}    /    ${groupId}    /current/
     @{logs} =               SSHLibrary.List Files In Directory              ${currDir}           log_*
-    ${numLogs} =            Get Length                          ${logs}
-    [return]                ${numLogs}                          ${logs}
+                            Close Connection
+    ${numLogs} =            Get Length                                      ${logs}
+    [return]                ${numLogs}                                      ${logs}
 
 ** Test Cases ***
 Stop Leader OM and Verify Failover

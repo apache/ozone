@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,6 +22,7 @@ import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -63,6 +64,10 @@ public class ReconUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ReconUtils.class);
+
+  public static File getReconScmDbDir(Configuration conf) {
+    return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
+  }
 
   /**
    * Get configured Recon DB directory value based on config. If not present,
@@ -219,8 +224,7 @@ public class ReconUtils {
    * @return Inputstream to the response of the HTTP call.
    * @throws IOException While reading the response.
    */
-  public InputStream makeHttpCall(CloseableHttpClient httpClient,
-                                         String url)
+  public InputStream makeHttpCall(CloseableHttpClient httpClient, String url)
       throws IOException {
 
     HttpGet httpGet = new HttpGet(url);

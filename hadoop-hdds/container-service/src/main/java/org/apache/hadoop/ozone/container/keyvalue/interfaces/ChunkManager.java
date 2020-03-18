@@ -20,10 +20,14 @@ package org.apache.hadoop.ozone.container.keyvalue.interfaces;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
 /**
@@ -39,12 +43,20 @@ public interface ChunkManager {
    * @param container - Container for the chunk
    * @param blockID - ID of the block.
    * @param info - ChunkInfo.
+   * @param data
    * @param dispatcherContext - dispatcher context info.
    * @throws StorageContainerException
    */
   void writeChunk(Container container, BlockID blockID, ChunkInfo info,
-      ByteBuffer data, DispatcherContext dispatcherContext)
+      ChunkBuffer data, DispatcherContext dispatcherContext)
       throws StorageContainerException;
+
+  default void writeChunk(Container container, BlockID blockID, ChunkInfo info,
+      ByteBuffer data, DispatcherContext dispatcherContext)
+      throws StorageContainerException {
+    ChunkBuffer wrapper = ChunkBuffer.wrap(data);
+    writeChunk(container, blockID, info, wrapper, dispatcherContext);
+  }
 
   /**
    * reads the data defined by a chunk.
@@ -59,7 +71,7 @@ public interface ChunkManager {
    * TODO: Right now we do not support partial reads and writes of chunks.
    * TODO: Explore if we need to do that for ozone.
    */
-  ByteBuffer readChunk(Container container, BlockID blockID, ChunkInfo info,
+  ChunkBuffer readChunk(Container container, BlockID blockID, ChunkInfo info,
       DispatcherContext dispatcherContext) throws StorageContainerException;
 
   /**
@@ -73,11 +85,21 @@ public interface ChunkManager {
   void deleteChunk(Container container, BlockID blockID, ChunkInfo info) throws
       StorageContainerException;
 
+  void deleteChunks(Container container, BlockData blockData) throws
+      StorageContainerException;
+
   // TODO : Support list operations.
 
   /**
    * Shutdown the chunkManager.
    */
-  void shutdown();
+  default void shutdown() {
+    // if applicable
+  }
+
+  default void finishWriteChunk(KeyValueContainer kvContainer, BlockID blockID,
+      ChunkInfo info) throws IOException {
+    // no-op
+  }
 
 }

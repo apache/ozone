@@ -78,7 +78,7 @@ public class TestS3BucketDeleteResponse {
         .setDeleteS3BucketResponse(S3DeleteBucketResponse.newBuilder()).build();
 
     S3BucketDeleteResponse s3BucketDeleteResponse =
-        new S3BucketDeleteResponse(s3BucketName, volumeName, omResponse);
+        new S3BucketDeleteResponse(omResponse, s3BucketName, volumeName);
 
     s3BucketDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
 

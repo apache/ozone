@@ -16,12 +16,16 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+MAVEN_OPTIONS='-B -fae -Dskip.yarn -Dskip.installyarn'
+
 if ! type unionBugs >/dev/null 2>&1 || ! type convertXmlToText >/dev/null 2>&1; then
-  mvn -B -fae compile spotbugs:check
+  #shellcheck disable=SC2086
+  mvn ${MAVEN_OPTIONS} compile spotbugs:check
   exit $?
 fi
 
-mvn -B -fae compile spotbugs:spotbugs
+#shellcheck disable=SC2086
+mvn ${MAVEN_OPTIONS} compile spotbugs:spotbugs
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/findbugs"}
 mkdir -p "$REPORT_DIR"

@@ -19,13 +19,16 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,7 +137,7 @@ public class OzoneManagerDoubleBuffer {
 
             readyBuffer.iterator().forEachRemaining((entry) -> {
               try {
-                entry.getResponse().addToDBBatch(omMetadataManager,
+                entry.getResponse().checkAndUpdateDB(omMetadataManager,
                     batchOperation);
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
@@ -143,7 +146,10 @@ public class OzoneManagerDoubleBuffer {
               }
             });
 
+            long startTime = Time.monotonicNowNanos();
             omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            ozoneManagerDoubleBufferMetrics.updateFlushTime(
+                Time.monotonicNowNanos() - startTime);
           }
 
           // Complete futures first and then do other things. So, that
@@ -169,19 +175,20 @@ public class OzoneManagerDoubleBuffer {
 
           long lastRatisTransactionIndex =
               readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
-              .max(Long::compareTo).get();
+                  .max(Long::compareTo).get();
+
+          List<Long> flushedEpochs =
+              readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
+                  .sorted().collect(Collectors.toList());
+
+          cleanupCache(flushedEpochs);
+
 
           readyBuffer.clear();
 
-          // cleanup cache.
-          cleanupCache(lastRatisTransactionIndex);
-
-          // TODO: Need to revisit this logic, once we have multiple
-          //  executors for volume/bucket request handling. As for now
-          //  transactions are serialized this should be fine.
           // update the last updated index in OzoneManagerStateMachine.
           ozoneManagerRatisSnapShot.updateLastAppliedIndex(
-              lastRatisTransactionIndex);
+              flushedEpochs);
 
           // set metrics.
           updateMetrics(flushedTransactionsSize);
@@ -196,9 +203,9 @@ public class OzoneManagerDoubleBuffer {
               "exception while running";
           ExitUtils.terminate(1, message, ex, LOG);
         } else {
-          LOG.info("OMDoubleBuffer flush thread " +
-              Thread.currentThread().getName() + " is interrupted and will " +
-              "exit. {}", Thread.currentThread().getName());
+          LOG.info("OMDoubleBuffer flush thread {} is interrupted and will "
+              + "exit. {}", Thread.currentThread().getName(),
+                  Thread.currentThread().getName());
         }
       } catch (IOException ex) {
         terminate(ex);
@@ -210,7 +217,7 @@ public class OzoneManagerDoubleBuffer {
     }
   }
 
-  private void cleanupCache(long lastRatisTransactionIndex) {
+  private void cleanupCache(List<Long> lastRatisTransactionIndex) {
     // As now only volume and bucket transactions are handled only called
     // cleanupCache on bucketTable.
     // TODO: After supporting all write operations we need to call
@@ -245,6 +252,10 @@ public class OzoneManagerDoubleBuffer {
     ozoneManagerDoubleBufferMetrics.incrTotalNumOfFlushOperations();
     ozoneManagerDoubleBufferMetrics.incrTotalSizeOfFlushedTransactions(
         flushedTransactionsSize);
+    ozoneManagerDoubleBufferMetrics.setAvgFlushTransactionsInOneIteration(
+        (float) ozoneManagerDoubleBufferMetrics
+            .getTotalNumOfFlushedTransactions() /
+            ozoneManagerDoubleBufferMetrics.getTotalNumOfFlushOperations());
     if (maxFlushedTransactionsInOneIteration < flushedTransactionsSize) {
       maxFlushedTransactionsInOneIteration = flushedTransactionsSize;
       ozoneManagerDoubleBufferMetrics

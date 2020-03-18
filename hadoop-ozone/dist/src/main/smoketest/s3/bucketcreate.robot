@@ -19,7 +19,7 @@ Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
-Test Setup          Setup s3 tests
+Suite Setup         Setup s3 tests
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
@@ -32,3 +32,7 @@ Create bucket which already exists
     ${result} =         Execute AWSS3APICli         create-bucket --bucket ${BUCKET}
                         Should contain              ${result}         ${BUCKET}
                         Should contain              ${result}         Location
+
+Create bucket with invalid bucket name
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket_1   255
+                        Should contain              ${result}         InvalidBucketName

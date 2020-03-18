@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -25,9 +25,11 @@ import java.io.File;
 import java.io.IOException;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -40,6 +42,7 @@ import org.slf4j.LoggerFactory;
  * relying on the OmMetadataManagerImpl, we can make sure all changes made to
  * schema in OM will be automatically picked up by Recon.
  */
+@Singleton
 public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     implements ReconOMMetadataManager {
 
@@ -84,11 +87,10 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       addOMTablesAndCodecs(dbStoreBuilder);
       DBStore newStore = dbStoreBuilder.build();
       setStore(newStore);
-      LOG.info("Created OM DB snapshot at {}.",
+      LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
-      LOG.error("Unable to initialize Recon OM DB snapshot store.",
-          ioEx);
+      LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
       initializeOmTables();
@@ -106,6 +108,16 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
       }
     }
     initializeNewRdbStore(newDbLocation);
+  }
+
+  @Override
+  public long getLastSequenceNumberFromDB() {
+    RDBStore rocksDBStore = (RDBStore) getStore();
+    if (null == rocksDBStore) {
+      return 0;
+    } else {
+      return rocksDBStore.getDb().getLatestSequenceNumber();
+    }
   }
 
 }

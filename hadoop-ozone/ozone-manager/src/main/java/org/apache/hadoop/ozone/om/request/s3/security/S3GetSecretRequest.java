@@ -164,10 +164,8 @@ public class S3GetSecretRequest extends OMClientRequest {
       omClientResponse = new S3GetSecretResponse(null,
           createErrorOMResponse(omResponse, ex));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(ozoneManagerDoubleBufferHelper.add(
-            omClientResponse, transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK,
             kerberosID);

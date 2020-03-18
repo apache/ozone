@@ -17,8 +17,10 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -33,12 +35,14 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -71,7 +75,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
@@ -95,11 +98,17 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.apache.ratis.server.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
 import static org.junit.Assert.fail;
+
+import javax.management.MBeanInfo;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
+@Ignore
 public class TestOzoneManagerHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -228,7 +237,7 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(bucketName, ozoneBucket.getName());
     Assert.assertTrue(ozoneBucket.getVersioning());
     Assert.assertEquals(StorageType.DISK, ozoneBucket.getStorageType());
-    Assert.assertTrue(ozoneBucket.getCreationTime() <= Time.now());
+    Assert.assertFalse(ozoneBucket.getCreationTime().isAfter(Instant.now()));
 
 
     // Change versioning to false
@@ -581,7 +590,7 @@ public class TestOzoneManagerHA {
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
           GenericTestUtils.assertExceptionContains(
-              "NotLeaderException", e);
+              "OMNotLeaderException", e);
         }
       } else {
         throw e;
@@ -622,7 +631,7 @@ public class TestOzoneManagerHA {
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
           GenericTestUtils.assertExceptionContains(
-              "NotLeaderException", e);
+              "OMNotLeaderException", e);
         }
       } else {
         throw e;
@@ -777,12 +786,10 @@ public class TestOzoneManagerHA {
     for (int i = 0; i < numOfOMs; i++) {
       // Failover OMFailoverProxyProvider to OM at index i
       OzoneManager ozoneManager = cluster.getOzoneManager(i);
-      String omHostName = ozoneManager.getOmRpcServerAddr().getHostName();
-      int rpcPort = ozoneManager.getOmRpcServerAddr().getPort();
 
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
       final ObjectStore store = OzoneClientFactory.getRpcClient(
-          omHostName, rpcPort, omServiceId, conf).getObjectStore();
+          omServiceId, conf).getObjectStore();
       final OMFailoverProxyProvider proxyProvider =
           store.getClientProxy().getOMProxyProvider();
 
@@ -1083,8 +1090,6 @@ public class TestOzoneManagerHA {
     Assert.assertTrue(removeAcl);
   }
 
-
-
   @Test
   public void testOMRatisSnapshot() throws Exception {
     String userName = "user" + RandomStringUtils.randomNumeric(5);
@@ -1114,7 +1119,7 @@ public class TestOzoneManagerHA {
     while (appliedLogIndex <= SNAPSHOT_THRESHOLD) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
-          .getStateMachineLastAppliedIndex();
+          .getLastAppliedTermIndex().getIndex();
     }
 
     GenericTestUtils.waitFor(() -> {
@@ -1127,7 +1132,7 @@ public class TestOzoneManagerHA {
     // The current lastAppliedLogIndex on the state machine should be greater
     // than or equal to the saved snapshot index.
     long smLastAppliedIndex =
-        ozoneManager.getOmRatisServer().getStateMachineLastAppliedIndex();
+        ozoneManager.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     long ratisSnapshotIndex = ozoneManager.getRatisSnapshotIndex();
     Assert.assertTrue("LastAppliedIndex on OM State Machine ("
             + smLastAppliedIndex + ") is less than the saved snapshot index("
@@ -1138,7 +1143,7 @@ public class TestOzoneManagerHA {
     while (appliedLogIndex <= (smLastAppliedIndex + SNAPSHOT_THRESHOLD)) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
-          .getStateMachineLastAppliedIndex();
+          .getLastAppliedTermIndex().getIndex();
     }
 
     GenericTestUtils.waitFor(() -> {
@@ -1205,7 +1210,7 @@ public class TestOzoneManagerHA {
     }
 
     long lastAppliedTxOnFollowerOM =
-        followerOM1.getOmRatisServer().getStateMachineLastAppliedIndex();
+        followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
 
     // Stop one follower OM
     followerOM1.stop();
@@ -1216,31 +1221,31 @@ public class TestOzoneManagerHA {
     // restarted.
     long minNewTxIndex = lastAppliedTxOnFollowerOM + (LOG_PURGE_GAP * 10);
     long leaderOMappliedLogIndex = leaderOM.getOmRatisServer()
-        .getStateMachineLastAppliedIndex();
+        .getLastAppliedTermIndex().getIndex();
 
     List<String> missedKeys = new ArrayList<>();
     while (leaderOMappliedLogIndex < minNewTxIndex) {
       missedKeys.add(createKey(ozoneBucket));
       leaderOMappliedLogIndex = leaderOM.getOmRatisServer()
-          .getStateMachineLastAppliedIndex();
+          .getLastAppliedTermIndex().getIndex();
     }
 
     // Restart the stopped OM.
     followerOM1.restart();
 
     // Get the latest snapshotIndex from the leader OM.
-    long leaderOMSnaphsotIndex = leaderOM.saveRatisSnapshot();
+    long leaderOMSnaphsotIndex = leaderOM.saveRatisSnapshot().getIndex();
 
     // The recently started OM should be lagging behind the leader OM.
     long followerOMLastAppliedIndex =
-        followerOM1.getOmRatisServer().getStateMachineLastAppliedIndex();
+        followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     Assert.assertTrue(
         followerOMLastAppliedIndex < leaderOMSnaphsotIndex);
 
     // Wait for the follower OM to catch up
     GenericTestUtils.waitFor(() -> {
       long lastAppliedIndex =
-          followerOM1.getOmRatisServer().getStateMachineLastAppliedIndex();
+          followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
       if (lastAppliedIndex >= leaderOMSnaphsotIndex) {
         return true;
       }
@@ -1254,14 +1259,14 @@ public class TestOzoneManagerHA {
       createKey(ozoneBucket);
     }
     long followerOM1lastAppliedIndex = followerOM1.getOmRatisServer()
-        .getStateMachineLastAppliedIndex();
+        .getLastAppliedTermIndex().getIndex();
     Assert.assertTrue(followerOM1lastAppliedIndex >
         leaderOMSnaphsotIndex);
 
     // The follower OMs should be in sync. There can be a small lag between
     // leader OM and follower OMs as txns are applied first on leader OM.
     long followerOM2lastAppliedIndex = followerOM1.getOmRatisServer()
-        .getStateMachineLastAppliedIndex();
+        .getLastAppliedTermIndex().getIndex();
     Assert.assertEquals(followerOM1lastAppliedIndex,
         followerOM2lastAppliedIndex);
 
@@ -1316,6 +1321,21 @@ public class TestOzoneManagerHA {
 
     validateVolumesList(userName, expectedVolumes);
 
+  }
+
+  @Test
+  public void testJMXMetrics() throws Exception {
+    // Verify any one ratis metric is exposed by JMX MBeanServer
+    OzoneManagerRatisServer ratisServer =
+        cluster.getOzoneManager(0).getOmRatisServer();
+    ObjectName oname = new ObjectName(RATIS_APPLICATION_NAME_METRICS, "name",
+        RATIS_APPLICATION_NAME_METRICS + ".log_worker." +
+            ratisServer.getRaftPeerId().toString() + ".flushCount");
+    MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
+    MBeanInfo mBeanInfo = mBeanServer.getMBeanInfo(oname);
+    Assert.assertNotNull(mBeanInfo);
+    Object flushCount = mBeanServer.getAttribute(oname, "Count");
+    Assert.assertTrue((long) flushCount >= 0);
   }
 
   private void validateVolumesList(String userName,

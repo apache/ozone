@@ -30,11 +30,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -59,6 +63,8 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -122,6 +128,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KMS_PROVIDER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
@@ -172,7 +179,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @SuppressWarnings("parameternumber")
-  private KeyManagerImpl(OzoneManager om, ScmClient scmClient,
+  public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
       OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
       OzoneBlockTokenSecretManager secretManager,
       KeyProviderCryptoExtension kmsProvider, PrefixManager prefixManager) {
@@ -653,37 +660,17 @@ public class KeyManagerImpl implements KeyManager {
       }
       // Refresh container pipeline info from SCM
       // based on OmKeyArgs.refreshPipeline flag
-      // 1. Client send initial read request OmKeyArgs.refreshPipeline = false
-      // and uses the pipeline cached in OM to access datanode
-      // 2. If succeeded, done.
-      // 3. If failed due to pipeline does not exist or invalid pipeline state
-      //    exception, client should retry lookupKey with
-      //    OmKeyArgs.refreshPipeline = true
       if (args.getRefreshPipeline()) {
-        for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-          key.getLocationList().forEach(k -> {
-            // TODO: fix Some tests that may not initialize container client
-            // The production should always have containerClient initialized.
-            if (scmClient.getContainerClient() != null) {
-              try {
-                ContainerWithPipeline cp = scmClient.getContainerClient()
-                    .getContainerWithPipeline(k.getContainerID());
-                if (!cp.getPipeline().equals(k.getPipeline())) {
-                  k.setPipeline(cp.getPipeline());
-                }
-              } catch (IOException e) {
-                LOG.error("Unable to update pipeline for container:{}",
-                    k.getContainerID());
-              }
-            }
-          });
-        }
+        refreshPipeline(value);
       }
       if (args.getSortDatanodes()) {
         sortDatanodeInPipeline(value, clientAddress);
       }
       return value;
     } catch (IOException ex) {
+      if (ex instanceof OMException) {
+        throw ex;
+      }
       LOG.debug("Get key failed for volume:{} bucket:{} key:{}",
           volumeName, bucketName, keyName, ex);
       throw new OMException(ex.getMessage(),
@@ -691,6 +678,47 @@ public class KeyManagerImpl implements KeyManager {
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
+    }
+  }
+
+  /**
+   * Refresh pipeline info in OM by asking SCM.
+   * @param value OmKeyInfo
+   */
+  @VisibleForTesting
+  protected void refreshPipeline(OmKeyInfo value) throws IOException {
+    if (value != null &&
+        CollectionUtils.isNotEmpty(value.getKeyLocationVersions())) {
+      Map<Long, ContainerWithPipeline> containerWithPipelineMap =
+          new HashMap<>();
+      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+        for (OmKeyLocationInfo k : key.getLocationList()) {
+          // TODO: fix Some tests that may not initialize container client
+          // The production should always have containerClient initialized.
+          if (scmClient.getContainerClient() != null) {
+            try {
+              if (!containerWithPipelineMap.containsKey(k.getContainerID())) {
+                ContainerWithPipeline containerWithPipeline = scmClient
+                    .getContainerClient()
+                    .getContainerWithPipeline(k.getContainerID());
+                containerWithPipelineMap.put(k.getContainerID(),
+                    containerWithPipeline);
+              }
+            } catch (IOException ioEx) {
+              LOG.debug("Get containerPipeline failed for volume:{} bucket:{} "
+                      + "key:{}", value.getVolumeName(), value.getBucketName(),
+                  value.getKeyName(), ioEx);
+              throw new OMException(ioEx.getMessage(),
+                  SCM_GET_PIPELINE_EXCEPTION);
+            }
+            ContainerWithPipeline cp =
+                containerWithPipelineMap.get(k.getContainerID());
+            if (!cp.getPipeline().equals(k.getPipeline())) {
+              k.setPipeline(cp.getPipeline());
+            }
+          }
+        }
+      }
     }
   }
 
@@ -792,7 +820,7 @@ public class KeyManagerImpl implements KeyManager {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           metadataManager.getDeletedTable().get(objectKey);
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(keyInfo,
-          repeatedOmKeyInfo);
+          repeatedOmKeyInfo, 0L, false);
       metadataManager.getKeyTable().delete(objectKey);
       metadataManager.getDeletedTable().put(objectKey, repeatedOmKeyInfo);
     } catch (OMException ex) {
@@ -840,9 +868,9 @@ public class KeyManagerImpl implements KeyManager {
 
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
-    Preconditions.checkArgument(maxKeys < listTrashKeysMax,
+    Preconditions.checkArgument(maxKeys <= listTrashKeysMax,
         "The max keys limit specified is not less than the cluster " +
-          "allowed limit.");
+          "allowed maximum limit.");
 
     return metadataManager.listTrash(volumeName, bucketName,
      startKeyName, keyPrefix, maxKeys);
@@ -915,9 +943,13 @@ public class KeyManagerImpl implements KeyManager {
 
       long currentTime = Time.now();
       Map<Integer, PartKeyInfo> partKeyInfoMap = new HashMap<>();
-      OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo(
-          multipartUploadID, currentTime, keyArgs.getType(),
-          keyArgs.getFactor(), partKeyInfoMap);
+      OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
+          .setUploadID(multipartUploadID)
+          .setCreationTime(currentTime)
+          .setReplicationType(keyArgs.getType())
+          .setReplicationFactor(keyArgs.getFactor())
+          .setPartKeyInfoList(partKeyInfoMap)
+          .build();
       List<OmKeyLocationInfo> locations = new ArrayList<>();
       OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
@@ -970,7 +1002,7 @@ public class KeyManagerImpl implements KeyManager {
               keyArgs.getBucketName() + OZONE_URI_DELIMITER +
               keyArgs.getKeyName());
 
-      if(prefixList.size() > 0) {
+      if (!prefixList.isEmpty()) {
         // Add all acls from direct parent to key.
         OmPrefixInfo prefixInfo = prefixList.get(prefixList.size() - 1);
         if(prefixInfo  != null) {
@@ -1033,7 +1065,7 @@ public class KeyManagerImpl implements KeyManager {
         RepeatedOmKeyInfo repeatedOmKeyInfo =
             metadataManager.getDeletedTable().get(partName);
         repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            keyInfo, repeatedOmKeyInfo);
+            keyInfo, repeatedOmKeyInfo, 0L, false);
         metadataManager.getDeletedTable().put(partName, repeatedOmKeyInfo);
         throw new OMException("No such Multipart upload is with specified " +
             "uploadId " + uploadID, ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
@@ -1070,7 +1102,7 @@ public class KeyManagerImpl implements KeyManager {
                     .get(oldPartKeyInfo.getPartName());
 
             repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-                partKey, repeatedOmKeyInfo);
+                partKey, repeatedOmKeyInfo, 0L, false);
 
             metadataManager.getDeletedTable().put(partName, repeatedOmKeyInfo);
             metadataManager.getDeletedTable().putWithBatch(batch,
@@ -1165,9 +1197,9 @@ public class KeyManagerImpl implements KeyManager {
       // If there is no entry in openKeyTable, then there is no multipart
       // upload initiated for this key.
       if (openKeyInfo == null) {
-        LOG.error("Abort Multipart Upload Failed: volume: " + volumeName +
-            "bucket: " + bucketName + "key: " + keyName + "with error no " +
-            "such uploadID:" + uploadID);
+        LOG.error("Abort Multipart Upload Failed: volume: {} bucket: {} "
+                + "key: {} with error no such uploadID: {}", volumeName,
+                bucketName, keyName, uploadID);
         throw new OMException("Abort Multipart Upload Failed: volume: " +
             volumeName + "bucket: " + bucketName + "key: " + keyName,
             ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
@@ -1188,7 +1220,7 @@ public class KeyManagerImpl implements KeyManager {
                     .get(partKeyInfo.getPartName());
 
             repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-                currentKeyPartInfo, repeatedOmKeyInfo);
+                currentKeyPartInfo, repeatedOmKeyInfo, 0L, false);
 
             metadataManager.getDeletedTable().putWithBatch(batch,
                 partKeyInfo.getPartName(), repeatedOmKeyInfo);
@@ -1226,17 +1258,13 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
 
-      List<String> multipartUploadKeys =
+      Set<String> multipartUploadKeys =
           metadataManager
               .getMultipartUploadKeys(volumeName, bucketName, prefix);
 
       List<OmMultipartUpload> collect = multipartUploadKeys.stream()
           .map(OmMultipartUpload::from)
           .peek(upload -> {
-            String dbKey = metadataManager
-                .getOzoneKey(upload.getVolumeName(),
-                    upload.getBucketName(),
-                    upload.getKeyName());
             try {
               Table<String, OmMultipartKeyInfo> keyInfoTable =
                   metadataManager.getMultipartInfoTable();
@@ -1253,7 +1281,8 @@ public class KeyManagerImpl implements KeyManager {
             } catch (IOException e) {
               LOG.warn(
                   "Open key entry for multipart upload record can be read  {}",
-                  dbKey);
+                  metadataManager.getOzoneKey(upload.getVolumeName(),
+                          upload.getBucketName(), upload.getKeyName()));
             }
           })
           .collect(Collectors.toList());
@@ -1663,6 +1692,9 @@ public class KeyManagerImpl implements KeyManager {
           volumeName, bucketName, keyName);
       OmKeyInfo fileKeyInfo = metadataManager.getKeyTable().get(fileKeyBytes);
       if (fileKeyInfo != null) {
+        if (args.getRefreshPipeline()) {
+          refreshPipeline(fileKeyInfo);
+        }
         // this is a file
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
@@ -1839,6 +1871,9 @@ public class KeyManagerImpl implements KeyManager {
     try {
       OzoneFileStatus fileStatus = getFileStatus(args);
       if (fileStatus.isFile()) {
+        if (args.getRefreshPipeline()) {
+          refreshPipeline(fileStatus.getKeyInfo());
+        }
         if (args.getSortDatanodes()) {
           sortDatanodeInPipeline(fileStatus.getKeyInfo(), clientAddress);
         }
@@ -1855,6 +1890,44 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   /**
+   * Helper function for listStatus to find key in TableCache.
+   */
+  private void listStatusFindKeyInTableCache(
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter,
+      String keyArgs, String startCacheKey, boolean recursive,
+      TreeMap<String, OzoneFileStatus> cacheKeyMap, Set<String> deletedKeySet) {
+
+    while (cacheIter.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
+          cacheIter.next();
+      String cacheKey = entry.getKey().getCacheKey();
+      if (cacheKey.equals(keyArgs)) {
+        continue;
+      }
+      OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
+      // cacheOmKeyInfo is null if an entry is deleted in cache
+      if (cacheOmKeyInfo != null) {
+        if (cacheKey.startsWith(startCacheKey) &&
+            cacheKey.compareTo(startCacheKey) >= 0) {
+          if (!recursive) {
+            String remainingKey = StringUtils.stripEnd(cacheKey.substring(
+                startCacheKey.length()), OZONE_URI_DELIMITER);
+            // For non-recursive, the remaining part of key can't have '/'
+            if (remainingKey.contains(OZONE_URI_DELIMITER)) {
+              continue;
+            }
+          }
+          OzoneFileStatus fileStatus = new OzoneFileStatus(
+              cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
+          cacheKeyMap.put(cacheKey, fileStatus);
+        }
+      } else {
+        deletedKeySet.add(cacheKey);
+      }
+    }
+  }
+
+  /**
    * List the status for a file or a directory and its contents.
    *
    * @param args       Key args
@@ -1868,11 +1941,20 @@ public class KeyManagerImpl implements KeyManager {
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
+
+    List<OzoneFileStatus> fileStatusList = new ArrayList<>();
+    if (numEntries <= 0) {
+      return fileStatusList;
+    }
+
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
+    // A map sorted by OmKey to combine results from TableCache and DB.
+    TreeMap<String, OzoneFileStatus> cacheKeyMap = new TreeMap<>();
+    // A set to keep track of keys deleted in cache but not flushed to DB.
+    Set<String> deletedKeySet = new TreeSet<>();
 
-    List<OzoneFileStatus> fileStatusList = new ArrayList<>();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
@@ -1881,60 +1963,105 @@ public class KeyManagerImpl implements KeyManager {
         if (fileStatus.isFile()) {
           return Collections.singletonList(fileStatus);
         }
+        // keyName is a directory
         startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
       }
 
+      Table keyTable = metadataManager.getKeyTable();
+      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
+          cacheIter = keyTable.cacheIterator();
+      String startCacheKey = OZONE_URI_DELIMITER + volumeName +
+          OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
+          ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
+      // Note: eliminating the case where startCacheKey could end with '//'
+      String keyArgs = OzoneFSUtils.addTrailingSlashIfNeeded(
+          metadataManager.getOzoneKey(volumeName, bucketName, keyName));
+
+      // First, find key in TableCache
+      listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
+          recursive, cacheKeyMap, deletedKeySet);
+      // Then, find key in DB
       String seekKeyInDb =
           metadataManager.getOzoneKey(volumeName, bucketName, startKey);
-      String keyInDb = OzoneFSUtils.addTrailingSlashIfNeeded(
-          metadataManager.getOzoneKey(volumeName, bucketName, keyName));
       TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          iterator = metadataManager.getKeyTable().iterator();
+          iterator = keyTable.iterator();
       iterator.seek(seekKeyInDb);
-
-      if (!iterator.hasNext()) {
-        return Collections.emptyList();
-      }
-
-      if (iterator.key().equals(keyInDb)) {
-        // skip the key which needs to be listed
-        iterator.next();
-      }
-
-      while (iterator.hasNext() && numEntries - fileStatusList.size() > 0) {
-        String entryInDb = iterator.key();
-        OmKeyInfo value = iterator.value().getValue();
-        if (entryInDb.startsWith(keyInDb)) {
-          String entryKeyName = value.getKeyName();
-          if (recursive) {
-            // for recursive list all the entries
-            fileStatusList.add(new OzoneFileStatus(value, scmBlockSize,
-                !OzoneFSUtils.isFile(entryKeyName)));
-            iterator.next();
-          } else {
-            // get the child of the directory to list from the entry. For
-            // example if directory to list is /a and entry is /a/b/c where
-            // c is a file. The immediate child is b which is a directory. c
-            // should not be listed as child of a.
-            String immediateChild = OzoneFSUtils
-                .getImmediateChild(entryKeyName, keyName);
-            boolean isFile = OzoneFSUtils.isFile(immediateChild);
-            if (isFile) {
-              fileStatusList
-                  .add(new OzoneFileStatus(value, scmBlockSize, !isFile));
+      int countEntries = 0;
+      if (iterator.hasNext()) {
+        if (iterator.key().equals(keyArgs)) {
+          // Skip the key itself, since we are listing inside the directory
+          iterator.next();
+        }
+        // Iterate through seek results
+        while (iterator.hasNext() && numEntries - countEntries > 0) {
+          String entryInDb = iterator.key();
+          OmKeyInfo omKeyInfo = iterator.value().getValue();
+          if (entryInDb.startsWith(keyArgs)) {
+            String entryKeyName = omKeyInfo.getKeyName();
+            if (recursive) {
+              // for recursive list all the entries
+              if (!deletedKeySet.contains(entryInDb)) {
+                cacheKeyMap.put(entryInDb, new OzoneFileStatus(omKeyInfo,
+                    scmBlockSize, !OzoneFSUtils.isFile(entryKeyName)));
+                countEntries++;
+              }
               iterator.next();
             } else {
-              // if entry is a directory
-              fileStatusList.add(new OzoneFileStatus(immediateChild));
-              // skip the other descendants of this child directory.
-              iterator.seek(
-                  getNextGreaterString(volumeName, bucketName, immediateChild));
+              // get the child of the directory to list from the entry. For
+              // example if directory to list is /a and entry is /a/b/c where
+              // c is a file. The immediate child is b which is a directory. c
+              // should not be listed as child of a.
+              String immediateChild = OzoneFSUtils
+                  .getImmediateChild(entryKeyName, keyName);
+              boolean isFile = OzoneFSUtils.isFile(immediateChild);
+              if (isFile) {
+                if (!deletedKeySet.contains(entryInDb)) {
+                  cacheKeyMap.put(entryInDb,
+                      new OzoneFileStatus(omKeyInfo, scmBlockSize, !isFile));
+                  countEntries++;
+                }
+                iterator.next();
+              } else {
+                // if entry is a directory
+                if (!deletedKeySet.contains(entryInDb)) {
+                  if (!entryKeyName.equals(immediateChild)) {
+                    cacheKeyMap.put(entryInDb,
+                        new OzoneFileStatus(immediateChild));
+                  } else {
+                    // If entryKeyName matches dir name, we have the info
+                    cacheKeyMap.put(entryInDb,
+                        new OzoneFileStatus(omKeyInfo, 0, true));
+                  }
+                  countEntries++;
+                }
+                // skip the other descendants of this child directory.
+                iterator.seek(getNextGreaterString(
+                    volumeName, bucketName, immediateChild));
+              }
             }
+          } else {
+            break;
           }
-        } else {
+        }
+      }
+
+      countEntries = 0;
+      // Convert results in cacheKeyMap to List
+      for (Map.Entry<String, OzoneFileStatus> entry : cacheKeyMap.entrySet()) {
+        // No need to check if a key is deleted or not here, this is handled
+        // when adding entries to cacheKeyMap from DB.
+        if (args.getRefreshPipeline()) {
+          refreshPipeline(entry.getValue().getKeyInfo());
+        }
+        fileStatusList.add(entry.getValue());
+        countEntries++;
+        if (countEntries >= numEntries) {
           break;
         }
       }
+      // Clean up temp map and set
+      cacheKeyMap.clear();
+      deletedKeySet.clear();
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
@@ -1985,8 +2112,9 @@ public class KeyManagerImpl implements KeyManager {
         OzoneFileStatus fileStatus =
             getFileStatus(argsBuilder.setKeyName(keyName).build());
         if (fileStatus.isFile()) {
-          LOG.error("Unable to create directory (File already exists): volume: "
-              + volumeName + "bucket: " + bucketName + "key: " + keyName);
+          LOG.error("Unable to create directory (File already exists): "
+                  + "volume: {} bucket: {} key: {}", volumeName, bucketName,
+                  keyName);
           throw new OMException(
               "Unable to create directory at : volume: " + volumeName
                   + "bucket: " + bucketName + "key: " + keyName,
@@ -2035,7 +2163,7 @@ public class KeyManagerImpl implements KeyManager {
       for (OmKeyLocationInfoGroup key : keyInfo.getKeyLocationVersions()) {
         key.getLocationList().forEach(k -> {
           List<DatanodeDetails> nodes = k.getPipeline().getNodes();
-          if (nodes == null || nodes.size() == 0) {
+          if (nodes == null || nodes.isEmpty()) {
             LOG.warn("Datanodes for pipeline {} is empty",
                 k.getPipeline().getId().toString());
             return;

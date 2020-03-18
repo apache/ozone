@@ -23,22 +23,19 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.security.token.Token;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.EOFException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 
@@ -55,6 +52,7 @@ public class TestBlockInputStream {
   private int blockSize;
   private List<ChunkInfo> chunks;
   private Map<String, byte[]> chunkDataMap;
+  private AtomicBoolean isRefreshed = new AtomicBoolean();
 
   @Before
   public void setup() throws Exception {
@@ -63,7 +61,7 @@ public class TestBlockInputStream {
     createChunkList(5);
 
     blockStream = new DummyBlockInputStream(blockID, blockSize, null, null,
-        false, null);
+        false, null, chunks, chunkDataMap);
   }
 
   /**
@@ -100,40 +98,6 @@ public class TestBlockInputStream {
 
       blockSize += chunkLen;
       blockData = Bytes.concat(blockData, byteData);
-    }
-  }
-
-  /**
-   * A dummy BlockInputStream to mock read block call to DN.
-   */
-  private class DummyBlockInputStream extends BlockInputStream {
-
-    DummyBlockInputStream(BlockID blockId,
-        long blockLen,
-        Pipeline pipeline,
-        Token<OzoneBlockTokenIdentifier> token,
-        boolean verifyChecksum,
-        XceiverClientManager xceiverClientManager) {
-      super(blockId, blockLen, pipeline, token, verifyChecksum,
-          xceiverClientManager);
-    }
-
-    @Override
-    protected List<ChunkInfo> getChunkInfos() {
-      return chunks;
-    }
-
-    @Override
-    protected void addStream(ChunkInfo chunkInfo) {
-      TestChunkInputStream testChunkInputStream = new TestChunkInputStream();
-      getChunkStreams().add(testChunkInputStream.new DummyChunkInputStream(
-          chunkInfo, null, null, false,
-          chunkDataMap.get(chunkInfo.getChunkName()).clone()));
-    }
-
-    @Override
-    protected synchronized void checkOpen() throws IOException {
-      // No action needed
     }
   }
 
@@ -230,5 +194,20 @@ public class TestBlockInputStream {
     byte[] b2 = new byte[100];
     blockStream.read(b2, 0, 100);
     matchWithInputData(b2, 150, 100);
+  }
+
+  @Test
+  public void testRefreshPipelineFunction() throws Exception {
+    BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
+    createChunkList(5);
+    BlockInputStream blockInputStreamWithRetry =
+        new DummyBlockInputStreamWithRetry(blockID, blockSize, null, null,
+            false, null, chunks, chunkDataMap, isRefreshed);
+
+    Assert.assertFalse(isRefreshed.get());
+    seekAndVerify(50);
+    byte[] b = new byte[200];
+    blockInputStreamWithRetry.read(b, 0, 200);
+    Assert.assertTrue(isRefreshed.get());
   }
 }

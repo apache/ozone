@@ -34,7 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
+import java.util.function.LongSupplier;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.opentracing.Scope;
@@ -177,6 +177,12 @@ public final class RandomKeyGenerator implements Callable<Void> {
   )
   private ReplicationFactor factor = ReplicationFactor.ONE;
 
+  @Option(
+      names = "--om-service-id",
+      description = "OM Service ID"
+  )
+  private String omServiceID = null;
+
   private int threadPoolSize;
 
   private OzoneClient ozoneClient;
@@ -239,7 +245,11 @@ public final class RandomKeyGenerator implements Callable<Void> {
     keyCounter = new AtomicLong();
     volumes = new ConcurrentHashMap<>();
     buckets = new ConcurrentHashMap<>();
-    ozoneClient = OzoneClientFactory.getClient(configuration);
+    if (omServiceID != null) {
+      ozoneClient = OzoneClientFactory.getRpcClient(omServiceID, configuration);
+    } else {
+      ozoneClient = OzoneClientFactory.getRpcClient(configuration);
+    }
     objectStore = ozoneClient.getObjectStore();
     for (FreonOps ops : FreonOps.values()) {
       histograms.add(ops.ordinal(), new Histogram(new UniformReservoir()));
@@ -280,7 +290,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     totalBucketCount = numOfVolumes * numOfBuckets;
     totalKeyCount = totalBucketCount * numOfKeys;
 
-    LOG.info("Number of Threads: " + numOfThreads);
+    LOG.info("Number of Threads: {}", numOfThreads);
     threadPoolSize = numOfThreads;
     executor = Executors.newFixedThreadPool(threadPoolSize);
     addShutdownHook();
@@ -292,7 +302,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     LOG.info("Buffer size: {} bytes", bufferSize);
     LOG.info("validateWrites : {}", validateWrites);
     for (int i = 0; i < numOfThreads; i++) {
-      executor.submit(new ObjectCreator());
+      executor.execute(new ObjectCreator());
     }
 
     Thread validator = null;
@@ -307,7 +317,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       LOG.info("Data validation is enabled.");
     }
 
-    Supplier<Long> currentValue = numberOfKeysAdded::get;
+    LongSupplier currentValue = numberOfKeysAdded::get;
     progressbar = new ProgressBar(System.out, totalKeyCount, currentValue);
 
     LOG.info("Starting progress bar Thread.");
@@ -464,9 +474,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       String jsonName =
           new SimpleDateFormat("yyyyMMddHHmmss").format(Time.now()) + ".json";
       String jsonPath = jsonDir + "/" + jsonName;
-      FileOutputStream os = null;
-      try {
-        os = new FileOutputStream(jsonPath);
+      try (FileOutputStream os = new FileOutputStream(jsonPath)) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.setVisibility(PropertyAccessor.FIELD,
             JsonAutoDetect.Visibility.ANY);
@@ -478,14 +486,6 @@ public final class RandomKeyGenerator implements Callable<Void> {
       } catch (IOException e) {
         out.println("Json object could not be created");
         out.println(e);
-      } finally {
-        try {
-          if (os != null) {
-            os.close();
-          }
-        } catch (IOException e) {
-          LOG.warn("Could not close the output stream for json", e);
-        }
       }
     }
   }
@@ -694,29 +694,29 @@ public final class RandomKeyGenerator implements Callable<Void> {
       try (Scope scope = GlobalTracer.get().buildSpan("createKey")
           .startActive(true)) {
         long keyCreateStart = System.nanoTime();
-        OzoneOutputStream os = bucket.createKey(keyName, keySize, type,
-            factor, new HashMap<>());
-        long keyCreationDuration = System.nanoTime() - keyCreateStart;
-        histograms.get(FreonOps.KEY_CREATE.ordinal())
-            .update(keyCreationDuration);
-        keyCreationTime.getAndAdd(keyCreationDuration);
+        try (OzoneOutputStream os = bucket.createKey(keyName, keySize, type,
+            factor, new HashMap<>())) {
+          long keyCreationDuration = System.nanoTime() - keyCreateStart;
+          histograms.get(FreonOps.KEY_CREATE.ordinal())
+              .update(keyCreationDuration);
+          keyCreationTime.getAndAdd(keyCreationDuration);
 
-        try (Scope writeScope = GlobalTracer.get().buildSpan("writeKeyData")
-            .startActive(true)) {
-          long keyWriteStart = System.nanoTime();
-          for (long nrRemaining = keySize;
-               nrRemaining > 0; nrRemaining -= bufferSize) {
-            int curSize = (int) Math.min(bufferSize, nrRemaining);
-            os.write(keyValueBuffer, 0, curSize);
+          try (Scope writeScope = GlobalTracer.get().buildSpan("writeKeyData")
+              .startActive(true)) {
+            long keyWriteStart = System.nanoTime();
+            for (long nrRemaining = keySize;
+                 nrRemaining > 0; nrRemaining -= bufferSize) {
+              int curSize = (int) Math.min(bufferSize, nrRemaining);
+              os.write(keyValueBuffer, 0, curSize);
+            }
+
+            long keyWriteDuration = System.nanoTime() - keyWriteStart;
+            histograms.get(FreonOps.KEY_WRITE.ordinal())
+                .update(keyWriteDuration);
+            keyWriteTime.getAndAdd(keyWriteDuration);
+            totalBytesWritten.getAndAdd(keySize);
+            numberOfKeysAdded.getAndIncrement();
           }
-          os.close();
-
-          long keyWriteDuration = System.nanoTime() - keyWriteStart;
-          histograms.get(FreonOps.KEY_WRITE.ordinal())
-              .update(keyWriteDuration);
-          keyWriteTime.getAndAdd(keyWriteDuration);
-          totalBytesWritten.getAndAdd(keySize);
-          numberOfKeysAdded.getAndIncrement();
         }
       }
 
@@ -1060,8 +1060,10 @@ public final class RandomKeyGenerator implements Callable<Void> {
             }
             is.close();
           }
-        } catch (IOException | InterruptedException ex) {
-          LOG.error("Exception while validating write: " + ex.getMessage());
+        } catch (IOException ex) {
+          LOG.error("Exception while validating write.", ex);
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
         }
       }
     }

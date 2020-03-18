@@ -18,11 +18,13 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -31,10 +33,8 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.SupportedRpcType;
-import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Utility class for Ratis pipelines. Contains methods to create and destroy
@@ -66,8 +66,8 @@ public final class RatisPipelineUtils {
       try {
         destroyPipeline(dn, pipeline.getId(), ozoneConf, grpcTlsConfig);
       } catch (IOException e) {
-        LOG.warn("Pipeline destroy failed for pipeline={} dn={}",
-            pipeline.getId(), dn);
+        LOG.warn("Pipeline destroy failed for pipeline={} dn={} exception={}",
+            pipeline.getId(), dn, e.getMessage());
       }
     }
   }
@@ -88,16 +88,30 @@ public final class RatisPipelineUtils {
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
     final RaftPeer p = RatisHelper.toRaftPeer(dn);
-    final int maxOutstandingRequests =
-        HddsClientUtils.getMaxOutstandingRequests(ozoneConf);
-    final TimeDuration requestTimeout =
-        RatisHelper.getClientRequestTimeout(ozoneConf);
     try(RaftClient client = RatisHelper
         .newRaftClient(SupportedRpcType.valueOfIgnoreCase(rpcType), p,
-            retryPolicy, maxOutstandingRequests, grpcTlsConfig,
-            requestTimeout)) {
+            retryPolicy, grpcTlsConfig, ozoneConf)) {
       client.groupRemove(RaftGroupId.valueOf(pipelineID.getId()),
           true, p.getId());
     }
+  }
+
+  /**
+   * Return the list of pipelines who share the same set of datanodes
+   * with the input pipeline.
+   *
+   * @param stateManager PipelineStateManager
+   * @param pipeline input pipeline
+   * @return list of matched pipeline
+   */
+  static List<Pipeline> checkPipelineContainSameDatanodes(
+      PipelineStateManager stateManager, Pipeline pipeline) {
+    return stateManager.getPipelines(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE)
+        .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
+            (p.getPipelineState() != Pipeline.PipelineState.CLOSED &&
+                p.sameDatanodes(pipeline)))
+        .collect(Collectors.toList());
   }
 }

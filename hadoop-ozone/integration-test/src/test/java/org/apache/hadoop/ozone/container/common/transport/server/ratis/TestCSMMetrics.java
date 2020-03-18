@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
       .ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.*;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -61,12 +62,14 @@ import org.apache.ratis.util.function.CheckedBiConsumer;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.Assert;
 
 /**
  * This class tests the metrics of ContainerStateMachine.
  */
+@Ignore
 public class TestCSMMetrics {
   static final String TEST_DIR =
       GenericTestUtils.getTestDir("dfs").getAbsolutePath()
@@ -98,8 +101,7 @@ public class TestCSMMetrics {
     XceiverClientSpi client = null;
     String containerName = OzoneUtils.getRequestID();
     try {
-      final Pipeline pipeline = ContainerTestHelper.createPipeline(
-          numDatanodes);
+      final Pipeline pipeline = MockPipeline.createPipeline(numDatanodes);
       final OzoneConfiguration conf = new OzoneConfiguration();
       initConf.accept(pipeline, conf);
 

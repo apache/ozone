@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -19,14 +19,21 @@ package org.apache.hadoop.ozone.freon;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.codahale.metrics.ScheduledReporter;
+import com.codahale.metrics.Slf4jReporter;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -35,7 +42,6 @@ import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -100,15 +106,16 @@ public class BaseFreonGenerator {
 
   private MetricRegistry metrics = new MetricRegistry();
 
-  private ExecutorService executor;
-
   private AtomicLong successCounter;
-
   private AtomicLong failureCounter;
+  private AtomicLong attemptCounter;
 
   private long startTime;
 
   private PathSchema pathSchema;
+  private String spanName;
+  private ExecutorService executor;
+  private ProgressBar progressBar;
 
   /**
    * The main logic to execute a test generator.
@@ -116,58 +123,86 @@ public class BaseFreonGenerator {
    * @param provider creates the new steps to execute.
    */
   public void runTests(TaskProvider provider) {
+    setup(provider);
+    startTaskRunners(provider);
+    waitForCompletion();
+    shutdown();
+    reportAnyFailure();
+  }
 
-    executor = Executors.newFixedThreadPool(threadNo);
+  /**
+   * Performs {@code provider}-specific initialization.
+   */
+  private void setup(TaskProvider provider) {
+    //provider is usually a lambda, print out only the owner class name:
+    spanName = provider.getClass().getSimpleName().split("\\$")[0];
+  }
 
-    ProgressBar progressBar =
-        new ProgressBar(System.out, testNo, successCounter::get);
-    progressBar.start();
-
-    startTime = System.currentTimeMillis();
-    //schedule the execution of all the tasks.
-
-    for (long i = 0; i < testNo; i++) {
-
-      final long counter = i;
-
-      //provider is usually a lambda, print out only the owner class name:
-      String spanName = provider.getClass().getSimpleName().split("\\$")[0];
-
-      executor.execute(() -> {
-        Scope scope =
-            GlobalTracer.get().buildSpan(spanName)
-                .startActive(true);
-        try {
-
-          //in case of an other failed test, we shouldn't execute more tasks.
-          if (!failAtEnd && failureCounter.get() > 0) {
-            return;
-          }
-
-          provider.executeNextTask(counter);
-          successCounter.incrementAndGet();
-        } catch (Exception e) {
-          scope.span().setTag("failure", true);
-          failureCounter.incrementAndGet();
-          LOG.error("Error on executing task", e);
-        } finally {
-          scope.close();
-        }
-      });
+  /**
+   * Launches {@code threadNo} task runners in executor.  Each one executes test
+   * tasks in a loop until completion or failure.
+   */
+  private void startTaskRunners(TaskProvider provider) {
+    for (int i = 0; i < threadNo; i++) {
+      executor.execute(() -> taskLoop(provider));
     }
+  }
 
-    // wait until all tasks are executed
+  /**
+   * Runs test tasks in a loop until completion or failure.  This is executed
+   * concurrently in {@code executor}.
+   */
+  private void taskLoop(TaskProvider provider) {
+    while (true) {
+      long counter = attemptCounter.getAndIncrement();
 
+      //in case of an other failed test, we shouldn't execute more tasks.
+      if (counter >= testNo || (!failAtEnd && failureCounter.get() > 0)) {
+        return;
+      }
+
+      tryNextTask(provider, counter);
+    }
+  }
+
+  /**
+   * Runs a single test task (eg. key creation).
+   * @param taskId unique ID of the task
+   */
+  private void tryNextTask(TaskProvider provider, long taskId) {
+    Scope scope =
+        GlobalTracer.get().buildSpan(spanName)
+            .startActive(true);
+    try {
+      provider.executeNextTask(taskId);
+      successCounter.incrementAndGet();
+    } catch (Exception e) {
+      scope.span().setTag("failure", true);
+      failureCounter.incrementAndGet();
+      LOG.error("Error on executing task {}", taskId, e);
+    } finally {
+      scope.close();
+    }
+  }
+
+  /**
+   * Waits until the requested number of tests are executed, or until any
+   * failure in early failure mode (the default).  This is run in the main
+   * thread.
+   */
+  private void waitForCompletion() {
     while (successCounter.get() + failureCounter.get() < testNo && (
         failureCounter.get() == 0 || failAtEnd)) {
       try {
         Thread.sleep(CHECK_INTERVAL_MILLIS);
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new RuntimeException(e);
       }
     }
+  }
 
-    //shutdown everything
+  private void shutdown() {
     if (failureCounter.get() > 0 && !failAtEnd) {
       progressBar.terminate();
     } else {
@@ -179,7 +214,12 @@ public class BaseFreonGenerator {
     } catch (Exception ex) {
       ex.printStackTrace();
     }
+  }
 
+  /**
+   * @throws RuntimeException if any tests failed
+   */
+  private void reportAnyFailure() {
     if (failureCounter.get() > 0) {
       throw new RuntimeException("One ore more freon test is failed.");
     }
@@ -194,6 +234,7 @@ public class BaseFreonGenerator {
 
     successCounter = new AtomicLong(0);
     failureCounter = new AtomicLong(0);
+    attemptCounter = new AtomicLong(0);
 
     if (prefix.length() == 0) {
       prefix = RandomStringUtils.randomAlphanumeric(10);
@@ -214,6 +255,14 @@ public class BaseFreonGenerator {
           }
           printReport();
         }));
+
+    executor = Executors.newFixedThreadPool(threadNo);
+
+    progressBar = new ProgressBar(System.out, testNo, successCounter::get,
+        freonCommand.isInteractive());
+    progressBar.start();
+
+    startTime = System.currentTimeMillis();
   }
 
   /**
@@ -234,29 +283,34 @@ public class BaseFreonGenerator {
    * Print out reports from the executed tests.
    */
   public void printReport() {
-    ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).build();
+    ScheduledReporter reporter = freonCommand.isInteractive()
+        ? ConsoleReporter.forRegistry(metrics).build()
+        : Slf4jReporter.forRegistry(metrics).build();
     reporter.report();
-    System.out.println("Total execution time (sec): " + Math
-        .round((System.currentTimeMillis() - startTime) / 1000.0));
-    System.out.println("Failures: " + failureCounter.get());
-    System.out.println("Successful executions: " + successCounter.get());
+
+    List<String> messages = new LinkedList<>();
+    messages.add("Total execution time (sec): " +
+        Math.round((System.currentTimeMillis() - startTime) / 1000.0));
+    messages.add("Failures: " + failureCounter.get());
+    messages.add("Successful executions: " + successCounter.get());
+
+    Consumer<String> print = freonCommand.isInteractive()
+        ? System.out::println
+        : LOG::info;
+    messages.forEach(print);
   }
 
   /**
    * Create the OM RPC client to use it for testing.
    */
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
-      OzoneConfiguration conf) throws IOException {
+      OzoneConfiguration conf, String omServiceID) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    long omVersion = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
-    InetSocketAddress omAddress = OmUtils.getOmAddressForClients(conf);
     RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
-    return new OzoneManagerProtocolClientSideTranslatorPB(
-        RPC.getProxy(OzoneManagerProtocolPB.class, omVersion, omAddress,
-            ugi, conf, NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf)), clientId);
+    return new OzoneManagerProtocolClientSideTranslatorPB(conf, clientId,
+        omServiceID, ugi);
   }
 
   public StorageContainerLocationProtocol createStorageContainerLocationClient(
@@ -282,6 +336,29 @@ public class BaseFreonGenerator {
     return client;
   }
 
+  public static Pipeline findPipelineForTest(String pipelineId,
+      StorageContainerLocationProtocol client, Logger log) throws IOException {
+    List<Pipeline> pipelines = client.listPipelines();
+    Pipeline pipeline;
+    if (pipelineId != null && pipelineId.length() > 0) {
+      pipeline = pipelines.stream()
+          .filter(p -> p.getId().toString().equals(pipelineId))
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException(
+              "Pipeline ID is defined, but there is no such pipeline: "
+                  + pipelineId));
+    } else {
+      pipeline = pipelines.stream()
+          .filter(p -> p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException(
+              "Pipeline ID is NOT defined, and no pipeline " +
+                  "has been found with factor=THREE"));
+      log.info("Using pipeline {}", pipeline.getId());
+    }
+    return pipeline;
+  }
+
   /**
    * Generate a key/file name based on the prefix and counter.
    */
@@ -292,60 +369,46 @@ public class BaseFreonGenerator {
   /**
    * Create missing target volume/bucket.
    */
-  public void ensureVolumeAndBucketExist(OzoneConfiguration ozoneConfiguration,
+  public void ensureVolumeAndBucketExist(OzoneClient rpcClient,
       String volumeName, String bucketName) throws IOException {
 
-    try (OzoneClient rpcClient = OzoneClientFactory
-        .getRpcClient(ozoneConfiguration)) {
+    OzoneVolume volume;
+    ensureVolumeExists(rpcClient, volumeName);
+    volume = rpcClient.getObjectStore().getVolume(volumeName);
 
-      OzoneVolume volume = null;
-      try {
-        volume = rpcClient.getObjectStore().getVolume(volumeName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-          rpcClient.getObjectStore().createVolume(volumeName);
-          volume = rpcClient.getObjectStore().getVolume(volumeName);
-        } else {
-          throw ex;
-        }
-      }
-
-      try {
-        volume.getBucket(bucketName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-          volume.createBucket(bucketName);
-        } else {
-          throw ex;
-        }
+    try {
+      volume.getBucket(bucketName);
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
+        volume.createBucket(bucketName);
+      } else {
+        throw ex;
       }
     }
+
   }
 
   /**
    * Create missing target volume.
    */
   public void ensureVolumeExists(
-      OzoneConfiguration ozoneConfiguration,
+      OzoneClient rpcClient,
       String volumeName) throws IOException {
-    try (OzoneClient rpcClient = OzoneClientFactory
-        .getRpcClient(ozoneConfiguration)) {
-
-      try {
-        rpcClient.getObjectStore().getVolume(volumeName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-          rpcClient.getObjectStore().createVolume(volumeName);
-        }
+    try {
+      rpcClient.getObjectStore().getVolume(volumeName);
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+        rpcClient.getObjectStore().createVolume(volumeName);
+      } else {
+        throw ex;
       }
-
     }
   }
 
   /**
    * Calculate checksum of a byte array.
    */
-  public byte[] getDigest(byte[] content) throws IOException {
+  public static byte[] getDigest(byte[] content) {
     DigestUtils dig = new DigestUtils(DIGEST_ALGORITHM);
     dig.getMessageDigest().reset();
     return dig.digest(content);
@@ -354,7 +417,7 @@ public class BaseFreonGenerator {
   /**
    * Calculate checksum of an Input stream.
    */
-  public byte[] getDigest(InputStream stream) throws IOException {
+  public static byte[] getDigest(InputStream stream) throws IOException {
     DigestUtils dig = new DigestUtils(DIGEST_ALGORITHM);
     dig.getMessageDigest().reset();
     return dig.digest(stream);
@@ -380,4 +443,20 @@ public class BaseFreonGenerator {
     void executeNextTask(long step) throws Exception;
   }
 
+  public AtomicLong getAttemptCounter() {
+    return attemptCounter;
+  }
+
+  public int getThreadNo() {
+    return threadNo;
+  }
+
+  protected OzoneClient createOzoneClient(String omServiceID,
+      OzoneConfiguration conf) throws Exception {
+    if (omServiceID != null) {
+      return OzoneClientFactory.getRpcClient(omServiceID, conf);
+    } else {
+      return OzoneClientFactory.getRpcClient(conf);
+    }
+  }
 }

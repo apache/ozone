@@ -20,42 +20,25 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
-import org.apache.hadoop.io.MultipleIOException;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
-import org.apache.ratis.client.RaftClient;
-import org.apache.ratis.grpc.GrpcTlsConfig;
-import org.apache.ratis.protocol.RaftClientReply;
-import org.apache.ratis.protocol.RaftGroup;
-import org.apache.ratis.protocol.RaftPeer;
-import org.apache.ratis.retry.RetryPolicy;
-import org.apache.ratis.rpc.SupportedRpcType;
-import org.apache.ratis.util.TimeDuration;
-import org.apache.ratis.util.function.CheckedBiConsumer;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinWorkerThread;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -69,92 +52,127 @@ public class RatisPipelineProvider implements PipelineProvider {
   private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
   private final Configuration conf;
-
-  // Set parallelism at 3, as now in Ratis we create 1 and 3 node pipelines.
-  private final int parallelismForPool = 3;
-
-  private final ForkJoinPool.ForkJoinWorkerThreadFactory factory =
-      (pool -> {
-        final ForkJoinWorkerThread worker = ForkJoinPool.
-            defaultForkJoinWorkerThreadFactory.newThread(pool);
-        worker.setName("RATISCREATEPIPELINE" + worker.getPoolIndex());
-        return worker;
-      });
-
-  private final ForkJoinPool forkJoinPool = new ForkJoinPool(
-      parallelismForPool, factory, null, false);
-  private final GrpcTlsConfig tlsConfig;
+  private final EventPublisher eventPublisher;
+  private final PipelinePlacementPolicy placementPolicy;
+  private int pipelineNumberLimit;
+  private int maxPipelinePerDatanode;
 
   RatisPipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager, Configuration conf,
-      GrpcTlsConfig tlsConfig) {
+      EventPublisher eventPublisher) {
     this.nodeManager = nodeManager;
     this.stateManager = stateManager;
     this.conf = conf;
-    this.tlsConfig = tlsConfig;
+    this.eventPublisher = eventPublisher;
+    this.placementPolicy =
+        new PipelinePlacementPolicy(nodeManager, stateManager, conf);
+    this.pipelineNumberLimit = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);
+    this.maxPipelinePerDatanode = conf.getInt(
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
   }
 
+  private List<DatanodeDetails> pickNodesNeverUsed(ReplicationFactor factor)
+      throws SCMException {
+    Set<DatanodeDetails> dnsUsed = new HashSet<>();
+    stateManager.getPipelines(ReplicationType.RATIS, factor)
+        .stream().filter(
+          p -> p.getPipelineState().equals(PipelineState.OPEN) ||
+              p.getPipelineState().equals(PipelineState.DORMANT) ||
+              p.getPipelineState().equals(PipelineState.ALLOCATED))
+        .forEach(p -> dnsUsed.addAll(p.getNodes()));
 
-  /**
-   * Create pluggable container placement policy implementation instance.
-   *
-   * @param nodeManager - SCM node manager.
-   * @param conf - configuration.
-   * @return SCM container placement policy implementation instance.
-   */
-  @SuppressWarnings("unchecked")
-  // TODO: should we rename ContainerPlacementPolicy to PipelinePlacementPolicy?
-  private static ContainerPlacementPolicy createContainerPlacementPolicy(
-      final NodeManager nodeManager, final Configuration conf) {
-    Class<? extends ContainerPlacementPolicy> implClass =
-        (Class<? extends ContainerPlacementPolicy>) conf.getClass(
-            ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
-            SCMContainerPlacementRandom.class);
-
-    try {
-      Constructor<? extends ContainerPlacementPolicy> ctor =
-          implClass.getDeclaredConstructor(NodeManager.class,
-              Configuration.class);
-      return ctor.newInstance(nodeManager, conf);
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (InvocationTargetException e) {
-      throw new RuntimeException(implClass.getName()
-          + " could not be constructed.", e.getCause());
-    } catch (Exception e) {
-//      LOG.error("Unhandled exception occurred, Placement policy will not " +
-//          "be functional.");
-      throw new IllegalArgumentException("Unable to load " +
-          "ContainerPlacementPolicy", e);
+    // Get list of healthy nodes
+    List<DatanodeDetails> dns = nodeManager
+        .getNodes(HddsProtos.NodeState.HEALTHY)
+        .parallelStream()
+        .filter(dn -> !dnsUsed.contains(dn))
+        .limit(factor.getNumber())
+        .collect(Collectors.toList());
+    if (dns.size() < factor.getNumber()) {
+      String e = String
+          .format("Cannot create pipeline of factor %d using %d nodes." +
+                  " Used %d nodes. Healthy nodes %d", factor.getNumber(),
+              dns.size(), dnsUsed.size(),
+              nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size());
+      throw new SCMException(e,
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
+    return dns;
+  }
+
+  private boolean exceedPipelineNumberLimit(ReplicationFactor factor) {
+    if (factor != ReplicationFactor.THREE) {
+      // Only put limits for Factor THREE pipelines.
+      return false;
+    }
+    // Per datanode limit
+    if (maxPipelinePerDatanode > 0) {
+      return (stateManager.getPipelines(ReplicationType.RATIS, factor).size() -
+          stateManager.getPipelines(ReplicationType.RATIS, factor,
+              Pipeline.PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
+          nodeManager.getNodeCount(HddsProtos.NodeState.HEALTHY) /
+          factor.getNumber();
+    }
+
+    // Global limit
+    if (pipelineNumberLimit > 0) {
+      return (stateManager.getPipelines(ReplicationType.RATIS,
+          ReplicationFactor.THREE).size() - stateManager.getPipelines(
+          ReplicationType.RATIS, ReplicationFactor.THREE,
+          Pipeline.PipelineState.CLOSED).size()) >
+          (pipelineNumberLimit - stateManager.getPipelines(
+              ReplicationType.RATIS, ReplicationFactor.ONE).size());
+    }
+
+    return false;
   }
 
   @Override
   public Pipeline create(ReplicationFactor factor) throws IOException {
-    // Get set of datanodes already used for ratis pipeline
-    Set<DatanodeDetails> dnsUsed = new HashSet<>();
-    stateManager.getPipelines(ReplicationType.RATIS, factor).stream().filter(
-        p -> p.getPipelineState().equals(PipelineState.OPEN) ||
-            p.getPipelineState().equals(PipelineState.DORMANT) ||
-            p.getPipelineState().equals(PipelineState.ALLOCATED))
-        .forEach(p -> dnsUsed.addAll(p.getNodes()));
-
-    // Get list of healthy nodes
-    List<DatanodeDetails> dns =
-        nodeManager.getNodes(NodeState.HEALTHY)
-            .parallelStream()
-            .filter(dn -> !dnsUsed.contains(dn))
-            .limit(factor.getNumber())
-            .collect(Collectors.toList());
-    if (dns.size() < factor.getNumber()) {
-      String e = String
-          .format("Cannot create pipeline of factor %d using %d nodes.",
-              factor.getNumber(), dns.size());
-      throw new InsufficientDatanodesException(e);
+    if (exceedPipelineNumberLimit(factor)) {
+      throw new SCMException("Ratis pipeline number meets the limit: " +
+          pipelineNumberLimit + " factor : " +
+          factor.getNumber(),
+          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
-    Pipeline pipeline = create(factor, dns);
-    initializePipeline(pipeline);
+    List<DatanodeDetails> dns;
+
+    switch(factor) {
+    case ONE:
+      dns = pickNodesNeverUsed(ReplicationFactor.ONE);
+      break;
+    case THREE:
+      dns = placementPolicy.chooseDatanodes(null,
+          null, factor.getNumber(), 0);
+      break;
+    default:
+      throw new IllegalStateException("Unknown factor: " + factor.name());
+    }
+
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setState(PipelineState.ALLOCATED)
+        .setType(ReplicationType.RATIS)
+        .setFactor(factor)
+        .setNodes(dns)
+        .build();
+
+    // Send command to datanodes to create pipeline
+    final CreatePipelineCommand createCommand =
+        new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
+            factor, dns);
+
+    dns.forEach(node -> {
+      LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
+          pipeline.getId(), node.getUuidString());
+      eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+          new CommandForDatanode<>(node.getUuid(), createCommand));
+    });
+
     return pipeline;
   }
 
@@ -172,78 +190,24 @@ public class RatisPipelineProvider implements PipelineProvider {
 
   @Override
   public void shutdown() {
-    forkJoinPool.shutdownNow();
-    try {
-      forkJoinPool.awaitTermination(60, TimeUnit.SECONDS);
-    } catch (Exception e) {
-      LOG.error("Unexpected exception occurred during shutdown of " +
-              "RatisPipelineProvider", e);
-    }
   }
 
-  protected void initializePipeline(Pipeline pipeline) throws IOException {
-    final RaftGroup group = RatisHelper.newRaftGroup(pipeline);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("creating pipeline:{} with {}", pipeline.getId(), group);
-    }
-    callRatisRpc(pipeline.getNodes(),
-        (raftClient, peer) -> {
-          RaftClientReply reply = raftClient.groupAdd(group, peer.getId());
-          if (reply == null || !reply.isSuccess()) {
-            String msg = "Pipeline initialization failed for pipeline:"
-                + pipeline.getId() + " node:" + peer.getId();
-            LOG.error(msg);
-            throw new IOException(msg);
-          }
-        });
-  }
-
-  private void callRatisRpc(List<DatanodeDetails> datanodes,
-      CheckedBiConsumer< RaftClient, RaftPeer, IOException> rpc)
-      throws IOException {
-    if (datanodes.isEmpty()) {
-      return;
-    }
-
-    final String rpcType = conf
-        .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
-            ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
-    final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(conf);
-    final List< IOException > exceptions =
-        Collections.synchronizedList(new ArrayList<>());
-    final int maxOutstandingRequests =
-        HddsClientUtils.getMaxOutstandingRequests(conf);
-    final TimeDuration requestTimeout =
-        RatisHelper.getClientRequestTimeout(conf);
-    try {
-      forkJoinPool.submit(() -> {
-        datanodes.parallelStream().forEach(d -> {
-          final RaftPeer p = RatisHelper.toRaftPeer(d);
-          try (RaftClient client = RatisHelper
-              .newRaftClient(SupportedRpcType.valueOfIgnoreCase(rpcType), p,
-                  retryPolicy, maxOutstandingRequests, tlsConfig,
-                  requestTimeout)) {
-            rpc.accept(client, p);
-          } catch (IOException ioe) {
-            String errMsg =
-                "Failed invoke Ratis rpc " + rpc + " for " + d.getUuid();
-            LOG.error(errMsg, ioe);
-            exceptions.add(new IOException(errMsg, ioe));
-          }
-        });
-      }).get();
-    } catch (ExecutionException | RejectedExecutionException ex) {
-      LOG.error(ex.getClass().getName() + " exception occurred during " +
-          "createPipeline", ex);
-      throw new IOException(ex.getClass().getName() + " exception occurred " +
-          "during createPipeline", ex);
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      throw new IOException("Interrupt exception occurred during " +
-          "createPipeline", ex);
-    }
-    if (!exceptions.isEmpty()) {
-      throw MultipleIOException.createIOException(exceptions);
-    }
+  /**
+   * Removes pipeline from SCM. Sends command to destroy pipeline on all
+   * the datanodes.
+   *
+   * @param pipeline        - Pipeline to be destroyed
+   * @throws IOException
+   */
+  public void close(Pipeline pipeline) {
+    final ClosePipelineCommand closeCommand =
+        new ClosePipelineCommand(pipeline.getId());
+    pipeline.getNodes().stream().forEach(node -> {
+      final CommandForDatanode datanodeCommand =
+          new CommandForDatanode<>(node.getUuid(), closeCommand);
+      LOG.info("Send pipeline:{} close command to datanode {}",
+          pipeline.getId(), datanodeCommand.getDatanodeId());
+      eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    });
   }
 }

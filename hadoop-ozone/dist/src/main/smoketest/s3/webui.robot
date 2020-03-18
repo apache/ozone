@@ -30,6 +30,7 @@ ${BUCKET}             generated
 S3 Gateway Web UI
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
     ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}
-                        Should contain      ${result}       HTTP/1.1 307 Temporary Redirect
+                        Should contain      ${result}       Location
+                        Should contain      ${result}       /static/
     ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}/static/index.html
                         Should contain      ${result}       Apache Hadoop Ozone S3

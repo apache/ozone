@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.ratis.grpc.GrpcTlsConfig;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -43,12 +42,17 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
+  boolean containsPipeline(PipelineID pipelineID);
+
   List<Pipeline> getPipelines();
 
   List<Pipeline> getPipelines(ReplicationType type);
 
   List<Pipeline> getPipelines(ReplicationType type,
       ReplicationFactor factor);
+
+  List<Pipeline> getPipelines(ReplicationType type,
+      Pipeline.PipelineState state);
 
   List<Pipeline> getPipelines(ReplicationType type,
       ReplicationFactor factor, Pipeline.PipelineState state);
@@ -73,6 +77,9 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException;
 
+  void scrubPipeline(ReplicationType type, ReplicationFactor factor)
+      throws IOException;
+
   void startPipelineCreator();
 
   void triggerPipelineCreation();
@@ -95,5 +102,27 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    */
   void deactivatePipeline(PipelineID pipelineID) throws IOException;
 
-  GrpcTlsConfig getGrpcTlsConfig();
+  /**
+   * Wait a pipeline to be OPEN.
+   *
+   * @param pipelineID ID of the pipeline to wait for.
+   * @param timeout    wait timeout(millisecond), if 0, use default timeout
+   * @throws IOException in case of any Exception, such as timeout
+   */
+  default void waitPipelineReady(PipelineID pipelineID, long timeout)
+      throws IOException {
+  }
+
+  /**
+   * Set SafeMode status.
+   *
+   * @param safeModeStatus
+   */
+  void setSafeModeStatus(boolean safeModeStatus);
+
+  /**
+   * Get SafeMode status.
+   * @return boolean
+   */
+  boolean getSafeModeStatus();
 }

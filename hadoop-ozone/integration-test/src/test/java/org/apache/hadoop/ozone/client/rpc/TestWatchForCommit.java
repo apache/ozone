@@ -37,10 +37,12 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.protocol.GroupMismatchException;
 import org.apache.ratis.protocol.RaftRetryFailureException;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -56,10 +58,12 @@ import java.util.concurrent.TimeoutException;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
  * This class verifies the watchForCommit Handling by xceiverClient.
  */
+@Ignore
 public class TestWatchForCommit {
 
   private MiniOzoneCluster cluster;
@@ -92,10 +96,12 @@ public class TestWatchForCommit {
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY,
         1, TimeUnit.SECONDS);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 5);
 
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
+        .setTotalPipelineNumLimit(10)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
@@ -104,7 +110,7 @@ public class TestWatchForCommit {
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "watchforcommithandlingtest";
@@ -135,8 +141,6 @@ public class TestWatchForCommit {
     // and will be captured in keyOutputStream and the failover will happen
     // to a different block
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, 20,
-        TimeUnit.SECONDS);
     conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
@@ -270,53 +274,9 @@ public class TestWatchForCommit {
   }
 
   @Test
-  public void testWatchForCommitWithSmallerTimeoutValue() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, 3,
-        TimeUnit.SECONDS);
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
-    startCluster(conf);
-    XceiverClientManager clientManager = new XceiverClientManager(conf);
-    ContainerWithPipeline container1 = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
-    XceiverClientSpi xceiverClient = clientManager
-        .acquireClient(container1.getPipeline());
-    Assert.assertEquals(1, xceiverClient.getRefcount());
-    Assert.assertEquals(container1.getPipeline(),
-        xceiverClient.getPipeline());
-    Pipeline pipeline = xceiverClient.getPipeline();
-    XceiverClientReply reply = xceiverClient.sendCommandAsync(
-        ContainerTestHelper.getCreateContainerRequest(
-            container1.getContainerInfo().getContainerID(),
-            xceiverClient.getPipeline()));
-    reply.getResponse().get();
-    long index = reply.getLogIndex();
-    cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
-    cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
-    try {
-      // just watch for a log index which in not updated in the commitInfo Map
-      // as well as there is no logIndex generate in Ratis.
-      // The basic idea here is just to test if its throws an exception.
-      xceiverClient
-          .watchForCommit(index + new Random().nextInt(100) + 10, 3000);
-      Assert.fail("expected exception not thrown");
-    } catch (Exception e) {
-      Assert.assertTrue(
-          HddsClientUtils.checkForException(e) instanceof TimeoutException);
-    }
-    // After releasing the xceiverClient, this connection should be closed
-    // and any container operations should fail
-    clientManager.releaseClient(xceiverClient, false);
-    shutdown();
-  }
-
-  @Test
   public void testWatchForCommitForRetryfailure() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT,
-        100, TimeUnit.SECONDS);
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
+    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 10);
     startCluster(conf);
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container1 = storageContainerLocationClient
@@ -342,7 +302,7 @@ public class TestWatchForCommit {
       // as well as there is no logIndex generate in Ratis.
       // The basic idea here is just to test if its throws an exception.
       xceiverClient
-          .watchForCommit(index + new Random().nextInt(100) + 10, 20000);
+          .watchForCommit(index + new Random().nextInt(100) + 10);
       Assert.fail("expected exception not thrown");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof ExecutionException);
@@ -359,9 +319,8 @@ public class TestWatchForCommit {
   @Test
   public void test2WayCommitForTimeoutException() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, 3,
-        TimeUnit.SECONDS);
     conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
+    conf.set("raft.client.watch.request.timeout", "3s");
     startCluster(conf);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
@@ -388,7 +347,7 @@ public class TestWatchForCommit {
         .getCloseContainer(pipeline,
             container1.getContainerInfo().getContainerID()));
     reply.getResponse().get();
-    xceiverClient.watchForCommit(reply.getLogIndex(), 3000);
+    xceiverClient.watchForCommit(reply.getLogIndex());
 
     // commitInfo Map will be reduced to 2 here
     Assert.assertEquals(2, ratisClient.getCommitInfoMap().size());
@@ -404,8 +363,6 @@ public class TestWatchForCommit {
   @Test
   public void testWatchForCommitForGroupMismatchException() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, 20,
-        TimeUnit.SECONDS);
     conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
 
     // mark the node stale early so that pipleline gets destroyed quickly
@@ -433,14 +390,13 @@ public class TestWatchForCommit {
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
     List<Pipeline> pipelineList = new ArrayList<>();
     pipelineList.add(pipeline);
-    ContainerTestHelper.waitForPipelineClose(pipelineList, cluster);
+    TestHelper.waitForPipelineClose(pipelineList, cluster);
     try {
       // just watch for a log index which in not updated in the commitInfo Map
       // as well as there is no logIndex generate in Ratis.
       // The basic idea here is just to test if its throws an exception.
       xceiverClient
-          .watchForCommit(reply.getLogIndex() + new Random().nextInt(100) + 10,
-              20000);
+          .watchForCommit(reply.getLogIndex() + new Random().nextInt(100) + 10);
       Assert.fail("Expected exception not thrown");
     } catch(Exception e) {
       Assert.assertTrue(HddsClientUtils
@@ -452,12 +408,12 @@ public class TestWatchForCommit {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return ContainerTestHelper
+    return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
   private void validateData(String keyName, byte[] data) throws Exception {
-    ContainerTestHelper
+    TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 }

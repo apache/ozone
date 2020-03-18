@@ -18,17 +18,16 @@
 package org.apache.hadoop.ozone.om.response.s3.bucket;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.io.IOException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.annotations.VisibleForTesting;
 
+import javax.annotation.Nullable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -43,11 +42,11 @@ public class S3BucketCreateResponse extends OMClientResponse {
   private String s3Bucket;
   private String s3Mapping;
 
-  public S3BucketCreateResponse(
+  public S3BucketCreateResponse(@Nonnull OMResponse omResponse,
       @Nullable OMVolumeCreateResponse omVolumeCreateResponse,
-      @Nullable OMBucketCreateResponse omBucketCreateResponse,
-      @Nullable String s3BucketName,
-      @Nullable String s3Mapping, @Nonnull OMResponse omResponse) {
+      @Nonnull OMBucketCreateResponse omBucketCreateResponse,
+      @Nonnull String s3BucketName,
+      @Nonnull String s3Mapping) {
     super(omResponse);
     this.omVolumeCreateResponse = omVolumeCreateResponse;
     this.omBucketCreateResponse = omBucketCreateResponse;
@@ -55,21 +54,29 @@ public class S3BucketCreateResponse extends OMClientResponse {
     this.s3Mapping = s3Mapping;
   }
 
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public S3BucketCreateResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
+  }
+
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      if (omVolumeCreateResponse != null) {
-        omVolumeCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
-      }
-
-      Preconditions.checkState(omBucketCreateResponse != null);
-      omBucketCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
-
-      omMetadataManager.getS3Table().putWithBatch(batchOperation, s3Bucket,
-          s3Mapping);
+    if (omVolumeCreateResponse != null) {
+      omVolumeCreateResponse.checkAndUpdateDB(omMetadataManager,
+          batchOperation);
     }
+
+    Preconditions.checkState(omBucketCreateResponse != null);
+    omBucketCreateResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+
+    omMetadataManager.getS3Table().putWithBatch(batchOperation, s3Bucket,
+        s3Mapping);
   }
 
   @VisibleForTesting

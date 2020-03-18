@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -61,6 +61,8 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   private static final Gson TRACING_SERIALIZER = new GsonBuilder().create();
 
+  private boolean isSilent = false;
+
   public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void addHandler(
       EVENT_TYPE event, EventHandler<PAYLOAD> handler) {
     this.addHandler(event, handler, generateHandlerName(handler));
@@ -99,7 +101,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
   }
 
   private <PAYLOAD> String generateHandlerName(EventHandler<PAYLOAD> handler) {
-    if (!"".equals(handler.getClass().getSimpleName())) {
+    if (!handler.getClass().isAnonymousClass()) {
       return handler.getClass().getSimpleName();
     } else {
       return handler.getClass().getName();
@@ -161,8 +163,8 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
         for (EventHandler handler : executorAndHandlers.getValue()) {
           queuedCount.incrementAndGet();
-          if (LOG.isDebugEnabled()) {
-            LOG.debug(
+          if (LOG.isTraceEnabled()) {
+            LOG.trace(
                 "Delivering [event={}] to executor/handler {}: <json>{}</json>",
                 event.getName(),
                 executorAndHandlers.getKey().getName(),
@@ -180,7 +182,9 @@ public class EventQueue implements EventPublisher, AutoCloseable {
       }
 
     } else {
-      LOG.warn("No event handler registered for event " + event);
+      if (!isSilent) {
+        LOG.warn("No event handler registered for event {}", event);
+      }
     }
 
   }
@@ -229,8 +233,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
         Thread.sleep(100);
       } catch (InterruptedException e) {
         LOG.warn("Interrupted exception while sleeping.", e);
-        // We ignore this exception for time being. Review? should we
-        // propogate it back to caller?
+        Thread.currentThread().interrupt();
       }
 
       if (Time.now() > currentTime + timeout) {
@@ -259,4 +262,11 @@ public class EventQueue implements EventPublisher, AutoCloseable {
     });
   }
 
+  /**
+   * Dont log messages when there are no consumers of a message.
+   * @param silent flag.
+   */
+  public void setSilent(boolean silent) {
+    isSilent = silent;
+  }
 }

@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
 
@@ -73,7 +74,7 @@ public final class OzoneManagerRatisUtils {
   private OzoneManagerRatisUtils() {
   }
   /**
-   * Create OMClientRequest which enacpsulates the OMRequest.
+   * Create OMClientRequest which encapsulates the OMRequest.
    * @param omRequest
    * @return OMClientRequest
    * @throws IOException
@@ -198,7 +199,20 @@ public final class OzoneManagerRatisUtils {
     if (exception instanceof OMException) {
       return Status.values()[((OMException) exception).getResult().ordinal()];
     } else {
-      return Status.INTERNAL_ERROR;
+      // Doing this here, because when DB error happens we need to return
+      // correct error code, so that in applyTransaction we can
+      // completeExceptionally for DB errors.
+
+      // Currently Table API's are in hdds-common, which are used by SCM, OM
+      // currently. So, they return IOException with setting cause to
+      // RocksDBException. So, here that is the reason for the instanceof
+      // check RocksDBException.
+      if (exception.getCause() != null
+          && exception.getCause() instanceof RocksDBException) {
+        return Status.METADATA_ERROR;
+      } else {
+        return Status.INTERNAL_ERROR;
+      }
     }
   }
 }

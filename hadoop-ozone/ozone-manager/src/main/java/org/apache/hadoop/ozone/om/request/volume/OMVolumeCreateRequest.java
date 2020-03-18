@@ -25,6 +25,7 @@ import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,11 +116,15 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     Collection<String> ozAdmins = ozoneManager.getOzoneAdmins();
     try {
       omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
-      // when you create a volume, we set both Object ID and update ID to the
-      // same ratis transaction ID. The Object ID will never change, but update
+      // when you create a volume, we set both Object ID and update ID.
+      // The Object ID will never change, but update
       // ID will be set to transactionID each time we update the object.
-      omVolumeArgs.setUpdateID(transactionLogIndex);
-      omVolumeArgs.setObjectID(transactionLogIndex);
+      omVolumeArgs.setObjectID(
+          OMFileRequest.getObjIDFromTxId(transactionLogIndex));
+      omVolumeArgs.setUpdateID(transactionLogIndex,
+          ozoneManager.isRatisEnabled());
+
+
       auditMap = omVolumeArgs.toAuditMap();
 
       // check Acl
@@ -131,8 +136,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
               OMException.ResultCodes.PERMISSION_DENIED);
         }
       }
-
-      UserVolumeInfo volumeList = null;
 
       // acquire lock.
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
@@ -146,6 +149,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       OmVolumeArgs dbVolumeArgs =
           omMetadataManager.getVolumeTable().get(dbVolumeKey);
 
+      UserVolumeInfo volumeList = null;
       if (dbVolumeArgs == null) {
         String dbUserKey = omMetadataManager.getUserKey(owner);
         volumeList = omMetadataManager.getUserTable().get(dbUserKey);
@@ -156,18 +160,28 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
         omResponse.setCreateVolumeResponse(CreateVolumeResponse.newBuilder()
             .build());
-        omClientResponse = new OMVolumeCreateResponse(omVolumeArgs, volumeList,
-            omResponse.build());
+        omClientResponse = new OMVolumeCreateResponse(omResponse.build(),
+            omVolumeArgs, volumeList);
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
       } else {
-        LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
-        throw new OMException("Volume already exists",
-            OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
+        // Check if this transaction is a replay of ratis logs.
+        if (isReplay(ozoneManager, dbVolumeArgs, transactionLogIndex)) {
+          // Replay implies the response has already been returned to
+          // the client. So take no further action and return a dummy
+          // OMClientResponse.
+          LOG.debug("Replayed Transaction {} ignored. Request: {}",
+              transactionLogIndex, createVolumeRequest);
+          return new OMVolumeCreateResponse(createReplayOMResponse(omResponse));
+        } else {
+          LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
+          throw new OMException("Volume already exists",
+              OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
+        }
       }
 
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new OMVolumeCreateResponse(null, null,
+      omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
       if (omClientResponse != null) {

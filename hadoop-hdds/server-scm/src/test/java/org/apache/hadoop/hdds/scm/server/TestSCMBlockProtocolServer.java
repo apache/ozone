@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -38,6 +38,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
@@ -62,7 +64,7 @@ public class TestSCMBlockProtocolServer {
     // add nodes to scm node manager
     nodeManager = scm.getScmNodeManager();
     for (int i = 0; i < nodeCount; i++) {
-      nodeManager.register(TestUtils.randomDatanodeDetails(), null, null);
+      nodeManager.register(randomDatanodeDetails(), null, null);
 
     }
     server = scm.getBlockProtocolServer();

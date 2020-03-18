@@ -74,6 +74,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
+
 /**
  * Ozone Container dispatcher takes a call from the netty server and routes it
  * to the right handler function.
@@ -175,14 +178,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     Map<String, String> params =
         ContainerCommandRequestPBHelper.getAuditParams(msg);
 
-    Container container;
     ContainerType containerType;
     ContainerCommandResponseProto responseProto = null;
     long startTime = System.nanoTime();
     ContainerProtos.Type cmdType = msg.getCmdType();
     long containerID = msg.getContainerID();
     metrics.incContainerOpsMetrics(cmdType);
-    container = getContainer(containerID);
+    Container container = getContainer(containerID);
     boolean isWriteStage =
         (cmdType == ContainerProtos.Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
@@ -218,10 +220,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       // just add it to the list, and remove it from missing container set
       // as it might have been added in the list during "init".
       Preconditions.checkNotNull(container2BCSIDMap);
-      if (container2BCSIDMap.get(containerID) == null) {
-        container2BCSIDMap
-            .put(containerID, container.getBlockCommitSequenceId());
-        containerSet.getMissingContainerSet().remove(containerID);
+      if (container != null && container2BCSIDMap.get(containerID) == null) {
+        container2BCSIDMap.put(
+            containerID, container.getBlockCommitSequenceId());
+        getMissingContainerSet().remove(containerID);
       }
     }
     if (getMissingContainerSet().contains(containerID)) {
@@ -255,7 +257,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         if (container2BCSIDMap != null) {
           // adds this container to list of containers created in the pipeline
           // with initial BCSID recorded as 0.
-          container2BCSIDMap.putIfAbsent(containerID, Long.valueOf(0));
+          container2BCSIDMap.putIfAbsent(containerID, 0L);
         }
         container = getContainer(containerID);
       }
@@ -273,7 +275,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       if (!msg.hasCreateContainer()) {
         audit(action, eventType, params, AuditEventStatus.FAILURE,
             new Exception("MALFORMED_REQUEST"));
-        return ContainerUtils.malformedRequest(msg);
+        return malformedRequest(msg);
       }
       containerType = msg.getCreateContainer().getContainerType();
     }
@@ -359,7 +361,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       // log failure
       audit(action, eventType, params, AuditEventStatus.FAILURE,
           new Exception("UNSUPPORTED_REQUEST"));
-      return ContainerUtils.unsupportedRequest(msg);
+      return unsupportedRequest(msg);
     }
   }
 
@@ -599,7 +601,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     default:
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Invalid audit event status - " + result);
+        LOG.debug("Invalid audit event status - {}", result);
       }
     }
   }
@@ -608,13 +610,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
       Map<String, String> auditMap) {
+
     return new AuditMessage.Builder()
         .setUser(null)
         .atIp(null)
-        .forOperation(op.getAction())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.SUCCESS.toString())
-        .withException(null)
+        .withResult(AuditEventStatus.SUCCESS)
         .build();
   }
 
@@ -622,12 +624,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
+
     return new AuditMessage.Builder()
         .setUser(null)
         .atIp(null)
-        .forOperation(op.getAction())
+        .forOperation(op)
         .withParams(auditMap)
-        .withResult(AuditEventStatus.FAILURE.toString())
+        .withResult(AuditEventStatus.FAILURE)
         .withException(throwable)
         .build();
   }

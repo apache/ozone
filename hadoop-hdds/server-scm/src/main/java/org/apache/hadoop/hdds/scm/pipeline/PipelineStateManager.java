@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -39,20 +38,20 @@ import java.util.NavigableSet;
  * state. All the read and write operations in PipelineStateMap are protected
  * by a read write lock.
  */
-class PipelineStateManager {
+public class PipelineStateManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineStateManager.class);
 
   private final PipelineStateMap pipelineStateMap;
 
-  PipelineStateManager(Configuration conf) {
+  public PipelineStateManager() {
     this.pipelineStateMap = new PipelineStateMap();
   }
 
-  void addPipeline(Pipeline pipeline) throws IOException {
+  public void addPipeline(Pipeline pipeline) throws IOException {
     pipelineStateMap.addPipeline(pipeline);
-    LOG.info("Created pipeline " + pipeline);
+    LOG.info("Created pipeline {}", pipeline);
   }
 
   void addContainerToPipeline(PipelineID pipelineId, ContainerID containerID)
@@ -129,9 +128,9 @@ class PipelineStateManager {
       throw new IOException("Closed pipeline can not be opened");
     }
     if (pipeline.getPipelineState() == PipelineState.ALLOCATED) {
-      pipeline = pipelineStateMap.updatePipelineState(
-          pipelineId, PipelineState.OPEN);
-      LOG.info("Pipeline {} moved to OPEN state", pipeline.toString());
+      LOG.info("Pipeline {} moved to OPEN state", pipeline);
+      pipeline = pipelineStateMap
+          .updatePipelineState(pipelineId, PipelineState.OPEN);
     }
     return pipeline;
   }
@@ -158,5 +157,10 @@ class PipelineStateManager {
       throws IOException {
     pipelineStateMap
         .updatePipelineState(pipelineID, PipelineState.DORMANT);
+  }
+
+  public void updatePipelineState(PipelineID id, PipelineState newState)
+      throws PipelineNotFoundException {
+    pipelineStateMap.updatePipelineState(id, newState);
   }
 }

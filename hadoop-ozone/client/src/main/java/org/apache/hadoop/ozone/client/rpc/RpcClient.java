@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.client.io.LengthInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
@@ -98,7 +99,7 @@ import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.SecureRandom;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -123,10 +124,10 @@ public class RpcClient implements ClientProtocol {
   private final UserGroupInformation ugi;
   private final ACLType userRights;
   private final ACLType groupRights;
+  private final int streamBufferSize;
   private final long streamBufferFlushSize;
   private final long streamBufferMaxSize;
   private final long blockSize;
-  private final long watchTimeout;
   private final ClientId clientId = ClientId.randomId();
   private final int maxRetryCount;
   private final long retryInterval;
@@ -176,6 +177,10 @@ public class RpcClient implements ClientProtocol {
     } else {
       chunkSize = configuredChunkSize;
     }
+    streamBufferSize = (int) conf
+        .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE,
+            OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT,
+            StorageUnit.BYTES);
     streamBufferFlushSize = (long) conf
         .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
             OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE_DEFAULT,
@@ -186,10 +191,6 @@ public class RpcClient implements ClientProtocol {
             StorageUnit.BYTES);
     blockSize = (long) conf.getStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
-    watchTimeout =
-        conf.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT,
-            OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS);
 
     int configuredChecksumSize = (int) conf.getStorageSize(
         OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM,
@@ -658,7 +659,7 @@ public class RpcClient implements ClientProtocol {
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .build();
     OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
-    return createInputStream(keyInfo);
+    return getInputStreamWithRetryFunction(keyInfo);
   }
 
   @Override
@@ -720,6 +721,14 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public boolean recoverTrash(String volumeName, String bucketName,
+      String keyName, String destinationBucket) throws IOException {
+
+    return ozoneManagerClient.recoverTrash(volumeName, bucketName, keyName,
+        destinationBucket);
+  }
+
+  @Override
   public OzoneKeyDetails getKeyDetails(
       String volumeName, String bucketName, String keyName)
       throws IOException {
@@ -754,6 +763,12 @@ public class RpcClient implements ClientProtocol {
 
     Preconditions.checkArgument(Strings.isNotBlank(s3BucketName), "bucket " +
         "name cannot be null or empty.");
+    try {
+      HddsClientUtils.verifyResourceName(s3BucketName);
+    } catch (IllegalArgumentException exception) {
+      throw new OMException("Invalid bucket name: " + s3BucketName,
+          OMException.ResultCodes.INVALID_BUCKET_NAME);
+    }
     ozoneManagerClient.createS3Bucket(userName, s3BucketName);
   }
 
@@ -872,9 +887,9 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(openKey.getKeyInfo().getType())
             .setFactor(openKey.getKeyInfo().getFactor())
+            .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferMaxSize(streamBufferMaxSize)
-            .setWatchTimeout(watchTimeout)
             .setBlockSize(blockSize)
             .setBytesPerChecksum(bytesPerChecksum)
             .setChecksumType(checksumType)
@@ -991,6 +1006,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setRefreshPipeline(true)
         .build();
     return ozoneManagerClient.getFileStatus(keyArgs);
   }
@@ -1016,7 +1032,33 @@ public class RpcClient implements ClientProtocol {
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .build();
     OmKeyInfo keyInfo = ozoneManagerClient.lookupFile(keyArgs);
-    return createInputStream(keyInfo);
+    return getInputStreamWithRetryFunction(keyInfo);
+  }
+
+  /**
+   * Create InputStream with Retry function to refresh pipeline information
+   * if reads fail.
+   * @param keyInfo
+   * @return
+   * @throws IOException
+   */
+  private OzoneInputStream getInputStreamWithRetryFunction(
+      OmKeyInfo keyInfo) throws IOException {
+    return createInputStream(keyInfo, omKeyInfo -> {
+      try {
+        OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(omKeyInfo.getVolumeName())
+            .setBucketName(omKeyInfo.getBucketName())
+            .setKeyName(omKeyInfo.getKeyName())
+            .setRefreshPipeline(true)
+            .setSortDatanodesInPipeline(topologyAwareReadEnabled)
+            .build();
+        return ozoneManagerClient.lookupKey(omKeyArgs);
+      } catch (IOException e) {
+        LOG.error("Unable to lookup key {} on retry.", keyInfo.getKeyName(), e);
+        return null;
+      }
+    });
   }
 
   @Override
@@ -1046,6 +1088,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setRefreshPipeline(true)
         .build();
     return ozoneManagerClient
         .listStatus(keyArgs, recursive, startKey, numEntries);
@@ -1101,11 +1144,12 @@ public class RpcClient implements ClientProtocol {
     return ozoneManagerClient.getAcl(obj);
   }
 
-  private OzoneInputStream createInputStream(OmKeyInfo keyInfo)
+  private OzoneInputStream createInputStream(
+      OmKeyInfo keyInfo, Function<OmKeyInfo, OmKeyInfo> retryFunction)
       throws IOException {
     LengthInputStream lengthInputStream = KeyInputStream
         .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-            verifyChecksum);
+            verifyChecksum, retryFunction);
     FileEncryptionInfo feInfo = keyInfo.getFileEncryptionInfo();
     if (feInfo != null) {
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
@@ -1146,9 +1190,9 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
             .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+            .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferMaxSize(streamBufferMaxSize)
-            .setWatchTimeout(watchTimeout)
             .setBlockSize(blockSize)
             .setChecksumType(checksumType)
             .setBytesPerChecksum(bytesPerChecksum)

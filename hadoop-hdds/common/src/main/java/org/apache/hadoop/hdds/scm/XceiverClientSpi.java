@@ -107,10 +107,13 @@ public abstract class XceiverClientSpi implements Closeable {
     try {
       XceiverClientReply reply;
       reply = sendCommandAsync(request);
-      ContainerCommandResponseProto responseProto = reply.getResponse().get();
-      return responseProto;
-    } catch (ExecutionException | InterruptedException e) {
-      throw new IOException("Failed to command " + request, e);
+      return reply.getResponse().get();
+    } catch (InterruptedException e) {
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
+      throw getIOExceptionForSendCommand(request, e);
+    } catch (ExecutionException e) {
+      throw getIOExceptionForSendCommand(request, e);
     }
   }
 
@@ -133,11 +136,19 @@ public abstract class XceiverClientSpi implements Closeable {
         function.apply(request, responseProto);
       }
       return responseProto;
-    } catch (ExecutionException | InterruptedException e) {
-      throw new IOException("Failed to command " + request, e);
+    } catch (InterruptedException e) {
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
+      throw getIOExceptionForSendCommand(request, e);
+    } catch (ExecutionException e) {
+      throw getIOExceptionForSendCommand(request, e);
     }
   }
 
+  private IOException getIOExceptionForSendCommand(
+      ContainerCommandRequestProto request, Exception e) {
+    return new IOException("Failed to execute command " + request, e);
+  }
   /**
    * Sends a given command to server gets a waitable future back.
    *
@@ -159,7 +170,6 @@ public abstract class XceiverClientSpi implements Closeable {
   /**
    * Check if an specfic commitIndex is replicated to majority/all servers.
    * @param index index to watch for
-   * @param timeout timeout provided for the watch operation to complete
    * @return reply containing the min commit index replicated to all or majority
    *         servers in case of a failure
    * @throws InterruptedException
@@ -167,7 +177,7 @@ public abstract class XceiverClientSpi implements Closeable {
    * @throws TimeoutException
    * @throws IOException
    */
-  public abstract XceiverClientReply watchForCommit(long index, long timeout)
+  public abstract XceiverClientReply watchForCommit(long index)
       throws InterruptedException, ExecutionException, TimeoutException,
       IOException;
 

@@ -161,7 +161,7 @@ public final class ContainerCommandRequestPBHelper {
       return auditParams;
 
     default :
-      LOG.debug("Invalid command type - " + cmdType);
+      LOG.debug("Invalid command type - {}", cmdType);
       return null;
     }
 
@@ -188,7 +188,7 @@ public final class ContainerCommandRequestPBHelper {
     case CloseContainer   : return DNAction.CLOSE_CONTAINER;
     case GetCommittedBlockLength : return DNAction.GET_COMMITTED_BLOCK_LENGTH;
     default :
-      LOG.debug("Invalid command type - " + cmdType);
+      LOG.debug("Invalid command type - {}", cmdType);
       return null;
     }
   }

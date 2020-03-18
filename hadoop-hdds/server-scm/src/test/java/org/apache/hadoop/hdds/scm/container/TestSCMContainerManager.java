@@ -96,9 +96,8 @@ public class TestSCMContainerManager {
     }
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue(), null);
-    containerManager = new SCMContainerManager(conf, nodeManager,
-        pipelineManager, new EventQueue());
+        new SCMPipelineManager(conf, nodeManager, new EventQueue());
+    containerManager = new SCMContainerManager(conf, pipelineManager);
     xceiverClientManager = new XceiverClientManager(conf);
     replicationFactor = SCMTestUtils.getReplicationFactor(conf);
     replicationType = SCMTestUtils.getReplicationType(conf);
@@ -147,7 +146,7 @@ public class TestSCMContainerManager {
           containerInfo.getPipelineID()).getFirstNode()
           .getUuid());
     }
-    Assert.assertTrue(pipelineList.size() > 5);
+    Assert.assertTrue(pipelineList.size() >= 1);
   }
 
   @Test
@@ -227,7 +226,7 @@ public class TestSCMContainerManager {
             finalContInfo.containerID()).size());
 
     contInfo = containerManager.getContainer(contInfo.containerID());
-    Assert.assertEquals(contInfo.getState(), LifeCycleState.CLOSED);
+    Assert.assertEquals(LifeCycleState.CLOSED, contInfo.getState());
     // After closing the container, we should get the replica and construct
     // standalone pipeline. No more ratis pipeline.
 

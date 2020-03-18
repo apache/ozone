@@ -27,8 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms
-    .ContainerPlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -54,10 +53,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static org.apache.hadoop.hdds.scm.TestUtils.createDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
-import static org.apache.hadoop.hdds.scm.TestUtils.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 
 /**
  * Test cases to verify the functionality of ReplicationManager.
@@ -66,7 +65,7 @@ public class TestReplicationManager {
 
   private ReplicationManager replicationManager;
   private ContainerStateManager containerStateManager;
-  private ContainerPlacementPolicy containerPlacementPolicy;
+  private PlacementPolicy containerPlacementPolicy;
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
 
@@ -93,7 +92,7 @@ public class TestReplicationManager {
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas((ContainerID)invocation.getArguments()[0]));
 
-    containerPlacementPolicy = Mockito.mock(ContainerPlacementPolicy.class);
+    containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
 
     Mockito.when(containerPlacementPolicy.chooseDatanodes(
         Mockito.anyListOf(DatanodeDetails.class),

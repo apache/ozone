@@ -122,6 +122,20 @@ public class ContainerSet {
     return containerMap.size();
   }
 
+  public void handleVolumeFailures() {
+    containerMap.values().forEach(c -> {
+      if (c.getContainerData().getVolume().isFailed()) {
+        try {
+          c.markContainerUnhealthy();
+        } catch (StorageContainerException e) {
+          LOG.error("Failed to move container {} to UNHEALTHY state in "
+                  + "volume {}", c.getContainerData().getContainerID(),
+              c.getContainerData().getVolume(), e);
+        }
+      }
+    });
+  }
+
   /**
    * Return an container Iterator over {@link ContainerSet#containerMap}.
    * @return {@literal Iterator<Container<?>>}
@@ -195,7 +209,7 @@ public class ContainerSet {
         "{}", startContainerId, count);
     ConcurrentNavigableMap<Long, Container<?>> map;
     if (startContainerId == 0) {
-      map = containerMap.tailMap(containerMap.firstKey(), true);
+      map = containerMap;
     } else {
       map = containerMap.tailMap(startContainerId, true);
     }

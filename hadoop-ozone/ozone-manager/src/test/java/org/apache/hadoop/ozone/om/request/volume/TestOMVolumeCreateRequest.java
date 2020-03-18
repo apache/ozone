@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
@@ -29,8 +30,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CreateVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -44,7 +43,6 @@ import static org.mockito.Mockito.when;
 
 public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
-
   @Test
   public void testPreExecute() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -53,7 +51,6 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     doPreExecute(volumeName, adminName, ownerName);
   }
 
-
   @Test
   public void testValidateAndUpdateCacheWithZeroMaxUserVolumeCount()
       throws Exception {
@@ -61,6 +58,8 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     String volumeName = UUID.randomUUID().toString();
     String adminName = "user1";
     String ownerName = "user1";
+    long txLogIndex = 1;
+    long expectedObjId = OMFileRequest.getObjIDFromTxId(txLogIndex);
 
     OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
         ownerName);
@@ -72,18 +71,18 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
     try {
       OMClientResponse omClientResponse =
-          omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-              ozoneManagerDoubleBufferHelper);
+          omVolumeCreateRequest.validateAndUpdateCache(ozoneManager,
+              txLogIndex, ozoneManagerDoubleBufferHelper);
       Assert.assertTrue(omClientResponse instanceof OMVolumeCreateResponse);
       OMVolumeCreateResponse respone =
           (OMVolumeCreateResponse) omClientResponse;
-      Assert.assertEquals(1, respone.getOmVolumeArgs().getObjectID());
-      Assert.assertEquals(1, respone.getOmVolumeArgs().getUpdateID());
+      Assert.assertEquals(expectedObjId, respone.getOmVolumeArgs()
+          .getObjectID());
+      Assert.assertEquals(txLogIndex, respone.getOmVolumeArgs().getUpdateID());
     } catch (IllegalArgumentException ex){
       GenericTestUtils.assertExceptionContains("should be greater than zero",
           ex);
     }
-
   }
 
   @Test
@@ -110,9 +109,11 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     Assert.assertNull(omMetadataManager.getUserTable().get(ownerKey));
 
     omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
+    long txLogIndex = 2;
+    long expectedObjId = OMFileRequest.getObjIDFromTxId(txLogIndex);
 
     OMClientResponse omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 2,
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex,
             ozoneManagerDoubleBufferHelper);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
@@ -130,8 +131,8 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
         omMetadataManager.getVolumeTable().get(volumeKey);
     // As request is valid volume table should not have entry.
     Assert.assertNotNull(omVolumeArgs);
-    Assert.assertEquals(2, omVolumeArgs.getObjectID());
-    Assert.assertEquals(2, omVolumeArgs.getUpdateID());
+    Assert.assertEquals(expectedObjId, omVolumeArgs.getObjectID());
+    Assert.assertEquals(txLogIndex, omVolumeArgs.getUpdateID());
 
     // Check data from table and request.
     Assert.assertEquals(volumeInfo.getVolume(), omVolumeArgs.getVolume());
@@ -163,10 +164,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
     Assert.assertTrue(omMetadataManager
         .getUserTable().get(ownerKey).getVolumeNamesList().size() == 2);
-
-
   }
-
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeAlreadyExists()
@@ -200,9 +198,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // Check really if we have a volume with the specified volume name.
     Assert.assertNotNull(omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(volumeName)));
-
   }
-
 
   private void doPreExecute(String volumeName,
       String adminName, String ownerName) throws Exception {
@@ -237,22 +233,29 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
         updated.getCreationTime());
   }
 
-  /**
-   * Create OMRequest for create volume.
-   * @param volumeName
-   * @param adminName
-   * @param ownerName
-   * @return OMRequest
-   */
-  private OMRequest createVolumeRequest(String volumeName, String adminName,
-      String ownerName) {
-    VolumeInfo volumeInfo = VolumeInfo.newBuilder().setVolume(volumeName)
-        .setAdminName(adminName).setOwnerName(ownerName).build();
-    CreateVolumeRequest createVolumeRequest =
-        CreateVolumeRequest.newBuilder().setVolumeInfo(volumeInfo).build();
+  @Test
+  public void testReplayRequest() throws Exception {
 
-    return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
-        .setCreateVolumeRequest(createVolumeRequest).build();
+    String volumeName = UUID.randomUUID().toString();
+    String adminName = "user1";
+    String ownerName = "user1";
+    OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
+        ownerName);
+    OMVolumeCreateRequest omVolumeCreateRequest =
+        new OMVolumeCreateRequest(originalRequest);
+
+    // Execute the original request
+    omVolumeCreateRequest.preExecute(ozoneManager);
+    omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
+        ozoneManagerDoubleBufferHelper);
+
+    // Replay the transaction - Execute the same request again
+    OMClientResponse omClientResponse =
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    // Replay should result in Replay response
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+        omClientResponse.getOMResponse().getStatus());
   }
 }

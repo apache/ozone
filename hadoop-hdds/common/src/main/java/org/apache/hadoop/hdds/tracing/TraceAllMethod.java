@@ -59,6 +59,11 @@ public class TraceAllMethod<T> implements InvocationHandler {
   public Object invoke(Object proxy, Method method, Object[] args)
       throws Throwable {
     Method delegateMethod = findDelegatedMethod(method);
+    if (delegateMethod == null) {
+      throw new NoSuchMethodException("Method not found: " +
+        method.getName());
+    }
+
     try (Scope scope = GlobalTracer.get().buildSpan(
         name + "." + method.getName())
         .startActive(true)) {

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.file;
 
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -26,16 +25,23 @@ import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 
-
-
 /**
  * Response for crate file request.
  */
 public class OMFileCreateResponse extends OMKeyCreateResponse {
 
-  public OMFileCreateResponse(@Nullable OmKeyInfo omKeyInfo,
-      long openKeySessionID, @Nonnull OMResponse omResponse) {
-    super(omKeyInfo, openKeySessionID, omResponse);
+  public OMFileCreateResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo, long openKeySessionID) {
+    super(omResponse, omKeyInfo, openKeySessionID);
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMFileCreateResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
 }

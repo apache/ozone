@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.lang3.RandomStringUtils;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
@@ -43,6 +45,7 @@ import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.fail;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -51,6 +54,7 @@ import org.junit.rules.Timeout;
  * Test some client operations after cluster starts. And perform restart and
  * then performs client operations and check the behavior is expected or not.
  */
+@Ignore
 public class TestOzoneManagerRestart {
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
@@ -77,6 +81,7 @@ public class TestOzoneManagerRestart {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     cluster =  MiniOzoneCluster.newBuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)

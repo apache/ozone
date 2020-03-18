@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -30,7 +30,7 @@ public class ContentGenerator {
   /**
    * Size of the destination object (key or file).
    */
-  private int keySize;
+  private long keySize;
 
   /**
    * Buffer for the pre-allocated content (will be reused if less than the
@@ -40,7 +40,7 @@ public class ContentGenerator {
 
   private final byte[] buffer;
 
-  ContentGenerator(int keySize, int bufferSize) {
+  ContentGenerator(long keySize, int bufferSize) {
     this.keySize = keySize;
     this.bufferSize = bufferSize;
 

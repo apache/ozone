@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -35,4 +35,10 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
    * @param dbLocation New location of the OM Snapshot DB.
    */
   void updateOmDB(File dbLocation) throws IOException;
+
+  /**
+   * Get the most recent sequence number from the Ozone Manager Metadata
+   * Database.
+   */
+  long getLastSequenceNumberFromDB();
 }

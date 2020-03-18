@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.ozone.s3.util;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 import java.util.regex.Pattern;
 

@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -38,11 +38,11 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -58,12 +58,14 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.yaml.snakeyaml.Yaml;
 
 /**
  * Test cases for mini ozone cluster.
  */
+@Ignore
 public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
@@ -127,9 +129,9 @@ public class TestMiniOzoneCluster {
   @Test
   public void testDatanodeIDPersistent() throws Exception {
     // Generate IDs for testing
-    DatanodeDetails id1 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails id2 = TestUtils.randomDatanodeDetails();
-    DatanodeDetails id3 = TestUtils.randomDatanodeDetails();
+    DatanodeDetails id1 = randomDatanodeDetails();
+    DatanodeDetails id2 = randomDatanodeDetails();
+    DatanodeDetails id3 = randomDatanodeDetails();
     id1.setPort(DatanodeDetails.newPort(Port.Name.STANDALONE, 1));
     id2.setPort(DatanodeDetails.newPort(Port.Name.STANDALONE, 2));
     id3.setPort(DatanodeDetails.newPort(Port.Name.STANDALONE, 3));
@@ -192,7 +194,8 @@ public class TestMiniOzoneCluster {
   public void testContainerRandomPort() throws IOException {
     Configuration ozoneConf = SCMTestUtils.getConf();
     File testDir = PathUtils.getTestDir(TestOzoneContainer.class);
-    ozoneConf.set(DFS_DATANODE_DATA_DIR_KEY, testDir.getAbsolutePath());
+    ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
+        testDir.getAbsolutePath());
     ozoneConf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         TEST_ROOT.toString());
 
@@ -206,7 +209,7 @@ public class TestMiniOzoneCluster {
 
       for (int i = 0; i < 3; i++) {
         stateMachines.add(new DatanodeStateMachine(
-            TestUtils.randomDatanodeDetails(), ozoneConf, null, null));
+            randomDatanodeDetails(), ozoneConf, null, null));
       }
 
       //we need to start all the servers to get the fix ports
@@ -251,11 +254,11 @@ public class TestMiniOzoneCluster {
     ozoneConf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
     try (
         DatanodeStateMachine sm1 = new DatanodeStateMachine(
-            TestUtils.randomDatanodeDetails(), ozoneConf,  null, null);
+            randomDatanodeDetails(), ozoneConf,  null, null);
         DatanodeStateMachine sm2 = new DatanodeStateMachine(
-            TestUtils.randomDatanodeDetails(), ozoneConf,  null, null);
+            randomDatanodeDetails(), ozoneConf,  null, null);
         DatanodeStateMachine sm3 = new DatanodeStateMachine(
-            TestUtils.randomDatanodeDetails(), ozoneConf,  null, null);
+            randomDatanodeDetails(), ozoneConf,  null, null);
     ) {
       HashSet<Integer> ports = new HashSet<Integer>();
       assertTrue(ports.add(sm1.getContainer().getReadChannel().getIPCPort()));
@@ -270,7 +273,7 @@ public class TestMiniOzoneCluster {
   private void createMalformedIDFile(File malformedFile)
       throws IOException{
     malformedFile.delete();
-    DatanodeDetails id = TestUtils.randomDatanodeDetails();
+    DatanodeDetails id = randomDatanodeDetails();
     ContainerUtils.writeDatanodeDetailsTo(id, malformedFile);
 
     FileOutputStream out = new FileOutputStream(malformedFile);
@@ -282,11 +285,11 @@ public class TestMiniOzoneCluster {
    * Test that a DN can register with SCM even if it was started before the SCM.
    * @throws Exception
    */
-  @Test (timeout = 300_000)
+  @Test (timeout = 60000)
   public void testDNstartAfterSCM() throws Exception {
-    // Start a cluster with 1 DN
+    // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1)
+        .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
 

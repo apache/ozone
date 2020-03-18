@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.server.events;
 /**
  * Basic event implementation to implement custom events.
  *
- * @param <T>
+ * @param <T> the payload type of the event
  */
 public class TypedEvent<T> implements Event<T> {
 

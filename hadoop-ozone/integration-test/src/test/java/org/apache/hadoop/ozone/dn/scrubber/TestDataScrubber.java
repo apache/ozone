@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -52,13 +52,13 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.util.Time;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.UUID;
@@ -84,7 +84,9 @@ public class TestDataScrubber {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, "1s");
     ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
-        SCMContainerPlacementCapacity.class, ContainerPlacementPolicy.class);
+        SCMContainerPlacementCapacity.class, PlacementPolicy.class);
+    ozoneConfig.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
+        false);
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
@@ -112,7 +114,7 @@ public class TestDataScrubber {
   public void testOpenContainerIntegrity() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    long currentTime = Time.now();
+    Instant testStartTime = Instant.now();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -137,8 +139,8 @@ public class TestDataScrubber {
           keyName, STAND_ALONE,
           ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime() >= currentTime);
-      Assert.assertTrue(key.getModificationTime() >= currentTime);
+      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
 
     // wait for the container report to propagate to SCM

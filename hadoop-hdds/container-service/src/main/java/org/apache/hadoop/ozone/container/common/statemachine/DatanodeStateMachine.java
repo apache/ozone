@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,7 +41,11 @@ import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .CloseContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
+    .ClosePipelineCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .CommandDispatcher;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
+    .CreatePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
     .DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
@@ -86,6 +92,11 @@ public class DatanodeStateMachine implements Closeable {
   private JvmPauseMonitor jvmPauseMonitor;
   private CertificateClient dnCertClient;
   private final HddsDatanodeStopService hddsDatanodeStopService;
+  /**
+   * Used to synchronize to the OzoneContainer object created in the
+   * constructor in a non-thread-safe way - see HDDS-3116.
+   */
+  private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
 
   /**
    * Constructs a a datanode state machine.
@@ -109,8 +120,16 @@ public class DatanodeStateMachine implements Closeable {
             .setNameFormat("Datanode State Machine Thread - %d").build());
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
-    container = new OzoneContainer(this.datanodeDetails,
-        ozoneConf, context, certClient);
+    // OzoneContainer instance is used in a non-thread safe way by the context
+    // past to its constructor, so we much synchronize its access. See
+    // HDDS-3116 for more details.
+    constructionLock.writeLock().lock();
+    try {
+      container = new OzoneContainer(this.datanodeDetails,
+          ozoneConf, context, certClient);
+    } finally {
+      constructionLock.writeLock().unlock();
+    }
     dnCertClient = certClient;
     nextHB = new AtomicLong(Time.monotonicNow());
 
@@ -132,6 +151,8 @@ public class DatanodeStateMachine implements Closeable {
         .addHandler(new ReplicateContainerCommandHandler(conf, supervisor))
         .addHandler(new DeleteContainerCommandHandler(
             dnConf.getContainerDeleteThreads()))
+        .addHandler(new ClosePipelineCommandHandler())
+        .addHandler(new CreatePipelineCommandHandler(conf))
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -167,7 +188,13 @@ public class DatanodeStateMachine implements Closeable {
   }
 
   public OzoneContainer getContainer() {
-    return this.container;
+    // See HDDS-3116 to explain the need for this lock
+    constructionLock.readLock().lock();
+    try {
+      return this.container;
+    } finally {
+      constructionLock.readLock().unlock();
+    }
   }
 
   /**
@@ -375,7 +402,9 @@ public class DatanodeStateMachine implements Closeable {
    * be sent by datanode.
    */
   public void triggerHeartbeat() {
-    stateMachineThread.interrupt();
+    if (stateMachineThread != null) {
+      stateMachineThread.interrupt();
+    }
   }
 
   /**
@@ -399,6 +428,7 @@ public class DatanodeStateMachine implements Closeable {
   public synchronized void stopDaemon() {
     try {
       supervisor.stop();
+      context.setShutdownGracefully();
       context.setState(DatanodeStates.SHUTDOWN);
       reportManager.shutdown();
       this.close();

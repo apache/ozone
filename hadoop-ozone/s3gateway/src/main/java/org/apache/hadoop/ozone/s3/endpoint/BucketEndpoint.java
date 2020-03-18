@@ -34,7 +34,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Instant;
 import java.util.Iterator;
 
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -54,7 +53,7 @@ import org.apache.hadoop.ozone.s3.util.S3StorageType;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
-import static org.apache.hadoop.ozone.s3.util.OzoneS3Util.getVolumeName;
+import static org.apache.hadoop.ozone.s3.util.OzoneS3Util.getS3Username;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
@@ -203,15 +202,22 @@ public class BucketEndpoint extends EndpointBase {
   public Response put(@PathParam("bucket") String bucketName, @Context
       HttpHeaders httpHeaders) throws IOException, OS3Exception {
 
-    String volumeName = getVolumeName(getAuthenticationHeaderParser().
-        getAccessKeyID());
+    String volumeName = getS3Username(getSignatureProcessor().getAwsAccessId());
 
-    String location = createS3Bucket(volumeName, bucketName);
-
-    LOG.info("Location is {}", location);
-    return Response.status(HttpStatus.SC_OK).header("Location", location)
-        .build();
-
+    try {
+      String location = createS3Bucket(volumeName, bucketName);
+      LOG.info("Location is {}", location);
+      return Response.status(HttpStatus.SC_OK).header("Location", location)
+          .build();
+    } catch (OMException exception) {
+      LOG.error("Error in Create Bucket Request for bucket: {}", bucketName,
+          exception);
+      if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_BUCKET_NAME,
+            bucketName);
+      }
+      throw exception;
+    }
   }
 
   public Response listMultipartUploads(
@@ -340,8 +346,7 @@ public class BucketEndpoint extends EndpointBase {
     } else {
       keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
     }
-    keyMetadata.setLastModified(Instant.ofEpochMilli(
-        next.getModificationTime()));
+    keyMetadata.setLastModified(next.getModificationTime());
     response.addKey(keyMetadata);
   }
 }

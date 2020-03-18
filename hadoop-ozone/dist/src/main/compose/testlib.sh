@@ -31,52 +31,38 @@ create_results_dir() {
   chmod ogu+w "$RESULT_DIR"
 }
 
-## @description print the number of datanodes up
-## @param the docker-compose file
-count_datanodes() {
-  local compose_file=$1
 
-  local jmx_url='http://scm:9876/jmx?qry=Hadoop:service=SCMNodeManager,name=SCMNodeManagerInfo'
-  if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-    docker-compose -f "${compose_file}" exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && curl --negotiate -u : -s '${jmx_url}'"
-  else
-    docker-compose -f "${compose_file}" exec -T scm curl -s "${jmx_url}"
-  fi \
-    | jq -r '.beans[0].NodeCount[] | select(.key=="HEALTHY") | .value' || true
-}
-
-## @description wait until datanodes are up (or 30 seconds)
+## @description wait until safemode exit (or 180 seconds)
 ## @param the docker-compose file
-## @param number of datanodes to wait for (default: 3)
-wait_for_datanodes(){
+wait_for_safemode_exit(){
   local compose_file=$1
-  local -i datanode_count=${2:-3}
 
   #Reset the timer
   SECONDS=0
 
-  #Don't give it up until 30 seconds
-  while [[ $SECONDS -lt 90 ]]; do
+  #Don't give it up until 180 seconds
+  while [[ $SECONDS -lt 180 ]]; do
 
-     #This line checks the number of HEALTHY datanodes registered in scm over the
-     # jmx HTTP servlet
-     datanodes=$(count_datanodes "${compose_file}")
-     if [[ "$datanodes" ]]; then
-       if [[ ${datanodes} -ge ${datanode_count} ]]; then
-
-         #It's up and running. Let's return from the function.
-         echo "$datanodes datanodes are up and registered to the scm"
-         return
-       else
-
-           #Print it only if a number. Could be not a number if scm is not yet started
-           echo "$datanodes datanode is up and healthy (until now)"
-         fi
+     #This line checks the safemode status in scm
+     local command="ozone scmcli safemode status"
+     if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+         status=$(docker-compose -f "${compose_file}" exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+     else
+         status=$(docker-compose -f "${compose_file}" exec -T scm bash -c "$command")
      fi
 
-      sleep 2
+     echo $status
+     if [[ "$status" ]]; then
+       if [[ ${status} == "SCM is out of safe mode." ]]; then
+         #Safemode exits. Let's return from the function.
+         echo "Safe mode is off"
+         return
+       fi
+     fi
+
+     sleep 2
    done
-   echo "WARNING! Datanodes are not started successfully. Please check the docker-compose files"
+   echo "WARNING! Safemode is still on. Please check the docker-compose files"
    return 1
 }
 
@@ -86,13 +72,10 @@ start_docker_env(){
   local -i datanode_count=${1:-3}
 
   create_results_dir
-
+  export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
   docker-compose -f "$COMPOSE_FILE" --no-ansi down
-  docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
-    && wait_for_datanodes "$COMPOSE_FILE" "${datanode_count}" \
-    && sleep 10
-
-  if [[ $? -gt 0 ]]; then
+  if ! { docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
+      && wait_for_safemode_exit "$COMPOSE_FILE"; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
@@ -114,14 +97,20 @@ execute_robot_test(){
   set +e
   OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
   OUTPUT_PATH="$RESULT_DIR_INSIDE/robot-$OUTPUT_NAME.xml"
-  docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE"
   # shellcheck disable=SC2068
-  docker-compose -f "$COMPOSE_FILE" exec -T -e  SECURITY_ENABLED="${SECURITY_ENABLED}" "$CONTAINER" python -m robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+  docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
+    && docker-compose -f "$COMPOSE_FILE" exec -T -e SECURITY_ENABLED="${SECURITY_ENABLED}" -e OM_HA_PARAM="${OM_HA_PARAM}" "$CONTAINER" python -m robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+  local -i rc=$?
 
   FULL_CONTAINER_NAME=$(docker-compose -f "$COMPOSE_FILE" ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
   set -e
 
+  if [[ ${rc} -gt 0 ]]; then
+    stop_docker_env
+  fi
+
+  return ${rc}
 }
 
 
@@ -131,8 +120,54 @@ execute_robot_test(){
 execute_command_in_container(){
   set -e
   # shellcheck disable=SC2068
-  docker-compose -f "$COMPOSE_FILE" exec -T $@
+  docker-compose -f "$COMPOSE_FILE" exec -T "$@"
   set +e
+}
+
+## @description Stop a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+stop_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" --no-ansi stop $@
+  set +e
+}
+
+
+## @description Start a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+start_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" --no-ansi start $@
+  set +e
+}
+
+
+## @description wait until the port is available on the given host
+## @param The host to check for the port
+## @param The port to check for
+## @param The maximum time to wait in seconds
+wait_for_port(){
+  local host=$1
+  local port=$2
+  local timeout=$3
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     set +e
+     docker-compose -f "${COMPOSE_FILE}" exec -T scm /bin/bash -c "nc -z $host $port"
+     status=$?
+     set -e
+     if [ $status -eq 0 ] ; then
+         echo "Port $port is available on $host"
+         return;
+     fi
+     echo "Port $port is not available on $host yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $host $port to become available"
+   return 1
 }
 
 

@@ -296,9 +296,8 @@ public class ObjectEndpoint extends EndpointBase {
   private void addLastModifiedDate(
       ResponseBuilder responseBuilder, OzoneKeyDetails key) {
 
-    ZonedDateTime lastModificationTime =
-        Instant.ofEpochMilli(key.getModificationTime())
-            .atZone(ZoneId.of("GMT"));
+    ZonedDateTime lastModificationTime = key.getModificationTime()
+        .atZone(ZoneId.of("GMT"));
 
     responseBuilder
         .header(LAST_MODIFIED,
@@ -700,8 +699,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       CopyObjectResponse copyObjectResponse = new CopyObjectResponse();
       copyObjectResponse.setETag(OzoneUtils.getRequestID());
-      copyObjectResponse.setLastModified(Instant.ofEpochMilli(destKeyDetails
-          .getModificationTime()));
+      copyObjectResponse.setLastModified(destKeyDetails.getModificationTime());
       return copyObjectResponse;
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {

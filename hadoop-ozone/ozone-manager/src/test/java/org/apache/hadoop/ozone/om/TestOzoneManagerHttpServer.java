@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.http.HttpConfig.Policy;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
@@ -80,9 +80,9 @@ public class TestOzoneManagerHttpServer {
     KeyStoreTestUtil.setupSSLConfig(keystoresDir, sslConfDir, conf, false);
     connectionFactory =
         URLConnectionFactory.newDefaultURLConnectionFactory(conf);
-    conf.set(DFSConfigKeys.DFS_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY,
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY,
         KeyStoreTestUtil.getClientSSLConfigFileName());
-    conf.set(DFSConfigKeys.DFS_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
+    conf.set(OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY,
         KeyStoreTestUtil.getServerSSLConfigFileName());
   }
 
@@ -92,7 +92,7 @@ public class TestOzoneManagerHttpServer {
   }
 
   @Test public void testHttpPolicy() throws Exception {
-    conf.set(DFSConfigKeys.DFS_HTTP_POLICY_KEY, policy.name());
+    conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());
     conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, "localhost:0");
     conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, "localhost:0");
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -49,7 +49,7 @@ import com.google.inject.Inject;
  * Class to iterate over the OM DB and populate the Recon container DB with
  * the container -> Key reverse mapping.
  */
-public class ContainerKeyMapperTask implements ReconDBUpdateTask {
+public class ContainerKeyMapperTask implements ReconOmTask {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerKeyMapperTask.class);
@@ -89,8 +89,8 @@ public class ContainerKeyMapperTask implements ReconDBUpdateTask {
       LOG.info("Completed 'reprocess' of ContainerKeyMapperTask.");
       Instant end = Instant.now();
       long duration = Duration.between(start, end).toMillis();
-      LOG.info("It took me " + (double) duration / 1000.0 + " seconds to " +
-          "process " + omKeyCount + " keys.");
+      LOG.info("It took me {} seconds to process {} keys.",
+          (double) duration / 1000.0, omKeyCount);
     } catch (IOException ioEx) {
       LOG.error("Unable to populate Container Key Prefix data in Recon DB. ",
           ioEx);
@@ -127,8 +127,19 @@ public class ContainerKeyMapperTask implements ReconDBUpdateTask {
           deleteOMKeyFromContainerDB(updatedKey);
           break;
 
-        default: LOG.debug("Skipping DB update event : " + omdbUpdateEvent
-            .getAction());
+        case UPDATE:
+          if (omdbUpdateEvent.getOldValue() != null) {
+            deleteOMKeyFromContainerDB(
+                omdbUpdateEvent.getOldValue().getKeyName());
+          } else {
+            LOG.warn("Update event does not have the old Key Info for {}.",
+                updatedKey);
+          }
+          writeOMKeyToContainerDB(updatedKey, updatedKeyValue);
+          break;
+
+        default: LOG.debug("Skipping DB update event : {}",
+            omdbUpdateEvent.getAction());
         }
         eventCount++;
       } catch (IOException e) {

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -66,30 +67,24 @@ public class LogSubcommand extends BaseInsightSubCommand
   private Map<String, String> filters;
 
   @Override
-  public Void call() throws Exception {
+  public Void call() {
     OzoneConfiguration conf =
         getInsightCommand().createOzoneConfiguration();
     InsightPoint insight =
         getInsight(conf, insightName);
 
-    List<LoggerSource> loggers = insight.getRelatedLoggers(verbose);
+    List<LoggerSource> loggers = insight.getRelatedLoggers(verbose, filters);
 
-    for (LoggerSource logger : loggers) {
-      setLogLevel(conf, logger.getLoggerName(), logger.getComponent(),
-          logger.getLevel());
-    }
+    setLogLevels(conf, loggers, LoggerSource::getLevel);
+    Runtime.getRuntime().addShutdownHook(new Thread(() ->
+        setLogLevels(conf, loggers, any -> Level.INFO)
+    ));
 
     Set<Component> sources = loggers.stream().map(LoggerSource::getComponent)
         .collect(Collectors.toSet());
-    try {
-      streamLog(conf, sources, loggers,
-          logLine -> insight.filterLog(filters, logLine));
-    } finally {
-      for (LoggerSource logger : loggers) {
-        setLogLevel(conf, logger.getLoggerName(), logger.getComponent(),
-            Level.INFO);
-      }
-    }
+    streamLog(conf, sources, loggers,
+        logLine -> insight.filterLog(filters, logLine));
+
     return null;
   }
 
@@ -158,6 +153,14 @@ public class LogSubcommand extends BaseInsightSubCommand
     }
     m.appendTail(sb);
     return sb.toString();
+  }
+
+  private void setLogLevels(OzoneConfiguration conf, List<LoggerSource> loggers,
+      Function<LoggerSource, Level> toLevel) {
+    for (LoggerSource logger : loggers) {
+      setLogLevel(conf, logger.getLoggerName(), logger.getComponent(),
+          toLevel.apply(logger));
+    }
   }
 
   private void setLogLevel(OzoneConfiguration conf, String name,

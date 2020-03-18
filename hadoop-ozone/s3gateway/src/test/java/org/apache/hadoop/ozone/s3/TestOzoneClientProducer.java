@@ -31,12 +31,12 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.test.LambdaTestUtils;
 
-import static org.apache.hadoop.ozone.s3.AWSAuthParser.AUTHORIZATION_HEADER;
-import static org.apache.hadoop.ozone.s3.AWSAuthParser.CONTENT_MD5;
-import static org.apache.hadoop.ozone.s3.AWSAuthParser.CONTENT_TYPE;
-import static org.apache.hadoop.ozone.s3.AWSAuthParser.HOST_HEADER;
-import static org.apache.hadoop.ozone.s3.AWSAuthParser.X_AMAZ_DATE;
-import static org.apache.hadoop.ozone.s3.AWSAuthParser.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.SignatureProcessor.AUTHORIZATION_HEADER;
+import static org.apache.hadoop.ozone.s3.SignatureProcessor.CONTENT_MD5;
+import static org.apache.hadoop.ozone.s3.SignatureProcessor.CONTENT_TYPE;
+import static org.apache.hadoop.ozone.s3.SignatureProcessor.HOST_HEADER;
+import static org.apache.hadoop.ozone.s3.SignatureProcessor.X_AMAZ_DATE;
+import static org.apache.hadoop.ozone.s3.SignatureProcessor.X_AMZ_CONTENT_SHA256;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -80,7 +80,6 @@ public class TestOzoneClientProducer {
     config.setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
     config.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
     setupContext();
-    producer.setContext(context);
     producer.setOzoneConfiguration(config);
   }
 

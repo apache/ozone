@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.RatisServerConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -52,13 +52,11 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
 
 /**
  * Tests the containerStateMachine failure handling.
  */
-
 public class TestContainerStateMachine {
 
   private MiniOzoneCluster cluster;
@@ -82,7 +80,7 @@ public class TestContainerStateMachine {
     baseDir.mkdirs();
 
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
-  //  conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+    //  conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
@@ -101,7 +99,7 @@ public class TestContainerStateMachine {
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";
     bucketName = volumeName;
@@ -160,7 +158,7 @@ public class TestContainerStateMachine {
   public void testRatisSnapshotRetention() throws Exception {
 
     ContainerStateMachine stateMachine =
-        (ContainerStateMachine) ContainerTestHelper.getStateMachine(cluster);
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Assert.assertNull(storage.findLatestSnapshot());
@@ -175,13 +173,14 @@ public class TestContainerStateMachine {
       key.write(("ratis" + i).getBytes());
       key.flush();
       key.write(("ratis" + i).getBytes());
+      key.close();
     }
 
     RatisServerConfiguration ratisServerConfiguration =
         conf.getObject(RatisServerConfiguration.class);
 
     stateMachine =
-        (ContainerStateMachine) ContainerTestHelper.getStateMachine(cluster);
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Path parentPath = storage.findLatestSnapshot().getFile().getPath();
     int numSnapshots = parentPath.getParent().toFile().listFiles().length;
@@ -198,9 +197,10 @@ public class TestContainerStateMachine {
       key.write(("ratis" + i).getBytes());
       key.flush();
       key.write(("ratis" + i).getBytes());
+      key.close();
     }
     stateMachine =
-        (ContainerStateMachine) ContainerTestHelper.getStateMachine(cluster);
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     parentPath = storage.findLatestSnapshot().getFile().getPath();
     numSnapshots = parentPath.getParent().toFile().listFiles().length;

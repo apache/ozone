@@ -22,8 +22,8 @@ import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -44,17 +44,18 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 import java.io.File;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Tests {@link VolumeSet} operations.
+ * Tests {@link MutableVolumeSet} operations.
  */
 public class TestVolumeSet {
 
   private OzoneConfiguration conf;
-  private VolumeSet volumeSet;
+  private MutableVolumeSet volumeSet;
   private final String baseDir = MiniDFSCluster.getBaseDirectory();
   private final String volume1 = baseDir + "disk1";
   private final String volume2 = baseDir + "disk2";
@@ -63,7 +64,7 @@ public class TestVolumeSet {
   private static final String DUMMY_IP_ADDR = "0.0.0.0";
 
   private void initializeVolumeSet() throws Exception {
-    volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
+    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
   }
 
   @Rule
@@ -75,7 +76,7 @@ public class TestVolumeSet {
     String dataDirKey = volume1 + "," + volume2;
     volumes.add(volume1);
     volumes.add(volume2);
-    conf.set(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY, dataDirKey);
+    conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, dataDirKey);
     initializeVolumeSet();
   }
 
@@ -166,7 +167,7 @@ public class TestVolumeSet {
     // Attempting to remove a volume which does not exist in VolumeSet should
     // log a warning.
     LogCapturer logs = LogCapturer.captureLogs(
-        LogFactory.getLog(VolumeSet.class));
+        LogFactory.getLog(MutableVolumeSet.class));
     volumeSet.removeVolume(volume1);
     assertEquals(1, volumeSet.getVolumesList().size());
     String expectedLogMessage = "Volume : " +
@@ -221,7 +222,7 @@ public class TestVolumeSet {
 
   @Test
   public void testFailVolumes() throws  Exception{
-    VolumeSet volSet = null;
+    MutableVolumeSet volSet = null;
     File readOnlyVolumePath = new File(baseDir);
     //Set to readonly, so that this volume will be failed
     readOnlyVolumePath.setReadOnly();
@@ -229,7 +230,7 @@ public class TestVolumeSet {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(HDDS_DATANODE_DIR_KEY, readOnlyVolumePath.getAbsolutePath()
         + "," + volumePath.getAbsolutePath());
-    volSet = new VolumeSet(UUID.randomUUID().toString(), ozoneConfig);
+    volSet = new MutableVolumeSet(UUID.randomUUID().toString(), ozoneConfig);
     assertEquals(1, volSet.getFailedVolumesList().size());
     assertEquals(readOnlyVolumePath, volSet.getFailedVolumesList().get(0)
         .getHddsRootDir());
@@ -243,4 +244,27 @@ public class TestVolumeSet {
     }
 
   }
+
+  @Test
+  public void testInterrupt() throws Exception {
+    Method method = this.volumeSet.getClass()
+        .getDeclaredMethod("checkAllVolumes");
+    method.setAccessible(true);
+    String exceptionMessage = "";
+
+    try {
+      Thread.currentThread().interrupt();
+      method.invoke(this.volumeSet);
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Interruption Occur");
+      }
+    } catch (InterruptedException interruptedException) {
+      exceptionMessage = "InterruptedException Occur.";
+    }
+
+    assertEquals(
+        "InterruptedException Occur.",
+        exceptionMessage);
+  }
+
 }

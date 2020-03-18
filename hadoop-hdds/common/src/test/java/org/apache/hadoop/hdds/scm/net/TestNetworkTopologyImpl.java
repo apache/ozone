@@ -227,7 +227,7 @@ public class TestNetworkTopologyImpl {
           "./networkTopologyTestFiles/good.xml").getPath();
       conf.set(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE, filePath);
       NetworkTopology newCluster = new NetworkTopologyImpl(conf);
-      LOG.info("network topology max level = " + newCluster.getMaxLevel());
+      LOG.info("network topology max level = {}", newCluster.getMaxLevel());
     } catch (Throwable e) {
       fail("should succeed");
     }
@@ -880,7 +880,7 @@ public class TestNetworkTopologyImpl {
         frequency.put(node, frequency.get(node) + 1);
       }
     }
-    LOG.info("Result:" + frequency);
+    LOG.info("Result:{}", frequency);
     return frequency;
   }
 
@@ -914,7 +914,7 @@ public class TestNetworkTopologyImpl {
         frequency.put(node, frequency.get(node) + 1);
       }
     }
-    LOG.info("Result:" + frequency);
+    LOG.info("Result:{}", frequency);
     return frequency;
   }
 
@@ -947,7 +947,7 @@ public class TestNetworkTopologyImpl {
       }
     }
 
-    LOG.info("Result:" + frequency);
+    LOG.info("Result:{}", frequency);
     return frequency;
   }
 }

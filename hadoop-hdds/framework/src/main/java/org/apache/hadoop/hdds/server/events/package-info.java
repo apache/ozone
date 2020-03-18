@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.server.events;
-
 /**
  * Simple event queue implementation for hdds/ozone components.
  */
+package org.apache.hadoop.hdds.server.events;

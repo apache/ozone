@@ -46,6 +46,8 @@ import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -171,7 +173,7 @@ public class HeartbeatEndpointTask
     if (requestBuilder.getIncrementalContainerReportCount() != 0) {
       reports.addAll(requestBuilder.getIncrementalContainerReportList());
     }
-    context.putBackReports(reports);
+    context.putBackReports(reports, rpcEndpoint.getAddressString());
   }
 
   /**
@@ -180,7 +182,8 @@ public class HeartbeatEndpointTask
    * @param requestBuilder builder to which the report has to be added.
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
-    for (GeneratedMessage report : context.getAllAvailableReports()) {
+    for (GeneratedMessage report :
+        context.getAllAvailableReports(rpcEndpoint.getAddressString())) {
       String reportName = report.getDescriptorForType().getFullName();
       for (Descriptors.FieldDescriptor descriptor :
           SCMHeartbeatRequestProto.getDescriptor().getFields()) {
@@ -204,7 +207,7 @@ public class HeartbeatEndpointTask
   private void addContainerActions(
       SCMHeartbeatRequestProto.Builder requestBuilder) {
     List<ContainerAction> actions = context.getPendingContainerAction(
-        maxContainerActionsPerHB);
+        rpcEndpoint.getAddressString(), maxContainerActionsPerHB);
     if (!actions.isEmpty()) {
       ContainerActionsProto cap = ContainerActionsProto.newBuilder()
           .addAllContainerActions(actions)
@@ -221,7 +224,7 @@ public class HeartbeatEndpointTask
   private void addPipelineActions(
       SCMHeartbeatRequestProto.Builder requestBuilder) {
     List<PipelineAction> actions = context.getPendingPipelineAction(
-        maxPipelineActionsPerHB);
+        rpcEndpoint.getAddressString(), maxPipelineActionsPerHB);
     if (!actions.isEmpty()) {
       PipelineActionsProto pap = PipelineActionsProto.newBuilder()
           .addAllPipelineActions(actions)
@@ -308,6 +311,26 @@ public class HeartbeatEndpointTask
               deleteContainerCommand.getContainerID());
         }
         this.context.addCommand(deleteContainerCommand);
+        break;
+      case createPipelineCommand:
+        CreatePipelineCommand createPipelineCommand =
+            CreatePipelineCommand.getFromProtobuf(
+                commandResponseProto.getCreatePipelineCommandProto());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Received SCM create pipeline request {}",
+              createPipelineCommand.getPipelineID());
+        }
+        this.context.addCommand(createPipelineCommand);
+        break;
+      case closePipelineCommand:
+        ClosePipelineCommand closePipelineCommand =
+            ClosePipelineCommand.getFromProtobuf(
+                commandResponseProto.getClosePipelineCommandProto());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Received SCM close pipeline request {}",
+              closePipelineCommand.getPipelineID());
+        }
+        this.context.addCommand(closePipelineCommand);
         break;
       default:
         throw new IllegalArgumentException("Unknown response : "

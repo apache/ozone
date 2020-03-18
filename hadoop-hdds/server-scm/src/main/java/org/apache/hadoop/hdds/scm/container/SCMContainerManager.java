@@ -25,14 +25,13 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
-import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataStore;
@@ -64,8 +63,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_CONTAINER_DB;
  * looking up a key.
  */
 public class SCMContainerManager implements ContainerManager {
-  private static final Logger LOG = LoggerFactory.getLogger(SCMContainerManager
-      .class);
+  private static final Logger LOG = LoggerFactory.getLogger(
+      SCMContainerManager.class);
 
   private final Lock lock;
   private final MetadataStore containerStore;
@@ -79,22 +78,18 @@ public class SCMContainerManager implements ContainerManager {
    * Constructs a mapping class that creates mapping between container names
    * and pipelines.
    *
-   * @param nodeManager - NodeManager so that we can get the nodes that are
-   * healthy to place new
-   * containers.
    * passed to LevelDB and this memory is allocated in Native code space.
    * CacheSize is specified
    * in MB.
-   * @param pipelineManager - PipelineManager
+   * @param conf - {@link Configuration}
+   * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
-  @SuppressWarnings("unchecked")
   public SCMContainerManager(final Configuration conf,
-      final NodeManager nodeManager, PipelineManager pipelineManager,
-      final EventPublisher eventPublisher) throws IOException {
+      PipelineManager pipelineManager)
+      throws IOException {
 
-    final File metaDir = ServerUtils.getScmDbDir(conf);
-    final File containerDBPath = new File(metaDir, SCM_CONTAINER_DB);
+    final File containerDBPath = getContainerDBPath(conf);
     final int cacheSize = conf.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
         OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
 
@@ -124,9 +119,17 @@ public class SCMContainerManager implements ContainerManager {
           ContainerInfoProto.PARSER.parseFrom(entry.getValue()));
       Preconditions.checkNotNull(container);
       containerStateManager.loadContainer(container);
-      if (container.getState() == LifeCycleState.OPEN) {
-        pipelineManager.addContainerToPipeline(container.getPipelineID(),
-            ContainerID.valueof(container.getContainerID()));
+      try {
+        if (container.getState() == LifeCycleState.OPEN) {
+          pipelineManager.addContainerToPipeline(container.getPipelineID(),
+              ContainerID.valueof(container.getContainerID()));
+        }
+      } catch (PipelineNotFoundException ex) {
+        LOG.warn("Found a Container {} which is in {} state with pipeline {} " +
+                "that does not exist. Closing Container.", container,
+            container.getState(), container.getPipelineID());
+        updateContainerState(container.containerID(),
+            HddsProtos.LifeCycleEvent.FINALIZE, true);
       }
     }
   }
@@ -199,6 +202,18 @@ public class SCMContainerManager implements ContainerManager {
   public ContainerInfo getContainer(final ContainerID containerID)
       throws ContainerNotFoundException {
     return containerStateManager.getContainer(containerID);
+  }
+
+  @Override
+  public boolean exists(ContainerID containerID) {
+    lock.lock();
+    try {
+      return (containerStateManager.getContainer(containerID) != null);
+    } catch (ContainerNotFoundException e) {
+      return false;
+    } finally {
+      lock.unlock();
+    }
   }
 
   /**
@@ -318,6 +333,15 @@ public class SCMContainerManager implements ContainerManager {
       ContainerID containerID, HddsProtos.LifeCycleEvent event)
       throws IOException {
     // Should we return the updated ContainerInfo instead of LifeCycleState?
+    return updateContainerState(containerID, event, false);
+  }
+
+
+  private HddsProtos.LifeCycleState updateContainerState(
+      ContainerID containerID, HddsProtos.LifeCycleEvent event,
+      boolean skipPipelineToContainerRemove)
+      throws IOException {
+    // Should we return the updated ContainerInfo instead of LifeCycleState?
     lock.lock();
     try {
       final ContainerInfo container = containerStateManager
@@ -326,10 +350,13 @@ public class SCMContainerManager implements ContainerManager {
       containerStateManager.updateContainerState(containerID, event);
       final LifeCycleState newState = container.getState();
 
-      if (oldState == LifeCycleState.OPEN && newState != LifeCycleState.OPEN) {
-        pipelineManager
-            .removeContainerFromPipeline(container.getPipelineID(),
-                containerID);
+      if (!skipPipelineToContainerRemove) {
+        if (oldState == LifeCycleState.OPEN &&
+            newState != LifeCycleState.OPEN) {
+          pipelineManager
+              .removeContainerFromPipeline(container.getPipelineID(),
+                  containerID);
+        }
       }
       final byte[] dbKey = Longs.toByteArray(containerID.getId());
       containerStore.put(dbKey, container.getProtobuf().toByteArray());
@@ -344,7 +371,6 @@ public class SCMContainerManager implements ContainerManager {
       lock.unlock();
     }
   }
-
 
     /**
      * Update deleteTransactionId according to deleteTransactionMap.
@@ -399,29 +425,23 @@ public class SCMContainerManager implements ContainerManager {
         .emptyList());
   }
 
+  @SuppressWarnings("squid:S2445")
   public ContainerInfo getMatchingContainer(final long sizeRequired,
       String owner, Pipeline pipeline, List<ContainerID> excludedContainers) {
     NavigableSet<ContainerID> containerIDs;
     try {
       synchronized (pipeline) {
-        //TODO: #CLUTIL See if lock is required here
-        containerIDs =
-            pipelineManager.getContainersInPipeline(pipeline.getId());
+        containerIDs = getContainersForOwner(pipeline, owner);
 
-        containerIDs = getContainersForOwner(containerIDs, owner);
         if (containerIDs.size() < numContainerPerOwnerInPipeline) {
-          // TODO: #CLUTIL Maybe we can add selection logic inside synchronized
-          // as well
-          if (containerIDs.size() < numContainerPerOwnerInPipeline) {
-            ContainerInfo containerInfo =
-                containerStateManager.allocateContainer(pipelineManager, owner,
-                    pipeline);
-            // Add to DB
-            addContainerToDB(containerInfo);
-            containerStateManager.updateLastUsedMap(pipeline.getId(),
-                containerInfo.containerID(), owner);
-            return containerInfo;
-          }
+          ContainerInfo containerInfo =
+              containerStateManager.allocateContainer(pipelineManager, owner,
+                  pipeline);
+          // Add to DB
+          addContainerToDB(containerInfo);
+          containerStateManager.updateLastUsedMap(pipeline.getId(),
+              containerInfo.containerID(), owner);
+          return containerInfo;
         }
       }
 
@@ -454,7 +474,7 @@ public class SCMContainerManager implements ContainerManager {
    * @param containerInfo
    * @throws IOException
    */
-  private void addContainerToDB(ContainerInfo containerInfo)
+  protected void addContainerToDB(ContainerInfo containerInfo)
       throws IOException {
     try {
       final byte[] containerIDBytes = Longs.toByteArray(
@@ -485,12 +505,14 @@ public class SCMContainerManager implements ContainerManager {
 
   /**
    * Returns the container ID's matching with specified owner.
-   * @param containerIDs
+   * @param pipeline
    * @param owner
    * @return NavigableSet<ContainerID>
    */
   private NavigableSet<ContainerID> getContainersForOwner(
-      NavigableSet<ContainerID> containerIDs, String owner) {
+      Pipeline pipeline, String owner) throws IOException {
+    NavigableSet<ContainerID> containerIDs =
+        pipelineManager.getContainersInPipeline(pipeline.getId());
     Iterator<ContainerID> containerIDIterator = containerIDs.iterator();
     while (containerIDIterator.hasNext()) {
       ContainerID cid = containerIDIterator.next();
@@ -588,5 +610,18 @@ public class SCMContainerManager implements ContainerManager {
         scmContainerManagerMetrics.incNumICRReportsProcessedFailed();
       }
     }
+  }
+
+  protected File getContainerDBPath(Configuration conf) {
+    File metaDir = ServerUtils.getScmDbDir(conf);
+    return new File(metaDir, SCM_CONTAINER_DB);
+  }
+
+  protected PipelineManager getPipelineManager() {
+    return pipelineManager;
+  }
+
+  public Lock getLock() {
+    return lock;
   }
 }

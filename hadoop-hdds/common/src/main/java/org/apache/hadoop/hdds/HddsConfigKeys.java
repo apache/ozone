@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.hdds;
 
-import org.apache.hadoop.hdds.utils.db.DBProfile;
-
 /**
  * This class contains constants for configuration keys and default values
  * used in hdds.
@@ -55,9 +53,9 @@ public final class HddsConfigKeys {
   // Configuration to allow volume choosing policy.
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
-  // DB PKIProfile used by ROCKDB instances.
+
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
-  public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
+
   // Once a container usage crosses this threshold, it is eligible for
   // closing.
   public static final String HDDS_CONTAINER_CLOSE_THRESHOLD =
@@ -81,7 +79,12 @@ public final class HddsConfigKeys {
   public static final String HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK =
       "hdds.scm.safemode.pipeline-availability.check";
   public static final boolean
-      HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT = false;
+      HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT = true;
+
+  public static final String HDDS_SCM_SAFEMODE_PIPELINE_CREATION =
+      "hdds.scm.safemode.pipeline.creation";
+  public static final boolean
+      HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT = true;
 
   // % of containers which should have at least one reported replica
   // before SCM comes out of safe mode.
@@ -89,11 +92,10 @@ public final class HddsConfigKeys {
       "hdds.scm.safemode.threshold.pct";
   public static final double HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT = 0.99;
 
-
   // percentage of healthy pipelines, where all 3 datanodes are reported in the
   // pipeline.
   public static final String HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT =
-      "hdds.scm.safemode.healthy.pipelie.pct";
+      "hdds.scm.safemode.healthy.pipeline.pct";
   public static final double
       HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT_DEFAULT = 0.10;
 
@@ -102,9 +104,6 @@ public final class HddsConfigKeys {
   public static final double
       HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT = 0.90;
 
-  public static final String HDDS_LOCK_MAX_CONCURRENCY =
-      "hdds.lock.max.concurrency";
-  public static final int HDDS_LOCK_MAX_CONCURRENCY_DEFAULT = 100;
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.
@@ -160,10 +159,13 @@ public final class HddsConfigKeys {
   public static final String HDDS_X509_FILE_NAME = "hdds.x509.file.name";
   public static final String HDDS_X509_FILE_NAME_DEFAULT = "certificate.crt";
 
+  public static final String HDDS_X509_CRL_NAME = "hdds.x509.CRL.name";
+  public static final String HDDS_X509_CRL_NAME_DEFAULT = "scm.crl";
+
   /**
-   * Default duration of certificates issued by SCM CA.
-   * The formats accepted are based on the ISO-8601 duration format PnDTnHnMn.nS
-   * Default value is 5 years and written as P1865D.
+   * Default duration of certificates issued by SCM CA. The formats accepted are
+   * based on the ISO-8601 duration format PnDTnHnMn.nS Default value is 5 years
+   * and written as P1865D.
    */
   public static final String HDDS_X509_DEFAULT_DURATION = "hdds.x509.default" +
       ".duration";

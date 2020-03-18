@@ -20,12 +20,14 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -34,11 +36,14 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
  * Tests for RatisPipelineUtils.
  */
+@Ignore
 public class TestRatisPipelineCreateAndDestroy {
 
   private static MiniOzoneCluster cluster;
@@ -48,9 +53,12 @@ public class TestRatisPipelineCreateAndDestroy {
   public void init(int numDatanodes) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         GenericTestUtils.getRandomizedTempPath());
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
-            .setHbInterval(1000)
+            .setTotalPipelineNumLimit(numDatanodes + numDatanodes/3)
+            .setHbInterval(2000)
             .setHbProcessorInterval(1000)
             .build();
     cluster.waitForClusterToBeReady();
@@ -66,15 +74,43 @@ public class TestRatisPipelineCreateAndDestroy {
   @Test(timeout = 180000)
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
-    init(6);
+    int numOfDatanodes = 6;
+    init(numOfDatanodes);
     // make sure two pipelines are created
     waitForPipelines(2);
+    Assert.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE).size());
+
     List<Pipeline> pipelines = pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
       pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     }
+    // make sure two pipelines are created
+    waitForPipelines(2);
+  }
+
+  @Test(timeout = 180000)
+  public void testAutomaticPipelineCreationDisablingFactorONE()
+      throws Exception {
+    conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
+    init(6);
+    // make sure two pipelines are created
+    waitForPipelines(2);
+    // No Factor ONE pipeline is auto created.
+    Assert.assertEquals(0, pipelineManager.getPipelines(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.ONE).size());
+
+    List<Pipeline> pipelines = pipelineManager
+        .getPipelines(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+    for (Pipeline pipeline : pipelines) {
+      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+    }
+
     // make sure two pipelines are created
     waitForPipelines(2);
   }
@@ -103,7 +139,9 @@ public class TestRatisPipelineCreateAndDestroy {
     } catch (IOException ioe) {
       // As now all datanodes are shutdown, they move to stale state, there
       // will be no sufficient datanodes to create the pipeline.
-      Assert.assertTrue(ioe instanceof InsufficientDatanodesException);
+      Assert.assertTrue(ioe instanceof SCMException);
+      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+          ((SCMException) ioe).getResult());
     }
 
     // make sure pipelines is destroyed
@@ -116,9 +154,14 @@ public class TestRatisPipelineCreateAndDestroy {
     for (Pipeline pipeline : pipelines) {
       pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     }
-    // make sure pipelines is created after node start
-    pipelineManager.triggerPipelineCreation();
-    waitForPipelines(1);
+
+    if (cluster.getStorageContainerManager()
+        .getScmNodeManager().getNodeCount(HddsProtos.NodeState.HEALTHY) >=
+        HddsProtos.ReplicationFactor.THREE.getNumber()) {
+      // make sure pipelines is created after node start
+      pipelineManager.triggerPipelineCreation();
+      waitForPipelines(1);
+    }
   }
 
   private void waitForPipelines(int numPipelines)
@@ -126,6 +169,6 @@ public class TestRatisPipelineCreateAndDestroy {
     GenericTestUtils.waitFor(() -> pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
-        .size() == numPipelines, 100, 40000);
+        .size() >= numPipelines, 100, 40000);
   }
 }

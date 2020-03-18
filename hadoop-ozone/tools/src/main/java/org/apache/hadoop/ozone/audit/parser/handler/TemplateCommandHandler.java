@@ -16,22 +16,30 @@
  */
 package org.apache.hadoop.ozone.audit.parser.handler;
 
+import java.sql.SQLException;
+import java.util.concurrent.Callable;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.audit.parser.AuditParser;
 import org.apache.hadoop.ozone.audit.parser.common.DatabaseHelper;
-import picocli.CommandLine.*;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
-
-import java.sql.SQLException;
-import java.util.concurrent.Callable;
+import picocli.CommandLine.ParentCommand;
 
 /**
  * Template command handler for ozone audit parser.
  */
 @Command(name = "template",
     aliases = "t",
-    description = "Execute template query",
+    description = "Execute template query.\n\n" +
+        "To run a template query:\n" +
+        "ozone auditparser <path to db file> template <template>\n\n" +
+        "Following templates are available:\n" +
+        "(Template)              (Description)\n" +
+        "top5users              : Top 5 users.\n" +
+        "top5cmds               : Top 5 commands.\n" +
+        "top5activetimebyseconds: Top 5 active times, grouped by seconds.\n",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class TemplateCommandHandler implements Callable<Void> {
@@ -42,7 +50,7 @@ public class TemplateCommandHandler implements Callable<Void> {
   @ParentCommand
   private AuditParser auditParser;
 
-  public Void call() {
+  public Void call() throws Exception {
     try {
       if(DatabaseHelper.validateTemplate(template)) {
         System.out.println(

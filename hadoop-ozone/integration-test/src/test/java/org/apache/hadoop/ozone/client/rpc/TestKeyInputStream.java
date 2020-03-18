@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -74,7 +75,6 @@ public class TestKeyInputStream {
     flushSize = 4 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
-    conf.set(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, "5000ms");
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
@@ -82,6 +82,7 @@ public class TestKeyInputStream {
         StorageUnit.MB);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
+        .setTotalPipelineNumLimit(5)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
@@ -90,7 +91,7 @@ public class TestKeyInputStream {
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "test-key-input-stream-volume";
@@ -115,7 +116,7 @@ public class TestKeyInputStream {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return ContainerTestHelper
+    return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
 
@@ -126,7 +127,7 @@ public class TestKeyInputStream {
         .getXceiverClientMetrics();
 
     String keyName = getKeyName();
-    OzoneOutputStream key = ContainerTestHelper.createKey(keyName,
+    OzoneOutputStream key = TestHelper.createKey(keyName,
         ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
 
     // write data of more than 2 blocks.
@@ -230,7 +231,7 @@ public class TestKeyInputStream {
         ContainerProtos.Type.ReadChunk);
 
     String keyName = getKeyName();
-    OzoneOutputStream key = ContainerTestHelper.createKey(keyName,
+    OzoneOutputStream key = TestHelper.createKey(keyName,
         ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
 
     // write data spanning 3 chunks

@@ -24,6 +24,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB
     .StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
@@ -45,7 +46,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static java.util.Collections.unmodifiableList;
-import static org.apache.hadoop.hdds.scm.HddsServerUtil
+import static org.apache.hadoop.hdds.utils.HddsServerUtil
     .getScmRpcTimeOutInMilliseconds;
 
 /**
@@ -137,6 +138,7 @@ public class SCMConnectionManager
             "Ignoring the request.");
         return;
       }
+
       RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
           ProtobufRpcEngine.class);
       long version =
@@ -145,8 +147,51 @@ public class SCMConnectionManager
       RetryPolicy retryPolicy =
           RetryPolicies.retryForeverWithFixedSleep(
               1000, TimeUnit.MILLISECONDS);
+
       StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           StorageContainerDatanodeProtocolPB.class, version,
+          address, UserGroupInformation.getCurrentUser(), conf,
+          NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
+          retryPolicy).getProxy();
+
+      StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
+          new StorageContainerDatanodeProtocolClientSideTranslatorPB(
+          rpcProxy);
+
+      EndpointStateMachine endPoint =
+          new EndpointStateMachine(address, rpcClient, conf);
+      endPoint.setPassive(false);
+      scmMachines.put(address, endPoint);
+    } finally {
+      writeUnlock();
+    }
+  }
+
+  /**
+   * Adds a new Recon server to the set of endpoints.
+   * @param address Recon address.
+   * @throws IOException
+   */
+  public void addReconServer(InetSocketAddress address) throws IOException {
+    LOG.info("Adding Recon Server : {}", address.toString());
+    writeLock();
+    try {
+      if (scmMachines.containsKey(address)) {
+        LOG.warn("Trying to add an existing SCM Machine to Machines group. " +
+            "Ignoring the request.");
+        return;
+      }
+
+      RPC.setProtocolEngine(conf, ReconDatanodeProtocolPB.class,
+          ProtobufRpcEngine.class);
+      long version =
+          RPC.getProtocolVersion(ReconDatanodeProtocolPB.class);
+
+      RetryPolicy retryPolicy =
+          RetryPolicies.retryUpToMaximumCountWithFixedSleep(10,
+              60000, TimeUnit.MILLISECONDS);
+      ReconDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
+          ReconDatanodeProtocolPB.class, version,
           address, UserGroupInformation.getCurrentUser(), conf,
           NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
           retryPolicy).getProxy();
@@ -156,6 +201,7 @@ public class SCMConnectionManager
 
       EndpointStateMachine endPoint =
           new EndpointStateMachine(address, rpcClient, conf);
+      endPoint.setPassive(true);
       scmMachines.put(address, endPoint);
     } finally {
       writeUnlock();

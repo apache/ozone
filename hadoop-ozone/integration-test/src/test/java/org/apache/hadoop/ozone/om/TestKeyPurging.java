@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -63,11 +64,12 @@ public class TestKeyPurging {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
+    // TODO enable when RATIS-788 is fixed
+    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setQuietMode(false);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1)
+        .setNumDatanodes(3)
         .setHbInterval(200)
         .build();
     cluster.waitForClusterToBeReady();
@@ -101,7 +103,7 @@ public class TestKeyPurging {
     for (int i = 1; i <= NUM_KEYS; i++) {
       String keyName = keyBase + "-" + i;
       keys.add(keyName);
-      OzoneOutputStream keyStream = ContainerTestHelper.createKey(
+      OzoneOutputStream keyStream = TestHelper.createKey(
           keyName, ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
           KEY_SIZE, store, volumeName, bucketName);
       keyStream.write(data);

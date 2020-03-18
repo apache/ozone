@@ -18,20 +18,28 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handles purging of keys from OM DB.
@@ -47,27 +55,112 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
-    List<String> purgeKeysList = purgeKeysRequest.getKeysList();
+    List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest
+        .getDeletedKeysList();
+    List<String> keysToBePurgedList = new ArrayList<>();
 
-    LOG.debug("Processing Purge Keys for {} number of keys.",
-        purgeKeysList.size());
-
-    OMResponse omResponse = OMResponse.newBuilder()
+    OMResponse.Builder omResponse = OMResponse.newBuilder()
         .setCmdType(Type.PurgeKeys)
-        .setPurgeKeysResponse(
-            OzoneManagerProtocolProtos.PurgeKeysResponse.newBuilder().build())
+        .setPurgeKeysResponse(PurgeKeysResponse.newBuilder().build())
         .setStatus(Status.OK)
-        .setSuccess(true)
-        .build();
+        .setSuccess(true);
+    OMClientResponse omClientResponse = null;
+    boolean success = true;
+    IOException exception = null;
 
-    OMClientResponse omClientResponse = new OMKeyPurgeResponse(purgeKeysList,
-        omResponse);
-    omClientResponse.setFlushFuture(
-        ozoneManagerDoubleBufferHelper.add(omClientResponse,
-            transactionLogIndex));
+    // Filter the keys that have updateID > transactionLogIndex. This is done so
+    // that in case this transaction is a replay, we do not purge keys
+    // created after the original purge request.
+    // PurgeKeys request has keys belonging to same bucket grouped together.
+    // We get each bucket lock and check the above condition.
+    for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
+      boolean acquiredLock = false;
+      String volumeName = bucketWithDeleteKeys.getVolumeName();
+      String bucketName = bucketWithDeleteKeys.getBucketName();
+      ArrayList<String> keysNotPurged = new ArrayList<>();
+      Result result = null;
+      try {
+        acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+            volumeName, bucketName);
+        for (String deletedKey : bucketWithDeleteKeys.getKeysList()) {
+          RepeatedOmKeyInfo repeatedOmKeyInfo =
+              omMetadataManager.getDeletedTable().get(deletedKey);
+          boolean purgeKey = true;
+          if (repeatedOmKeyInfo != null) {
+            for (OmKeyInfo omKeyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
+              // Discard those keys whose updateID is > transactionLogIndex.
+              // This could happen when the PurgeRequest is replayed.
+              if (isReplay(ozoneManager, omKeyInfo,
+                  trxnLogIndex)) {
+                purgeKey = false;
+                result = Result.REPLAY;
+                break;
+              }
+              // TODO: If a deletedKey has any one OmKeyInfo which was
+              //  deleted after the original PurgeRequest (updateID >
+              //  trxnLogIndex), we avoid purging that whole key in the
+              //  replay request. Instead of discarding the whole key, we can
+              //  identify the OmKeyInfo's which have updateID <
+              //  trxnLogIndex and purge only those OMKeyInfo's from the
+              //  deletedKey in DeletedTable.
+            }
+            if (purgeKey) {
+              keysToBePurgedList.add(deletedKey);
+            } else {
+              keysNotPurged.add(deletedKey);
+            }
+          }
+        }
+      } catch (IOException ex) {
+        success = false;
+        exception = ex;
+        break;
+      } finally {
+        if (acquiredLock) {
+          omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+              bucketName);
+        }
+      }
+
+      if (result == Result.REPLAY) {
+        LOG.debug("Replayed Transaction {}. Request: {}", trxnLogIndex,
+            purgeKeysRequest);
+        if (!keysNotPurged.isEmpty()) {
+          StringBuilder notPurgeList = new StringBuilder();
+          for (String key : keysNotPurged) {
+            notPurgeList.append(", ").append(key);
+          }
+          LOG.debug("Following keys from Volume:{}, Bucket:{} will not be" +
+              " purged: {}", notPurgeList.toString().substring(2));
+        }
+      }
+    }
+
+    if (success) {
+      if (LOG.isDebugEnabled()) {
+        if (keysToBePurgedList.isEmpty()) {
+          LOG.debug("No keys will be purged as part of KeyPurgeRequest: {}",
+              purgeKeysRequest);
+        } else {
+          LOG.debug("Following keys will be purged as part of " +
+              "KeyPurgeRequest: {} - {}", purgeKeysRequest,
+              String.join(",", keysToBePurgedList));
+        }
+      }
+      omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
+          keysToBePurgedList);
+    } else {
+      omClientResponse = new OMKeyPurgeResponse(createErrorOMResponse(
+          omResponse, exception));
+    }
+
+    addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+        omDoubleBufferHelper);
     return omClientResponse;
   }
 }

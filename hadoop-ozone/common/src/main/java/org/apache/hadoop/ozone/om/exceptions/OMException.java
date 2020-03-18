@@ -216,7 +216,17 @@ public class OMException extends IOException {
     INVALID_PART, // When part name is not found or not matching with partname 
     // in OM MPU partInfo.
 
-    INVALID_PART_ORDER // When list of parts mentioned to complete MPU are not 
-    // given in ascending order.  
+    INVALID_PART_ORDER, // When list of parts mentioned to complete MPU are not
+    // given in ascending order.
+
+    SCM_GET_PIPELINE_EXCEPTION,
+
+    INVALID_BUCKET_NAME,
+
+    CANNOT_CREATE_DIRECTORY_AT_ROOT,
+
+    DIRECTORY_ALREADY_EXISTS,
+
+    REPLAY // When ratis logs are replayed.
   }
 }

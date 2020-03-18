@@ -48,7 +48,7 @@ public class SimplePipelineProvider implements PipelineProvider {
       String e = String
           .format("Cannot create pipeline of factor %d using %d nodes.",
               factor.getNumber(), dns.size());
-      throw new IOException(e);
+      throw new InsufficientDatanodesException(e);
     }
 
     Collections.shuffle(dns);
@@ -71,6 +71,11 @@ public class SimplePipelineProvider implements PipelineProvider {
         .setFactor(factor)
         .setNodes(nodes)
         .build();
+  }
+
+  @Override
+  public void close(Pipeline pipeline) throws IOException {
+
   }
 
   @Override

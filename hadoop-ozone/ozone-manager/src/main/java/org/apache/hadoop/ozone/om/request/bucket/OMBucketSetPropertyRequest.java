@@ -75,24 +75,19 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
 
-
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
-
     Preconditions.checkNotNull(setBucketPropertyRequest);
 
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketUpdates();
-
-
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     BucketArgs bucketArgs = setBucketPropertyRequest.getBucketArgs();
     OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
 
     String volumeName = bucketArgs.getVolumeName();
     String bucketName = bucketArgs.getBucketName();
-
 
     OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
         OzoneManagerProtocolProtos.Type.CreateBucket).setStatus(
@@ -102,7 +97,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     IOException exception = null;
-    boolean acquiredBucketLock = false;
+    boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
       // check Acl
@@ -117,17 +112,30 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           BUCKET_LOCK, volumeName, bucketName);
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo oldBucketInfo =
+      OmBucketInfo dbBucketInfo =
           omMetadataManager.getBucketTable().get(bucketKey);
       //Check if bucket exist
-      if (oldBucketInfo == null) {
+      if (dbBucketInfo == null) {
         LOG.debug("bucket: {} not found ", bucketName);
         throw new OMException("Bucket doesn't exist",
             OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
+
+      // Check if this transaction is a replay of ratis logs.
+      // If a replay, then the response has already been returned to the
+      // client. So take no further action and return a dummy OMClientResponse.
+      if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}",
+            transactionLogIndex, setBucketPropertyRequest);
+        return new OMBucketSetPropertyResponse(
+            createReplayOMResponse(omResponse));
+      }
+
       OmBucketInfo.Builder bucketInfoBuilder = OmBucketInfo.newBuilder();
-      bucketInfoBuilder.setVolumeName(oldBucketInfo.getVolumeName())
-          .setBucketName(oldBucketInfo.getBucketName());
+      bucketInfoBuilder.setVolumeName(dbBucketInfo.getVolumeName())
+          .setBucketName(dbBucketInfo.getBucketName())
+          .setObjectID(dbBucketInfo.getObjectID())
+          .setUpdateID(transactionLogIndex);
       bucketInfoBuilder.addAllMetadata(KeyValueUtil
           .getFromProtobuf(bucketArgs.getMetadataList()));
 
@@ -138,7 +146,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         LOG.debug("Updating bucket storage type for bucket: {} in volume: {}",
             bucketName, volumeName);
       } else {
-        bucketInfoBuilder.setStorageType(oldBucketInfo.getStorageType());
+        bucketInfoBuilder.setStorageType(dbBucketInfo.getStorageType());
       }
 
       //Check Versioning to update
@@ -149,15 +157,23 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             bucketName, volumeName);
       } else {
         bucketInfoBuilder
-            .setIsVersionEnabled(oldBucketInfo.getIsVersionEnabled());
+            .setIsVersionEnabled(dbBucketInfo.getIsVersionEnabled());
       }
 
-      bucketInfoBuilder.setCreationTime(oldBucketInfo.getCreationTime());
+      bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
 
-      // Set acls from oldBucketInfo if it has any.
-      if (oldBucketInfo.getAcls() != null) {
-        bucketInfoBuilder.setAcls(oldBucketInfo.getAcls());
+      // Set acls from dbBucketInfo if it has any.
+      if (dbBucketInfo.getAcls() != null) {
+        bucketInfoBuilder.setAcls(dbBucketInfo.getAcls());
       }
+
+      // Set the objectID to dbBucketInfo objectID, if present
+      if (dbBucketInfo.getObjectID() != 0) {
+        bucketInfoBuilder.setObjectID(dbBucketInfo.getObjectID());
+      }
+
+      // Set the updateID to current transaction log index
+      bucketInfoBuilder.setUpdateID(transactionLogIndex);
 
       omBucketInfo = bucketInfoBuilder.build();
 
@@ -168,18 +184,16 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
       omResponse.setSetBucketPropertyResponse(
           SetBucketPropertyResponse.newBuilder().build());
-      omClientResponse =
-          new OMBucketSetPropertyResponse(omBucketInfo, omResponse.build());
+      omClientResponse = new OMBucketSetPropertyResponse(
+          omResponse.build(), omBucketInfo);
     } catch (IOException ex) {
+      success = false;
       exception = ex;
-      omClientResponse = new OMBucketSetPropertyResponse(omBucketInfo,
-          createErrorOMResponse(omResponse, exception));
+      omClientResponse = new OMBucketSetPropertyResponse(
+          createErrorOMResponse(omResponse, exception), omBucketInfo);
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
@@ -191,7 +205,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         omBucketArgs.toAuditMap(), exception, userInfo));
 
     // return response.
-    if (exception == null) {
+    if (success) {
       LOG.debug("Setting bucket property for bucket:{} in volume:{}",
           bucketName, volumeName);
       return omClientResponse;

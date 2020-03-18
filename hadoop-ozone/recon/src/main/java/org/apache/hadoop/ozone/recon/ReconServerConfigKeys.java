@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 /**
  * This class contains constants for Recon configuration keys.
@@ -39,7 +39,7 @@ public final class ReconServerConfigKeys {
       "ozone.recon.http-address";
   public static final String OZONE_RECON_HTTPS_ADDRESS_KEY =
       "ozone.recon.https-address";
-  public static final String OZONE_RECON_KEYTAB_FILE =
+  public static final String OZONE_RECON_HTTP_KEYTAB_FILE =
       "ozone.recon.keytab.file";
   public static final String OZONE_RECON_HTTP_BIND_HOST_DEFAULT =
       "0.0.0.0";
@@ -56,6 +56,11 @@ public final class ReconServerConfigKeys {
 
   public static final String OZONE_RECON_OM_SNAPSHOT_DB_DIR =
       "ozone.recon.om.db.dir";
+
+  public static final String OZONE_RECON_SCM_DB_DIR =
+      "ozone.recon.scm.db.dirs";
+
+  public static final String RECON_STORAGE_DIR = "recon";
 
   public static final String RECON_OM_SOCKET_TIMEOUT =
       "recon.om.socket.timeout";

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.common.states.datanode;
 import com.google.common.base.Strings;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine
@@ -42,6 +42,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
 import static org.apache.hadoop.hdds.HddsUtils.getSCMAddresses;
 
 /**
@@ -83,12 +84,12 @@ public class InitDatanodeState implements DatanodeState,
       addresses = getSCMAddresses(conf);
     } catch (IllegalArgumentException e) {
       if(!Strings.isNullOrEmpty(e.getMessage())) {
-        LOG.error("Failed to get SCM addresses: " + e.getMessage());
+        LOG.error("Failed to get SCM addresses: {}", e.getMessage());
       }
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
     }
 
-    if (addresses == null || addresses.isEmpty()) {
+    if (addresses.isEmpty()) {
       LOG.error("Null or empty SCM address list found.");
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
     } else {
@@ -104,6 +105,12 @@ public class InitDatanodeState implements DatanodeState,
       }
       for (InetSocketAddress addr : addresses) {
         connectionManager.addSCMServer(addr);
+        this.context.addEndpoint(addr.toString());
+      }
+      InetSocketAddress reconAddress = getReconAddresses(conf);
+      if (reconAddress != null) {
+        connectionManager.addReconServer(reconAddress);
+        this.context.addEndpoint(reconAddress.toString());
       }
     }
 

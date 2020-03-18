@@ -24,14 +24,14 @@ import java.io.IOException;
 import java.util.Arrays;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3TOKEN;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 /**
  * The token identifier for Ozone Master.
@@ -96,7 +96,7 @@ public class OzoneTokenIdentifier extends
         .setMasterKeyId(getMasterKeyId());
 
     // Set s3 specific fields.
-    if (getTokenType().equals(S3TOKEN)) {
+    if (getTokenType().equals(S3AUTHINFO)) {
       builder.setAccessKeyId(getAwsAccessId())
           .setSignature(getSignature())
           .setStrToSign(getStrToSign());
@@ -128,7 +128,7 @@ public class OzoneTokenIdentifier extends
     setOmCertSerialId(token.getOmCertSerialId());
 
     // Set s3 specific fields.
-    if (getTokenType().equals(S3TOKEN)) {
+    if (getTokenType().equals(S3AUTHINFO)) {
       setAwsAccessId(token.getAccessKeyId());
       setSignature(token.getSignature());
       setStrToSign(token.getStrToSign());
@@ -147,7 +147,7 @@ public class OzoneTokenIdentifier extends
     identifier.setMaxDate(token.getMaxDate());
 
     // Set type specific fields.
-    if (token.getType().equals(S3TOKEN)) {
+    if (token.getType().equals(S3AUTHINFO)) {
       identifier.setSignature(token.getSignature());
       identifier.setStrToSign(token.getStrToSign());
       identifier.setAwsAccessId(token.getAccessKeyId());

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
@@ -48,6 +49,7 @@ public class ConfigFileAppender {
   public ConfigFileAppender() {
     try {
       DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       builder = factory.newDocumentBuilder();
     } catch (Exception ex) {
       throw new ConfigurationException("Can initialize new configuration", ex);
@@ -91,7 +93,7 @@ public class ConfigFileAppender {
 
     addXmlElement(propertyElement, "description", description);
 
-    String tagsAsString = Arrays.stream(tags).map(tag -> tag.name())
+    String tagsAsString = Arrays.stream(tags).map(Enum::name)
         .collect(Collectors.joining(", "));
 
     addXmlElement(propertyElement, "tag", tagsAsString);
@@ -111,15 +113,16 @@ public class ConfigFileAppender {
    */
   public void write(Writer writer) {
     try {
-      TransformerFactory transformerFactory = TransformerFactory.newInstance();
-      Transformer transf = transformerFactory.newTransformer();
+      TransformerFactory factory = TransformerFactory.newInstance();
+      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      Transformer transformer = factory.newTransformer();
 
-      transf.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
-      transf.setOutputProperty(OutputKeys.INDENT, "yes");
-      transf
-          .setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+      transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+      transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+      transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount",
+          "2");
 
-      transf.transform(new DOMSource(document), new StreamResult(writer));
+      transformer.transform(new DOMSource(document), new StreamResult(writer));
     } catch (TransformerException e) {
       throw new ConfigurationException("Can't write the configuration xml", e);
     }

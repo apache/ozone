@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -58,6 +59,15 @@ public class ContainerController {
    */
   public Container getContainer(final long containerId) {
     return containerSet.getContainer(containerId);
+  }
+
+  public String getContainerLocation(final long containerId) {
+    Container cont = containerSet.getContainer(containerId);
+    if (cont != null) {
+      return cont.getContainerData().getContainerPath();
+    } else {
+      return "nonexistent";
+    }
   }
 
   /**
@@ -120,13 +130,13 @@ public class ContainerController {
     getHandler(container).closeContainer(container);
   }
 
-  public Container importContainer(final ContainerType type,
-      final long containerId, final long maxSize, final String originPipelineId,
-      final String originNodeId, final InputStream rawContainerStream,
+  public Container importContainer(
+      final ContainerData containerData,
+      final InputStream rawContainerStream,
       final TarContainerPacker packer)
       throws IOException {
-    return handlers.get(type).importContainer(containerId, maxSize,
-        originPipelineId, originNodeId, rawContainerStream, packer);
+    return handlers.get(containerData.getContainerType())
+        .importContainer(containerData, rawContainerStream, packer);
   }
 
   public void exportContainer(final ContainerType type,

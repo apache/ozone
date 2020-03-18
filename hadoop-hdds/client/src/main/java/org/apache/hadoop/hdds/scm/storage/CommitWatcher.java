@@ -34,9 +34,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.ExecutionException;
@@ -69,17 +71,13 @@ public class CommitWatcher {
 
   private XceiverClientSpi xceiverClient;
 
-  private final long watchTimeout;
-
   // total data which has been successfully flushed and acknowledged
   // by all servers
   private long totalAckDataLength;
 
-  public CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient,
-      long watchTimeout) {
+  public CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
     this.bufferPool = bufferPool;
     this.xceiverClient = xceiverClient;
-    this.watchTimeout = watchTimeout;
     commitIndex2flushedDataMap = new ConcurrentSkipListMap<>();
     totalAckDataLength = 0;
     futureMap = new ConcurrentHashMap<>();
@@ -95,10 +93,7 @@ public class CommitWatcher {
       Preconditions.checkState(commitIndex2flushedDataMap.containsKey(index));
       final List<ChunkBuffer> buffers
           = commitIndex2flushedDataMap.remove(index);
-      long length = buffers.stream().mapToLong(value -> {
-        int pos = value.position();
-        return pos;
-      }).sum();
+      long length = buffers.stream().mapToLong(ChunkBuffer::position).sum();
       totalAckDataLength += length;
       // clear the future object from the future Map
       Preconditions.checkNotNull(futureMap.remove(totalAckDataLength));
@@ -110,7 +105,8 @@ public class CommitWatcher {
   }
 
   public void updateCommitInfoMap(long index, List<ChunkBuffer> buffers) {
-    commitIndex2flushedDataMap.put(index, buffers);
+    commitIndex2flushedDataMap.computeIfAbsent(index, k -> new LinkedList<>())
+      .addAll(buffers);
   }
 
   int getCommitInfoMapSize() {
@@ -132,7 +128,7 @@ public class CommitWatcher {
           commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).min()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for first index " + index + " to catch up");
+        LOG.debug("waiting for first index {} to catch up", index);
       }
       return watchForCommit(index);
     } else {
@@ -156,7 +152,7 @@ public class CommitWatcher {
           commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).max()
               .getAsLong();
       if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for last flush Index " + index + " to catch up");
+        LOG.debug("waiting for last flush Index {} to catch up", index);
       }
       return watchForCommit(index);
     } else {
@@ -164,13 +160,10 @@ public class CommitWatcher {
     }
   }
 
-
   private void adjustBuffers(long commitIndex) {
     List<Long> keyList = commitIndex2flushedDataMap.keySet().stream()
         .filter(p -> p <= commitIndex).collect(Collectors.toList());
-    if (keyList.isEmpty()) {
-      return;
-    } else {
+    if (!keyList.isEmpty()) {
       releaseBuffers(keyList);
     }
   }
@@ -181,7 +174,6 @@ public class CommitWatcher {
   void releaseBuffersOnException() {
     adjustBuffers(xceiverClient.getReplicatedMinCommitIndex());
   }
-
 
   /**
    * calls watchForCommit API of the Ratis Client. For Standalone client,
@@ -195,7 +187,7 @@ public class CommitWatcher {
     long index;
     try {
       XceiverClientReply reply =
-          xceiverClient.watchForCommit(commitIndex, watchTimeout);
+          xceiverClient.watchForCommit(commitIndex);
       if (reply == null) {
         index = 0;
       } else {
@@ -203,13 +195,22 @@ public class CommitWatcher {
       }
       adjustBuffers(index);
       return reply;
-    } catch (TimeoutException | InterruptedException | ExecutionException e) {
-      LOG.warn("watchForCommit failed for index " + commitIndex, e);
-      IOException ioException = new IOException(
-          "Unexpected Storage Container Exception: " + e.toString(), e);
-      releaseBuffersOnException();
-      throw ioException;
+    } catch (InterruptedException e) {
+      // Re-interrupt the thread while catching InterruptedException
+      Thread.currentThread().interrupt();
+      throw getIOExceptionForWatchForCommit(commitIndex, e);
+    } catch (TimeoutException | ExecutionException e) {
+      throw getIOExceptionForWatchForCommit(commitIndex, e);
     }
+  }
+
+  private IOException getIOExceptionForWatchForCommit(long commitIndex,
+                                                       Exception e) {
+    LOG.warn("watchForCommit failed for index {}", commitIndex, e);
+    IOException ioException = new IOException(
+        "Unexpected Storage Container Exception: " + e.toString(), e);
+    releaseBuffersOnException();
+    return ioException;
   }
 
   @VisibleForTesting
@@ -217,9 +218,9 @@ public class CommitWatcher {
     return commitIndex2flushedDataMap;
   }
 
-  public ConcurrentHashMap<Long,
-      CompletableFuture<ContainerProtos.
-          ContainerCommandResponseProto>> getFutureMap() {
+  public ConcurrentMap<Long,
+        CompletableFuture<ContainerProtos.
+            ContainerCommandResponseProto>> getFutureMap() {
     return futureMap;
   }
 

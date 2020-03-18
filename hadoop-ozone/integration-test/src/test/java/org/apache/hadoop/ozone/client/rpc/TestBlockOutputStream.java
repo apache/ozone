@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -75,7 +76,6 @@ public class TestBlockOutputStream {
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
-    conf.set(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, "5000ms");
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.set(OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE, "NONE");
@@ -84,6 +84,7 @@ public class TestBlockOutputStream {
         StorageUnit.MB);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
+        .setTotalPipelineNumLimit(10)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
@@ -92,7 +93,7 @@ public class TestBlockOutputStream {
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "testblockoutputstream";
@@ -199,9 +200,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 1,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 1,
+    Assert.assertEquals(putBlockCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 2,
+    Assert.assertEquals(totalOpCount + 3,
         metrics.getTotalOpCount());
 
     // make sure the bufferPool is empty
@@ -300,9 +301,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 1,
+    Assert.assertEquals(putBlockCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 3,
+    Assert.assertEquals(totalOpCount + 4,
         metrics.getTotalOpCount());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
@@ -395,9 +396,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 1,
+    Assert.assertEquals(putBlockCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 3,
+    Assert.assertEquals(totalOpCount + 4,
         metrics.getTotalOpCount());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
@@ -565,9 +566,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 4,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 2,
+    Assert.assertEquals(putBlockCount + 3,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 6,
+    Assert.assertEquals(totalOpCount + 7,
         metrics.getTotalOpCount());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
@@ -673,9 +674,9 @@ public class TestBlockOutputStream {
         metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 5,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 3,
+    Assert.assertEquals(putBlockCount + 4,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 8,
+    Assert.assertEquals(totalOpCount + 9,
         metrics.getTotalOpCount());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
@@ -685,11 +686,11 @@ public class TestBlockOutputStream {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return ContainerTestHelper
+    return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
   private void validateData(String keyName, byte[] data) throws Exception {
-    ContainerTestHelper
+    TestHelper
         .validateData(keyName, data, objectStore, volumeName, bucketName);
   }
 

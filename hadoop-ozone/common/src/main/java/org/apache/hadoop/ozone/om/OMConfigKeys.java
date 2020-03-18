@@ -39,6 +39,9 @@ public final class OMConfigKeys {
       "ozone.om.handler.count.key";
   public static final int OZONE_OM_HANDLER_COUNT_DEFAULT = 20;
 
+  public static final String OZONE_OM_INTERNAL_SERVICE_ID =
+      "ozone.om.internal.service.id";
+
   public static final String OZONE_OM_SERVICE_IDS_KEY =
       "ozone.om.service.ids";
   public static final String OZONE_OM_NODES_KEY =
@@ -151,22 +154,6 @@ public final class OMConfigKeys {
   public static final TimeDuration OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
       = TimeDuration.valueOf(1, TimeUnit.SECONDS);
 
-  // OM Ratis client configurations
-  public static final String OZONE_OM_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_KEY
-      = "ozone.om.ratis.client.request.timeout.duration";
-  public static final TimeDuration
-      OZONE_OM_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT
-      = TimeDuration.valueOf(3000, TimeUnit.MILLISECONDS);
-  public static final String OZONE_OM_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY
-      = "ozone.om.ratis.client.request.max.retries";
-  public static final int OZONE_OM_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT
-      = 180;
-  public static final String OZONE_OM_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY
-      = "ozone.om.ratis.client.request.retry.interval";
-  public static final TimeDuration
-      OZONE_OM_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT
-      = TimeDuration.valueOf(100, TimeUnit.MILLISECONDS);
-
   // OM Ratis Leader Election configurations
   public static final String
       OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
@@ -241,4 +228,10 @@ public final class OMConfigKeys {
   // hadoop-policy.xml, "*" allows all users/groups to access.
   public static final String OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL =
       "ozone.om.security.client.protocol.acl";
+
+  //Ozone FS Config parameters.
+  public static final String OZONE_FS_CREATE_PREFIX_DIRECTORIES =
+      "ozone.manager.fs.prefix.create";
+  public static final Boolean OZONE_FS_CREATE_PREFIX_DIRECTORIES_DEFAULT =
+      Boolean.TRUE;
 }

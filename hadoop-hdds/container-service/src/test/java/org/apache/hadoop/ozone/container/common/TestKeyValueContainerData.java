@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.Test;
 
@@ -48,6 +49,7 @@ public class TestKeyValueContainerData {
     UUID datanodeId = UUID.randomUUID();
 
     KeyValueContainerData kvData = new KeyValueContainerData(containerId,
+        ChunkLayOutVersion.FILE_PER_CHUNK,
         MAXSIZE, pipelineId.toString(), datanodeId.toString());
 
     assertEquals(containerType, kvData.getContainerType());

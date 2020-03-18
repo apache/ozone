@@ -17,16 +17,36 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.GatheringByteChannel;
+import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /** Buffer for a block chunk. */
 public interface ChunkBuffer {
 
   /** Similar to {@link ByteBuffer#allocate(int)}. */
   static ChunkBuffer allocate(int capacity) {
+    return allocate(capacity, 0);
+  }
+
+  /**
+   * Similar to {@link ByteBuffer#allocate(int)}
+   * except that it can specify the increment.
+   *
+   * @param increment
+   *   the increment size so that this buffer is allocated incrementally.
+   *   When increment <= 0, entire buffer is allocated in the beginning.
+   */
+  static ChunkBuffer allocate(int capacity, int increment) {
+    if (increment > 0 && increment < capacity) {
+      return new IncrementalChunkBuffer(capacity, increment, false);
+    }
     return new ChunkBufferImplWithByteBuffer(ByteBuffer.allocate(capacity));
   }
 
@@ -35,11 +55,22 @@ public interface ChunkBuffer {
     return new ChunkBufferImplWithByteBuffer(buffer);
   }
 
+  /** Wrap the given list of {@link ByteBuffer}s as a {@link ChunkBuffer}. */
+  static ChunkBuffer wrap(List<ByteBuffer> buffers) {
+    return new ChunkBufferImplWithByteBufferList(buffers);
+  }
+
   /** Similar to {@link ByteBuffer#position()}. */
   int position();
 
   /** Similar to {@link ByteBuffer#remaining()}. */
   int remaining();
+
+  /** Similar to {@link ByteBuffer#limit()}. */
+  int limit();
+
+  /** Similar to {@link ByteBuffer#rewind()}. */
+  ChunkBuffer rewind();
 
   /** Similar to {@link ByteBuffer#hasRemaining()}. */
   default boolean hasRemaining() {
@@ -47,23 +78,29 @@ public interface ChunkBuffer {
   }
 
   /** Similar to {@link ByteBuffer#clear()}. */
-  void clear();
+  ChunkBuffer clear();
 
   /** Similar to {@link ByteBuffer#put(ByteBuffer)}. */
-  void put(ByteBuffer b);
+  ChunkBuffer put(ByteBuffer b);
+
+  /** Similar to {@link ByteBuffer#put(byte[])}. */
+  default ChunkBuffer put(byte[] b) {
+    return put(ByteBuffer.wrap(b));
+  }
 
   /** Similar to {@link ByteBuffer#put(byte[], int, int)}. */
-  default void put(byte[] b, int offset, int length) {
-    put(ByteBuffer.wrap(b, offset, length));
+  default ChunkBuffer put(byte[] b, int offset, int length) {
+    return put(ByteBuffer.wrap(b, offset, length));
   }
 
   /** The same as put(b.asReadOnlyByteBuffer()). */
-  default void put(ByteString b) {
-    put(b.asReadOnlyByteBuffer());
+  default ChunkBuffer put(ByteString b) {
+    return put(b.asReadOnlyByteBuffer());
   }
 
   /**
    * Duplicate and then set the position and limit on the duplicated buffer.
+   * The new limit cannot be larger than the limit of this buffer.
    *
    * @see ByteBuffer#duplicate()
    */
@@ -74,14 +111,53 @@ public interface ChunkBuffer {
    *
    * Upon the iteration complete,
    * the buffer's position will be equal to its limit.
+   *
+   * @param bufferSize the size of each buffer in the iteration.
    */
-  Iterable<ByteBuffer> iterate(int bytesPerChecksum);
+  Iterable<ByteBuffer> iterate(int bufferSize);
+
+  List<ByteBuffer> asByteBufferList();
+
+  /**
+   * Write the contents of the buffer from the current position to the limit
+   * to {@code channel}.
+   *
+   * @return The number of bytes written, possibly zero
+   */
+  long writeTo(GatheringByteChannel channel) throws IOException;
 
   /**
    * Convert this buffer to a {@link ByteString}.
-   * The position and limit of this {@link ChunkBuffer} remains unchanged
-   * as long as the given function preserves the position and limit
+   * The position and limit of this {@link ChunkBuffer} remains unchanged.
+   * The given function must preserve the position and limit
    * of the input {@link ByteBuffer}.
    */
-  ByteString toByteString(Function<ByteBuffer, ByteString> function);
+  default ByteString toByteString(Function<ByteBuffer, ByteString> function) {
+    return toByteStringImpl(b -> applyAndAssertFunction(b, function, this));
+  }
+
+  // for testing
+  default ByteString toByteString() {
+    return toByteString(ByteStringConversion::safeWrap);
+  }
+
+  ByteString toByteStringImpl(Function<ByteBuffer, ByteString> function);
+
+  static void assertInt(int expected, int computed, Supplier<String> prefix) {
+    if (expected != computed) {
+      throw new IllegalStateException(prefix.get()
+          + ": expected = " + expected + " but computed = " + computed);
+    }
+  }
+
+  /** Apply the function and assert if it preserves position and limit. */
+  static ByteString applyAndAssertFunction(ByteBuffer buffer,
+      Function<ByteBuffer, ByteString> function, Object name) {
+    final int pos = buffer.position();
+    final int lim = buffer.limit();
+    final ByteString bytes = function.apply(buffer);
+    assertInt(pos, buffer.position(), () -> name + ": Unexpected position");
+    assertInt(lim, buffer.limit(), () -> name + ": Unexpected limit");
+    return bytes;
+  }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,9 +20,8 @@ package org.apache.hadoop.hdds.server.events;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -32,19 +31,19 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 /**
  * Simple EventExecutor to call all the event handler one-by-one.
  *
- * @param <T>
+ * @param <P> the payload type of events
  */
 @Metrics(context = "EventQueue")
-public class SingleThreadExecutor<T> implements EventExecutor<T> {
+public class SingleThreadExecutor<P> implements EventExecutor<P> {
 
-  public static final String THREAD_NAME_PREFIX = "EventQueue";
+  private static final String EVENT_QUEUE = "EventQueue";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SingleThreadExecutor.class);
 
   private final String name;
 
-  private final ThreadPoolExecutor executor;
+  private final ExecutorService executor;
 
   @Metric
   private MutableCounterLong queued;
@@ -63,21 +62,18 @@ public class SingleThreadExecutor<T> implements EventExecutor<T> {
   public SingleThreadExecutor(String name) {
     this.name = name;
     DefaultMetricsSystem.instance()
-        .register("EventQueue" + name, "Event Executor metrics ", this);
+        .register(EVENT_QUEUE + name, "Event Executor metrics ", this);
 
-    LinkedBlockingQueue<Runnable> workQueue = new LinkedBlockingQueue<>();
-    executor =
-        new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, workQueue,
-            runnable -> {
-              Thread thread = new Thread(runnable);
-              thread.setName(THREAD_NAME_PREFIX + "-" + name);
-              return thread;
-            });
-
+    executor = Executors.newSingleThreadExecutor(
+        runnable -> {
+          Thread thread = new Thread(runnable);
+          thread.setName(EVENT_QUEUE + "-" + name);
+          return thread;
+        });
   }
 
   @Override
-  public void onMessage(EventHandler<T> handler, T message, EventPublisher
+  public void onMessage(EventHandler<P> handler, P message, EventPublisher
       publisher) {
     queued.incr();
     executor.execute(() -> {

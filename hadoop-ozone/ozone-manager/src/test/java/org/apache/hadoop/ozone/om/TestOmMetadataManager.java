@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -55,6 +56,87 @@ public class TestOmMetadataManager {
         folder.getRoot().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
   }
+
+  @Test
+  public void testListVolumes() throws Exception {
+    String ownerName = "owner";
+    OmVolumeArgs.Builder argsBuilder = OmVolumeArgs.newBuilder()
+        .setAdminName("admin")
+        .setOwnerName(ownerName);
+
+    String volName;
+    OmVolumeArgs omVolumeArgs;
+    for (int i = 0; i < 50; i++) {
+      volName = "vol" + i;
+      omVolumeArgs = argsBuilder
+          .setVolume(volName)
+          .build();
+
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+
+    // Test list volumes with setting startVolume that
+    // was not part of the result.
+    String prefix = "";
+    int totalVol = omMetadataManager
+        .listVolumes(ownerName, prefix, null, 100)
+        .size();
+    int startOrder = 10;
+    String startVolume = "vol" + startOrder;
+    List<OmVolumeArgs> volumeList = omMetadataManager.listVolumes(ownerName,
+        prefix, startVolume, 100);
+    Assert.assertEquals(volumeList.size(), totalVol - startOrder - 1);
+  }
+
+  @Test
+  public void testListAllVolumes() throws Exception {
+    OmVolumeArgs.Builder argsBuilder =
+        OmVolumeArgs.newBuilder().setAdminName("admin");
+    String volName;
+    String ownerName;
+    for (int i = 0; i < 50; i++) {
+      ownerName = "owner" + i;
+      volName = "vola" + i;
+      OmVolumeArgs omVolumeArgs = argsBuilder.
+          setOwnerName(ownerName).setVolume(volName).build();
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+    for (int i = 0; i < 50; i++) {
+      ownerName = "owner" + i;
+      volName = "volb" + i;
+      OmVolumeArgs omVolumeArgs = argsBuilder.
+          setOwnerName(ownerName).setVolume(volName).build();
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+
+    String prefix = "";
+    String startKey = "";
+
+    // Test list all volumes
+    List<OmVolumeArgs> volListA = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListA.size(), 100);
+
+    // Test list all volumes with prefix
+    prefix = "volb";
+    List<OmVolumeArgs> volListB = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListB.size(), 50);
+
+    // Test list all volumes with setting startVolume
+    // that was not part of result.
+    prefix = "";
+    int totalVol = volListB.size();
+    int startOrder = 0;
+    startKey = "volb" + startOrder;
+    List<OmVolumeArgs> volListC = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListC.size(), totalVol - startOrder - 1);
+  }
+
   @Test
   public void testListBuckets() throws Exception {
 

@@ -56,6 +56,7 @@ function hadoop_usage
   hadoop_add_subcommand "dtutil" client "operations related to delegation tokens"
   hadoop_add_subcommand "upgrade" client "HDFS to Ozone in-place upgrade tool"
   hadoop_add_subcommand "admin" client "Ozone admin tool"
+  hadoop_add_subcommand "ratislogparser" client "ozone debug tool, to convert Ratis log files into readable text"
 
   hadoop_generate_usage "${HADOOP_SHELL_EXECNAME}" false
 }
@@ -210,6 +211,10 @@ function ozonecmd_case
     ;;
     admin)
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
+      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
+    ;;
+    ratislogparser)
+      HADOOP_CLASSNAME=org.apache.hadoop.ozone.segmentparser.RatisLogParser
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     *)

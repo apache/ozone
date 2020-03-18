@@ -24,8 +24,8 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -47,7 +47,7 @@ public class TestSCMContainerPlacementCapacity {
 
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < 7; i++) {
-      datanodes.add(TestUtils.randomDatanodeDetails());
+      datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
 
     NodeManager mockNodeManager = Mockito.mock(NodeManager.class);

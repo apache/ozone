@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import static org.apache.commons.io.FilenameUtils.removeExtension;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_CHECKSUM_ERROR;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
 import java.io.File;
@@ -35,7 +36,6 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -49,7 +49,7 @@ import org.yaml.snakeyaml.Yaml;
 import com.google.common.base.Preconditions;
 
 /**
- * A set of helper functions to create proper responses.
+ * A mix of helper functions for containers.
  */
 public final class ContainerUtils {
 
@@ -58,78 +58,6 @@ public final class ContainerUtils {
 
   private ContainerUtils() {
     //never constructed.
-  }
-
-  /**
-   * Returns a Container Command Response Builder with the specified result
-   * and message.
-   * @param request requestProto message.
-   * @param result result of the command.
-   * @param message response message.
-   * @return ContainerCommand Response Builder.
-   */
-  public static ContainerCommandResponseProto.Builder
-      getContainerCommandResponse(
-          ContainerCommandRequestProto request, Result result, String message) {
-    return ContainerCommandResponseProto.newBuilder()
-        .setCmdType(request.getCmdType())
-        .setTraceID(request.getTraceID())
-        .setResult(result)
-        .setMessage(message);
-  }
-
-  /**
-   * Returns a Container Command Response Builder. This call is used to build
-   * success responses. Calling function can add other fields to the response
-   * as required.
-   * @param request requestProto message.
-   * @return ContainerCommand Response Builder with result as SUCCESS.
-   */
-  public static ContainerCommandResponseProto.Builder getSuccessResponseBuilder(
-      ContainerCommandRequestProto request) {
-    return
-        ContainerCommandResponseProto.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setTraceID(request.getTraceID())
-            .setResult(Result.SUCCESS);
-  }
-
-  /**
-   * Returns a Container Command Response. This call is used for creating null
-   * success responses.
-   * @param request requestProto message.
-   * @return ContainerCommand Response with result as SUCCESS.
-   */
-  public static ContainerCommandResponseProto getSuccessResponse(
-      ContainerCommandRequestProto request) {
-    ContainerCommandResponseProto.Builder builder =
-        getContainerCommandResponse(request, Result.SUCCESS, "");
-    return builder.build();
-  }
-
-  /**
-   * We found a command type but no associated payload for the command. Hence
-   * return malformed Command as response.
-   *
-   * @param request - Protobuf message.
-   * @return ContainerCommandResponseProto - MALFORMED_REQUEST.
-   */
-  public static ContainerCommandResponseProto malformedRequest(
-      ContainerCommandRequestProto request) {
-    return getContainerCommandResponse(request, Result.MALFORMED_REQUEST,
-        "Cmd type does not match the payload.").build();
-  }
-
-  /**
-   * We found a command type that is not supported yet.
-   *
-   * @param request - Protobuf message.
-   * @return ContainerCommandResponseProto - UNSUPPORTED_REQUEST.
-   */
-  public static ContainerCommandResponseProto unsupportedRequest(
-      ContainerCommandRequestProto request) {
-    return getContainerCommandResponse(request, Result.UNSUPPORTED_REQUEST,
-        "Server does not support this command yet.").build();
   }
 
   /**
@@ -143,9 +71,10 @@ public final class ContainerUtils {
   public static ContainerCommandResponseProto logAndReturnError(
       Logger log, StorageContainerException ex,
       ContainerCommandRequestProto request) {
-    log.info("Operation: {} , Trace ID: {} , Message: {} , Result: {}",
-        request.getCmdType().name(), request.getTraceID(),
-        ex.getMessage(), ex.getResult().getValueDescriptor().getName());
+    String logInfo = "Operation: {} , Trace ID: {} , Message: {} , " +
+        "Result: {} , StorageContainerException Occurred.";
+    log.info(logInfo, request.getCmdType().name(), request.getTraceID(),
+        ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
     return getContainerCommandResponse(request, ex.getResult(), ex.getMessage())
         .build();
   }
@@ -264,7 +193,7 @@ public final class ContainerUtils {
   }
 
   /**
-   * Return the SHA-256 chesksum of the containerData.
+   * Return the SHA-256 checksum of the containerData.
    * @param containerDataYamlStr ContainerData as a Yaml String
    * @return Checksum of the container data
    * @throws StorageContainerException

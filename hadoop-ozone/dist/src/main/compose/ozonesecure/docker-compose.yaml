@@ -18,14 +18,12 @@ version: "3"
 services:
   kdc:
     build:
-      context: docker-image/docker-krb5
+      context: ../common/docker-image/docker-krb5
       dockerfile: Dockerfile-krb5
-      args:
-        buildno: 1
+    image: ozone-insecure-krb5
     hostname: kdc
     volumes:
       - ../..:/opt/hadoop
-  
   kms:
       image: apache/hadoop:${HADOOP_VERSION}
       ports:
@@ -43,6 +41,8 @@ services:
     command: ["/opt/hadoop/bin/ozone","datanode"]
     env_file:
       - docker-config
+    environment:
+      KERBEROS_KEYTABS: dn HTTP
   om:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: om
@@ -52,9 +52,11 @@ services:
       - 9874:9874
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+      KERBEROS_KEYTABS: om HTTP
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
+
   s3g:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: s3g
@@ -65,6 +67,8 @@ services:
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","s3g"]
+    environment:
+      KERBEROS_KEYTABS: s3g HTTP testuser
   recon:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: recon
@@ -75,7 +79,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      WAITFOR: om:9874
+      KERBEROS_KEYTABS: recon HTTP
     command: ["/opt/hadoop/bin/ozone","recon"]
   scm:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -87,5 +91,7 @@ services:
     env_file:
       - docker-config
     environment:
+      KERBEROS_KEYTABS: scm HTTP testuser testuser2
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
+      OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
     command: ["/opt/hadoop/bin/ozone","scm"]

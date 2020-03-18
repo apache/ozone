@@ -18,12 +18,11 @@
 
 package org.apache.hadoop.hdds.scm;
 
-
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerCommandResponseProto;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -33,26 +32,19 @@ import java.util.concurrent.CompletableFuture;
 public class XceiverClientReply {
 
   private CompletableFuture<ContainerCommandResponseProto> response;
-  private Long logIndex;
+  private long logIndex;
 
   /**
    * List of datanodes where the command got executed and reply is received.
    * If there is an exception in the reply, these datanodes will inform
    * about the servers where there is a failure.
    */
-  private List<DatanodeDetails> datanodes;
+  private final List<DatanodeDetails> datanodes;
 
   public XceiverClientReply(
       CompletableFuture<ContainerCommandResponseProto> response) {
-    this(response, null);
-  }
-
-  public XceiverClientReply(
-      CompletableFuture<ContainerCommandResponseProto> response,
-      List<DatanodeDetails> datanodes) {
-    this.logIndex = (long) 0;
     this.response = response;
-    this.datanodes = datanodes == null ? new ArrayList<>() : datanodes;
+    this.datanodes = new LinkedList<>();
   }
 
   public CompletableFuture<ContainerCommandResponseProto> getResponse() {
@@ -63,7 +55,7 @@ public class XceiverClientReply {
     return logIndex;
   }
 
-  public void setLogIndex(Long logIndex) {
+  public void setLogIndex(long logIndex) {
     this.logIndex = logIndex;
   }
 

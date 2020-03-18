@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto
@@ -33,7 +34,9 @@ import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server
     .SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
@@ -86,47 +89,6 @@ public final class TestUtils {
   }
 
   /**
-   * Creates DatanodeDetails with random UUID.
-   *
-   * @return DatanodeDetails
-   */
-  public static DatanodeDetails randomDatanodeDetails() {
-    return createDatanodeDetails(UUID.randomUUID());
-  }
-
-  /**
-   * Creates DatanodeDetails with random UUID, specific hostname and network
-   * location.
-   *
-   * @return DatanodeDetails
-   */
-  public static DatanodeDetails createDatanodeDetails(String hostname,
-       String loc) {
-    String ipAddress = random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256);
-    return createDatanodeDetails(UUID.randomUUID().toString(), hostname,
-        ipAddress, loc);
-  }
-
-  /**
-   * Creates DatanodeDetails using the given UUID.
-   *
-   * @param uuid Datanode's UUID
-   *
-   * @return DatanodeDetails
-   */
-  public static DatanodeDetails createDatanodeDetails(UUID uuid) {
-    String ipAddress = random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256)
-        + "." + random.nextInt(256);
-    return createDatanodeDetails(uuid.toString(), "localhost" + "-" + ipAddress,
-        ipAddress, null);
-  }
-
-  /**
    * Generates DatanodeDetails from RegisteredCommand.
    *
    * @param registeredCommand registration response from SCM
@@ -135,39 +97,11 @@ public final class TestUtils {
    */
   public static DatanodeDetails getDatanodeDetails(
       RegisteredCommand registeredCommand) {
-    return createDatanodeDetails(
+    return MockDatanodeDetails.createDatanodeDetails(
         registeredCommand.getDatanode().getUuidString(),
         registeredCommand.getDatanode().getHostName(),
         registeredCommand.getDatanode().getIpAddress(),
         null);
-  }
-
-  /**
-   * Creates DatanodeDetails with the given information.
-   *
-   * @param uuid      Datanode's UUID
-   * @param hostname  hostname of Datanode
-   * @param ipAddress ip address of Datanode
-   *
-   * @return DatanodeDetails
-   */
-  public static DatanodeDetails createDatanodeDetails(String uuid,
-      String hostname, String ipAddress, String networkLocation) {
-    DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.STANDALONE, 0);
-    DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.RATIS, 0);
-    DatanodeDetails.Port restPort = DatanodeDetails.newPort(
-        DatanodeDetails.Port.Name.REST, 0);
-    DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(uuid)
-        .setHostName(hostname)
-        .setIpAddress(ipAddress)
-        .addPort(containerPort)
-        .addPort(ratisPort)
-        .addPort(restPort)
-        .setNetworkLocation(networkLocation);
-    return builder.build();
   }
 
   /**
@@ -181,7 +115,7 @@ public final class TestUtils {
   public static DatanodeDetails createRandomDatanodeAndRegister(
       SCMNodeManager nodeManager) {
     return getDatanodeDetails(
-        nodeManager.register(randomDatanodeDetails(), null,
+        nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null,
                 getRandomPipelineReports()));
   }
 
@@ -369,6 +303,16 @@ public final class TestUtils {
     return new PipelineReportFromDatanode(dn, reportBuilder.build());
   }
 
+  public static void openAllRatisPipelines(PipelineManager pipelineManager)
+      throws IOException {
+    // Pipeline is created by background thread
+    List<Pipeline> pipelines =
+        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS);
+    // Trigger the processed pipeline report event
+    for (Pipeline pipeline : pipelines) {
+      pipelineManager.openPipeline(pipeline.getId());
+    }
+  }
 
   public static PipelineActionsFromDatanode getPipelineActionFromDatanode(
       DatanodeDetails dn, PipelineID... pipelineIDs) {

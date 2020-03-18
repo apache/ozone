@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
@@ -243,7 +242,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     // We need to create the DB here, as when during restart, stop closes the
     // db, so we need to create the store object and initialize DB.
     if (store == null) {
-      File metaDir = OmUtils.getOmDbDir(configuration);
+      File metaDir = OMStorage.getOmDbDir(configuration);
 
       RocksDBConfiguration rocksDBConfiguration =
           configuration.getObject(RocksDBConfiguration.class);
@@ -805,36 +804,39 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return deletedKeys;
   }
 
+  /**
+   * @param userName volume owner, null for listing all volumes.
+   */
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
-    List<OmVolumeArgs> result = Lists.newArrayList();
-    UserVolumeInfo volumes;
+
     if (StringUtil.isBlank(userName)) {
-      throw new OMException("User name is required to list Volumes.",
-          ResultCodes.USER_NOT_FOUND);
-    }
-    volumes = getVolumesByUser(userName);
-
-    if (volumes == null || volumes.getVolumeNamesCount() == 0) {
-      return result;
+      // null userName represents listing all volumes in cluster.
+      return listAllVolumes(prefix, startKey, maxKeys);
     }
 
-    boolean startKeyFound = Strings.isNullOrEmpty(startKey);
-    for (String volumeName : volumes.getVolumeNamesList()) {
-      if (!Strings.isNullOrEmpty(prefix)) {
-        if (!volumeName.startsWith(prefix)) {
-          continue;
-        }
-      }
+    final List<OmVolumeArgs> result = Lists.newArrayList();
+    final List<String> volumes = getVolumesByUser(userName)
+        .getVolumeNamesList();
 
-      if (!startKeyFound && volumeName.equals(startKey)) {
-        startKeyFound = true;
-        continue;
-      }
-      if (startKeyFound && result.size() < maxKeys) {
-        OmVolumeArgs volumeArgs =
-            getVolumeTable().get(this.getVolumeKey(volumeName));
+    int index = 0;
+    if (!Strings.isNullOrEmpty(startKey)) {
+      index = volumes.indexOf(
+          startKey.startsWith(OzoneConsts.OM_KEY_PREFIX) ?
+          startKey.substring(1) :
+          startKey);
+
+      // Exclude the startVolume as part of the result.
+      index = index != -1 ? index + 1 : index;
+    }
+    final String startChar = prefix == null ? "" : prefix;
+
+    while (index != -1 && index < volumes.size() && result.size() < maxKeys) {
+      final String volumeName = volumes.get(index);
+      if (volumeName.startsWith(startChar)) {
+        final OmVolumeArgs volumeArgs = getVolumeTable()
+            .get(getVolumeKey(volumeName));
         if (volumeArgs == null) {
           // Could not get volume info by given volume name,
           // since the volume name is loaded from db,
@@ -845,6 +847,45 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         }
         result.add(volumeArgs);
       }
+      index++;
+    }
+
+    return result;
+  }
+
+    /**
+     * @return list of all volumes.
+     */
+  private List<OmVolumeArgs> listAllVolumes(String prefix, String startKey,
+      int maxKeys) {
+    List<OmVolumeArgs> result = Lists.newArrayList();
+
+    /* volumeTable is full-cache, so we use cacheIterator. */
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+        cacheIterator = getVolumeTable().cacheIterator();
+
+    String volumeName;
+    OmVolumeArgs omVolumeArgs;
+    boolean prefixIsEmpty = Strings.isNullOrEmpty(prefix);
+    boolean startKeyIsEmpty = Strings.isNullOrEmpty(startKey);
+    while (cacheIterator.hasNext() && result.size() < maxKeys) {
+      Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry =
+          cacheIterator.next();
+      omVolumeArgs = entry.getValue().getCacheValue();
+      volumeName = omVolumeArgs.getVolume();
+
+      if (!prefixIsEmpty && !volumeName.startsWith(prefix)) {
+        continue;
+      }
+
+      if (!startKeyIsEmpty) {
+        if (volumeName.equals(startKey)) {
+          startKeyIsEmpty = true;
+        }
+        continue;
+      }
+
+      result.add(omVolumeArgs);
     }
 
     return result;
@@ -931,21 +972,43 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<String> getMultipartUploadKeys(
+  public Set<String> getMultipartUploadKeys(
       String volumeName, String bucketName, String prefix) throws IOException {
-    List<String> response = new ArrayList<>();
 
-    TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
-        iterator = getMultipartInfoTable().iterator();
+    Set<String> response = new TreeSet<>();
+    Set<String> aborted = new TreeSet<>();
+
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>>>
+        cacheIterator = getMultipartInfoTable().cacheIterator();
 
     String prefixKey =
         OmMultipartUpload.getDbKey(volumeName, bucketName, prefix);
+
+    // First iterate all the entries in cache.
+    while (cacheIterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmMultipartKeyInfo>> cacheEntry =
+          cacheIterator.next();
+      if (cacheEntry.getKey().getCacheKey().startsWith(prefixKey)) {
+        // Check if it is marked for delete, due to abort mpu
+        if (cacheEntry.getValue().getCacheValue() != null) {
+          response.add(cacheEntry.getKey().getCacheKey());
+        } else {
+          aborted.add(cacheEntry.getKey().getCacheKey());
+        }
+      }
+    }
+
+    TableIterator<String, ? extends KeyValue<String, OmMultipartKeyInfo>>
+        iterator = getMultipartInfoTable().iterator();
     iterator.seek(prefixKey);
 
     while (iterator.hasNext()) {
       KeyValue<String, OmMultipartKeyInfo> entry = iterator.next();
       if (entry.getKey().startsWith(prefixKey)) {
-        response.add(entry.getKey());
+        // If it is marked for abort, skip it.
+        if (!aborted.contains(entry.getKey())) {
+          response.add(entry.getKey());
+        }
       } else {
         break;
       }

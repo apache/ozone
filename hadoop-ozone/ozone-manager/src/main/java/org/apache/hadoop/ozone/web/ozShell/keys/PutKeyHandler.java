@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.web.ozShell.keys;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,7 +35,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
 import org.apache.hadoop.ozone.web.ozShell.Shell;
@@ -72,9 +73,9 @@ public class PutKeyHandler extends Handler {
    */
   @Override
   public Void call() throws Exception {
-
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureKeyAddress();
+
     try (OzoneClient client =
              address.createClient(createOzoneConfiguration())) {
 
@@ -91,10 +92,10 @@ public class PutKeyHandler extends Handler {
       File dataFile = new File(fileName);
 
       if (isVerbose()) {
-        FileInputStream stream = new FileInputStream(dataFile);
-        String hash = DigestUtils.md5Hex(stream);
-        System.out.printf("File Hash : %s%n", hash);
-        stream.close();
+        try (InputStream stream = new FileInputStream(dataFile)) {
+          String hash = DigestUtils.md5Hex(stream);
+          System.out.printf("File Hash : %s%n", hash);
+        }
       }
 
       Configuration conf = new OzoneConfiguration();
@@ -107,20 +108,20 @@ public class PutKeyHandler extends Handler {
           conf.get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
       OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
       OzoneBucket bucket = vol.getBucket(bucketName);
+
       Map<String, String> keyMetadata = new HashMap<>();
-      if (Boolean.valueOf(bucket.getMetadata().get(OzoneConsts.GDPR_FLAG))) {
+      String gdprEnabled = bucket.getMetadata().get(OzoneConsts.GDPR_FLAG);
+      if (Boolean.parseBoolean(gdprEnabled)) {
         keyMetadata.put(OzoneConsts.GDPR_FLAG, Boolean.TRUE.toString());
       }
-      OzoneOutputStream outputStream = bucket
-          .createKey(keyName, dataFile.length(), replicationType,
-              replicationFactor, keyMetadata);
-      FileInputStream fileInputStream = new FileInputStream(dataFile);
-      IOUtils.copyBytes(fileInputStream, outputStream, (int) conf
-          .getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
-              OZONE_SCM_CHUNK_SIZE_DEFAULT,
-              StorageUnit.BYTES));
-      outputStream.close();
-      fileInputStream.close();
+
+      int chunkSize = (int) conf.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
+          OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
+      try (InputStream input = new FileInputStream(dataFile);
+           OutputStream output = bucket.createKey(keyName, dataFile.length(),
+               replicationType, replicationFactor, keyMetadata)) {
+        IOUtils.copyBytes(input, output, chunkSize);
+      }
     }
     return null;
   }

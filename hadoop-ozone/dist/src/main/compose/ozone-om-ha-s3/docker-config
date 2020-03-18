@@ -22,6 +22,8 @@ OZONE-SITE.XML_ozone.om.address.id1.om1=om1
 OZONE-SITE.XML_ozone.om.address.id1.om2=om2
 OZONE-SITE.XML_ozone.om.address.id1.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
+OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
@@ -31,3 +33,5 @@ OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
+
+no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1

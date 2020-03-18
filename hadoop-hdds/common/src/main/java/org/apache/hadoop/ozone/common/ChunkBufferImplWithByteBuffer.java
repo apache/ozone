@@ -19,13 +19,18 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.GatheringByteChannel;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Function;
 
 /** {@link ChunkBuffer} implementation using a single {@link ByteBuffer}. */
-public final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
+final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   private final ByteBuffer buffer;
 
   ChunkBufferImplWithByteBuffer(ByteBuffer buffer) {
@@ -43,7 +48,18 @@ public final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
-  public Iterable<ByteBuffer> iterate(int bytesPerChecksum) {
+  public int limit() {
+    return buffer.limit();
+  }
+
+  @Override
+  public ChunkBuffer rewind() {
+    buffer.rewind();
+    return this;
+  }
+
+  @Override
+  public Iterable<ByteBuffer> iterate(int bufferSize) {
     return () -> new Iterator<ByteBuffer>() {
       @Override
       public boolean hasNext() {
@@ -52,14 +68,27 @@ public final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
 
       @Override
       public ByteBuffer next() {
+        if (!buffer.hasRemaining()) {
+          throw new NoSuchElementException();
+        }
         final ByteBuffer duplicated = buffer.duplicate();
         final int min = Math.min(
-            buffer.position() + bytesPerChecksum, buffer.limit());
+            buffer.position() + bufferSize, buffer.limit());
         duplicated.limit(min);
         buffer.position(min);
         return duplicated;
       }
     };
+  }
+
+  @Override
+  public List<ByteBuffer> asByteBufferList() {
+    return Collections.singletonList(buffer);
+  }
+
+  @Override
+  public long writeTo(GatheringByteChannel channel) throws IOException {
+    return channel.write(buffer);
   }
 
   @Override
@@ -70,18 +99,20 @@ public final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
-  public void put(ByteBuffer b) {
+  public ChunkBuffer put(ByteBuffer b) {
     buffer.put(b);
+    return this;
   }
 
   @Override
-  public void clear() {
+  public ChunkBuffer clear() {
     buffer.clear();
+    return this;
   }
 
   @Override
-  public ByteString toByteString(Function<ByteBuffer, ByteString> function) {
-    return function.apply(buffer);
+  public ByteString toByteStringImpl(Function<ByteBuffer, ByteString> f) {
+    return f.apply(buffer);
   }
 
   @Override
