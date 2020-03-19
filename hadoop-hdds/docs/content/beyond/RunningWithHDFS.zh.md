@@ -21,11 +21,11 @@ summary: Ozone 能够与 HDFS 并存运行，本页介绍如何将 Ozone 部署�
   limitations under the License.
 -->
 
-Ozone 支持与 HDFS 并存工作，所以在用户可以轻易的在已有的 HDFS 集群上部署 Ozone。
+Ozone 支持与 HDFS 并存工作，所以用户可以轻易的在已有的 HDFS 集群上部署 Ozone。
 
-Ozone 的容器管理组件可以在 HDFS 数据节点上运行，以插件的形式或是独立运行，下文介绍插件运行的方法。
+Ozone 的容器管理组件可以在 HDFS 数据节点上以插件的形式或是独立运行，下文介绍插件运行的方法。
 
-为了启用 Ozone，你需要定义服务插件实现类。
+为了在 HDFS 数据节点上启用 Ozone 插件，你需要定义服务插件实现类。
 
 <div class="alert alert-warning" role="alert">
 <b>重要</b>：因为插件在 HDFS 数据节点启动过程中被激活，服务插件实现类的定义需要添加到 <b>hdfs-site.xml</b> 中。
@@ -38,7 +38,7 @@ Ozone 的容器管理组件可以在 HDFS 数据节点上运行，以插件的�
 </property>
 {{< /highlight >}}
 
-此外还需要将 /opt/ozone/share/ozone/lib/ 路径下的 jar 包添加到 classpath 下： 
+此外还需要将 /opt/ozone/share/ozone/lib/ 路径下的 jar 包添加到 Hadoop classpath 下： 
 
 {{< highlight bash >}}
 export HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/*.jar
@@ -56,9 +56,9 @@ export HADOOP_CLASSPATH=/opt/ozone/share/ozone/lib/*.jar
 检查数据节点的日志以确认 HDDS/Ozone 插件是否启动，日志中应当包含以下内容：
 
 ```
-2018-09-17 16:19:24 INFO  HddsDatanodeService:158 - Started plug-in org.apache.hadoop.ozone.web.OzoneHddsDatanodeService@6f94fb9d
+2018-09-17 16:19:24 INFO  HddsDatanodeService:158 - Started plug-in org.apache.hadoop.ozone.HddsDatanodeService@6f94fb9d
 ```
 
 <div class="alert alert-warning" role="alert">
-<b>注意：</b> 当前版本的 Ozone 使用 Hadoop 3.1 测试。
+<b>注意：</b> 上面的测试是基于 Hadoop 3.1 进行的。
 </div>
