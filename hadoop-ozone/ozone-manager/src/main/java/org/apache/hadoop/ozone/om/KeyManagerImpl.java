@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -698,13 +699,10 @@ public class KeyManagerImpl implements KeyManager {
       return;
     }
 
-    List<Long> containerIDs = new ArrayList<>();
+    Set<Long> containerIDs = new HashSet<>();
     for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
       for (OmKeyLocationInfo k : key.getLocationList()) {
-        Long containerID = k.getContainerID();
-        if (!containerIDs.contains(containerID)) {
-          containerIDs.add(containerID);
-        }
+        containerIDs.add(k.getContainerID());
       }
     }
 
@@ -712,7 +710,7 @@ public class KeyManagerImpl implements KeyManager {
 
     try {
       List<ContainerWithPipeline> cpList = scmClient.getContainerClient().
-              getContainerWithPipelineBatch(containerIDs);
+              getContainerWithPipelineBatch(new ArrayList<>(containerIDs));
       for (ContainerWithPipeline cp : cpList) {
         containerWithPipelineMap.put(
                 cp.getContainerInfo().getContainerID(), cp);
