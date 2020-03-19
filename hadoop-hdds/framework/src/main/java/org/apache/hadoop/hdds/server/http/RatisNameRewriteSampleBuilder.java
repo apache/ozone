@@ -63,8 +63,8 @@ public class RatisNameRewriteSampleBuilder extends DefaultSampleBuilder {
 
       if (LOG.isTraceEnabled()) {
         LOG.trace(
-          "Ratis dropwizard {} metrics are converted to {} with tag "
-              + "keys/values {},{}", dropwizardName, name, names, values);
+            "Ratis dropwizard {} metrics are converted to {} with tag "
+                + "keys/values {},{}", dropwizardName, name, names, values);
       }
       return super
           .createSample(name, nameSuffix,
