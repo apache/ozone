@@ -244,7 +244,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
-          omKeyInfo, clientID);
+          omKeyInfo, null, clientID);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
