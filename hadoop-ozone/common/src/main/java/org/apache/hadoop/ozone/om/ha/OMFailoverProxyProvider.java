@@ -200,7 +200,7 @@ public class OMFailoverProxyProvider implements
       // dtService can be null when during client object creation when one of
       // the OM configured address in unreachable.
       if (dtService != null) {
-        rpcAddress.append(",").append(rpcAddress);
+        rpcAddress.append(",").append(dtService);
       }
     }
 

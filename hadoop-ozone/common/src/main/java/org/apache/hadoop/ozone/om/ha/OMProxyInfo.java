@@ -46,22 +46,17 @@ public class OMProxyInfo {
     this.rpcAddr = NetUtils.createSocketAddr(rpcAddrStr);
     if (rpcAddr.isUnresolved()) {
       LOG.warn("OzoneManager address {} for serviceID {} remains unresolved " +
-          "for node ID {} Check your ozone-site.xml file to ensure ozone " +
-          "manager addresses are configured properly.",
+              "for node ID {} Check your ozone-site.xml file to ensure ozone " +
+              "manager addresses are configured properly.",
           rpcAddress, serviceId, nodeId);
+      this.dtService = null;
     } else {
 
       // This issue will be a problem with docker/kubernetes world where one of
       // the container is killed, and that OM address will be unresolved. For now
       // skip the unresolved OM address setting it to the token service field.
 
-
-      try {
-        this.dtService = SecurityUtil.buildTokenService(rpcAddr);
-      } catch (Throwable t) {
-        // As anyway, we have logged above for unresolved address skipping here.
-        this.dtService = null;
-      }
+      this.dtService = SecurityUtil.buildTokenService(rpcAddr);
     }
   }
 
