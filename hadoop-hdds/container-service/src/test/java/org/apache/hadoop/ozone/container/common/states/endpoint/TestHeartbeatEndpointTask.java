@@ -48,6 +48,7 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+import java.net.InetSocketAddress;
 import java.util.UUID;
 
 /**
@@ -55,7 +56,8 @@ import java.util.UUID;
  */
 public class TestHeartbeatEndpointTask {
 
-  private static final String TEST_SCM_ENDPOINT = "test-scm-1:9861";
+  private static final InetSocketAddress TEST_SCM_ENDPOINT =
+      new InetSocketAddress("test-scm-1", 9861);
 
   @Test
   public void testheartbeatWithoutReports() throws Exception {
@@ -283,7 +285,7 @@ public class TestHeartbeatEndpointTask {
     EndpointStateMachine endpointStateMachine = Mockito
         .mock(EndpointStateMachine.class);
     Mockito.when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
-    Mockito.when(endpointStateMachine.getAddressString())
+    Mockito.when(endpointStateMachine.getAddress())
         .thenReturn(TEST_SCM_ENDPOINT);
     return HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
