@@ -339,6 +339,24 @@ public class TestTypedRDBTableStore {
   }
 
   @Test
+  public void testGetIfExist() throws Exception {
+    try (Table<String, String> testTable = createTypedTable(
+        "Eighth")) {
+      String key =
+          RandomStringUtils.random(10);
+      String value = RandomStringUtils.random(10);
+      testTable.put(key, value);
+      Assert.assertNotNull(testTable.getIfExist(key));
+
+      String invalidKey = key + RandomStringUtils.random(1);
+      Assert.assertNull(testTable.getIfExist(invalidKey));
+
+      testTable.delete(key);
+      Assert.assertNull(testTable.getIfExist(key));
+    }
+  }
+
+  @Test
   public void testIsExistCache() throws Exception {
     try (Table<String, String> testTable = createTypedTable(
         "Eighth")) {

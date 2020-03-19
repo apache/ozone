@@ -156,6 +156,32 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
+  public byte[] getIfExist(byte[] key) throws IOException {
+    try {
+      // RocksDB#keyMayExist
+      // If the key definitely does not exist in the database, then this
+      // method returns false, else true.
+      rdbMetrics.incNumDBKeyGetIfExistChecks();
+      StringBuilder outValue = new StringBuilder();
+      boolean keyMayExist = db.keyMayExist(handle, key, outValue);
+      if (keyMayExist) {
+        // Not using out value from string builder, as that is causing
+        // IllegalArgumentException during protobuf parsing.
+        rdbMetrics.incNumDBKeyGetIfExistGets();
+        byte[] val;
+        val = db.get(handle, key);
+        if (val == null) {
+          rdbMetrics.incNumDBKeyGetIfExistMisses();
+        }
+        return val;
+      }
+      return null;
+    } catch (RocksDBException e) {
+      throw toIOException("Error in accessing DB. ", e);
+    }
+  }
+
+  @Override
   public void delete(byte[] key) throws IOException {
     try {
       db.delete(handle, key);

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.segmentparser;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.tools.ParseRatisLog;
 import picocli.CommandLine;
@@ -45,5 +46,10 @@ public abstract class BaseLogParser {
       System.out.println(DatanodeRatisLogParser.class.getSimpleName()
           + "failed with exception  " + e.toString());
     }
+  }
+
+  @VisibleForTesting
+  public void setSegmentFile(File segmentFile) {
+    this.segmentFile = segmentFile;
   }
 }

@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Test Read Write with Mini Ozone Chaos Cluster.
  */
+@Ignore
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
 public class TestMiniChaosOzoneCluster implements Runnable {
@@ -136,7 +137,6 @@ public class TestMiniChaosOzoneCluster implements Runnable {
     CommandLine.run(new TestMiniChaosOzoneCluster(), System.err, args);
   }
 
-  @Ignore
   @Test
   public void testReadWriteWithChaosCluster() {
     cluster.startChaos(5, 10, TimeUnit.SECONDS);
