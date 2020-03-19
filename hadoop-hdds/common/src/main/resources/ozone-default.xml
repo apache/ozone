@@ -412,7 +412,7 @@
   </property>
   <property>
     <name>ozone.client.max.retries</name>
-    <value>100</value>
+    <value>5</value>
     <tag>OZONE, CLIENT</tag>
     <description>Maximum number of retries by Ozone Client on encountering
       exception while writing a key.
