@@ -170,9 +170,29 @@ public class TestOzoneFileInterfaces {
   public void testOzFsReadWrite() throws IOException {
     long currentTime = Time.now();
     int stringLen = 20;
+    OMMetadataManager metadataManager = cluster.getOzoneManager()
+        .getMetadataManager();
+    String lev1dir = "l1dir";
+    Path lev1path = createPath("/" + lev1dir);
+    String lev1key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev1path));
+    String lev2dir = "l2dir";
+    Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
+    String lev2key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev2path));
+
     String data = RandomStringUtils.randomAlphanumeric(stringLen);
     String filePath = RandomStringUtils.randomAlphanumeric(5);
-    Path path = createPath("/" + filePath);
+
+    Path path = createPath("/" + lev1dir + "/" + lev2dir + "/" + filePath);
+    String fileKey = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(path));
+
+    // verify prefix directories and the file, do not already exist
+    assertTrue(metadataManager.getKeyTable().get(lev1key) == null);
+    assertTrue(metadataManager.getKeyTable().get(lev2key) == null);
+    assertTrue(metadataManager.getKeyTable().get(fileKey) == null);
+
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.writeBytes(data);
     }
@@ -194,6 +214,18 @@ public class TestOzoneFileInterfaces {
     assertFalse(status.isDirectory());
     assertEquals(FsPermission.getFileDefault(), status.getPermission());
     verifyOwnerGroup(status);
+
+    FileStatus lev1status;
+    FileStatus lev2status;
+
+    // verify prefix directories got created when creating the file.
+    assertTrue(metadataManager.getKeyTable().get(lev1key).getKeyName()
+        .equals("l1dir/"));
+    assertTrue(metadataManager.getKeyTable().get(lev2key).getKeyName()
+        .equals("l1dir/l2dir/"));
+    lev1status = getDirectoryStat(lev1path);
+    lev2status = getDirectoryStat(lev2path);
+    assertTrue((lev1status != null) && (lev2status != null));
 
     try (FSDataInputStream inputStream = fs.open(path)) {
       byte[] buffer = new byte[stringLen];
@@ -276,26 +308,22 @@ public class TestOzoneFileInterfaces {
     leafstatus = getDirectoryStat(leaf);
     assertTrue(leafstatus != null);
 
-    if (cluster.getOzoneManager().createPrefixEntries()) {
-      FileStatus lev1status;
-      FileStatus lev2status;
+    FileStatus lev1status;
+    FileStatus lev2status;
 
-      // verify prefix directories got created when creating the leaf directory.
-      assertTrue(metadataManager
-          .getKeyTable()
-          .get(lev1key)
-          .getKeyName().equals("abc/"));
-      assertTrue(metadataManager
-          .getKeyTable()
-          .get(lev2key)
-          .getKeyName().equals("abc/def/"));
-      lev1status = getDirectoryStat(lev1path);
-      lev2status = getDirectoryStat(lev2path);
-      assertTrue((lev1status != null) && (lev2status != null));
-      rootChild = lev1status;
-    } else {
-      rootChild = leafstatus;
-    }
+    // verify prefix directories got created when creating the leaf directory.
+    assertTrue(metadataManager
+        .getKeyTable()
+        .get(lev1key)
+        .getKeyName().equals("abc/"));
+    assertTrue(metadataManager
+        .getKeyTable()
+        .get(lev2key)
+        .getKeyName().equals("abc/def/"));
+    lev1status = getDirectoryStat(lev1path);
+    lev2status = getDirectoryStat(lev2path);
+    assertTrue((lev1status != null) && (lev2status != null));
+    rootChild = lev1status;
 
     // check the root directory
     rootstatus = getDirectoryStat(createPath("/"));
