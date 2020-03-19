@@ -64,7 +64,8 @@ public class TracingFilter implements ContainerRequestFilter,
     closeActiveScope();
 
     Scope scope = GlobalTracer.get().buildSpan(
-            resourceInfo.getResourceClass().getSimpleName() + "." + resourceInfo
+            resourceInfo.getResourceClass().getSimpleName()
+                    + "." + resourceInfo
                     .getResourceMethod().getName()).startActive(true);
     requestContext.setProperty(TRACING_SCOPE, scope);
   }
