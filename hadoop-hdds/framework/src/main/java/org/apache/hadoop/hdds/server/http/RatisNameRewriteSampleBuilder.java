@@ -61,11 +61,11 @@ public class RatisNameRewriteSampleBuilder extends DefaultSampleBuilder {
       List<String> values = new ArrayList<>(additionalLabelValues);
       String name = normalizeRatisMetric(dropwizardName, names, values);
 
-      //      if (LOG.isTraceEnabled()) {
-      LOG.info(
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(
           "Ratis dropwizard {} metrics are converted to {} with tag "
               + "keys/values {},{}", dropwizardName, name, names, values);
-      //      }
+      }
       return super
           .createSample(name, nameSuffix,
               names,
