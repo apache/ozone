@@ -16,39 +16,10 @@
  * limitations under the License.
  */
 
-@progress-gray: #d0d0d0;
-@progress-blue: #1890ff;
-@progress-green: #52c41a;
-
 .datanodes-container {
   .content-div {
     .pipeline-container {
       margin-bottom: 5px;
     }
-    .storage-cell-container {
-      position: relative;
-      .capacity-bar {
-        .ant-progress-text {
-          font-size: 0.8em;
-        }
-        .ant-progress-inner {
-          background-color: @progress-gray;
-        }
-        position: absolute;
-        bottom: -12px;
-      }
-    }
   }
-}
-
-.ozone-used-bg {
-  color: @progress-green;
-}
-
-.non-ozone-used-bg {
-  color: @progress-blue;
-}
-
-.remaining-bg {
-  color: @progress-gray;
 }

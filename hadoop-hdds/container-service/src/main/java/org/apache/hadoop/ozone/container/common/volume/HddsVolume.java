@@ -237,6 +237,9 @@ public class HddsVolume
     }
     if (!hddsRootDir.isDirectory()) {
       // Volume Root exists but is not a directory.
+      LOG.warn("Volume {} exists but is not a directory,"
+          + " current volume state: {}.",
+          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     File[] files = hddsRootDir.listFiles();
@@ -246,6 +249,9 @@ public class HddsVolume
     }
     if (!getVersionFile().exists()) {
       // Volume Root is non empty but VERSION file does not exist.
+      LOG.warn("VERSION file does not exist in volume {},"
+          + " current volume state: {}.",
+          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     // Volume Root and VERSION file exist.

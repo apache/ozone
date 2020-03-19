@@ -18,23 +18,13 @@
 
 import React from 'react';
 import axios from 'axios';
-import {Table, Icon, Progress} from 'antd';
-import filesize from 'filesize';
-import './Datanodes.less';
+import {Table, Icon} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
-import {getCapacityPercent} from 'utils/common';
-import Tooltip from 'antd/lib/tooltip';
-import {FilledIcon, ReplicationIcon} from 'utils/themeIcons';
-
-export type DatanodeStatus = "HEALTHY" | "STALE" | "DEAD" | "DECOMMISSIONING" | "DECOMMISSIONED";
-const size = filesize.partial({standard: 'iec', round: 1});
-
-interface StorageReport {
-  capacity: number;
-  used: number;
-  remaining: number;
-}
+import {ReplicationIcon} from 'utils/themeIcons';
+import StorageBar from "components/StorageBar/StorageBar";
+import {DatanodeStatus, StorageReport} from "types/datanode.types";
+import './Datanodes.less';
 
 interface DatanodeResponse {
   hostname: string;
@@ -105,24 +95,9 @@ const COLUMNS = [
     dataIndex: 'storageUsed',
     key: 'storageUsed',
     sorter: (a: Datanode, b: Datanode) => a.storageRemaining - b.storageRemaining,
-    render: (text: string, record: Datanode) => {
-      const nonOzoneUsed = record.storageTotal - record.storageRemaining - record.storageUsed;
-      const totalUsed = record.storageTotal - record.storageRemaining;
-      const tooltip = <div>
-        <div><Icon component={FilledIcon} className="ozone-used-bg"/> Ozone Used ({size(record.storageUsed)})</div>
-        <div><Icon component={FilledIcon} className="non-ozone-used-bg"/> Non Ozone Used ({size(nonOzoneUsed)})</div>
-        <div><Icon component={FilledIcon} className="remaining-bg"/> Remaining ({size(record.storageRemaining)})</div>
-      </div>;
-      return <div className="storage-cell-container">
-        <Tooltip title={tooltip} placement="bottomLeft">
-          <div>{size(record.storageUsed)} + {size(nonOzoneUsed)} / {size(record.storageTotal)}</div>
-          <Progress strokeLinecap="square"
-                    percent={getCapacityPercent(totalUsed, record.storageTotal)}
-                    successPercent={getCapacityPercent(record.storageUsed, record.storageTotal)}
-                    className="capacity-bar" strokeWidth={3}/>
-        </Tooltip>
-      </div>
-    }
+    render: (text: string, record: Datanode) =>
+        <StorageBar total={record.storageTotal} used={record.storageUsed}
+                    remaining={record.storageRemaining}/>
   },
   {
     title: 'Last Heartbeat',

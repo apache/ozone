@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -125,6 +125,17 @@ public class ContainerKeyMapperTask implements ReconOmTask {
 
         case DELETE:
           deleteOMKeyFromContainerDB(updatedKey);
+          break;
+
+        case UPDATE:
+          if (omdbUpdateEvent.getOldValue() != null) {
+            deleteOMKeyFromContainerDB(
+                omdbUpdateEvent.getOldValue().getKeyName());
+          } else {
+            LOG.warn("Update event does not have the old Key Info for {}.",
+                updatedKey);
+          }
+          writeOMKeyToContainerDB(updatedKey, updatedKeyValue);
           break;
 
         default: LOG.debug("Skipping DB update event : {}",
