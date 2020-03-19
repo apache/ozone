@@ -25,12 +25,14 @@ import org.apache.hadoop.ozone.loadgenerators.AgedLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.DataBuffer;
 import org.apache.hadoop.ozone.loadgenerators.LoadExecutors;
+import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import org.apache.hadoop.ozone.utils.LoadBucket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -44,11 +46,16 @@ public class MiniOzoneLoadGenerator {
   private static String keyNameDelimiter = "_";
   private final List<LoadExecutors> loadExecutors;
 
+  private final OzoneVolume volume;
+  private final OzoneConfiguration conf;
+
   MiniOzoneLoadGenerator(OzoneVolume volume, int numClients, int numThreads,
                          int numBuffers, OzoneConfiguration conf)
       throws Exception {
     DataBuffer buffer = new DataBuffer(numBuffers);
     loadExecutors = new ArrayList<>();
+    this.volume = volume;
+    this.conf = conf;
 
     // Random Load
     String mixBucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -63,25 +70,22 @@ public class MiniOzoneLoadGenerator {
     loadExecutors.add(new LoadExecutors(numThreads, loadGenerator));
 
     // Aged Load
-    String agedBucketName =
-        RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    volume.createBucket(agedBucketName);
-    LoadBucket agedLoadBucket =
-        new LoadBucket(volume.getBucket(agedBucketName), conf);
-    AgedLoadGenerator agedLoadGenerator =
-        new AgedLoadGenerator(buffer, agedLoadBucket);
-    loadExecutors.add(new LoadExecutors(numThreads, agedLoadGenerator));
+    addLoads(numThreads,
+        bucket -> new AgedLoadGenerator(buffer, bucket));
 
     //Filesystem Load
-    String fsBucketName =
-        RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    addLoads(numThreads,
+        bucket -> new FilesystemLoadGenerator(buffer, bucket));
+  }
 
-    volume.createBucket(fsBucketName);
-    LoadBucket fsBucket =
-        new LoadBucket(volume.getBucket(fsBucketName), conf);
-    FilesystemLoadGenerator filesystemLoadGenerator =
-        new FilesystemLoadGenerator(buffer, fsBucket);
-    loadExecutors.add(new LoadExecutors(numThreads, filesystemLoadGenerator));
+  private void addLoads(int numThreads,
+                        Function<LoadBucket, LoadGenerator> function)
+      throws Exception {
+    String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    volume.createBucket(bucketName);
+    LoadBucket bucket = new LoadBucket(volume.getBucket(bucketName), conf);
+    LoadGenerator loadGenerator = function.apply(bucket);
+    loadExecutors.add(new LoadExecutors(numThreads, loadGenerator));
   }
 
   void startIO(long time, TimeUnit timeUnit) {
