@@ -2208,6 +2208,15 @@
     <value/>
     <tag>RECON, SECURITY</tag>
     <description>
+      DEPRECATED. Use "ozone.recon.http.kerberos.keytab.file" instead.
+      The keytab file for HTTP Kerberos authentication in Recon.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.http.kerberos.keytab.file</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
       The keytab file for HTTP Kerberos authentication in Recon.
     </description>
   </property>
