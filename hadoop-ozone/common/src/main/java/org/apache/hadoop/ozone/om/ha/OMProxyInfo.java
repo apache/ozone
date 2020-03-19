@@ -53,8 +53,9 @@ public class OMProxyInfo {
     } else {
 
       // This issue will be a problem with docker/kubernetes world where one of
-      // the container is killed, and that OM address will be unresolved. For now
-      // skip the unresolved OM address setting it to the token service field.
+      // the container is killed, and that OM address will be unresolved.
+      // For now skip the unresolved OM address setting it to the token
+      // service field.
 
       this.dtService = SecurityUtil.buildTokenService(rpcAddr);
     }

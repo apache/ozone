@@ -197,8 +197,8 @@ public class OMFailoverProxyProvider implements
         omProxyInfos.entrySet()) {
       Text dtService = omProxyInfoSet.getValue().getDelegationTokenService();
 
-      // dtService can be null when during client object creation when one of
-      // the OM configured address in unreachable.
+      // During client object creation when one of the OM configured address
+      // in unreachable, dtService can be null.
       if (dtService != null) {
         rpcAddress.append(",").append(dtService);
       }
