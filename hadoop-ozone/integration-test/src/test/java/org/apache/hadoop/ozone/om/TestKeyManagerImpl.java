@@ -1123,9 +1123,9 @@ public class TestKeyManagerImpl {
       List<ContainerWithPipeline> cps = new ArrayList<>();
       for (Long containerID : containerIDs) {
         ContainerWithPipeline containerWithPipelineMock =
-                mock(ContainerWithPipeline.class);
+            mock(ContainerWithPipeline.class);
         when(containerWithPipelineMock.getPipeline())
-                .thenReturn(getRandomPipeline());
+            .thenReturn(getRandomPipeline());
 
         ContainerInfo ci = mock(ContainerInfo.class);
         when(ci.getContainerID()).thenReturn(containerID);
@@ -1135,7 +1135,7 @@ public class TestKeyManagerImpl {
       }
 
       when(sclProtocolMock.getContainerWithPipelineBatch(containerIDs))
-              .thenReturn(cps);
+          .thenReturn(cps);
 
       ScmClient scmClientMock = mock(ScmClient.class);
       when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);

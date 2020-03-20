@@ -302,7 +302,7 @@ public class SCMClientProtocolServer implements
         SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
         Collections.singletonMap("containerIDs",
         containerIDs.stream().map(id -> ContainerID.valueof(id).toString())
-        .collect(Collectors.joining(",")))));
+            .collect(Collectors.joining(",")))));
 
     return cpList;
   }

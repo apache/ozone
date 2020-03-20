@@ -709,22 +709,22 @@ public class KeyManagerImpl implements KeyManager {
 
     try {
       List<ContainerWithPipeline> cpList = scmClient.getContainerClient().
-              getContainerWithPipelineBatch(new ArrayList<>(containerIDs));
+          getContainerWithPipelineBatch(new ArrayList<>(containerIDs));
       for (ContainerWithPipeline cp : cpList) {
         containerWithPipelineMap.put(
-                cp.getContainerInfo().getContainerID(), cp);
+            cp.getContainerInfo().getContainerID(), cp);
       }
     } catch (IOException ioEx) {
-      LOG.debug("Get containerPipeline failed for volume:{} bucket:{} "
-                      + "key:{}", value.getVolumeName(), value.getBucketName(),
-              value.getKeyName(), ioEx);
+      LOG.debug("Get containerPipeline failed for volume:{} bucket:{} " +
+          "key:{}", value.getVolumeName(), value.getBucketName(),
+          value.getKeyName(), ioEx);
       throw new OMException(ioEx.getMessage(), SCM_GET_PIPELINE_EXCEPTION);
     }
 
     for (OmKeyLocationInfoGroup key : locationInfoGroups) {
       for (OmKeyLocationInfo k : key.getLocationList()) {
         ContainerWithPipeline cp =
-                containerWithPipelineMap.get(k.getContainerID());
+            containerWithPipelineMap.get(k.getContainerID());
         if (!cp.getPipeline().equals(k.getPipeline())) {
           k.setPipeline(cp.getPipeline());
         }

@@ -199,31 +199,31 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * {@inheritDoc}
    */
   public List<ContainerWithPipeline> getContainerWithPipelineBatch(
-          List<Long> containerIDs) throws IOException {
+      List<Long> containerIDs) throws IOException {
     for (Long containerID: containerIDs) {
       Preconditions.checkState(containerID >= 0,
-              "Container ID cannot be negative");
+          "Container ID cannot be negative");
     }
 
     GetContainerWithPipelineBatchRequestProto request =
-            GetContainerWithPipelineBatchRequestProto.newBuilder()
-                    .setTraceID(TracingUtil.exportCurrentSpan())
-                    .addAllContainerIDs(containerIDs)
-                    .build();
+        GetContainerWithPipelineBatchRequestProto.newBuilder()
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .addAllContainerIDs(containerIDs)
+            .build();
 
     ScmContainerLocationResponse response =
         submitRequest(Type.GetContainerWithPipelineBatch,
             (builder) -> builder
-                            .setGetContainerWithPipelineBatchRequest(request));
+                .setGetContainerWithPipelineBatchRequest(request));
 
     List<org.apache.hadoop.hdds.protocol.proto.HddsProtos
-            .ContainerWithPipeline> protoCps =
+        .ContainerWithPipeline> protoCps =
             response.getGetContainerWithPipelineBatchResponse()
-                    .getContainerWithPipelinesList();
+                .getContainerWithPipelinesList();
 
     List<ContainerWithPipeline> cps = new ArrayList<>();
     for (org.apache.hadoop.hdds.protocol.proto.HddsProtos
-            .ContainerWithPipeline cp : protoCps) {
+      .ContainerWithPipeline cp : protoCps) {
       cps.add(ContainerWithPipeline.fromProtobuf(cp));
     }
 

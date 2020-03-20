@@ -154,7 +154,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetContainerWithPipelineBatchResponse(
                 getContainerWithPipelineBatch(
-                request.getGetContainerWithPipelineBatchRequest()))
+                    request.getGetContainerWithPipelineBatchRequest()))
             .build();
       case ListContainer:
         return ScmContainerLocationResponse.newBuilder()
@@ -303,7 +303,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       getContainerWithPipelineBatch(
       GetContainerWithPipelineBatchRequestProto request) throws IOException {
     List<ContainerWithPipeline> containers = impl
-            .getContainerWithPipelineBatch(request.getContainerIDsList());
+        .getContainerWithPipelineBatch(request.getContainerIDsList());
     GetContainerWithPipelineBatchResponseProto.Builder builder =
         GetContainerWithPipelineBatchResponseProto.newBuilder();
     for (ContainerWithPipeline container : containers) {
