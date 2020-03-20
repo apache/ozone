@@ -47,6 +47,34 @@ public class RDBMetrics {
   private @Metric MutableCounterLong numDBKeyMayExistChecks;
   private @Metric MutableCounterLong numDBKeyMayExistMisses;
 
+  private @Metric MutableCounterLong numDBKeyGetIfExistChecks;
+  private @Metric MutableCounterLong numDBKeyGetIfExistMisses;
+  private @Metric MutableCounterLong numDBKeyGetIfExistGets;
+
+
+  public long getNumDBKeyGetIfExistGets() {
+    return numDBKeyGetIfExistGets.value();
+  }
+
+  public void incNumDBKeyGetIfExistGets() {
+    this.numDBKeyGetIfExistGets.incr();
+  }
+
+  public long getNumDBKeyGetIfExistChecks() {
+    return numDBKeyGetIfExistChecks.value();
+  }
+
+  public void incNumDBKeyGetIfExistChecks() {
+    this.numDBKeyGetIfExistChecks.incr();
+  }
+
+  public long getNumDBKeyGetIfExistMisses() {
+    return numDBKeyGetIfExistMisses.value();
+  }
+
+  public void incNumDBKeyGetIfExistMisses() {
+    this.numDBKeyGetIfExistMisses.incr();
+  }
 
   public void incNumDBKeyMayExistChecks() {
     numDBKeyMayExistChecks.incr();

@@ -105,12 +105,12 @@ public class InitDatanodeState implements DatanodeState,
       }
       for (InetSocketAddress addr : addresses) {
         connectionManager.addSCMServer(addr);
-        this.context.addEndpoint(addr.toString());
+        this.context.addEndpoint(addr);
       }
       InetSocketAddress reconAddress = getReconAddresses(conf);
       if (reconAddress != null) {
         connectionManager.addReconServer(reconAddress);
-        this.context.addEndpoint(reconAddress.toString());
+        this.context.addEndpoint(reconAddress);
       }
     }
 

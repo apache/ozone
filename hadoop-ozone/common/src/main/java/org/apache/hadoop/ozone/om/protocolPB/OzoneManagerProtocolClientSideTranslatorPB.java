@@ -146,6 +146,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
@@ -241,6 +242,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       public RetryAction shouldRetry(Exception exception, int retries,
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
+        if (isAccessControlException(exception)) {
+          return RetryAction.FAIL; // do not retry
+        }
         if (exception instanceof ServiceException) {
           OMNotLeaderException notLeaderException =
               getNotLeaderException(exception);
@@ -271,7 +275,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         // does not perform any failover.
         omFailoverProxyProvider.performFailoverToNextProxy();
         return getRetryAction(FAILOVER_AND_RETRY, failovers);
-
       }
 
       private RetryAction getRetryAction(RetryAction fallbackAction,
@@ -293,12 +296,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
+   * Unwrap exception to check if it is a {@link AccessControlException}.
+   */
+  private boolean isAccessControlException(Exception ex) {
+    if (ex instanceof ServiceException) {
+      Throwable t = ex.getCause();
+      while (t != null) {
+        if (t instanceof AccessControlException) {
+          return true;
+        }
+        t = t.getCause();
+      }
+    }
+    return false;
+  }
+  
+  /**
    * Check if exception is a OMNotLeaderException.
    * @return OMNotLeaderException.
    */
   private OMNotLeaderException getNotLeaderException(Exception exception) {
     Throwable cause = exception.getCause();
-    if (cause != null && cause instanceof RemoteException) {
+    if (cause instanceof RemoteException) {
       IOException ioException =
           ((RemoteException) cause).unwrapRemoteException();
       if (ioException instanceof OMNotLeaderException) {
@@ -316,7 +335,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private OMLeaderNotReadyException getLeaderNotReadyException(
       Exception exception) {
     Throwable cause = exception.getCause();
-    if (cause != null && cause instanceof RemoteException) {
+    if (cause instanceof RemoteException) {
       IOException ioException =
           ((RemoteException) cause).unwrapRemoteException();
       if (ioException instanceof OMLeaderNotReadyException) {

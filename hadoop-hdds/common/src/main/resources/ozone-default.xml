@@ -1533,6 +1533,15 @@
   </property>
 
   <property>
+    <name>ozone.client.read.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone grpc client during read.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.lock.fair</name>
     <value>false</value>
     <description>If this is true, the Ozone Manager lock will be used in Fair
@@ -2201,6 +2210,15 @@
       The address and the base port where the Recon web UI will listen
       on using HTTPS. If the port is 0 then the server will start on a free
       port.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.keytab.file</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      DEPRECATED. Use "ozone.recon.http.kerberos.keytab.file" instead.
+      The keytab file for HTTP Kerberos authentication in Recon.
     </description>
   </property>
   <property>

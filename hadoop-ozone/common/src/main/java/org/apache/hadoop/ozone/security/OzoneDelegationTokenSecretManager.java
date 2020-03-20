@@ -162,9 +162,8 @@ public class OzoneDelegationTokenSecretManager
    * @return renewTime - If updated successfully, return renewTime.
    */
   public long updateToken(Token<OzoneTokenIdentifier> token,
-      OzoneTokenIdentifier ozoneTokenIdentifier) {
-    long renewTime =
-        ozoneTokenIdentifier.getIssueDate() + getTokenRenewInterval();
+      OzoneTokenIdentifier ozoneTokenIdentifier, long tokenRenewInterval) {
+    long renewTime = ozoneTokenIdentifier.getIssueDate() + tokenRenewInterval;
     TokenInfo tokenInfo = new TokenInfo(renewTime, token.getPassword(),
         ozoneTokenIdentifier.getTrackingId());
     currentTokens.put(ozoneTokenIdentifier, tokenInfo);

@@ -380,6 +380,7 @@ message UserInfo {
 */
 message UpdateGetDelegationTokenRequest {
     required GetDelegationTokenResponseProto getDelegationTokenResponse = 1;
+    optional uint64 tokenRenewInterval = 2;
 }
 
 /**

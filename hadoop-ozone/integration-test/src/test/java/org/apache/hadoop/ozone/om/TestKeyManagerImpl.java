@@ -97,6 +97,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -418,6 +419,9 @@ public class TestKeyManagerImpl {
   }
 
   @Test
+  @Ignore
+  // TODO this test relies on KeyManagerImpl.createFile which is dead code.
+  // Move the test case out of this file, update the implementation.
   public void testCheckAccessForFileKey() throws Exception {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName("testdir/deep/NOTICE.txt")

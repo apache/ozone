@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProvider
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,7 +45,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -94,23 +94,22 @@ public class TestReconWithOzoneManager {
         .setConnectionRequestTimeout(connectionTimeout)
         .setSocketTimeout(connectionRequestTimeout).build();
 
-    int reconHttpPort = NetUtils.getFreeSocketPort();
-    String reconHTTPAddress = "0.0.0.0:" + reconHttpPort;
-    containerKeyServiceURL = "http://" + reconHTTPAddress +
-        "/api/v1/containers";
-    taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
-
     cluster =
         MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(1)
             .includeRecon(true)
-            .setReconHttpPort(reconHttpPort)
-            .setReconDatanodePort(NetUtils.getFreeSocketPort())
             .build();
     cluster.waitForClusterToBeReady();
     metadataManager = cluster.getOzoneManager().getMetadataManager();
 
     cluster.getStorageContainerManager().exitSafeMode();
+
+    InetSocketAddress address =
+        cluster.getReconServer().getHttpServer().getHttpAddress();
+    String reconHTTPAddress = address.getHostName() + ":" + address.getPort();
+    containerKeyServiceURL = "http://" + reconHTTPAddress +
+        "/api/v1/containers";
+    taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
 
     // initialize HTTPClient
     httpClient = HttpClientBuilder

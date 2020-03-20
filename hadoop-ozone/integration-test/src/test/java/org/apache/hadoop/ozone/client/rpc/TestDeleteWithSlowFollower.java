@@ -148,6 +148,7 @@ public class TestDeleteWithSlowFollower {
             .setHbInterval(100)
             .build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
