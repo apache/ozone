@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 
+import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
@@ -53,7 +54,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
 
   public StorageContainerDatanodeProtocolServerSideTranslatorPB(
       StorageContainerDatanodeProtocol impl,
-      ProtocolMessageMetrics protocolMessageMetrics) {
+      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics) {
     this.impl = impl;
     dispatcher =
         new OzoneProtocolMessageDispatcher<>("SCMDatanodeProtocol",

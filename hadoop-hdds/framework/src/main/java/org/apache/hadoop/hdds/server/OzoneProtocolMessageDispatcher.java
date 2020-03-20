@@ -38,12 +38,14 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
 
   private String serviceName;
 
-  private final ProtocolMessageMetrics protocolMessageMetrics;
+  private final ProtocolMessageMetrics<ProtocolMessageEnum>
+      protocolMessageMetrics;
 
   private Logger logger;
 
   public OzoneProtocolMessageDispatcher(String serviceName,
-      ProtocolMessageMetrics protocolMessageMetrics, Logger logger) {
+      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics,
+      Logger logger) {
     this.serviceName = serviceName;
     this.protocolMessageMetrics = protocolMessageMetrics;
     this.logger = logger;
@@ -69,9 +71,10 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
       }
 
       long startTime = System.nanoTime();
-      protocolMessageMetrics.increment(type, System.nanoTime() - startTime);
 
       RESPONSE response = methodCall.apply(request);
+
+      protocolMessageMetrics.increment(type, System.nanoTime() - startTime);
 
       if (logger.isTraceEnabled()) {
         logger.trace(
