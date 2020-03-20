@@ -688,19 +688,18 @@ public class KeyManagerImpl implements KeyManager {
    */
   @VisibleForTesting
   protected void refreshPipeline(OmKeyInfo value) throws IOException {
+    final List<OmKeyLocationInfoGroup> locationInfoGroups = value == null ?
+        null : value.getKeyLocationVersions();
+
     // TODO: fix Some tests that may not initialize container client
     // The production should always have containerClient initialized.
-    if (scmClient.getContainerClient() == null) {
-      return;
-    }
-
-    if (value == null
-            || CollectionUtils.isEmpty(value.getKeyLocationVersions())) {
+    if (scmClient.getContainerClient() == null ||
+        CollectionUtils.isEmpty(locationInfoGroups)) {
       return;
     }
 
     Set<Long> containerIDs = new HashSet<>();
-    for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+    for (OmKeyLocationInfoGroup key : locationInfoGroups) {
       for (OmKeyLocationInfo k : key.getLocationList()) {
         containerIDs.add(k.getContainerID());
       }
@@ -722,7 +721,7 @@ public class KeyManagerImpl implements KeyManager {
       throw new OMException(ioEx.getMessage(), SCM_GET_PIPELINE_EXCEPTION);
     }
 
-    for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+    for (OmKeyLocationInfoGroup key : locationInfoGroups) {
       for (OmKeyLocationInfo k : key.getLocationList()) {
         ContainerWithPipeline cp =
                 containerWithPipelineMap.get(k.getContainerID());
