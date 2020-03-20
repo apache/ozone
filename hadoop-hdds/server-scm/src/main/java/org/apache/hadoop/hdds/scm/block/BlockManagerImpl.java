@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -358,10 +359,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   }
 
   @Override
-  public void setSafeModeStatus(boolean safeModeStatus) {
-    this.safeModePrecheck.setInSafeMode(safeModeStatus);
+  public void handleSafeModeTransition(
+      SCMSafeModeManager.SafeModeStatus status) {
+    this.safeModePrecheck.setInSafeMode(status.getSafeModeStatus());
   }
-
   /**
    * Returns status of scm safe mode determined by SAFE_MODE_STATUS event.
    * */
