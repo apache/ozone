@@ -31,6 +31,8 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,7 +96,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
       missingReplicas.removeAll(containersInDn);
 
-      processContainerReplicas(datanodeDetails, replicas);
+      processContainerReplicas(datanodeDetails, replicas, publisher);
       processMissingReplicas(datanodeDetails, missingReplicas);
       updateDeleteTransaction(datanodeDetails, replicas, publisher);
 
@@ -114,13 +116,16 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   }
 
   /**
-   * Processes the ContainerReport.
+   * Processes the ContainerReport, unknown container reported
+   * that will be deleted by SCM.
    *
    * @param datanodeDetails Datanode from which this report was received
    * @param replicas list of ContainerReplicaProto
+   * @param publisher EventPublisher reference
    */
   private void processContainerReplicas(final DatanodeDetails datanodeDetails,
-      final List<ContainerReplicaProto> replicas) {
+      final List<ContainerReplicaProto> replicas,
+      final EventPublisher publisher) {
     for (ContainerReplicaProto replicaProto : replicas) {
       try {
         processContainerReplica(datanodeDetails, replicaProto);
@@ -128,6 +133,16 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         LOG.error("Received container report for an unknown container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
             datanodeDetails, e);
+
+        final ContainerID containerId = ContainerID
+            .valueof(replicaProto.getContainerID());
+        final DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
+            containerId.getId(), true);
+        final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
+            datanodeDetails.getUuid(), deleteCommand);
+        publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+        LOG.info("Sending delete container command for container {}"
+            + " to datanode {}", containerId.getId(), datanodeDetails);
       } catch (IOException e) {
         LOG.error("Exception while processing container report for container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
