@@ -223,7 +223,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     List<ContainerWithPipeline> cps = new ArrayList<>();
     for (org.apache.hadoop.hdds.protocol.proto.HddsProtos
-      .ContainerWithPipeline cp : protoCps) {
+        .ContainerWithPipeline cp : protoCps) {
       cps.add(ContainerWithPipeline.fromProtobuf(cp));
     }
 
