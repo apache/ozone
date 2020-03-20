@@ -42,6 +42,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeNotification;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -70,7 +72,7 @@ import org.slf4j.LoggerFactory;
  * that the containers are properly replicated. Replication Manager deals only
  * with Quasi Closed / Closed container.
  */
-public class ReplicationManager implements MetricsSource {
+public class ReplicationManager implements MetricsSource, SafeModeNotification {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
@@ -771,6 +773,14 @@ public class ReplicationManager implements MetricsSource {
         .addGauge(ReplicationManagerMetrics.INFLIGHT_DELETION,
             inflightDeletion.size())
         .endRecord();
+  }
+
+  @Override
+  public void handleSafeModeTransition(
+      SCMSafeModeManager.SafeModeStatus status) {
+    if (!status.getSafeModeStatus() && !this.isRunning()) {
+      this.start();
+    }
   }
 
   /**

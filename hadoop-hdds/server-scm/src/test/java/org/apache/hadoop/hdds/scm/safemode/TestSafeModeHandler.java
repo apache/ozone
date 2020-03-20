@@ -73,9 +73,9 @@ public class TestSafeModeHandler {
         eventQueue, new LockManager(configuration));
     scmPipelineManager = Mockito.mock(SCMPipelineManager.class);
     blockManager = Mockito.mock(BlockManagerImpl.class);
-    safeModeHandler =
-        new SafeModeHandler(configuration, scmClientProtocolServer,
-            blockManager, replicationManager, scmPipelineManager);
+    safeModeHandler = new SafeModeHandler(configuration);
+    safeModeHandler.notifyImmediately(scmClientProtocolServer, blockManager);
+    safeModeHandler.notifyAfterDelay(replicationManager, scmPipelineManager);
 
     eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, safeModeHandler);
     safeModeStatus = new SCMSafeModeManager.SafeModeStatus(false);
