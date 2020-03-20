@@ -216,14 +216,13 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             (builder) -> builder
                 .setGetContainerWithPipelineBatchRequest(request));
 
-    List<org.apache.hadoop.hdds.protocol.proto.HddsProtos
-        .ContainerWithPipeline> protoCps =
-            response.getGetContainerWithPipelineBatchResponse()
-                .getContainerWithPipelinesList();
+    List<HddsProtos.ContainerWithPipeline> protoCps = response
+        .getGetContainerWithPipelineBatchResponse()
+        .getContainerWithPipelinesList();
 
     List<ContainerWithPipeline> cps = new ArrayList<>();
-    for (org.apache.hadoop.hdds.protocol.proto.HddsProtos
-        .ContainerWithPipeline cp : protoCps) {
+
+    for (HddsProtos.ContainerWithPipeline cp : protoCps) {
       cps.add(ContainerWithPipeline.fromProtobuf(cp));
     }
 
