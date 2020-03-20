@@ -32,7 +32,7 @@ import javax.ws.rs.ext.Provider;
 
 @Provider
 public class TracingFilter implements ContainerRequestFilter,
-        ContainerResponseFilter {
+    ContainerResponseFilter {
 
   public static final String TRACING_SCOPE = "TRACING_SCOPE";
 
@@ -64,14 +64,14 @@ public class TracingFilter implements ContainerRequestFilter,
     closeActiveScope();
 
     Scope scope = GlobalTracer.get().buildSpan(
-            resourceInfo.getResourceClass().getSimpleName() + "." + resourceInfo
-                    .getResourceMethod().getName()).startActive(true);
+        resourceInfo.getResourceClass().getSimpleName() + "." +
+        resourceInfo.getResourceMethod().getName()).startActive(true);
     requestContext.setProperty(TRACING_SCOPE, scope);
   }
 
   @Override
   public void filter(ContainerRequestContext requestContext,
-                     ContainerResponseContext responseContext) {
+      ContainerResponseContext responseContext) {
     Scope scope = (Scope)requestContext.getProperty(TRACING_SCOPE);
     closeScope(scope);
   }
