@@ -93,6 +93,7 @@ public final class BlockUtils {
    */
   public static void shutdownCache(ContainerCache cache)  {
     cache.shutdownCache();
+    ContainerCache.clearDefaultCache();
   }
 
   /**
