@@ -1707,11 +1707,6 @@ public class KeyManagerImpl implements KeyManager {
         return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
       }
 
-      List<OmKeyInfo> keys = metadataManager.listKeys(volumeName, bucketName,
-          null, dirKey, 1);
-      if (keys.iterator().hasNext()) {
-        return new OzoneFileStatus(keyName);
-      }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Unable to get file status for the key: volume: {}, bucket:" +
                 " {}, key: {}, with error: No such file exists.", volumeName,

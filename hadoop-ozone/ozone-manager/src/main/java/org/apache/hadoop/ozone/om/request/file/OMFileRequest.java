@@ -23,10 +23,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,8 +115,10 @@ public final class OMFileRequest {
     }
 
     if (inheritAcls.isEmpty()) {
-      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      inheritAcls = omMetadataManager.getBucketTable().get(bucketKey).getAcls();
+      String bucketKey = omMetadataManager.getBucketKey(volumeName,
+          bucketName);
+      inheritAcls = omMetadataManager.getBucketTable().get(bucketKey)
+          .getAcls();
       LOG.trace("Acls inherited from bucket " + bucketName + " are : "
           + inheritAcls);
     }
@@ -163,7 +169,7 @@ public final class OMFileRequest {
     public OMPathInfo(List missingParents, OMDirectoryResult result,
         List<OzoneAcl> aclList) {
       this.missingParents = missingParents;
-      directoryResult = result;
+      this.directoryResult = result;
       this.acls = aclList;
     }
 
@@ -177,6 +183,14 @@ public final class OMFileRequest {
 
     public List<OzoneAcl> getAcls() {
       return acls;
+    }
+
+    /**
+     * indicates if the immediate parent in the path already exists.
+     * @return true indicates the parent exists
+     */
+    public boolean directParentExists() {
+      return missingParents.isEmpty();
     }
   }
 
@@ -208,5 +222,36 @@ public final class OMFileRequest {
     // If we don't have any file/directory name with "a/b/c" or any
     // sub-directory or file name from the given path we return this enum value.
     NONE
+  }
+
+  /**
+   * Add entries to the Key Table cache.
+   * @param omMetadataManager
+   * @param volumeName
+   * @param bucketName
+   * @param keyInfo
+   * @param parentInfoList
+   * @param index
+   *
+   * TODO : move code to a separate utility class.
+   */
+  public static void addKeyTableCacheEntries(
+      OMMetadataManager omMetadataManager, String volumeName,
+      String bucketName, Optional<OmKeyInfo> keyInfo,
+      Optional<List<OmKeyInfo>> parentInfoList,
+      long index) {
+    for (OmKeyInfo parentInfo : parentInfoList.get()) {
+      omMetadataManager.getKeyTable().addCacheEntry(
+          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
+              parentInfo.getKeyName())),
+          new CacheValue<>(Optional.of(parentInfo), index));
+    }
+
+    if (keyInfo.isPresent()) {
+      omMetadataManager.getKeyTable().addCacheEntry(
+          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
+                  keyInfo.get().getKeyName())),
+          new CacheValue<>(keyInfo, index));
+    }
   }
 }

@@ -54,6 +54,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeNotification;
 import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -88,7 +90,7 @@ import org.slf4j.LoggerFactory;
  * The RPC server that listens to requests from clients.
  */
 public class SCMClientProtocolServer implements
-    StorageContainerLocationProtocol, Auditor {
+    StorageContainerLocationProtocol, Auditor, SafeModeNotification {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMClientProtocolServer.class);
   private static final AuditLogger AUDIT =
@@ -592,12 +594,9 @@ public class SCMClientProtocolServer implements
     stop();
   }
 
-  /**
-   * Set SafeMode status.
-   *
-   * @param safeModeStatus
-   */
-  public void setSafeModeStatus(boolean safeModeStatus) {
-    safeModePrecheck.setInSafeMode(safeModeStatus);
+  @Override
+  public void handleSafeModeTransition(
+      SCMSafeModeManager.SafeModeStatus status) {
+    safeModePrecheck.setInSafeMode(status.getSafeModeStatus());
   }
 }

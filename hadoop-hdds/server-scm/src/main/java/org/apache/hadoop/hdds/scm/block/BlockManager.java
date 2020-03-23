@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeNotification;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -31,7 +32,7 @@ import java.util.List;
  *  Block APIs.
  *  Container is transparent to these APIs.
  */
-public interface BlockManager extends Closeable {
+public interface BlockManager extends Closeable, SafeModeNotification {
   /**
    * Allocates a new block for a given size.
    * @param size - Block Size
@@ -80,10 +81,4 @@ public interface BlockManager extends Closeable {
    */
   SCMBlockDeletingService getSCMBlockDeletingService();
 
-  /**
-   * Set SafeMode status.
-   *
-   * @param safeModeStatus
-   */
-  void setSafeModeStatus(boolean safeModeStatus);
 }

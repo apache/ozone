@@ -66,5 +66,5 @@ not. Log of datanode should contain something like this:
 ```
 
 <div class="alert alert-warning" role="alert">
-<b>Note:</b> The current version of Ozone is tested with Hadoop 3.1.
+<b>Note:</b> document above is based on Hadoop 3.1.
 </div>

@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREF
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -252,6 +253,11 @@ public class ReconStorageContainerManagerFacade
   @Override
   public ReplicationManager getReplicationManager() {
     return null;
+  }
+
+  @Override
+  public InetSocketAddress getDatanodeRpcAddress() {
+    return getDatanodeProtocolServer().getDatanodeRpcAddress();
   }
 
   public EventQueue getEventQueue() {

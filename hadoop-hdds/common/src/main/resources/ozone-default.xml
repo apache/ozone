@@ -252,7 +252,7 @@
   </property>
   <property>
     <name>dfs.ratis.client.request.retry.interval</name>
-    <value>1000ms</value>
+    <value>15000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>Interval between successive retries for a ratis client request.
     </description>
@@ -412,7 +412,7 @@
   </property>
   <property>
     <name>ozone.client.max.retries</name>
-    <value>100</value>
+    <value>5</value>
     <tag>OZONE, CLIENT</tag>
     <description>Maximum number of retries by Ozone Client on encountering
       exception while writing a key.
@@ -1529,6 +1529,15 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Ozone client to verify checksum of the checksum blocksize data.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.read.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone grpc client during read.
     </description>
   </property>
 
