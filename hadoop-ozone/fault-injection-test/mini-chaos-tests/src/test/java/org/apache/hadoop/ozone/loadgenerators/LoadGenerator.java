@@ -23,7 +23,7 @@ package org.apache.hadoop.ozone.loadgenerators;
  */
 public abstract class LoadGenerator {
 
-  String keyNameDelimiter = "_";
+  private final String keyNameDelimiter = "_";
 
   public abstract void initialize();
 
