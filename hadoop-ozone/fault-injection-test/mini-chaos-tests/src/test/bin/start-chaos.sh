@@ -19,6 +19,7 @@ date=$(date +"%Y-%m-%d-%H-%M-%S-%Z")
 logfiledirectory="/tmp/chaos-${date}/"
 completesuffix="complete.log"
 chaossuffix="chaos.log"
+errorsuffix="error.log"
 compilesuffix="compile.log"
 heapformat="dump.hprof"
 
@@ -30,6 +31,8 @@ chaosfilename="${logfiledirectory}${chaossuffix}"
 compilefilename="${logfiledirectory}${compilesuffix}"
 #log goes to something like /tmp/2019-12-04--00-01-26-IST/dump.hprof
 heapdumpfile="${logfiledirectory}${heapformat}"
+#log goes to something like /tmp/2019-12-04--00-01-26-IST/error.log
+errorfilename="${logfiledirectory}${errorsuffix}"
 
 #TODO: add gc log file details as well
 MVN_OPTS="-XX:+HeapDumpOnOutOfMemoryError "
@@ -46,6 +49,7 @@ mvn exec:java \
   -Dexec.mainClass="org.apache.hadoop.ozone.TestMiniChaosOzoneCluster" \
   -Dexec.classpathScope=test \
   -Dchaoslogfilename=${chaosfilename} \
+  -Derrorlogfilename=${errorfilename} \
   -Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false \
   -Dio.netty.leakDetection.level=advanced \
   -Dio.netty.leakDetectionLevel=advanced \
