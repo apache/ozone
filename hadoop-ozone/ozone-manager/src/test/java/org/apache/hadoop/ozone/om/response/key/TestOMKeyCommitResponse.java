@@ -52,8 +52,10 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
         keyName, clientID);
     Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
     OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
-        omResponse, omKeyInfo, openKey);
+        omResponse, omKeyInfo, ozoneKey, openKey);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -81,9 +83,11 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
 
     OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
-        omResponse, omKeyInfo, openKey);
+        omResponse, omKeyInfo, ozoneKey, openKey);
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.

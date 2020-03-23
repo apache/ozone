@@ -198,7 +198,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOpenKey);
+          omKeyInfo, dbOzoneKey, dbOpenKey);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

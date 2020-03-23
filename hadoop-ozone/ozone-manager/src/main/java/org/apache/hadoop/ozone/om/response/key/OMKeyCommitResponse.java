@@ -33,12 +33,14 @@ import javax.annotation.Nonnull;
 public class OMKeyCommitResponse extends OMClientResponse {
 
   private OmKeyInfo omKeyInfo;
+  private String ozoneKeyName;
   private String openKeyName;
 
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, String openKeyName) {
+      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
+    this.ozoneKeyName = ozoneKeyName;
     this.openKeyName = openKeyName;
   }
 
@@ -76,10 +78,7 @@ public class OMKeyCommitResponse extends OMClientResponse {
     // Add entry to Key table if omKeyInfo is available i.e. it is not a
     // replayed transaction.
     if (omKeyInfo != null) {
-      String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
-          omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKey,
+      omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
           omKeyInfo);
     }
   }
