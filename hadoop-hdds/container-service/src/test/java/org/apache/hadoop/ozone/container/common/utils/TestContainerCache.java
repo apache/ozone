@@ -16,13 +16,11 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.container.common;
+package org.apache.hadoop.ozone.container.common.utils;
 
 import org.apache.hadoop.fs.FileSystemTestHelper;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.junit.Assert;
@@ -62,7 +60,7 @@ public class TestContainerCache {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
 
-    ContainerCache cache = ContainerCache.getInstance(conf);
+    ContainerCache cache = ContainerCache.getInstance(conf, true);
     File containerDir1 = new File(root, "cont1");
     File containerDir2 = new File(root, "cont2");
     File containerDir3 = new File(root, "cont3");
