@@ -21,8 +21,6 @@ package org.apache.hadoop.ozone.recon.fsck;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
-import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -33,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
@@ -49,7 +48,7 @@ import org.junit.Test;
 public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
 
   @Test
-  public void testRun() throws IOException, SQLException, InterruptedException {
+  public void testRun() throws Exception {
     Configuration sqlConfiguration =
         getInjector().getInstance((Configuration.class));
 
@@ -89,10 +88,10 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
             missingContainersDao);
     missingContainerTask.register();
     missingContainerTask.start();
-    Thread.sleep(5000L);
 
+    LambdaTestUtils.await(6000, 1000, () ->
+        (missingContainersTableHandle.findAll().size() == 1));
     all = missingContainersTableHandle.findAll();
-    Assert.assertEquals(1, all.size());
     Assert.assertEquals(3, all.get(0).getContainerId().longValue());
 
     ReconTaskStatus taskStatus =

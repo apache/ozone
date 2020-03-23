@@ -85,6 +85,8 @@ public class MissingContainerTask extends ReconScmTask {
           containerManager.getContainerReplicas(containerID);
       if (CollectionUtils.isEmpty(containerReplicas)) {
         if (!missingContainersDao.existsById(containerID.getId())) {
+          LOG.info("Found a missing container with ID {}. Adding it to the " +
+              "database", containerID.getId());
           MissingContainers newRecord =
               new MissingContainers(containerID.getId(), currentTime);
           missingContainersDao.insert(newRecord);
