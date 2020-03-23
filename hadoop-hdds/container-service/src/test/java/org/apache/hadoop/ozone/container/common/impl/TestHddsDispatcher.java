@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -53,6 +54,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -77,6 +79,11 @@ public class TestHddsDispatcher {
 
   public static final Consumer<ContainerReplicaProto> NO_OP_ICR_SENDER =
       c -> {};
+
+  @Before
+  public void setup() {
+    DefaultMetricsSystem.instance().shutdown();
+  }
 
   @Test
   public void testContainerCloseActionWhenFull() throws IOException {

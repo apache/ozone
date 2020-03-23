@@ -91,6 +91,7 @@ public class TestHddsVolumeChecker {
 
   @Before
   public void setup() throws IOException {
+    DefaultMetricsSystem.instance().shutdown();
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
         .getAbsolutePath());
