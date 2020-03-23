@@ -143,7 +143,7 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_CLIENT_MAX_RETRIES =
       "ozone.client.max.retries";
-  public static final int OZONE_CLIENT_MAX_RETRIES_DEFAULT = 100;
+  public static final int OZONE_CLIENT_MAX_RETRIES_DEFAULT = 5;
   public static final String OZONE_CLIENT_RETRY_INTERVAL =
       "ozone.client.retry.interval";
   public static final TimeDuration OZONE_CLIENT_RETRY_INTERVAL_DEFAULT =
