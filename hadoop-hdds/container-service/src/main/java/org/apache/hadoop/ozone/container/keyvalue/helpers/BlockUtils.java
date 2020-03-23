@@ -22,11 +22,14 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.MetadataStore;
+import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
+import java.io.File;
 import java.io.IOException;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
@@ -93,6 +96,45 @@ public final class BlockUtils {
    */
   public static void shutdownCache(ContainerCache cache)  {
     cache.shutdownCache();
+  }
+
+  /**
+   * Check whether a DB handler exists in cache.
+   *
+   * @param containerData containerData.
+   * @param conf configuration.
+   */
+  public static boolean isDBExist(KeyValueContainerData containerData,
+      Configuration conf) {
+    Preconditions.checkNotNull(containerData);
+    ContainerCache cache = ContainerCache.getInstance(conf);
+    Preconditions.checkNotNull(cache);
+    Preconditions.checkNotNull(containerData.getDbFile());
+    return cache.isDBExist(containerData.getDbFile().getAbsolutePath());
+  }
+
+  /**
+   * Create a DB handler and put it into cache.
+   *
+   * @param containerDBType - DB type of the container.
+   * @param containerDBPath - DB path of the container.
+   * @param conf configuration.
+   */
+  public static void createDBAndPutCache(String containerDBType,
+      String containerDBPath, Configuration conf) throws IOException {
+    ContainerCache cache = ContainerCache.getInstance(conf);
+    Preconditions.checkNotNull(cache);
+
+    MetadataStore metadataStore =
+        MetadataStoreBuilder.newBuilder()
+        .setDbFile(new File(containerDBPath))
+        .setCreateIfMissing(true)
+        .setConf(conf)
+        .setDBType(containerDBType)
+        .build();
+    ReferenceCountedDB db =
+        new ReferenceCountedDB(metadataStore, containerDBPath);
+    cache.addDB(containerDBPath, db);
   }
 
   /**

@@ -32,8 +32,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
@@ -73,14 +71,6 @@ public final class KeyValueContainerUtil {
       throw new IOException("Unable to create directory for metadata storage." +
           " Path: " + containerMetaDataPath);
     }
-    MetadataStore store = MetadataStoreBuilder.newBuilder().setConf(conf)
-        .setCreateIfMissing(true).setDbFile(dbFile).build();
-
-    // we close since the SCM pre-creates containers.
-    // we will open and put Db handle into a cache when keys are being created
-    // in a container.
-
-    store.close();
 
     if (!chunksPath.mkdirs()) {
       LOG.error("Unable to create chunks directory Container {}",

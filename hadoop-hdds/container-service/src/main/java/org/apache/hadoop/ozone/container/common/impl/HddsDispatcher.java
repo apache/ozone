@@ -52,6 +52,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis
     .DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerCommandRequestProto;
@@ -163,6 +165,20 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
+  private void createRocksDBAndPutCache(Container container)
+      throws IOException {
+    if (container == null) {
+      return;
+    }
+
+    KeyValueContainerData kvContainerData =
+        (KeyValueContainerData)container.getContainerData();
+    if (!BlockUtils.isDBExist(kvContainerData, conf)) {
+      BlockUtils.createDBAndPutCache(kvContainerData.getContainerDBType(),
+          kvContainerData.getDbFile().getAbsolutePath(), conf);
+    }
+  }
+
   @SuppressWarnings("methodlength")
   private ContainerCommandResponseProto dispatchRequest(
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
@@ -213,6 +229,15 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       container2BCSIDMap = dispatcherContext.getContainer2BCSIDMap();
     }
     if (isWriteCommitStage) {
+      try {
+        createRocksDBAndPutCache(container);
+      } catch (IOException ioe) {
+        StorageContainerException sce = new StorageContainerException(
+            "Create RocksDB failed. " + ioe.getMessage(), ioe,
+            Result.UNABLE_TO_READ_METADATA_DB);
+        return ContainerUtils.logAndReturnError(LOG, sce, msg);
+      }
+
       //  check if the container Id exist in the loaded snapshot file. if
       // it does not , it infers that , this is a restart of dn where
       // the we are reapplying the transaction which was not captured in the
