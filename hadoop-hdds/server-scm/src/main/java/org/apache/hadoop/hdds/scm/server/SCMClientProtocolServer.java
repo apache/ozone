@@ -604,6 +604,6 @@ public class SCMClientProtocolServer implements
   @Override
   public void handleSafeModeTransition(
       SCMSafeModeManager.SafeModeStatus status) {
-    safeModePrecheck.setInSafeMode(status.getSafeModeStatus());
+    safeModePrecheck.setInSafeMode(status.isInSafeMode());
   }
 }

@@ -38,6 +38,8 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.util.HashSet;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Tests SafeModeHandler behavior.
@@ -78,7 +80,7 @@ public class TestSafeModeHandler {
     safeModeHandler.notifyAfterDelay(replicationManager, scmPipelineManager);
 
     eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, safeModeHandler);
-    safeModeStatus = new SCMSafeModeManager.SafeModeStatus(false);
+    safeModeStatus = new SCMSafeModeManager.SafeModeStatus(false, false);
 
   }
 
@@ -114,5 +116,72 @@ public class TestSafeModeHandler {
     Assert.assertFalse(((BlockManagerImpl) blockManager).isScmInSafeMode());
     GenericTestUtils.waitFor(() ->
         replicationManager.isRunning(), 1000, 5000);
+  }
+
+  @Test
+  public void testSafeModeHandlerPreCheckWhenPreCheckNotCompleted()
+      throws TimeoutException, InterruptedException {
+    setup(true);
+    // Create a new safemode handler and register some dummy listeners
+    SafeModeHandler smHandler = new SafeModeHandler(configuration);
+    SafeModeListener immediate = new SafeModeListener();
+    SafeModeListener delayed = new SafeModeListener();
+    safeModeHandler.notifyImmediately(immediate);
+    safeModeHandler.notifyAfterDelay(delayed);
+
+    // Fire an event to set preCheck to completed and then check the listeners
+    // receive the correct value.
+    Assert.assertFalse(safeModeHandler.getPreCheckComplete());
+    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS,
+        new SCMSafeModeManager.SafeModeStatus(true, true));
+    eventQueue.processAll(5000);
+    Assert.assertTrue(safeModeHandler.getPreCheckComplete());
+    Assert.assertEquals(1, immediate.getCallCount());
+    Assert.assertEquals(true,
+        immediate.getSafeModeStatus().isPreCheckComplete());
+    Assert.assertEquals(true, immediate.getSafeModeStatus().isInSafeMode());
+    Assert.assertEquals(1, delayed.getCallCount());
+    Assert.assertEquals(true, delayed.getSafeModeStatus().isPreCheckComplete());
+    Assert.assertEquals(true, delayed.getSafeModeStatus().isInSafeMode());
+
+    // Now fire an event to set safemode off.
+    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS,
+        new SCMSafeModeManager.SafeModeStatus(false, true));
+    eventQueue.processAll(5000);
+    Assert.assertEquals(2, immediate.getCallCount());
+    Assert.assertEquals(true,
+        immediate.getSafeModeStatus().isPreCheckComplete());
+    Assert.assertEquals(false, immediate.getSafeModeStatus().isInSafeMode());
+    // The delayed one will not be updated yet
+    Assert.assertEquals(1, delayed.getCallCount());
+    Assert.assertEquals(true, delayed.getSafeModeStatus().isPreCheckComplete());
+    Assert.assertEquals(true, delayed.getSafeModeStatus().isInSafeMode());
+    // After a delay they should be updated
+    GenericTestUtils.waitFor(() ->
+        delayed.getCallCount() == 2, 1000, 5000);
+    Assert.assertEquals(true, delayed.getSafeModeStatus().isPreCheckComplete());
+    Assert.assertEquals(false, delayed.getSafeModeStatus().isInSafeMode());
+  }
+
+  private static class SafeModeListener implements SafeModeNotification {
+
+    private String name;
+    private AtomicInteger callCount = new AtomicInteger(0);
+    private SCMSafeModeManager.SafeModeStatus safeModeStatus;
+
+    public SCMSafeModeManager.SafeModeStatus getSafeModeStatus() {
+      return safeModeStatus;
+    }
+
+    public int getCallCount() {
+      return callCount.get();
+    }
+
+    @Override
+    public void handleSafeModeTransition(
+        SCMSafeModeManager.SafeModeStatus status) {
+      this.callCount.incrementAndGet();
+      this.safeModeStatus = status;
+    }
   }
 }
