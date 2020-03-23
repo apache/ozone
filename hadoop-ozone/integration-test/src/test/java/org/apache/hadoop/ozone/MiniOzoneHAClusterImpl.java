@@ -223,20 +223,19 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         if (includeRecon) {
           configureRecon();
           reconServer = new ReconServer();
+          reconServer.execute(new String[] {});
         }
       } catch (AuthenticationException ex) {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(scm);
+      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(scm,
+          reconServer);
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(
           conf, omMap, activeOMs, inactiveOMs, scm, hddsDatanodes,
           omServiceId, reconServer);
       if (startDataNodes) {
         cluster.startHddsDatanodes();
-      }
-      if (includeRecon) {
-        reconServer.execute(new String[] {});
       }
       return cluster;
     }

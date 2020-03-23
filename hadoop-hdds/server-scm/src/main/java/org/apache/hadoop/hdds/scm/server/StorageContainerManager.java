@@ -333,9 +333,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     clientProtocolServer = new SCMClientProtocolServer(conf, this);
     httpServer = new StorageContainerManagerHttpServer(conf);
 
-    safeModeHandler = new SafeModeHandler(configuration,
-        clientProtocolServer, scmBlockManager, replicationManager,
-        pipelineManager);
+    safeModeHandler = new SafeModeHandler(configuration);
+    safeModeHandler.notifyImmediately(clientProtocolServer, scmBlockManager);
+    safeModeHandler.notifyAfterDelay(replicationManager, pipelineManager);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);

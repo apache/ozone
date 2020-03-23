@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -597,8 +598,8 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void setSafeModeStatus(boolean safeModeStatus) {
-    this.isInSafeMode.set(safeModeStatus);
+  public boolean getSafeModeStatus() {
+    return this.isInSafeMode.get();
   }
 
   public Table<PipelineID, Pipeline> getPipelineStore() {
@@ -606,8 +607,15 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   @Override
-  public boolean getSafeModeStatus() {
-    return this.isInSafeMode.get();
+  public void handleSafeModeTransition(
+      SCMSafeModeManager.SafeModeStatus status) {
+    this.isInSafeMode.set(status.getSafeModeStatus());
+    if (!status.getSafeModeStatus()) {
+      // TODO: #CLUTIL if we reenter safe mode the fixed interval pipeline
+      // creation job needs to stop
+      startPipelineCreator();
+      triggerPipelineCreation();
+    }
   }
 
 }

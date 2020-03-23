@@ -190,20 +190,19 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         long baseObjId = OMFileRequest.getObjIDFromTxId(trxnLogIndex);
         List<OzoneAcl> inheritAcls = omPathInfo.getAcls();
 
-        dirKeyInfo = createDirectoryKeyInfo(ozoneManager, keyName, keyArgs,
-            baseObjId, trxnLogIndex);
+        dirKeyInfo = createDirectoryKeyInfoWithACL(ozoneManager, keyName,
+            keyArgs, baseObjId,
+            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex);
 
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
             missingParents, inheritAcls, trxnLogIndex);
 
-        omMetadataManager.getKeyTable().addCacheEntry(
-            new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
-                dirKeyInfo.getKeyName())),
-            new CacheValue<>(Optional.of(dirKeyInfo), trxnLogIndex));
+        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
+            bucketName, Optional.of(dirKeyInfo),
+            Optional.of(missingParentInfos), trxnLogIndex);
 
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos,
-            ozoneManager.createPrefixEntries());
+            dirKeyInfo, missingParentInfos);
         result = Result.SUCCESS;
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
@@ -249,7 +248,17 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  private List<OmKeyInfo> getAllParentInfo(OzoneManager ozoneManager,
+  /**
+   * Construct OmKeyInfo for every parent directory in missing list.
+   * @param ozoneManager
+   * @param keyArgs
+   * @param missingParents list of parent directories to be created
+   * @param inheritAcls ACLs to be assigned to each new parent dir
+   * @param trxnLogIndex
+   * @return
+   * @throws IOException
+   */
+  public static List<OmKeyInfo> getAllParentInfo(OzoneManager ozoneManager,
       KeyArgs keyArgs, List<String> missingParents, List<OzoneAcl> inheritAcls,
       long trxnLogIndex) throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -331,9 +340,23 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     }
   }
 
-  private OmKeyInfo createDirectoryKeyInfoWithACL(OzoneManager ozoneManager,
-      String keyName, KeyArgs keyArgs, long objectId,
-      List<OzoneAcl> inheritAcls, long transactionIndex) throws IOException {
+  /**
+   * fill in a KeyInfo for a new directory entry in OM database.
+   * without initializing ACLs from the KeyArgs - used for intermediate
+   * directories which get created internally/recursively during file
+   * and directory create.
+   * @param ozoneManager
+   * @param keyName
+   * @param keyArgs
+   * @param objectId
+   * @param transactionIndex
+   * @return the OmKeyInfo structure
+   * @throws IOException
+   */
+  public static OmKeyInfo createDirectoryKeyInfoWithACL(
+      OzoneManager ozoneManager, String keyName, KeyArgs keyArgs,
+      long objectId, List<OzoneAcl> inheritAcls,
+      long transactionIndex) throws IOException {
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -347,25 +370,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .build();
   }
 
-  private OmKeyInfo createDirectoryKeyInfo(OzoneManager ozoneManager,
-      String keyName, KeyArgs keyArgs, long objectId, long transactionIndex)
-      throws IOException {
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-
-    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
-        omMetadataManager.getBucketKey(volumeName, bucketName));
-    return dirKeyInfoBuilderNoACL(ozoneManager, omBucketInfo, volumeName,
-        bucketName, keyName, keyArgs, objectId)
-        .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))
-        .setUpdateID(transactionIndex)
-        .build();
-  }
-
-  private OmKeyInfo.Builder dirKeyInfoBuilderNoACL(OzoneManager ozoneManager,
-      OmBucketInfo omBucketInfo, String volumeName, String bucketName,
-      String keyName, KeyArgs keyArgs, long objectId)
+  private static OmKeyInfo.Builder dirKeyInfoBuilderNoACL(
+      OzoneManager ozoneManager, OmBucketInfo omBucketInfo, String volumeName,
+      String bucketName, String keyName, KeyArgs keyArgs, long objectId)
       throws IOException {
     Optional<FileEncryptionInfo> encryptionInfo =
         getFileEncryptionInfo(ozoneManager, omBucketInfo);

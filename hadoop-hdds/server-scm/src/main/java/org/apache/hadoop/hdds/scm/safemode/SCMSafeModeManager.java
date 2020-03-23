@@ -204,9 +204,6 @@ public class SCMSafeModeManager implements SafeModeManager {
     // register events anymore.
 
     emitSafeModeStatus();
-    // TODO: #CLUTIL if we reenter safe mode the fixed interval pipeline
-    // creation job needs to stop
-    pipelineManager.startPipelineCreator();
   }
 
   public boolean getInSafeMode() {
