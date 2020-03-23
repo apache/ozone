@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * The default writes to read ratio is 10:90.
  */
-public class AgedLoadGenerator implements LoadGenerator {
+public class AgedLoadGenerator extends LoadGenerator {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AgedLoadGenerator.class);
@@ -58,36 +58,26 @@ public class AgedLoadGenerator implements LoadGenerator {
     this.agedWriteProbability = TestProbability.valueOf(10);
   }
 
-  public void startLoad(long runTimeMillis) {
-    long threadID = Thread.currentThread().getId();
-    LOG.info("AGED LOADGEN: Started Aged IO Thread:{}.", threadID);
-    long startTime = Time.monotonicNow();
-
-    while (Time.monotonicNow() < startTime + runTimeMillis) {
-
-      String keyName = null;
-      try {
-        if (agedWriteProbability.isTrue()) {
-          synchronized (agedFileAllocationIndex) {
-            int index = agedFileAllocationIndex.getAndIncrement();
-            ByteBuffer buffer = dataBuffer.getBuffer(index);
-            keyName = MiniOzoneLoadGenerator.getKeyName(index, agedSuffix);
-            agedLoadBucket.writeKey(buffer, keyName);
-            agedFileWrittenIndex.getAndIncrement();
-          }
-        } else {
-          Optional<Integer> index = randomKeyToRead();
-          if (index.isPresent()) {
-            ByteBuffer buffer = dataBuffer.getBuffer(index.get());
-            keyName =
-                MiniOzoneLoadGenerator.getKeyName(index.get(), agedSuffix);
-            agedLoadBucket.readKey(buffer, keyName);
-          }
-        }
-      } catch (Throwable t) {
-        LOG.error("AGED LOADGEN: {} Exiting due to exception", keyName, t);
-        ExitUtil.terminate(new ExitUtil.ExitException(1, t));
-        break;
+  @Override
+  public String generateLoad() throws Exception {
+    if (agedWriteProbability.isTrue()) {
+      synchronized (agedFileAllocationIndex) {
+        int index = agedFileAllocationIndex.getAndIncrement();
+        ByteBuffer buffer = dataBuffer.getBuffer(index);
+        String keyName = getKeyName(index, agedSuffix);
+        agedLoadBucket.writeKey(buffer, keyName);
+        agedFileWrittenIndex.getAndIncrement();
+        return keyName;
+      }
+    } else {
+      Optional<Integer> index = randomKeyToRead();
+      if (index.isPresent()) {
+        ByteBuffer buffer = dataBuffer.getBuffer(index.get());
+        String keyName = getKeyName(index.get(), agedSuffix);
+        agedLoadBucket.readKey(buffer, keyName);
+        return keyName;
+      } else {
+        return "NoKey";
       }
     }
   }
@@ -99,12 +89,13 @@ public class AgedLoadGenerator implements LoadGenerator {
         : Optional.empty();
   }
 
+  @Override
   public void initialize() {
     // Nothing to do here
   }
 
   @Override
   public String name() {
-    return "Aged Load";
+    return "Aged";
   }
 }

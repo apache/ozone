@@ -43,7 +43,6 @@ public class MiniOzoneLoadGenerator {
   private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneLoadGenerator.class);
 
-  private static String keyNameDelimiter = "_";
   private final List<LoadExecutors> loadExecutors;
 
   private final OzoneVolume volume;
@@ -98,9 +97,5 @@ public class MiniOzoneLoadGenerator {
 
   void shutdownLoadGenerator() {
     loadExecutors.forEach(LoadExecutors::shutdown);
-  }
-
-  public static String getKeyName(int keyIndex, String prefix) {
-    return prefix + keyNameDelimiter + keyIndex;
   }
 }

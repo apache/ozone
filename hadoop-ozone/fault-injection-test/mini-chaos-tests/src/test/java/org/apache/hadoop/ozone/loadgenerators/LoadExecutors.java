@@ -18,14 +18,16 @@
 
 package org.apache.hadoop.ozone.loadgenerators;
 
+import org.apache.hadoop.util.ExitUtil;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -38,24 +40,42 @@ public class LoadExecutors {
 
   private final LoadGenerator generator;
   private final int numThreads;
-  private final ThreadPoolExecutor executor;
+  private final ExecutorService executor;
   private final List<CompletableFuture<Void>> futures = new ArrayList<>();
 
   public LoadExecutors(int numThreads, LoadGenerator generator) {
     this.numThreads = numThreads;
     this.generator = generator;
-    this.executor = new ThreadPoolExecutor(numThreads, numThreads,
-        100, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
-        new ThreadPoolExecutor.CallerRunsPolicy());
-    executor.prestartAllCoreThreads();
+    this.executor = Executors.newFixedThreadPool(numThreads);
   }
+
+  private void load(long runTimeMillis) {
+    long threadID = Thread.currentThread().getId();
+    LOG.info("{} LOADGEN: Started Aged IO Thread:{}.",
+        generator.name(), threadID);
+    long startTime = Time.monotonicNow();
+
+    while (Time.monotonicNow() - startTime < runTimeMillis) {
+
+      String keyName = null;
+      try {
+        keyName = generator.generateLoad();
+      } catch (Throwable t) {
+        LOG.error("{} LOADGEN: {} Exiting due to exception",
+            generator.name(), keyName, t);
+        ExitUtil.terminate(new ExitUtil.ExitException(1, t));
+        break;
+      }
+    }
+  }
+
 
   public void startLoad(long time) {
     LOG.info("Starting {} threads for {}", numThreads, generator.name());
     generator.initialize();
     for (int i = 0; i < numThreads; i++) {
       futures.add(CompletableFuture.runAsync(
-          () ->generator.startLoad(time), executor));
+          () -> load(time), executor));
     }
   }
 

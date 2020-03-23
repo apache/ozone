@@ -33,7 +33,7 @@ import java.util.List;
  * Random load generator which writes, read and deletes keys from
  * the bucket.
  */
-public class RandomLoadGenerator implements LoadGenerator {
+public class RandomLoadGenerator extends LoadGenerator {
   private static final Logger LOG =
       LoggerFactory.getLogger(RandomLoadGenerator.class);
 
@@ -45,30 +45,19 @@ public class RandomLoadGenerator implements LoadGenerator {
     this.dataBuffer = dataBuffer;
   }
 
-  // Start IO load on an Ozone bucket.
-  public void startLoad(long runTimeMillis) {
-    long threadID = Thread.currentThread().getId();
-    LOG.info("Started Mixed IO Thread:{}.", threadID);
-    String threadName = Thread.currentThread().getName();
-    long startTime = Time.monotonicNow();
+  @Override
+  public String generateLoad() throws Exception {
+    LoadBucket bucket =
+        ozoneBuckets.get((int) (Math.random() * ozoneBuckets.size()));
+    int index = RandomUtils.nextInt();
+    ByteBuffer buffer = dataBuffer.getBuffer(index);
+    String keyName = getKeyName(index, name());
+    bucket.writeKey(buffer, keyName);
 
-    while (Time.monotonicNow() < startTime + runTimeMillis) {
-      LoadBucket bucket =
-          ozoneBuckets.get((int) (Math.random() * ozoneBuckets.size()));
-      try {
-        int index = RandomUtils.nextInt();
-        ByteBuffer buffer = dataBuffer.getBuffer(index);
-        String keyName = MiniOzoneLoadGenerator.getKeyName(index, threadName);
-        bucket.writeKey(buffer, keyName);
+    bucket.readKey(buffer, keyName);
 
-        bucket.readKey(buffer, keyName);
-
-        bucket.deleteKey(keyName);
-      } catch (Throwable t) {
-        LOG.error("LOADGEN: Exiting due to exception", t);
-        ExitUtil.terminate(new ExitUtil.ExitException(3, t));
-      }
-    }
+    bucket.deleteKey(keyName);
+    return keyName;
   }
 
   public void initialize() {

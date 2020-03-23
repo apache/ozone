@@ -34,7 +34,7 @@ import java.nio.ByteBuffer;
  * This load generator read, writes and deletes data using the filesystem
  * apis.
  */
-public class FilesystemLoadGenerator implements LoadGenerator {
+public class FilesystemLoadGenerator extends LoadGenerator {
   private static final Logger LOG =
       LoggerFactory.getLogger(FilesystemLoadGenerator.class);
 
@@ -47,36 +47,26 @@ public class FilesystemLoadGenerator implements LoadGenerator {
     this.fsBucket = fsBucket;
   }
 
-  // Start IO load on an Ozone bucket.
-  public void startLoad(long runTimeMillis) {
-    long threadID = Thread.currentThread().getId();
-    LOG.info("Started Filesystem IO Thread:{}.", threadID);
-    String threadName = Thread.currentThread().getName();
-    long startTime = Time.monotonicNow();
+  @Override
+  public String generateLoad() throws Exception {
+    int index = RandomUtils.nextInt();
+    ByteBuffer buffer = dataBuffer.getBuffer(index);
+    String keyName = getKeyName(index, name());
+    fsBucket.writeKey(true, buffer, keyName);
 
-    while (Time.monotonicNow() < startTime + runTimeMillis) {
-      try {
-        int index = RandomUtils.nextInt();
-        ByteBuffer buffer = dataBuffer.getBuffer(index);
-        String keyName = MiniOzoneLoadGenerator.getKeyName(index, threadName);
-        fsBucket.writeKey(true, buffer, keyName);
+    fsBucket.readKey(true, buffer, keyName);
 
-        fsBucket.readKey(true, buffer, keyName);
-
-        fsBucket.deleteKey(true, keyName);
-      } catch (Throwable t) {
-        LOG.error("LOADGEN: Exiting due to exception", t);
-        ExitUtil.terminate(new ExitUtil.ExitException(1, t));
-      }
-    }
+    fsBucket.deleteKey(true, keyName);
+    return keyName;
   }
 
+  @Override
   public void initialize() {
     // Nothing to do here
   }
 
   @Override
   public String name() {
-    return "FileSystem Load";
+    return "FileSystem";
   }
 }

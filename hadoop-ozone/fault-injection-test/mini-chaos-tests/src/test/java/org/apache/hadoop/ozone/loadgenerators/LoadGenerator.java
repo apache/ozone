@@ -21,12 +21,17 @@ package org.apache.hadoop.ozone.loadgenerators;
 /**
  * Interface for load generator.
  */
-public interface LoadGenerator {
+public abstract class LoadGenerator {
 
-  void initialize();
+  String keyNameDelimiter = "_";
 
-  void startLoad(long time);
+  public abstract void initialize();
 
-  String name();
+  public abstract String generateLoad() throws Exception;
 
+  public abstract String name();
+
+  String getKeyName(int keyIndex, String prefix) {
+    return prefix + keyNameDelimiter + keyIndex;
+  }
 }
