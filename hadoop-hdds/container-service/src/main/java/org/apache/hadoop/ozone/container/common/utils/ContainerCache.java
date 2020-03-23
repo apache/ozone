@@ -65,13 +65,15 @@ public final class ContainerCache extends LRUMap {
   /**
    * Return a singleton instance of {@link ContainerCache}
    * that holds the DB handlers. and recreate it if renew is true
-   * This method is useful for testing because we need a fresh new instance for each test
+   * This method is useful for testing because we need a fresh
+   * new instance for each test
    *
    * @param conf - Configuration.
    * @return A instance of {@link ContainerCache}.
    */
   @VisibleForTesting
-  synchronized static ContainerCache getInstance(Configuration conf, boolean renew) {
+  synchronized static ContainerCache getInstance(Configuration conf,
+                                                 boolean renew) {
     if (renew || cache == null) {
       int cacheSize = conf.getInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE,
             OzoneConfigKeys.OZONE_CONTAINER_CACHE_DEFAULT);
