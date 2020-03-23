@@ -60,7 +60,7 @@ public class TestContainerCache {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
 
-    ContainerCache cache = ContainerCache.getInstance(conf, true);
+    ContainerCache cache = ContainerCache.getInstance(conf);
     File containerDir1 = new File(root, "cont1");
     File containerDir2 = new File(root, "cont2");
     File containerDir3 = new File(root, "cont3");
