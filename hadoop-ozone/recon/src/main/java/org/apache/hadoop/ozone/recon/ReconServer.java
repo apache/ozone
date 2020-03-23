@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
@@ -67,6 +68,7 @@ public class ReconServer extends GenericCli {
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     ConfigurationProvider.setConfiguration(ozoneConfiguration);
+    HddsServerUtil.initializeMetrics(ozoneConfiguration, "Recon");
 
     injector =  Guice.createInjector(new
         ReconControllerModule(),
