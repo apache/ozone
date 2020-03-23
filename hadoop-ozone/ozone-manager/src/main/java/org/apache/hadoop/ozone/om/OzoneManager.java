@@ -202,6 +202,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_VOLUME_LISTALL_ALLOWED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
@@ -295,6 +297,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static String keyProviderUriKeyName =
       CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 
+  private boolean allowListAllVolumes;
   // Adding parameters needed for VolumeRequests here, so that during request
   // execution, we can get from ozoneManager.
   private long maxUserVolumeCount;
@@ -341,6 +344,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     loginOMUserIfSecurityEnabled(conf);
 
+    this.allowListAllVolumes = conf.getBoolean(
+        OZONE_OM_USER_VOLUME_LISTALL_ALLOWED,
+        OZONE_OM_USER_VOLUME_LISTALL_ALLOWED_DEFAULT);
     this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
         OZONE_OM_USER_MAX_VOLUME_DEFAULT);
     Preconditions.checkArgument(this.maxUserVolumeCount > 0,
@@ -421,11 +427,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     instantiateServices();
-
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo(
         omStorage.getCurrentDir());
     initializeRatisServer();
-
     if (isRatisEnabled) {
       // Create Ratis storage dir
       String omRatisDirectory =
@@ -446,7 +450,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     metrics = OMMetrics.create();
-
     omClientProtocolMetrics = ProtocolMessageMetrics
         .create("OmClientProtocol", "Ozone Manager RPC endpoint",
             OzoneManagerProtocolProtos.Type.values());
@@ -1876,6 +1879,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USERNAME, null);
     try {
       metrics.incNumVolumeLists();
+      if (!allowListAllVolumes) {
+        // Only admin can list all volumes when disallowed in config
+        checkAdmin();
+      }
       return volumeManager.listVolumes(null, prefix, prevKey, maxKeys);
     } catch (Exception ex) {
       metrics.incNumVolumeListFails();
