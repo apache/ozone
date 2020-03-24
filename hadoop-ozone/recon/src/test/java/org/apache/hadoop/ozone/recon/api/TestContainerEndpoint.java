@@ -92,7 +92,7 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
     reconOMMetadataManager = getTestMetadataManager(
         initializeNewOmMetadataManager());
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        getMockOzoneManagerServiceProvider();
+        mock(OzoneManagerServiceProviderImpl.class);
 
     Injector parentInjector = guiceInjectorTest.getInjector(
         ozoneManagerServiceProvider, reconOMMetadataManager, temporaryFolder);
@@ -449,10 +449,6 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
     assertEquals(keyCount, container.getKeys());
     assertEquals(pipelineID.getId(), container.getPipelineID());
     assertEquals(0, container.getDatanodes().size());
-    assertTrue(System.currentTimeMillis() > container.getMissingSince());
-  }
-
-  private OzoneManagerServiceProviderImpl getMockOzoneManagerServiceProvider() {
-    return mock(OzoneManagerServiceProviderImpl.class);
+    assertEquals(missingSince, container.getMissingSince());
   }
 }

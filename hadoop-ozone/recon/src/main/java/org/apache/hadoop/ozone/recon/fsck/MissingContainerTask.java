@@ -48,7 +48,7 @@ public class MissingContainerTask extends ReconScmTask {
 
   private ContainerManager containerManager;
   private MissingContainersDao missingContainersDao;
-  private static final long INTERVAL = 60 * 1000L;
+  private static final long INTERVAL = 5 * 60 * 1000L;
 
   @Inject
   public MissingContainerTask(

@@ -108,9 +108,8 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
     Set<Long> missingContainerIDs = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(2L, 3L))
     );
-    Assert.assertTrue(all.stream().allMatch(record ->
-        missingContainerIDs.stream().anyMatch(
-            record.getContainerId()::equals)));
+    Assert.assertTrue(all.stream().allMatch(r ->
+        missingContainerIDs.contains(r.getContainerId())));
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(missingContainerTask.getTaskName());
     Assert.assertTrue(taskStatus.getLastUpdatedTimestamp() >
