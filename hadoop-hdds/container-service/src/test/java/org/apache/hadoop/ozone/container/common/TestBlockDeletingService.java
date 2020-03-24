@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletio
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -97,7 +96,6 @@ public class TestBlockDeletingService {
   @AfterClass
   public static void cleanup() throws IOException {
     FileUtils.deleteDirectory(testRoot);
-    BlockUtils.shutdownCache(ContainerCache.getInstance(new Configuration()));
   }
 
   /**
