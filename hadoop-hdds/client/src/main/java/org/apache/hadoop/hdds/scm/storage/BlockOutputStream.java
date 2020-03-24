@@ -438,7 +438,9 @@ public class BlockOutputStream extends OutputStream {
   @Override
   public void flush() throws IOException {
     if (xceiverClientManager != null && xceiverClient != null
-        && bufferPool != null && bufferPool.getSize() > 0 && whetherDoFlush()) {
+        && bufferPool != null && bufferPool.getSize() > 0
+        && (!streamBufferFlushDelay ||
+            writtenDataLength - totalDataFlushedLength >= streamBufferSize)) {
       try {
         handleFlush(false);
       } catch (InterruptedException | ExecutionException e) {
@@ -448,15 +450,6 @@ public class BlockOutputStream extends OutputStream {
         adjustBuffersOnException();
         throw getIoException();
       }
-    }
-  }
-
-  private boolean whetherDoFlush() {
-    if (streamBufferFlushDelay &&
-        (writtenDataLength - totalDataFlushedLength) < streamBufferSize) {
-      return false;
-    } else {
-      return true;
     }
   }
 
