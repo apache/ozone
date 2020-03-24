@@ -142,13 +142,12 @@ public class TestHddsDispatcher {
   public void testCreateContainerWithWriteChunk() throws IOException {
     String testDir =
         GenericTestUtils.getTempPath(TestHddsDispatcher.class.getSimpleName());
-    HddsDispatcher hddsDispatcher = null;
     try {
       UUID scmId = UUID.randomUUID();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir);
       DatanodeDetails dd = randomDatanodeDetails();
-      hddsDispatcher = createDispatcher(dd, scmId, conf);
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest =
           getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
       // send read chunk request and make sure container does not exist
@@ -167,7 +166,7 @@ public class TestHddsDispatcher {
       Assert.assertEquals(response.getReadChunk().getData(),
           writeChunkRequest.getWriteChunk().getData());
     } finally {
-      shutdownDispatcher(hddsDispatcher);
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
   }
@@ -176,13 +175,12 @@ public class TestHddsDispatcher {
   public void testContainerNotFoundWithCommitChunk() throws IOException {
     String testDir =
         GenericTestUtils.getTempPath(TestHddsDispatcher.class.getSimpleName());
-    HddsDispatcher hddsDispatcher = null;
     try {
       UUID scmId = UUID.randomUUID();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir);
       DatanodeDetails dd = randomDatanodeDetails();
-      hddsDispatcher = createDispatcher(dd, scmId, conf);
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest =
           getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
 
@@ -209,7 +207,7 @@ public class TestHddsDispatcher {
           "ContainerID " + writeChunkRequest.getContainerID()
               + " does not exist"));
     } finally {
-      shutdownDispatcher(hddsDispatcher);
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
   }
@@ -218,13 +216,12 @@ public class TestHddsDispatcher {
   public void testWriteChunkWithCreateContainerFailure() throws IOException {
     String testDir = GenericTestUtils.getTempPath(
         TestHddsDispatcher.class.getSimpleName());
-    HddsDispatcher hddsDispatcher = null;
     try {
       UUID scmId = UUID.randomUUID();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir);
       DatanodeDetails dd = randomDatanodeDetails();
-      hddsDispatcher = createDispatcher(dd, scmId, conf);
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
       ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
           dd.getUuidString(), 1L, 1L);
 
@@ -246,7 +243,7 @@ public class TestHddsDispatcher {
           .contains("ContainerID " + writeChunkRequest.getContainerID()
               + " creation failed , Result: DISK_OUT_OF_SPACE"));
     } finally {
-      shutdownDispatcher(hddsDispatcher);
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
   }
@@ -281,13 +278,6 @@ public class TestHddsDispatcher {
         conf, containerSet, volumeSet, handlers, context, metrics, null);
     hddsDispatcher.setScmId(scmId.toString());
     return hddsDispatcher;
-  }
-
-  private void shutdownDispatcher(HddsDispatcher dispatcher){
-    if(dispatcher != null) {
-      dispatcher.shutdown();
-    }
-    ContainerMetrics.remove();
   }
 
   // This method has to be removed once we move scm/TestUtils.java
