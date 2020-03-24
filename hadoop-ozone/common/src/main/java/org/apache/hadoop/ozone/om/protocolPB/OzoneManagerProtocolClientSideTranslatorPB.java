@@ -573,7 +573,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Lists volume owned by a specific user.
+   * Lists volumes accessible by a specific user.
    *
    * @param userName - user name
    * @param prefix - Filter prefix -- Return only entries that match this.

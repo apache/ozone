@@ -1728,7 +1728,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public boolean checkVolumeAccess(String volume, OzoneAclInfo userAcl)
       throws IOException {
-    if(isAclEnabled) {
+    if (isAclEnabled) {
       checkAcls(ResourceType.VOLUME, StoreType.OZONE,
           ACLType.READ, volume, null, null);
     }
@@ -1813,7 +1813,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Lists volume owned by a specific user.
+   * Lists volumes accessible by a specific user.
    *
    * @param userName - user name
    * @param prefix - Filter prefix -- Return only entries that match this.
@@ -1826,7 +1826,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<OmVolumeArgs> listVolumeByUser(String userName, String prefix,
       String prevKey, int maxKeys) throws IOException {
-    if(isAclEnabled) {
+    if (isAclEnabled) {
       UserGroupInformation remoteUserUgi = ProtobufRpcEngine.Server.
           getRemoteUser();
       if (remoteUserUgi == null) {
@@ -1843,7 +1843,46 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USERNAME, userName);
     try {
       metrics.incNumVolumeLists();
-      return volumeManager.listVolumes(userName, prefix, prevKey, maxKeys);
+      if (isAclEnabled) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("ACL is enabled. Listing accessible volumes for user. "
+                  + "Principal: {}, keytab: {}",
+              configuration.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY),
+              configuration.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY));
+        }
+        // List all volumes, then filter by ACL read
+        List<OmVolumeArgs> listOfAllVolumes = volumeManager.listVolumes(
+            null, prefix, prevKey, maxKeys);
+        List<OmVolumeArgs> res = new ArrayList<>();
+        for (OmVolumeArgs volumeArgs : listOfAllVolumes) {
+          boolean hasAccess = true;
+          try {
+            // Check Read ACL
+            checkAcls(ResourceType.VOLUME, StoreType.OZONE,
+                ACLType.READ, volumeArgs.getVolume(), null, null);
+          } catch (OMException ex) {
+            // Only handle PERMISSION_DENIED here, throw otherwise
+            if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+              hasAccess = false;
+            } else {
+              throw ex;
+            }
+          }
+          if (hasAccess) {
+            res.add(volumeArgs);
+          }
+        }
+        return res;
+      } else {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("ACL is disabled. Listing volumes owned by user. "
+                  + "Principal: {}, keytab: {}",
+              configuration.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY),
+              configuration.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY));
+        }
+        // When ACL is not enabled, fallback to owner check
+        return volumeManager.listVolumes(userName, prefix, prevKey, maxKeys);
+      }
     } catch (Exception ex) {
       metrics.incNumVolumeListFails();
       auditSuccess = false;
