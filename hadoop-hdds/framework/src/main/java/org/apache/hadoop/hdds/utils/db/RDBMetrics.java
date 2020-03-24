@@ -34,14 +34,20 @@ public class RDBMetrics {
   private static final String SOURCE_NAME =
       RDBMetrics.class.getSimpleName();
 
+  private static RDBMetrics instance;
+
   public RDBMetrics() {
   }
 
-  public static RDBMetrics create() {
+  public static synchronized RDBMetrics create() {
+    if (instance != null) {
+      return instance;
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
+    instance = ms.register(SOURCE_NAME,
         "Rocks DB Metrics",
         new RDBMetrics());
+    return instance;
   }
 
   private @Metric MutableCounterLong numDBKeyMayExistChecks;
