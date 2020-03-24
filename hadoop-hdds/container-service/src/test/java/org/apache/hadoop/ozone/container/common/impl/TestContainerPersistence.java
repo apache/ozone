@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.impl;
 import com.google.common.collect.Maps;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -39,7 +38,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -150,11 +148,6 @@ public class TestContainerPersistence {
       StorageLocation location = StorageLocation.parse(dir);
       FileUtils.deleteDirectory(new File(location.getNormalizedUri()));
     }
-  }
-
-  @After
-  public void cleanupBlockUtil() {
-    BlockUtils.shutdownCache(ContainerCache.getInstance(new Configuration()));
   }
 
   private long getTestContainerID() {
