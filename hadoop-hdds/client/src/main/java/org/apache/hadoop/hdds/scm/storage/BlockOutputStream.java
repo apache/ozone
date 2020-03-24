@@ -452,7 +452,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private boolean whetherDoFlush() {
-    if (streamBufferFlushDelay == true  &&
+    if (streamBufferFlushDelay &&
         (writtenDataLength - totalDataFlushedLength) < streamBufferSize) {
       return false;
     } else {

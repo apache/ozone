@@ -66,8 +66,8 @@ public final class BlockOutputStreamEntry extends OutputStream {
   private BlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientManager xceiverClientManager,
       Pipeline pipeline, String requestId, int chunkSize,
-      long length, int streamBufferSize, long streamBufferFlushSize, boolean streamBufferFlushDelay,
-      long streamBufferMaxSize,
+      long length, int streamBufferSize, long streamBufferFlushSize,
+      boolean streamBufferFlushDelay, long streamBufferMaxSize,
       long watchTimeout, BufferPool bufferPool,
       ChecksumType checksumType, int bytesPerChecksum,
       Token<OzoneBlockTokenIdentifier> token) {

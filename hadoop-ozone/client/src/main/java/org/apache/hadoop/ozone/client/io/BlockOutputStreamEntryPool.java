@@ -77,7 +77,7 @@ public class BlockOutputStreamEntryPool {
       int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType type,
       int bufferSize, long bufferFlushSize,
-      boolean bufferFlushDelay,long bufferMaxSize,
+      boolean bufferFlushDelay, long bufferMaxSize,
       long size, long watchTimeout, ContainerProtos.ChecksumType checksumType,
       int bytesPerChecksum, String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
