@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -1560,8 +1561,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void createVolume(OmVolumeArgs args) throws IOException {
     try {
-      metrics.incNumVolumeCreates();
       checkAdmin();
+      HddsClientUtils.verifyResourceName(args.getVolume());
+      metrics.incNumVolumeCreates();
       volumeManager.createVolume(args);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_VOLUME,
           (args == null) ? null : args.toAuditMap()));
@@ -1883,7 +1885,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private void checkAdmin() throws OMException {
-    if(isAclEnabled) {
+    if (isAclEnabled) {
       if (!ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
           !ozAdmins.contains(ProtobufRpcEngine.Server.getRemoteUser()
               .getUserName())) {
@@ -1905,10 +1907,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void createBucket(OmBucketInfo bucketInfo) throws IOException {
     try {
-      if(isAclEnabled) {
+      if (isAclEnabled) {
         checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
             bucketInfo.getVolumeName(), bucketInfo.getBucketName(), null);
       }
+      HddsClientUtils.verifyResourceName(bucketInfo.getVolumeName(),
+          bucketInfo.getBucketName());
       metrics.incNumBucketCreates();
       bucketManager.createBucket(bucketInfo);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_BUCKET,
