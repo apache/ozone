@@ -284,8 +284,9 @@ public class TestHddsDispatcher {
   }
 
   private void shutdownDispatcher(HddsDispatcher dispatcher){
-    if(dispatcher != null)
+    if(dispatcher != null) {
       dispatcher.shutdown();
+    }
     ContainerMetrics.remove();
   }
 
