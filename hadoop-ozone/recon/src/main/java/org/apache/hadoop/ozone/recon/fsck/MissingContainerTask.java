@@ -22,6 +22,7 @@ import java.util.Set;
 
 import javax.inject.Inject;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -47,7 +48,7 @@ public class MissingContainerTask extends ReconScmTask {
 
   private ContainerManager containerManager;
   private MissingContainersDao missingContainersDao;
-  private static final long INTERVAL = 5 * 60 * 1000L;
+  private static final long INTERVAL = 60 * 1000L;
 
   @Inject
   public MissingContainerTask(
@@ -83,7 +84,12 @@ public class MissingContainerTask extends ReconScmTask {
     try {
       Set<ContainerReplica> containerReplicas =
           containerManager.getContainerReplicas(containerID);
-      if (CollectionUtils.isEmpty(containerReplicas)) {
+      // check if a container has 0 replicas or if all available replicas
+      // are marked UNHEALTHY.
+      boolean isAllUnhealthy =
+          containerReplicas.stream().allMatch(replica ->
+              replica.getState().equals(State.UNHEALTHY));
+      if (CollectionUtils.isEmpty(containerReplicas) || isAllUnhealthy) {
         if (!missingContainersDao.existsById(containerID.getId())) {
           LOG.info("Found a missing container with ID {}. Adding it to the " +
               "database", containerID.getId());
