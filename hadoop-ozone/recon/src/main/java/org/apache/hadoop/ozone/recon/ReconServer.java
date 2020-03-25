@@ -57,6 +57,7 @@ public class ReconServer extends GenericCli {
   private ContainerDBServiceProvider containerDBServiceProvider;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
   private OzoneStorageContainerManager reconStorageContainerManager;
+  private OzoneConfiguration configuration;
 
   private volatile boolean isStarted = false;
 
@@ -68,7 +69,7 @@ public class ReconServer extends GenericCli {
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     ConfigurationProvider.setConfiguration(ozoneConfiguration);
-    HddsServerUtil.initializeMetrics(ozoneConfiguration, "Recon");
+    configuration = ozoneConfiguration;
 
     injector =  Guice.createInjector(new
         ReconControllerModule(),
@@ -126,6 +127,8 @@ public class ReconServer extends GenericCli {
     if (!isStarted) {
       LOG.info("Starting Recon server");
       isStarted = true;
+      // Initialize metrics for Recon
+      HddsServerUtil.initializeMetrics(configuration, "Recon");
       if (httpServer != null) {
         httpServer.start();
       }
