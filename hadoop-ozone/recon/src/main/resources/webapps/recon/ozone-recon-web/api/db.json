@@ -361,7 +361,9 @@
           "localhost1.storage.enterprise.com",
           "localhost3.storage.enterprise.com",
           "localhost5.storage.enterprise.com"
-        ]
+        ],
+        "missingSince": 1578491371528,
+        "pipelineId": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
       },
       {
         "id": 2,
@@ -370,7 +372,9 @@
           "localhost1.storage.enterprise.com",
           "localhost3.storage.enterprise.com",
           "localhost5.storage.enterprise.com"
-        ]
+        ],
+        "missingSince": 1578491471528,
+        "pipelineId": "04a5d908-ff01-4ce6-ad75-f3ec73dfc8a2"
       }
     ]
   },
