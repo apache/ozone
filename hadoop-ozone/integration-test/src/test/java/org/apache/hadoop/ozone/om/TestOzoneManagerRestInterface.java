@@ -24,13 +24,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.protocol.proto
     .OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
@@ -133,23 +130,6 @@ public class TestOzoneManagerRestInterface {
         break;
       }
     }
-  }
-
-  @Test
-  public void testInvalidVolumeBucketNamesThrowException() throws Exception {
-    OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
-        .setVolume("v1")
-        .setOwnerName("owner1")
-        .setAdminName("admin1")
-        .build();
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Bucket or Volume length is illegal",
-        () -> cluster.getOzoneManager().createVolume(volumeArgs));
-    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder().setVolumeName(
-        "volume1").setBucketName("b1").build();
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Bucket or Volume length is illegal",
-        () -> cluster.getOzoneManager().createBucket(bucketInfo));
   }
 
 }
