@@ -287,16 +287,25 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public OzoneFSOutputStream createFile(String pathStr, boolean overWrite,
-      boolean recursive) throws IOException {
+  public OzoneFSOutputStream createFile(String pathStr, short replication,
+      boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED);
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
     try {
       // Hadoop CopyCommands class always sets recursive to true
       OzoneBucket bucket = getBucket(ofsPath, recursive);
-      OzoneOutputStream ozoneOutputStream = bucket.createFile(
-          key, 0, replicationType, replicationFactor, overWrite, recursive);
+      OzoneOutputStream ozoneOutputStream = null;
+      if (replication == ReplicationFactor.ONE.getValue()
+          || replication == ReplicationFactor.THREE.getValue()) {
+        ReplicationFactor clientReplication = ReplicationFactor
+            .valueOf(replication);
+        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
+            clientReplication, overWrite, recursive);
+      } else {
+        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
+            replicationFactor, overWrite, recursive);
+      }
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
