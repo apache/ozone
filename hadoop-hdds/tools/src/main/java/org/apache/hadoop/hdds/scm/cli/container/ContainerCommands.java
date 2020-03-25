@@ -17,14 +17,18 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.MissingSubcommandException;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.Spec;
 
 /**
  * Subcommand to group container related operations.
@@ -43,6 +47,9 @@ import picocli.CommandLine.ParentCommand;
     })
 public class ContainerCommands implements Callable<Void> {
 
+  @Spec
+  private CommandSpec spec;
+
   @ParentCommand
   private WithScmClient parent;
 
@@ -52,7 +59,15 @@ public class ContainerCommands implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    throw new MissingSubcommandException(
-        new CommandLine(new ContainerCommands()));
+    GenericCli.missingSubcommand(spec);
+    return null;
+  }
+
+  public static void checkContainerExists(ScmClient scmClient, long containerId)
+      throws IOException {
+    ContainerInfo container = scmClient.getContainer(containerId);
+    if (container == null) {
+      throw new IllegalArgumentException("No such container " + containerId);
+    }
   }
 }

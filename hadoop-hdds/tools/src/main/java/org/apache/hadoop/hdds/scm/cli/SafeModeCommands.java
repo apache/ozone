@@ -19,15 +19,16 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.MissingSubcommandException;
 import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.Spec;
 
 /**
  * Subcommand to group safe mode related operations.
@@ -47,6 +48,9 @@ public class SafeModeCommands implements Callable<Void> {
   private static final Logger LOG =
       LoggerFactory.getLogger(SafeModeCommands.class);
 
+  @Spec
+  private CommandSpec spec;
+
   @ParentCommand
   private WithScmClient parent;
 
@@ -56,7 +60,7 @@ public class SafeModeCommands implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    throw new MissingSubcommandException(
-        new CommandLine(new SafeModeCommands()));
+    GenericCli.missingSubcommand(spec);
+    return null;
   }
 }

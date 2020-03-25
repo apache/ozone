@@ -38,6 +38,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMI
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import picocli.CommandLine;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
 
 /**
  * Handler of printTopology command.
@@ -48,6 +50,9 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class TopologySubcommand implements Callable<Void> {
+
+  @Spec
+  private CommandSpec spec;
 
   @CommandLine.ParentCommand
   private WithScmClient parent;

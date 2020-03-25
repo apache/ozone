@@ -19,13 +19,14 @@ package org.apache.hadoop.hdds.scm.cli;
 
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.MissingSubcommandException;
 import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
 
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.Spec;
 
 /**
  * Subcommand to group replication manager related operations.
@@ -42,6 +43,9 @@ import picocli.CommandLine.ParentCommand;
     })
 public class ReplicationManagerCommands implements Callable<Void> {
 
+  @Spec
+  private CommandSpec spec;
+
   @ParentCommand
   private WithScmClient parent;
 
@@ -51,7 +55,7 @@ public class ReplicationManagerCommands implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    throw new MissingSubcommandException(
-        new CommandLine(new ReplicationManagerCommands()));
+    GenericCli.missingSubcommand(spec);
+    return null;
   }
 }

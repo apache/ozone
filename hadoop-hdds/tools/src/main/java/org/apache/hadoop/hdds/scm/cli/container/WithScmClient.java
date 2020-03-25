@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.container;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
 /**
- * Command which provides and SCM client based on the current config.
+ * Command which provides a SCM client based on the current config.
  */
 public interface WithScmClient {
 
