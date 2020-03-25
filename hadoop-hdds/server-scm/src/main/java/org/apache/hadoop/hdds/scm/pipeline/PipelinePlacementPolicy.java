@@ -319,6 +319,12 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     return results;
   }
 
+  /**
+   * Random pick two nodes and compare with the pipeline load.
+   * Return the node with lower pipeline load.
+   * @param healthyNodes healthy nodes
+   * @return node
+   */
   private DatanodeDetails randomPick(List<DatanodeDetails> healthyNodes) {
     DatanodeDetails datanodeDetails;
     int firstNodeNdx = getRand().nextInt(healthyNodes.size());
@@ -338,16 +344,22 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     return datanodeDetails;
   }
 
+  /**
+   * Get a list of nodes with lower load than max pipeline number.
+   */
   private List<DatanodeDetails> getLowerLoadNodes(
       List<DatanodeDetails> nodes, int num) {
     int maxPipelineUsage = nodes.size() * heavyNodeCriteria /
         HddsProtos.ReplicationFactor.THREE.getNumber();
     return nodes.stream()
         // Skip the nodes which exceeds the load limit.
-        .filter(p -> nodeManager.getPipelinesCount(p) < num - maxPipelineUsage)
+        .filter(p -> nodeManager.getPipelinesCount(p) < maxPipelineUsage - num)
         .collect(Collectors.toList());
   }
 
+  /**
+   * Pick a datanode with lower pipeline load.
+   */
   private DatanodeDetails lowerLoadPick(List<DatanodeDetails> healthyNodes) {
     int curPipelineCounts =  stateManager
         .getPipelines(HddsProtos.ReplicationType.RATIS).size();

@@ -180,17 +180,17 @@ public class TestPipelinePlacementPolicy {
       }
     }
 
-    // Should max out pipeline usage
-    Assert.assertEquals(maxPipelineCount,
-        stateManager.getPipelines(HddsProtos.ReplicationType.RATIS).size());
-
-    // Every node should be equally using up the limit.
+    // Every node should be evenly used.
     int averageLoadOnNode = maxPipelineCount *
         HddsProtos.ReplicationFactor.THREE.getNumber() / healthyNodes.size();
     for (DatanodeDetails node : healthyNodes) {
       Assert.assertTrue(nodeManager.getPipelinesCount(node)
           >= averageLoadOnNode);
     }
+    
+    // Should max out pipeline usage.
+    Assert.assertEquals(maxPipelineCount,
+        stateManager.getPipelines(HddsProtos.ReplicationType.RATIS).size());
   }
 
   @Test
