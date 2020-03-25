@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -763,12 +764,7 @@ public class RpcClient implements ClientProtocol {
 
     Preconditions.checkArgument(Strings.isNotBlank(s3BucketName), "bucket " +
         "name cannot be null or empty.");
-    try {
-      HddsClientUtils.verifyResourceName(s3BucketName);
-    } catch (IllegalArgumentException exception) {
-      throw new OMException("Invalid bucket name: " + s3BucketName,
-          OMException.ResultCodes.INVALID_BUCKET_NAME);
-    }
+    OmUtils.validateBucketName(s3BucketName);
     ozoneManagerClient.createS3Bucket(userName, s3BucketName);
   }
 

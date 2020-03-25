@@ -1562,7 +1562,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void createVolume(OmVolumeArgs args) throws IOException {
     try {
       checkAdmin();
-      HddsClientUtils.verifyResourceName(args.getVolume());
+      OmUtils.validateVolumeName(args.getVolume());
       metrics.incNumVolumeCreates();
       volumeManager.createVolume(args);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_VOLUME,
@@ -1911,8 +1911,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
             bucketInfo.getVolumeName(), bucketInfo.getBucketName(), null);
       }
-      HddsClientUtils.verifyResourceName(bucketInfo.getVolumeName(),
-          bucketInfo.getBucketName());
+      OmUtils.validateBucketName(bucketInfo.getBucketName());
       metrics.incNumBucketCreates();
       bucketManager.createBucket(bucketInfo);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_BUCKET,
