@@ -100,7 +100,7 @@ public class TestMiniChaosOzoneCluster implements Runnable {
 
     loadGenerator =
         new MiniOzoneLoadGenerator(volume, numClients, numThreads,
-            numBuffers, configuration);
+            numBuffers, configuration, omServiceID);
   }
 
   /**
