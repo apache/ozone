@@ -77,7 +77,7 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_DB_CACHE_SIZE_DEFAULT = 128;
 
   public static final String OZONE_OM_USER_VOLUME_LISTALL_ALLOWED =
-      "ozone.om.user.volume.listall.allowed";
+      "ozone.om.volume.listall.allowed";
   public static final boolean OZONE_OM_USER_VOLUME_LISTALL_ALLOWED_DEFAULT =
       true;
   public static final String OZONE_OM_USER_MAX_VOLUME =

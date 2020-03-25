@@ -584,7 +584,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.user.volume.listall.allowed</name>
+    <name>ozone.om.volume.listall.allowed</name>
     <value>true</value>
     <tag>OM, MANAGEMENT</tag>
     <description>
