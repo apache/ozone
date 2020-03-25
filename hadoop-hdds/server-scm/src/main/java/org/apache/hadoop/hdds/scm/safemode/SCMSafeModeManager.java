@@ -138,13 +138,6 @@ public class SCMSafeModeManager implements SafeModeManager {
         exitRules.put(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE,
             oneReplicaPipelineSafeModeRule);
       }
-      boolean createPipelineInSafemode = conf.getBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
-
-      if (createPipelineInSafemode) {
-        pipelineManager.startPipelineCreator();
-      }
     } else {
       this.safeModeMetrics = null;
       exitSafeMode(eventQueue);

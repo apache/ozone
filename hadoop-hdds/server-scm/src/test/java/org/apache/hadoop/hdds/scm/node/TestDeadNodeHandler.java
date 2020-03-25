@@ -95,6 +95,10 @@ public class TestDeadNodeHandler {
     pipelineManager =
         (SCMPipelineManager)scm.getPipelineManager();
     pipelineManager.setAllowPipelineCreation(true);
+    // This should be triggered by safemode preCheck rules passing, or safe
+    // mode exiting, but the relevant events to trigger safe mode exit are not
+    // fired by this test and hence we need to start the creator thread here.
+    pipelineManager.startPipelineCreator();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
