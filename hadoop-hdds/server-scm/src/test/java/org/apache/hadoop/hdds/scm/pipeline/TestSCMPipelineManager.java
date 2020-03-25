@@ -468,6 +468,12 @@ public class TestSCMPipelineManager {
       // expected
     }
 
+    // Ensure a pipeline of factor ONE can be created - no exceptions should be
+    // raised.
+    Pipeline pipeline = pipelineManager
+        .createPipeline(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE);
+
     // Simulate safemode check exiting.
     pipelineManager.handleSafeModeTransition(
         new SCMSafeModeManager.SafeModeStatus(true, true));

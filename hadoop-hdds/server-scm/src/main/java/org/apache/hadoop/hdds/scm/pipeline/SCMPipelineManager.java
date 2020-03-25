@@ -221,7 +221,7 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public synchronized Pipeline createPipeline(ReplicationType type,
       ReplicationFactor factor) throws IOException {
-    if (!allowPipelineCreation.get()) {
+    if (!allowPipelineCreation.get() && factor != ReplicationFactor.ONE) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
       throw new IOException("Pipeline creation is not allowed as safe mode " +

@@ -94,6 +94,7 @@ public class TestDeadNodeHandler {
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     pipelineManager =
         (SCMPipelineManager)scm.getPipelineManager();
+    pipelineManager.setAllowPipelineCreation(true);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);

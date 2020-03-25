@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -70,8 +70,8 @@ public class TestSCMSafeModeManager {
   @Rule
   public final TemporaryFolder tempDir = new TemporaryFolder();
 
-  @BeforeClass
-  public static void setUp() {
+  @Before
+  public void setUp() {
     queue = new EventQueue();
     config = new OzoneConfiguration();
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
