@@ -111,6 +111,35 @@ public class TestPipelinePlacementPolicy {
   }
 
   @Test
+  public void testChooseNodeWithSingleNodeRack() throws SCMException {
+    // There is only one node on 3 racks altogether.
+    List<DatanodeDetails> datanodes = new ArrayList<>();
+    for (Node node : SINGLE_NODE_RACK) {
+      DatanodeDetails datanode = overwriteLocationInNode(
+          MockDatanodeDetails.randomDatanodeDetails(), node);
+      datanodes.add(datanode);
+    }
+    MockNodeManager localNodeManager = new MockNodeManager(initTopology(),
+        datanodes, false, datanodes.size());
+    PipelinePlacementPolicy localPlacementPolicy = new PipelinePlacementPolicy(
+        localNodeManager, new PipelineStateManager(), conf);
+    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
+    List<DatanodeDetails> results = localPlacementPolicy.chooseDatanodes(
+        new ArrayList<>(datanodes.size()),
+        new ArrayList<>(datanodes.size()),
+        nodesRequired, 0);
+
+    Assert.assertEquals(nodesRequired, results.size());
+    // 3 nodes should be on different racks.
+    Assert.assertNotEquals(results.get(0).getNetworkLocation(),
+        results.get(1).getNetworkLocation());
+    Assert.assertNotEquals(results.get(0).getNetworkLocation(),
+        results.get(2).getNetworkLocation());
+    Assert.assertNotEquals(results.get(1).getNetworkLocation(),
+        results.get(2).getNetworkLocation());
+  }
+  
+  @Test
   public void testChooseNodeBasedOnRackAwareness() {
     List<DatanodeDetails> healthyNodes = overWriteLocationInNodes(
         nodeManager.getNodes(HddsProtos.NodeState.HEALTHY));
@@ -192,6 +221,12 @@ public class TestPipelinePlacementPolicy {
       new NodeImpl("h8", "/r4", NetConstants.NODE_COST_DEFAULT),
   };
 
+  // 3 racks with single node.
+  private final static Node[] SINGLE_NODE_RACK = new NodeImpl[] {
+      new NodeImpl("h1", "/r1", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h2", "/r2", NetConstants.NODE_COST_DEFAULT),
+      new NodeImpl("h3", "/r3", NetConstants.NODE_COST_DEFAULT)
+  };
 
   private NetworkTopology createNetworkTopologyOnDifRacks() {
     NetworkTopology topology = new NetworkTopologyImpl(new Configuration());
