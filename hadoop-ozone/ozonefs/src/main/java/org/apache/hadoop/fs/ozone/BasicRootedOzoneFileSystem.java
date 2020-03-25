@@ -640,6 +640,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
+  @Override
+  public short getDefaultReplication() {
+    return adapter.getDefaultReplication();
+  }
+
   /**
    * Turn a path (relative or otherwise) into an Ozone key.
    *
