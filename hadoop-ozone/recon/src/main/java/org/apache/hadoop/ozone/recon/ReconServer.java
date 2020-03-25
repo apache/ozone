@@ -67,9 +67,8 @@ public class ReconServer extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    ConfigurationProvider.setConfiguration(ozoneConfiguration);
-    configuration = ozoneConfiguration;
+    configuration = createOzoneConfiguration();
+    ConfigurationProvider.setConfiguration(configuration);
 
     injector =  Guice.createInjector(new
         ReconControllerModule(),
@@ -86,7 +85,7 @@ public class ReconServer extends GenericCli {
 
     LOG.info("Initializing Recon server...");
     try {
-      loginReconUserIfSecurityEnabled(ozoneConfiguration);
+      loginReconUserIfSecurityEnabled(configuration);
       this.containerDBServiceProvider =
           injector.getInstance(ContainerDBServiceProvider.class);
 
