@@ -152,35 +152,34 @@ Test Multiple Failovers
             Start OM                    ${leaderOM}
     END
 
-##Disabling inconsistent test
-#Restart OM and Verify Ratis Logs
-#    Set Test Variable       ${OM_HOST}              om2
-#    Set Test Variable       ${keyBase}              testOMRestart_
-#
-#    # Stop 1 OM and get the Logs present in its Ratis Dir
-#                            Stop OM                 ${OM_HOST}
-#    ${numLogsBefore}        @{logsBefore} =         Get Ratis Logs          ${OM_HOST}
-#    ${leaderOM} =           Get OM Leader Node
-#
-#    # Perform write operations to advance the Ratis log index till a new Log segment is created
-#    FOR     ${INDEX}    IN RANGE    20
-#            Set Test Variable       ${keyPrefix}        ${keyBase}${INDEX}
-#            Put Multiple Keys       5                   ${keyPrefix}            ${TEST_FILE}
-#            ${numLogsLeader}        @{logsLeader} =     Get Ratis Logs          ${leaderOM}
-#            EXIT FOR LOOP IF        ${numLogsLeader} > ${numLogsBefore}
-#    END
-#    Should Be True                  ${numLogsLeader} > ${numLogsBefore}         Cannot test OM Restart as Ratis did not start new log segment.
-#
-#    # Restart the stopped OM and wait for Ratis to catch up with Leader OM
-#            Start OM                ${OM_HOST}
-#    FOR     ${INDEX}    IN RANGE    300
-#            ${numLogsAfter}         @{logsAfter} =      Get Ratis Logs          ${OM_HOST}
-#            EXIT FOR LOOP IF        ${numLogsAfter} >= ${numLogsLeader}
-#            Sleep                   1s
-#    END
-#    Should Be True                  ${numLogsAfter} >= ${numLogsLeader}         Restarted OM did not catch up with Leader OM
-#
-#    # Verify that the logs match with the Leader OMs logs
-#    List Should Contain Sub List    ${logsAfter}        ${logsLeader}
+Restart OM and Verify Ratis Logs
+    Set Test Variable       ${OM_HOST}              om2
+    Set Test Variable       ${keyBase}              testOMRestart_
+
+    # Stop 1 OM and get the Logs present in its Ratis Dir
+                            Stop OM                 ${OM_HOST}
+    ${numLogsBefore}        @{logsBefore} =         Get Ratis Logs          ${OM_HOST}
+    ${leaderOM} =           Get OM Leader Node
+
+    # Perform write operations to advance the Ratis log index till a new Log segment is created
+    FOR     ${INDEX}    IN RANGE    20
+            Set Test Variable       ${keyPrefix}        ${keyBase}${INDEX}
+            Put Multiple Keys       5                   ${keyPrefix}            ${TEST_FILE}
+            ${numLogsLeader}        @{logsLeader} =     Get Ratis Logs          ${leaderOM}
+            EXIT FOR LOOP IF        ${numLogsLeader} > ${numLogsBefore}
+    END
+    Should Be True                  ${numLogsLeader} > ${numLogsBefore}         Cannot test OM Restart as Ratis did not start new log segment.
+
+    # Restart the stopped OM and wait for Ratis to catch up with Leader OM
+            Start OM                ${OM_HOST}
+    FOR     ${INDEX}    IN RANGE    300
+            ${numLogsAfter}         @{logsAfter} =      Get Ratis Logs          ${OM_HOST}
+            EXIT FOR LOOP IF        ${numLogsAfter} >= ${numLogsLeader}
+            Sleep                   1s
+    END
+    Should Be True                  ${numLogsAfter} >= ${numLogsLeader}         Restarted OM did not catch up with Leader OM
+
+    # Verify that the logs match with the Leader OMs logs
+    List Should Contain Sub List    ${logsAfter}        ${logsLeader}
 
 
