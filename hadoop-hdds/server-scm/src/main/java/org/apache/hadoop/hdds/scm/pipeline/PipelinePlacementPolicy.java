@@ -408,7 +408,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   @VisibleForTesting
   protected DatanodeDetails chooseNodeFromNetworkTopology(
       NetworkTopology networkTopology, DatanodeDetails anchor,
-      List<DatanodeDetails> excludedNodes) throws SCMException {
+      List<DatanodeDetails> excludedNodes) {
     Preconditions.checkArgument(networkTopology != null);
 
     Collection<Node> excluded = new ArrayList<>();
