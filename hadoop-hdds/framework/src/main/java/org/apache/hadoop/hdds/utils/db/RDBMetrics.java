@@ -102,6 +102,7 @@ public class RDBMetrics {
   }
 
   public void unRegister() {
+    instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }

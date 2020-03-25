@@ -85,6 +85,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
    * Unregister the metrics instance.
    */
   public void unRegister() {
+    instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
