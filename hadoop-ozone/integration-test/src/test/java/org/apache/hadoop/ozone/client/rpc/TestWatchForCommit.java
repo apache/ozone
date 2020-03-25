@@ -58,6 +58,7 @@ import java.util.concurrent.TimeoutException;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
  * This class verifies the watchForCommit Handling by xceiverClient.
@@ -95,10 +96,12 @@ public class TestWatchForCommit {
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY,
         1, TimeUnit.SECONDS);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 5);
 
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
+        .setTotalPipelineNumLimit(10)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
@@ -107,7 +110,7 @@ public class TestWatchForCommit {
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "watchforcommithandlingtest";

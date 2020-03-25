@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ReportFromDatanode;
@@ -68,7 +68,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
 
@@ -95,6 +95,8 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+
+import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,37 +115,38 @@ public class SCMDatanodeProtocolServer implements
   /**
    * The RPC server that listens to requests from DataNodes.
    */
-  private final RPC.Server datanodeRpcServer;
+  private RPC.Server datanodeRpcServer;
 
   private final OzoneStorageContainerManager scm;
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
-  private final ProtocolMessageMetrics protocolMessageMetrics;
+  private ProtocolMessageMetrics protocolMessageMetrics;
 
   public SCMDatanodeProtocolServer(final OzoneConfiguration conf,
                                    OzoneStorageContainerManager scm,
                                    EventPublisher eventPublisher)
       throws IOException {
 
+    // This constructor has broken down to smaller methods so that Recon's
+    // passive SCM server can override them.
     Preconditions.checkNotNull(scm, "SCM cannot be null");
     Preconditions.checkNotNull(eventPublisher, "EventPublisher cannot be null");
 
     this.scm = scm;
     this.eventPublisher = eventPublisher;
-    final int handlerCount =
-        conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
-            OZONE_SCM_HANDLER_COUNT_DEFAULT);
 
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
 
-    RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
-        ProtobufRpcEngine.class);
+    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
 
-    protocolMessageMetrics = ProtocolMessageMetrics
-        .create("SCMDatanodeProtocol", "SCM Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
+    protocolMessageMetrics = getProtocolMessageMetrics();
+
+    final int handlerCount = conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
+        OZONE_SCM_HANDLER_COUNT_DEFAULT);
+
+    RPC.setProtocolEngine(conf, getProtocolClass(), ProtobufRpcEngine.class);
 
     BlockingService dnProtoPbService =
         StorageContainerDatanodeProtocolProtos
@@ -152,25 +155,20 @@ public class SCMDatanodeProtocolServer implements
                 new StorageContainerDatanodeProtocolServerSideTranslatorPB(
                     this, protocolMessageMetrics));
 
-    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
+    datanodeRpcServer =  startRpcServer(
+        conf,
+        datanodeRpcAddr,
+        getProtocolClass(),
+        dnProtoPbService,
+        handlerCount);
 
-    datanodeRpcServer =
-        startRpcServer(
-            conf,
-            datanodeRpcAddr,
-            StorageContainerDatanodeProtocolPB.class,
-            dnProtoPbService,
-            handlerCount);
-
-    datanodeRpcAddress =
-        updateRPCListenAddress(
-            conf, getScmDatanodeAddressKey(), datanodeRpcAddr,
+    datanodeRpcAddress = updateRPCListenAddress(
+            conf, getDatanodeAddressKey(), datanodeRpcAddr,
             datanodeRpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
-      datanodeRpcServer.refreshServiceAcl(conf,
-          SCMPolicyProvider.getInstance());
+      datanodeRpcServer.refreshServiceAcl(conf, getPolicyProvider());
     }
   }
 
@@ -407,12 +405,47 @@ public class SCMDatanodeProtocolServer implements
         .replaceAll(" +", " ");
   }
 
-  protected String getScmDatanodeAddressKey() {
+  /**
+   * Get the ProtocolMessageMetrics for this server.
+   * @return ProtocolMessageMetrics
+   */
+  protected ProtocolMessageMetrics getProtocolMessageMetrics() {
+    return ProtocolMessageMetrics
+        .create("SCMDatanodeProtocol", "SCM Datanode protocol",
+            StorageContainerDatanodeProtocolProtos.Type.values());
+  }
+
+  /**
+   * Get Key associated with Datanode address for this server.
+   * @return
+   */
+  protected String getDatanodeAddressKey() {
     return OZONE_SCM_DATANODE_ADDRESS_KEY;
   }
 
+  /**
+   * Get Datanode bind address for SCM.
+   * @param conf ozone configuration
+   * @return InetSocketAddress
+   */
   protected InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
     return HddsServerUtil.getScmDataNodeBindAddress(conf);
+  }
+
+  /**
+   * Get the authorization provider for this SCM server.
+   * @return SCM policy provider.
+   */
+  protected PolicyProvider getPolicyProvider() {
+    return SCMPolicyProvider.getInstance();
+  }
+
+  /**
+   * Get protocol class type for this RPC Server.
+   * @return Class type.
+   */
+  protected Class getProtocolClass() {
+    return StorageContainerDatanodeProtocolPB.class;
   }
 
   /**

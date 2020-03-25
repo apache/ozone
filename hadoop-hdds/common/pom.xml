@@ -114,7 +114,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
-      <version>6.0.1</version>
+      <version>6.6.4</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>

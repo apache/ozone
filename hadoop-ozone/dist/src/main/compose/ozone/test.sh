@@ -36,11 +36,15 @@ execute_robot_test scm basic
 
 execute_robot_test scm gdpr
 
+execute_robot_test scm ozonefs/ozonefs.robot
+
 execute_robot_test scm s3
 
 execute_robot_test scm recon
 
 execute_robot_test scm om-ratis
+
+execute_robot_test scm freon
 
 stop_docker_env
 

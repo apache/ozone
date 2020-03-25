@@ -17,27 +17,34 @@
 
 package org.apache.hadoop.ozone.om;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.protobuf.BlockingService;
-
+import javax.management.ObjectName;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
-import java.security.KeyPair;
 import java.security.cert.CertificateException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.codec.digest.DigestUtils;
-
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -50,6 +57,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -65,6 +74,11 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.RetriableTask;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
+import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -72,28 +86,13 @@ import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
-import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
-import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerServerProtocol;
-import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
-import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
-import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
-import org.apache.hadoop.ozone.security.OzoneSecurityException;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -104,6 +103,9 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
+import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -113,29 +115,41 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerServerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
+import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
+import org.apache.hadoop.ozone.security.OzoneSecurityException;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
+import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -147,38 +161,15 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.KMSUtil;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.ShutdownHookManager;
-import org.apache.hadoop.hdds.utils.RetriableTask;
-import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
-import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 
-import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.ratis.util.FileUtils;
-import org.apache.ratis.util.LifeCycle;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.management.ObjectName;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.net.InetSocketAddress;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.concurrent.TimeUnit;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.protobuf.BlockingService;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
@@ -194,6 +185,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -213,13 +205,22 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_D
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.OzoneManagerService
-    .newReflectiveBlockingService;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
+
+import org.apache.ratis.metrics.MetricRegistries;
+import org.apache.ratis.metrics.MetricsReporting;
+import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.FileUtils;
+import org.apache.ratis.util.LifeCycle;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import io.prometheus.client.CollectorRegistry;
 
 /**
  * Ozone Manager is the metadata manager of ozone.
@@ -365,7 +366,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
 
-
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
@@ -451,6 +451,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
+  }
+
+  /**
+   * Register Ratis metrics reporters.
+   */
+  private void registerRatisMetricReporters() {
+    // All the Ratis metrics (registered from now) will be published via JMX
+    // and via the prometheus exporter (used by the /prom servlet
+    MetricRegistries.global()
+        .addReporterRegistration(MetricsReporting.jmxReporter());
+    MetricRegistries.global().addReporterRegistration(
+        registry -> CollectorRegistry.defaultRegistry.register(
+            new RatisDropwizardExports(
+                registry.getDropWizardMetricRegistry())));
   }
 
   /**
@@ -864,10 +878,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Logs in the OM use if security is enabled in the configuration.
+   * Logs in the OM user if security is enabled in the configuration.
    *
    * @param conf OzoneConfiguration
-   * @throws IOException, AuthenticationException in case login failes.
+   * @throws IOException, AuthenticationException in case login fails.
    */
   private static void loginOMUserIfSecurityEnabled(OzoneConfiguration  conf)
       throws IOException, AuthenticationException {
@@ -1073,13 +1087,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Start service.
    */
   public void start() throws IOException {
-
     omClientProtocolMetrics.register();
+    HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
-
-    HddsUtils.initializeMetrics(configuration, "OzoneManager");
 
     // Start Ratis services
     if (omRatisServer != null) {
@@ -1132,7 +1144,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info(buildRpcServerStartMessage("OzoneManager RPC server",
         omRpcAddress));
 
-    HddsUtils.initializeMetrics(configuration, "OzoneManager");
+    HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
 
     instantiateServices();
 
@@ -1212,6 +1224,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void initializeRatisServer() throws IOException {
     if (isRatisEnabled) {
       if (omRatisServer == null) {
+        // This needs to be done before initializing Ratis.
+        registerRatisMetricReporters();
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
             configuration, this, omNodeDetails, peerNodes);
       }
@@ -1362,7 +1376,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omDetailsProtoBuilder.build();
     LOG.info("OzoneManager ports added:{}", omDetailsProto.getPortsList());
     SCMSecurityProtocolClientSideTranslatorPB secureScmClient =
-        HddsUtils.getScmSecurityClient(config);
+        HddsServerUtil.getScmSecurityClient(config);
 
     SCMGetCertResponseProto response = secureScmClient.
         getOMCertChain(omDetailsProto, getEncodedString(csr));
@@ -1603,8 +1617,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setAclRights(aclType)
         .build();
     if (!accessAuthorizer.checkAccess(obj, context)) {
-      LOG.warn("User {} doesn't have {} permission to access {}",
-          ugi.getUserName(), aclType, resType);
+      LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
+          ugi.getUserName(), aclType, resType, vol, bucket, key);
       throw new OMException("User " + ugi.getUserName() + " doesn't " +
           "have " + aclType + " permission to access " + resType,
           ResultCodes.PERMISSION_DENIED);
@@ -2770,13 +2784,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (IOException ex) {
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
-      AUDIT.logWriteFailure(
+      AUDIT.logReadFailure(
           buildAuditMessageForFailure(OMAction.GET_FILE_STATUS,
               (args == null) ? null : args.toAuditMap(), ex));
       throw ex;
     } finally {
       if (auditSuccess) {
-        AUDIT.logWriteSuccess(
+        AUDIT.logReadSuccess(
             buildAuditMessageForSuccess(OMAction.GET_FILE_STATUS,
                 (args == null) ? null : args.toAuditMap()));
       }
@@ -2879,12 +2893,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       metrics.incNumListStatusFails();
       auditSuccess = false;
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.LIST_STATUS,
+      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_STATUS,
           (args == null) ? null : args.toAuditMap(), ex));
       throw ex;
     } finally {
       if(auditSuccess){
-        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+        AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             OMAction.LIST_STATUS, (args == null) ? null : args.toAuditMap()));
       }
     }

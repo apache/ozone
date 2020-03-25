@@ -106,7 +106,7 @@ jobs:
             args: ./hadoop-ozone/dev-support/checks/build.sh
         - run: sudo pip install robotframework
         - run: sudo chown runner -R .
-        - run: cd ./hadoop-ozone/dist/target/ozone-*-SNAPSHOT/ && mkdir .aws && sudo chown 1000 .aws 
+        - run: cd ./hadoop-ozone/dist/target/ozone-*/ && mkdir .aws && sudo chown 1000 .aws
         - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
         - uses: actions/upload-artifact@master
           if: always()
@@ -158,8 +158,8 @@ jobs:
           with:
             name: it-filesystem-contract
             path: target/integration
-  it-client-and-hdds:
-    name: it-client-and-hdds
+  it-client:
+    name: it-client
     runs-on: ubuntu-18.04
     needs:
         - build
@@ -167,14 +167,14 @@ jobs:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv
           with:
-             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pclient-and-hdds
+             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pclient
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: it-client-and-hdds
+            name: it-client
             path: target/integration
-  it-om:
-    name: it-om
+  it-hdds-om:
+    name: it-hdds-om
     runs-on: ubuntu-18.04
     needs:
         - build
@@ -182,11 +182,11 @@ jobs:
         - uses: actions/checkout@master
         - uses: ./.github/buildenv
           with:
-             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pom
+             args: ./hadoop-ozone/dev-support/checks/integration.sh -Phdds-om
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: it-om
+            name: it-hdds-om
             path: target/integration
   it-ozone:
     name: it-ozone

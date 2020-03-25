@@ -804,13 +804,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return deletedKeys;
   }
 
+  /**
+   * @param userName volume owner, null for listing all volumes.
+   */
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
 
     if (StringUtil.isBlank(userName)) {
-      throw new OMException("User name is required to list Volumes.",
-          ResultCodes.USER_NOT_FOUND);
+      // null userName represents listing all volumes in cluster.
+      return listAllVolumes(prefix, startKey, maxKeys);
     }
 
     final List<OmVolumeArgs> result = Lists.newArrayList();
@@ -845,6 +848,44 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         result.add(volumeArgs);
       }
       index++;
+    }
+
+    return result;
+  }
+
+    /**
+     * @return list of all volumes.
+     */
+  private List<OmVolumeArgs> listAllVolumes(String prefix, String startKey,
+      int maxKeys) {
+    List<OmVolumeArgs> result = Lists.newArrayList();
+
+    /* volumeTable is full-cache, so we use cacheIterator. */
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+        cacheIterator = getVolumeTable().cacheIterator();
+
+    String volumeName;
+    OmVolumeArgs omVolumeArgs;
+    boolean prefixIsEmpty = Strings.isNullOrEmpty(prefix);
+    boolean startKeyIsEmpty = Strings.isNullOrEmpty(startKey);
+    while (cacheIterator.hasNext() && result.size() < maxKeys) {
+      Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> entry =
+          cacheIterator.next();
+      omVolumeArgs = entry.getValue().getCacheValue();
+      volumeName = omVolumeArgs.getVolume();
+
+      if (!prefixIsEmpty && !volumeName.startsWith(prefix)) {
+        continue;
+      }
+
+      if (!startKeyIsEmpty) {
+        if (volumeName.equals(startKey)) {
+          startKeyIsEmpty = true;
+        }
+        continue;
+      }
+
+      result.add(omVolumeArgs);
     }
 
     return result;

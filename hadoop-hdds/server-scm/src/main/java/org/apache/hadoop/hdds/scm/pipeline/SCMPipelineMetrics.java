@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -54,12 +54,15 @@ public final class SCMPipelineMetrics implements MetricsSource {
   private @Metric MutableCounterLong numPipelineDestroyFailed;
   private @Metric MutableCounterLong numPipelineReportProcessed;
   private @Metric MutableCounterLong numPipelineReportProcessingFailed;
+  private @Metric MutableCounterLong numPipelineContainSameDatanodes;
   private Map<PipelineID, MutableCounterLong> numBlocksAllocated;
+  private Map<PipelineID, MutableCounterLong> numBytesWritten;
 
   /** Private constructor. */
   private SCMPipelineMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
     numBlocksAllocated = new ConcurrentHashMap<>();
+    numBytesWritten = new ConcurrentHashMap<>();
   }
 
   /**
@@ -92,6 +95,9 @@ public final class SCMPipelineMetrics implements MetricsSource {
     numPipelineDestroyFailed.snapshot(recordBuilder, true);
     numPipelineReportProcessed.snapshot(recordBuilder, true);
     numPipelineReportProcessingFailed.snapshot(recordBuilder, true);
+    numPipelineContainSameDatanodes.snapshot(recordBuilder, true);
+    numBytesWritten
+        .forEach((pid, metric) -> metric.snapshot(recordBuilder, true));
     numBlocksAllocated
         .forEach((pid, metric) -> metric.snapshot(recordBuilder, true));
   }
@@ -100,6 +106,9 @@ public final class SCMPipelineMetrics implements MetricsSource {
     numBlocksAllocated.put(pipeline.getId(), new MutableCounterLong(Interns
         .info(getBlockAllocationMetricName(pipeline),
             "Number of blocks allocated in pipeline " + pipeline.getId()), 0L));
+    numBytesWritten.put(pipeline.getId(), new MutableCounterLong(Interns
+        .info(getBytesWrittenMetricName(pipeline),
+            "Number of bytes written into pipeline " + pipeline.getId()), 0L));
   }
 
   public static String getBlockAllocationMetricName(Pipeline pipeline) {
@@ -107,15 +116,21 @@ public final class SCMPipelineMetrics implements MetricsSource {
         .getFactor() + "-" + pipeline.getId().getId();
   }
 
+  public static String getBytesWrittenMetricName(Pipeline pipeline) {
+    return "NumPipelineBytesWritten-" + pipeline.getType() + "-" + pipeline
+        .getFactor() + "-" + pipeline.getId().getId();
+  }
+
   void removePipelineMetrics(PipelineID pipelineID) {
     numBlocksAllocated.remove(pipelineID);
+    numBytesWritten.remove(pipelineID);
   }
 
   /**
    * Increments number of blocks allocated for the pipeline.
    */
   void incNumBlocksAllocated(PipelineID pipelineID) {
-    Optional.of(numBlocksAllocated.get(pipelineID)).ifPresent(
+    Optional.ofNullable(numBlocksAllocated.get(pipelineID)).ifPresent(
         MutableCounterLong::incr);
   }
 
@@ -132,6 +147,15 @@ public final class SCMPipelineMetrics implements MetricsSource {
    */
   void incNumPipelineCreated() {
     numPipelineCreated.incr();
+  }
+
+  /**
+   * Increments the number of total bytes that write into the pipeline.
+   */
+  void incNumPipelineBytesWritten(Pipeline pipeline, long bytes) {
+    numBytesWritten.put(pipeline.getId(), new MutableCounterLong(
+        Interns.info(getBytesWrittenMetricName(pipeline), "Number of" +
+            " bytes written into pipeline " + pipeline.getId()), bytes));
   }
 
   /**
@@ -167,5 +191,12 @@ public final class SCMPipelineMetrics implements MetricsSource {
    */
   void incNumPipelineReportProcessingFailed() {
     numPipelineReportProcessingFailed.incr();
+  }
+
+  /**
+   * Increments number of pipeline who contains same set of datanodes.
+   */
+  void incNumPipelineContainSameDatanodes() {
+    numPipelineContainSameDatanodes.incr();
   }
 }

@@ -18,11 +18,11 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +45,10 @@ import picocli.CommandLine.Option;
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
-        DatanodeChunkGenerator.class},
+        DatanodeChunkGenerator.class,
+        DatanodeBlockPutter.class,
+        FollowerAppendLogEntryGenerator.class,
+        ChunkManagerDiskWrite.class},
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {
@@ -57,13 +60,15 @@ public class Freon extends GenericCli {
           + "and profile endpoint")
   private boolean httpServer = false;
 
+  private final boolean interactive = System.console() != null;
+
   private FreonHttpServer freonHttpServer;
   private OzoneConfiguration conf;
 
   @Override
   public void execute(String[] argv) {
     conf = createOzoneConfiguration();
-    HddsUtils.initializeMetrics(conf, "ozone-freon");
+    HddsServerUtil.initializeMetrics(conf, "ozone-freon");
     TracingUtil.initTracing("freon", conf);
     super.execute(argv);
   }
@@ -94,4 +99,7 @@ public class Freon extends GenericCli {
     new Freon().run(args);
   }
 
+  public boolean isInteractive() {
+    return interactive;
+  }
 }

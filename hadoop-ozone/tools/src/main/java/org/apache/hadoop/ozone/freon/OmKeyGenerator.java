@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -62,24 +63,37 @@ public class OmKeyGenerator extends BaseFreonGenerator
   )
   private ReplicationFactor factor = ReplicationFactor.THREE;
 
+  @Option(
+      names = "--om-service-id",
+      description = "OM Service ID"
+  )
+  private String omServiceID = null;
+
   private OzoneManagerProtocol ozoneManagerClient;
 
   private Timer timer;
 
   @Override
   public Void call() throws Exception {
-
     init();
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    ensureVolumeAndBucketExist(ozoneConfiguration, volumeName, bucketName);
+    try (OzoneClient rpcClient = createOzoneClient(omServiceID,
+        ozoneConfiguration)) {
 
-    ozoneManagerClient = createOmClient(ozoneConfiguration);
+      ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
 
-    timer = getMetrics().timer("key-create");
+      ozoneManagerClient = createOmClient(ozoneConfiguration, omServiceID);
 
-    runTests(this::createKey);
+      timer = getMetrics().timer("key-create");
+
+      runTests(this::createKey);
+    } finally {
+      if (ozoneManagerClient != null) {
+        ozoneManagerClient.close();
+      }
+    }
 
     return null;
   }

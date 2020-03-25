@@ -178,14 +178,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     Map<String, String> params =
         ContainerCommandRequestPBHelper.getAuditParams(msg);
 
-    Container container;
     ContainerType containerType;
     ContainerCommandResponseProto responseProto = null;
     long startTime = System.nanoTime();
     ContainerProtos.Type cmdType = msg.getCmdType();
     long containerID = msg.getContainerID();
     metrics.incContainerOpsMetrics(cmdType);
-    container = getContainer(containerID);
+    Container container = getContainer(containerID);
     boolean isWriteStage =
         (cmdType == ContainerProtos.Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
@@ -221,10 +220,10 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       // just add it to the list, and remove it from missing container set
       // as it might have been added in the list during "init".
       Preconditions.checkNotNull(container2BCSIDMap);
-      if (container2BCSIDMap.get(containerID) == null) {
-        container2BCSIDMap
-            .put(containerID, container.getBlockCommitSequenceId());
-        containerSet.getMissingContainerSet().remove(containerID);
+      if (container != null && container2BCSIDMap.get(containerID) == null) {
+        container2BCSIDMap.put(
+            containerID, container.getBlockCommitSequenceId());
+        getMissingContainerSet().remove(containerID);
       }
     }
     if (getMissingContainerSet().contains(containerID)) {
@@ -258,7 +257,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         if (container2BCSIDMap != null) {
           // adds this container to list of containers created in the pipeline
           // with initial BCSID recorded as 0.
-          container2BCSIDMap.putIfAbsent(containerID, Long.valueOf(0));
+          container2BCSIDMap.putIfAbsent(containerID, 0L);
         }
         container = getContainer(containerID);
       }
@@ -602,7 +601,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
     default:
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Invalid audit event status - " + result);
+        LOG.debug("Invalid audit event status - {}", result);
       }
     }
   }

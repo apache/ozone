@@ -214,13 +214,15 @@ public class MiniOzoneChaosCluster extends MiniOzoneClusterImpl {
     protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
-          2, StorageUnit.KB);
-      conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
-          16, StorageUnit.KB);
-      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
           4, StorageUnit.KB);
-      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE,
+      conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+          32, StorageUnit.KB);
+      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
           8, StorageUnit.KB);
+      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE,
+          16, StorageUnit.KB);
+      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE,
+          4, StorageUnit.KB);
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
           1, StorageUnit.MB);
       conf.setTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT, 1000,
@@ -240,6 +242,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneClusterImpl {
           1, TimeUnit.SECONDS);
       conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1,
           TimeUnit.SECONDS);
+      conf.setInt(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
+          4);
+      conf.setInt(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
+          2);
       conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
       conf.setInt("hdds.scm.replication.thread.interval", 10 * 1000);
       conf.setInt("hdds.scm.replication.event.timeout", 20 * 1000);
@@ -265,7 +273,8 @@ public class MiniOzoneChaosCluster extends MiniOzoneClusterImpl {
       }
 
       om.start();
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(scm);
+      final List<HddsDatanodeService> hddsDatanodes =
+          createHddsDatanodes(scm, null);
       MiniOzoneChaosCluster cluster =
           new MiniOzoneChaosCluster(conf, om, scm, hddsDatanodes);
       if (startDataNodes) {

@@ -43,8 +43,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -56,6 +58,7 @@ import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -82,7 +85,7 @@ public class TestHddsDispatcher {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testDir);
     DatanodeDetails dd = randomDatanodeDetails();
-    VolumeSet volumeSet = new VolumeSet(dd.getUuidString(), conf);
+    MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf);
 
     try {
       UUID scmId = UUID.randomUUID();
@@ -94,6 +97,7 @@ public class TestHddsDispatcher {
       Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
       Mockito.when(context.getParent()).thenReturn(stateMachine);
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
+          ChunkLayOutVersion.FILE_PER_CHUNK,
           (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
           dd.getUuidString());
       Container container = new KeyValueContainer(containerData, conf);
@@ -166,6 +170,46 @@ public class TestHddsDispatcher {
   }
 
   @Test
+  public void testContainerNotFoundWithCommitChunk() throws IOException {
+    String testDir =
+        GenericTestUtils.getTempPath(TestHddsDispatcher.class.getSimpleName());
+    try {
+      UUID scmId = UUID.randomUUID();
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDir);
+      DatanodeDetails dd = randomDatanodeDetails();
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
+      ContainerCommandRequestProto writeChunkRequest =
+          getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+
+      // send read chunk request and make sure container does not exist
+      ContainerCommandResponseProto response =
+          hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
+      Assert.assertEquals(
+          ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+      DispatcherContext dispatcherContext =
+          new DispatcherContext.Builder()
+              .setContainer2BCSIDMap(Collections.emptyMap())
+              .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+              .build();
+
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+          .captureLogs(HddsDispatcher.LOG);
+      // send write chunk request without sending create container
+      response = hddsDispatcher.dispatch(writeChunkRequest, dispatcherContext);
+      // container should not be found
+      Assert.assertEquals(
+          ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+
+      assertTrue(logCapturer.getOutput().contains(
+          "ContainerID " + writeChunkRequest.getContainerID()
+              + " does not exist"));
+    } finally {
+      FileUtils.deleteDirectory(new File(testDir));
+    }
+  }
+
+  @Test
   public void testWriteChunkWithCreateContainerFailure() throws IOException {
     String testDir = GenericTestUtils.getTempPath(
         TestHddsDispatcher.class.getSimpleName());
@@ -211,7 +255,7 @@ public class TestHddsDispatcher {
   private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf) throws IOException {
     ContainerSet containerSet = new ContainerSet();
-    VolumeSet volumeSet = new VolumeSet(dd.getUuidString(), conf);
+    VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf);
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
     StateContext context = Mockito.mock(StateContext.class);

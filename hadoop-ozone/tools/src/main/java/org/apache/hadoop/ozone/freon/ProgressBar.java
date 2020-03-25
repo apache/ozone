@@ -123,7 +123,7 @@ public class ProgressBar {
 
   private Runnable getProgressBar(final PrintStream stream) {
     return () -> {
-      stream.println();
+      println(stream);
       while (running && currentValue.getAsLong() < maxValue) {
         print(stream, currentValue.getAsLong());
         try {
@@ -134,7 +134,7 @@ public class ProgressBar {
         }
       }
       print(stream, maxValue);
-      stream.println();
+      println(stream);
       running = false;
     };
   }
@@ -149,6 +149,12 @@ public class ProgressBar {
       printProgressBar(stream, value);
     } else {
       logProgressBar(stream, value);
+    }
+  }
+
+  private void println(PrintStream stream) {
+    if (interactive) {
+      stream.println();
     }
   }
 

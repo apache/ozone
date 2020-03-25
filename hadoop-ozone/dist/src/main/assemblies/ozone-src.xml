@@ -33,7 +33,7 @@
       <outputDirectory>/</outputDirectory>
     </file>
     <file>
-      <source> hadoop-ozone/dist/src/main/license/src/licenses/LICENSE-angular-nvd3.txt</source>
+      <source>hadoop-ozone/dist/src/main/license/src/licenses/LICENSE-angular-nvd3.txt</source>
       <outputDirectory>/licenses</outputDirectory>
     </file>
     <file>
@@ -58,7 +58,7 @@
       <directory>.</directory>
       <includes>
         <include>pom.xml</include>
-        <include>README.txt</include>
+        <include>README.md</include>
       </includes>
     </fileSet>
     <fileSet>

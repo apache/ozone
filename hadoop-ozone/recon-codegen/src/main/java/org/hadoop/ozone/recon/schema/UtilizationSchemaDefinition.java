@@ -41,6 +41,9 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
   public static final String FILE_COUNT_BY_SIZE_TABLE_NAME =
       "file_count_by_size";
 
+  public static final String MISSING_CONTAINERS_TABLE_NAME =
+      "missing_containers";
+
   @Inject
   UtilizationSchemaDefinition(DataSource dataSource) {
     this.dataSource = dataSource;
@@ -52,6 +55,7 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
     Connection conn = dataSource.getConnection();
     createClusterGrowthTable(conn);
     createFileSizeCount(conn);
+    createMissingContainersTable(conn);
   }
 
   void createClusterGrowthTable(Connection conn) {
@@ -75,6 +79,15 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
         .column("count", SQLDataType.BIGINT)
         .constraint(DSL.constraint("pk_file_size")
             .primaryKey("file_size"))
+        .execute();
+  }
+
+  void createMissingContainersTable(Connection conn) {
+    DSL.using(conn).createTableIfNotExists(MISSING_CONTAINERS_TABLE_NAME)
+        .column("container_id", SQLDataType.BIGINT)
+        .column("missing_since", SQLDataType.BIGINT)
+        .constraint(DSL.constraint("pk_container_id")
+        .primaryKey("container_id"))
         .execute();
   }
 }

@@ -260,7 +260,7 @@ public class TestSCMSafeModeManager {
         mockNodeManager, queue);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
-            pipelineManager.getStateManager(), config);
+            pipelineManager.getStateManager(), config, true);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
 
@@ -478,7 +478,7 @@ public class TestSCMSafeModeManager {
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
-              pipelineManager.getStateManager(), config);
+              pipelineManager.getStateManager(), config, true);
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
 
@@ -492,8 +492,6 @@ public class TestSCMSafeModeManager {
       queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
           HddsTestUtils.createNodeRegistrationContainerReport(containers));
       assertTrue(scmSafeModeManager.getInSafeMode());
-
-
 
       firePipelineEvent(pipelineManager, pipeline);
 

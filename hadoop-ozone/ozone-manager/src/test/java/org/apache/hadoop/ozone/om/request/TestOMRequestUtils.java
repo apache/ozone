@@ -470,7 +470,6 @@ public final class TestOMRequestUtils {
       throws IOException {
     // Retrieve the keyInfo
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
-    omKeyInfo.setUpdateID(trxnLogIndex);
 
     // Delete key from KeyTable and put in DeletedKeyTable
     omMetadataManager.getKeyTable().delete(ozoneKey);
@@ -479,7 +478,7 @@ public final class TestOMRequestUtils {
         omMetadataManager.getDeletedTable().get(ozoneKey);
 
     repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(omKeyInfo,
-        repeatedOmKeyInfo);
+        repeatedOmKeyInfo, trxnLogIndex, true);
 
     omMetadataManager.getDeletedTable().put(ozoneKey, repeatedOmKeyInfo);
 

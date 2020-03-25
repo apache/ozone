@@ -252,7 +252,7 @@
   </property>
   <property>
     <name>dfs.ratis.client.request.retry.interval</name>
-    <value>1000ms</value>
+    <value>15000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>Interval between successive retries for a ratis client request.
     </description>
@@ -387,26 +387,32 @@
     </description>
   </property>
   <property>
+    <name>ozone.client.stream.buffer.size</name>
+    <value>4MB</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>The size of chunks the client will send to the server.</description>
+  </property>
+  <property>
     <name>ozone.client.stream.buffer.flush.size</name>
     <value>16MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position , a partial
-      flush will be initiated during write. It should be ideally a multiple
-      of chunkSize.
+    <description>Size which determines at what buffer position a partial
+      flush will be initiated during write. It should be a multiple
+      of ozone.client.stream.buffer.size.
     </description>
   </property>
   <property>
     <name>ozone.client.stream.buffer.max.size</name>
     <value>32MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position,
+    <description>Size which determines at what buffer position
       write call be blocked till acknowledgement of the first partial flush
       happens by all servers.
     </description>
   </property>
   <property>
     <name>ozone.client.max.retries</name>
-    <value>100</value>
+    <value>5</value>
     <tag>OZONE, CLIENT</tag>
     <description>Maximum number of retries by Ozone Client on encountering
       exception while writing a key.
@@ -707,10 +713,25 @@
     <description>
       The chunk size for reading/writing chunk operations in bytes.
 
-      The chunk size defaults to 8MB. If the value configured is more than the
-      maximum size (16MB), it will be reset to the maximum size. This maps to
-      the network packet sizes and file write operations in the client to
-      datanode protocol.
+      The chunk size defaults to 4MB. If the value configured is more than the
+      maximum size (32MB), it will be reset to the maximum size (32MB). This
+      maps to the network packet sizes and file write operations in the
+      client to datanode protocol.
+
+      When tuning this parameter, flow control window parameter should be
+      tuned accordingly. Refer to
+      hdds.ratis.raft.grpc.flow.control.window for more information.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.chunk.layout</name>
+    <value>FILE_PER_BLOCK</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      Chunk layout defines how chunks, blocks and containers are stored on disk.
+      Each chunk is stored separately with FILE_PER_CHUNK.  All chunks of a
+      block are stored in the same file with FILE_PER_BLOCK.  The default is
+      FILE_PER_BLOCK.
     </description>
   </property>
   <property>
@@ -776,9 +797,11 @@
     </value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
-      The full name of class which implements org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicy.
+      The full name of class which implements
+      org.apache.hadoop.hdds.scm.PlacementPolicy.
       The class decides which datanode will be used to host the container replica. If not set,
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default value.
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default
+      value.
     </description>
   </property>
   <property>
@@ -786,6 +809,35 @@
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>Number of containers per owner in a pipeline.
+    </description>
+  </property>
+  <property>
+  <name>ozone.datanode.pipeline.limit</name>
+  <value>2</value>
+  <tag>OZONE, SCM, PIPELINE</tag>
+  <description>Max number of pipelines per datanode can be engaged in.
+  </description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.pipeline.limit</name>
+    <value>0</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>Upper limit for how many pipelines can be OPEN in SCM.
+      0 as default means there is no limit. Otherwise, the number is the limit
+      of max amount of pipelines which are OPEN.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.pipeline.allocated.timeout</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      Timeout for every pipeline to stay in ALLOCATED stage. When pipeline is created,
+      it should be at OPEN stage once pipeline report is successfully received by SCM.
+      If a pipeline stays at ALLOCATED longer than the specified period of time,
+      it should be scrubbed so that new pipeline can be created.
+      This timeout is for how long pipeline can stay at ALLOCATED
+      stage until it gets scrubbed.
     </description>
   </property>
   <property>
@@ -1361,16 +1413,6 @@
   </property>
 
   <property>
-    <name>hdds.lock.max.concurrency</name>
-    <value>100</value>
-    <tag>HDDS</tag>
-    <description>Locks in HDDS/Ozone uses object pool to maintain active locks
-      in the system, this property defines the max limit for the locks that
-      will be maintained in the pool.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.s3g.authentication.kerberos.principal</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
@@ -1487,6 +1529,15 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Ozone client to verify checksum of the checksum blocksize data.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.read.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone grpc client during read.
     </description>
   </property>
 
@@ -2166,7 +2217,16 @@
     <value/>
     <tag>RECON, SECURITY</tag>
     <description>
-      The keytab file for Kerberos authentication in Recon.
+      DEPRECATED. Use "ozone.recon.http.kerberos.keytab.file" instead.
+      The keytab file for HTTP Kerberos authentication in Recon.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.http.kerberos.keytab.file</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      The keytab file for HTTP Kerberos authentication in Recon.
     </description>
   </property>
   <property>
@@ -2431,6 +2491,82 @@
       of the desired parent directory. The value of the property will be used to
       set Jetty context attribute 'org.eclipse.jetty.webapp.basetempdir'.
       The directory named by this property must exist and be writeable.
+    </description>
+  </property>
+  <property>
+    <name>ozone.http.policy</name>
+    <value>HTTP_ONLY</value>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <description>Decide if HTTPS(SSL) is supported on Ozone
+      This configures the HTTP endpoint for Ozone daemons:
+      The following values are supported:
+      - HTTP_ONLY : Service is provided only on http
+      - HTTPS_ONLY : Service is provided only on https
+      - HTTP_AND_HTTPS : Service is provided both on http and https
+    </description>
+  </property>
+  <property>
+    <name>ozone.https.client.need-auth</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value>false</value>
+    <description>
+      Whether SSL client certificate authentication is required
+    </description>
+  </property>
+  <property>
+    <name>ozone.https.client.keystore.resource</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value>ssl-client.xml</value>
+    <description>
+      Resource file from which ssl client keystore
+      information will be extracted
+    </description>
+  </property>
+  <property>
+    <name>ozone.https.server.keystore.resource</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value>ssl-server.xml</value>
+    <description>Resource file from which ssl server keystore
+      information will be extracted
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.keystore.keypassword</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>Keystore key password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.keystore.location</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Keystore location for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.keystore.password</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Keystore password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.truststore.location</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Truststore location for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.truststore.password</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Truststore password for HTTPS SSL configuration
     </description>
   </property>
 </configuration>

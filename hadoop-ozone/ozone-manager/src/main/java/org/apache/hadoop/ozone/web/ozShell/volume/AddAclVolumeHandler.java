@@ -36,7 +36,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
  * Add acl handler for volume.
  */
 @Command(name = "addacl",
-    description = "Add a new Acl.")
+    description = "Add a new ACL.")
 public class AddAclVolumeHandler extends Handler {
 
   @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
@@ -44,22 +44,22 @@ public class AddAclVolumeHandler extends Handler {
 
   @CommandLine.Option(names = {"--acl", "-a"},
       required = true,
-      description = "Add acl." +
-          "r = READ," +
-          "w = WRITE," +
-          "c = CREATE," +
-          "d = DELETE," +
-          "l = LIST," +
-          "a = ALL," +
-          "n = NONE," +
-          "x = READ_AC," +
-          "y = WRITE_AC" +
-          "Ex user:user1:rw or group:hadoop:rw")
+      description = "The new ACL to be added.\n" +
+          "Ex: user:user1:rw or group:hadoop:rw\n" +
+          "r = READ, " +
+          "w = WRITE, " +
+          "c = CREATE, " +
+          "d = DELETE, " +
+          "l = LIST, " +
+          "a = ALL, " +
+          "n = NONE, " +
+          "x = READ_ACL, " +
+          "y = WRITE_ACL.")
   private String acl;
 
   @CommandLine.Option(names = {"--store", "-s"},
       required = false,
-      description = "store type. i.e OZONE or S3")
+      description = "Store type. i.e OZONE or S3")
   private String storeType;
 
   /**
@@ -67,7 +67,8 @@ public class AddAclVolumeHandler extends Handler {
    */
   @Override
   public Void call() throws Exception {
-    Objects.requireNonNull(acl, "New acl to be added not specified.");
+    Objects.requireNonNull(acl,
+        "You need to specify a new ACL to be added.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureVolumeAddress();
     try (OzoneClient client =
@@ -90,8 +91,8 @@ public class AddAclVolumeHandler extends Handler {
           OzoneAcl.parseAcl(acl));
 
       String message = result
-          ? ("Acl added successfully.")
-          : ("Acl already exists.");
+          ? ("ACL added successfully.")
+          : ("ACL already exists.");
 
       System.out.println(message);
     }

@@ -32,35 +32,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TimeZone;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.metrics2.MetricsException;
-import org.apache.hadoop.metrics2.MetricsSystem;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.source.JvmMetrics;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.base.Preconditions;
 import com.google.common.net.HostAndPort;
@@ -150,30 +133,7 @@ public final class HddsUtils {
     return NetUtils.createSocketAddr(host.get() + ":" + port);
   }
 
-  /**
-   * Create a scm security client.
-   * @param conf    - Ozone configuration.
-   *
-   * @return {@link SCMSecurityProtocol}
-   * @throws IOException
-   */
-  public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(
-      OzoneConfiguration conf) throws IOException {
-    RPC.setProtocolEngine(conf, SCMSecurityProtocolPB.class,
-        ProtobufRpcEngine.class);
-    long scmVersion =
-        RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
-    InetSocketAddress address =
-        getScmAddressForSecurityProtocol(conf);
-    RetryPolicy retryPolicy =
-        RetryPolicies.retryForeverWithFixedSleep(
-            1000, TimeUnit.MILLISECONDS);
-    return new SCMSecurityProtocolClientSideTranslatorPB(
-        RPC.getProtocolProxy(SCMSecurityProtocolPB.class, scmVersion,
-            address, UserGroupInformation.getCurrentUser(),
-            conf, NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf), retryPolicy).getProxy());
-  }
+
 
   /**
    * Retrieve the hostname, trying the supplied config keys in order.
@@ -510,54 +470,6 @@ public final class HddsUtils {
   }
 
   /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to the SCM for
-   * {@link org.apache.hadoop.hdds.protocol.SCMSecurityProtocol}. If
-   * {@link ScmConfigKeys#OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY} is not defined
-   * then {@link ScmConfigKeys#OZONE_SCM_CLIENT_ADDRESS_KEY} is used. If neither
-   * is defined then {@link ScmConfigKeys#OZONE_SCM_NAMES} is used.
-   *
-   * @param conf
-   * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
-   * @throws IllegalArgumentException if configuration is not defined or invalid
-   */
-  public static InetSocketAddress getScmAddressForSecurityProtocol(
-      Configuration conf) {
-    Optional<String> host = getHostNameFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
-        ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      // Fallback to Ozone SCM name
-      host = Optional.of(getSingleSCMAddress(conf).getHostName());
-    }
-
-    final int port = getPortNumberFromConfigKeys(conf,
-        ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY)
-        .orElse(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT);
-
-    return NetUtils.createSocketAddr(host.get() + ":" + port);
-  }
-
-  /**
-   * Initialize hadoop metrics system for Ozone servers.
-   * @param configuration OzoneConfiguration to use.
-   * @param serverName    The logical name of the server components.
-   */
-  public static MetricsSystem initializeMetrics(
-      OzoneConfiguration configuration, String serverName) {
-    MetricsSystem metricsSystem = DefaultMetricsSystem.initialize(serverName);
-    try {
-      JvmMetrics.create(serverName,
-          configuration.get(DFSConfigKeysLegacy.DFS_METRICS_SESSION_ID_KEY),
-          DefaultMetricsSystem.instance());
-    } catch (MetricsException e) {
-      LOG.info("Metrics source JvmMetrics already added to DataNode.");
-    }
-    return metricsSystem;
-  }
-
-  /**
    * Basic validation for {@code path}: checks that it is a descendant of
    * (or the same as) the given {@code ancestor}.
    * @param path the path to be validated
@@ -578,32 +490,27 @@ public final class HddsUtils {
         "Path should be a descendant of %s", ancestor);
   }
 
-  public static String writeChunkToString(WriteChunkRequestProto wc,
-                                          long contId, String location) {
-    Preconditions.checkNotNull(wc);
-    StringBuilder builder = new StringBuilder();
+  /**
+   * Leverages the Configuration.getPassword method to attempt to get
+   * passwords from the CredentialProvider API before falling back to
+   * clear text in config - if falling back is allowed.
+   * @param conf Configuration instance
+   * @param alias name of the credential to retreive
+   * @return String credential value or null
+   */
+  static String getPassword(Configuration conf, String alias) {
+    String password = null;
+    try {
+      char[] passchars = conf.getPassword(alias);
+      if (passchars != null) {
+        password = new String(passchars);
+      }
+    } catch (IOException ioe) {
+      LOG.warn("Setting password to null since IOException is caught"
+          + " when getting password", ioe);
 
-    builder.append("cmd=");
-    builder.append(ContainerProtos.Type.WriteChunk.toString());
-
-    builder.append(", container id=");
-    builder.append(contId);
-
-    builder.append(", blockid=");
-    builder.append(wc.getBlockID().getContainerID());
-    builder.append(":localid=");
-    builder.append(wc.getBlockID().getLocalID());
-
-    builder.append(", chunk=");
-    builder.append(wc.getChunkData().getChunkName());
-    builder.append(":offset=");
-    builder.append(wc.getChunkData().getOffset());
-    builder.append(":length=");
-    builder.append(wc.getChunkData().getLen());
-
-    builder.append(", container path=");
-    builder.append(location);
-
-    return builder.toString();
+      password = null;
+    }
+    return password;
   }
 }

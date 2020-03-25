@@ -42,13 +42,22 @@ public class Node2PipelineMap extends Node2ObjectsMap<PipelineID> {
   }
 
   /**
-   * Returns null if there no pipelines associated with this datanode ID.
+   * Returns null if there are no pipelines associated with this datanode ID.
    *
    * @param datanode - UUID
    * @return Set of pipelines or Null.
    */
   public Set<PipelineID> getPipelines(UUID datanode) {
     return getObjects(datanode);
+  }
+
+  /**
+   * Return 0 if there are no pipelines associated with this datanode ID.
+   * @param datanode - UUID
+   * @return Number of pipelines or 0.
+   */
+  public int getPipelinesCount(UUID datanode) {
+    return getObjects(datanode).size();
   }
 
   /**

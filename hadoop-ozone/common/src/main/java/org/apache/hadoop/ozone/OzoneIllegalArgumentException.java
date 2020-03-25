@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 /**
  * Indicates that a method has been passed illegal or invalid argument. This

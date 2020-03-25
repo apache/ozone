@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.header;
 
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
@@ -34,8 +35,8 @@ import static java.time.temporal.ChronoUnit.DAYS;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
-import static org.apache.hadoop.ozone.s3.AWSV4AuthParser.AWS4_SIGNING_ALGORITHM;
-import static org.apache.hadoop.ozone.s3.AWSV4AuthParser.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.AWSV4SignatureProcessor.AWS4_SIGNING_ALGORITHM;
+import static org.apache.hadoop.ozone.s3.AWSV4SignatureProcessor.DATE_FORMATTER;
 
 /**
  * S3 Authorization header.
@@ -177,18 +178,23 @@ public class AuthorizationHeaderV4 {
 
     // Date should not be empty and within valid range.
     if (!credentialObj.getDate().isEmpty()) {
-      LocalDate date = LocalDate.parse(credentialObj.getDate(), DATE_FORMATTER);
-      LocalDate now = LocalDate.now();
-      if (date.isBefore(now.minus(1, DAYS)) ||
-          date.isAfter(now.plus(1, DAYS))) {
-        LOG.error("AWS date not in valid range. Date:{} should not be older " +
-                "than 1 day(i.e yesterday) and greater than 1 day(i.e " +
-                "tomorrow).",
-            getDate());
-        throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
-      }
+      validateDateRange();
     } else {
       LOG.error("AWS date shouldn't be empty. credential:{}", credential);
+      throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
+    }
+  }
+
+  @VisibleForTesting
+  public void validateDateRange() throws OS3Exception {
+    LocalDate date = LocalDate.parse(credentialObj.getDate(), DATE_FORMATTER);
+    LocalDate now = LocalDate.now();
+    if (date.isBefore(now.minus(1, DAYS)) ||
+        date.isAfter(now.plus(1, DAYS))) {
+      LOG.error("AWS date not in valid range. Date:{} should not be older " +
+              "than 1 day(i.e yesterday) and greater than 1 day(i.e " +
+              "tomorrow).",
+          getDate());
       throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);
     }
   }

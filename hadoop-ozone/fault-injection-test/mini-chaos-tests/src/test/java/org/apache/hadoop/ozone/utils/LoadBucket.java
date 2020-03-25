@@ -110,7 +110,7 @@ public class LoadBucket {
     }
 
     public void execute() throws Exception {
-      LOG.info("Going to {} key {}", this.opName, keyName);
+      LOG.info("Going to {}", this);
       try {
         if (fsOp) {
           Path p = new Path("/", keyName);
@@ -119,9 +119,9 @@ public class LoadBucket {
           doBucketOp(keyName);
         }
         doPostOp();
-        LOG.trace("Done: {} key {}", this.opName, keyName);
+        LOG.trace("Done: {}", this);
       } catch (Throwable t) {
-        LOG.error("Unable to {} key:{}", this.opName, keyName, t);
+        LOG.error("Unable to {}", this, t);
         throw t;
       }
     }
@@ -132,7 +132,7 @@ public class LoadBucket {
 
     @Override
     public String toString() {
-      return "opType=" + opName;
+      return "opType=" + opName + " keyName=" + keyName;
     }
   }
 
@@ -166,6 +166,11 @@ public class LoadBucket {
       } finally {
         os.close();
       }
+    }
+
+    @Override
+    public String toString() {
+      return super.toString() + " buffer:" + buffer.limit();
     }
   }
 
@@ -213,6 +218,11 @@ public class LoadBucket {
         is.close();
       }
     }
+
+    @Override
+    public String toString() {
+      return super.toString() + " buffer:" + buffer.limit();
+    }
   }
 
   /**
@@ -236,6 +246,11 @@ public class LoadBucket {
     @Override
     void doPostOp() {
       // Nothing to do here
+    }
+
+    @Override
+    public String toString() {
+      return super.toString();
     }
   }
 }

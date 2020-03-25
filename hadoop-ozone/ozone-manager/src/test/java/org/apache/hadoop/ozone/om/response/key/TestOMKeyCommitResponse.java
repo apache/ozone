@@ -52,8 +52,8 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
         keyName, clientID);
     Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
-    OMKeyCommitResponse omKeyCommitResponse =
-        new OMKeyCommitResponse(omKeyInfo, clientID, omResponse);
+    OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
+        omResponse, omKeyInfo, clientID);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -79,9 +79,8 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
             .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
             .build();
 
-
-    OMKeyCommitResponse omKeyCommitResponse =
-        new OMKeyCommitResponse(omKeyInfo, clientID, omResponse);
+    OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
+        omResponse, omKeyInfo, clientID);
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.
@@ -93,7 +92,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
 
-    omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omKeyCommitResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);

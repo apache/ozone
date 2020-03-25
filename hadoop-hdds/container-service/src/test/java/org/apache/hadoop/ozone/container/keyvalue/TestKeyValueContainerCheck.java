@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -32,13 +32,15 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerImpl;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -75,7 +77,7 @@ import static org.junit.Assert.assertFalse;
   private final String storeImpl;
   private KeyValueContainer container;
   private KeyValueContainerData containerData;
-  private VolumeSet volumeSet;
+  private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
   private File testRoot;
 
@@ -93,7 +95,7 @@ import static org.junit.Assert.assertFalse;
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
-    volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
+    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
   }
 
   @After public void teardown() {
@@ -206,6 +208,7 @@ import static org.junit.Assert.assertFalse;
     ChecksumData checksumData = checksum.computeChecksum(chunkData);
 
     containerData = new KeyValueContainerData(containerId,
+        ChunkLayOutVersion.FILE_PER_CHUNK,
         (long) StorageUnit.BYTES.toBytes(
             chunksPerBlock * chunkLen * totalBlocks),
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
@@ -214,7 +217,7 @@ import static org.junit.Assert.assertFalse;
         UUID.randomUUID().toString());
     try (ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
         conf)) {
-      ChunkManagerImpl chunkManager = new ChunkManagerImpl(true);
+      ChunkManager chunkManager = new FilePerChunkStrategy(true);
 
       assertNotNull(containerData.getChunksPath());
       File chunksPath = new File(containerData.getChunksPath());

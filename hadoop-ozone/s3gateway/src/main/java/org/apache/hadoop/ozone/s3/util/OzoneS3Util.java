@@ -38,9 +38,9 @@ public final class OzoneS3Util {
   private OzoneS3Util() {
   }
 
-  public static String getVolumeName(String userName) {
+  public static String getS3Username(String userName) {
     Objects.requireNonNull(userName);
-    return DigestUtils.md5Hex(userName);
+    return DigestUtils.md5Hex(userName.toLowerCase());
   }
 
   /**

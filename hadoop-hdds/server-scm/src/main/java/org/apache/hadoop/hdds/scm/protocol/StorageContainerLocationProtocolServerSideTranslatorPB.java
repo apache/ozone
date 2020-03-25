@@ -20,9 +20,10 @@ package org.apache.hadoop.hdds.scm.protocol;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
@@ -65,12 +66,15 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
-import org.apache.hadoop.ozone.protocolPB.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -159,6 +163,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setScmCloseContainerResponse(closeContainer(
                 request.getScmCloseContainerRequest()))
+            .build();
+      case AllocatePipeline:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setPipelineResponse(allocatePipeline(request.getPipelineRequest()))
             .build();
       case ListPipelines:
         return ScmContainerLocationResponse.newBuilder()
@@ -325,6 +335,22 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     impl.closeContainer(request.getContainerID());
     return SCMCloseContainerResponseProto.newBuilder().build();
+  }
+
+  public PipelineResponseProto allocatePipeline(
+      StorageContainerLocationProtocolProtos.PipelineRequestProto request)
+      throws IOException {
+    Pipeline pipeline = impl.createReplicationPipeline(
+        request.getReplicationType(), request.getReplicationFactor(),
+        HddsProtos.NodePool.getDefaultInstance());
+    if (pipeline == null) {
+      return PipelineResponseProto.newBuilder()
+          .setErrorCode(errorPipelineAlreadyExists).build();
+    }
+    PipelineResponseProto response = PipelineResponseProto.newBuilder()
+        .setErrorCode(success)
+        .setPipeline(pipeline.getProtobufMessage()).build();
+    return response;
   }
 
   public ListPipelineResponseProto listPipelines(

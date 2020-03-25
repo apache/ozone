@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 /**
  * This class contains constants for Recon configuration keys.
@@ -39,8 +39,11 @@ public final class ReconServerConfigKeys {
       "ozone.recon.http-address";
   public static final String OZONE_RECON_HTTPS_ADDRESS_KEY =
       "ozone.recon.https-address";
-  public static final String OZONE_RECON_KEYTAB_FILE =
+  // Deprecated config
+  public static final String OZONE_RECON_HTTP_KEYTAB_FILE_OLD =
       "ozone.recon.keytab.file";
+  public static final String OZONE_RECON_HTTP_KEYTAB_FILE =
+      "ozone.recon.http.kerberos.keytab.file";
   public static final String OZONE_RECON_HTTP_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_RECON_HTTP_BIND_PORT_DEFAULT = 9888;

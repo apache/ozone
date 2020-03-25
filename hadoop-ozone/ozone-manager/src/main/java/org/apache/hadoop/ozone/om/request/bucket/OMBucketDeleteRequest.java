@@ -127,8 +127,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // If this is a replay, then the response has already been returned to
       // the client. So take no further action and return a dummy
       // OMClientResponse.
-      if (isReplay(ozoneManager, omBucketInfo.getUpdateID(),
-          transactionLogIndex)) {
+      if (isReplay(ozoneManager, omBucketInfo, transactionLogIndex)) {
         LOG.debug("Replayed Transaction {} ignored. Request: {}",
             transactionLogIndex, deleteBucketRequest);
         return new OMBucketDeleteResponse(createReplayOMResponse(omResponse));
@@ -159,11 +158,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       omClientResponse = new OMBucketDeleteResponse(
           createErrorOMResponse(omResponse, exception), volumeName, bucketName);
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);

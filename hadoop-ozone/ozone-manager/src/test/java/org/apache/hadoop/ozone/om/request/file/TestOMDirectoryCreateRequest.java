@@ -295,7 +295,7 @@ public class TestOMDirectoryCreateRequest {
             ozoneManagerDoubleBufferHelper);
 
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.OK);
+        == OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS);
 
     // Key should exist in DB
     Assert.assertTrue(omMetadataManager.getKeyTable().get(

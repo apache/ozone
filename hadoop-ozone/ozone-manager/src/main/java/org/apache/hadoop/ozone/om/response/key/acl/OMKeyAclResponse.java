@@ -21,12 +21,10 @@ package org.apache.hadoop.ozone.om.response.key.acl;
 import java.io.IOException;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -36,27 +34,30 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
  */
 public class OMKeyAclResponse extends OMClientResponse {
 
-  private final OmKeyInfo omKeyInfo;
+  private OmKeyInfo omKeyInfo;
 
-  public OMKeyAclResponse(@Nullable OmKeyInfo omKeyInfo,
-      @Nonnull OMResponse omResponse) {
+  public OMKeyAclResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeyAclResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // If response status is OK and success is true, add to DB batch.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK &&
-        getOMResponse().getSuccess()) {
-      String dbKey =
-          omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
-              omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-          dbKey, omKeyInfo);
-    }
+    String dbKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
+    omMetadataManager.getKeyTable().putWithBatch(batchOperation, dbKey,
+        omKeyInfo);
   }
 
 }

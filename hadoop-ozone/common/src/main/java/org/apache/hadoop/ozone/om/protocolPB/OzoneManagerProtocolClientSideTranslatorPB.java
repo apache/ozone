@@ -24,12 +24,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc.ProtobufHelper;
@@ -147,6 +146,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
@@ -163,12 +163,12 @@ import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAILOVER_AND_RETRY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
-
-
 
 /**
  *  The client side implementation of OzoneManagerProtocol.
@@ -232,10 +232,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       OMFailoverProxyProvider failoverProxyProvider,
       int maxFailovers, int delayMillis, int maxDelayBase) {
 
-    RetryPolicy retryPolicyOnNetworkException = RetryPolicies
-        .failoverOnNetworkException(RetryPolicies.TRY_ONCE_THEN_FAIL,
-            maxFailovers, maxFailovers, delayMillis, maxDelayBase);
-
     // Client attempts contacting each OM ipc.client.connect.max.retries
     // (default = 10) times before failing over to the next OM, if
     // available.
@@ -246,6 +242,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       public RetryAction shouldRetry(Exception exception, int retries,
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
+        if (isAccessControlException(exception)) {
+          return RetryAction.FAIL; // do not retry
+        }
         if (exception instanceof ServiceException) {
           OMNotLeaderException notLeaderException =
               getNotLeaderException(exception);
@@ -256,7 +255,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             // does not perform any failover.
             omFailoverProxyProvider.performFailoverIfRequired(
                 notLeaderException.getSuggestedLeaderNodeId());
-            return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
+            return getRetryAction(FAILOVER_AND_RETRY, failovers);
           }
 
           OMLeaderNotReadyException leaderNotReadyException =
@@ -266,18 +265,16 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           // does not perform any failover.
           // So Just retry with same ON node.
           if (leaderNotReadyException != null) {
-            return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
+            return getRetryAction(FAILOVER_AND_RETRY, failovers);
           }
-
-          // We need to failover manually to the next OM Node proxy.
-          // OMFailoverProxyProvider#performFailover() is a dummy call and
-          // does not perform any failover.
-          omFailoverProxyProvider.performFailoverToNextProxy();
-          return getRetryAction(RetryAction.FAILOVER_AND_RETRY, failovers);
-        } else {
-          return retryPolicyOnNetworkException.shouldRetry(
-              exception, retries, failovers, isIdempotentOrAtMostOnce);
         }
+
+        // For all other exceptions other than LeaderNotReadyException and
+        // NotLeaderException fail over manually to the next OM Node proxy.
+        // OMFailoverProxyProvider#performFailover() is a dummy call and
+        // does not perform any failover.
+        omFailoverProxyProvider.performFailoverToNextProxy();
+        return getRetryAction(FAILOVER_AND_RETRY, failovers);
       }
 
       private RetryAction getRetryAction(RetryAction fallbackAction,
@@ -299,12 +296,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
+   * Unwrap exception to check if it is a {@link AccessControlException}.
+   */
+  private boolean isAccessControlException(Exception ex) {
+    if (ex instanceof ServiceException) {
+      Throwable t = ex.getCause();
+      while (t != null) {
+        if (t instanceof AccessControlException) {
+          return true;
+        }
+        t = t.getCause();
+      }
+    }
+    return false;
+  }
+  
+  /**
    * Check if exception is a OMNotLeaderException.
    * @return OMNotLeaderException.
    */
   private OMNotLeaderException getNotLeaderException(Exception exception) {
     Throwable cause = exception.getCause();
-    if (cause != null && cause instanceof RemoteException) {
+    if (cause instanceof RemoteException) {
       IOException ioException =
           ((RemoteException) cause).unwrapRemoteException();
       if (ioException instanceof OMNotLeaderException) {
@@ -322,7 +335,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private OMLeaderNotReadyException getLeaderNotReadyException(
       Exception exception) {
     Throwable cause = exception.getCause();
-    if (cause != null && cause instanceof RemoteException) {
+    if (cause instanceof RemoteException) {
       IOException ioException =
           ((RemoteException) cause).unwrapRemoteException();
       if (ioException instanceof OMLeaderNotReadyException) {
@@ -1434,7 +1447,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setCreateDirectoryRequest(request)
         .build();
 
-    handleError(submitRequest(omRequest));
+    OMResponse omResponse = submitRequest(omRequest);
+    if (!omResponse.getStatus().equals(DIRECTORY_ALREADY_EXISTS)) {
+      // TODO: If the directory already exists, we should return false to
+      //  client. For this, the client createDirectory API needs to be
+      //  changed to return a boolean.
+      handleError(omResponse);
+    }
   }
 
   @Override

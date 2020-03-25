@@ -107,8 +107,8 @@ public final class NodeSchemaLoader {
       File schemaFile = new File(schemaFilePath);
 
       if (schemaFile.exists()) {
-        LOG.info("Load network topology schema file " +
-            schemaFile.getAbsolutePath());
+        LOG.info("Load network topology schema file {}",
+                schemaFile.getAbsolutePath());
         try (FileInputStream inputStream = new FileInputStream(schemaFile)) {
           return loadSchemaFromStream(schemaFilePath, inputStream);
         }

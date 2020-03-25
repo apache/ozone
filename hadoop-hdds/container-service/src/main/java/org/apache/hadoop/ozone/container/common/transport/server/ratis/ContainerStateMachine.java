@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
@@ -73,6 +73,7 @@ import org.apache.ratis.statemachine.StateMachineStorage;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,11 +81,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.concurrent.Executors;
@@ -137,14 +139,14 @@ public class ContainerStateMachine extends BaseStateMachine {
   private final RaftGroupId gid;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
-  private ThreadPoolExecutor chunkExecutor;
   private final XceiverServerRatis ratisServer;
   private final ConcurrentHashMap<Long,
       CompletableFuture<ContainerCommandResponseProto>> writeChunkFutureMap;
 
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
-  private ExecutorService[] executors;
+  private final ExecutorService[] executors;
+  private final List<ThreadPoolExecutor> chunkExecutors;
   private final Map<Long, Long> applyTransactionCompletionMap;
   private final Cache<Long, ByteString> stateMachineDataCache;
   private final AtomicBoolean stateMachineHealthy;
@@ -157,12 +159,12 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
-      ContainerController containerController, ThreadPoolExecutor chunkExecutor,
+      ContainerController containerController,
+      List<ThreadPoolExecutor> chunkExecutors,
       XceiverServerRatis ratisServer, Configuration conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
-    this.chunkExecutor = chunkExecutor;
     this.ratisServer = ratisServer;
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
@@ -177,6 +179,9 @@ public class ContainerStateMachine extends BaseStateMachine {
     stateMachineDataCache = new ResourceLimitCache<>(new ConcurrentHashMap<>(),
         (index, data) -> new int[] {1, data.size()}, numPendingRequests,
         pendingRequestsByteLimit);
+
+    this.chunkExecutors = chunkExecutors;
+
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
     final int numContainerOpExecutors = conf.getInt(
@@ -370,14 +375,15 @@ public class ContainerStateMachine extends BaseStateMachine {
     return entryProto.getStateMachineEntry().getStateMachineData();
   }
 
-  private ContainerCommandRequestProto getContainerCommandRequestProto(
-      ByteString request) throws InvalidProtocolBufferException {
+  private static ContainerCommandRequestProto getContainerCommandRequestProto(
+      RaftGroupId id, ByteString request)
+      throws InvalidProtocolBufferException {
     // TODO: We can avoid creating new builder and set pipeline Id if
     // the client is already sending the pipeline id, then we just have to
     // validate the pipeline Id.
     return ContainerCommandRequestProto.newBuilder(
         ContainerCommandRequestProto.parseFrom(request))
-        .setPipelineID(gid.getUuid().toString()).build();
+        .setPipelineID(id.getUuid().toString()).build();
   }
 
   private ContainerCommandRequestProto message2ContainerCommandRequestProto(
@@ -450,7 +456,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             raftFuture.completeExceptionally(e);
             throw e;
           }
-        }, chunkExecutor);
+        }, getChunkExecutor(requestProto.getWriteChunk()));
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
@@ -496,6 +502,15 @@ public class ContainerStateMachine extends BaseStateMachine {
     return raftFuture;
   }
 
+  private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
+    int hash = Objects.hashCode(req.getBlockID());
+    if (hash == Integer.MIN_VALUE) {
+      hash = Integer.MAX_VALUE;
+    }
+    int i = Math.abs(hash) % chunkExecutors.size();
+    return chunkExecutors.get(i);
+  }
+
   /*
    * writeStateMachineData calls are not synchronized with each other
    * and also with applyTransaction.
@@ -506,7 +521,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       metrics.incNumWriteStateMachineOps();
       long writeStateMachineStartTime = Time.monotonicNowNanos();
       ContainerCommandRequestProto requestProto =
-          getContainerCommandRequestProto(
+          getContainerCommandRequestProto(gid,
               entry.getStateMachineLogEntry().getLogData());
       WriteChunkRequestProto writeChunk =
           WriteChunkRequestProto.newBuilder(requestProto.getWriteChunk())
@@ -638,7 +653,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
     try {
       final ContainerCommandRequestProto requestProto =
-          getContainerCommandRequestProto(
+          getContainerCommandRequestProto(gid,
               entry.getStateMachineLogEntry().getLogData());
       // readStateMachineData should only be called for "write" to Ratis.
       Preconditions.checkArgument(!HddsUtils.isReadOnly(requestProto));
@@ -654,7 +669,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             future.completeExceptionally(e);
           }
           return future;
-        }, chunkExecutor);
+        }, getChunkExecutor(requestProto.getWriteChunk()));
         return future;
       } else {
         throw new IllegalStateException("Cmd type:" + requestProto.getCmdType()
@@ -721,7 +736,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       applyTransactionSemaphore.acquire();
       metrics.incNumApplyTransactionsOps();
       ContainerCommandRequestProto requestProto =
-          getContainerCommandRequestProto(
+          getContainerCommandRequestProto(gid,
               trx.getStateMachineLogEntry().getLogData());
       Type cmdType = requestProto.getCmdType();
       // Make sure that in write chunk, the user data is not set
@@ -887,22 +902,30 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
+    return smProtoToString(gid, containerController, proto);
+  }
+
+  public static String smProtoToString(RaftGroupId gid,
+                                   ContainerController containerController,
+                                   StateMachineLogEntryProto proto) {
+    StringBuilder builder = new StringBuilder();
     try {
       ContainerCommandRequestProto requestProto =
-              getContainerCommandRequestProto(proto.getLogData());
+          getContainerCommandRequestProto(gid, proto.getLogData());
       long contId = requestProto.getContainerID();
 
-      switch (requestProto.getCmdType()) {
-      case WriteChunk:
+      builder.append(TextFormat.shortDebugString(requestProto));
+
+      if (containerController != null) {
         String location = containerController.getContainerLocation(contId);
-        return HddsUtils.writeChunkToString(requestProto.getWriteChunk(),
-                contId, location);
-      default:
-        return "Cmd Type:" + requestProto.getCmdType()
-          + " should not have state machine data";
+        builder.append(", container path=");
+        builder.append(location);
       }
     } catch (Throwable t) {
-      return "";
+      LOG.info("smProtoToString failed", t);
+      builder.append("smProtoToString failed with");
+      builder.append(t.getMessage());
     }
+    return builder.toString();
   }
 }

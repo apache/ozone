@@ -132,4 +132,39 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omResponse.getStatus());
   }
+
+  @Test
+  public void testReplayRequest() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String ownerName = "user1";
+
+    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
+    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
+
+    OzoneAcl userAccessAcl = OzoneAcl.parseAcl("user:bilbo:rw[ACCESS]");
+    OzoneAcl groupDefaultAcl = OzoneAcl.parseAcl(
+        "group:admin:rwdlncxy[DEFAULT]");
+
+    List<OzoneAcl> acls = Lists.newArrayList(userAccessAcl, groupDefaultAcl);
+
+    OMRequest originalRequest = TestOMRequestUtils.createVolumeSetAclRequest(
+        volumeName, acls);
+
+    OMVolumeSetAclRequest omVolumeSetAclRequest = new OMVolumeSetAclRequest(
+        originalRequest);
+    omVolumeSetAclRequest.preExecute(ozoneManager);
+
+    OMClientResponse omClientResponse = omVolumeSetAclRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    OMClientResponse replayResponse = omVolumeSetAclRequest
+        .validateAndUpdateCache(ozoneManager, 1,
+            ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+        replayResponse.getOMResponse().getStatus());
+  }
 }

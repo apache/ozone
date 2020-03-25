@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -62,6 +64,7 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.REPLAY;
 
 /**
  * The OM StateMachine is the state machine for OM Ratis server. It is
@@ -228,7 +231,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
       CompletableFuture<Message> ratisFuture =
           new CompletableFuture<>();
-
       applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
           () -> runCommand(request, trxLogIndex), executorService);
@@ -250,6 +252,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
           } else if (omResponse.getStatus() == METADATA_ERROR) {
             terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
+          } else if (omResponse.getStatus() == REPLAY) {
+            // For replay we do not add response to double buffer, so update
+            // LastAppliedIndex for the replay transactions here.
+            computeAndUpdateLastAppliedIndex(trxLogIndex,
+                trx.getLogEntry().getTerm(), Lists.newArrayList(trxLogIndex),
+                true);
           }
         }
 
@@ -377,6 +385,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     omRatisServer.updateServerRole();
   }
 
+  @Override
+  public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
+    return OMRatisHelper.smProtoToString(proto);
+  }
+
   /**
    * Handle the RaftClientRequest and return TransactionContext object.
    * @param raftClientRequest
@@ -456,17 +469,37 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           for (long epoch : flushedTrans) {
             ratisTransactionMap.put(epoch, applyTransactionMap.remove(epoch));
           }
+          if (LOG.isDebugEnabled()) {
+            if (!flushedTrans.isEmpty()) {
+              LOG.debug("ComputeAndUpdateLastAppliedIndex due to SM added " +
+                  "to map remaining {}", flushedTrans);
+            }
+          }
           break;
         }
       }
       if (appliedTerm != null) {
         updateLastAppliedTermIndex(appliedTerm, appliedIndex);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("ComputeAndUpdateLastAppliedIndex due to SM is {}",
+              getLastAppliedTermIndex());
+        }
       }
     } else {
       if (getLastAppliedTermIndex().getIndex() + 1 == lastFlushedIndex) {
         updateLastAppliedTermIndex(currentTerm, lastFlushedIndex);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex {}",
+              getLastAppliedTermIndex());
+        }
       } else {
         ratisTransactionMap.put(lastFlushedIndex, currentTerm);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex " +
+              "added to map. Passed Term {} index {}, where as lastApplied " +
+              "Index {}", currentTerm, lastFlushedIndex,
+              getLastAppliedTermIndex());
+        }
       }
     }
   }
@@ -477,7 +510,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // nextIndex (placeHolderIndex).
     setLastAppliedTermIndex(TermIndex.newTermIndex(snapshotInfo.getTerm(),
         snapshotInfo.getIndex()));
-
+    LOG.info("LastAppliedIndex set from SnapShotInfo {}",
+        getLastAppliedTermIndex());
   }
 
   /**
