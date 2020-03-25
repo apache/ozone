@@ -453,23 +453,11 @@ public class VolumeManagerImpl implements VolumeManager {
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
-    metadataManager.getLock().acquireLock(USER_LOCK, userName);
+    metadataManager.getLock().acquireWriteLock(USER_LOCK, userName);
     try {
-      List<OmVolumeArgs> volumes = metadataManager.listVolumes(
-          userName, prefix, startKey, maxKeys);
-      UserGroupInformation userUgi = ProtobufRpcEngine.Server.
-          getRemoteUser();
-      if (userUgi == null || !aclEnabled) {
-        return volumes;
-      }
-
-      List<OmVolumeArgs> filteredVolumes = volumes.stream().
-          filter(v -> v.getAclMap().
-              hasAccess(IAccessAuthorizer.ACLType.LIST, userUgi))
-          .collect(Collectors.toList());
-      return filteredVolumes;
+      return metadataManager.listVolumes(userName, prefix, startKey, maxKeys);
     } finally {
-      metadataManager.getLock().releaseLock(USER_LOCK, userName);
+      metadataManager.getLock().releaseWriteLock(USER_LOCK, userName);
     }
   }
 
