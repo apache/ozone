@@ -1550,8 +1550,8 @@ function hadoop_translate_cygwin_path
 function hadoop_add_default_gc_opts
 {
   if [[ "${HADOOP_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
-    hadoop_debug "Appending default GC parameter to the HADOOP_OPTS"
     if [[ ! "$HADOOP_OPTS" =~ "-XX" ]] ; then
+       hadoop_debug "Appending default GC parameter to the HADOOP_OPTS"
        HADOOP_OPTS="${HADOOP_OPTS} -XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
     fi
   fi
