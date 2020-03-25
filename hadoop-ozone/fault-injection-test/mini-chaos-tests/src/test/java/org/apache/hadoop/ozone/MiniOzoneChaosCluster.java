@@ -242,6 +242,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneClusterImpl {
           1, TimeUnit.SECONDS);
       conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1,
           TimeUnit.SECONDS);
+      conf.setInt(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
+          4);
+      conf.setInt(
+          OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
+          2);
       conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
       conf.setInt("hdds.scm.replication.thread.interval", 10 * 1000);
       conf.setInt("hdds.scm.replication.event.timeout", 20 * 1000);
