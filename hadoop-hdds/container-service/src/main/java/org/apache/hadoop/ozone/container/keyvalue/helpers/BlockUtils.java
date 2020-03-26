@@ -53,8 +53,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
  */
 public final class BlockUtils {
   private static final Logger LOG = LoggerFactory.getLogger(BlockUtils.class);
-
-  private static final Object cacheLock = new Object();
+  private static final Object CACHE_LOCK = new Object();
   @VisibleForTesting
   static LoadingCache<DbHandlerCacheKey, ReferenceDB> cache;
 
@@ -110,7 +109,7 @@ public final class BlockUtils {
                                                Configuration conf)
       throws StorageContainerException {
     try {
-      synchronized (cacheLock) {
+      synchronized (CACHE_LOCK) {
         initCache(conf);
         Preconditions.checkNotNull(containerData);
         Preconditions.checkNotNull(cache);
@@ -135,7 +134,7 @@ public final class BlockUtils {
    */
   public static void removeDB(KeyValueContainerData container, Configuration
       conf) {
-    synchronized (cacheLock) {
+    synchronized (CACHE_LOCK) {
       Preconditions.checkNotNull(container);
       initCache(conf);
       Preconditions.checkNotNull(cache);
@@ -147,7 +146,7 @@ public final class BlockUtils {
    * Shutdown all DB Handles.
    */
   public static void shutdownCache()  {
-    synchronized (cacheLock) {
+    synchronized (CACHE_LOCK) {
       if(Objects.nonNull(cache)) {
         cache.asMap().values().forEach(ReferenceDB::cleanup);
         cache.invalidateAll();
