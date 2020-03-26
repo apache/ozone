@@ -82,12 +82,9 @@ class BackgroundPipelineCreator {
   void triggerPipelineCreation() {
     // TODO: #CLUTIL introduce a better mechanism to not have more than one
     // job of a particular type running, probably via ratis.
-    LOG.info("Entered triggerPipelineCreation");
     if (!shouldSchedulePipelineCreator()) {
-      LOG.info("Not able to schedule the pipelineCreator");
       return;
     }
-    LOG.info("Scheduling the pipeline creation process");
     scheduler.schedule(this::createPipelines, 0, TimeUnit.MILLISECONDS);
   }
 
