@@ -153,6 +153,11 @@ public class TestDeadNodeHandler {
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
 
+    // The background pipline creation thread normally runs on a 2 minute
+    // heartbeat. Rather than wait potentially 2 minutes, we trigger it manually
+    // here.
+    pipelineManager.triggerPipelineCreation();
+
     LambdaTestUtils.await(120000, 10000,
         () -> pipelineManager.getPipelines(RATIS, THREE).size() == 3);
     TestUtils.openAllRatisPipelines(pipelineManager);
