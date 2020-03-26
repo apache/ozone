@@ -18,15 +18,11 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import com.google.common.base.Preconditions;
-
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Class to implement reference counting over instances handed by Container
@@ -35,54 +31,26 @@ import java.util.concurrent.atomic.AtomicInteger;
  * from caller stack. When JDK9 StackWalker is available, we can switch to
  * StackWalker instead of new Exception().printStackTrace().
  */
-public class ReferenceCountedDB implements Closeable {
+public class ReferenceDB implements Closeable {
   private static final Logger LOG =
-      LoggerFactory.getLogger(ReferenceCountedDB.class);
-  private final AtomicInteger referenceCount;
+      LoggerFactory.getLogger(ReferenceDB.class);
   private final MetadataStore store;
   private final String containerDBPath;
 
-  public ReferenceCountedDB(MetadataStore store, String containerDBPath) {
-    this.referenceCount = new AtomicInteger(0);
+  public ReferenceDB(MetadataStore store, String containerDBPath) {
     this.store = store;
     this.containerDBPath = containerDBPath;
   }
 
-  public long getReferenceCount() {
-    return referenceCount.get();
-  }
-
-  public void incrementReference() {
-    this.referenceCount.incrementAndGet();
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("IncRef {} to refCnt {}, stackTrace: {}", containerDBPath,
-          referenceCount.get(), ExceptionUtils.getStackTrace(new Throwable()));
-    }
-  }
-
-  public void decrementReference() {
-    int refCount = this.referenceCount.decrementAndGet();
-    Preconditions.checkArgument(refCount >= 0, "refCount:", refCount);
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("DecRef {} to refCnt {}, stackTrace: {}", containerDBPath,
-          referenceCount.get(), ExceptionUtils.getStackTrace(new Throwable()));
-    }
-  }
-
   public boolean cleanup() {
-    if (referenceCount.get() == 0 && store != null) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Close {} refCnt {}", containerDBPath,
-            referenceCount.get());
-      }
-      try {
-        store.close();
-        return true;
-      } catch (Exception e) {
-        LOG.error("Error closing DB. Container: " + containerDBPath, e);
-        return false;
-      }
-    } else {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Close {}", containerDBPath);
+    }
+    try {
+      store.close();
+      return true;
+    } catch (Exception e) {
+      LOG.error("Error closing DB. Container: " + containerDBPath, e);
       return false;
     }
   }
@@ -92,6 +60,5 @@ public class ReferenceCountedDB implements Closeable {
   }
 
   public void close() {
-    decrementReference();
   }
 }

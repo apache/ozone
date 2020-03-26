@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -202,7 +202,7 @@ public class TestOzoneContainer {
 
     long freeBytes = container.getContainerData().getMaxSize();
     long containerId = container.getContainerData().getContainerID();
-    ReferenceCountedDB db = BlockUtils.getDB(container
+    ReferenceDB db = BlockUtils.getDB(container
         .getContainerData(), conf);
 
     for (int bi = 0; bi < blocks; bi++) {

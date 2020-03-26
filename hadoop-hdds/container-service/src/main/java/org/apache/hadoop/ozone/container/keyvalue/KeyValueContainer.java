@@ -78,7 +78,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .Result.UNSUPPORTED_REQUEST;
 
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -382,7 +382,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   private void compactDB() throws StorageContainerException {
     try {
-      try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+      try(ReferenceDB db = BlockUtils.getDB(containerData, config)) {
         db.getStore().compactDB();
       }
     } catch (StorageContainerException ex) {
@@ -395,7 +395,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   private void flushAndSyncDB() throws StorageContainerException {
     try {
-      try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+      try (ReferenceDB db = BlockUtils.getDB(containerData, config)) {
         db.getStore().flushDB(true);
         LOG.info("Container {} is synced with bcsId {}.",
             containerData.getContainerID(),

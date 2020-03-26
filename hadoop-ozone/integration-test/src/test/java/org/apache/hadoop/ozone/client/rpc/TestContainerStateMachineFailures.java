@@ -43,7 +43,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -602,7 +602,7 @@ public class TestContainerStateMachineFailures {
         .getContainer(omKeyLocationInfo.getContainerID()).getContainerData();
     Assert.assertTrue(containerData instanceof KeyValueContainerData);
     keyValueContainerData = (KeyValueContainerData) containerData;
-    ReferenceCountedDB db = BlockUtils.
+    ReferenceDB db = BlockUtils.
         getDB(keyValueContainerData, conf);
     byte[] blockCommitSequenceIdKey =
         DFSUtil.string2Bytes(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
@@ -610,7 +610,6 @@ public class TestContainerStateMachineFailures {
     // modify the bcsid for the container in the ROCKS DB thereby inducing
     // corruption
     db.getStore().put(blockCommitSequenceIdKey, Longs.toByteArray(0));
-    db.decrementReference();
     // shutdown of dn will take a snapsot which will persist the valid BCSID
     // recorded in the container2BCSIDMap in ContainerStateMachine
     cluster.shutdownHddsDatanode(

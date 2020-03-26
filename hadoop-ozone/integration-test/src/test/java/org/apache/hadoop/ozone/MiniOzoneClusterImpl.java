@@ -71,7 +71,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
-import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -390,7 +390,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
               scm.getClientProtocolServer().getScmInfo().getClusterId()));
       stop();
       FileUtils.deleteDirectory(baseDir);
-      ContainerCache.getInstance(conf).shutdownCache();
+      BlockUtils.shutdownCache();
       DefaultMetricsSystem.shutdown();
     } catch (IOException e) {
       LOG.error("Exception while shutting down the cluster.", e);

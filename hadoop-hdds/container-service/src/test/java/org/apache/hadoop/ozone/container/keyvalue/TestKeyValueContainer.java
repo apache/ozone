@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume
     .RoundRobinVolumeChoosingPolicy;
@@ -40,8 +41,8 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -109,6 +110,11 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
   }
 
+  @AfterClass
+  public static void shutdown() {
+    BlockUtils.shutdownCache();
+  }
+
   @Test
   public void testBlockIterator() throws Exception{
     keyValueContainerData = new KeyValueContainerData(100L,
@@ -137,7 +143,7 @@ public class TestKeyValueContainer {
   private void addBlocks(int count) throws Exception {
     long containerId = keyValueContainerData.getContainerID();
 
-    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
+    try(ReferenceDB metadataStore = BlockUtils.getDB(keyValueContainer
         .getContainerData(), conf)) {
       for (int i = 0; i < count; i++) {
         // Creating BlockData
@@ -196,7 +202,7 @@ public class TestKeyValueContainer {
 
     int numberOfKeysToWrite = 12;
     //write one few keys to check the key count after import
-    try(ReferenceCountedDB metadataStore =
+    try(ReferenceDB metadataStore =
         BlockUtils.getDB(keyValueContainerData, conf)) {
       for (int i = 0; i < numberOfKeysToWrite; i++) {
         metadataStore.getStore().put(("test" + i).getBytes(UTF_8),

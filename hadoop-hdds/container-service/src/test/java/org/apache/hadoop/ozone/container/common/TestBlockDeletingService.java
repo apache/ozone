@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletio
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -49,7 +50,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Test;
@@ -95,6 +95,7 @@ public class TestBlockDeletingService {
 
   @AfterClass
   public static void cleanup() throws IOException {
+    BlockUtils.shutdownCache();
     FileUtils.deleteDirectory(testRoot);
   }
 
@@ -120,7 +121,7 @@ public class TestBlockDeletingService {
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(
           containerID).getContainerData();
-      try(ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
+      try(ReferenceDB metadata = BlockUtils.getDB(data, conf)) {
         for (int j = 0; j < numOfBlocksPerContainer; j++) {
           BlockID blockID =
               ContainerTestHelper.getTestBlockID(containerID);
@@ -161,7 +162,7 @@ public class TestBlockDeletingService {
    * Get under deletion blocks count from DB,
    * note this info is parsed from container.db.
    */
-  private int getUnderDeletionBlocksCount(ReferenceCountedDB meta)
+  private int getUnderDeletionBlocksCount(ReferenceDB meta)
       throws IOException {
     List<Map.Entry<byte[], byte[]>> underDeletionBlocks =
         meta.getStore().getRangeKVs(null, 100,
@@ -170,7 +171,7 @@ public class TestBlockDeletingService {
     return underDeletionBlocks.size();
   }
 
-  private int getDeletedBlocksCount(ReferenceCountedDB db) throws IOException {
+  private int getDeletedBlocksCount(ReferenceDB db) throws IOException {
     List<Map.Entry<byte[], byte[]>> underDeletionBlocks =
         db.getStore().getRangeKVs(null, 100,
             new MetadataKeyFilters.KeyPrefixFilter()
@@ -196,7 +197,7 @@ public class TestBlockDeletingService {
     containerSet.listContainer(0L, 1, containerData);
     Assert.assertEquals(1, containerData.size());
 
-    try(ReferenceCountedDB meta = BlockUtils.getDB(
+    try(ReferenceDB meta = BlockUtils.getDB(
         (KeyValueContainerData) containerData.get(0), conf)) {
       Map<Long, Container<?>> containerMap = containerSet.getContainerMapCopy();
       // NOTE: this test assumes that all the container is KetValueContainer and
@@ -300,7 +301,7 @@ public class TestBlockDeletingService {
     KeyValueContainer container =
         (KeyValueContainer) containerSet.getContainerIterator().next();
     KeyValueContainerData data = container.getContainerData();
-    try (ReferenceCountedDB meta = BlockUtils.getDB(data, conf)) {
+    try (ReferenceDB meta = BlockUtils.getDB(data, conf)) {
 
       LogCapturer newLog = LogCapturer.captureLogs(BackgroundService.LOG);
       GenericTestUtils.waitFor(() -> {

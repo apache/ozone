@@ -1,4 +1,3 @@
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -28,6 +27,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -47,7 +47,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -255,7 +254,7 @@ public class BlockDeletingService extends BackgroundService {
       container.writeLock();
       long startTime = Time.monotonicNow();
       // Scan container's db and get list of under deletion blocks
-      try (ReferenceCountedDB meta = BlockUtils.getDB(containerData, conf)) {
+      try (ReferenceDB meta = BlockUtils.getDB(containerData, conf)) {
         // # of blocks to delete is throttled
         KeyPrefixFilter filter =
             new KeyPrefixFilter().addFilter(OzoneConsts.DELETING_KEY_PREFIX);

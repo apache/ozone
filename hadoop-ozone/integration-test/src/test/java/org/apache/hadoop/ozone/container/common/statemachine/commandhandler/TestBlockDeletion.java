@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.protocol.commands.RetriableDatanodeEventWatcher;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -321,7 +321,7 @@ public class TestBlockDeletion {
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet();
     OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
-      try(ReferenceCountedDB db =
+      try(ReferenceDB db =
           BlockUtils.getDB((KeyValueContainerData) dnContainerSet
           .getContainer(blockID.getContainerID()).getContainerData(), conf)) {
         Assert.assertNotNull(db.getStore().get(
@@ -336,7 +336,7 @@ public class TestBlockDeletion {
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet();
     OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
-      try(ReferenceCountedDB db =
+      try(ReferenceDB db =
           BlockUtils.getDB((KeyValueContainerData) dnContainerSet
           .getContainer(blockID.getContainerID()).getContainerData(), conf)) {
         Assert.assertNull(db.getStore().get(

@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.BatchOperation;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -205,7 +205,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     }
 
     int newDeletionBlocks = 0;
-    try(ReferenceCountedDB containerDB =
+    try(ReferenceDB containerDB =
             BlockUtils.getDB(containerData, conf)) {
       for (Long blk : delTX.getLocalIDList()) {
         BatchOperation batch = new BatchOperation();

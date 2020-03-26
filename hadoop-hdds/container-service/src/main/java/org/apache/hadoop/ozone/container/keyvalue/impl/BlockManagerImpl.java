@@ -28,14 +28,13 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
-import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,7 +87,7 @@ public class BlockManagerImpl implements BlockManager {
         "cannot be negative");
     // We are not locking the key manager since LevelDb serializes all actions
     // against a single DB. We rely on DB level locking to avoid conflicts.
-    try(ReferenceCountedDB db = BlockUtils.
+    try(ReferenceDB db = BlockUtils.
         getDB((KeyValueContainerData) container.getContainerData(), config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
@@ -150,7 +149,7 @@ public class BlockManagerImpl implements BlockManager {
 
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
-    try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+    try(ReferenceDB db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -188,7 +187,7 @@ public class BlockManagerImpl implements BlockManager {
       throws IOException {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
-    try(ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
+    try(ReferenceDB db = BlockUtils.getDB(containerData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -216,7 +215,7 @@ public class BlockManagerImpl implements BlockManager {
 
     KeyValueContainerData cData = (KeyValueContainerData) container
         .getContainerData();
-    try(ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
+    try(ReferenceDB db = BlockUtils.getDB(cData, config)) {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
@@ -254,7 +253,7 @@ public class BlockManagerImpl implements BlockManager {
       List<BlockData> result = null;
       KeyValueContainerData cData =
           (KeyValueContainerData) container.getContainerData();
-      try (ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
+      try (ReferenceDB db = BlockUtils.getDB(cData, config)) {
         result = new ArrayList<>();
         byte[] startKeyInBytes = Longs.toByteArray(startLocalID);
         List<Map.Entry<byte[], byte[]>> range = db.getStore()
@@ -276,10 +275,10 @@ public class BlockManagerImpl implements BlockManager {
    * Shutdown KeyValueContainerManager.
    */
   public void shutdown() {
-    BlockUtils.shutdownCache(ContainerCache.getInstance(config));
+    BlockUtils.shutdownCache();
   }
 
-  private byte[] getBlockByID(ReferenceCountedDB db, BlockID blockID)
+  private byte[] getBlockByID(ReferenceDB db, BlockID blockID)
       throws IOException {
     byte[] blockKey = Longs.toByteArray(blockID.getLocalID());
 

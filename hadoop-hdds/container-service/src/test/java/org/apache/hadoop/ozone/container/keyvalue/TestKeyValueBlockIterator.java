@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -97,6 +97,7 @@ public class TestKeyValueBlockIterator {
 
   @After
   public void tearDown() {
+    BlockUtils.shutdownCache();
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
   }
@@ -256,7 +257,7 @@ public class TestKeyValueBlockIterator {
     container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID
         .randomUUID().toString());
-    try(ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
+    try(ReferenceDB metadataStore = BlockUtils.getDB(containerData,
         conf)) {
 
       List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();

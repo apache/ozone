@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -227,7 +227,7 @@ public class KeyValueContainerCheck {
     }
 
     onDiskContainerData.setDbFile(dbFile);
-    try(ReferenceCountedDB db =
+    try(ReferenceDB db =
             BlockUtils.getDB(onDiskContainerData, checkConfig);
         KeyValueBlockIterator kvIter = new KeyValueBlockIterator(containerID,
             new File(onDiskContainerData.getContainerPath()))) {

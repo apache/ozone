@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocat
 import org.apache.hadoop.hdds.utils.MetaStoreIterator;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.hdds.utils.MetadataStore.KeyValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +56,7 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
       KeyValueBlockIterator.class);
 
   private MetaStoreIterator<KeyValue> blockIterator;
-  private final ReferenceCountedDB db;
+  private final ReferenceDB db;
   private static KeyPrefixFilter defaultBlockFilter = MetadataKeyFilters
       .getNormalKeyFilter();
   private KeyPrefixFilter blockFilter;

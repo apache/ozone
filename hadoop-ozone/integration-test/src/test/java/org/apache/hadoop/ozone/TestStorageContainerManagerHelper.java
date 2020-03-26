@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -88,7 +88,7 @@ public class TestStorageContainerManagerHelper {
   public List<String> getPendingDeletionBlocks(Long containerID)
       throws IOException {
     List<String> pendingDeletionBlocks = Lists.newArrayList();
-    ReferenceCountedDB meta = getContainerMetadata(containerID);
+    ReferenceDB meta = getContainerMetadata(containerID);
     KeyPrefixFilter filter =
         new KeyPrefixFilter().addFilter(OzoneConsts.DELETING_KEY_PREFIX);
     List<Map.Entry<byte[], byte[]>> kvs = meta.getStore()
@@ -113,7 +113,7 @@ public class TestStorageContainerManagerHelper {
 
   public List<Long> getAllBlocks(Long containeID) throws IOException {
     List<Long> allBlocks = Lists.newArrayList();
-    ReferenceCountedDB meta = getContainerMetadata(containeID);
+    ReferenceDB meta = getContainerMetadata(containeID);
     List<Map.Entry<byte[], byte[]>> kvs =
         meta.getStore().getRangeKVs(null, Integer.MAX_VALUE,
             MetadataKeyFilters.getNormalKeyFilter());
@@ -124,7 +124,7 @@ public class TestStorageContainerManagerHelper {
     return allBlocks;
   }
 
-  private ReferenceCountedDB getContainerMetadata(Long containerID)
+  private ReferenceDB getContainerMetadata(Long containerID)
       throws IOException {
     ContainerWithPipeline containerWithPipeline = cluster
         .getStorageContainerManager().getClientProtocolServer()

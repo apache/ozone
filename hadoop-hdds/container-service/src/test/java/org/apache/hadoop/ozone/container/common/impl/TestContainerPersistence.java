@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -121,6 +121,7 @@ public class TestContainerPersistence {
 
   @AfterClass
   public static void shutdown() throws IOException {
+    BlockUtils.shutdownCache();
     FileUtils.deleteDirectory(new File(hddsPath));
   }
 
@@ -201,7 +202,7 @@ public class TestContainerPersistence {
     Path meta = kvData.getDbFile().toPath().getParent();
     Assert.assertTrue(meta != null && Files.exists(meta));
 
-    ReferenceCountedDB store = null;
+    ReferenceDB store = null;
     try {
       store = BlockUtils.getDB(kvData, conf);
       Assert.assertNotNull(store);

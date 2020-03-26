@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -43,7 +44,6 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -99,6 +99,7 @@ import static org.junit.Assert.assertFalse;
   }
 
   @After public void teardown() {
+    BlockUtils.shutdownCache();
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
   }
@@ -161,9 +162,9 @@ import static org.junit.Assert.assertFalse;
     File dbFile = KeyValueContainerLocationUtil
         .getContainerDBFile(metaDir, containerID);
     containerData.setDbFile(dbFile);
-    try (ReferenceCountedDB ignored =
+    try (ReferenceDB ignored =
             BlockUtils.getDB(containerData, conf);
-        KeyValueBlockIterator kvIter = new KeyValueBlockIterator(containerID,
+         KeyValueBlockIterator kvIter = new KeyValueBlockIterator(containerID,
             new File(containerData.getContainerPath()))) {
       BlockData block = kvIter.nextBlock();
       assertFalse(block.getChunks().isEmpty());
@@ -215,7 +216,7 @@ import static org.junit.Assert.assertFalse;
     container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
         UUID.randomUUID().toString());
-    try (ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
+    try (ReferenceDB metadataStore = BlockUtils.getDB(containerData,
         conf)) {
       ChunkManager chunkManager = new FilePerChunkStrategy(true);
 

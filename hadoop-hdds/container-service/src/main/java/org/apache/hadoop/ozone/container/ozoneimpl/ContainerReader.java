@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -191,7 +191,7 @@ public class ContainerReader implements Runnable {
         KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
         KeyValueContainer kvContainer = new KeyValueContainer(
             kvContainerData, config);
-        try(ReferenceCountedDB containerDB = BlockUtils.getDB(kvContainerData,
+        try(ReferenceDB containerDB = BlockUtils.getDB(kvContainerData,
             config)) {
           MetadataKeyFilters.KeyPrefixFilter filter =
               new MetadataKeyFilters.KeyPrefixFilter()

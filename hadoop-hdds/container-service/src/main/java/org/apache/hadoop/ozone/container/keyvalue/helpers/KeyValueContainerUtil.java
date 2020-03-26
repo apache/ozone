@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,7 +151,7 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
-    try(ReferenceCountedDB metadata =
+    try(ReferenceDB metadata =
             BlockUtils.getDB(kvContainerData, config)) {
       long bytesUsed = 0;
       List<Map.Entry<byte[], byte[]>> liveKeys = metadata.getStore()
