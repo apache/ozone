@@ -112,6 +112,9 @@ public final class OmUtils {
             addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
         if (rpcAddr != null) {
           result.get(serviceId).add(NetUtils.createSocketAddr(rpcAddr));
+        } else {
+          LOG.warn("Address undefined for nodeId: {} for service {}", nodeId,
+              serviceId);
         }
       }
     }
