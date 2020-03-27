@@ -19,13 +19,11 @@ package org.apache.hadoop.ozone.freon;
 import java.net.URI;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
-import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +35,8 @@ import picocli.CommandLine.Option;
  */
 @Command(name = "ddsg",
     aliases = "dfs-directory-generator",
-    description = "Create random directories to the any dfs compatible file system.",
+    description =
+            "Create random directories to the any dfs compatible file system.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
@@ -59,12 +58,14 @@ public class HadoopDirGenerator extends BaseFreonGenerator
   private int depth;
 
   @Option(names = {"--span"},
-      description = "Number of child directories to be created inside leaf directory.",
+      description =
+              "Number of child directories to be created in leaf directory.",
       defaultValue = "10")
   private int span;
 
   @Option(names = {"--nameLen"},
-      description = "Length of the random name of directory you want to create.",
+      description =
+              "Length of the random name of directory you want to create.",
       defaultValue = "10")
   private int n;
 
@@ -83,18 +84,18 @@ public class HadoopDirGenerator extends BaseFreonGenerator
 
   private void createDir(long counter) throws Exception {
     String dirString = RandomStringUtils.randomAlphanumeric(n);
-      for(int i = 1; i <= depth; i++) {
-        dirString = dirString + "/" + RandomStringUtils.randomAlphanumeric(n);
-      }
-      Path file = new Path(rootPath + "/" + dirString);
-      fileSystem.mkdirs(file.getParent());
-
-      String leafDir = dirString.substring(0, dirString.length() - n);
-      String tmp = "/0";
-      for(int i = 1; i <= span; i++) {
-        String childDir = leafDir + Integer.toString(i) + tmp;
-        Path dir = new Path(rootPath + "/" + childDir);
-        fileSystem.mkdirs(dir.getParent());
-      }
+    for(int i = 1; i <= depth; i++) {
+      dirString = dirString.concat("/").concat(RandomStringUtils.
+              randomAlphanumeric(n));
+    }
+    Path file = new Path(rootPath.concat("/").concat(dirString));
+    fileSystem.mkdirs(file.getParent());
+    String leafDir = dirString.substring(0, dirString.length() - n);
+    String tmp = "/0";
+    for(int i = 1; i <= span; i++) {
+      String childDir = leafDir.concat(Integer.toString(i)).concat(tmp);
+      Path dir = new Path(rootPath.concat("/").concat(childDir));
+      fileSystem.mkdirs(dir.getParent());
+    }
   }
 }
