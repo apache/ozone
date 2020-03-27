@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -33,6 +33,8 @@ import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
+import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.rules.TemporaryFolder;
 
@@ -71,7 +73,7 @@ public interface GuiceInjectorUtilsForTests {
     JooqPersistenceModule jooqPersistenceModule =
         new JooqPersistenceModule(configurationProvider);
 
-    return Guice.createInjector(jooqPersistenceModule,
+    Injector baseInjector = Guice.createInjector(jooqPersistenceModule,
         new AbstractModule() {
           @Override
           protected void configure() {
@@ -93,13 +95,24 @@ public interface GuiceInjectorUtilsForTests {
 
               bind(DBStore.class).toProvider(ReconContainerDBProvider.class).
                   in(Singleton.class);
-              bind(ContainerDBServiceProvider.class).to(
-                  ContainerDBServiceProviderImpl.class).in(Singleton.class);
             } catch (IOException e) {
               Assert.fail();
             }
           }
         });
+
+    return baseInjector.createChildInjector(new AbstractModule() {
+      @Override
+      protected void configure() {
+        Configuration sqlConfiguration =
+            baseInjector.getInstance((Configuration.class));
+        MissingContainersDao missingContainersDao =
+            new MissingContainersDao(sqlConfiguration);
+        bind(MissingContainersDao.class).toInstance(missingContainersDao);
+        bind(ContainerDBServiceProvider.class).to(
+            ContainerDBServiceProviderImpl.class).in(Singleton.class);
+      }
+    });
   }
 
   /**

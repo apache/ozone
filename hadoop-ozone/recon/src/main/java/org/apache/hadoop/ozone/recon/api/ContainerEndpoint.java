@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.recon.api;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import javax.ws.rs.DefaultValue;
@@ -37,6 +39,9 @@ import javax.ws.rs.core.Response;
 
 import javax.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -46,7 +51,10 @@ import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
+import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
@@ -60,13 +68,21 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
  */
 @Path("/containers")
 @Produces(MediaType.APPLICATION_JSON)
-public class ContainerKeyService {
+public class ContainerEndpoint {
 
   @Inject
   private ContainerDBServiceProvider containerDBServiceProvider;
 
   @Inject
   private ReconOMMetadataManager omMetadataManager;
+
+  private ReconContainerManager containerManager;
+
+  @Inject
+  public ContainerEndpoint(OzoneStorageContainerManager reconSCM) {
+    this.containerManager =
+        (ReconContainerManager) reconSCM.getContainerManager();
+  }
 
   /**
    * Return @{@link org.apache.hadoop.ozone.recon.api.types.ContainerMetadata}
@@ -173,7 +189,6 @@ public class ContainerKeyService {
             keyMetadata.getBlockIds().put(containerKeyPrefix.getKeyVersion(),
                 blockIds);
           }
-
         }
       }
 
@@ -186,6 +201,41 @@ public class ContainerKeyService {
     KeysResponse keysResponse =
         new KeysResponse(totalCount, keyMetadataMap.values());
     return Response.ok(keysResponse).build();
+  }
+
+  /**
+   * Return
+   * {@link org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata}
+   * for all missing containers.
+   *
+   * @return {@link Response}
+   */
+  @GET
+  @Path("/missing")
+  public Response getMissingContainers() {
+    List<MissingContainerMetadata> missingContainers = new ArrayList<>();
+    containerDBServiceProvider.getMissingContainers().forEach(container -> {
+      long containerID = container.getContainerId();
+      try {
+        ContainerInfo containerInfo =
+            containerManager.getContainer(new ContainerID(containerID));
+        long keyCount = containerInfo.getNumberOfKeys();
+        UUID pipelineID = containerInfo.getPipelineID().getId();
+
+        // TODO: Find out which datanodes had replicas of this container
+        // and populate this list
+        List datanodes = Collections.emptyList();
+        missingContainers.add(new MissingContainerMetadata(containerID,
+            container.getMissingSince(), keyCount, pipelineID, datanodes));
+      } catch (IOException ioEx) {
+        throw new WebApplicationException(ioEx,
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+    });
+    MissingContainersResponse response =
+        new MissingContainersResponse(missingContainers.size(),
+            missingContainers);
+    return Response.ok(response).build();
   }
 
   /**
