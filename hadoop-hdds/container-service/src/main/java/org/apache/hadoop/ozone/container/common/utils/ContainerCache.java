@@ -162,20 +162,6 @@ public final class ContainerCache extends LRUMap {
   }
 
   /**
-   * Check whether a DB handler exists in cache.
-   *
-   * @param containerDBPath - DB path of the container.
-   */
-  public boolean isDBExist(String containerDBPath) {
-    lock.lock();
-    try {
-      return this.get(containerDBPath) != null;
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  /**
    * Add a DB handler into cache.
    *
    * @param containerDBPath - DB path of the container.
