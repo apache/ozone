@@ -1910,6 +1910,186 @@
     <tag>OZONE, HDDS, SECURITY</tag>
     <description>SCM security server port.</description>
   </property>
+  <property>
+    <name>ozone.scm.service.ids</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      Comma-separated list of SCM service Ids. This property allows the client
+      to figure out quorum of OzoneManager address.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.internal.service.id</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      Service ID of the SCM. If this is not set fall back to
+      ozone.scm.service.ids to find the service ID it belongs to.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.nodes.EXAMPLESCMSERVICEID</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      Comma-separated list of SCM node Ids for a given SCM service ID (eg.
+      EXAMPLESCMSERVICEID). The SCM service ID should be the value (one of the
+      values if there are multiple) set for the parameter ozone.scm.service.ids.
+
+      Unique identifiers for each SCM Node, delimited by commas. This will be
+      used by SCMs in HA setup to determine all the SCMs
+      belonging to the same SCM in the cluster. For example, if you
+      used “scmService1” as the SCM service ID previously, and you wanted to
+      use “scm1”, “scm2” and "scm3" as the individual IDs of the SCMs,
+      you would configure a property ozone.scm.nodes.scmService1, and its value
+      "scm1,scm2,scm3".
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.node.id</name>
+    <value></value>
+    <tag>OZONE, SCM, HA</tag>
+    <description>
+      The ID of this SCM node. If the SCM node ID is not configured it
+      is determined automatically by matching the local node's address
+      with the configured address.
+
+      If node ID is not deterministic from the configuration, then it is set
+      to the scmId from the SCM version file.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.enable</name>
+    <value>false</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>Property to enable or disable Ratis server on SCM.
+      Please note - this is a temporary property to disable SCM Ratis server.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.port</name>
+    <value>9872</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>
+      The port number of the SCM's Ratis server.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.rpc.type</name>
+    <value>GRPC</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>Ratis supports different kinds of transports like netty, GRPC,
+      Hadoop RPC etc. This picks one of those for this cluster.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.storage.dir</name>
+    <value/>
+    <tag>OZONE, SCM, HA, RATIS, STORAGE</tag>
+    <description>This directory is used for storing SCM's Ratis metadata like
+      logs. If this is not set then default metadata dirs is used. A warning
+      will be logged if this not set. Ideally, this should be mapped to a
+      fast disk like an SSD.
+      If undefined, SCM ratis storage dir will fallback to ozone.metadata.dirs.
+      This fallback approach is not recommended for production environments.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.segment.size</name>
+    <value>16KB</value>
+    <tag>OZONE, SCM, HA, RATIS, PERFORMANCE</tag>
+    <description>The size of the raft segment used by Apache Ratis on SCM.
+      (16 KB by default)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.segment.preallocated.size</name>
+    <value>16KB</value>
+    <tag>OZONE, SCM, HA, RATIS, PERFORMANCE</tag>
+    <description>The size of the buffer which is preallocated for raft segment
+      used by Apache Ratis on SCM.(16 KB by default)
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.log.appender.queue.num-elements</name>
+    <value>1024</value>
+    <tag>OZONE, DEBUG, SCM, HA, RATIS</tag>
+    <description>Number of operation pending with Raft's Log Worker.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.log.appender.queue.byte-limit</name>
+    <value>32MB</value>
+    <tag>OZONE, DEBUG, SCM, HA, RATIS</tag>
+    <description>Byte limit for Raft's Log Worker queue.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.log.purge.gap</name>
+    <value>1000000</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>The minimum gap between log indices for Raft server to purge
+      its log segments after taking snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.server.request.timeout</name>
+    <value>3s</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>The timeout duration for SCM's ratis server request .</description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.server.retry.cache.timeout</name>
+    <value>600000ms</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>Retry Cache entry timeout for SCM's ratis server.</description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.minimum.timeout</name>
+    <value>1s</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>The minimum timeout duration for SCM's Ratis server rpc.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.leader.election.minimum.timeout.duration</name>
+    <value>1s</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>The minimum timeout duration for SCM ratis leader election.
+      Default is 1s.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.server.failure.timeout.duration</name>
+    <value>120s</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>The timeout duration for ratis server failure detection,
+      once the threshold has reached, the ratis state machine will be informed
+      about the failure in the ratis ring.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.scm.ratis.server.role.check.interval</name>
+    <value>15s</value>
+    <tag>OZONE, SCM, HA, RATIS</tag>
+    <description>The interval between SCM leader performing a role
+      check on its ratis server. Ratis server informs SCM if it
+      loses the leader role. The scheduled check is an secondary
+      check to ensure that the leader role is updated periodically
+      .</description>
+  </property>
 
   <property>
     <name>hdds.metadata.dir</name>
