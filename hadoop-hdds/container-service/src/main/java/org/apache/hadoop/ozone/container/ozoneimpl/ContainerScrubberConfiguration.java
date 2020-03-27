@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 /**
  * This class defines configuration parameters for container scrubber.
  **/
-@ConfigGroup(prefix = "hdds.containerscrub")
+@ConfigGroup(prefix = "hdds.container.scrub")
 public class ContainerScrubberConfiguration {
 
   @Config(key = "enabled",
