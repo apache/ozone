@@ -95,7 +95,7 @@ public class ReconStorageContainerManagerFacade
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
-    DBStore dbStore = new SCMDBDefinition().createDBStore(conf);
+    DBStore dbStore = new ReconDBDefinition().createDBStore(conf);
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
