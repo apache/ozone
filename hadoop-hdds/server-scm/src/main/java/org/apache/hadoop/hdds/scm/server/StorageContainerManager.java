@@ -29,6 +29,7 @@ import com.google.protobuf.BlockingService;
 
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
 import java.util.Objects;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
@@ -36,6 +37,9 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.ratis.SCMRatisServer;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -190,6 +194,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private CertificateServer certificateServer;
   private GrpcTlsConfig grpcTlsConfig;
 
+  // SCM HA related
+  private SCMRatisServer scmRatisServer;
+
   private JvmPauseMonitor jvmPauseMonitor;
   private final OzoneConfiguration configuration;
   private final SafeModeHandler safeModeHandler;
@@ -256,6 +263,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
      */
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       loginAsSCMUser(conf);
+    }
+
+    if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      initializeRatisServer();
+    } else {
+      scmRatisServer = null;
     }
 
     // Creates the SCM DBs or opens them if it exists.
@@ -1106,5 +1119,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public NetworkTopology getClusterMap() {
     return this.clusterMap;
+  }
+
+  private void initializeRatisServer() throws IOException {
+    if (scmRatisServer == null) {
+      SCMNodeDetails scmNodeDetails = SCMNodeDetails
+          .initStandAlone(configuration);
+      //TODO enable Ratis ring
+      scmRatisServer = SCMRatisServer.newSCMRatisServer(configuration, this,
+          scmNodeDetails, Collections.EMPTY_LIST);
+      if (scmRatisServer != null) {
+        LOG.info("SCM Ratis server initialized at port {}",
+            scmRatisServer.getServerPort());
+      }
+    }
   }
 }
