@@ -22,12 +22,14 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -206,7 +208,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_CREATE);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
-    return createOutputStream(key, overwrite, true);
+    return createOutputStream(key, replication, overwrite, true);
   }
 
   @Override
@@ -220,13 +222,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_CREATE_NON_RECURSIVE);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(path);
-    return createOutputStream(key, flags.contains(CreateFlag.OVERWRITE), false);
+    return createOutputStream(key,
+        replication, flags.contains(CreateFlag.OVERWRITE), false);
   }
 
-  private FSDataOutputStream createOutputStream(String key, boolean overwrite,
-      boolean recursive) throws IOException {
-    return new FSDataOutputStream(adapter.createFile(key, overwrite, recursive),
-        statistics);
+  private FSDataOutputStream createOutputStream(String key, short replication,
+      boolean overwrite, boolean recursive) throws IOException {
+    return new FSDataOutputStream(adapter.createFile(key,
+        replication, overwrite, recursive), statistics);
   }
 
   @Override
@@ -626,6 +629,22 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return fileStatus;
   }
 
+  @Override
+  public BlockLocation[] getFileBlockLocations(FileStatus fileStatus,
+      long start, long len)
+      throws IOException {
+    if (fileStatus instanceof LocatedFileStatus) {
+      return ((LocatedFileStatus) fileStatus).getBlockLocations();
+    } else {
+      return super.getFileBlockLocations(fileStatus, start, len);
+    }
+  }
+
+  @Override
+  public short getDefaultReplication() {
+    return adapter.getDefaultReplication();
+  }
+
   /**
    * Turn a path (relative or otherwise) into an Ozone key.
    *
@@ -773,7 +792,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       //NOOP: If not symlink symlink remains null.
     }
 
-    return new FileStatus(
+    FileStatus fileStatus = new FileStatus(
         fileStatusAdapter.getLength(),
         fileStatusAdapter.isDir(),
         fileStatusAdapter.getBlockReplication(),
@@ -786,5 +805,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         symLink,
         fileStatusAdapter.getPath()
     );
+
+    BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
+    if (blockLocations == null || blockLocations.length == 0) {
+      return fileStatus;
+    }
+    return new LocatedFileStatus(fileStatus, blockLocations);
   }
+
 }
