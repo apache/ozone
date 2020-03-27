@@ -252,7 +252,7 @@
   </property>
   <property>
     <name>dfs.ratis.client.request.retry.interval</name>
-    <value>15000ms</value>
+    <value>1000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>Interval between successive retries for a ratis client request.
     </description>
