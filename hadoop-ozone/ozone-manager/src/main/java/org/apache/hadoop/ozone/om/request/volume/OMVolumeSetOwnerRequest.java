@@ -135,8 +135,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       // If this is a replay, then the response has already been returned to
       // the client. So take no further action and return a dummy
       // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs.getUpdateID(),
-          transactionLogIndex)) {
+      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
         LOG.debug("Replayed Transaction {} ignored. Request: {}",
             transactionLogIndex, setVolumePropertyRequest);
         return new OMVolumeSetOwnerResponse(createReplayOMResponse(omResponse));
@@ -160,7 +159,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
       // Set owner with new owner name.
       omVolumeArgs.setOwnerName(newOwner);
-      omVolumeArgs.setUpdateID(transactionLogIndex);
+      omVolumeArgs.setUpdateID(transactionLogIndex,
+          ozoneManager.isRatisEnabled());
 
       // Update cache.
       omMetadataManager.getUserTable().addCacheEntry(
@@ -185,11 +185,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeSetOwnerResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredUserLocks) {
         omMetadataManager.getLock().releaseMultiUserLock(newOwner, oldOwner);
       }

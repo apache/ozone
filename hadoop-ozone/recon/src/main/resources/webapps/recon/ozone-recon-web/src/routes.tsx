@@ -20,7 +20,7 @@ import {Overview} from './views/Overview/Overview';
 import {Datanodes} from './views/Datanodes/Datanodes';
 import {Pipelines} from "./views/Pipelines/Pipelines";
 import {NotFound} from './views/NotFound/NotFound';
-import {IRoute} from "./routes.types";
+import {IRoute} from "./types/routes.types";
 import {MissingContainers} from "./views/MissingContainers/MissingContainers";
 
 export const routes: IRoute[] = [

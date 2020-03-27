@@ -21,11 +21,10 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 /**
@@ -36,34 +35,38 @@ public class OMKeyCommitResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;
 
-  public OMKeyCommitResponse(@Nullable OmKeyInfo omKeyInfo,
-      long openKeySessionID,
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse) {
+  public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo, long openKeySessionID) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeyCommitResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String volumeName = omKeyInfo.getVolumeName();
-      String bucketName = omKeyInfo.getBucketName();
-      String keyName = omKeyInfo.getKeyName();
-      String openKey = omMetadataManager.getOpenKey(volumeName,
-          bucketName, keyName, openKeySessionID);
-      String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-          keyName);
+    String volumeName = omKeyInfo.getVolumeName();
+    String bucketName = omKeyInfo.getBucketName();
+    String keyName = omKeyInfo.getKeyName();
+    String openKey = omMetadataManager.getOpenKey(volumeName,
+        bucketName, keyName, openKeySessionID);
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
 
-      // Delete from open key table and add entry to key table.
-      omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-          openKey);
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKey,
-          omKeyInfo);
-    }
+    // Delete from open key table and add entry to key table.
+    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
+        openKey);
+    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKey,
+        omKeyInfo);
   }
 }

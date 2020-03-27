@@ -61,7 +61,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>26.0-android</version>
+      <version>${guava.version}</version>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>

@@ -20,22 +20,21 @@ package org.apache.hadoop.ozone;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.utils.LoadBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Test Read Write with Mini Ozone Chaos Cluster.
  */
+@Ignore
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
 public class TestMiniChaosOzoneCluster implements Runnable {
@@ -75,35 +74,13 @@ public class TestMiniChaosOzoneCluster implements Runnable {
     cluster.waitForClusterToBeReady();
 
     String volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
-    String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     ObjectStore store = cluster.getRpcClient().getObjectStore();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
-    List<LoadBucket> ozoneBuckets = new ArrayList<>(numClients);
-    for (int i = 0; i < numClients; i++) {
-      ozoneBuckets.add(new LoadBucket(volume.getBucket(bucketName),
-          configuration));
-    }
-
-    String agedBucketName =
-        RandomStringUtils.randomAlphabetic(10).toLowerCase();
-
-    volume.createBucket(agedBucketName);
-    LoadBucket agedLoadBucket =
-            new LoadBucket(volume.getBucket(agedBucketName), configuration);
-
-    String fsBucketName =
-        RandomStringUtils.randomAlphabetic(10).toLowerCase();
-
-    volume.createBucket(fsBucketName);
-    LoadBucket fsBucket =
-        new LoadBucket(volume.getBucket(fsBucketName), configuration);
-
 
     loadGenerator =
-        new MiniOzoneLoadGenerator(ozoneBuckets, agedLoadBucket, fsBucket,
-          numThreads, numBuffers);
+        new MiniOzoneLoadGenerator(volume, numClients, numThreads,
+            numBuffers, configuration);
   }
 
   /**
@@ -138,6 +115,6 @@ public class TestMiniChaosOzoneCluster implements Runnable {
   @Test
   public void testReadWriteWithChaosCluster() {
     cluster.startChaos(5, 10, TimeUnit.SECONDS);
-    loadGenerator.startIO(1, TimeUnit.MINUTES);
+    loadGenerator.startIO(120, TimeUnit.SECONDS);
   }
 }

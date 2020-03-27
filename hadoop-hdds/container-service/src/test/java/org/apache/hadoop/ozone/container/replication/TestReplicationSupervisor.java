@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -38,7 +39,7 @@ import org.junit.Test;
 
 import javax.annotation.Nonnull;
 
-import static com.google.common.util.concurrent.MoreExecutors.sameThreadExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.Collections.emptyList;
 
 /**
@@ -115,7 +116,7 @@ public class TestReplicationSupervisor {
   public void failureHandling() {
     // GIVEN
     ReplicationSupervisor supervisor = supervisorWith(
-        __ -> throwingReplicator, sameThreadExecutor());
+        __ -> throwingReplicator, newDirectExecutorService());
 
     try {
       //WHEN
@@ -159,7 +160,7 @@ public class TestReplicationSupervisor {
 
   private ReplicationSupervisor supervisorWithSuccessfulReplicator() {
     return supervisorWith(supervisor -> new FakeReplicator(supervisor, set),
-        sameThreadExecutor());
+        newDirectExecutorService());
   }
 
   private ReplicationSupervisor supervisorWith(
@@ -193,7 +194,8 @@ public class TestReplicationSupervisor {
       Assert.assertEquals(1, supervisor.getInFlightReplications());
 
       KeyValueContainerData kvcd =
-          new KeyValueContainerData(task.getContainerId(), 100L,
+          new KeyValueContainerData(task.getContainerId(),
+              ChunkLayOutVersion.FILE_PER_CHUNK, 100L,
               UUID.randomUUID().toString(), UUID.randomUUID().toString());
       KeyValueContainer kvc =
           new KeyValueContainer(kvcd, conf);

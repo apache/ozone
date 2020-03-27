@@ -48,6 +48,7 @@ public class Gateway extends GenericCli {
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
+    ozoneConfiguration.set("hadoop.http.authentication.type", "simple");
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
     start();
     return null;

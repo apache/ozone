@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -24,17 +24,25 @@ import java.io.File;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Recon's overriding implementation of SCM's Container Manager.
  */
 public class ReconContainerManager extends SCMContainerManager {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ReconContainerManager.class);
+  private StorageContainerServiceProvider scmClient;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -49,14 +57,39 @@ public class ReconContainerManager extends SCMContainerManager {
    * @throws IOException on Failure.
    */
   public ReconContainerManager(
-      Configuration conf, PipelineManager pipelineManager) throws IOException {
+      Configuration conf, PipelineManager pipelineManager,
+      StorageContainerServiceProvider scm) throws IOException {
     super(conf, pipelineManager);
+    this.scmClient = scm;
   }
 
   @Override
   protected File getContainerDBPath(Configuration conf) {
     File metaDir = ReconUtils.getReconScmDbDir(conf);
     return new File(metaDir, RECON_SCM_CONTAINER_DB);
+  }
+
+  /**
+   * Check and add new container if not already present in Recon.
+   * @param containerID containerID to check.
+   * @param datanodeDetails Datanode from where we got this container.
+   * @throws IOException on Error.
+   */
+  public void checkAndAddNewContainer(ContainerID containerID,
+                                      DatanodeDetails datanodeDetails)
+      throws IOException {
+    if (!exists(containerID)) {
+      LOG.info("New container {} got from {}.", containerID,
+          datanodeDetails.getHostName());
+      ContainerWithPipeline containerWithPipeline =
+          scmClient.getContainerWithPipeline(containerID.getId());
+      LOG.debug("Verified new container from SCM {} ",
+          containerWithPipeline.getContainerInfo().containerID());
+      // If no other client added this, go ahead and add this container.
+      if (!exists(containerID)) {
+        addNewContainer(containerID.getId(), containerWithPipeline);
+      }
+    }
   }
 
   /**
@@ -71,10 +104,22 @@ public class ReconContainerManager extends SCMContainerManager {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     getLock().lock();
     try {
-      getContainerStateManager().addContainerInfo(containerId, containerInfo,
-          getPipelineManager(), containerWithPipeline.getPipeline());
-      addContainerToDB(containerInfo);
+      if (getPipelineManager().containsPipeline(
+          containerWithPipeline.getPipeline().getId())) {
+        getContainerStateManager().addContainerInfo(containerId, containerInfo,
+            getPipelineManager(), containerWithPipeline.getPipeline());
+        addContainerToDB(containerInfo);
+        LOG.info("Successfully added container {} to Recon.",
+            containerInfo.containerID());
+      } else {
+        throw new IOException(
+            String.format("Pipeline %s not found. Cannot add container %s",
+                containerWithPipeline.getPipeline().getId(),
+                containerInfo.containerID()));
+      }
     } catch (IOException ex) {
+      LOG.info("Exception while adding container {} .",
+          containerInfo.containerID(), ex);
       getPipelineManager().removeContainerFromPipeline(
           containerInfo.getPipelineID(),
           new ContainerID(containerInfo.getContainerID()));

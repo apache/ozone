@@ -18,12 +18,13 @@
 
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
+import org.apache.hadoop.http.HttpConfig;
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
 
@@ -122,6 +123,12 @@ public final class OzoneConfigKeys {
    * */
   public static final String OZONE_ADMINISTRATORS_WILDCARD = "*";
 
+  public static final String OZONE_CLIENT_STREAM_BUFFER_SIZE =
+      "ozone.client.stream.buffer.size";
+
+  public static final String OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT =
+      "4MB";
+
   public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE =
       "ozone.client.stream.buffer.flush.size";
 
@@ -136,7 +143,7 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_CLIENT_MAX_RETRIES =
       "ozone.client.max.retries";
-  public static final int OZONE_CLIENT_MAX_RETRIES_DEFAULT = 100;
+  public static final int OZONE_CLIENT_MAX_RETRIES_DEFAULT = 5;
   public static final String OZONE_CLIENT_RETRY_INTERVAL =
       "ozone.client.retry.interval";
   public static final TimeDuration OZONE_CLIENT_RETRY_INTERVAL_DEFAULT =
@@ -358,6 +365,9 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_VERIFY_CHECKSUM =
       "ozone.client.verify.checksum";
   public static final boolean OZONE_CLIENT_VERIFY_CHECKSUM_DEFAULT = true;
+  public static final String OZONE_CLIENT_READ_TIMEOUT
+          = "ozone.client.read.timeout";
+  public static final String OZONE_CLIENT_READ_TIMEOUT_DEFAULT = "30s";
   public static final String OZONE_ACL_AUTHORIZER_CLASS =
       "ozone.acl.authorizer.class";
   public static final String OZONE_ACL_AUTHORIZER_CLASS_DEFAULT =
@@ -424,6 +434,31 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 
+  public static final String OZONE_HTTP_POLICY_KEY =
+      "ozone.http.policy";
+  public static final String OZONE_HTTP_POLICY_DEFAULT =
+      HttpConfig.Policy.HTTP_ONLY.name();
+  public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
+      "ozone.https.server.keystore.resource";
+  public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
+      "ssl-server.xml";
+  public static final String  OZONE_SERVER_HTTPS_KEYPASSWORD_KEY =
+      "ssl.server.keystore.keypassword";
+  public static final String  OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY =
+      "ssl.server.keystore.password";
+  public static final String  OZONE_SERVER_HTTPS_KEYSTORE_LOCATION_KEY =
+      "ssl.server.keystore.location";
+  public static final String  OZONE_SERVER_HTTPS_TRUSTSTORE_LOCATION_KEY =
+      "ssl.server.truststore.location";
+  public static final String  OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY =
+      "ssl.server.truststore.password";
+  public static final String  OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY =
+      "ozone.https.client.keystore.resource";
+  public static final String  OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
+      "ssl-client.xml";
+  public static final String  OZONE_CLIENT_HTTPS_NEED_AUTH_KEY =
+      "ozone.https.client.need-auth";
+  public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
   /**
    * There is no need to instantiate this class.
    */

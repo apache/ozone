@@ -48,7 +48,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyCreateResponse omKeyCreateResponse =
-        new OMKeyCreateResponse(omResponse, omKeyInfo, clientID);
+        new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID);
 
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, clientID);
@@ -73,7 +73,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
         .build();
 
     OMKeyCreateResponse omKeyCreateResponse =
-        new OMKeyCreateResponse(omResponse, omKeyInfo, clientID);
+        new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID);
 
     // Before calling addToDBBatch
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,

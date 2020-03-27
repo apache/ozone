@@ -60,6 +60,8 @@ Test ozone shell with scheme
                         Execute               ozone fs -copyFromLocal NOTICE.txt ${scheme}://${testBucket1}/testdir/deep/
     ${result} =         Execute               ozone sh key list ${O3Bucket1} | jq -r '.name'
                         Should contain    ${result}         NOTICE.txt
+    ${result} =         Execute               ozone sh key info o3://om/fstest/bucket1/testdir/deep/NOTICE.txt | jq -r '.replicationFactor'
+                        Should Be Equal   ${result}         3
 
                         Execute               ozone fs -put NOTICE.txt ${scheme}://${testBucket1}/testdir/deep/PUTFILE.txt
     ${result} =         Execute               ozone sh key list ${O3Bucket1} | jq -r '.name'

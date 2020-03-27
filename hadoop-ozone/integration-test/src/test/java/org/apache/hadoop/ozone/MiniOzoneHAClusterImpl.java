@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +71,7 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    *
    * @throws IOException if there is an I/O error
    */
-
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
       Map<String, OzoneManager> omMap,
@@ -78,8 +79,9 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       List<OzoneManager> inactiveOMList,
       StorageContainerManager scm,
       List<HddsDatanodeService> hddsDatanodes,
-      String omServiceId) {
-    super(conf, scm, hddsDatanodes);
+      String omServiceId,
+      ReconServer reconServer) {
+    super(conf, scm, hddsDatanodes, reconServer);
     this.ozoneManagerMap = omMap;
     this.ozoneManagers = new ArrayList<>(omMap.values());
     this.activeOMs = activeOMList;
@@ -164,7 +166,7 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public void stop() {
     for (OzoneManager ozoneManager : ozoneManagers) {
       if (ozoneManager != null) {
-        LOG.info("Stopping the OzoneManager " + ozoneManager.getOMNodeId());
+        LOG.info("Stopping the OzoneManager {}", ozoneManager.getOMNodeId());
         ozoneManager.stop();
         ozoneManager.join();
       }
@@ -213,17 +215,25 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       initializeConfiguration();
       StorageContainerManager scm;
       Map<String, OzoneManager> omMap;
+      ReconServer reconServer = null;
       try {
         scm = createSCM();
         scm.start();
         omMap = createOMService();
+        if (includeRecon) {
+          configureRecon();
+          reconServer = new ReconServer();
+          reconServer.execute(new String[] {});
+        }
       } catch (AuthenticationException ex) {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(scm);
+      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(scm,
+          reconServer);
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(
-          conf, omMap, activeOMs, inactiveOMs, scm, hddsDatanodes, omServiceId);
+          conf, omMap, activeOMs, inactiveOMs, scm, hddsDatanodes,
+          omServiceId, reconServer);
       if (startDataNodes) {
         cluster.startHddsDatanodes();
       }
@@ -289,12 +299,12 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             if (i <= numOfActiveOMs) {
               om.start();
               activeOMs.add(om);
-              LOG.info("Started OzoneManager RPC server at " +
+              LOG.info("Started OzoneManager RPC server at {}",
                   om.getOmRpcServerAddr());
             } else {
               inactiveOMs.add(om);
-              LOG.info("Intialized OzoneManager at " + om.getOmRpcServerAddr()
-                  + ". This OM is currently inactive (not running).");
+              LOG.info("Intialized OzoneManager at {}. This OM is currently "
+                      + "inactive (not running).", om.getOmRpcServerAddr());
             }
           }
 
@@ -309,13 +319,13 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           for (OzoneManager om : omMap.values()) {
             om.stop();
             om.join();
-            LOG.info("Stopping OzoneManager server at " +
+            LOG.info("Stopping OzoneManager server at {}",
                 om.getOmRpcServerAddr());
           }
           omMap.clear();
           ++retryCount;
-          LOG.info("MiniOzoneHACluster port conflicts, retried " +
-              retryCount + " times");
+          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
+                  retryCount);
         }
       }
       return omMap;

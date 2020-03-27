@@ -18,7 +18,8 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.http.HttpConfig;
+
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.net.NetUtils;
 
 import java.net.InetAddress;

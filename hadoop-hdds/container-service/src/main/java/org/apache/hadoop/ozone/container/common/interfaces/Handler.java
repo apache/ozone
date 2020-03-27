@@ -29,7 +29,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -108,11 +110,7 @@ public abstract class Handler {
    * Imports container from a raw input stream.
    */
   public abstract Container importContainer(
-      long containerID,
-      long maxSize,
-      String originPipelineId,
-      String originNodeId,
-      InputStream rawContainerStream,
+      ContainerData containerData, InputStream rawContainerStream,
       TarContainerPacker packer)
       throws IOException;
 
@@ -176,6 +174,16 @@ public abstract class Handler {
    * @throws IOException
    */
   public abstract void deleteContainer(Container container, boolean force)
+      throws IOException;
+
+  /**
+   * Deletes the given files associated with a block of the container.
+   *
+   * @param container container whose block is to be deleted
+   * @param blockData block to be deleted
+   * @throws IOException
+   */
+  public abstract void deleteBlock(Container container, BlockData blockData)
       throws IOException;
 
   public void setScmID(String scmId) {

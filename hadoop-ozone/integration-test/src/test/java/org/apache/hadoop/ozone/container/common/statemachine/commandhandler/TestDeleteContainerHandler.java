@@ -72,7 +72,7 @@ public class TestDeleteContainerHandler {
         .setNumDatanodes(1).build();
     cluster.waitForClusterToBeReady();
 
-    OzoneClient client = OzoneClientFactory.getClient(conf);
+    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import org.apache.hadoop.hdds.ratis.RatisHelper;
+
 import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
@@ -26,7 +28,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
  * RaftClient creation.
  *
  */
-@ConfigGroup(prefix = "raft.client")
+@ConfigGroup(prefix = RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY)
 public class RatisClientConfig {
   @Config(key = "async.outstanding-requests.max",
       defaultValue = "32",
@@ -64,7 +66,7 @@ public class RatisClientConfig {
     this.requestTimeOut = requestTimeOut;
   }
 
-  @Config(key = "watch.request.timeout",
+  @Config(key = "rpc.watch.request.timeout",
       defaultValue = "180s",
       type = ConfigType.TIME,
       tags = {OZONE, CLIENT, PERFORMANCE},

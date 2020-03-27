@@ -54,12 +54,13 @@ import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
@@ -118,7 +119,6 @@ public class KeyValueHandler extends Handler {
 
   // A lock that is held during container creation.
   private final AutoCloseableLock containerCreationLock;
-  private final boolean doSyncWrite;
 
   public KeyValueHandler(Configuration config, String datanodeId,
       ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
@@ -126,10 +126,7 @@ public class KeyValueHandler extends Handler {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
-    doSyncWrite =
-        conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY,
-            OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT);
-    chunkManager = ChunkManagerFactory.getChunkManager(config, doSyncWrite);
+    chunkManager = ChunkManagerFactory.createChunkManager(config);
     volumeChoosingPolicy = ReflectionUtils.newInstance(conf.getClass(
         HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
             .class, VolumeChoosingPolicy.class), conf);
@@ -230,8 +227,10 @@ public class KeyValueHandler extends Handler {
 
     long containerID = request.getContainerID();
 
+    ChunkLayOutVersion layoutVersion =
+        ChunkLayOutVersion.getConfiguredVersion(conf);
     KeyValueContainerData newContainerData = new KeyValueContainerData(
-        containerID, maxContainerSize, request.getPipelineID(),
+        containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
@@ -247,8 +246,7 @@ public class KeyValueHandler extends Handler {
         // The create container request for an already existing container can
         // arrive in case the ContainerStateMachine reapplies the transaction
         // on datanode restart. Just log a warning msg here.
-        LOG.debug("Container already exists." +
-            "container Id " + containerID);
+        LOG.debug("Container already exists. container Id {}", containerID);
       }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -264,12 +262,12 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  public void populateContainerPathFields(KeyValueContainer container,
-      long maxSize) throws IOException {
+  private void populateContainerPathFields(KeyValueContainer container)
+      throws IOException {
     volumeSet.readLock();
     try {
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
-          .getVolumesList(), maxSize);
+          .getVolumesList(), container.getContainerData().getMaxSize());
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
       container.populatePathFields(scmID, containerVolume, hddsVolumeDir);
     } finally {
@@ -411,9 +409,17 @@ public class KeyValueHandler extends Handler {
     try {
       checkContainerOpen(kvContainer);
 
-      BlockData blockData = BlockData.getFromProtoBuf(
-          request.getPutBlock().getBlockData());
+      ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
+      BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);
+
+      if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
+        for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+          chunkManager.finishWriteChunk(kvContainer, blockData.getBlockID(),
+              ChunkInfo.getFromProtoBuf(chunkInfo));
+        }
+      }
+
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
@@ -760,6 +766,7 @@ public class KeyValueHandler extends Handler {
       // here. There is no need to maintain this info in openContainerBlockMap.
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
+      chunkManager.finishWriteChunk(kvContainer, blockID, chunkInfo);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();
       chunks.add(chunkInfoProto);
@@ -889,21 +896,18 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public Container importContainer(final long containerID,
-      final long maxSize, final String originPipelineId,
-      final String originNodeId, final InputStream rawContainerStream,
+  public Container importContainer(ContainerData originalContainerData,
+      final InputStream rawContainerStream,
       final TarContainerPacker packer)
       throws IOException {
 
-    // TODO: Add layout version!
     KeyValueContainerData containerData =
-        new KeyValueContainerData(containerID,
-            maxSize, originPipelineId, originNodeId);
+        new KeyValueContainerData(originalContainerData);
 
     KeyValueContainer container = new KeyValueContainer(containerData,
         conf);
 
-    populateContainerPathFields(container, maxSize);
+    populateContainerPathFields(container);
     container.importContainerData(rawContainerStream, packer);
     sendICR(container);
     return container;
@@ -1024,6 +1028,18 @@ public class KeyValueHandler extends Handler {
   public void deleteContainer(Container container, boolean force)
       throws IOException {
     deleteInternal(container, force);
+  }
+
+  @Override
+  public void deleteBlock(Container container, BlockData blockData)
+      throws IOException {
+    chunkManager.deleteChunks(container, blockData);
+    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+      ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
+      }
+    }
   }
 
   private void deleteInternal(Container container, boolean force)

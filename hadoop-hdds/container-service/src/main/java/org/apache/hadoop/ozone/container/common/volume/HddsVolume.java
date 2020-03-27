@@ -41,13 +41,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * HddsVolume represents volume in a datanode. {@link VolumeSet} maintains a
- * list of HddsVolumes, one for each volume in the Datanode.
+ * HddsVolume represents volume in a datanode. {@link MutableVolumeSet}
+ * maintains a list of HddsVolumes, one for each volume in the Datanode.
  * {@link VolumeInfo} in encompassed by this class.
  * <p>
  * The disk layout per volume is as follows:
@@ -96,6 +97,9 @@ public class HddsVolume
    */
   @Override
   public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+    if (!hddsRootDir.exists()) {
+      return VolumeCheckResult.FAILED;
+    }
     DiskChecker.checkDir(hddsRootDir);
     return VolumeCheckResult.HEALTHY;
   }
@@ -233,6 +237,9 @@ public class HddsVolume
     }
     if (!hddsRootDir.isDirectory()) {
       // Volume Root exists but is not a directory.
+      LOG.warn("Volume {} exists but is not a directory,"
+          + " current volume state: {}.",
+          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     File[] files = hddsRootDir.listFiles();
@@ -242,6 +249,9 @@ public class HddsVolume
     }
     if (!getVersionFile().exists()) {
       // Volume Root is non empty but VERSION file does not exist.
+      LOG.warn("VERSION file does not exist in volume {},"
+          + " current volume state: {}.",
+          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     // Volume Root and VERSION file exist.
@@ -436,6 +446,18 @@ public class HddsVolume
    */
   public long getCommittedBytes() {
     return committedBytes.get();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(hddsRootDir);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    return this == other
+        || other instanceof HddsVolume && ((HddsVolume) other).hddsRootDir
+        .equals(this.hddsRootDir);
   }
 
   /**

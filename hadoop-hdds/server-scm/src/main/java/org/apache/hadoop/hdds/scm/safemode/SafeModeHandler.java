@@ -19,18 +19,13 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.scm.block.BlockManager;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -45,57 +40,57 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
   private static final Logger LOG =
       LoggerFactory.getLogger(SafeModeHandler.class);
 
-  private final SCMClientProtocolServer scmClientProtocolServer;
-  private final BlockManager scmBlockManager;
   private final long waitTime;
   private final AtomicBoolean isInSafeMode = new AtomicBoolean(true);
-  private final ReplicationManager replicationManager;
-
-  private final PipelineManager scmPipelineManager;
+  private final List<SafeModeNotification> immediate = new ArrayList<>();
+  private final List<SafeModeNotification> delayed = new ArrayList<>();
 
   /**
    * SafeModeHandler, to handle the logic once we exit safe mode.
    * @param configuration
-   * @param clientProtocolServer
-   * @param blockManager
-   * @param replicationManager
    */
-  public SafeModeHandler(Configuration configuration,
-      SCMClientProtocolServer clientProtocolServer,
-      BlockManager blockManager,
-      ReplicationManager replicationManager, PipelineManager pipelineManager) {
-    Objects.requireNonNull(configuration, "Configuration cannot be null");
-    Objects.requireNonNull(clientProtocolServer, "SCMClientProtocolServer " +
-        "object cannot be null");
-    Objects.requireNonNull(blockManager, "BlockManager object cannot be null");
-    Objects.requireNonNull(replicationManager, "ReplicationManager " +
-        "object cannot be null");
-    Objects.requireNonNull(pipelineManager, "PipelineManager object cannot " +
-        "be" + "null");
+  public SafeModeHandler(Configuration configuration) {
     this.waitTime = configuration.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
         TimeUnit.MILLISECONDS);
-    this.scmClientProtocolServer = clientProtocolServer;
-    this.scmBlockManager = blockManager;
-    this.replicationManager = replicationManager;
-    this.scmPipelineManager = pipelineManager;
 
     final boolean safeModeEnabled = configuration.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT);
     isInSafeMode.set(safeModeEnabled);
-
   }
 
+  /**
+   * Add any objects which should be notified immediately on a safemode status
+   * change.
+   * @param objs List of objects to be notified.
+   */
+  public void notifyImmediately(SafeModeNotification...objs) {
+    for (SafeModeNotification o : objs) {
+      Objects.requireNonNull(o, "Only non null objects can be notified");
+      immediate.add(o);
+    }
+  }
 
+  /**
+   * Add any object which should be notified when safemode is ended and after
+   * the configured safemode delay.
+   * @param objs List of objects to be notified.
+   */
+  public void notifyAfterDelay(SafeModeNotification...objs) {
+    for (SafeModeNotification o : objs) {
+      Objects.requireNonNull(o, "Only non null objects can be notified");
+      delayed.add(o);
+    }
+  }
 
   /**
    * Set SafeMode status based on
    * {@link org.apache.hadoop.hdds.scm.events.SCMEvents#SAFE_MODE_STATUS}.
    *
-   * Inform BlockManager, ScmClientProtocolServer and replicationAcitivity
-   * status about safeMode status.
+   * Inform BlockManager, ScmClientProtocolServer, ScmPipeline Manager and
+   * Replication Manager status about safeMode status.
    *
    * @param safeModeStatus
    * @param publisher
@@ -104,9 +99,9 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
   public void onMessage(SafeModeStatus safeModeStatus,
                         EventPublisher publisher) {
     isInSafeMode.set(safeModeStatus.getSafeModeStatus());
-    scmClientProtocolServer.setSafeModeStatus(isInSafeMode.get());
-    scmBlockManager.setSafeModeStatus(isInSafeMode.get());
-
+    for (SafeModeNotification s : immediate) {
+      s.handleSafeModeTransition(safeModeStatus);
+    }
     if (!isInSafeMode.get()) {
       final Thread safeModeExitThread = new Thread(() -> {
         try {
@@ -114,29 +109,15 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
-        replicationManager.start();
-        cleanupPipelines();
+        for (SafeModeNotification s : delayed) {
+          s.handleSafeModeTransition(safeModeStatus);
+        }
       });
 
       safeModeExitThread.setDaemon(true);
       safeModeExitThread.start();
     }
 
-  }
-
-  private void cleanupPipelines() {
-    List<Pipeline> pipelineList = scmPipelineManager.getPipelines();
-    pipelineList.forEach((pipeline) -> {
-      try {
-        if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED &&
-            pipeline.isAllocationTimeout()) {
-          scmPipelineManager.finalizeAndDestroyPipeline(pipeline, false);
-        }
-      } catch (IOException ex) {
-        LOG.error("Finalize and destroy pipeline failed for pipeline "
-            + pipeline.toString(), ex);
-      }
-    });
   }
 
   public boolean getSafeModeStatus() {

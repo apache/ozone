@@ -21,10 +21,12 @@ package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -32,7 +34,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf
     .InvalidProtocolBufferException;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
@@ -55,6 +56,7 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -185,7 +187,7 @@ public class BlockDeletingService extends BackgroundService {
           long containerBCSID = containerData.getBlockCommitSequenceId();
           if (minReplicatedIndex >= 0 && minReplicatedIndex < containerBCSID) {
             LOG.warn("Close Container log Index {} is not replicated across all"
-                    + "the servers in the pipeline {} as the min replicated "
+                    + " the servers in the pipeline {} as the min replicated "
                     + "index is {}. Deletion is not allowed in this container "
                     + "yet.", containerBCSID,
                 containerData.getOriginPipelineId(), minReplicatedIndex);
@@ -275,25 +277,21 @@ public class BlockDeletingService extends BackgroundService {
           return crr;
         }
 
+        Handler handler = Objects.requireNonNull(ozoneContainer.getDispatcher()
+            .getHandler(container.getContainerType()));
+
         toDeleteBlocks.forEach(entry -> {
           String blockName = DFSUtil.bytes2String(entry.getKey());
           LOG.debug("Deleting block {}", blockName);
           try {
             ContainerProtos.BlockData data =
                 ContainerProtos.BlockData.parseFrom(entry.getValue());
-            for (ContainerProtos.ChunkInfo chunkInfo : data.getChunksList()) {
-              File chunkFile = dataDir.toPath()
-                  .resolve(chunkInfo.getChunkName()).toFile();
-              if (FileUtils.deleteQuietly(chunkFile)) {
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("block {} chunk {} deleted", blockName,
-                      chunkFile.getAbsolutePath());
-                }
-              }
-            }
+            handler.deleteBlock(container, BlockData.getFromProtoBuf(data));
             succeedBlocks.add(blockName);
           } catch (InvalidProtocolBufferException e) {
             LOG.error("Failed to parse block info for block {}", blockName, e);
+          } catch (IOException e) {
+            LOG.error("Failed to delete files for block {}", blockName, e);
           }
         });
 

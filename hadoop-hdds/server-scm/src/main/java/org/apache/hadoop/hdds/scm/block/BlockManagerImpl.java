@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -197,8 +198,13 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
           // TODO: #CLUTIL Remove creation logic when all replication types and
           // factors are handled by pipeline creator
           pipeline = pipelineManager.createPipeline(type, factor);
+
           // wait until pipeline is ready
           pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+        } catch (SCMException se) {
+          LOG.warn("Pipeline creation failed for type:{} factor:{}. " +
+              "Datanodes may be used up.", type, factor, se);
+          break;
         } catch (IOException e) {
           LOG.warn("Pipeline creation failed for type:{} factor:{}. Retrying " +
                   "get pipelines call once.", type, factor, e);
@@ -353,10 +359,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   }
 
   @Override
-  public void setSafeModeStatus(boolean safeModeStatus) {
-    this.safeModePrecheck.setInSafeMode(safeModeStatus);
+  public void handleSafeModeTransition(
+      SCMSafeModeManager.SafeModeStatus status) {
+    this.safeModePrecheck.setInSafeMode(status.getSafeModeStatus());
   }
-
   /**
    * Returns status of scm safe mode determined by SAFE_MODE_STATUS event.
    * */

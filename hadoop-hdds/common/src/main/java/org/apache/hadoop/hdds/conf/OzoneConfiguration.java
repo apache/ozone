@@ -33,11 +33,13 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -375,5 +377,19 @@ public class OzoneConfiguration extends Configuration {
       }
     }
     return props;
+  }
+
+  @Override
+  public Map<String, String> getPropsWithPrefix(String confPrefix) {
+    Properties props = getProps();
+    Map<String, String> configMap = new HashMap<>();
+    for (String name : props.stringPropertyNames()) {
+      if (name.startsWith(confPrefix)) {
+        String value = get(name);
+        String keyName = name.substring(confPrefix.length());
+        configMap.put(keyName, value);
+      }
+    }
+    return configMap;
   }
 }

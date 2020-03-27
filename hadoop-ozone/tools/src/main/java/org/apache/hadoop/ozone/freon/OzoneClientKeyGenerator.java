@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 
 import com.codahale.metrics.Timer;
 import picocli.CommandLine.Command;
@@ -73,6 +72,12 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   )
   private ReplicationFactor factor = ReplicationFactor.THREE;
 
+  @Option(
+      names = "--om-service-id",
+      description = "OM Service ID"
+  )
+  private String omServiceID = null;
+
   private Timer timer;
 
   private OzoneBucket bucket;
@@ -86,22 +91,18 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
-    ensureVolumeAndBucketExist(ozoneConfiguration, volumeName, bucketName);
-
     contentGenerator = new ContentGenerator(keySize, bufferSize);
     metadata = new HashMap<>();
 
-    try (OzoneClient rpcClient = OzoneClientFactory
-        .getRpcClient(ozoneConfiguration)) {
-
-      bucket =
-          rpcClient.getObjectStore().getVolume(volumeName)
-              .getBucket(bucketName);
+    try (OzoneClient rpcClient = createOzoneClient(omServiceID,
+        ozoneConfiguration)) {
+      ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
+      bucket = rpcClient.getObjectStore().getVolume(volumeName)
+          .getBucket(bucketName);
 
       timer = getMetrics().timer("key-create");
 
       runTests(this::createKey);
-
     }
     return null;
   }

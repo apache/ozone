@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
+import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
+import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -251,7 +253,8 @@ public class TestOzoneManagerServiceProviderImpl extends
         ArgumentCaptor.forClass(ReconTaskStatus.class);
     verify(reconTaskStatusDaoMock, times(1))
         .update(captor.capture());
-    assertTrue(captor.getValue().getTaskName().equals("OM_DB_FULL_SNAPSHOT"));
+    assertTrue(captor.getValue().getTaskName()
+        .equals(OmSnapshotRequest.name()));
     verify(reconTaskControllerMock, times(1))
         .reInitializeTasks(omMetadataManager);
   }
@@ -285,7 +288,7 @@ public class TestOzoneManagerServiceProviderImpl extends
         ArgumentCaptor.forClass(ReconTaskStatus.class);
     verify(reconTaskStatusDaoMock, times(1))
         .update(captor.capture());
-    assertTrue(captor.getValue().getTaskName().equals("OM_DB_DELTA_UPDATES"));
+    assertTrue(captor.getValue().getTaskName().equals(OmDeltaRequest.name()));
 
     verify(reconTaskControllerMock, times(1))
         .consumeOMEvents(any(OMUpdateEventBatch.class),

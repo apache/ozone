@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.s3;
 import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.server.BaseHttpServer;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 
 /**
  * S3 Gateway specific configuration keys.

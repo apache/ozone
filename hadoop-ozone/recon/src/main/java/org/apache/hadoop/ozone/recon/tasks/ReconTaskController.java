@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -33,7 +33,7 @@ public interface ReconTaskController {
    * Register API used by tasks to register themselves.
    * @param task task instance
    */
-  void registerTask(ReconDBUpdateTask task);
+  void registerTask(ReconOmTask task);
 
   /**
    * Pass on a set of OM DB update events to the registered tasks.
@@ -55,7 +55,7 @@ public interface ReconTaskController {
    * Get set of registered tasks.
    * @return Map of Task name -> Task.
    */
-  Map<String, ReconDBUpdateTask> getRegisteredTasks();
+  Map<String, ReconOmTask> getRegisteredTasks();
 
   /**
    * Get instance of ReconTaskStatusDao.

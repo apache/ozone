@@ -36,7 +36,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
  * Remove acl handler for key.
  */
 @Command(name = "removeacl",
-    description = "Remove an acl.")
+    description = "Remove an existing ACL.")
 public class RemoveAclKeyHandler extends Handler {
 
   @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
@@ -44,22 +44,22 @@ public class RemoveAclKeyHandler extends Handler {
 
   @CommandLine.Option(names = {"--acl", "-a"},
       required = true,
-      description = "Remove acl." +
-          "r = READ," +
-          "w = WRITE," +
-          "c = CREATE," +
-          "d = DELETE," +
-          "l = LIST," +
-          "a = ALL," +
-          "n = NONE," +
-          "x = READ_AC," +
-          "y = WRITE_AC" +
-          "Ex user:user1:rw or group:hadoop:rw")
+      description = "The ACL to be removed.\n" +
+          "Ex: user:user1:rw or group:hadoop:rw\n" +
+          "r = READ, " +
+          "w = WRITE, " +
+          "c = CREATE, " +
+          "d = DELETE, " +
+          "l = LIST, " +
+          "a = ALL, " +
+          "n = NONE, " +
+          "x = READ_ACL, " +
+          "y = WRITE_ACL.")
   private String acl;
 
   @CommandLine.Option(names = {"--store", "-s"},
       required = false,
-      description = "store type. i.e OZONE or S3")
+      description = "Store type. i.e OZONE or S3")
   private String storeType;
 
   /**
@@ -67,7 +67,8 @@ public class RemoveAclKeyHandler extends Handler {
    */
   @Override
   public Void call() throws Exception {
-    Objects.requireNonNull(acl, "ACL to be removed not specified.");
+    Objects.requireNonNull(acl,
+        "You need to specify an ACL to be removed.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureKeyAddress();
     try (OzoneClient client =
@@ -96,8 +97,8 @@ public class RemoveAclKeyHandler extends Handler {
           OzoneAcl.parseAcl(acl));
 
       String message = result
-          ? ("Acl removed successfully.")
-          : ("Acl doesn't exist.");
+          ? ("ACL removed successfully.")
+          : ("ACL doesn't exist.");
 
       System.out.println(message);
     }

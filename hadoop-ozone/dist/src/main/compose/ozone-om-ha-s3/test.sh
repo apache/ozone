@@ -19,6 +19,7 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 export SECURITY_ENABLED=false
+export OM_HA_PARAM="--om-service-id=id1"
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
@@ -27,6 +28,9 @@ start_docker_env
 
 execute_robot_test scm s3
 
+execute_robot_test scm freon
+
 stop_docker_env
 
 generate_report
+

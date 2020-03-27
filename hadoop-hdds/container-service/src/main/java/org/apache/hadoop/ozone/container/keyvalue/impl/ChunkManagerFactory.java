@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,41 +31,24 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_SCRUB_ENABLED
 
 /**
  * Select an appropriate ChunkManager implementation as per config setting.
- * Ozone ChunkManager is a Singleton
  */
 public final class ChunkManagerFactory {
-  static final Logger LOG = LoggerFactory.getLogger(ChunkManagerFactory.class);
-
-  private static volatile ChunkManager instance = null;
-  private static boolean syncChunks = false;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ChunkManagerFactory.class);
 
   private ChunkManagerFactory() {
   }
 
-  public static ChunkManager getChunkManager(Configuration config,
-      boolean sync) {
-    if (instance == null) {
-      synchronized (ChunkManagerFactory.class) {
-        if (instance == null) {
-          instance = createChunkManager(config, sync);
-          syncChunks = sync;
-        }
-      }
-    }
+  public static ChunkManager createChunkManager(Configuration conf) {
+    boolean sync =
+        conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY,
+            OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT);
 
-    Preconditions.checkArgument((syncChunks == sync),
-        "value of sync conflicts with previous invocation");
-    return instance;
-  }
-
-  private static ChunkManager createChunkManager(Configuration config,
-      boolean sync) {
-    ChunkManager manager = null;
-    boolean persist = config.getBoolean(HDDS_CONTAINER_PERSISTDATA,
+    boolean persist = conf.getBoolean(HDDS_CONTAINER_PERSISTDATA,
         HDDS_CONTAINER_PERSISTDATA_DEFAULT);
 
     if (!persist) {
-      boolean scrubber = config.getBoolean(
+      boolean scrubber = conf.getBoolean(
           HDDS_CONTAINER_SCRUB_ENABLED,
           HDDS_CONTAINER_SCRUB_ENABLED_DEFAULT);
       if (scrubber) {
@@ -77,15 +60,13 @@ public final class ChunkManagerFactory {
       }
     }
 
-    if (persist) {
-      manager = new ChunkManagerImpl(sync);
-    } else {
+    if (!persist) {
       LOG.warn(HDDS_CONTAINER_PERSISTDATA
           + " is set to false. This should be used only for testing."
           + " All user data will be discarded.");
-      manager = new ChunkManagerDummyImpl(sync);
+      return new ChunkManagerDummyImpl();
     }
 
-    return manager;
+    return new ChunkManagerDispatcher(sync);
   }
 }

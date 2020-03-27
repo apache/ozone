@@ -40,7 +40,7 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates Bucket Info.
  */
-public final class OmBucketInfo extends WithMetadata implements Auditable {
+public final class OmBucketInfo extends WithObjectID implements Auditable {
   /**
    * Name of the volume in which the bucket belongs to.
    */
@@ -66,16 +66,6 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
    * Creation time of bucket.
    */
   private final long creationTime;
-  /**
-   * ObjectIDs are unique and immutable identifier for each object in the
-   * System.
-   */
-  private long objectID;
-  /**
-   * UpdateIDs are monotonically increasing values which are updated
-   * each time there is an update.
-   */
-  private long updateID;
 
   /**
    * Bucket encryption key info if encryption is enabled.
@@ -195,52 +185,11 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
   }
 
   /**
-   * Returns objectID.
-   * @return long
-   */
-  public long getObjectID() {
-    return objectID;
-  }
-
-  /**
-   * Returns updateID.
-   * @return long
-   */
-  public long getUpdateID() {
-    return updateID;
-  }
-
-  /**
    * Returns bucket encryption key info.
    * @return bucket encryption key info
    */
   public BucketEncryptionKeyInfo getEncryptionKeyInfo() {
     return bekInfo;
-  }
-
-  /**
-   * Set the Object ID. If this value is already set then this function throws.
-   * There is a reason why we cannot use the final here. The OMBucketInfo is
-   * deserialized from the protobuf in many places in code. We need to set
-   * this object ID, after it is deserialized.
-   *
-   * @param obId - long
-   */
-  public void setObjectID(long obId) {
-    if(this.objectID != 0) {
-      throw new UnsupportedOperationException("Attempt to modify object ID " +
-          "which is not zero. Current Object ID is " + this.objectID);
-    }
-    this.objectID = obId;
-  }
-
-  /**
-   * Sets the update ID. For each modification of this object, we will set
-   * this to a value greater than the current value.
-   * @param updateID  long
-   */
-  public void setUpdateID(long updateID) {
-    this.updateID = updateID;
   }
 
   /**
@@ -450,6 +399,17 @@ public final class OmBucketInfo extends WithMetadata implements Auditable {
       obib.setBucketEncryptionKey(OMPBHelper.convert(bucketInfo.getBeinfo()));
     }
     return obib.build();
+  }
+
+  @Override
+  public String getObjectInfo() {
+    return "OMBucketInfo{" +
+        "volume='" + volumeName + '\'' +
+        ", bucket='" + bucketName + '\'' +
+        ", isVersionEnabled='" + isVersionEnabled + '\'' +
+        ", storageType='" + storageType + '\'' +
+        ", creationTime='" + creationTime + '\'' +
+        '}';
   }
 
   @Override

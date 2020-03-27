@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -36,7 +37,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -53,7 +54,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -72,7 +72,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
  * Tests delete key operation with a slow follower in the datanode
  * pipeline.
  */
-@Ignore
 public class TestDeleteWithSlowFollower {
 
   private static MiniOzoneCluster cluster;
@@ -83,6 +82,7 @@ public class TestDeleteWithSlowFollower {
   private static String bucketName;
   private static String path;
   private static XceiverClientManager xceiverClientManager;
+  private static final int FACTOR_THREE_PIPELINE_COUNT = 1;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -104,30 +104,53 @@ public class TestDeleteWithSlowFollower {
     // never gets initiated early at Datanode in the test.
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000, TimeUnit.SECONDS);
+    conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000,
+            TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000,
+            TimeUnit.SECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL, 2000,
         TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
     conf.setTimeDuration(
-        DatanodeRatisServerConfig.DATANODE_RATIS_SERVER_CONFIG_PREFIX +
+        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
             DatanodeRatisServerConfig.RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
         1000, TimeUnit.SECONDS);
     conf.setTimeDuration(
-        DatanodeRatisServerConfig.DATANODE_RATIS_SERVER_CONFIG_PREFIX +
+        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
         DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
         1000, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.
+                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "rpc.request.timeout",
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "watch.request.timeout",
+            3, TimeUnit.SECONDS);
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         1, TimeUnit.SECONDS);
-
     conf.setQuietMode(false);
-    cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).setHbInterval(100)
+    int numOfDatanodes = 3;
+    cluster = MiniOzoneCluster.newBuilder(conf)
+            .setNumDatanodes(numOfDatanodes)
+            .setTotalPipelineNumLimit(
+                numOfDatanodes + FACTOR_THREE_PIPELINE_COUNT)
+            .setHbInterval(100)
             .build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
     volumeName = "testcontainerstatemachinefailures";
@@ -160,10 +183,10 @@ public class TestDeleteWithSlowFollower {
    */
   @Test
   public void testDeleteKeyWithSlowFollower() throws Exception {
-
+    String keyName = "ratis";
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 0, ReplicationType.RATIS,
+            .createKey(keyName, 0, ReplicationType.RATIS,
                 ReplicationFactor.THREE, new HashMap<>());
     byte[] testData = "ratis".getBytes();
     // First write and flush creates a container in the datanode
@@ -185,7 +208,7 @@ public class TestDeleteWithSlowFollower {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines(HddsProtos.ReplicationType.RATIS,
                 HddsProtos.ReplicationFactor.THREE);
-    Assert.assertTrue(pipelineList.size() == 1);
+    Assert.assertTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
     Pipeline pipeline = pipelineList.get(0);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       if (ContainerTestHelper.isRatisFollower(dn, pipeline)) {
@@ -218,7 +241,7 @@ public class TestDeleteWithSlowFollower {
             .getStateMachine(leader, pipeline);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
         setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName("ratis")
+        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
         .build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
     BlockID blockID =
@@ -239,7 +262,9 @@ public class TestDeleteWithSlowFollower {
     long numPendingDeletionBlocks = containerData.getNumPendingDeletionBlocks();
     BlockData blockData =
         keyValueHandler.getBlockManager().getBlock(container, blockID);
-    cluster.getOzoneManager().deleteKey(keyArgs);
+    //cluster.getOzoneManager().deleteKey(keyArgs);
+    client.getObjectStore().getVolume(volumeName).getBucket(bucketName).
+            deleteKey("ratis");
     GenericTestUtils.waitFor(() -> {
       return
           dnStateMachine.getCommandDispatcher().getDeleteBlocksCommandHandler()

@@ -177,6 +177,12 @@ public final class RandomKeyGenerator implements Callable<Void> {
   )
   private ReplicationFactor factor = ReplicationFactor.ONE;
 
+  @Option(
+      names = "--om-service-id",
+      description = "OM Service ID"
+  )
+  private String omServiceID = null;
+
   private int threadPoolSize;
 
   private OzoneClient ozoneClient;
@@ -239,7 +245,11 @@ public final class RandomKeyGenerator implements Callable<Void> {
     keyCounter = new AtomicLong();
     volumes = new ConcurrentHashMap<>();
     buckets = new ConcurrentHashMap<>();
-    ozoneClient = OzoneClientFactory.getClient(configuration);
+    if (omServiceID != null) {
+      ozoneClient = OzoneClientFactory.getRpcClient(omServiceID, configuration);
+    } else {
+      ozoneClient = OzoneClientFactory.getRpcClient(configuration);
+    }
     objectStore = ozoneClient.getObjectStore();
     for (FreonOps ops : FreonOps.values()) {
       histograms.add(ops.ordinal(), new Histogram(new UniformReservoir()));
