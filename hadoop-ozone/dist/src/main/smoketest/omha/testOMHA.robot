@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             SSHLibrary
 Library             Collections
 Resource            ../commonlib.robot
+Test Timeout        8 minutes
 
 *** Variables ***
 ${SECURITY_ENABLED}                 false

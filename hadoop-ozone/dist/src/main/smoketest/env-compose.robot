@@ -16,7 +16,7 @@
 *** Settings ***
 Documentation       High level utilities to execute commands and tests in docker-compose based environments.
 Resource            commonlib.robot
-
+Test Timeout        5 minutes
 
 *** Keywords ***
 
