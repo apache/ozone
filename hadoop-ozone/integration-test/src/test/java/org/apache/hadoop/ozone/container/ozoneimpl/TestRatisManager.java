@@ -64,7 +64,7 @@ public class TestRatisManager {
   }
 
   private static void runTestRatisManager(RpcType rpc) throws Exception {
-    LOG.info("runTestRatisManager, rpc=" + rpc);
+    LOG.info("runTestRatisManager, rpc={}", rpc);
 
     // create Ozone clusters
     final OzoneConfiguration conf = newOzoneConfiguration();
@@ -91,7 +91,7 @@ public class TestRatisManager {
         // Create Ratis cluster
         final String ratisId = "ratis" + i;
         //manager.createRatisCluster(ratisId, subIds);
-        LOG.info("Created RatisCluster " + ratisId);
+        LOG.info("Created RatisCluster {}", ratisId);
 
         // check Ratis cluster members
         //final List<DatanodeDetails> dns = manager.getMembers(ratisId);
@@ -100,7 +100,7 @@ public class TestRatisManager {
 
       // randomly close two of the clusters
       final int chosen = ThreadLocalRandom.current().nextInt(idIndex.length);
-      LOG.info("chosen = " + chosen);
+      LOG.info("chosen = {}", chosen);
 
       for (int i = 0; i < idIndex.length; i++) {
         if (i != chosen) {

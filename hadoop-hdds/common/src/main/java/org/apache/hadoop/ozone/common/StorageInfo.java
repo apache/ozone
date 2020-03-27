@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.common;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 
 import java.io.File;

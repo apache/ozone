@@ -82,7 +82,7 @@ public class TestBlockData {
   static long assertAddChunk(List<ContainerProtos.ChunkInfo> expected,
       BlockData computed, long offset) {
     final ContainerProtos.ChunkInfo info = addChunk(expected, offset);
-    LOG.info("addChunk: " + toString(info));
+    LOG.info("addChunk: {}", toString(info));
     computed.addChunk(info);
     assertChunks(expected, computed);
     return info.getLen();
@@ -93,7 +93,7 @@ public class TestBlockData {
       BlockData computed) {
     final int i = ThreadLocalRandom.current().nextInt(expected.size());
     final ContainerProtos.ChunkInfo info = expected.remove(i);
-    LOG.info("removeChunk: " + toString(info));
+    LOG.info("removeChunk: {}", toString(info));
     computed.removeChunk(info);
     assertChunks(expected, computed);
   }
@@ -127,7 +127,7 @@ public class TestBlockData {
     int n = 5;
     for(int i = 0; i < n; i++) {
       offset += addChunk(expected, offset).getLen();
-      LOG.info("setChunk: " + toString(expected));
+      LOG.info("setChunk: {}", toString(expected));
       computed.setChunks(expected);
       assertChunks(expected, computed);
     }

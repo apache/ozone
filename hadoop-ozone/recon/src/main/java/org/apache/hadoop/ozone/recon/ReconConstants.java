@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -53,4 +53,6 @@ public final class ReconConstants {
       "recon-" + CONTAINER_DB_SUFFIX;
   public static final String RECON_SCM_PIPELINE_DB = "recon-"
       + PIPELINE_DB_SUFFIX;
+  public static final String RECON_SCM_NODE_DB =
+      "recon-node.db";
 }

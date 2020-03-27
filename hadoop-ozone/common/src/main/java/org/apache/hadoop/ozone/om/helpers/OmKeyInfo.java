@@ -40,7 +40,7 @@ import com.google.common.base.Preconditions;
  * This is returned from OM to client, and client use class to talk to
  * datanode. Also, this is the metadata written to om.db on server side.
  */
-public final class OmKeyInfo extends WithMetadata {
+public final class OmKeyInfo extends WithObjectID {
   private final String volumeName;
   private final String bucketName;
   // name of key client specified
@@ -52,8 +52,6 @@ public final class OmKeyInfo extends WithMetadata {
   private HddsProtos.ReplicationType type;
   private HddsProtos.ReplicationFactor factor;
   private FileEncryptionInfo encInfo;
-  private long objectID;
-  private long updateID;
 
   /**
    * ACL Information.
@@ -139,50 +137,6 @@ public final class OmKeyInfo extends WithMetadata {
 
   public void updateModifcationTime() {
     this.modificationTime = Time.monotonicNow();
-  }
-
-  /**
-   * Set the Object ID. If this value is already set then this function throws.
-   * There is a reason why we cannot use the final here. The OMKeyInfo is
-   * deserialized from the protobuf in many places in code. We need to set
-   * this object ID, after it is deserialized.
-   *
-   * @param obId - long
-   */
-  public void setObjectID(long obId) {
-    if(this.objectID != 0) {
-      throw new UnsupportedOperationException("Attempt to modify object ID " +
-          "which is not zero. Current Object ID is " + this.objectID);
-    }
-    this.objectID = obId;
-  }
-
-  /**
-   * Sets the update ID. For each modification of this object, we will set
-   * this to a value greater than the current value.
-   * @param updateId  long
-   */
-  public void setUpdateID(long updateId) {
-    Preconditions.checkArgument(updateId > this.updateID,
-        "Trying to set updateID to a value ({}) which is less than the " +
-            "current value ({}) for ()", updateId, this.updateID, this);
-    this.updateID = updateId;
-  }
-
-  /**
-   * Returns objectID.
-   * @return long
-   */
-  public long getObjectID() {
-    return objectID;
-  }
-
-  /**
-   * Returns updateID.
-   * @return long
-   */
-  public long getUpdateID() {
-    return updateID;
   }
 
   /**
@@ -480,6 +434,19 @@ public final class OmKeyInfo extends WithMetadata {
   }
 
   @Override
+  public String getObjectInfo() {
+    return "OMKeyInfo{" +
+        "volume='" + volumeName + '\'' +
+        ", bucket='" + bucketName + '\'' +
+        ", key='" + keyName + '\'' +
+        ", dataSize='" + dataSize + '\'' +
+        ", creationTime='" + creationTime + '\'' +
+        ", type='" + type + '\'' +
+        ", factor='" + factor + '\'' +
+        '}';
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -513,14 +480,6 @@ public final class OmKeyInfo extends WithMetadata {
    * Return a new copy of the object.
    */
   public OmKeyInfo copyObject() {
-    return copyObject(true);
-  }
-
-  /**
-   * Return a copy of the OMKeyInfo without setting the objectID and updateID.
-   * This is used during key renames.
-   */
-  public OmKeyInfo copyObject(boolean copyObjectID) {
     OmKeyInfo.Builder builder = new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -530,11 +489,9 @@ public final class OmKeyInfo extends WithMetadata {
         .setDataSize(dataSize)
         .setReplicationType(type)
         .setReplicationFactor(factor)
-        .setFileEncryptionInfo(encInfo);
+        .setFileEncryptionInfo(encInfo)
+        .setObjectID(objectID).setUpdateID(updateID);
 
-    if (copyObjectID) {
-      builder.setObjectID(objectID).setUpdateID(updateID);
-    }
 
     keyLocationVersions.forEach(keyLocationVersion -> {
       List<OmKeyLocationInfo> keyLocationInfos = new ArrayList<>();

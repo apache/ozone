@@ -53,6 +53,7 @@ public class PipelineReportHandler implements
   private final Configuration conf;
   private final SafeModeManager scmSafeModeManager;
   private final boolean pipelineAvailabilityCheck;
+  private final SCMPipelineMetrics metrics;
 
   public PipelineReportHandler(SafeModeManager scmSafeModeManager,
       PipelineManager pipelineManager, Configuration conf) {
@@ -60,6 +61,7 @@ public class PipelineReportHandler implements
     this.scmSafeModeManager = scmSafeModeManager;
     this.pipelineManager = pipelineManager;
     this.conf = conf;
+    this.metrics = SCMPipelineMetrics.create();
     this.pipelineAvailabilityCheck = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT);
@@ -106,8 +108,10 @@ public class PipelineReportHandler implements
     setPipelineLeaderId(report, pipeline, dn);
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
-      LOGGER.info("Pipeline {} {} reported by {}", pipeline.getFactor(),
-          pipeline.getId(), dn);
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Pipeline {} {} reported by {}", pipeline.getFactor(),
+            pipeline.getId(), dn);
+      }
       if (pipeline.isHealthy()) {
         pipelineManager.openPipeline(pipelineID);
         if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
@@ -130,6 +134,7 @@ public class PipelineReportHandler implements
     if (report.getIsLeader() ||
         pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
       pipeline.setLeaderId(dn.getUuid());
+      metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }
   }
 

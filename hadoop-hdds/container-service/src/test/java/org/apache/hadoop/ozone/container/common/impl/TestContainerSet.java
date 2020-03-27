@@ -65,6 +65,7 @@ public class TestContainerSet {
         .ContainerDataProto.State.CLOSED;
 
     KeyValueContainerData kvData = new KeyValueContainerData(containerId,
+        ChunkLayOutVersion.FILE_PER_CHUNK,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     kvData.setState(state);
@@ -153,8 +154,9 @@ public class TestContainerSet {
     ContainerSet containerSet = new ContainerSet();
     for (int i=0; i<10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
-              (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
-              UUID.randomUUID().toString());
+          ChunkLayOutVersion.FILE_PER_CHUNK,
+          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+          UUID.randomUUID().toString());
       if (i%2 == 0) {
         kvData.setVolume(vol1);
       } else {
@@ -194,6 +196,7 @@ public class TestContainerSet {
     int containerCount = 50;
     for (int i = 0; i < containerCount; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
+          ChunkLayOutVersion.FILE_PER_CHUNK,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
       if (random.nextBoolean()) {
@@ -286,6 +289,7 @@ public class TestContainerSet {
     ContainerSet containerSet = new ContainerSet();
     for (int i = FIRST_ID; i < FIRST_ID + 10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
+          ChunkLayOutVersion.FILE_PER_CHUNK,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
       if (i%2 == 0) {

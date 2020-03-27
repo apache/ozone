@@ -33,7 +33,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -83,9 +83,9 @@ public class ContainerReader implements Runnable {
   private final ContainerSet containerSet;
   private final OzoneConfiguration config;
   private final File hddsVolumeDir;
-  private final VolumeSet volumeSet;
+  private final MutableVolumeSet volumeSet;
 
-  ContainerReader(VolumeSet volSet, HddsVolume volume, ContainerSet cset,
+  ContainerReader(MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
                   OzoneConfiguration conf) {
     Preconditions.checkNotNull(volume);
     this.hddsVolume = volume;

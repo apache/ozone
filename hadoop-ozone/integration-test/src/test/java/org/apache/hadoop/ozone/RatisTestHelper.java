@@ -102,8 +102,8 @@ public interface RatisTestHelper {
     conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY, rpc.name());
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
-    LOG.info(OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY
-        + " = " + rpc.name());
+    LOG.info("{} = {}", OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
+            rpc.name());
   }
 
   static MiniOzoneCluster newMiniOzoneCluster(

@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.security;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -162,9 +162,8 @@ public class OzoneDelegationTokenSecretManager
    * @return renewTime - If updated successfully, return renewTime.
    */
   public long updateToken(Token<OzoneTokenIdentifier> token,
-      OzoneTokenIdentifier ozoneTokenIdentifier) {
-    long renewTime =
-        ozoneTokenIdentifier.getIssueDate() + getTokenRenewInterval();
+      OzoneTokenIdentifier ozoneTokenIdentifier, long tokenRenewInterval) {
+    long renewTime = ozoneTokenIdentifier.getIssueDate() + tokenRenewInterval;
     TokenInfo tokenInfo = new TokenInfo(renewTime, token.getPassword(),
         ozoneTokenIdentifier.getTrackingId());
     currentTokens.put(ozoneTokenIdentifier, tokenInfo);
@@ -529,8 +528,8 @@ public class OzoneDelegationTokenSecretManager
     @Override
     public void run() {
       LOG.info("Starting expired delegation token remover thread, "
-          + "tokenRemoverScanInterval=" + getTokenRemoverScanInterval()
-          / (60 * 1000) + " min(s)");
+          + "tokenRemoverScanInterval={} min(s)",
+              getTokenRemoverScanInterval() / (60 * 1000));
       try {
         while (isRunning()) {
           long now = Time.now();
@@ -543,7 +542,7 @@ public class OzoneDelegationTokenSecretManager
             Thread.sleep(Math.min(5000,
                 getTokenRemoverScanInterval())); // 5 seconds
           } catch (InterruptedException ie) {
-            LOG.error("ExpiredTokenRemover received " + ie);
+            LOG.error("ExpiredTokenRemover received {}", ie);
           }
         }
       } catch (Throwable t) {

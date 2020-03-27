@@ -29,14 +29,12 @@ import java.util.TreeMap;
  * This class represents multipart upload information for a key, which holds
  * upload part information of the key.
  */
-public class OmMultipartKeyInfo {
+public class OmMultipartKeyInfo extends WithObjectID {
   private final String uploadID;
   private final long creationTime;
   private final ReplicationType replicationType;
   private final ReplicationFactor replicationFactor;
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
-  private long objectID;
-  private long updateID;
 
   /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
@@ -53,32 +51,6 @@ public class OmMultipartKeyInfo {
     this.objectID = objectID;
     this.updateID = updateID;
   }
-
-  /**
-   * Sets the update ID. For each modification of this object, we will set
-   * this to a value greater than the current value.
-   * @param updateID  long
-   */
-  public void setUpdateID(long updateID) {
-    this.updateID = updateID;
-  }
-
-  /**
-   * Returns objectID.
-   * @return long
-   */
-  public long getObjectID() {
-    return objectID;
-  }
-
-  /**
-   * Returns updateID.
-   * @return long
-   */
-  public long getUpdateID() {
-    return updateID;
-  }
-
 
   /**
    * Returns the uploadID for this multi part upload of a key.
@@ -208,6 +180,11 @@ public class OmMultipartKeyInfo {
         .setUpdateID(updateID);
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
+  }
+
+  @Override
+  public String getObjectInfo() {
+    return getProto().toString();
   }
 
   @Override

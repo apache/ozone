@@ -95,7 +95,7 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
             for (OmKeyInfo omKeyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
               // Discard those keys whose updateID is > transactionLogIndex.
               // This could happen when the PurgeRequest is replayed.
-              if (isReplay(ozoneManager, omKeyInfo.getUpdateID(),
+              if (isReplay(ozoneManager, omKeyInfo,
                   trxnLogIndex)) {
                 purgeKey = false;
                 result = Result.REPLAY;
@@ -159,8 +159,8 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
           omResponse, exception));
     }
 
-    omClientResponse.setFlushFuture(omDoubleBufferHelper.add(
-        omClientResponse, trxnLogIndex));
+    addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+        omDoubleBufferHelper);
     return omClientResponse;
   }
 }

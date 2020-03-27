@@ -165,6 +165,7 @@ public abstract class TestOzoneRpcClientAbstract {
   static void startCluster(OzoneConfiguration conf) throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
+        .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
         .build();
     cluster.waitForClusterToBeReady();
@@ -331,7 +332,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Instant testStartTime = Instant.now();
     String userName = "ozone/localhost@EXAMPLE.COM";
     String bucketName = UUID.randomUUID().toString();
-    String s3VolumeName = OzoneS3Util.getVolumeName(userName);
+    String s3VolumeName = OzoneS3Util.getS3Username(userName);
     store.createS3Bucket(s3VolumeName, bucketName);
     String volumeName = store.getOzoneVolumeName(bucketName);
     assertEquals(volumeName, "s3" + s3VolumeName);
@@ -1216,16 +1217,15 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertNotNull("Block not found", blockData);
 
       // Get the location of the chunk file
-      String chunkName = blockData.getChunks().get(0).getChunkName();
       String containreBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
           .getChunksLocationPath(containreBaseDir, scmId, containerID);
-      File chunkFile = new File(chunksLocationPath, chunkName);
-
-      // Corrupt the contents of the chunk file
-      String newData = new String("corrupted data");
-      FileUtils.writeByteArrayToFile(chunkFile, newData.getBytes());
+      byte[] corruptData = "corrupted data".getBytes();
+      // Corrupt the contents of chunk files
+      for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {
+        FileUtils.writeByteArrayToFile(file, corruptData);
+      }
     }
   }
 

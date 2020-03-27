@@ -27,9 +27,10 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Response for create directory request.
@@ -39,11 +40,23 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   public static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
   private OmKeyInfo dirKeyInfo;
+  private List<OmKeyInfo> parentKeyInfos;
 
-  public OMDirectoryCreateResponse(@Nullable OmKeyInfo dirKeyInfo,
-      @Nonnull OMResponse omResponse) {
+  public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
+      @Nullable OmKeyInfo dirKeyInfo,
+      @Nullable List<OmKeyInfo> parentKeyInfos) {
+
     super(omResponse);
     this.dirKeyInfo = dirKeyInfo;
+    this.parentKeyInfos = parentKeyInfos;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction or
+   * the directory already exists.
+   */
+  public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
   }
 
   @Override
@@ -51,11 +64,23 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     if (dirKeyInfo != null) {
-      String dirKey =
-          omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
-              dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
+      if (parentKeyInfos != null) {
+        for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
+          String parentKey = omMetadataManager
+              .getOzoneDirKey(parentKeyInfo.getVolumeName(),
+                  parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
+          LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
+              parentKeyInfo);
+          omMetadataManager.getKeyTable()
+              .putWithBatch(batchOperation, parentKey, parentKeyInfo);
+        }
+      }
+
+      String dirKey = omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
+          dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
       omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
           dirKeyInfo);
+
     } else {
       // When directory already exists, we don't add it to cache. And it is
       // not an error, in this case dirKeyInfo will be null.

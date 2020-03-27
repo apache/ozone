@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -25,20 +26,25 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
+import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.GlobalStorageStatistics;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -51,6 +57,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import org.junit.After;
 import org.junit.Assert;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -163,9 +170,29 @@ public class TestOzoneFileInterfaces {
   public void testOzFsReadWrite() throws IOException {
     long currentTime = Time.now();
     int stringLen = 20;
+    OMMetadataManager metadataManager = cluster.getOzoneManager()
+        .getMetadataManager();
+    String lev1dir = "l1dir";
+    Path lev1path = createPath("/" + lev1dir);
+    String lev1key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev1path));
+    String lev2dir = "l2dir";
+    Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
+    String lev2key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev2path));
+
     String data = RandomStringUtils.randomAlphanumeric(stringLen);
     String filePath = RandomStringUtils.randomAlphanumeric(5);
-    Path path = createPath("/" + filePath);
+
+    Path path = createPath("/" + lev1dir + "/" + lev2dir + "/" + filePath);
+    String fileKey = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(path));
+
+    // verify prefix directories and the file, do not already exist
+    assertTrue(metadataManager.getKeyTable().get(lev1key) == null);
+    assertTrue(metadataManager.getKeyTable().get(lev2key) == null);
+    assertTrue(metadataManager.getKeyTable().get(fileKey) == null);
+
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.writeBytes(data);
     }
@@ -188,6 +215,18 @@ public class TestOzoneFileInterfaces {
     assertEquals(FsPermission.getFileDefault(), status.getPermission());
     verifyOwnerGroup(status);
 
+    FileStatus lev1status;
+    FileStatus lev2status;
+
+    // verify prefix directories got created when creating the file.
+    assertTrue(metadataManager.getKeyTable().get(lev1key).getKeyName()
+        .equals("l1dir/"));
+    assertTrue(metadataManager.getKeyTable().get(lev2key).getKeyName()
+        .equals("l1dir/l2dir/"));
+    lev1status = getDirectoryStat(lev1path);
+    lev2status = getDirectoryStat(lev2path);
+    assertTrue((lev1status != null) && (lev2status != null));
+
     try (FSDataInputStream inputStream = fs.open(path)) {
       byte[] buffer = new byte[stringLen];
       // This read will not change the offset inside the file
@@ -208,6 +247,25 @@ public class TestOzoneFileInterfaces {
     assertEquals(statistics.getLong("objects_read").longValue(), 1);
   }
 
+  @Test
+  public void testReplication() throws IOException {
+    int stringLen = 20;
+    String data = RandomStringUtils.randomAlphanumeric(stringLen);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+
+    Path pathIllegal = createPath("/" + filePath + "illegal");
+    try (FSDataOutputStream streamIllegal = fs.create(pathIllegal, (short)2)) {
+      streamIllegal.writeBytes(data);
+    }
+    assertEquals(3, fs.getFileStatus(pathIllegal).getReplication());
+
+    Path pathLegal = createPath("/" + filePath + "legal");
+    try (FSDataOutputStream streamLegal = fs.create(pathLegal, (short)1)) {
+      streamLegal.writeBytes(data);
+    }
+    assertEquals(1, fs.getFileStatus(pathLegal).getReplication());
+  }
+
   private void verifyOwnerGroup(FileStatus fileStatus) {
     String owner = getCurrentUser();
     assertEquals(owner, fileStatus.getOwner());
@@ -217,27 +275,64 @@ public class TestOzoneFileInterfaces {
 
   @Test
   public void testDirectory() throws IOException {
-    String dirPath = RandomStringUtils.randomAlphanumeric(5);
-    Path path = createPath("/" + dirPath);
-    assertTrue("Makedirs returned with false for the path " + path,
-        fs.mkdirs(path));
+    String leafName = RandomStringUtils.randomAlphanumeric(5);
+    OMMetadataManager metadataManager = cluster.getOzoneManager()
+        .getMetadataManager();
 
-    FileStatus status = fs.getFileStatus(path);
-    assertTrue("The created path is not directory.", status.isDirectory());
+    String lev1dir = "abc";
+    Path lev1path = createPath("/" + lev1dir);
+    String lev1key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev1path));
+    String lev2dir = "def";
+    Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
+    String lev2key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev2path));
 
-    assertTrue(status.isDirectory());
-    assertEquals(FsPermission.getDirDefault(), status.getPermission());
-    verifyOwnerGroup(status);
+    FileStatus rootChild;
+    FileStatus rootstatus;
+    FileStatus leafstatus;
 
-    assertEquals(0, status.getLen());
+    Path leaf = createPath("/" + lev1dir + "/" + lev2dir + "/" + leafName);
+    String leafKey = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(leaf));
 
+    // verify prefix directories and the leaf, do not already exist
+    assertTrue(metadataManager.getKeyTable().get(lev1key) == null);
+    assertTrue(metadataManager.getKeyTable().get(lev2key) == null);
+    assertTrue(metadataManager.getKeyTable().get(leafKey) == null);
+
+    assertTrue("Makedirs returned with false for the path " + leaf,
+        fs.mkdirs(leaf));
+
+    // verify the leaf directory got created.
+    leafstatus = getDirectoryStat(leaf);
+    assertTrue(leafstatus != null);
+
+    FileStatus lev1status;
+    FileStatus lev2status;
+
+    // verify prefix directories got created when creating the leaf directory.
+    assertTrue(metadataManager
+        .getKeyTable()
+        .get(lev1key)
+        .getKeyName().equals("abc/"));
+    assertTrue(metadataManager
+        .getKeyTable()
+        .get(lev2key)
+        .getKeyName().equals("abc/def/"));
+    lev1status = getDirectoryStat(lev1path);
+    lev2status = getDirectoryStat(lev2path);
+    assertTrue((lev1status != null) && (lev2status != null));
+    rootChild = lev1status;
+
+    // check the root directory
+    rootstatus = getDirectoryStat(createPath("/"));
+    assertTrue(rootstatus != null);
+
+    // root directory listing should contain the lev1 prefix directory
     FileStatus[] statusList = fs.listStatus(createPath("/"));
     assertEquals(1, statusList.length);
-    assertEquals(status, statusList[0]);
-
-    fs.getFileStatus(createPath("/"));
-    assertTrue("Root dir (/) is not a directory.", status.isDirectory());
-    assertEquals(0, status.getLen());
+    assertEquals(rootChild, statusList[0]);
   }
 
   @Test
@@ -306,10 +401,60 @@ public class TestOzoneFileInterfaces {
 
     assertTrue("The created path is not directory.", omStatus.isDirectory());
 
-    // For directories, the time returned is the current time.
+    // For directories, the time returned is the current time when the dir key
+    // doesn't actually exist on server; if it exists, it will be a fixed value.
+    // In this case, the dir key exists.
     assertEquals(0, omStatus.getLen());
-    assertTrue(omStatus.getModificationTime() >= currentTime);
+    assertTrue(omStatus.getModificationTime() <= currentTime);
     assertEquals(omStatus.getPath().getName(), o3fs.pathToKey(path));
+  }
+
+  @Test
+  public void testOzoneManagerLocatedFileStatus() throws IOException {
+    String data = RandomStringUtils.randomAlphanumeric(20);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    Path path = createPath("/" + filePath);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.writeBytes(data);
+    }
+    FileStatus status = fs.getFileStatus(path);
+    assertTrue(status instanceof LocatedFileStatus);
+    LocatedFileStatus locatedFileStatus = (LocatedFileStatus) status;
+    assertTrue(locatedFileStatus.getBlockLocations().length >= 1);
+
+    for (BlockLocation blockLocation : locatedFileStatus.getBlockLocations()) {
+      assertTrue(blockLocation.getNames().length >= 1);
+      assertTrue(blockLocation.getHosts().length >= 1);
+    }
+  }
+
+  @Test
+  public void testOzoneManagerLocatedFileStatusBlockOffsetsWithMultiBlockFile()
+      throws Exception {
+    // naive assumption: MiniOzoneCluster will not have larger than ~1GB
+    // block size when running this test.
+    int blockSize = (int) fs.getConf().getStorageSize(
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
+        StorageUnit.BYTES
+    );
+    String data = RandomStringUtils.randomAlphanumeric(2*blockSize+837);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    Path path = createPath("/" + filePath);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.writeBytes(data);
+    }
+    FileStatus status = fs.getFileStatus(path);
+    assertTrue(status instanceof LocatedFileStatus);
+    LocatedFileStatus locatedFileStatus = (LocatedFileStatus) status;
+    BlockLocation[] blockLocations = locatedFileStatus.getBlockLocations();
+
+    assertEquals(0, blockLocations[0].getOffset());
+    assertEquals(blockSize, blockLocations[1].getOffset());
+    assertEquals(2*blockSize, blockLocations[2].getOffset());
+    assertEquals(blockSize, blockLocations[0].getLength());
+    assertEquals(blockSize, blockLocations[1].getLength());
+    assertEquals(837, blockLocations[2].getLength());
   }
 
   @Test
@@ -339,5 +484,30 @@ public class TestOzoneFileInterfaces {
     } else {
       return new Path(relativePath);
     }
+  }
+
+  /**
+   * verify that a directory exists and is initialized correctly.
+   * @param path of the directory
+   * @return null indicates FILE_NOT_FOUND, else the FileStatus
+   * @throws IOException
+   */
+  private FileStatus getDirectoryStat(Path path) throws IOException {
+
+    FileStatus status = null;
+
+    try {
+      status = fs.getFileStatus(path);
+    } catch (FileNotFoundException e) {
+      return null;
+    }
+    assertTrue("The created path is not directory.", status.isDirectory());
+
+    assertEquals(FsPermission.getDirDefault(), status.getPermission());
+    verifyOwnerGroup(status);
+
+    assertEquals(0, status.getLen());
+
+    return status;
   }
 }

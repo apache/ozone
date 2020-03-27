@@ -73,37 +73,42 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
     omResponse.setSuccess(operationResult);
     omResponse.setRemoveAclResponse(RemoveAclResponse.newBuilder()
         .setResponse(operationResult));
-    return new OMKeyAclResponse(omKeyInfo,
-        omResponse.build());
+    return new OMKeyAclResponse(omResponse.build(), omKeyInfo);
   }
 
   @Override
-  OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
-    return new OMKeyAclResponse(null,
-        createErrorOMResponse(omResponse, exception));
-  }
-
-  @Override
-  void onComplete(boolean operationResult, IOException exception) {
-    if (operationResult) {
-      LOG.debug("Remove acl: {} to path: {} success!", ozoneAcls, path);
-    } else {
-      if (exception == null) {
-        LOG.debug("Remove acl {} to path {} failed, because acl already exist",
-            ozoneAcls, path);
-      } else {
-        LOG.error("Remove acl {} to path {} failed!", ozoneAcls, path,
-            exception);
+  void onComplete(Result result, boolean operationResult,
+      IOException exception, long trxnLogIndex) {
+    switch (result) {
+    case SUCCESS:
+      if (LOG.isDebugEnabled()) {
+        if (operationResult) {
+          LOG.debug("Remove acl: {} to path: {} success!", ozoneAcls, path);
+        } else {
+          LOG.debug("Acl {} not removed from path {} as it does not exist",
+              ozoneAcls, path);
+        }
       }
+      break;
+    case REPLAY:
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
+            getOmRequest());
+      }
+      break;
+    case FAILURE:
+      LOG.error("Remove acl {} to path {} failed!", ozoneAcls, path, exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyRemoveAclRequest: {}",
+          getOmRequest());
     }
   }
 
   @Override
-  boolean apply(OmKeyInfo omKeyInfo) {
+  boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
     return omKeyInfo.removeAcl(ozoneAcls.get(0));
   }
-
 }
 

@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
@@ -30,6 +33,12 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
  */
 public interface OzoneStorageContainerManager {
 
+  void start() throws IOException;
+
+  void stop();
+
+  void join();
+
   NodeManager getScmNodeManager();
 
   BlockManager getScmBlockManager();
@@ -39,4 +48,7 @@ public interface OzoneStorageContainerManager {
   ContainerManager getContainerManager();
 
   ReplicationManager getReplicationManager();
+
+  InetSocketAddress getDatanodeRpcAddress();
+
 }

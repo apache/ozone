@@ -193,7 +193,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             bucketName, keyName);
         OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
         if (dbKeyInfo != null) {
-          if (isReplay(ozoneManager, dbKeyInfo.getUpdateID(), trxnLogIndex)) {
+          if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
             // This transaction is a replay. Send replay response.
             throw new OMReplayException();
           }
@@ -205,7 +205,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Check if this transaction is a replay of ratis logs.
       // Check the updateID of the openKey to verify that it is not greater
       // than the current transactionLogIndex
-      if (isReplay(ozoneManager, openKeyInfo.getUpdateID(), trxnLogIndex)) {
+      if (isReplay(ozoneManager, openKeyInfo, trxnLogIndex)) {
         // This transaction is a replay. Send replay response.
         throw new OMReplayException();
       }
@@ -218,7 +218,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       openKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       // Set the UpdateID to current transactionLogIndex
-      openKeyInfo.setUpdateID(trxnLogIndex);
+      openKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache.
       omMetadataManager.getOpenKeyTable().addCacheEntry(
@@ -249,6 +249,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
             "Exception:{}", volumeName, bucketName, openKeyName, exception);
       }
+    } finally {
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
     }
 
     if (result != Result.REPLAY) {
@@ -256,8 +259,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           exception, getOmRequest().getUserInfo()));
     }
 
-    omClientResponse.setFlushFuture(omDoubleBufferHelper.add(omClientResponse,
-        trxnLogIndex));
+
 
     return omClientResponse;
   }

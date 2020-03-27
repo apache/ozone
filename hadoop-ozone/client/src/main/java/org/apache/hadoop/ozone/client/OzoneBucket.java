@@ -591,10 +591,8 @@ public class OzoneBucket extends WithMetadata {
 
     @Override
     public boolean hasNext() {
-      if(!currentIterator.hasNext()) {
-        currentIterator = getNextListOfKeys(
-            currentValue != null ? currentValue.getName() : null)
-            .iterator();
+      if(!currentIterator.hasNext() && currentValue != null) {
+        currentIterator = getNextListOfKeys(currentValue.getName()).iterator();
       }
       return currentIterator.hasNext();
     }
@@ -611,7 +609,7 @@ public class OzoneBucket extends WithMetadata {
     /**
      * Gets the next set of key list using proxy.
      * @param prevKey
-     * @return {@code List<OzoneVolume>}
+     * @return {@code List<OzoneKey>}
      */
     private List<OzoneKey> getNextListOfKeys(String prevKey) {
       try {

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,6 +21,9 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
+import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
+import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,11 +51,13 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
 
   private Map<Integer, String> tablesNames;
   private CodecRegistry codecRegistry;
+  private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
 
-  public OMDBUpdatesHandler(OMMetadataManager omMetadataManager) {
-    tablesNames = omMetadataManager.getStore().getTableNames();
-    codecRegistry = omMetadataManager.getStore().getCodecRegistry();
+  public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
+    omMetadataManager = metadataManager;
+    tablesNames = metadataManager.getStore().getTableNames();
+    codecRegistry = metadataManager.getStore().getCodecRegistry();
   }
 
   @Override
@@ -88,30 +93,47 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
     String tableName = tablesNames.get(cfIndex);
-    Class keyType = getKeyType();
+    Class<String> keyType = getKeyType();
     Class valueType = getValueType(tableName);
     if (valueType != null) {
       OMDBUpdateEvent.OMUpdateEventBuilder builder =
           new OMDBUpdateEvent.OMUpdateEventBuilder<>();
       builder.setTable(tableName);
+      builder.setAction(action);
 
-      Object key = codecRegistry.asObject(keyBytes, keyType);
+      String key = codecRegistry.asObject(keyBytes, keyType);
       builder.setKey(key);
 
-      if (!action.equals(OMDBUpdateEvent.OMDBUpdateAction.DELETE)) {
+      if (action == PUT) {
         Object value = codecRegistry.asObject(valueBytes, valueType);
         builder.setValue(value);
+        // If a PUT key operation happens on an existing Key, it is tagged
+        // as an "UPDATE" event.
+        if (tableName.equalsIgnoreCase(KEY_TABLE)) {
+          if (omMetadataManager.getKeyTable().isExist(key)) {
+            OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(key);
+            builder.setOldValue(omKeyInfo);
+            builder.setAction(UPDATE);
+          }
+        }
+      } else if (action.equals(DELETE)) {
+        // When you delete a Key, we add the old OmKeyInfo to the event so that
+        // a downstream task can use it.
+        if (tableName.equalsIgnoreCase(KEY_TABLE)) {
+          OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(key);
+          builder.setValue(omKeyInfo);
+        }
       }
 
-      builder.setAction(action);
       OMDBUpdateEvent event = builder.build();
       LOG.debug("Generated OM update Event for table : " + event.getTable()
           + ", Key = " + event.getKey() + ", action = " + event.getAction());
-      // Temporarily adding to an event buffer for testing. In subsequent JIRAs,
-      // a Recon side class will be implemented that requests delta updates
-      // from OM and calls on this handler. In that case, we will fill up
-      // this buffer and pass it on to the ReconTaskController which has
-      // tasks waiting on OM events.
+      if (omdbUpdateEvents.contains(event)) {
+        // If the same event is part of this batch, the last one only holds.
+        // For example, if there are 2 PUT key1 events, then the first one
+        // can be discarded.
+        omdbUpdateEvents.remove(event);
+      }
       omdbUpdateEvents.add(event);
     }
   }
@@ -244,7 +266,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
    * @param name table name.
    * @return String.class by default.
    */
-  private Class getKeyType() {
+  private Class<String> getKeyType() {
     return String.class;
   }
 
@@ -264,7 +286,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
   }
 
   /**
-   * Get List of events. (Temporary API to unit test the class).
+   * Get List of events.
    * @return List of events.
    */
   public List<OMDBUpdateEvent> getEvents() {

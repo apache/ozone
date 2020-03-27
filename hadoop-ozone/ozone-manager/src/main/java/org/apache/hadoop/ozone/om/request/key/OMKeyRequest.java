@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -81,18 +82,6 @@ import static org.apache.hadoop.util.Time.monotonicNow;
 public abstract class OMKeyRequest extends OMClientRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OMKeyRequest.class);
-
-  /**
-   * Stores the result of request execution in
-   * OMClientRequest#validateAndUpdateCache.
-   */
-  public enum Result {
-    SUCCESS, // The request was executed successfully
-
-    REPLAY, // The request is a replay and was ignored
-
-    FAILURE // The request failed and exception was thrown
-  }
 
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
@@ -193,7 +182,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
-  protected Optional<FileEncryptionInfo> getFileEncryptionInfo(
+  protected static Optional<FileEncryptionInfo> getFileEncryptionInfo(
       OzoneManager ozoneManager, OmBucketInfo bucketInfo) throws IOException {
     Optional<FileEncryptionInfo> encInfo = Optional.absent();
     BucketEncryptionKeyInfo ezInfo = bucketInfo.getEncryptionKeyInfo();
@@ -215,7 +204,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return encInfo;
   }
 
-  private EncryptedKeyVersion generateEDEK(OzoneManager ozoneManager,
+  private static EncryptedKeyVersion generateEDEK(OzoneManager ozoneManager,
       String ezKeyName) throws IOException {
     if (ezKeyName == null) {
       return null;
@@ -252,6 +241,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
         long transactionLogIndex) {
+    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
+
     return new OmKeyInfo.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
@@ -266,7 +257,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .setFileEncryptionInfo(encInfo)
         .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
-        .setObjectID(transactionLogIndex)
+        .setObjectID(objectID)
         .setUpdateID(transactionLogIndex)
         .build();
   }
@@ -322,7 +313,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-      long transactionLogIndex)
+      long transactionLogIndex, boolean isRatisEnabled)
       throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartKeyInfo(omMetadataManager, keyArgs,
@@ -341,7 +332,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // The modification time is set in preExecute. Use the same
       // modification time.
       dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
-      dbKeyInfo.setUpdateID(transactionLogIndex);
+      dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
       return dbKeyInfo;
     }
 

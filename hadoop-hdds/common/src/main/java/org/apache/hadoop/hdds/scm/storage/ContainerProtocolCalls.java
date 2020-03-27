@@ -193,16 +193,19 @@ public final class ContainerProtocolCalls  {
    *
    * @param xceiverClient client to perform call
    * @param containerBlockData block data to identify container
+   * @param eof whether this is the last putBlock for the same block
    * @return putBlockResponse
    * @throws IOException if there is an error while performing the call
    * @throws InterruptedException
    * @throws ExecutionException
    */
   public static XceiverClientReply putBlockAsync(
-      XceiverClientSpi xceiverClient, BlockData containerBlockData)
+      XceiverClientSpi xceiverClient, BlockData containerBlockData, boolean eof)
       throws IOException, InterruptedException, ExecutionException {
     PutBlockRequestProto.Builder createBlockRequest =
-        PutBlockRequestProto.newBuilder().setBlockData(containerBlockData);
+        PutBlockRequestProto.newBuilder()
+            .setBlockData(containerBlockData)
+            .setEof(eof);
     String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
     ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.PutBlock)

@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 
 import org.junit.Assert;
@@ -59,7 +60,7 @@ public class TestHandler {
   public void setup() throws Exception {
     this.conf = new Configuration();
     this.containerSet = Mockito.mock(ContainerSet.class);
-    this.volumeSet = Mockito.mock(VolumeSet.class);
+    this.volumeSet = Mockito.mock(MutableVolumeSet.class);
     DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
     DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);

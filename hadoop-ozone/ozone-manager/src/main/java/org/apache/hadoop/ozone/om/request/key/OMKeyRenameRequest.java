@@ -23,6 +23,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -111,7 +112,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
 
-    Map<String, String> auditMap = buildKeyArgsAuditMap(renameKeyArgs);
+    Map<String, String> auditMap =
+        buildAuditMap(renameKeyArgs, renameKeyRequest);
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(
@@ -152,8 +154,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       if (toKeyValue != null) {
 
         // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, toKeyValue.getUpdateID(),
-            trxnLogIndex)) {
+        if (isReplay(ozoneManager, toKeyValue, trxnLogIndex)) {
 
           // Check if fromKey is still in the DB and created before this
           // replay.
@@ -209,15 +210,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
         }
 
-        // Copy fromKeyValue into toKeyValue and set objectID and updateID to
-        // current transactionLogIndex
-        toKeyValue = fromKeyValue.copyObject(false);
-        toKeyValue.setObjectID(trxnLogIndex);
-        toKeyValue.setUpdateID(trxnLogIndex);
+        fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-        toKeyValue.setKeyName(toKeyName);
+        fromKeyValue.setKeyName(toKeyName);
         //Set modification time
-        toKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
+        fromKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
 
         // Add to cache.
         // fromKey should be deleted, toKey should be added with newly updated
@@ -228,11 +225,11 @@ public class OMKeyRenameRequest extends OMKeyRequest {
             new CacheValue<>(Optional.absent(), trxnLogIndex));
 
         keyTable.addCacheEntry(new CacheKey<>(toKey),
-            new CacheValue<>(Optional.of(toKeyValue), trxnLogIndex));
+            new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
 
         omClientResponse = new OMKeyRenameResponse(omResponse
             .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-            fromKeyName, toKeyName, toKeyValue);
+            fromKeyName, toKeyName, fromKeyValue);
 
         result = Result.SUCCESS;
       }
@@ -242,11 +239,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       omClientResponse = new OMKeyRenameResponse(createErrorOMResponse(
           omResponse, exception));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse,
-                trxnLogIndex));
-      }
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+            omDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
@@ -284,5 +278,14 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           renameKeyRequest);
     }
     return omClientResponse;
+  }
+
+  private Map<String, String> buildAuditMap(
+      KeyArgs keyArgs, RenameKeyRequest renameKeyRequest) {
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    auditMap.remove(OzoneConsts.KEY);
+    auditMap.put(OzoneConsts.SRC_KEY, keyArgs.getKeyName());
+    auditMap.put(OzoneConsts.DST_KEY, renameKeyRequest.getToKeyName());
+    return auditMap;
   }
 }

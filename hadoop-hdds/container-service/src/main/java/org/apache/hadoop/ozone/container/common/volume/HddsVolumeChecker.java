@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -32,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
@@ -45,12 +45,14 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * A class that encapsulates running disk checks against each HDDS volume and
- * allows retrieving a list of failed volumes.
+ * allows retrieving a list of failed volumes. The class only detects failed
+ * volumes and handling of failed volumes is responsibility of caller.
  */
 public class HddsVolumeChecker {
 
@@ -200,7 +202,8 @@ public class HddsVolumeChecker {
         allVolumes.add(v);
         Futures.addCallback(olf.get(),
             new ResultHandler(v, healthyVolumes, failedVolumes,
-                numVolumes, (ignored1, ignored2) -> latch.countDown()));
+                numVolumes, (ignored1, ignored2) -> latch.countDown()),
+            MoreExecutors.directExecutor());
       } else {
         if (numVolumes.decrementAndGet() == 0) {
           latch.countDown();
@@ -305,24 +308,29 @@ public class HddsVolumeChecker {
     }
 
     @Override
-    public void onSuccess(@Nonnull VolumeCheckResult result) {
-      switch (result) {
-      case HEALTHY:
-      case DEGRADED:
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Volume {} is {}.", volume, result);
+    public void onSuccess(@Nullable VolumeCheckResult result) {
+      if (result == null) {
+        LOG.error("Unexpected empty health check result for volume {}", volume);
+        markHealthy();
+      } else {
+        switch (result) {
+        case HEALTHY:
+        case DEGRADED:
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Volume {} is {}.", volume, result);
+          }
+          markHealthy();
+          break;
+        case FAILED:
+          LOG.warn("Volume {} detected as being unhealthy", volume);
+          markFailed();
+          break;
+        default:
+          LOG.error("Unexpected health check result {} for volume {}", result,
+              volume);
+          markHealthy();
+          break;
         }
-        markHealthy();
-        break;
-      case FAILED:
-        LOG.warn("Volume {} detected as being unhealthy", volume);
-        markFailed();
-        break;
-      default:
-        LOG.error("Unexpected health check result {} for volume {}",
-            result, volume);
-        markHealthy();
-        break;
       }
       cleanup();
     }
@@ -331,7 +339,7 @@ public class HddsVolumeChecker {
     public void onFailure(@Nonnull Throwable t) {
       Throwable exception = (t instanceof ExecutionException) ?
           t.getCause() : t;
-      LOG.warn("Exception running disk checks against volume " +
+      LOG.warn("Exception running disk checks against volume {}",
           volume, exception);
       markFailed();
       cleanup();

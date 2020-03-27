@@ -94,8 +94,8 @@ public class TestOzoneAuditLogger {
   public static void tearDown() {
     File file = new File("audit.log");
     if (FileUtils.deleteQuietly(file)) {
-      LOG.info(file.getName() +
-          " has been deleted as all tests have completed.");
+      LOG.info("{} has been deleted as all tests have completed.",
+              file.getName());
     } else {
       LOG.info("audit.log could not be deleted.");
     }

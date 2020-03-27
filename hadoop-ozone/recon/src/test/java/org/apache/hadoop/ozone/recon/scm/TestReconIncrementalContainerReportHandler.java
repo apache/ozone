@@ -19,10 +19,6 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
-import static org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest.getRandomPipeline;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -37,14 +33,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.junit.Test;
 
 /**
@@ -56,29 +48,7 @@ public class TestReconIncrementalContainerReportHandler
   @Test
   public void testProcessICR() throws IOException, NodeNotFoundException {
 
-    Pipeline pipeline = getRandomPipeline();
-    ReconPipelineManager pipelineManager = getPipelineManager();
-    pipelineManager.addPipeline(pipeline);
-
     ContainerID containerID = new ContainerID(100L);
-    ContainerInfo containerInfo =
-        new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
-            .setNumberOfKeys(10)
-            .setPipelineID(pipeline.getId())
-            .setReplicationFactor(ONE)
-            .setOwner("test")
-            .setState(OPEN)
-            .setReplicationType(STAND_ALONE)
-            .build();
-    ContainerWithPipeline containerWithPipeline =
-        new ContainerWithPipeline(containerInfo, pipeline);
-
-    StorageContainerServiceProvider scmServiceProviderMock = mock(
-        StorageContainerServiceProvider.class);
-    when(scmServiceProviderMock.getContainerWithPipeline(100L))
-        .thenReturn(containerWithPipeline);
-
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     IncrementalContainerReportFromDatanode reportMock =
         mock(IncrementalContainerReportFromDatanode.class);
@@ -92,12 +62,12 @@ public class TestReconIncrementalContainerReportHandler
     NodeManager nodeManagerMock = mock(NodeManager.class);
 
     ReconContainerManager containerManager = getContainerManager();
-    ReconIncrementalContainerReportHandler recconIcr =
+    ReconIncrementalContainerReportHandler reconIcr =
         new ReconIncrementalContainerReportHandler(nodeManagerMock,
-            containerManager, scmServiceProviderMock);
+            containerManager);
     EventPublisher eventPublisherMock = mock(EventPublisher.class);
 
-    recconIcr.onMessage(reportMock, eventPublisherMock);
+    reconIcr.onMessage(reportMock, eventPublisherMock);
     verify(nodeManagerMock, times(1))
         .addContainer(datanodeDetails, containerID);
     assertTrue(containerManager.exists(containerID));

@@ -557,6 +557,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
+        .setRefreshPipeline(true)
         .build();
 
     GetFileStatusResponse.Builder rb = GetFileStatusResponse.newBuilder();
@@ -588,6 +589,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
+        .setRefreshPipeline(true)
         .build();
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),

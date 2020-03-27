@@ -20,11 +20,12 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -63,10 +64,11 @@ public class TestNodeFailure {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(
+        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
         DatanodeRatisServerConfig.RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
         10, TimeUnit.SECONDS);
     conf.setTimeDuration(
-        DatanodeRatisServerConfig.DATANODE_RATIS_SERVER_CONFIG_PREFIX +
+        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
         DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
         10, TimeUnit.SECONDS);
     conf.setTimeDuration(
