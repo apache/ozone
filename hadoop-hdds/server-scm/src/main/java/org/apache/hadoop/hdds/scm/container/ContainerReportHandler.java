@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -53,6 +55,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
   private final NodeManager nodeManager;
   private final ContainerManager containerManager;
+  private final boolean unknownContainerDeletionEnabled;
 
   /**
    * Constructs ContainerReportHandler instance with the
@@ -60,12 +63,28 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    *
    * @param nodeManager NodeManager instance
    * @param containerManager ContainerManager instance
+   * @param conf OzoneConfiguration instance
    */
   public ContainerReportHandler(final NodeManager nodeManager,
-                                final ContainerManager containerManager) {
+                                final ContainerManager containerManager,
+                                OzoneConfiguration conf) {
     super(containerManager, LOG);
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
+
+    if (conf != null) {
+      unknownContainerDeletionEnabled = conf.getBoolean(
+          ScmConfigKeys.HDDS_SCM_UNKNOWN_CONTAINER_DELETION_ENABLED,
+          ScmConfigKeys.HDDS_SCM_UNKNOWN_CONTAINER_DELETION_ENABLED_DEFAULT);
+    } else {
+      unknownContainerDeletionEnabled =
+          ScmConfigKeys.HDDS_SCM_UNKNOWN_CONTAINER_DELETION_ENABLED_DEFAULT;
+    }
+  }
+
+  public ContainerReportHandler(final NodeManager nodeManager,
+      final ContainerManager containerManager) {
+    this(nodeManager, containerManager, null);
   }
 
   /**
@@ -134,15 +153,17 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
                 " {} from datanode {}.", replicaProto.getContainerID(),
             datanodeDetails, e);
 
-        final ContainerID containerId = ContainerID
-            .valueof(replicaProto.getContainerID());
-        final DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
-            containerId.getId(), true);
-        final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
-            datanodeDetails.getUuid(), deleteCommand);
-        publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-        LOG.info("Sending delete container command for container {}"
-            + " to datanode {}", containerId.getId(), datanodeDetails);
+        if (unknownContainerDeletionEnabled) {
+          final ContainerID containerId = ContainerID
+              .valueof(replicaProto.getContainerID());
+          final DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
+              containerId.getId(), true);
+          final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
+              datanodeDetails.getUuid(), deleteCommand);
+          publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+          LOG.info("Sending delete container command for unknown container {}"
+              + " to datanode {}", containerId.getId(), datanodeDetails);
+        }
       } catch (IOException e) {
         LOG.error("Exception while processing container report for container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),

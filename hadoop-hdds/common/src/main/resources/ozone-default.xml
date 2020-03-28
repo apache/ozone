@@ -2551,4 +2551,13 @@
       Truststore password for HTTPS SSL configuration
     </description>
   </property>
+  <property>
+    <name>hdds.scm.unknown-container.deletion.enabled</name>
+    <value>false</value>
+    <tag>HDDS, SCM, OPERATION</tag>
+    <description>
+      Enable unknown container deletion on SCM, these containers are
+      some containers reported by Datanodes but cannot be found in SCM.
+    </description>
+  </property>
 </configuration>
