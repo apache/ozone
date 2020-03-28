@@ -505,7 +505,7 @@
   </property>
   <property>
     <name>ozone.om.handler.count.key</name>
-    <value>20</value>
+    <value>100</value>
     <tag>OM, PERFORMANCE</tag>
     <description>
       The number of RPC handler threads for OM service endpoints.
@@ -918,7 +918,7 @@
   </property>
   <property>
     <name>ozone.scm.handler.count.key</name>
-    <value>10</value>
+    <value>100</value>
     <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
     <description>
       The number of RPC handler threads for each SCM service
