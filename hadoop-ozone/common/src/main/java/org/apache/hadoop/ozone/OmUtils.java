@@ -29,8 +29,12 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.stream.Collectors;
@@ -87,6 +91,34 @@ public final class OmUtils {
    */
   public static InetSocketAddress getOmAddress(Configuration conf) {
     return NetUtils.createSocketAddr(getOmRpcAddress(conf));
+  }
+
+  /**
+   * Return list of OM addresses by service ids - when HA is enabled.
+   *
+   * @param conf {@link Configuration}
+   * @return {service.id -> [{@link InetSocketAddress}]}
+   */
+  public static Map<String, List<InetSocketAddress>> getOmHAAddressesById(
+      Configuration conf) {
+    Map<String, List<InetSocketAddress>> result = new HashMap<>();
+    for (String serviceId : conf.getTrimmedStringCollection(
+        OZONE_OM_SERVICE_IDS_KEY)) {
+      if (!result.containsKey(serviceId)) {
+        result.put(serviceId, new ArrayList<>());
+      }
+      for (String nodeId : getOMNodeIds(conf, serviceId)) {
+        String rpcAddr = getOmRpcAddress(conf,
+            addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
+        if (rpcAddr != null) {
+          result.get(serviceId).add(NetUtils.createSocketAddr(rpcAddr));
+        } else {
+          LOG.warn("Address undefined for nodeId: {} for service {}", nodeId,
+              serviceId);
+        }
+      }
+    }
+    return result;
   }
 
   /**
