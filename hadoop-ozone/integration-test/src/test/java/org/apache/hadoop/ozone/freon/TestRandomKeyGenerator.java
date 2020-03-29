@@ -36,6 +36,7 @@ import org.junit.Test;
 /**
  * Tests Freon, with MiniOzoneCluster.
  */
+@Ignore("HDDS-3290")
 public class TestRandomKeyGenerator {
 
   private static MiniOzoneCluster cluster;
