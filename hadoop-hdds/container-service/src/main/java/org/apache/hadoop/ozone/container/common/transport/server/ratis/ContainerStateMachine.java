@@ -146,7 +146,8 @@ public class ContainerStateMachine extends BaseStateMachine {
   // keeps track of the containers created per pipeline
   private final Map<Long, Long> container2BCSIDMap;
   private final ExecutorService[] executors;
-  private final List<ThreadPoolExecutor> chunkExecutors;
+  private final List<ThreadPoolExecutor> writeChunkExecutors;
+  private final List<ThreadPoolExecutor> readChunkExecutors;
   private final Map<Long, Long> applyTransactionCompletionMap;
   private final Cache<Long, ByteString> stateMachineDataCache;
   private final AtomicBoolean stateMachineHealthy;
@@ -160,7 +161,8 @@ public class ContainerStateMachine extends BaseStateMachine {
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
       ContainerController containerController,
-      List<ThreadPoolExecutor> chunkExecutors,
+      List<ThreadPoolExecutor> writeChunkExecutors,
+      List<ThreadPoolExecutor> readChunkExecutors,
       XceiverServerRatis ratisServer, Configuration conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
@@ -180,7 +182,8 @@ public class ContainerStateMachine extends BaseStateMachine {
         (index, data) -> new int[] {1, data.size()}, numPendingRequests,
         pendingRequestsByteLimit);
 
-    this.chunkExecutors = chunkExecutors;
+    this.writeChunkExecutors = writeChunkExecutors;
+    this.readChunkExecutors = readChunkExecutors;
 
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
@@ -456,7 +459,7 @@ public class ContainerStateMachine extends BaseStateMachine {
             raftFuture.completeExceptionally(e);
             throw e;
           }
-        }, getChunkExecutor(requestProto.getWriteChunk()));
+        }, getWriteChunkExecutor(requestProto.getWriteChunk()));
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
@@ -502,7 +505,16 @@ public class ContainerStateMachine extends BaseStateMachine {
     return raftFuture;
   }
 
-  private ExecutorService getChunkExecutor(WriteChunkRequestProto req) {
+  private ExecutorService getWriteChunkExecutor(WriteChunkRequestProto req) {
+    return getChunkExecutor(req, writeChunkExecutors);
+  }
+
+  private ExecutorService getReadChunkExecutor(WriteChunkRequestProto req) {
+    return getChunkExecutor(req, readChunkExecutors);
+  }
+
+  private ExecutorService getChunkExecutor(WriteChunkRequestProto req,
+      List<ThreadPoolExecutor> chunkExecutors) {
     int hash = Objects.hashCode(req.getBlockID());
     if (hash == Integer.MIN_VALUE) {
       hash = Integer.MAX_VALUE;
@@ -613,10 +625,23 @@ public class ContainerStateMachine extends BaseStateMachine {
    */
   private ByteString getCachedStateMachineData(Long logIndex, long term,
       ContainerCommandRequestProto requestProto)
-      throws IOException {
+      throws Exception {
     ByteString data = stateMachineDataCache.get(logIndex);
     if (data == null) {
-      data = readStateMachineData(requestProto, term, logIndex);
+      try {
+        final CompletableFuture<ByteString> future = new CompletableFuture<>();
+        CompletableFuture.supplyAsync(() -> {
+          try {
+            future.complete(readStateMachineData(requestProto, term, logIndex));
+          } catch (IOException e) {
+            future.completeExceptionally(e);
+          }
+          return future;
+        }, getWriteChunkExecutor(requestProto.getWriteChunk()));
+        return future.get();
+      } catch (Exception e) {
+        throw e;
+      }
     }
     return data;
   }
@@ -664,12 +689,12 @@ public class ContainerStateMachine extends BaseStateMachine {
             future.complete(
                 getCachedStateMachineData(entry.getIndex(), entry.getTerm(),
                     requestProto));
-          } catch (IOException e) {
+          } catch (Exception e) {
             metrics.incNumReadStateMachineFails();
             future.completeExceptionally(e);
           }
           return future;
-        }, getChunkExecutor(requestProto.getWriteChunk()));
+        }, getReadChunkExecutor(requestProto.getWriteChunk()));
         return future;
       } else {
         throw new IllegalStateException("Cmd type:" + requestProto.getCmdType()

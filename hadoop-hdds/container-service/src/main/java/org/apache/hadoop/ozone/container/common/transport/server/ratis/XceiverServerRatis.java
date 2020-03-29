@@ -105,7 +105,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private int port;
   private final RaftServer server;
-  private final List<ThreadPoolExecutor> chunkExecutors;
+  private final List<ThreadPoolExecutor> writeChunkExecutors;
+  private final List<ThreadPoolExecutor> readChunkExecutors;
   private final ContainerDispatcher dispatcher;
   private final ContainerController containerController;
   private ClientId clientId = ClientId.randomId();
@@ -134,7 +135,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.dispatcher = dispatcher;
     this.containerController = containerController;
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
-    chunkExecutors = createChunkExecutors(conf);
+    writeChunkExecutors = createWriteChunkExecutors(conf);
+    readChunkExecutors = createReadChunkExecutors(conf);
 
     RaftServer.Builder builder =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -148,7 +150,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
     return new ContainerStateMachine(gid, dispatcher, containerController,
-        chunkExecutors, this, conf);
+        writeChunkExecutors, readChunkExecutors, this, conf);
   }
 
   private RaftProperties newRaftProperties() {
@@ -405,9 +407,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     if (!isStarted) {
       LOG.info("Starting {} {} at port {}", getClass().getSimpleName(),
           server.getId(), getIPCPort());
-      for (ThreadPoolExecutor executor : chunkExecutors) {
+      for (ThreadPoolExecutor executor : writeChunkExecutors) {
         executor.prestartAllCoreThreads();
       }
+
+      for (ThreadPoolExecutor executor : readChunkExecutors) {
+        executor.prestartAllCoreThreads();
+      }
+
       server.start();
 
       int realPort =
@@ -436,7 +443,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         // shutdown server before the executors as while shutting down,
         // some of the tasks would be executed using the executors.
         server.close();
-        for (ExecutorService executor : chunkExecutors) {
+        for (ExecutorService executor : writeChunkExecutors) {
+          executor.shutdown();
+        }
+
+        for (ExecutorService executor : readChunkExecutors) {
           executor.shutdown();
         }
         isStarted = false;
@@ -754,22 +765,35 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private static List<ThreadPoolExecutor> createChunkExecutors(
-      Configuration conf) {
+      int threadCount, String namePrefix) {
     // TODO create single pool with N threads if using non-incremental chunks
-    final int threadCount = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
     ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
     for (int i = 0; i < executors.length; i++) {
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)
-          .setNameFormat("ChunkWriter-" + i + "-%d")
+          .setNameFormat(namePrefix + i + "-%d")
           .build();
       BlockingQueue<Runnable> workQueue = new LinkedBlockingDeque<>();
       executors[i] = new ThreadPoolExecutor(1, 1,
           0, TimeUnit.SECONDS, workQueue, threadFactory);
     }
     return ImmutableList.copyOf(executors);
+  }
+
+  private static List<ThreadPoolExecutor> createWriteChunkExecutors(
+      Configuration conf) {
+    final int threadCount = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
+    return createChunkExecutors(threadCount, "ChunkWriter-");
+  }
+
+  private static List<ThreadPoolExecutor> createReadChunkExecutors(
+      Configuration conf) {
+    final int threadCount = conf.getInt(
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_READ_CHUNK_THREADS_KEY,
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_READ_CHUNK_THREADS_DEFAULT);
+    return createChunkExecutors(threadCount, "ChunkRead-");
   }
 
 }
