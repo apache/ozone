@@ -106,21 +106,6 @@ jobs:
           with:
             name: acceptance
             path: target/acceptance
-  it-freon:
-    name: it-freon
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pfreon
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-freon
-            path: target/integration
   it-filesystem:
     name: it-filesystem
     runs-on: ubuntu-18.04
