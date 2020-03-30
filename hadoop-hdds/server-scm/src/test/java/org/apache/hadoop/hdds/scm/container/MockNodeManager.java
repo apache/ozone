@@ -94,6 +94,7 @@ public class MockNodeManager implements NodeManager {
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
+                         List<DatanodeDetails> nodes,
                          boolean initializeFakeNodes, int nodeCount) {
     this.healthyNodes = new LinkedList<>();
     this.staleNodes = new LinkedList<>();
@@ -104,6 +105,13 @@ public class MockNodeManager implements NodeManager {
     this.dnsToUuidMap = new ConcurrentHashMap<>();
     this.aggregateStat = new SCMNodeStat();
     this.clusterMap = clusterMap;
+    if (!nodes.isEmpty()) {
+      for (int x = 0; x < nodes.size(); x++) {
+        DatanodeDetails node = nodes.get(x);
+        register(node, null, null);
+        populateNodeMetric(node, x);
+      }
+    }
     if (initializeFakeNodes) {
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
@@ -116,7 +124,7 @@ public class MockNodeManager implements NodeManager {
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
-    this(new NetworkTopologyImpl(new OzoneConfiguration()),
+    this(new NetworkTopologyImpl(new OzoneConfiguration()), new ArrayList<>(),
         initializeFakeNodes, nodeCount);
   }
 

@@ -18,6 +18,7 @@ Documentation       Test ozone fs with hadoopfs
 Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 ${DATANODE_HOST}        datanode

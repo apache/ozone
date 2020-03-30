@@ -17,6 +17,7 @@
 Documentation       Ozonefs test
 Library             OperatingSystem
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 
