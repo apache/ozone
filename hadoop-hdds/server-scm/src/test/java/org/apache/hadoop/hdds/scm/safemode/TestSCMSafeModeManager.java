@@ -201,12 +201,32 @@ public class TestSCMSafeModeManager {
   }
 
   @Test
-  public void testSafeModeExitRuleWithPipelineAvailabilityCheck()
-      throws Exception{
+  public void testSafeModeExitRuleWithPipelineAvailabilityCheck1()
+      throws Exception {
     testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 30, 8, 0.90, 1);
+  }
+
+  @Test
+  public void testSafeModeExitRuleWithPipelineAvailabilityCheck2()
+      throws Exception {
     testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 90, 22, 0.10, 0.9);
+  }
+
+  @Test
+  public void testSafeModeExitRuleWithPipelineAvailabilityCheck3()
+      throws Exception {
     testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 30, 8, 0, 0.9);
+  }
+
+  @Test
+  public void testSafeModeExitRuleWithPipelineAvailabilityCheck4()
+      throws Exception {
     testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 90, 22, 0, 0);
+  }
+
+  @Test
+  public void testSafeModeExitRuleWithPipelineAvailabilityCheck5()
+      throws Exception {
     testSafeModeExitRuleWithPipelineAvailabilityCheck(100, 90, 22, 0, 0.5);
   }
 
