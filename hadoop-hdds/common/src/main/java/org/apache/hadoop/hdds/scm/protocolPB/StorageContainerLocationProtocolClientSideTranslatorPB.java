@@ -111,16 +111,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       builderConsumer.accept(builder);
       ScmContainerLocationRequest wrapper = builder.build();
 
-      response = submitRpcRequest(wrapper);
+      response = rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
     } catch (ServiceException ex) {
       throw ProtobufHelper.getRemoteException(ex);
     }
     return response;
-  }
-
-  private ScmContainerLocationResponse submitRpcRequest(
-      ScmContainerLocationRequest wrapper) throws ServiceException {
-    return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
   }
 
   /**
