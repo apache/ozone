@@ -70,7 +70,7 @@ public class DatanodeDetails extends NodeImpl implements
     this.certSerialId = certSerialId;
   }
 
-  protected DatanodeDetails(DatanodeDetails datanodeDetails) {
+  public DatanodeDetails(DatanodeDetails datanodeDetails) {
     super(datanodeDetails.getHostName(), datanodeDetails.getNetworkLocation(),
         datanodeDetails.getCost());
     this.uuid = datanodeDetails.uuid;

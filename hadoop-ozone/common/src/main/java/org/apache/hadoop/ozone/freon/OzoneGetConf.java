@@ -253,7 +253,11 @@ public class OzoneGetConf extends Configured implements Tool {
     @Override
     public int doWorkInternal(OzoneGetConf tool, String[] args)
         throws IOException {
-      tool.printOut(OmUtils.getOmAddress(tool.getConf()).getHostName());
+      if (OmUtils.isServiceIdsDefined(tool.getConf())) {
+        tool.printOut(OmUtils.getOmHAAddressesById(tool.getConf()).toString());
+      } else {
+        tool.printOut(OmUtils.getOmAddress(tool.getConf()).getHostName());
+      }
       return 0;
     }
   }
