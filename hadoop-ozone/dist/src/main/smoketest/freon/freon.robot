@@ -17,6 +17,7 @@
 Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Test Cases ***
 Freon Randomkey Generator

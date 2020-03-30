@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 ${ENDPOINT_URL}    http://s3g:9878
