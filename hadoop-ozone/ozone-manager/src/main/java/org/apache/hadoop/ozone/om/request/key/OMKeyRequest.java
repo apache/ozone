@@ -182,7 +182,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
-  protected Optional<FileEncryptionInfo> getFileEncryptionInfo(
+  protected static Optional<FileEncryptionInfo> getFileEncryptionInfo(
       OzoneManager ozoneManager, OmBucketInfo bucketInfo) throws IOException {
     Optional<FileEncryptionInfo> encInfo = Optional.absent();
     BucketEncryptionKeyInfo ezInfo = bucketInfo.getEncryptionKeyInfo();
@@ -204,7 +204,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return encInfo;
   }
 
-  private EncryptedKeyVersion generateEDEK(OzoneManager ozoneManager,
+  private static EncryptedKeyVersion generateEDEK(OzoneManager ozoneManager,
       String ezKeyName) throws IOException {
     if (ezKeyName == null) {
       return null;

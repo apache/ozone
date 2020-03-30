@@ -34,7 +34,8 @@
     "test": "react-app-rewired test",
     "eject": "react-scripts eject",
     "mock:api": "json-server --watch api/db.json --routes api/routes.json --port 9888",
-    "dev": "npm-run-all --parallel mock:api start"
+    "dev": "npm-run-all --parallel mock:api start",
+    "lint": "eslint '**/*.tsx'"
   },
   "eslintConfig": {
     "extends": "react-app"

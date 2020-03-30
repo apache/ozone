@@ -284,6 +284,69 @@ public class TestRDBTableStore {
     }
   }
 
+
+  @Test
+  public void testGetIfExist() throws Exception {
+    DBOptions rocksDBOptions = new DBOptions();
+    rocksDBOptions.setCreateIfMissing(true);
+    rocksDBOptions.setCreateMissingColumnFamilies(true);
+
+    String tableName = StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY);
+
+    Set<TableConfig> configSet = new HashSet<>();
+    TableConfig newConfig = new TableConfig(tableName,
+        new ColumnFamilyOptions());
+    configSet.add(newConfig);
+
+    File rdbLocation = folder.newFolder();
+    RDBStore dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
+
+    byte[] key = RandomStringUtils.random(10, true, false)
+        .getBytes(StandardCharsets.UTF_8);
+    byte[] value = RandomStringUtils.random(10, true, false)
+        .getBytes(StandardCharsets.UTF_8);
+
+    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
+      testTable.put(key, value);
+
+      // Test if isExist returns value for a key that definitely exists.
+      Assert.assertNotNull(testTable.getIfExist(key));
+
+      // Test if isExist returns null for a key that has been deleted.
+      testTable.delete(key);
+      Assert.assertNull(testTable.getIfExist(key));
+
+      byte[] invalidKey =
+          RandomStringUtils.random(5).getBytes(StandardCharsets.UTF_8);
+      // Test if isExist returns null for a key that is definitely not present.
+      Assert.assertNull(testTable.getIfExist(invalidKey));
+
+      RDBMetrics rdbMetrics = dbStore.getMetrics();
+      Assert.assertEquals(3, rdbMetrics.getNumDBKeyGetIfExistChecks());
+
+
+      Assert.assertEquals(0, rdbMetrics.getNumDBKeyGetIfExistMisses());
+
+      Assert.assertEquals(1, rdbMetrics.getNumDBKeyGetIfExistGets());
+
+      // Reinsert key for further testing.
+      testTable.put(key, value);
+    }
+
+    dbStore.close();
+    rocksDBOptions = new DBOptions();
+    rocksDBOptions.setCreateIfMissing(true);
+    rocksDBOptions.setCreateMissingColumnFamilies(true);
+    dbStore = new RDBStore(rdbLocation, rocksDBOptions, configSet);
+    try (Table<byte[], byte[]> testTable = dbStore.getTable(tableName)) {
+      // Verify getIfExists works with key not in block cache.
+      Assert.assertNotNull(testTable.getIfExist(key));
+    } finally {
+      dbStore.close();
+    }
+  }
+
+
   @Test
   public void testCountEstimatedRowsInTable() throws Exception {
     try (Table<byte[], byte[]> testTable = rdbStore.getTable("Eighth")) {

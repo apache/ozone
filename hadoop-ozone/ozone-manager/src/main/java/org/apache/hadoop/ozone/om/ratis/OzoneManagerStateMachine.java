@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -382,6 +383,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public void notifyNotLeader(Collection<TransactionContext> pendingEntries)
       throws IOException {
     omRatisServer.updateServerRole();
+  }
+
+  @Override
+  public String toStateMachineLogEntryString(StateMachineLogEntryProto proto) {
+    return OMRatisHelper.smProtoToString(proto);
   }
 
   /**

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -39,8 +39,11 @@ public final class ReconServerConfigKeys {
       "ozone.recon.http-address";
   public static final String OZONE_RECON_HTTPS_ADDRESS_KEY =
       "ozone.recon.https-address";
-  public static final String OZONE_RECON_HTTP_KEYTAB_FILE =
+  // Deprecated config
+  public static final String OZONE_RECON_HTTP_KEYTAB_FILE_OLD =
       "ozone.recon.keytab.file";
+  public static final String OZONE_RECON_HTTP_KEYTAB_FILE =
+      "ozone.recon.http.kerberos.keytab.file";
   public static final String OZONE_RECON_HTTP_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_RECON_HTTP_BIND_PORT_DEFAULT = 9888;

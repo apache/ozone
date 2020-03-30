@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -220,5 +220,15 @@ public class ReconServer extends GenericCli {
   @VisibleForTesting
   public StorageContainerServiceProvider getStorageContainerServiceProvider() {
     return injector.getInstance(StorageContainerServiceProvider.class);
+  }
+
+  @VisibleForTesting
+  public ContainerDBServiceProvider getContainerDBServiceProvider() {
+    return containerDBServiceProvider;
+  }
+
+  @VisibleForTesting
+  ReconHttpServer getHttpServer() {
+    return httpServer;
   }
 }

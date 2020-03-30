@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.ha;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 
@@ -28,16 +30,35 @@ import java.net.InetSocketAddress;
  * Class to store OM proxy information.
  */
 public class OMProxyInfo {
+  private String serviceId;
   private String nodeId;
   private String rpcAddrStr;
   private InetSocketAddress rpcAddr;
   private Text dtService;
 
-  OMProxyInfo(String nodeID, String rpcAddress) {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMProxyInfo.class);
+
+  OMProxyInfo(String serviceID, String nodeID, String rpcAddress) {
+    this.serviceId = serviceID;
     this.nodeId = nodeID;
     this.rpcAddrStr = rpcAddress;
     this.rpcAddr = NetUtils.createSocketAddr(rpcAddrStr);
-    this.dtService = SecurityUtil.buildTokenService(rpcAddr);
+    if (rpcAddr.isUnresolved()) {
+      LOG.warn("OzoneManager address {} for serviceID {} remains unresolved " +
+              "for node ID {} Check your ozone-site.xml file to ensure ozone " +
+              "manager addresses are configured properly.",
+          rpcAddress, serviceId, nodeId);
+      this.dtService = null;
+    } else {
+
+      // This issue will be a problem with docker/kubernetes world where one of
+      // the container is killed, and that OM address will be unresolved.
+      // For now skip the unresolved OM address setting it to the token
+      // service field.
+
+      this.dtService = SecurityUtil.buildTokenService(rpcAddr);
+    }
   }
 
   public String toString() {

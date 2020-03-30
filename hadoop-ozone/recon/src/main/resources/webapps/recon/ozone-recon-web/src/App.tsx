@@ -67,7 +67,7 @@ class App extends React.Component<Props, State> {
               <Content style={{margin: '0 16px 0', overflow: 'initial'}}>
                 <Switch>
                   <Route exact path="/">
-                    <Redirect to="/Datanodes"/>
+                    <Redirect to="/Overview"/>
                   </Route>
                   {
                     routes.map(

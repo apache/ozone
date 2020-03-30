@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREF
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -128,6 +129,7 @@ public class ReconStorageContainerManagerFacade
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
 
+    eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, nodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
@@ -252,6 +254,11 @@ public class ReconStorageContainerManagerFacade
   @Override
   public ReplicationManager getReplicationManager() {
     return null;
+  }
+
+  @Override
+  public InetSocketAddress getDatanodeRpcAddress() {
+    return getDatanodeProtocolServer().getDatanodeRpcAddress();
   }
 
   public EventQueue getEventQueue() {

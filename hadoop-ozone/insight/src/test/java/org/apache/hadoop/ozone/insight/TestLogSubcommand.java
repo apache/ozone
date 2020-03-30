@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.insight;
 
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -26,18 +25,17 @@ import org.junit.Test;
  */
 public class TestLogSubcommand {
 
-  @Ignore("HDDS-3144")
   @Test
   public void filterLog() {
     LogSubcommand logSubcommand = new LogSubcommand();
     String result = logSubcommand.processLogLine(
-        "2019-08-04 12:27:08,648 [TRACE|org.apache.hadoop.hdds.scm.node"
+        "2020-03-12 20:57:54,001 [TRACE|org.apache.hadoop.hdds.scm.node"
             + ".SCMNodeManager|SCMNodeManager] HB is received from "
             + "[datanode=localhost]: <json>storageReport {\\n  storageUuid: "
-            + "\"DS-29204db6-a615-4106-9dd4-ce294c2f4cf6\"\\n  "
-            + "storageLocation: \"/tmp/hadoop-elek/dfs/data\"\\n  capacity: "
-            + "8348086272\\n  scmUsed: 4096\\n  remaining: 8246956032n  "
-            + "storageType: DISK\\n  failed: falsen}\\n</json>\n");
-    Assert.assertEquals(3, result.split("\n").length);
+            + "\"DS-f65eb957-fc2d-4b77-b4a3-e96ae2bd2ca6\"\\n  "
+            + "storageLocation: \"/tmp/hadoop-neo/dfs/data\"\\n  capacity: "
+            + "250438021120\\n  scmUsed: 16384\\n  remaining: 212041244672\\n  "
+            + "storageType: DISK\\n  failed: false\\n}\\n</json>");
+    Assert.assertEquals(10, result.split("\n").length);
   }
 }

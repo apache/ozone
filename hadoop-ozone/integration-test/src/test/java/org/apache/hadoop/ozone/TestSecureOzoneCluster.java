@@ -34,6 +34,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
@@ -104,6 +106,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+
+import org.apache.ratis.protocol.ClientId;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -115,6 +119,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -404,6 +409,54 @@ public final class TestSecureOzoneCluster {
       // kerberos should succeed.
       assertTrue(logs.getOutput().contains("Ozone Manager login successful"));
     }
+  }
+
+  @Test
+  public void testAccessControlExceptionOnClient() throws Exception {
+    initSCM();
+    // Create a secure SCM instance as om client will connect to it
+    scm = StorageContainerManager.createSCM(conf);
+    LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
+    GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
+    setupOm(conf);
+    long omVersion = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
+    try {
+      om.setCertClient(new CertificateClientTestImpl(conf));
+      om.start();
+    } catch (Exception ex) {
+      // Expects timeout failure from scmClient in om but om user login via
+      // kerberos should succeed.
+      assertTrue(logs.getOutput().contains("Ozone Manager login successful"));
+    }
+    UserGroupInformation ugi =
+        UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+            testUserPrincipal, testUserKeytab.getCanonicalPath());
+    ugi.setAuthenticationMethod(KERBEROS);
+    OzoneManagerProtocolClientSideTranslatorPB secureClient =
+        new OzoneManagerProtocolClientSideTranslatorPB(conf,
+            ClientId.randomId().toString(), null, ugi);
+    try {
+      secureClient.createVolume(
+          new OmVolumeArgs.Builder().setVolume("vol1")
+              .setOwnerName("owner1")
+              .setAdminName("admin")
+              .build());
+    } catch (IOException ex) {
+      fail("Secure client should be able to create volume.");
+    }
+
+    ugi = UserGroupInformation.createUserForTesting(
+        "testuser1", new String[]{"test"});
+    OzoneManagerProtocolClientSideTranslatorPB unsecureClient =
+        new OzoneManagerProtocolClientSideTranslatorPB(conf,
+            ClientId.randomId().toString(), null, ugi);
+    String exMessage = "org.apache.hadoop.security.AccessControlException: " +
+        "Client cannot authenticate via:[TOKEN, KERBEROS]";
+    logs = LogCapturer.captureLogs(Client.LOG);
+    LambdaTestUtils.intercept(IOException.class, exMessage,
+        () -> unsecureClient.listAllVolumes(null, null, 0));
+    assertEquals("There should be no retry on AccessControlException", 1,
+        StringUtils.countMatches(logs.getOutput(), exMessage));
   }
 
   /**

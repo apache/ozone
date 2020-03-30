@@ -16,9 +16,10 @@
 # limitations under the License.
 
 date=$(date +"%Y-%m-%d-%H-%M-%S-%Z")
-logfiledirectory="/tmp/${date}/"
+logfiledirectory="/tmp/chaos-${date}/"
 completesuffix="complete.log"
 chaossuffix="chaos.log"
+problemsuffix="problem.log"
 compilesuffix="compile.log"
 heapformat="dump.hprof"
 
@@ -30,6 +31,8 @@ chaosfilename="${logfiledirectory}${chaossuffix}"
 compilefilename="${logfiledirectory}${compilesuffix}"
 #log goes to something like /tmp/2019-12-04--00-01-26-IST/dump.hprof
 heapdumpfile="${logfiledirectory}${heapformat}"
+#log goes to something like /tmp/2019-12-04--00-01-26-IST/problem.log
+problemfilename="${logfiledirectory}${problemsuffix}"
 
 #TODO: add gc log file details as well
 MVN_OPTS="-XX:+HeapDumpOnOutOfMemoryError "
@@ -46,7 +49,9 @@ mvn exec:java \
   -Dexec.mainClass="org.apache.hadoop.ozone.TestMiniChaosOzoneCluster" \
   -Dexec.classpathScope=test \
   -Dchaoslogfilename=${chaosfilename} \
+  -Dproblemlogfilename=${problemfilename} \
   -Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false \
   -Dio.netty.leakDetection.level=advanced \
   -Dio.netty.leakDetectionLevel=advanced \
+  -Dtest.build.data="${logfiledirectory}" \
   -Dexec.args="$*" > "${logfilename}" 2>&1
