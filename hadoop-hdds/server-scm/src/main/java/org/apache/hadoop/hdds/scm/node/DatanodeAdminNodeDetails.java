@@ -107,6 +107,14 @@ public class DatanodeAdminNodeDetails {
   }
 
   /**
+   * Returns the maintenance end time as milli seconds from the epoch.
+   * @return The maintenance end time, or zero if no end time is set.
+   */
+  public long getMaintenanceEnd() {
+    return maintenanceEndTime;
+  }
+
+  /**
    * Matches only on the DatanodeDetails field, which compares only the UUID
    * of the node to determine of they are the same object or not.
    *

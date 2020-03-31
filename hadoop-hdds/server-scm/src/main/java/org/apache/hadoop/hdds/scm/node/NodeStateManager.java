@@ -358,10 +358,28 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public void setNodeOperationalState(DatanodeDetails dn,
       NodeOperationalState newState)  throws NodeNotFoundException {
+    setNodeOperationalState(dn, newState, 0);
+  }
+
+  /**
+   * Sets the operational state of the given node. Intended to be called when
+   * a node is being decommissioned etc.
+   *
+   * @param dn The datanode having its state set
+   * @param newState The new operational State of the node.
+   * @param stateExpiryEpochSec The number of seconds from the epoch when the
+   *                            operational state should expire. Passing zero
+   *                            indicates the state will never expire
+   */
+  public void setNodeOperationalState(DatanodeDetails dn,
+      NodeOperationalState newState,
+      long stateExpiryEpochSec)  throws NodeNotFoundException {
     DatanodeInfo dni = nodeStateMap.getNodeInfo(dn.getUuid());
     NodeStatus oldStatus = dni.getNodeStatus();
-    if (oldStatus.getOperationalState() != newState) {
-      nodeStateMap.updateNodeOperationalState(dn.getUuid(), newState);
+    if (oldStatus.getOperationalState() != newState ||
+        oldStatus.getOpStateExpiryEpochSeconds() != stateExpiryEpochSec) {
+      nodeStateMap.updateNodeOperationalState(
+          dn.getUuid(), newState, stateExpiryEpochSec);
       // This will trigger an event based on the nodes health when the
       // operational state changes. Eg a node that was IN_MAINTENANCE goes
       // to IN_SERVICE + HEALTHY. This will trigger the HEALTHY node event to
@@ -370,7 +388,9 @@ public class NodeStateManager implements Runnable, Closeable {
       // container replicas. Sometimes the event will do nothing, but it will
       // not do any harm either. Eg DECOMMISSIONING -> DECOMMISSIONED + HEALTHY
       // but the pipeline creation logic will ignore decommissioning nodes.
-      fireHealthStateEvent(oldStatus.getHealth(), dn);
+      if (oldStatus.getOperationalState() != newState) {
+        fireHealthStateEvent(oldStatus.getHealth(), dn);
+      }
     }
   }
 

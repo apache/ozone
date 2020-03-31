@@ -191,9 +191,22 @@ public class ReplicationNodeManagerMock implements NodeManager {
   @Override
   public void setNodeOperationalState(DatanodeDetails dd,
       HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+    setNodeOperationalState(dd, newState, 0);
+  }
+
+  /**
+   * Set the operation state of a node.
+   * @param dd The datanode to set the new state for
+   * @param newState The new operational state for the node
+   */
+  @Override
+  public void setNodeOperationalState(DatanodeDetails dd,
+      HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
+      throws NodeNotFoundException {
     NodeStatus currentStatus = nodeStateMap.get(dd);
     if (currentStatus != null) {
-      nodeStateMap.put(dd, new NodeStatus(newState, currentStatus.getHealth()));
+      nodeStateMap.put(dd, new NodeStatus(newState, currentStatus.getHealth(),
+          opStateExpiryEpocSec));
     } else {
       throw new NodeNotFoundException();
     }

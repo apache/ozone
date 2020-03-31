@@ -38,6 +38,7 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
@@ -272,6 +273,35 @@ public class TestSCMNodeManager {
     // and 3 times more than OZONE_SCM_HEARTBEAT_INTERVAL
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3 * 1000, MILLISECONDS);
     createNodeManager(conf).close();
+  }
+
+  /**
+   * Ensure that a change to the operationalState of a node fires a datanode
+   * event of type SetNodeOperationalStateCommand.
+   */
+  @Test
+  @Ignore // TODO - this test is no longer valid as the heartbeat processing
+          //        now generates the command message.
+  public void testSetNodeOpStateAndCommandFired()
+      throws IOException, NodeNotFoundException, AuthenticationException {
+    final int interval = 100;
+
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, interval,
+        MILLISECONDS);
+
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      DatanodeDetails dn = TestUtils.createRandomDatanodeAndRegister(
+          nodeManager);
+      long expiry = System.currentTimeMillis() / 1000 + 1000;
+      nodeManager.setNodeOperationalState(dn,
+          HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE, expiry);
+      List<SCMCommand> commands = nodeManager.getCommandQueue(dn.getUuid());
+
+      Assert.assertTrue(commands.get(0).getClass().equals(
+          SetNodeOperationalStateCommand.class));
+      assertEquals(1, commands.size());
+    }
   }
 
   /**

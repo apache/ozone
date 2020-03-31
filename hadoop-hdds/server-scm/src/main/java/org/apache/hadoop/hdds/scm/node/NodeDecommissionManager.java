@@ -314,9 +314,15 @@ public class NodeDecommissionManager {
       throws NodeNotFoundException, InvalidNodeStateException {
     NodeStatus nodeStatus = getNodeStatus(dn);
     NodeOperationalState opState = nodeStatus.getOperationalState();
+
+    long maintenanceEnd = 0;
+    if (endInHours != 0) {
+      maintenanceEnd =
+          (System.currentTimeMillis() / 1000L) + (endInHours * 60L * 60L);
+    }
     if (opState == NodeOperationalState.IN_SERVICE) {
       nodeManager.setNodeOperationalState(
-          dn, NodeOperationalState.ENTERING_MAINTENANCE);
+          dn, NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
       monitor.startMonitoring(dn, endInHours);
       LOG.info("Starting Maintenance for node {}", dn);
     } else if (nodeStatus.isMaintenance()) {

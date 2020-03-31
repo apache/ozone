@@ -142,6 +142,18 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       NodeOperationalState newState) throws NodeNotFoundException;
 
   /**
+   * Set the operation state of a node.
+   * @param datanodeDetails The datanode to set the new state for
+   * @param newState The new operational state for the node
+   * @param opStateExpiryEpocSec Seconds from the epoch when the operational
+   *                             state should end. Zero indicates the state
+   *                             never end.
+   */
+  void setNodeOperationalState(DatanodeDetails datanodeDetails,
+       NodeOperationalState newState,
+       long opStateExpiryEpocSec) throws NodeNotFoundException;
+
+  /**
    * Get set of pipelines a datanode is part of.
    * @param datanodeDetails DatanodeDetails
    * @return Set of PipelineID

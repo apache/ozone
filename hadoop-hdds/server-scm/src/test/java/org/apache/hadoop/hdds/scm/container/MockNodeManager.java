@@ -279,6 +279,16 @@ public class MockNodeManager implements NodeManager {
   }
 
   /**
+   * Set the operation state of a node.
+   * @param datanodeDetails The datanode to set the new state for
+   * @param newState The new operational state for the node
+   */
+  public void setNodeOperationalState(DatanodeDetails datanodeDetails,
+      HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
+      throws NodeNotFoundException {
+  }
+
+  /**
    * Get set of pipelines a datanode is part of.
    * @param dnId - datanodeID
    * @return Set of PipelineID
