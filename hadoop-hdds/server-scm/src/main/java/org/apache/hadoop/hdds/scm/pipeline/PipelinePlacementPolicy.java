@@ -348,12 +348,23 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * Get a list of nodes with lower load than max pipeline number.
    */
   private List<DatanodeDetails> getLowerLoadNodes(
-      List<DatanodeDetails> nodes, int num) {
-    int maxPipelineUsage = nodes.size() * heavyNodeCriteria /
-        HddsProtos.ReplicationFactor.THREE.getNumber();
+      List<DatanodeDetails> nodes, int mark) {
+    int limit = nodes.size() * heavyNodeCriteria
+        / HddsProtos.ReplicationFactor.THREE.getNumber();
     return nodes.stream()
         // Skip the nodes which exceeds the load limit.
-        .filter(p -> nodeManager.getPipelinesCount(p) < maxPipelineUsage - num)
+        .filter(p -> nodeManager.getPipelinesCount(p) < limit - mark)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Get a list of nodes with higher load than max pipeline number.
+   */
+  private List<DatanodeDetails> getHigherLoadNodes(
+      List<DatanodeDetails> nodes, int mark) {
+    return nodes.stream()
+        // Skip the nodes with lower load than mark.
+        .filter(p -> nodeManager.getPipelinesCount(p) > mark)
         .collect(Collectors.toList());
   }
 
@@ -370,7 +381,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       // random pick node if nodes load is at same level.
       datanodeDetails = randomPick(healthyNodes);
     } else {
-      datanodeDetails = nodes.stream().findFirst().get();
+      datanodeDetails = nodes.stream().findAny().get();
     }
     return datanodeDetails;
   }
@@ -453,24 +464,38 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     if (excludedNodes != null && excludedNodes.size() != 0) {
       excluded.addAll(excludedNodes);
     }
-
-    List<DatanodeDetails> healthyNodes = nodeManager.getNodes(
+    List<DatanodeDetails> candidates = nodeManager.getNodes(
         HddsProtos.NodeState.HEALTHY);
-    List<DatanodeDetails> lowerLoadNodes = getLowerLoadNodes(healthyNodes,
-        stateManager.getPipelines(HddsProtos.ReplicationType.RATIS).size());
-    if (!lowerLoadNodes.isEmpty()) {
+    int currentPipelineNum  = stateManager
+        .getPipelines(HddsProtos.ReplicationType.RATIS).size();
+    List<DatanodeDetails> higherLoadNodes = getHigherLoadNodes(candidates,
+        currentPipelineNum);
+    if (!higherLoadNodes.isEmpty()) {
       // Consider nodes with lower load first.
-      lowerLoadNodes.stream().forEach(p->healthyNodes.remove(p));
-      excludedNodes.addAll(healthyNodes);
+      excluded.addAll(higherLoadNodes);
     }
 
     Node pick = networkTopology.chooseRandom(
         anchor.getNetworkLocation(), excluded);
     DatanodeDetails pickedNode = (DatanodeDetails) pick;
+
     if (pickedNode == null) {
       LOG.debug("Pick node is null, excluded nodes {}, anchor {}.",
           excluded, anchor);
+      return null;
     }
+
+    if (nodeManager.getPipelinesCount(pickedNode)
+        >= heavyNodeCriteria - currentPipelineNum
+        - HddsProtos.ReplicationFactor.THREE.getNumber()) {
+      LOG.debug("Picked node violates pipeline load balance," +
+              " pickedNode {}, pipeline load {}.",
+          pickedNode, nodeManager.getPipelinesCount(pickedNode));
+      // When topology picked a node that violates the pipeline load balance,
+      // we ignore the result.
+      pickedNode = null;
+    }
+
     return pickedNode;
   }
 }

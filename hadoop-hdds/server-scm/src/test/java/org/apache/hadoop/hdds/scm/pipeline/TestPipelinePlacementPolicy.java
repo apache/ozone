@@ -91,11 +91,14 @@ public class TestPipelinePlacementPolicy {
 
   private List<DatanodeDetails> getNodesWithRackAwareness() {
     List<DatanodeDetails> datanodes = new ArrayList<>();
-    for (Node node : NODES) {
+    int iter = 0;
+    int delimiter = NODES.length;
+    while (iter < PIPELINE_PLACEMENT_MAX_NODES_COUNT) {
       DatanodeDetails datanode = overwriteLocationInNode(
-          getNodesWithoutRackAwareness(), node);
+          getNodesWithoutRackAwareness(), NODES[iter % delimiter]);
       nodesWithRackAwareness.add(datanode);
       datanodes.add(datanode);
+      iter++;
     }
     return datanodes;
   }
@@ -107,7 +110,7 @@ public class TestPipelinePlacementPolicy {
   }
 
   @Test
-  public void testChooseNodeBasedOnNetworkTopology() throws SCMException {
+  public void testChooseNodeBasedOnNetworkTopology() {
     DatanodeDetails anchor = placementPolicy.chooseNode(nodesWithRackAwareness);
     // anchor should be removed from healthyNodes after being chosen.
     Assert.assertFalse(nodesWithRackAwareness.contains(anchor));
