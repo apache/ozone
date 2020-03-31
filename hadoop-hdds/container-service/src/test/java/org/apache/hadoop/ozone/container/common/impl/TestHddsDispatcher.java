@@ -147,6 +147,7 @@ public class TestHddsDispatcher {
 
     } finally {
       volumeSet.shutdown();
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
 
@@ -180,6 +181,7 @@ public class TestHddsDispatcher {
       Assert.assertEquals(response.getReadChunk().getData(),
           writeChunkRequest.getWriteChunk().getData());
     } finally {
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
   }
@@ -220,6 +222,7 @@ public class TestHddsDispatcher {
           "ContainerID " + writeChunkRequest.getContainerID()
               + " does not exist"));
     } finally {
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
   }
@@ -255,6 +258,7 @@ public class TestHddsDispatcher {
           .contains("ContainerID " + writeChunkRequest.getContainerID()
               + " creation failed , Result: DISK_OUT_OF_SPACE"));
     } finally {
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
   }
