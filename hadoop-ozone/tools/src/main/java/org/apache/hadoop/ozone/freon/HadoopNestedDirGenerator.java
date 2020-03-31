@@ -31,7 +31,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 /**
- * Directory generator tool test om performance.
+ *  Directory Generator tool to test OM performance.
  */
 @Command(name = "ddsg",
     aliases = "dfs-directory-generator",
