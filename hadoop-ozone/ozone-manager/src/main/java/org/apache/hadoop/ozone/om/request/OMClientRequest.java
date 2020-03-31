@@ -127,7 +127,14 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
 
     if (remoteAddress != null) {
-      userInfo.setHostName(remoteAddress.getHostName());
+      OzoneManagerProtocolProtos.UserInfo userInfoInProtocol = getOmRequest()
+          .toBuilder().getUserInfo();
+      if (userInfoInProtocol.getHostName().isEmpty()) {
+        userInfo.setHostName(remoteAddress.getHostAddress());
+      } else {
+        userInfo.setHostName(userInfoInProtocol.getHostName());
+      }
+
       userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
     }
 

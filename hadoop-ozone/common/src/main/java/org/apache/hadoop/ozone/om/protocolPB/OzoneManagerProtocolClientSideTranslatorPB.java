@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -142,6 +143,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -384,10 +386,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @param cmdType type of the request
    */
   private OMRequest.Builder createOMRequest(Type cmdType) {
+    UserInfo.Builder userInfo = UserInfo.newBuilder();
+    userInfo.setHostName(InetAddress.getLocalHost().getHostName());
 
     return OMRequest.newBuilder()
         .setCmdType(cmdType)
-        .setClientId(clientID);
+        .setClientId(clientID)
+        .setUserInfo(userInfo);
   }
 
   /**
