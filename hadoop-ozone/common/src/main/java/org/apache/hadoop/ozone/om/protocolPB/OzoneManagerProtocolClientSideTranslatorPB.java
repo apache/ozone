@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -386,13 +387,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @param cmdType type of the request
    */
   private OMRequest.Builder createOMRequest(Type cmdType) {
-    UserInfo.Builder userInfo = UserInfo.newBuilder();
-    userInfo.setHostName(InetAddress.getLocalHost().getHostName());
-
-    return OMRequest.newBuilder()
+    OMRequest.Builder request = OMRequest
+        .newBuilder()
         .setCmdType(cmdType)
-        .setClientId(clientID)
-        .setUserInfo(userInfo);
+        .setClientId(clientID);
+
+    try {
+      UserInfo.Builder userInfo = UserInfo.newBuilder();
+      userInfo.setHostName(InetAddress.getLocalHost().getHostName());
+      return request.setUserInfo(userInfo);
+    } catch (UnknownHostException e) {
+      return request;
+    }
   }
 
   /**
