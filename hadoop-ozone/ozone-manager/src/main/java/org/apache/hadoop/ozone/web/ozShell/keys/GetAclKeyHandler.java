@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.web.ozShell.keys;
 
+import java.util.List;
+
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -24,14 +27,11 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
 import org.apache.hadoop.ozone.web.ozShell.Shell;
-import org.apache.hadoop.ozone.web.utils.JsonUtils;
+
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
-
-import java.util.List;
-
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 
 /**
  * Get acl handler for Key.

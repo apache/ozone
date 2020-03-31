@@ -18,16 +18,17 @@
 
 package org.apache.hadoop.ozone.web.ozShell.token;
 
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.utils.JsonUtils;
-import org.apache.hadoop.security.token.Token;
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+
+import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.web.ozShell.Handler;
+import org.apache.hadoop.security.token.Token;
+
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
 
 /**
  * Executes getDelegationToken api.

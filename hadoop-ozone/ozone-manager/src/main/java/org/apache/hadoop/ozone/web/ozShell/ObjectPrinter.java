@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.web.ozShell;
 
 import java.io.IOException;
 
-import org.apache.hadoop.ozone.web.utils.JsonUtils;
+import org.apache.hadoop.hdds.server.JsonUtils;
 
 /**
  * Utility to print out response object in human readable form.
