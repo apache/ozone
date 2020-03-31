@@ -111,7 +111,7 @@ public class TestHealthyPipelineSafeModeRule {
 
       SCMPipelineManager pipelineManager = new SCMPipelineManager(config,
           nodeManager, eventQueue);
-      pipelineManager.setAllowPipelineCreation(true);
+      pipelineManager.allowPipelineCreation();
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
@@ -185,7 +185,7 @@ public class TestHealthyPipelineSafeModeRule {
 
       SCMPipelineManager pipelineManager = new SCMPipelineManager(config,
           nodeManager, eventQueue);
-      pipelineManager.setAllowPipelineCreation(true);
+      pipelineManager.allowPipelineCreation();
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
               pipelineManager.getStateManager(), config, true);

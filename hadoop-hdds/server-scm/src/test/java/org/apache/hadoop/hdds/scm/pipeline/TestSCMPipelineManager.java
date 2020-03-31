@@ -89,7 +89,7 @@ public class TestSCMPipelineManager {
   public void testPipelineReload() throws IOException {
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -109,7 +109,7 @@ public class TestSCMPipelineManager {
     // new pipeline manager should be able to load the pipelines from the db
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -140,7 +140,7 @@ public class TestSCMPipelineManager {
   public void testRemovePipeline() throws IOException {
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -175,7 +175,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, eventQueue);
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -241,7 +241,7 @@ public class TestSCMPipelineManager {
         20);
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManagerMock, new EventQueue());
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManagerMock,
             pipelineManager.getStateManager(), conf);
@@ -300,7 +300,7 @@ public class TestSCMPipelineManager {
   public void testActivateDeactivatePipeline() throws IOException {
     final SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     final PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -348,7 +348,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, eventQueue);
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -409,7 +409,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     final SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, eventQueue);
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     final PipelineProvider ratisProvider = new MockRatisPipelineProvider(
         nodeManager, pipelineManager.getStateManager(), conf, eventQueue,
         false);
@@ -506,18 +506,18 @@ public class TestSCMPipelineManager {
         ratisProvider);
 
     assertEquals(true, pipelineManager.getSafeModeStatus());
-    assertEquals(false, pipelineManager.getAllowPipelineCreation());
+    assertEquals(false, pipelineManager.isPipelineCreationAllowed());
     // First pass pre-check as true, but safemode still on
     pipelineManager.handleSafeModeTransition(
         new SCMSafeModeManager.SafeModeStatus(true, true));
     assertEquals(true, pipelineManager.getSafeModeStatus());
-    assertEquals(true, pipelineManager.getAllowPipelineCreation());
+    assertEquals(true, pipelineManager.isPipelineCreationAllowed());
 
     // Then also turn safemode off
     pipelineManager.handleSafeModeTransition(
         new SCMSafeModeManager.SafeModeStatus(false, true));
     assertEquals(false, pipelineManager.getSafeModeStatus());
-    assertEquals(true, pipelineManager.getAllowPipelineCreation());
+    assertEquals(true, pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();
   }
 

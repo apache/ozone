@@ -90,7 +90,7 @@ public class SCMPipelineManager implements PipelineManager {
   private final AtomicBoolean isInSafeMode;
   // Used to track if the safemode pre-checks have completed. This is designed
   // to prevent pipelines being created until sufficient nodes have registered.
-  private final AtomicBoolean allowPipelineCreation;
+  private final AtomicBoolean pipelineCreationAllowed;
 
   public SCMPipelineManager(Configuration conf, NodeManager nodeManager,
       EventPublisher eventPublisher)
@@ -139,7 +139,7 @@ public class SCMPipelineManager implements PipelineManager {
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT));
     // Pipeline creation is only allowed after the safemode prechecks have
     // passed, eg sufficient nodes have registered.
-    this.allowPipelineCreation = new AtomicBoolean(!this.isInSafeMode.get());
+    this.pipelineCreationAllowed = new AtomicBoolean(!this.isInSafeMode.get());
   }
 
   public PipelineStateManager getStateManager() {
@@ -153,13 +153,13 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   @VisibleForTesting
-  public void setAllowPipelineCreation(boolean newState) {
-    this.allowPipelineCreation.set(newState);
+  public void allowPipelineCreation() {
+    this.pipelineCreationAllowed.set(true);
   }
 
   @VisibleForTesting
-  public boolean getAllowPipelineCreation() {
-    return allowPipelineCreation.get();
+  public boolean isPipelineCreationAllowed() {
+    return pipelineCreationAllowed.get();
   }
 
   protected void initializePipelineState() throws IOException {
@@ -221,7 +221,7 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public synchronized Pipeline createPipeline(ReplicationType type,
       ReplicationFactor factor) throws IOException {
-    if (!allowPipelineCreation.get() && factor != ReplicationFactor.ONE) {
+    if (!isPipelineCreationAllowed() && factor != ReplicationFactor.ONE) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
       throw new IOException("Pipeline creation is not allowed as safe mode " +
@@ -667,14 +667,14 @@ public class SCMPipelineManager implements PipelineManager {
       SCMSafeModeManager.SafeModeStatus status) {
     // TODO: #CLUTIL - handle safemode getting re-enabled
     boolean currentAllowPipelines =
-        allowPipelineCreation.getAndSet(status.isPreCheckComplete());
+        pipelineCreationAllowed.getAndSet(status.isPreCheckComplete());
     boolean currentlyInSafeMode =
         isInSafeMode.getAndSet(status.isInSafeMode());
     boolean triggerPipelines = false;
 
     // Trigger pipeline creation only if the preCheck status has changed to
     // complete.
-    if (allowPipelineCreation.get() && !currentAllowPipelines) {
+    if (isPipelineCreationAllowed() && !currentAllowPipelines) {
       triggerPipelines = true;
     }
     // Start the pipeline creation thread only when safemode switches off

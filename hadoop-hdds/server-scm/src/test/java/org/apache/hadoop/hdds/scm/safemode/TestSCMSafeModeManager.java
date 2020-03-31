@@ -267,7 +267,7 @@ public class TestSCMSafeModeManager {
             pipelineManager.getStateManager(), config, true);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
 
     for (int i=0; i < pipelineCount; i++) {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
@@ -485,7 +485,7 @@ public class TestSCMSafeModeManager {
               pipelineManager.getStateManager(), config, true);
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
-      pipelineManager.setAllowPipelineCreation(true);
+      pipelineManager.allowPipelineCreation();
 
       Pipeline pipeline = pipelineManager.createPipeline(
           HddsProtos.ReplicationType.RATIS,
@@ -569,7 +569,7 @@ public class TestSCMSafeModeManager {
     Assert.assertEquals(true, smHandler.getIsInSafeMode());
 
     // Create a pipeline and ensure safemode is exited.
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     Pipeline pipeline = pipelineManager.createPipeline(
         HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE);

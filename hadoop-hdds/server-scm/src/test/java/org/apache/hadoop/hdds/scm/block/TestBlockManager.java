@@ -107,7 +107,7 @@ public class TestBlockManager {
     eventQueue = new EventQueue();
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager, eventQueue);
-    pipelineManager.setAllowPipelineCreation(true);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf, eventQueue);
