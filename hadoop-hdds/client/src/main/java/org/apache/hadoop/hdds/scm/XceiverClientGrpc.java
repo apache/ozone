@@ -79,6 +79,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private Map<UUID, ManagedChannel> channels;
   private final Semaphore semaphore;
   private boolean closed = false;
+  private long timeout;
   private SecurityConfig secConfig;
   private final boolean topologyAwareRead;
   private X509Certificate caCert;
@@ -189,6 +190,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     ManagedChannel channel = channelBuilder.build();
     XceiverClientProtocolServiceStub asyncStub =
         XceiverClientProtocolServiceGrpc.newStub(channel);
+    timeout = config.getTimeDuration(OzoneConfigKeys.
+            OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
+            .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
     asyncStubs.put(dn.getUuid(), asyncStub);
     channels.put(dn.getUuid(), channel);
   }
@@ -425,8 +429,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     // create a new grpc stream for each non-async call.
 
     // TODO: for async calls, we should reuse StreamObserver resources.
+    // set the grpc dealine here so as if the response is not received
+    // in the configured time, the rpc will fail with DEADLINE_EXCEEDED here
     final StreamObserver<ContainerCommandRequestProto> requestObserver =
-        asyncStubs.get(dnId)
+        asyncStubs.get(dnId).withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(new StreamObserver<ContainerCommandResponseProto>() {
               @Override
               public void onNext(ContainerCommandResponseProto value) {
