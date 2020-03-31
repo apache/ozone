@@ -82,11 +82,12 @@ public class TestNodeStateMap {
 
     NodeStatus expectedStatus = new NodeStatus(
         NodeOperationalState.DECOMMISSIONING,
-        NodeState.HEALTHY);
+        NodeState.HEALTHY, 999);
     NodeStatus returnedStatus = map.updateNodeOperationalState(
-        dn.getUuid(), expectedStatus.getOperationalState());
+        dn.getUuid(), expectedStatus.getOperationalState(), 999);
     assertEquals(expectedStatus, returnedStatus);
     assertEquals(returnedStatus, map.getNodeStatus(dn.getUuid()));
+    assertEquals(999, returnedStatus.getOpStateExpiryEpochSeconds());
   }
 
   @Test

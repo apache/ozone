@@ -49,6 +49,8 @@ public class DatanodeDetails extends NodeImpl implements
   private String hostName;
   private List<Port> ports;
   private String certSerialId;
+  private HddsProtos.NodeOperationalState persistedOpState;
+  private long persistedOpStateExpiryEpochSec = 0;
 
   /**
    * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
@@ -59,15 +61,23 @@ public class DatanodeDetails extends NodeImpl implements
    * @param networkLocation DataNode's network location path
    * @param ports Ports used by the DataNode
    * @param certSerialId serial id from SCM issued certificate.
+   * @param persistedOpState Operational State stored on DN.
+   * @param persistedOpStateExpiryEpochSec Seconds after the epoch the stored
+   *                                       state should expire.
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private DatanodeDetails(String uuid, String ipAddress, String hostName,
-      String networkLocation, List<Port> ports, String certSerialId) {
+      String networkLocation, List<Port> ports, String certSerialId,
+      HddsProtos.NodeOperationalState persistedOpState,
+      long persistedOpStateExpiryEpochSec) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = UUID.fromString(uuid);
     this.ipAddress = ipAddress;
     this.hostName = hostName;
     this.ports = ports;
     this.certSerialId = certSerialId;
+    this.persistedOpState = persistedOpState;
+    this.persistedOpStateExpiryEpochSec = persistedOpStateExpiryEpochSec;
   }
 
   protected DatanodeDetails(DatanodeDetails datanodeDetails) {
@@ -78,6 +88,9 @@ public class DatanodeDetails extends NodeImpl implements
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
     this.setNetworkName(datanodeDetails.getNetworkName());
+    this.persistedOpState = datanodeDetails.getPersistedOpState();
+    this.persistedOpStateExpiryEpochSec =
+        datanodeDetails.getPersistedOpStateExpiryEpochSec();
   }
 
   /**
@@ -156,6 +169,46 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
+   * Return the persistedOpState. If the stored value is null, return the
+   * default value of IN_SERVICE.
+   *
+   * @return The OperationalState persisted on the datanode.
+   */
+  public HddsProtos.NodeOperationalState getPersistedOpState() {
+    if (persistedOpState == null) {
+      return HddsProtos.NodeOperationalState.IN_SERVICE;
+    } else {
+      return persistedOpState;
+    }
+  }
+
+  /**
+   * Set the persistedOpState for this instance.
+   *
+   * @param state The new operational state.
+   */
+  public void setPersistedOpState(HddsProtos.NodeOperationalState state) {
+    this.persistedOpState = state;
+  }
+
+  /**
+   * Get the persistedOpStateExpiryEpochSec for the instance.
+   * @return Seconds from the epoch when the operational state should expire.
+   */
+  public long getPersistedOpStateExpiryEpochSec() {
+    return persistedOpStateExpiryEpochSec;
+  }
+
+  /**
+   * Set persistedOpStateExpiryEpochSec.
+   * @param expiry The number of second after the epoch the operational state
+   *               should expire.
+   */
+  public void setPersistedOpStateExpiryEpochSec(long expiry) {
+    this.persistedOpStateExpiryEpochSec = expiry;
+  }
+
+  /**
    * Given the name returns port number, null if the asked port is not found.
    *
    * @param name Name of the port
@@ -200,6 +253,13 @@ public class DatanodeDetails extends NodeImpl implements
     if (datanodeDetailsProto.hasNetworkLocation()) {
       builder.setNetworkLocation(datanodeDetailsProto.getNetworkLocation());
     }
+    if (datanodeDetailsProto.hasPersistedOpState()) {
+      builder.setPersistedOpState(datanodeDetailsProto.getPersistedOpState());
+    }
+    if (datanodeDetailsProto.hasPersistedOpStateExpiry()) {
+      builder.setPersistedOpStateExpiry(
+          datanodeDetailsProto.getPersistedOpStateExpiry());
+    }
     return builder.build();
   }
 
@@ -226,6 +286,10 @@ public class DatanodeDetails extends NodeImpl implements
     if (!Strings.isNullOrEmpty(getNetworkLocation())) {
       builder.setNetworkLocation(getNetworkLocation());
     }
+    if (persistedOpState != null) {
+      builder.setPersistedOpState(persistedOpState);
+    }
+    builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
     for (Port port : ports) {
       builder.addPorts(HddsProtos.Port.newBuilder()
@@ -246,6 +310,8 @@ public class DatanodeDetails extends NodeImpl implements
         ", networkLocation: " +
         getNetworkLocation() +
         ", certSerialId: " + certSerialId +
+        ", persistedOpState: " + persistedOpState +
+        ", persistedOpStateExpiryEpochSec: " + persistedOpStateExpiryEpochSec +
         "}";
   }
 
@@ -285,6 +351,8 @@ public class DatanodeDetails extends NodeImpl implements
     private String networkLocation;
     private List<Port> ports;
     private String certSerialId;
+    private HddsProtos.NodeOperationalState persistedOpState;
+    private long persistedOpStateExpiryEpochSec = 0;
 
     /**
      * Default private constructor. To create Builder instance use
@@ -374,6 +442,31 @@ public class DatanodeDetails extends NodeImpl implements
     }
 
     /**
+     * Adds persistedOpState.
+     *
+     * @param state The operational state persisted on the datanode
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setPersistedOpState(HddsProtos.NodeOperationalState state) {
+      this.persistedOpState = state;
+      return this;
+    }
+
+    /**
+     * Adds persistedOpStateExpiryEpochSec.
+     *
+     * @param expiry The seconds after the epoch the operational state should
+     *              expire.
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setPersistedOpStateExpiry(long expiry) {
+      this.persistedOpStateExpiryEpochSec = expiry;
+      return this;
+    }
+
+    /**
      * Builds and returns DatanodeDetails instance.
      *
      * @return DatanodeDetails
@@ -384,7 +477,8 @@ public class DatanodeDetails extends NodeImpl implements
         networkLocation = NetConstants.DEFAULT_RACK;
       }
       DatanodeDetails dn = new DatanodeDetails(id, ipAddress, hostName,
-          networkLocation, ports, certSerialId);
+          networkLocation, ports, certSerialId, persistedOpState,
+          persistedOpStateExpiryEpochSec);
       if (networkName != null) {
         dn.setNetworkName(networkName);
       }

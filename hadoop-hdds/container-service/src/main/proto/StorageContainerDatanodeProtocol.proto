@@ -287,6 +287,7 @@ message SCMCommandProto {
     replicateContainerCommand = 5;
     createPipelineCommand = 6;
     closePipelineCommand = 7;
+    setNodeOperationalStateCommand = 8;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;
@@ -297,6 +298,7 @@ message SCMCommandProto {
   optional ReplicateContainerCommandProto replicateContainerCommandProto = 6;
   optional CreatePipelineCommandProto createPipelineCommandProto = 7;
   optional ClosePipelineCommandProto closePipelineCommandProto = 8;
+  optional SetNodeOperationalStateCommandProto setNodeOperationalStateCommandProto = 9;
 }
 
 /**
@@ -382,6 +384,12 @@ This command asks the datanode to close a pipeline.
 message ClosePipelineCommandProto {
   required PipelineID pipelineID = 1;
   required int64 cmdId = 2;
+}
+
+message SetNodeOperationalStateCommandProto {
+  required  int64 cmdId = 1;
+  required  NodeOperationalState nodeOperationalState = 2;
+  required  int64 stateExpiryEpochSeconds = 3;
 }
 
 /**

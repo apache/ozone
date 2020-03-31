@@ -357,7 +357,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private void setNodeOpState(DatanodeAdminNodeDetails dn,
       HddsProtos.NodeOperationalState state) throws NodeNotFoundException {
-    nodeManager.setNodeOperationalState(dn.getDatanodeDetails(), state);
+    nodeManager.setNodeOperationalState(dn.getDatanodeDetails(), state,
+        dn.getMaintenanceEnd() / 1000);
   }
 
   private NodeStatus getNodeStatus(DatanodeDetails dnd)
