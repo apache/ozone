@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -128,11 +127,6 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
       defaultValue = "0")
   private int rateLimit;
 
-  @Option(names = {"--inflight-limit"},
-      description = "Maximum in-flight messages",
-      defaultValue = "10")
-  private int inflightLimit;
-
   private TimedSemaphore rateLimiter;
 
   private RaftPeerProto requestor;
@@ -146,8 +140,6 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
   private ByteString dataToWrite;
 
   private Timer timer;
-
-  private BlockingQueue<Long> inFlightMessages;
 
   private StreamObserver<AppendEntriesRequestProto> sender;
 
