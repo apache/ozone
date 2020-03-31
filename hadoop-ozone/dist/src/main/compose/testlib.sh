@@ -44,7 +44,7 @@ wait_for_safemode_exit(){
   while [[ $SECONDS -lt 180 ]]; do
 
      #This line checks the safemode status in scm
-     local command="ozone scmcli safemode status"
+     local command="ozone admin safemode status"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
          status=$(docker-compose -f "${compose_file}" exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
