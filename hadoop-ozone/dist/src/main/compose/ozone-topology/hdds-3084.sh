@@ -31,7 +31,7 @@ start_docker_env 4
 
 execute_robot_test scm basic/basic.robot
 
-execute_robot_test scm topology/scmcli.robot
+execute_robot_test scm topology/cli.robot
 
 # Ensure data can be read even when a full rack
 # is stopped.

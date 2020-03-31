@@ -43,11 +43,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 
 import static java.nio.channels.FileChannel.open;
 import static java.util.Collections.unmodifiableSet;
@@ -56,7 +54,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_ALGORITHM;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,11 +75,11 @@ public final class ChunkUtils {
           StandardOpenOption.WRITE,
           StandardOpenOption.SPARSE
       ));
-  private static final Set<? extends OpenOption> READ_OPTIONS =
+  public static final Set<? extends OpenOption> READ_OPTIONS =
       unmodifiableSet(EnumSet.of(
           StandardOpenOption.READ
       ));
-  private static final FileAttribute<?>[] NO_ATTRIBUTES = {};
+  public static final FileAttribute<?>[] NO_ATTRIBUTES = {};
 
   /** Never constructed. **/
   private ChunkUtils() {
@@ -230,38 +227,6 @@ public final class ChunkUtils {
       return true;
     }
     return false;
-  }
-
-  /**
-   * Validates that Path to chunk file exists.
-   *
-   * @param containerData - Container Data
-   * @param info - Chunk info
-   * @return - File.
-   */
-  public static File getChunkFile(KeyValueContainerData containerData,
-      ChunkInfo info) throws StorageContainerException {
-    File chunksLoc = verifyChunkDirExists(containerData);
-    return chunksLoc.toPath().resolve(info.getChunkName()).toFile();
-  }
-
-  public static File verifyChunkDirExists(KeyValueContainerData containerData)
-      throws StorageContainerException {
-    Preconditions.checkNotNull(containerData, "Container data can't be null");
-
-    String chunksPath = containerData.getChunksPath();
-    if (chunksPath == null) {
-      LOG.error("Chunks path is null in the container data");
-      throw new StorageContainerException("Unable to get Chunks directory.",
-          UNABLE_TO_FIND_DATA_DIR);
-    }
-    File chunksLoc = new File(chunksPath);
-    if (!chunksLoc.exists()) {
-      LOG.error("Chunks path does not exist");
-      throw new StorageContainerException("Unable to get Chunks directory.",
-          UNABLE_TO_FIND_DATA_DIR);
-    }
-    return chunksLoc;
   }
 
   /**

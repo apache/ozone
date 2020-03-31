@@ -18,15 +18,17 @@ Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 
 
 *** Test Cases ***
-Run printTopology
-    ${output} =         Execute          ozone scmcli printTopology
-                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)    /rack2
-Run printTopology -o
-    ${output} =         Execute          ozone scmcli printTopology -o
-                        Should contain   ${output}         Location: /rack2
-                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)
+Run list pipeline
+    ${output} =         Execute          ozone admin pipeline list
+                        Should contain   ${output}   Type:
+                        Should contain   ${output}   Factor:ONE, State:
+
+Run create pipeline
+    ${output} =         Execute          ozone admin pipeline create
+                        Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE

@@ -18,12 +18,13 @@ Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 
 
 *** Test Cases ***
 Run list datanodes
-    ${output} =         Execute          ozone scmcli datanode list
+    ${output} =         Execute          ozone admin datanode list
                         Should contain   ${output}   Datanode:
                         Should contain   ${output}   Related pipelines:

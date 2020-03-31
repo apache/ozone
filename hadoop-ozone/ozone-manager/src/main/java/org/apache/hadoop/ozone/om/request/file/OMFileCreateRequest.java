@@ -84,12 +84,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
     super(omRequest);
   }
 
-  private enum Result {
-    SUCCESS,
-    REPLAY,
-    FAILURE
-  }
-
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateFileRequest createFileRequest = getOmRequest().getCreateFileRequest();

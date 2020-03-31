@@ -99,9 +99,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       try {
         pipeline = stateManager.getPipeline(pid);
       } catch (PipelineNotFoundException e) {
-        LOG.error("Pipeline not found in pipeline state manager during" +
-            " pipeline creation. PipelineID: " + pid +
-            " exception: " + e.getMessage());
+        LOG.debug("Pipeline not found in pipeline state manager during" +
+            " pipeline creation. PipelineID: {}", pid, e);
         continue;
       }
       if (pipeline != null &&
@@ -282,26 +281,32 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         LOG.debug("Second node chosen: {}", nextNode);
       }
     } else {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Pipeline Placement: Unable to find 2nd node on different " +
-            "rack based on rack awareness.");
-      }
+      LOG.debug("Pipeline Placement: Unable to find 2nd node on different " +
+          "rack based on rack awareness. anchor: {}", anchor);
     }
 
     // Then choose nodes close to anchor based on network topology
     int nodesToFind = nodesRequired - results.size();
     for (int x = 0; x < nodesToFind; x++) {
       // Pick remaining nodes based on the existence of rack awareness.
-      DatanodeDetails pick = rackAwareness
-          ? chooseNodeFromNetworkTopology(
-              nodeManager.getClusterNetworkTopologyMap(), anchor, exclude)
-          : fallBackPickNodes(healthyNodes, exclude);
+      DatanodeDetails pick = null;
+      if (rackAwareness) {
+        pick = chooseNodeFromNetworkTopology(
+            nodeManager.getClusterNetworkTopologyMap(), anchor, exclude);
+      }
+      // fall back protection
+      if (pick == null) {
+        pick = fallBackPickNodes(healthyNodes, exclude);
+        if (rackAwareness) {
+          LOG.debug("Failed to choose node based on topology. Fallback " +
+              "picks node as: {}", pick);
+        }
+      }
+
       if (pick != null) {
         results.add(pick);
         exclude.add(pick);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Remaining node chosen: {}", pick);
-        }
+        LOG.debug("Remaining node chosen: {}", pick);
       }
     }
 
@@ -414,6 +419,10 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     Node pick = networkTopology.chooseRandom(
         anchor.getNetworkLocation(), excluded);
     DatanodeDetails pickedNode = (DatanodeDetails) pick;
+    if (pickedNode == null) {
+      LOG.debug("Pick node is null, excluded nodes {}, anchor {}.",
+          excluded, anchor);
+    }
     return pickedNode;
   }
 }

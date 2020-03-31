@@ -46,14 +46,14 @@ Client commands:
 
 Admin commands:
 
+   * **admin** -  Collects admin and developer related commands related to the 
+   ozone components.
    * **classpath** - Prints the class path needed to get the hadoop jar and the
     required libraries.
    * **dtutil**    - Operations related to delegation tokens
    * **envvars** - Display computed Hadoop environment variables.
    * **getconf** -  Reads ozone config values from configuration.
    * **jmxget**  - Get JMX exported values from NameNode or DataNode.
-   * **scmcli** -  Developer only, Command Line Interface for the Storage
-   Container Manager.
    * **genconf** -  Generate minimally required ozone configs and output to
    ozone-site.xml.
 

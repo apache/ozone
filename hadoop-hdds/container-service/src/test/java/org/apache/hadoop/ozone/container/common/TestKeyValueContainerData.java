@@ -21,8 +21,11 @@ package org.apache.hadoop.ozone.container.common;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import static org.junit.Assert.assertEquals;
 
@@ -32,9 +35,22 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * This class is used to test the KeyValueContainerData.
  */
+@RunWith(Parameterized.class)
 public class TestKeyValueContainerData {
 
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
+
+  private final ChunkLayOutVersion layout;
+
+  public TestKeyValueContainerData(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
+
   @Test
   public void testKeyValueData() {
     long containerId = 1L;
@@ -49,7 +65,7 @@ public class TestKeyValueContainerData {
     UUID datanodeId = UUID.randomUUID();
 
     KeyValueContainerData kvData = new KeyValueContainerData(containerId,
-        ChunkLayOutVersion.FILE_PER_CHUNK,
+        layout,
         MAXSIZE, pipelineId.toString(), datanodeId.toString());
 
     assertEquals(containerType, kvData.getContainerType());
