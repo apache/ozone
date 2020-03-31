@@ -670,20 +670,15 @@ public class SCMPipelineManager implements PipelineManager {
         pipelineCreationAllowed.getAndSet(status.isPreCheckComplete());
     boolean currentlyInSafeMode =
         isInSafeMode.getAndSet(status.isInSafeMode());
-    boolean triggerPipelines = false;
 
     // Trigger pipeline creation only if the preCheck status has changed to
     // complete.
     if (isPipelineCreationAllowed() && !currentAllowPipelines) {
-      triggerPipelines = true;
+      triggerPipelineCreation();
     }
     // Start the pipeline creation thread only when safemode switches off
     if (!getSafeModeStatus() && currentlyInSafeMode) {
       startPipelineCreator();
-      triggerPipelines = true;
-    }
-    if (triggerPipelines) {
-      triggerPipelineCreation();
     }
   }
 
