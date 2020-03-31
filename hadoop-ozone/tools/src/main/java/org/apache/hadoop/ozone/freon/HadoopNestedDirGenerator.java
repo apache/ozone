@@ -36,7 +36,7 @@ import picocli.CommandLine.Option;
 @Command(name = "ddsg",
     aliases = "dfs-directory-generator",
     description =
-            "Create random directories to the any dfs compatible file system.",
+            "Create nested directories to the any dfs compatible file system.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
@@ -46,7 +46,7 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(HadoopNestedDirGenerator.class);
 
-  @Option(names = {"--dpath"},
+  @Option(names = {"-r","--rpath"},
       description = "Hadoop FS directory system path",
       defaultValue = "o3fs://bucket2.vol2")
   private String rootPath;
@@ -57,17 +57,17 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
       defaultValue = "5")
   private int depth;
 
-  @Option(names = {"--span"},
+  @Option(names = {"-s","--span"},
       description =
               "Number of child directories to be created in leaf directory.",
       defaultValue = "10")
   private int span;
 
-  @Option(names = {"--nameLen"},
+  @Option(names = {"-l","--nameLen"},
       description =
               "Length of the random name of directory you want to create.",
       defaultValue = "10")
-  private int n;
+  private int length;
 
   private FileSystem fileSystem;
 
@@ -95,14 +95,14 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
 
    */
   private void createDir(long counter) throws Exception {
-    String dirString = RandomStringUtils.randomAlphanumeric(n);
+    String dirString = RandomStringUtils.randomAlphanumeric(length);
     for(int i = 1; i <= depth; i++) {
       dirString = dirString.concat("/").concat(RandomStringUtils.
-              randomAlphanumeric(n));
+              randomAlphanumeric(length));
     }
     Path file = new Path(rootPath.concat("/").concat(dirString));
     fileSystem.mkdirs(file.getParent());
-    String leafDir = dirString.substring(0, dirString.length() - n);
+    String leafDir = dirString.substring(0, dirString.length() - length);
     String tmp = "/0";
     for(int i = 1; i <= span; i++) {
       String childDir = leafDir.concat(Integer.toString(i)).concat(tmp);
