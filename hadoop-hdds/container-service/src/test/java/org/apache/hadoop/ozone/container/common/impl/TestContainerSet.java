@@ -26,10 +26,13 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -53,9 +56,21 @@ import static org.junit.Assert.fail;
 /**
  * Class used to test ContainerSet operations.
  */
+@RunWith(Parameterized.class)
 public class TestContainerSet {
 
   private static final int FIRST_ID = 2;
+
+  private final ChunkLayOutVersion layout;
+
+  public TestContainerSet(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
 
   @Test
   public void testAddGetRemoveContainer() throws StorageContainerException {
@@ -65,7 +80,7 @@ public class TestContainerSet {
         .ContainerDataProto.State.CLOSED;
 
     KeyValueContainerData kvData = new KeyValueContainerData(containerId,
-        ChunkLayOutVersion.FILE_PER_CHUNK,
+        layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     kvData.setState(state);
@@ -154,7 +169,7 @@ public class TestContainerSet {
     ContainerSet containerSet = new ContainerSet();
     for (int i=0; i<10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
-          ChunkLayOutVersion.FILE_PER_CHUNK,
+          layout,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
       if (i%2 == 0) {
@@ -196,7 +211,7 @@ public class TestContainerSet {
     int containerCount = 50;
     for (int i = 0; i < containerCount; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
-          ChunkLayOutVersion.FILE_PER_CHUNK,
+          layout,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
       if (random.nextBoolean()) {
@@ -289,7 +304,7 @@ public class TestContainerSet {
     ContainerSet containerSet = new ContainerSet();
     for (int i = FIRST_ID; i < FIRST_ID + 10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
-          ChunkLayOutVersion.FILE_PER_CHUNK,
+          layout,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
       if (i%2 == 0) {
