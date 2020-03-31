@@ -304,6 +304,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private boolean isNativeAuthorizerEnabled;
 
+  private enum State {
+    INITIALIZED,
+    RUNNING,
+    STOPPED
+  }
+  // Used in MiniOzoneCluster testing
+  private State omState;
+
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
@@ -322,10 +330,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // In case of single OM Node Service there will be no OM Node ID
     // specified, set it to value from om storage
     if (this.omNodeDetails.getOMNodeId() == null) {
-      this.omNodeDetails =
-          OMHANodeDetails.getOMNodeDetails(conf, omNodeDetails.getOMServiceId(),
-              omStorage.getOmId(), omNodeDetails.getRpcAddress(),
-              omNodeDetails.getRatisPort());
+      this.omNodeDetails = OMHANodeDetails.getOMNodeDetails(conf,
+          omNodeDetails.getOMServiceId(),
+          omStorage.getOmId(), omNodeDetails.getRpcAddress(),
+          omNodeDetails.getRatisPort());
     }
 
     loginOMUserIfSecurityEnabled(conf);
@@ -413,7 +421,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo(
         omStorage.getCurrentDir());
-
     initializeRatisServer();
 
     if (isRatisEnabled) {
@@ -451,6 +458,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
+    omState = State.INITIALIZED;
   }
 
   /**
@@ -1135,6 +1143,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     registerMXBean();
     setStartTime();
+    omState = State.RUNNING;
   }
 
   /**
@@ -1168,14 +1177,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metricsTimer = new Timer();
     metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
 
-    omRpcServer = getRpcServer(configuration);
-    omRpcServer.start();
-    isOmRpcServerRunning = true;
-
     initializeRatisServer();
     if (omRatisServer != null) {
       omRatisServer.start();
     }
+
+    omRpcServer = getRpcServer(configuration);
+    omRpcServer.start();
+    isOmRpcServerRunning = true;
 
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
@@ -1191,6 +1200,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     jvmPauseMonitor.init(configuration);
     jvmPauseMonitor.start();
     setStartTime();
+    omState = State.RUNNING;
   }
 
   /**
@@ -1291,6 +1301,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (jvmPauseMonitor != null) {
         jvmPauseMonitor.stop();
       }
+      omState = State.STOPPED;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }
@@ -3366,5 +3377,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isNativeAuthorizerEnabled() {
     return isNativeAuthorizerEnabled;
+  }
+
+  @VisibleForTesting
+  public boolean isRunning() {
+    return omState == State.RUNNING;
   }
 }
