@@ -47,14 +47,16 @@ public class MiniOzoneLoadGenerator {
 
   private final OzoneVolume volume;
   private final OzoneConfiguration conf;
+  private final String omServiceID;
 
   MiniOzoneLoadGenerator(OzoneVolume volume, int numClients, int numThreads,
-                         int numBuffers, OzoneConfiguration conf)
+      int numBuffers, OzoneConfiguration conf, String omServiceId)
       throws Exception {
     DataBuffer buffer = new DataBuffer(numBuffers);
     loadExecutors = new ArrayList<>();
     this.volume = volume;
     this.conf = conf;
+    this.omServiceID = omServiceId;
 
     // Random Load
     String mixBucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -62,7 +64,7 @@ public class MiniOzoneLoadGenerator {
     List<LoadBucket> ozoneBuckets = new ArrayList<>(numClients);
     for (int i = 0; i < numClients; i++) {
       ozoneBuckets.add(new LoadBucket(volume.getBucket(mixBucketName),
-          conf));
+          conf, omServiceId));
     }
     RandomLoadGenerator loadGenerator =
         new RandomLoadGenerator(buffer, ozoneBuckets);
@@ -82,7 +84,8 @@ public class MiniOzoneLoadGenerator {
       throws Exception {
     String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     volume.createBucket(bucketName);
-    LoadBucket bucket = new LoadBucket(volume.getBucket(bucketName), conf);
+    LoadBucket bucket = new LoadBucket(volume.getBucket(bucketName), conf,
+        omServiceID);
     LoadGenerator loadGenerator = function.apply(bucket);
     loadExecutors.add(new LoadExecutors(numThreads, loadGenerator));
   }
