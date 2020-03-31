@@ -40,11 +40,11 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-public class HadoopDirGenerator extends BaseFreonGenerator
+public class HadoopNestedDirGenerator extends BaseFreonGenerator
     implements Callable<Void> {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(HadoopDirGenerator.class);
+      LoggerFactory.getLogger(HadoopNestedDirGenerator.class);
 
   @Option(names = {"--dpath"},
       description = "Hadoop FS directory system path",
@@ -81,7 +81,19 @@ public class HadoopDirGenerator extends BaseFreonGenerator
     return null;
 
   }
+  /*
+      Nested directories will be created like this,
+      suppose you pass depth=3, span=3 and number of tests=2
 
+              Dir11                               Dir12
+                |                                   |
+              Dir21                               Dir22
+                |                                   |
+              Dir31                               Dir32
+            /   |   \                           /   |   \
+      Dir311 Dir312 Dir313                 Dir321 Dir322 Dir323
+
+   */
   private void createDir(long counter) throws Exception {
     String dirString = RandomStringUtils.randomAlphanumeric(n);
     for(int i = 1; i <= depth; i++) {
