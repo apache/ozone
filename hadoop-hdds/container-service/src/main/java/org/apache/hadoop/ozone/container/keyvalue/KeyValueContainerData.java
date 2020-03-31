@@ -56,9 +56,6 @@ public class KeyValueContainerData extends ContainerData {
   // Path to Container metadata Level DB/RocksDB Store and .container file.
   private String metadataPath;
 
-  // Path to Physical file system where chunks are stored.
-  private String chunksPath;
-
   //Type of DB used to store key to chunks mapping
   private String containerDBType;
 
@@ -162,22 +159,6 @@ public class KeyValueContainerData extends ContainerData {
    */
   public void updateBlockCommitSequenceId(long id) {
     this.blockCommitSequenceId = id;
-  }
-
-  /**
-   * Get chunks path.
-   * @return - Path where chunks are stored
-   */
-  public String getChunksPath() {
-    return chunksPath;
-  }
-
-  /**
-   * Set chunks Path.
-   * @param chunkPath - File path.
-   */
-  public void setChunksPath(String chunkPath) {
-    this.chunksPath = chunkPath;
   }
 
   /**
