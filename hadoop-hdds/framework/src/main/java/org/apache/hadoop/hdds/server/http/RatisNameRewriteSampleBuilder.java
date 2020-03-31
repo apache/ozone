@@ -27,11 +27,16 @@ import io.prometheus.client.Collector.MetricFamilySamples.Sample;
 import io.prometheus.client.dropwizard.samplebuilder.DefaultSampleBuilder;
 import org.apache.logging.log4j.util.Strings;
 import static org.apache.ratis.server.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Collect Dropwizard metrics and rename ratis specific metrics.
  */
 public class RatisNameRewriteSampleBuilder extends DefaultSampleBuilder {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RatisNameRewriteSampleBuilder.class);
 
   private List<Pattern> followerPatterns = new ArrayList<>();
 
@@ -41,8 +46,8 @@ public class RatisNameRewriteSampleBuilder extends DefaultSampleBuilder {
             "grpc_log_appender_follower_(.*)_(latency|success|inconsistency)"
                 + ".*"));
     followerPatterns
-        .add(Pattern.compile("follower_(.*)_lastHeartbeatElapsedTime"));
-    followerPatterns.add(Pattern.compile("(.*)_peerCommitIndex"));
+        .add(Pattern.compile("follower_([^_]*)_.*"));
+    followerPatterns.add(Pattern.compile("([^_]*)_peerCommitIndex"));
 
   }
 
@@ -51,12 +56,16 @@ public class RatisNameRewriteSampleBuilder extends DefaultSampleBuilder {
       List<String> additionalLabelNames, List<String> additionalLabelValues,
       double value) {
     //this is a ratis metrics, where the second part is an instance id.
-    if (dropwizardName.startsWith(RATIS_APPLICATION_NAME_METRICS)
-        || (dropwizardName.startsWith("ratis_grpc"))) {
+    if (dropwizardName.startsWith(RATIS_APPLICATION_NAME_METRICS)) {
       List<String> names = new ArrayList<>(additionalLabelNames);
       List<String> values = new ArrayList<>(additionalLabelValues);
       String name = normalizeRatisMetric(dropwizardName, names, values);
 
+      if (LOG.isTraceEnabled()) {
+        LOG.trace(
+            "Ratis dropwizard {} metrics are converted to {} with tag "
+                + "keys/values {},{}", dropwizardName, name, names, values);
+      }
       return super
           .createSample(name, nameSuffix,
               names,
