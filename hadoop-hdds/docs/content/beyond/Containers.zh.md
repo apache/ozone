@@ -34,7 +34,7 @@ Ozone 的开发中大量地使用了 Docker，包括以下三种主要的应用�
 </div>
 
 * __生产__:
-     * 我们提供了如何创建用于生产的 docker 镜像的文档。
+     * 我们提供了如何为生产集群创建 docker 镜像的文档。
 
 下面我们来详细地介绍一下各种应用场景：
 
@@ -71,7 +71,7 @@ cd compose/ozone
 
 ### 实现细节
 
-`compose` 测试都基于 apache/hadoop-runner 镜像，这个镜像本身并不包含任何 Ozone 的 jar 包或二进制文件，它只是提供其了启动 ozone 的辅助脚本。
+`compose` 测试都基于 apache/hadoop-runner 镜像，这个镜像本身并不包含任何 Ozone 的 jar 包或二进制文件，它只是提供其了启动 Ozone 的辅助脚本。
 
 hadoop-runner 提供了一个随处运行 Ozone 的固定环境，Ozone 分发包通过目录挂载包含在其中。
 
@@ -128,7 +128,7 @@ cd kubernetes/examples/ozone
 kubectl apply -f
 ```
 
-注意，此时会从 Docker Hub 下载最新的镜像。
+注意，在这个例子中会从 Docker Hub 下载最新的镜像。
 
 ### 开发构建测试
 
@@ -199,14 +199,5 @@ Ozone 相关的容器镜像和 Dockerfile 位置：
       <td>这是用于测试 Hadoop Ozone 的基础镜像，包含了一系列可以让我们更加方便地运行 Ozone 的工具。
       </td>
     </tr>
-    <!---tr>
-      <th scope="row">3</th>
-      <td>apache/ozone:build (WIP)</td>
-      <td>https://github.com/apache/hadoop-docker-ozone</td>
-      <td>ozone-build </td>
-      <td> </td>
-      <td> </td>
-      <td>TODO: 此处需要添加更多文档</td>
-    </tr-->
   </tbody>
 </table>

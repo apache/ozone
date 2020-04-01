@@ -221,14 +221,5 @@ Ozone related container images and source locations:
       <td>This is the base image used for testing Hadoop Ozone.
        This is a set of utilities that make it easy for us run ozone.</td>
     </tr>
-    <!---tr>
-      <th scope="row">3</th>
-      <td>apache/ozone:build (WIP)</td>
-      <td>https://github.com/apache/hadoop-docker-ozone</td>
-      <td>ozone-build </td>
-      <td> </td>
-      <td> </td>
-      <td>TODO: Add more documentation here.</td>
-    </tr-->
   </tbody>
 </table>
