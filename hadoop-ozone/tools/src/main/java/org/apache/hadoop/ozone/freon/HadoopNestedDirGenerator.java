@@ -31,12 +31,12 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 /**
- *  Directory Generator tool to test OM performance.
+ * Directory Generator tool to test OM performance.
  */
 @Command(name = "ddsg",
     aliases = "dfs-directory-generator",
     description =
-            "Create nested directories to the any dfs compatible file system.",
+        "Create nested directories to the any dfs compatible file system.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
@@ -46,26 +46,25 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
   private static final Logger LOG =
       LoggerFactory.getLogger(HadoopNestedDirGenerator.class);
 
-  @Option(names = {"-r","--rpath"},
+  @Option(names = {"-r", "--rpath"},
       description = "Hadoop FS directory system path",
       defaultValue = "o3fs://bucket2.vol2")
   private String rootPath;
-
 
   @Option(names = {"-d", "--depth"},
       description = "Number of directories to be generated recursively",
       defaultValue = "5")
   private int depth;
 
-  @Option(names = {"-s","--span"},
+  @Option(names = {"-s", "--span"},
       description =
-              "Number of child directories to be created in leaf directory.",
+          "Number of child directories to be created in leaf directory.",
       defaultValue = "10")
   private int span;
 
-  @Option(names = {"-l","--nameLen"},
+  @Option(names = {"-l", "--nameLen"},
       description =
-              "Length of the random name of directory you want to create.",
+          "Length of the random name of directory you want to create.",
       defaultValue = "10")
   private int length;
 
@@ -81,6 +80,7 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
     return null;
 
   }
+
   /*
       Nested directories will be created like this,
       suppose you pass depth=3, span=3 and number of tests=2
@@ -96,15 +96,15 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
    */
   private void createDir(long counter) throws Exception {
     String dirString = RandomStringUtils.randomAlphanumeric(length);
-    for(int i = 1; i <= depth; i++) {
+    for (int i = 1; i <= depth; i++) {
       dirString = dirString.concat("/").concat(RandomStringUtils.
-              randomAlphanumeric(length));
+          randomAlphanumeric(length));
     }
     Path file = new Path(rootPath.concat("/").concat(dirString));
     fileSystem.mkdirs(file.getParent());
     String leafDir = dirString.substring(0, dirString.length() - length);
     String tmp = "/0";
-    for(int i = 1; i <= span; i++) {
+    for (int i = 1; i <= span; i++) {
       String childDir = leafDir.concat(Integer.toString(i)).concat(tmp);
       Path dir = new Path(rootPath.concat("/").concat(childDir));
       fileSystem.mkdirs(dir.getParent());
