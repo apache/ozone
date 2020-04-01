@@ -21,12 +21,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.annotations.VisibleForTesting;
 import picocli.CommandLine;
 import picocli.CommandLine.ExecutionException;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.RunLast;
 
@@ -49,6 +50,15 @@ public class GenericCli implements Callable<Void>, GenericParentCommand {
 
   public GenericCli() {
     cmd = new CommandLine(this);
+  }
+
+  /**
+   * Handle the error when subcommand is required but not set.
+   */
+  public static void missingSubcommand(CommandSpec spec) {
+    System.err.println("Incomplete command");
+    spec.commandLine().usage(System.err);
+    System.exit(-1);
   }
 
   public void run(String[] argv) {

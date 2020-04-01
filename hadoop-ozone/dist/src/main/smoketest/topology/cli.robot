@@ -18,15 +18,16 @@ Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 
 
 *** Test Cases ***
 Run printTopology
-    ${output} =         Execute          ozone scmcli printTopology
+    ${output} =         Execute          ozone admin printTopology
                         Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)    /rack2
 Run printTopology -o
-    ${output} =         Execute          ozone scmcli printTopology -o
+    ${output} =         Execute          ozone admin printTopology -o
                         Should contain   ${output}         Location: /rack2
                         Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)

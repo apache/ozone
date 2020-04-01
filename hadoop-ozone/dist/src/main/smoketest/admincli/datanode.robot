@@ -18,16 +18,13 @@ Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 
 
 *** Test Cases ***
-Run list pipeline
-    ${output} =         Execute          ozone scmcli pipeline list
-                        Should contain   ${output}   Type:
-                        Should contain   ${output}   Factor:ONE, State:
-
-Run create pipeline
-    ${output} =         Execute          ozone scmcli pipeline create
-                        Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE
+Run list datanodes
+    ${output} =         Execute          ozone admin datanode list
+                        Should contain   ${output}   Datanode:
+                        Should contain   ${output}   Related pipelines:

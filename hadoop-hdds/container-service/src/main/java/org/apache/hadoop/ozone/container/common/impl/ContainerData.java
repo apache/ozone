@@ -72,6 +72,9 @@ public abstract class ContainerData {
   // This can hold information like volume name, owner etc.,
   private final Map<String, String> metadata;
 
+  // Path to Physical file system where chunks are stored.
+  private String chunksPath;
+
   // State of the Container
   private ContainerDataProto.State state;
 
@@ -225,6 +228,22 @@ public abstract class ContainerData {
    */
   public ChunkLayOutVersion getLayOutVersion() {
     return ChunkLayOutVersion.getChunkLayOutVersion(layOutVersion);
+  }
+
+  /**
+   * Get chunks path.
+   * @return - Path where chunks are stored
+   */
+  public String getChunksPath() {
+    return chunksPath;
+  }
+
+  /**
+   * Set chunks Path.
+   * @param chunkPath - File path.
+   */
+  public void setChunksPath(String chunkPath) {
+    this.chunksPath = chunkPath;
   }
 
   /**

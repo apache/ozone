@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -80,6 +81,11 @@ public class TestHandler {
     }
     this.dispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, null, metrics, null);
+  }
+
+  @After
+  public void tearDown(){
+    ContainerMetrics.remove();
   }
 
   @Test

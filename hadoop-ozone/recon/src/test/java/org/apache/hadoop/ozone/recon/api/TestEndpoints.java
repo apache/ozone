@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -50,9 +49,6 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
-import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
-import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
-import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -60,7 +56,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.jooq.Configuration;
 import org.junit.Assert;
@@ -72,7 +67,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import javax.ws.rs.core.Response;
-import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -98,25 +92,6 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
   private Pipeline pipeline;
 
   private void initializeInjector() throws IOException {
-
-    File tempDir = temporaryFolder.newFolder();
-
-    AbstractSqlDatabaseTest.DataSourceConfigurationProvider
-        configurationProvider =
-        new AbstractSqlDatabaseTest.DataSourceConfigurationProvider(tempDir);
-
-    JooqPersistenceModule persistenceModule =
-        new JooqPersistenceModule(configurationProvider);
-
-    Injector sqlInjector = Guice.createInjector(persistenceModule,
-        new AbstractModule() {
-          @Override
-          public void configure() {
-            bind(DataSourceConfiguration.class)
-                .toProvider(configurationProvider);
-          }
-        });
-
     reconOMMetadataManager = getTestMetadataManager(
         initializeNewOmMetadataManager());
     OzoneManagerServiceProviderImpl omServiceProviderMock =
@@ -134,7 +109,7 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
               pipelineId = pipeline.getId().getId().toString();
 
               Configuration sqlConfiguration =
-                  sqlInjector.getInstance((Configuration.class));
+                  parentInjector.getInstance((Configuration.class));
 
               ContainerInfo containerInfo = new ContainerInfo.Builder()
                   .setContainerID(containerId)
@@ -147,17 +122,14 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
               ContainerWithPipeline containerWithPipeline =
                   new ContainerWithPipeline(containerInfo, pipeline);
 
-              ReconTaskSchemaDefinition taskSchemaDefinition = sqlInjector
+              ReconTaskSchemaDefinition taskSchemaDefinition = parentInjector
                   .getInstance(ReconTaskSchemaDefinition.class);
               taskSchemaDefinition.initializeSchema();
 
               ReconTaskStatusDao reconTaskStatusDao =
                   new ReconTaskStatusDao(sqlConfiguration);
-              MissingContainersDao missingContainersDao =
-                  new MissingContainersDao(sqlConfiguration);
 
               bind(ReconTaskStatusDao.class).toInstance(reconTaskStatusDao);
-              bind(MissingContainersDao.class).toInstance(missingContainersDao);
 
               StorageContainerLocationProtocol mockScmClient = mock(
                   StorageContainerLocationProtocol.class);
@@ -431,6 +403,6 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
             .setDatanodeDetails(datanodeDetailsProto)
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
-    LambdaTestUtils.await(30000, 2000, check);
+    LambdaTestUtils.await(30000, 1000, check);
   }
 }

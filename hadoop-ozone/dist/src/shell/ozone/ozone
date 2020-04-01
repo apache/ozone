@@ -48,7 +48,6 @@ function hadoop_usage
   hadoop_add_subcommand "s3g" daemon "run the S3 compatible REST gateway"
   hadoop_add_subcommand "csi" daemon "run the standalone CSI daemon"
   hadoop_add_subcommand "recon" daemon "run the Recon service"
-  hadoop_add_subcommand "scmcli" client "run the CLI of the Storage Container Manager"
   hadoop_add_subcommand "sh" client "command line interface for object store operations"
   hadoop_add_subcommand "s3" client "command line interface for s3 related operations"
   hadoop_add_subcommand "insight" client "tool to get runtime operation information"
@@ -182,11 +181,6 @@ function ozonecmd_case
     fs)
       HADOOP_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
-    ;;
-    scmcli)
-      HADOOP_CLASSNAME=org.apache.hadoop.hdds.scm.cli.SCMCLI
-      HADOOP_OPTS="${HADOOP_OPTS} ${HDFS_SCM_CLI_OPTS}"
-      OZONE_RUN_ARTIFACT_NAME="hadoop-hdds-tools"
     ;;
     insight)
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.insight.Insight
