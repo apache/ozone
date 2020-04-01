@@ -18,8 +18,21 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -41,6 +54,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
@@ -51,21 +66,6 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.security.cert.X509Certificate;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * A Client for the storageContainer protocol for read object data.
@@ -79,7 +79,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private Map<UUID, ManagedChannel> channels;
   private final Semaphore semaphore;
   private boolean closed = false;
-  private long timeout;
+  private final long timeout;
   private SecurityConfig secConfig;
   private final boolean topologyAwareRead;
   private X509Certificate caCert;
@@ -100,6 +100,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
+    timeout = config.getTimeDuration(OzoneConfigKeys.
+        OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
+        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -190,9 +193,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     ManagedChannel channel = channelBuilder.build();
     XceiverClientProtocolServiceStub asyncStub =
         XceiverClientProtocolServiceGrpc.newStub(channel);
-    timeout = config.getTimeDuration(OzoneConfigKeys.
-            OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
-            .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
     asyncStubs.put(dn.getUuid(), asyncStub);
     channels.put(dn.getUuid(), channel);
   }
