@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             BuiltIn
 Library             String
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 Suite Setup         Generate volume
 
 *** Variables ***

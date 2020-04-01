@@ -117,7 +117,7 @@ public final class ScmConfigKeys {
       "dfs.ratis.client.request.retry.interval";
   public static final TimeDuration
       DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT =
-      TimeDuration.valueOf(15000, TimeUnit.MILLISECONDS);
+      TimeDuration.valueOf(1000, TimeUnit.MILLISECONDS);
   public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
       "dfs.ratis.server.retry-cache.timeout.duration";
   public static final TimeDuration
@@ -221,7 +221,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HANDLER_COUNT_KEY =
       "ozone.scm.handler.count.key";
-  public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 10;
+  public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_SCM_SECURITY_HANDLER_COUNT_KEY =
       "ozone.scm.security.handler.count.key";

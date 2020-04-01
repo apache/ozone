@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_NODE_DB;
@@ -27,6 +28,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
@@ -34,6 +36,7 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -41,21 +44,26 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.ImmutableSet;
+
 /**
  * Recon SCM's Node manager that includes persistence.
  */
 public class ReconNodeManager extends SCMNodeManager {
 
-  private static final Logger LOG = LoggerFactory
+  public static final Logger LOG = LoggerFactory
       .getLogger(ReconNodeManager.class);
 
   private final MetadataStore nodeStore;
+  private final static Set<Type> ALLOWED_COMMANDS =
+      ImmutableSet.of(reregisterCommand);
 
   /**
    * Map that contains mapping between datanodes
@@ -130,6 +138,19 @@ public class ReconNodeManager extends SCMNodeManager {
    */
   public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
     return datanodeHeartbeatMap.getOrDefault(datanodeDetails.getUuid(), 0L);
+  }
+
+  @Override
+  public void onMessage(CommandForDatanode commandForDatanode,
+                        EventPublisher ignored) {
+    if (ALLOWED_COMMANDS.contains(
+        commandForDatanode.getCommand().getType())) {
+      super.onMessage(commandForDatanode, ignored);
+    } else {
+      LOG.info("Ignoring unsupported command {} for Datanode {}.",
+          commandForDatanode.getCommand().getType(),
+          commandForDatanode.getDatanodeId());
+    }
   }
 
   /**

@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
-import org.apache.hadoop.hdfs.MiniDFSCluster;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -48,21 +47,24 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.times;
 
+
 /**
  * Unit tests for {@link KeyValueHandler}.
  */
+@RunWith(Parameterized.class)
 public class TestKeyValueHandler {
 
   @Rule
@@ -73,13 +75,21 @@ public class TestKeyValueHandler {
 
   private final static String DATANODE_UUID = UUID.randomUUID().toString();
 
-  private final String baseDir = MiniDFSCluster.getBaseDirectory();
-  private final String volume = baseDir + "disk1";
-
   private static final long DUMMY_CONTAINER_ID = 9999;
 
-  @BeforeClass
-  public static void setup() throws StorageContainerException {
+  private final ChunkLayOutVersion layout;
+
+  public TestKeyValueHandler(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
+
+  @Before
+  public void setup() throws StorageContainerException {
     // Create mock HddsDispatcher and KeyValueHandler.
     handler = Mockito.mock(KeyValueHandler.class);
 
@@ -98,7 +108,6 @@ public class TestKeyValueHandler {
 
   }
 
-  @Test
   /**
    * Test that Handler handles different command types correctly.
    */
@@ -292,14 +301,11 @@ public class TestKeyValueHandler {
 
   private ContainerCommandRequestProto getDummyCommandRequestProto(
       ContainerProtos.Type cmdType) {
-    ContainerCommandRequestProto request =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(cmdType)
-            .setContainerID(DUMMY_CONTAINER_ID)
-            .setDatanodeUuid(DATANODE_UUID)
-            .build();
-
-    return request;
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(cmdType)
+        .setContainerID(DUMMY_CONTAINER_ID)
+        .setDatanodeUuid(DATANODE_UUID)
+        .build();
   }
 
 
@@ -308,7 +314,7 @@ public class TestKeyValueHandler {
     long containerID = 1234L;
     Configuration conf = new Configuration();
     KeyValueContainerData kvData = new KeyValueContainerData(containerID,
-        ChunkLayOutVersion.FILE_PER_CHUNK,
+        layout,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     KeyValueContainer container = new KeyValueContainer(kvData, conf);
@@ -332,8 +338,7 @@ public class TestKeyValueHandler {
     ContainerProtos.ContainerCommandResponseProto response =
         handler.handleCloseContainer(closeContainerRequest, container);
 
-    Assert.assertTrue("Close container should return Invalid container error",
-        response.getResult().equals(
-            ContainerProtos.Result.INVALID_CONTAINER_STATE));
+    assertEquals("Close container should return Invalid container error",
+        ContainerProtos.Result.INVALID_CONTAINER_STATE, response.getResult());
   }
 }
