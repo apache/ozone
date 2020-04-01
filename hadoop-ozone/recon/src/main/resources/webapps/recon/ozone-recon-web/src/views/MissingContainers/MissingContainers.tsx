@@ -25,12 +25,14 @@ import prettyBytes from "pretty-bytes";
 import moment from "moment";
 
 interface MissingContainerResponse {
-  id: number;
+  containerID: number;
   keys: number;
   datanodes: string[];
+  missingSince: number;
+  pipelineID: string;
 }
 
-interface MissingContainersResponse  {
+export interface MissingContainersResponse  {
   totalCount: number;
   containers: MissingContainerResponse[];
 }
@@ -54,20 +56,36 @@ interface ContainerKeysResponse {
 const COLUMNS = [
   {
     title: 'Container ID',
-    dataIndex: 'id',
-    key: 'id'
+    dataIndex: 'containerID',
+    key: 'containerID',
+    sorter: (a: MissingContainerResponse, b: MissingContainerResponse) => a.containerID - b.containerID
   },
   {
     title: 'No. of Keys',
     dataIndex: 'keys',
-    key: 'keys'
+    key: 'keys',
+    sorter: (a: MissingContainerResponse, b: MissingContainerResponse) => a.keys - b.keys
   },
   {
     title: 'Datanodes',
     dataIndex: 'datanodes',
     key: 'datanodes',
     render: (datanodes: string[]) => <div>{datanodes.map(datanode => <div key={datanode}>{datanode}</div>)}</div>
-  }
+  },
+  {
+    title: 'Pipeline ID',
+    dataIndex: 'pipelineID',
+    key: 'pipelineID',
+    sorter: (a: MissingContainerResponse, b: MissingContainerResponse) => a.pipelineID.localeCompare(b.pipelineID)
+  },
+  {
+    title: 'Missing Since',
+    dataIndex: 'missingSince',
+    key: 'missingSince',
+    render: (missingSince: number) => missingSince > 0 ?
+        moment(missingSince).format('lll') : 'NA',
+    sorter: (a: MissingContainerResponse, b: MissingContainerResponse) => a.missingSince - b.missingSince
+  },
 ];
 
 const KEY_TABLE_COLUMNS = [
@@ -141,7 +159,7 @@ export class MissingContainers extends React.Component<any, MissingContainersSta
     this.setState({
       loading: true
     });
-    axios.get('/api/v1/missingContainers').then(response => {
+    axios.get('/api/v1/containers/missing').then(response => {
       const missingContainersResponse: MissingContainersResponse = response.data;
       const totalCount = missingContainersResponse.totalCount;
       const missingContainers: MissingContainerResponse[] = missingContainersResponse.containers;
@@ -161,21 +179,21 @@ export class MissingContainers extends React.Component<any, MissingContainersSta
   onRowExpandClick = (expanded: boolean, record: MissingContainerResponse) => {
     if (expanded) {
       this.setState(({expandedRowData}) => {
-        const expandedRowState: ExpandedRowState = expandedRowData[record.id] ?
-            Object.assign({}, expandedRowData[record.id], {loading: true}) :
-            {containerId: record.id, loading: true, dataSource: [], totalCount: 0};
+        const expandedRowState: ExpandedRowState = expandedRowData[record.containerID] ?
+            Object.assign({}, expandedRowData[record.containerID], {loading: true}) :
+            {containerId: record.containerID, loading: true, dataSource: [], totalCount: 0};
         return {
-          expandedRowData: Object.assign({}, expandedRowData, {[record.id]: expandedRowState})
+          expandedRowData: Object.assign({}, expandedRowData, {[record.containerID]: expandedRowState})
         }
       });
-      axios.get(`/api/v1/containers/${record.id}/keys`).then(response => {
+      axios.get(`/api/v1/containers/${record.containerID}/keys`).then(response => {
         const containerKeysResponse: ContainerKeysResponse = response.data;
         this.setState(({expandedRowData}) => {
           const expandedRowState: ExpandedRowState =
-              Object.assign({}, expandedRowData[record.id],
+              Object.assign({}, expandedRowData[record.containerID],
                   {loading: false, dataSource: containerKeysResponse.keys, totalCount: containerKeysResponse.totalCount});
           return {
-            expandedRowData: Object.assign({}, expandedRowData, {[record.id]: expandedRowState})
+            expandedRowData: Object.assign({}, expandedRowData, {[record.containerID]: expandedRowState})
           }
         });
       });
@@ -184,14 +202,18 @@ export class MissingContainers extends React.Component<any, MissingContainersSta
 
   expandedRowRender = (record: MissingContainerResponse) => {
     const {expandedRowData} = this.state;
-    const containerId = record.id;
+    const containerId = record.containerID;
     if (expandedRowData[containerId]) {
       const containerKeys: ExpandedRowState = expandedRowData[containerId];
+      const dataSource = containerKeys.dataSource.map(record => (
+          {...record, uid: `${record.Volume}/${record.Bucket}/${record.Key}`}
+          ));
       const paginationConfig: PaginationConfig = {
         showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} keys`
       };
-      return <Table loading={containerKeys.loading} dataSource={containerKeys.dataSource}
-                    columns={KEY_TABLE_COLUMNS} pagination={paginationConfig}/>
+      return <Table loading={containerKeys.loading} dataSource={dataSource}
+                    columns={KEY_TABLE_COLUMNS} pagination={paginationConfig}
+                    rowKey="uid"/>
     }
     return <div>Loading...</div>;
   };
@@ -210,7 +232,8 @@ export class MissingContainers extends React.Component<any, MissingContainersSta
           </div>
           <div className="content-div">
             <Table dataSource={dataSource} columns={COLUMNS} loading={loading} pagination={paginationConfig}
-                   rowKey="id" expandedRowRender={this.expandedRowRender} expandRowByClick={true} onExpand={this.onRowExpandClick}/>
+                   rowKey="containerID" expandedRowRender={this.expandedRowRender}
+                   expandRowByClick={true} onExpand={this.onRowExpandClick}/>
           </div>
         </div>
     );
