@@ -14,25 +14,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#doc: Add a REQUESTED_CHANGE type review to mark issue non-mergeable: `/pending <reason>`
+#doc: Close pending pull request temporary.
 # shellcheck disable=SC2124
-MESSAGE="Marking this issue as un-mergeable as requested.
+MESSAGE="Thank you very much the patch. I am closing this issue __temporary__ as there was no 
+activity recently and it's pending on the author of the PR.
 
-Please use \`/ready\` comment when it's resolved.
+It doesn't mean that this PR is not important or ignored: feel free to reopen the PR at any time.
+
+It means only that attention of commiters is not required. To get faster review for all the PRs, 
+we prefer to clean the queue to show which PRs require review or feedback.
+
+If you need ANY help to finish this PR, please contact with the community on the mailing list or the slack channel.
+
+(See the README about the details of chat/mailing list: https://github.com/apache/hadoop-ozone)
 
 > $@"
 
-URL="$(jq -r '.issue.pull_request.url' "$GITHUB_EVENT_PATH")/reviews"
 set +x #GITHUB_TOKEN
 curl -s -o /dev/null \
-  --data "$(jq --arg body "$MESSAGE" -n '{event: "REQUEST_CHANGES", body: $body}')" \
+  -X POST \
+  --data "$(jq --arg body "$MESSAGE" -n '{body: $body}')" \
   --header "authorization: Bearer $GITHUB_TOKEN" \
   --header 'content-type: application/json' \
-  "$URL"
+  "$(jq -r '.issue.comments_url' "$GITHUB_EVENT_PATH")"
 
 curl -s -o /dev/null \
-  -X POST \
-  --data '{"labels": [ "pending" ]}' \
+  -X PATCH \
+  --data '{"state": "close"}' \
   --header "authorization: Bearer $GITHUB_TOKEN" \
-  "$(jq -r '.issue.url' "$GITHUB_EVENT_PATH")/labels"
-
+  --header 'content-type: application/json' \
+  "$(jq -r '.issue.pull_request.url' "$GITHUB_EVENT_PATH")"
