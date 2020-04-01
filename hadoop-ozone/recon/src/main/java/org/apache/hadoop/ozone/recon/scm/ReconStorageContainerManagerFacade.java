@@ -73,6 +73,7 @@ public class ReconStorageContainerManagerFacade
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
   private final EventQueue eventQueue;
   private final SCMStorageConfig scmStorageConfig;
+  private final DBStore dbStore;
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
@@ -93,7 +94,7 @@ public class ReconStorageContainerManagerFacade
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
-    DBStore dbStore = new ReconDBDefinition().createDBStore(conf);
+    dbStore = new ReconDBDefinition().createDBStore(conf);
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
@@ -101,11 +102,13 @@ public class ReconStorageContainerManagerFacade
     this.pipelineManager =
         new ReconPipelineManager(conf,
             nodeManager,
-            ReconDBDefinition.PIPELINES.getTable(dbStore),
+            ReconDBDefinition.PIPELINES.getTable(
+                dbStore),
             eventQueue);
     this.containerManager =
         new ReconContainerManager(conf,
-            ReconDBDefinition.CONTAINERS.getTable(dbStore),
+            ReconDBDefinition.CONTAINERS.getTable(
+                dbStore),
             dbStore,
             pipelineManager,
             scmServiceProvider);
@@ -223,6 +226,11 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, nodeManager);
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
+    try {
+      dbStore.close();
+    } catch (Exception e) {
+      LOG.error("Can't close dbStore ", e);
+    }
   }
 
   public ReconDatanodeProtocolServer getDatanodeProtocolServer() {
