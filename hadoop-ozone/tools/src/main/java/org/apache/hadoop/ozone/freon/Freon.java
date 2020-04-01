@@ -42,13 +42,15 @@ import picocli.CommandLine.Option;
         OmKeyGenerator.class,
         OmBucketGenerator.class,
         HadoopFsGenerator.class,
+        HadoopNestedDirGenerator.class,
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
         DatanodeChunkGenerator.class,
         DatanodeBlockPutter.class,
         FollowerAppendLogEntryGenerator.class,
-        ChunkManagerDiskWrite.class},
+        ChunkManagerDiskWrite.class,
+        LeaderAppendLogEntryGenerator.class},
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class Freon extends GenericCli {

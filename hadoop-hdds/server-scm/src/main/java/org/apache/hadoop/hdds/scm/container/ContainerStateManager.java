@@ -118,6 +118,7 @@ public class ContainerStateManager {
       HddsProtos.LifeCycleEvent> stateMachine;
 
   private final long containerSize;
+  private final boolean autoCreateRatisOne;
   private final ConcurrentHashMap<ContainerState, ContainerID> lastUsedMap;
   private final ContainerStateMap containers;
   private final AtomicLong containerCount;
@@ -149,6 +150,9 @@ public class ContainerStateManager {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
+    this.autoCreateRatisOne = configuration.getBoolean(
+            ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
     this.lastUsedMap = new ConcurrentHashMap<>();
     this.containerCount = new AtomicLong(0);
@@ -247,23 +251,33 @@ public class ContainerStateManager {
       final HddsProtos.ReplicationType type,
       final HddsProtos.ReplicationFactor replicationFactor, final String owner)
       throws IOException {
-
+    final List<Pipeline> pipelines = pipelineManager
+        .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
     Pipeline pipeline;
-    try {
-      // TODO: #CLUTIL remove creation logic when all replication types and
-      // factors are handled by pipeline creator job.
-      pipeline = pipelineManager.createPipeline(type, replicationFactor);
-      pipelineManager.waitPipelineReady(pipeline.getId(), 0);
-    } catch (IOException e) {
-      final List<Pipeline> pipelines = pipelineManager
-          .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
-      if (pipelines.isEmpty()) {
-        throw new IOException("Could not allocate container. Cannot get any" +
-            " matching pipeline for Type:" + type +
-            ", Factor:" + replicationFactor + ", State:PipelineState.OPEN");
-      }
+
+    boolean bgCreateOne = (type == ReplicationType.RATIS) && replicationFactor
+        == ReplicationFactor.ONE && autoCreateRatisOne;
+    boolean bgCreateThree = (type == ReplicationType.RATIS) && replicationFactor
+        == ReplicationFactor.THREE;
+
+    if (!pipelines.isEmpty() && (bgCreateOne || bgCreateThree)) {
+      // let background create Ratis pipelines.
       pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
+    } else {
+      try {
+        pipeline = pipelineManager.createPipeline(type, replicationFactor);
+        pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+      } catch (IOException e) {
+
+        if (pipelines.isEmpty()) {
+          throw new IOException("Could not allocate container. Cannot get any" +
+              " matching pipeline for Type:" + type +
+              ", Factor:" + replicationFactor + ", State:PipelineState.OPEN");
+        }
+        pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
+      }
     }
+
     synchronized (pipeline) {
       return allocateContainer(pipelineManager, owner, pipeline);
     }

@@ -18,19 +18,45 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.List;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
 
 /**
  * Defines layout versions for the Chunks.
  */
 public enum ChunkLayOutVersion {
 
-  FILE_PER_CHUNK(1, "One file per chunk"),
-  FILE_PER_BLOCK(2, "One file per block");
+  FILE_PER_CHUNK(1, "One file per chunk") {
+    @Override
+    public File getChunkFile(ContainerData containerData, BlockID blockID,
+        ChunkInfo info) throws StorageContainerException {
+      File chunksLoc = verifyChunkDirExists(containerData);
+      return chunksLoc.toPath().resolve(info.getChunkName()).toFile();
+    }
+  },
+  FILE_PER_BLOCK(2, "One file per block") {
+    @Override
+    public File getChunkFile(ContainerData containerData, BlockID blockID,
+        ChunkInfo info) throws StorageContainerException {
+      File chunkDir = verifyChunkDirExists(containerData);
+      return new File(chunkDir, blockID.getLocalID() + ".block");
+    }
+  };
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ChunkLayOutVersion.class);
 
   private static final ChunkLayOutVersion
       DEFAULT_LAYOUT = ChunkLayOutVersion.FILE_PER_BLOCK;
@@ -91,8 +117,31 @@ public enum ChunkLayOutVersion {
     return description;
   }
 
+  public abstract File getChunkFile(ContainerData containerData,
+      BlockID blockID, ChunkInfo info) throws StorageContainerException;
+
   @Override
   public String toString() {
     return "ChunkLayout:v" + version;
   }
+
+  private static File verifyChunkDirExists(ContainerData containerData)
+      throws StorageContainerException {
+    Preconditions.checkNotNull(containerData, "Container data can't be null");
+
+    String chunksPath = containerData.getChunksPath();
+    if (chunksPath == null) {
+      LOG.error("Chunks path is null in the container data");
+      throw new StorageContainerException("Unable to get Chunks directory.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+    File chunksLoc = new File(chunksPath);
+    if (!chunksLoc.exists()) {
+      LOG.error("Chunks path does not exist");
+      throw new StorageContainerException("Unable to get Chunks directory.",
+          UNABLE_TO_FIND_DATA_DIR);
+    }
+    return chunksLoc;
+  }
+
 }

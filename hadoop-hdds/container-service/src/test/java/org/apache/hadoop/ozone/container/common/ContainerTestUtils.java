@@ -115,10 +115,11 @@ public final class ContainerTestUtils {
   }
 
   public static KeyValueContainer getContainer(long containerId,
+      ChunkLayOutVersion layout,
       ContainerProtos.ContainerDataProto.State state) {
     KeyValueContainerData kvData =
         new KeyValueContainerData(containerId,
-            ChunkLayOutVersion.FILE_PER_CHUNK,
+            layout,
             (long) StorageUnit.GB.toBytes(5),
             UUID.randomUUID().toString(), UUID.randomUUID().toString());
     kvData.setState(state);

@@ -25,10 +25,10 @@ Test Timeout        5 minutes
 
 *** Test Cases ***
 Run list pipeline
-    ${output} =         Execute          ozone scmcli pipeline list
+    ${output} =         Execute          ozone admin pipeline list
                         Should contain   ${output}   Type:
                         Should contain   ${output}   Factor:ONE, State:
 
 Run create pipeline
-    ${output} =         Execute          ozone scmcli pipeline create
+    ${output} =         Execute          ozone admin pipeline create
                         Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE

@@ -18,22 +18,25 @@
 
 package org.apache.hadoop.ozone.freon;
 
+import java.util.concurrent.TimeUnit;
+
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
  */
+@Ignore("HDDS-3290")
 public class TestRandomKeyGenerator {
 
   private static MiniOzoneCluster cluster;
@@ -129,6 +132,7 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
+  @Ignore("HDDS-2011")
   public void bigFileThan2GB() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());

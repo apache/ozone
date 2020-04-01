@@ -48,6 +48,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 import org.rocksdb.Options;
 
@@ -75,6 +77,7 @@ import static org.mockito.Mockito.mock;
 /**
  * Class to test KeyValue Container operations.
  */
+@RunWith(Parameterized.class)
 public class TestKeyValueContainer {
 
   @Rule
@@ -87,6 +90,17 @@ public class TestKeyValueContainer {
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
+
+  private final ChunkLayOutVersion layout;
+
+  public TestKeyValueContainer(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
 
   @Before
   public void setUp() throws Exception {
@@ -102,7 +116,7 @@ public class TestKeyValueContainer {
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
-        ChunkLayOutVersion.FILE_PER_CHUNK,
+        layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 
@@ -112,7 +126,7 @@ public class TestKeyValueContainer {
   @Test
   public void testBlockIterator() throws Exception{
     keyValueContainerData = new KeyValueContainerData(100L,
-        ChunkLayOutVersion.FILE_PER_CHUNK,
+        layout,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         datanodeId.toString());
     keyValueContainer = new KeyValueContainer(
@@ -158,7 +172,6 @@ public class TestKeyValueContainer {
     }
   }
 
-  @SuppressWarnings("RedundantCast")
   @Test
   public void testCreateContainer() throws Exception {
 
@@ -226,7 +239,7 @@ public class TestKeyValueContainer {
     //create a new one
     KeyValueContainerData containerData =
         new KeyValueContainerData(containerId,
-            ChunkLayOutVersion.FILE_PER_CHUNK,
+            keyValueContainerData.getLayOutVersion(),
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
@@ -407,7 +420,7 @@ public class TestKeyValueContainer {
 
     // Create Container 2
     keyValueContainerData = new KeyValueContainerData(2L,
-        ChunkLayOutVersion.FILE_PER_CHUNK,
+        layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
@@ -42,11 +43,14 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 /**
  * The class for testing container deletion choosing policy.
  */
+@RunWith(Parameterized.class)
 public class TestContainerDeletionChoosingPolicy {
   private static String path;
   private OzoneContainer ozoneContainer;
@@ -56,6 +60,17 @@ public class TestContainerDeletionChoosingPolicy {
   // the service timeout
   private static final int SERVICE_TIMEOUT_IN_MILLISECONDS = 0;
   private static final int SERVICE_INTERVAL_IN_MILLISECONDS = 1000;
+
+  private final ChunkLayOutVersion layout;
+
+  public TestContainerDeletionChoosingPolicy(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
 
   @Before
   public void init() throws Throwable {
@@ -82,7 +97,7 @@ public class TestContainerDeletionChoosingPolicy {
     int numContainers = 10;
     for (int i = 0; i < numContainers; i++) {
       KeyValueContainerData data = new KeyValueContainerData(i,
-          ChunkLayOutVersion.FILE_PER_CHUNK,
+          layout,
           ContainerTestHelper.CONTAINER_MAX_SIZE, UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
       data.closeContainer();
@@ -140,7 +155,7 @@ public class TestContainerDeletionChoosingPolicy {
       long containerId = RandomUtils.nextLong();
       KeyValueContainerData data =
           new KeyValueContainerData(containerId,
-              ChunkLayOutVersion.FILE_PER_CHUNK,
+              layout,
               ContainerTestHelper.CONTAINER_MAX_SIZE,
               UUID.randomUUID().toString(),
               UUID.randomUUID().toString());

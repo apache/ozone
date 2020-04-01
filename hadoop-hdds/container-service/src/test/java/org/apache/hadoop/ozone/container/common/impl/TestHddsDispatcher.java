@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Dispatche
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -54,6 +55,8 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -73,10 +76,22 @@ import static org.mockito.Mockito.verify;
 /**
  * Test-cases to verify the functionality of HddsDispatcher.
  */
+@RunWith(Parameterized.class)
 public class TestHddsDispatcher {
 
   public static final Consumer<ContainerReplicaProto> NO_OP_ICR_SENDER =
       c -> {};
+
+  private final ChunkLayOutVersion layout;
+
+  public TestHddsDispatcher(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
 
   @Test
   public void testContainerCloseActionWhenFull() throws IOException {
@@ -97,7 +112,7 @@ public class TestHddsDispatcher {
       Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(dd);
       Mockito.when(context.getParent()).thenReturn(stateMachine);
       KeyValueContainerData containerData = new KeyValueContainerData(1L,
-          ChunkLayOutVersion.FILE_PER_CHUNK,
+          layout,
           (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
           dd.getUuidString());
       Container container = new KeyValueContainer(containerData, conf);
@@ -132,6 +147,7 @@ public class TestHddsDispatcher {
 
     } finally {
       volumeSet.shutdown();
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
 
@@ -165,6 +181,7 @@ public class TestHddsDispatcher {
       Assert.assertEquals(response.getReadChunk().getData(),
           writeChunkRequest.getWriteChunk().getData());
     } finally {
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
   }
@@ -205,6 +222,7 @@ public class TestHddsDispatcher {
           "ContainerID " + writeChunkRequest.getContainerID()
               + " does not exist"));
     } finally {
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
   }
@@ -240,6 +258,7 @@ public class TestHddsDispatcher {
           .contains("ContainerID " + writeChunkRequest.getContainerID()
               + " creation failed , Result: DISK_OUT_OF_SPACE"));
     } finally {
+      ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
     }
   }
