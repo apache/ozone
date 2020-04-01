@@ -24,7 +24,11 @@ Test Timeout        5 minutes
 
 
 *** Test Cases ***
-Run list datanodes
-    ${output} =         Execute          ozone scmcli datanode list
-                        Should contain   ${output}   Datanode:
-                        Should contain   ${output}   Related pipelines:
+Run list pipeline
+    ${output} =         Execute          ozone admin pipeline list
+                        Should contain   ${output}   Type:
+                        Should contain   ${output}   Factor:ONE, State:
+
+Run create pipeline
+    ${output} =         Execute          ozone admin pipeline create
+                        Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE

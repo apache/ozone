@@ -39,7 +39,7 @@ HDDS_DN_OPTS=-Dmodule.name=datanode
 HDFS_OM_OPTS=-Dmodule.name=om
 HDFS_STORAGECONTAINERMANAGER_OPTS=-Dmodule.name=scm
 HDFS_OM_SH_OPTS=-Dmodule.name=sh
-HDFS_SCM_CLI_OPTS=-Dmodule.name=scmcli
+HDFS_SCM_CLI_OPTS=-Dmodule.name=admin
 
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
