@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#doc: Close pending pull request temporary.
+#doc: Close pending pull request temporary
 # shellcheck disable=SC2124
 MESSAGE="Thank you very much the patch. I am closing this issue __temporary__ as there was no 
 activity recently and it's pending on the author of the PR.
@@ -26,9 +26,7 @@ we prefer to clean the queue to show which PRs require review or feedback.
 
 If you need ANY help to finish this PR, please contact with the community on the mailing list or the slack channel.
 
-(See the README about the details of chat/mailing list: https://github.com/apache/hadoop-ozone)
-
-> $@"
+(See the README about the details of chat/mailing list: https://github.com/apache/hadoop-ozone)"
 
 set +x #GITHUB_TOKEN
 curl -s -o /dev/null \
