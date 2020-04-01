@@ -363,11 +363,6 @@ public final class ScmConfigKeys {
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
   public static final boolean HDDS_TRACING_ENABLED_DEFAULT = true;
 
-  public static final String HDDS_SCM_UNKNOWN_CONTAINER_DELETION_ENABLED =
-      "hdds.scm.unknown-container.deletion.enabled";
-  public static final boolean HDDS_SCM_UNKNOWN_CONTAINER_DELETION_ENABLED_DEFAULT
-      = false;
-
   /**
    * Never constructed.
    */

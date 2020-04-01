@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -55,7 +55,12 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
   private final NodeManager nodeManager;
   private final ContainerManager containerManager;
-  private final boolean unknownContainerDeletionEnabled;
+  private final String unknownContainerHandleAction;
+
+  /** The action taken by ContainerReportHandler to handle
+   *  unknown containers */
+  static final String UNKNOWN_CONTAINER_ACTION_WARN = "WARN";
+  static final String UNKNOWN_CONTAINER_ACTION_DELETE = "DELETE";
 
   /**
    * Constructs ContainerReportHandler instance with the
@@ -73,12 +78,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     this.containerManager = containerManager;
 
     if (conf != null) {
-      unknownContainerDeletionEnabled = conf.getBoolean(
-          ScmConfigKeys.HDDS_SCM_UNKNOWN_CONTAINER_DELETION_ENABLED,
-          ScmConfigKeys.HDDS_SCM_UNKNOWN_CONTAINER_DELETION_ENABLED_DEFAULT);
+      ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+      unknownContainerHandleAction = scmConfig.getUnknownContainerAction();
     } else {
-      unknownContainerDeletionEnabled =
-          ScmConfigKeys.HDDS_SCM_UNKNOWN_CONTAINER_DELETION_ENABLED_DEFAULT;
+      unknownContainerHandleAction = UNKNOWN_CONTAINER_ACTION_WARN;
     }
   }
 
@@ -149,11 +152,13 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       try {
         processContainerReplica(datanodeDetails, replicaProto);
       } catch (ContainerNotFoundException e) {
-        LOG.error("Received container report for an unknown container" +
-                " {} from datanode {}.", replicaProto.getContainerID(),
-            datanodeDetails, e);
-
-        if (unknownContainerDeletionEnabled) {
+        if(unknownContainerHandleAction.equals(
+            UNKNOWN_CONTAINER_ACTION_WARN)) {
+          LOG.error("Received container report for an unknown container" +
+              " {} from datanode {}.", replicaProto.getContainerID(),
+          datanodeDetails, e);
+        } else if (unknownContainerHandleAction.equals(
+            UNKNOWN_CONTAINER_ACTION_DELETE)) {
           final ContainerID containerId = ContainerID
               .valueof(replicaProto.getContainerID());
           final DeleteContainerCommand deleteCommand = new DeleteContainerCommand(

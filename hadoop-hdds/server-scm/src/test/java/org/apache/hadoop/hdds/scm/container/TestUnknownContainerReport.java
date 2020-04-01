@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server
@@ -86,8 +86,9 @@ public class TestUnknownContainerReport {
   @Test
   public void testUnknownContainerDeleted() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(
-        ScmConfigKeys.HDDS_SCM_UNKNOWN_CONTAINER_DELETION_ENABLED, true);
+    conf.set(
+        ScmConfig.HDDS_SCM_UNKNOWN_CONTAINER_ACTION,
+        ContainerReportHandler.UNKNOWN_CONTAINER_ACTION_DELETE);
 
     sendContainerReport(conf);
     verify(publisher, times(1)).fireEvent(
