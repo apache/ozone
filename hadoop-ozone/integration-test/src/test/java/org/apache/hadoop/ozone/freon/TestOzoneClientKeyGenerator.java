@@ -29,7 +29,9 @@ import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.slf4j.event.Level;
 
 /**
@@ -37,6 +39,12 @@ import org.slf4j.event.Level;
  */
 @Ignore("HDDS-3297")
 public class TestOzoneClientKeyGenerator {
+
+  /**
+   * Set a timeout for each test.
+   */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private String path;
 
