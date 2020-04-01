@@ -237,7 +237,7 @@ public class BaseFreonGenerator {
     attemptCounter = new AtomicLong(0);
 
     if (prefix.length() == 0) {
-      prefix = RandomStringUtils.randomAlphanumeric(10);
+      prefix = RandomStringUtils.randomAlphanumeric(10).toLowerCase();
     } else {
       //replace environment variables to support multi-node execution
       prefix = resolvePrefix(prefix);
