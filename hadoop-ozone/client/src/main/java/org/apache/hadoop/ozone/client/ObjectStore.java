@@ -250,7 +250,7 @@ public class ObjectStore {
       String volumePrefix, String prevVolume)
       throws IOException {
     if(Strings.isNullOrEmpty(user)) {
-      user = UserGroupInformation.getCurrentUser().getShortUserName();
+      user = UserGroupInformation.getCurrentUser().getUserName();
     }
     return new VolumeIterator(user, volumePrefix, prevVolume);
   }
