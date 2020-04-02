@@ -103,8 +103,11 @@ public class OzoneTokenIdentifier extends
           .setStrToSign(getStrToSign());
     } else {
       builder.setOmCertSerialId(getOmCertSerialId());
-      builder.setOmServiceId(getOmServiceId());
+      if (getOmServiceId() != null) {
+        builder.setOmServiceId(getOmServiceId());
+      }
     }
+
     OMTokenProto token = builder.build();
     out.write(token.toByteArray());
   }
@@ -128,13 +131,16 @@ public class OzoneTokenIdentifier extends
     setSequenceNumber(token.getSequenceNumber());
     setMasterKeyId(token.getMasterKeyId());
     setOmCertSerialId(token.getOmCertSerialId());
-    setOmServiceId(token.getOmServiceId());
 
     // Set s3 specific fields.
     if (getTokenType().equals(S3AUTHINFO)) {
       setAwsAccessId(token.getAccessKeyId());
       setSignature(token.getSignature());
       setStrToSign(token.getStrToSign());
+    }
+
+    if (token.hasOmServiceId()) {
+      setOmServiceId(token.getOmServiceId());
     }
   }
 

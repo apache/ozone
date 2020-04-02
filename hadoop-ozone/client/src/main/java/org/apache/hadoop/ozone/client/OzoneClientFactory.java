@@ -184,10 +184,10 @@ public final class OzoneClientFactory {
         return OzoneClientFactory.getRpcClient(omServiceId, conf);
       } else {
         // HA with mismatched service id
-        throw new IOException("Service ID specified does not match" +
-            " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
-            "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY +
-            " are" + conf.getTrimmedStringCollection(
+        throw new IOException("Service ID specified " + omServiceId +
+            " does not match" + " with " + OZONE_OM_SERVICE_IDS_KEY +
+            " defined in the " + "configuration. Configured " +
+            OZONE_OM_SERVICE_IDS_KEY + " are" + conf.getTrimmedStringCollection(
             OZONE_OM_SERVICE_IDS_KEY));
       }
     } else {

@@ -400,7 +400,7 @@ public class TestOzoneDelegationTokenSecretManager {
     return new OzoneDelegationTokenSecretManager.Builder()
         .setConf(config)
         .setTokenMaxLifetime(tokenMaxLife)
-        .setTokenRenewInterval(expiryTime)
+        .setTokenRenewInterval(expiry)
         .setTokenRemoverScanInterval(tokenRemoverScanTime)
         .setService(serviceRpcAdd)
         .setS3SecretManager(s3SecretManager)
