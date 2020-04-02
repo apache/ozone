@@ -176,8 +176,9 @@ public final class OzoneClientFactory {
     String omServiceId = token.decodeIdentifier().getOmServiceId();
     if (StringUtils.isNotEmpty(omServiceId)) {
       // new OM should always issue token with omServiceId
-      if (omServiceId.equals(OzoneConsts.OM_SERVICE_ID_DEFAULT)) {
-        // Non-HA
+      if (!OmUtils.isServiceIdsDefined(conf)
+          && omServiceId.equals(OzoneConsts.OM_SERVICE_ID_DEFAULT)) {
+        // Non-HA or single-node Ratis HA
         return OzoneClientFactory.getRpcClient(conf);
       } else if (OmUtils.isOmHAServiceId(conf, omServiceId)) {
         // HA with matching service id
@@ -196,10 +197,10 @@ public final class OzoneClientFactory {
       if (!OmUtils.isServiceIdsDefined(conf)) {
         return OzoneClientFactory.getRpcClient(conf);
       } else {
-        throw new IOException("Service ID must not"
-            + " be omitted when " + OZONE_OM_SERVICE_IDS_KEY + " is defined. " +
-            "Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
-            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+        throw new IOException("OzoneToken with no service ID can't "
+            + "be renewed or canceled with local OM HA setup because we "
+            + "don't know if the token is issued from local OM HA cluster "
+            + "or not.");
       }
     }
   }
