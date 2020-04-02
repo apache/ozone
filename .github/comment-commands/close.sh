@@ -21,8 +21,7 @@ activity recently and it is waiting for response from its author.
 
 It doesn't mean that this PR is not important or ignored: feel free to reopen the PR at any time.
 
-It means only that attention of commiters is not required. To get faster review for all the PRs, 
-we prefer to clean the queue to show which PRs require review or feedback.
+It only means that attention of committers is not required. We prefer to keep the review queue clean. This ensures PRs in need of review are more visible, which results in faster feedback for all PRs.
 
 If you need ANY help to finish this PR, please contact with the community on the mailing list or the slack channel.
 
