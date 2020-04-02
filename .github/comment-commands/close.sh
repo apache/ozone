@@ -16,8 +16,8 @@
 
 #doc: Close pending pull request temporary
 # shellcheck disable=SC2124
-MESSAGE="Thank you very much the patch. I am closing this issue __temporary__ as there was no 
-activity recently and it's pending on the author of the PR.
+MESSAGE="Thank you very much for the patch. I am closing this PR __temporarily__ as there was no 
+activity recently and it is waiting for response from its author.
 
 It doesn't mean that this PR is not important or ignored: feel free to reopen the PR at any time.
 
