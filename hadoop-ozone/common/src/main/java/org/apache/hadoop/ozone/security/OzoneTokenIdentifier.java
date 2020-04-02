@@ -47,6 +47,7 @@ public class OzoneTokenIdentifier extends
   private String awsAccessId;
   private String signature;
   private String strToSign;
+  private String omServiceId;
 
   /**
    * Create an empty delegation token identifier.
@@ -102,6 +103,7 @@ public class OzoneTokenIdentifier extends
           .setStrToSign(getStrToSign());
     } else {
       builder.setOmCertSerialId(getOmCertSerialId());
+      builder.setOmServiceId(getOmServiceId());
     }
     OMTokenProto token = builder.build();
     out.write(token.toByteArray());
@@ -126,6 +128,7 @@ public class OzoneTokenIdentifier extends
     setSequenceNumber(token.getSequenceNumber());
     setMasterKeyId(token.getMasterKeyId());
     setOmCertSerialId(token.getOmCertSerialId());
+    setOmServiceId(token.getOmServiceId());
 
     // Set s3 specific fields.
     if (getTokenType().equals(S3AUTHINFO)) {
@@ -160,6 +163,7 @@ public class OzoneTokenIdentifier extends
       identifier.setMasterKeyId(token.getMasterKeyId());
     }
     identifier.setOmCertSerialId(token.getOmCertSerialId());
+    identifier.setOmServiceId(token.getOmServiceId());
     return identifier;
   }
 
@@ -210,6 +214,7 @@ public class OzoneTokenIdentifier extends
         .append(getRenewer(), that.getRenewer())
         .append(getKind(), that.getKind())
         .append(getSequenceNumber(), that.getSequenceNumber())
+        .append(getOmServiceId(), that.getOmServiceId())
         .build();
   }
 
@@ -264,6 +269,14 @@ public class OzoneTokenIdentifier extends
     this.omCertSerialId = omCertSerialId;
   }
 
+  public String getOmServiceId() {
+    return omServiceId;
+  }
+
+  public void setOmServiceId(String omServiceId) {
+    this.omServiceId = omServiceId;
+  }
+
   public Type getTokenType() {
     return tokenType;
   }
@@ -309,7 +322,8 @@ public class OzoneTokenIdentifier extends
         .append(", masterKeyId=").append(getMasterKeyId())
         .append(", strToSign=").append(getStrToSign())
         .append(", signature=").append(getSignature())
-        .append(", awsAccessKeyId=").append(getAwsAccessId());
+        .append(", awsAccessKeyId=").append(getAwsAccessId())
+        .append(", omServiceId=").append(getOmServiceId());
     return buffer.toString();
   }
 }
