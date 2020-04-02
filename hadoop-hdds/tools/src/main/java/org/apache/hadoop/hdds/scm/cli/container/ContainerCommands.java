@@ -17,13 +17,18 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.MissingSubcommandException;
-import org.apache.hadoop.hdds.scm.cli.SCMCLI;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
-
+import java.io.IOException;
 import java.util.concurrent.Callable;
+
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.Spec;
 
 /**
  * Subcommand to group container related operations.
@@ -42,16 +47,27 @@ import java.util.concurrent.Callable;
     })
 public class ContainerCommands implements Callable<Void> {
 
-  @ParentCommand
-  private SCMCLI parent;
+  @Spec
+  private CommandSpec spec;
 
-  public SCMCLI getParent() {
+  @ParentCommand
+  private WithScmClient parent;
+
+  public WithScmClient getParent() {
     return parent;
   }
 
   @Override
   public Void call() throws Exception {
-    throw new MissingSubcommandException(
-        this.parent.getCmd().getSubcommands().get("container"));
+    GenericCli.missingSubcommand(spec);
+    return null;
+  }
+
+  public static void checkContainerExists(ScmClient scmClient, long containerId)
+      throws IOException {
+    ContainerInfo container = scmClient.getContainer(containerId);
+    if (container == null) {
+      throw new IllegalArgumentException("No such container " + containerId);
+    }
   }
 }

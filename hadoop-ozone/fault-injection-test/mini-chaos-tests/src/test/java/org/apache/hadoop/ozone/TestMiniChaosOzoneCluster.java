@@ -21,6 +21,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.MiniOzoneChaosCluster.FailureService;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Ignore;
@@ -43,6 +44,15 @@ public class TestMiniChaosOzoneCluster implements Runnable {
       description = "num of datanodes")
   private static int numDatanodes = 20;
 
+  @Option(names = {"-o", "--numOzoneManager"},
+      description = "num of ozoneManagers")
+  private static int numOzoneManagers = 1;
+
+  @Option(names = {"-s", "--failureService"},
+      description = "service (datanode or ozoneManager) to test chaos on",
+      defaultValue = "datanode")
+  private static String failureService = "datanode";
+
   @Option(names = {"-t", "--numThreads"},
       description = "num of IO threads")
   private static int numThreads = 5;
@@ -61,16 +71,26 @@ public class TestMiniChaosOzoneCluster implements Runnable {
 
   @Option(names = {"-i", "--failureInterval"},
       description = "time between failure events in seconds")
-  private static int failureInterval = 300; // 5 second period between failures.
+  private static int failureInterval = 300; // 5 minute period between failures.
 
   private static MiniOzoneChaosCluster cluster;
   private static MiniOzoneLoadGenerator loadGenerator;
 
+  private static final String OM_SERVICE_ID = "ozoneChaosTest";
+
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
+    String omServiceID =
+        FailureService.of(failureService) == FailureService.OZONE_MANAGER ?
+            OM_SERVICE_ID : null;
+
     cluster = new MiniOzoneChaosCluster.Builder(configuration)
-        .setNumDatanodes(numDatanodes).build();
+        .setNumDatanodes(numDatanodes)
+        .setNumOzoneManagers(numOzoneManagers)
+        .setFailureService(failureService)
+        .setOMServiceID(omServiceID)
+        .build();
     cluster.waitForClusterToBeReady();
 
     String volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -80,7 +100,7 @@ public class TestMiniChaosOzoneCluster implements Runnable {
 
     loadGenerator =
         new MiniOzoneLoadGenerator(volume, numClients, numThreads,
-            numBuffers, configuration);
+            numBuffers, configuration, omServiceID);
   }
 
   /**

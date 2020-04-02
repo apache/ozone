@@ -244,8 +244,7 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
 
     Response response = containerEndpoint.getKeysForContainer(1L, -1, "");
 
-    KeysResponse responseObject = (KeysResponse) response.getEntity();
-    KeysResponse.KeysResponseData data = responseObject.getKeysResponseData();
+    KeysResponse data = (KeysResponse) response.getEntity();
     Collection<KeyMetadata> keyMetadataList = data.getKeys();
 
     assertEquals(3, data.getTotalCount());
@@ -272,16 +271,14 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
     assertEquals(104, blockIds.get(1L).iterator().next().getLocalID());
 
     response = containerEndpoint.getKeysForContainer(3L, -1, "");
-    responseObject = (KeysResponse) response.getEntity();
-    data = responseObject.getKeysResponseData();
+    data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
     assertTrue(keyMetadataList.isEmpty());
     assertEquals(0, data.getTotalCount());
 
     // test if limit works as expected
     response = containerEndpoint.getKeysForContainer(1L, 1, "");
-    responseObject = (KeysResponse) response.getEntity();
-    data = responseObject.getKeysResponseData();
+    data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
     assertEquals(1, keyMetadataList.size());
     assertEquals(3, data.getTotalCount());
@@ -293,11 +290,9 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
     Response response = containerEndpoint.getKeysForContainer(
         1L, -1, "/sampleVol/bucketOne/key_one");
 
-    KeysResponse responseObject =
+    KeysResponse data =
         (KeysResponse) response.getEntity();
 
-    KeysResponse.KeysResponseData data =
-        responseObject.getKeysResponseData();
     assertEquals(3, data.getTotalCount());
 
     Collection<KeyMetadata> keyMetadataList = data.getKeys();
@@ -312,8 +307,7 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
 
     response = containerEndpoint.getKeysForContainer(
         1L, -1, StringUtils.EMPTY);
-    responseObject = (KeysResponse) response.getEntity();
-    data = responseObject.getKeysResponseData();
+    data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
 
     assertEquals(3, data.getTotalCount());
@@ -325,16 +319,14 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
     // test for negative cases
     response = containerEndpoint.getKeysForContainer(
         1L, -1, "/sampleVol/bucketOne/invalid_key");
-    responseObject = (KeysResponse) response.getEntity();
-    data = responseObject.getKeysResponseData();
+    data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
     assertEquals(3, data.getTotalCount());
     assertEquals(0, keyMetadataList.size());
 
     response = containerEndpoint.getKeysForContainer(
         5L, -1, "");
-    responseObject = (KeysResponse) response.getEntity();
-    data = responseObject.getKeysResponseData();
+    data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
     assertEquals(0, keyMetadataList.size());
     assertEquals(0, data.getTotalCount());

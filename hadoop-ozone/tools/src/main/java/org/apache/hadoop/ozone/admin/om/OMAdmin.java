@@ -19,16 +19,17 @@ package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.MissingSubcommandException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import picocli.CommandLine;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import picocli.CommandLine;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
 
 /**
  * Subcommand for admin operations related to OM.
@@ -46,14 +47,17 @@ public class OMAdmin extends GenericCli {
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
 
+  @Spec
+  private CommandSpec spec;
+
   public OzoneAdmin getParent() {
     return parent;
   }
 
   @Override
   public Void call() throws Exception {
-    throw new MissingSubcommandException(
-        this.parent.getCmd().getSubcommands().get("om"));
+    GenericCli.missingSubcommand(spec);
+    return null;
   }
 
   public ClientProtocol createClient(String omServiceId) throws Exception {

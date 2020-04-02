@@ -24,7 +24,10 @@ Test Timeout        5 minutes
 
 
 *** Test Cases ***
-Run list datanodes
-    ${output} =         Execute          ozone scmcli datanode list
-                        Should contain   ${output}   Datanode:
-                        Should contain   ${output}   Related pipelines:
+Run printTopology
+    ${output} =         Execute          ozone admin printTopology
+                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)    /rack2
+Run printTopology -o
+    ${output} =         Execute          ozone admin printTopology -o
+                        Should contain   ${output}         Location: /rack2
+                        Should contain   ${output}         10.5.0.7(ozone-topology_datanode_4_1.ozone-topology_net)
