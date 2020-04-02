@@ -204,14 +204,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.num.read.chunk.threads</name>
-    <value>10</value>
-    <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum number of threads in the thread pool that Ratis
-      will use for reading chunks (10 by default).
-    </description>
-  </property>
-  <property>
     <name>dfs.container.ratis.leader.pending.bytes.limit</name>
     <value>1GB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
