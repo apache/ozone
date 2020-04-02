@@ -43,25 +43,20 @@ public class CreateVolumeHandler extends Handler {
 
   @Option(names = {"--user", "-u"},
       description = "Owner of of the volume")
-  private String userName;
+  private String ownerName;
 
   @Option(names = {"--quota", "-q"},
       description =
           "Quota of the newly created volume (eg. 1G)")
   private String quota;
 
-  @Option(names = {"--root"},
-      description = "Development flag to execute the "
-          + "command as the admin (hdfs) user.")
-  private boolean root;
-
   /**
    * Executes the Create Volume.
    */
   @Override
   public Void call() throws Exception {
-    if(userName == null) {
-      userName = UserGroupInformation.getCurrentUser().getUserName();
+    if (ownerName == null) {
+      ownerName = UserGroupInformation.getCurrentUser().getUserName();
     }
 
     OzoneAddress address = new OzoneAddress(uri);
@@ -75,16 +70,10 @@ public class CreateVolumeHandler extends Handler {
         System.out.printf("Volume name : %s%n", volumeName);
       }
 
-      String rootName;
-      if (root) {
-        rootName = "hdfs";
-      } else {
-        rootName = UserGroupInformation.getCurrentUser().getShortUserName();
-      }
-
+      String adminName = UserGroupInformation.getCurrentUser().getUserName();
       VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
-          .setAdmin(rootName)
-          .setOwner(userName);
+          .setAdmin(adminName)
+          .setOwner(ownerName);
       if (quota != null) {
         volumeArgsBuilder.setQuota(quota);
       }

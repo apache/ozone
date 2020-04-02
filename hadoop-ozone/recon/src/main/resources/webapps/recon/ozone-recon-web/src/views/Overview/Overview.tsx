@@ -23,6 +23,7 @@ import axios from 'axios';
 import prettyBytes from 'pretty-bytes';
 import './Overview.less';
 import {StorageReport} from "types/datanode.types";
+import {MissingContainersResponse} from "../MissingContainers/MissingContainers";
 
 interface ClusterStateResponse {
   totalDatanodes: number;
@@ -73,9 +74,12 @@ export class Overview extends React.Component<any, OverviewState> {
       loading: true
     });
     axios.all([
-        axios.get('/api/v1/clusterState')
-    ]).then(axios.spread((clusterStateResponse) => {
+        axios.get('/api/v1/clusterState'),
+        axios.get('/api/v1/containers/missing')
+    ]).then(axios.spread((clusterStateResponse, missingContainersResponse) => {
       const clusterState: ClusterStateResponse = clusterStateResponse.data;
+      const missingContainers: MissingContainersResponse = missingContainersResponse.data;
+      const missingContainersCount = missingContainers.totalCount;
       this.setState({
         loading: false,
         datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
@@ -85,7 +89,7 @@ export class Overview extends React.Component<any, OverviewState> {
         volumes: clusterState.volumes,
         buckets: clusterState.buckets,
         keys: clusterState.keys,
-        missingContainersCount: 0
+        missingContainersCount
       });
     }));
   }
@@ -103,7 +107,7 @@ export class Overview extends React.Component<any, OverviewState> {
           <Tooltip placement="bottom" title={`${missingContainersCount} ${containersTooltip}`}>
             <Icon type="exclamation-circle" theme="filled" className="icon-failure icon-small"/>
           </Tooltip>
-          <span className="padded-text">{containers}</span>
+          <span className="padded-text">{containers-missingContainersCount}/{containers}</span>
         </span>
         : containers.toString();
     const clusterCapacity = `${prettyBytes(storageReport.capacity - storageReport.remaining)}/${prettyBytes(storageReport.capacity)}`;
