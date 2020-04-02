@@ -74,13 +74,6 @@ public final class KeyValueContainerUtil {
           " Path: " + containerMetaDataPath);
     }
 
-    MetadataStore store = MetadataStoreBuilder.newBuilder().setConf(conf)
-        .setCreateIfMissing(true).setDbFile(dbFile).build();
-    ReferenceCountedDB db =
-        new ReferenceCountedDB(store, dbFile.getAbsolutePath());
-    //add db handler into cache
-    BlockUtils.addDB(db, dbFile.getAbsolutePath(), conf);
-
     if (!chunksPath.mkdirs()) {
       LOG.error("Unable to create chunks directory Container {}",
           chunksPath);
@@ -90,6 +83,13 @@ public final class KeyValueContainerUtil {
       throw new IOException("Unable to create directory for data storage." +
           " Path: " + chunksPath);
     }
+
+    MetadataStore store = MetadataStoreBuilder.newBuilder().setConf(conf)
+        .setCreateIfMissing(true).setDbFile(dbFile).build();
+    ReferenceCountedDB db =
+        new ReferenceCountedDB(store, dbFile.getAbsolutePath());
+    //add db handler into cache
+    BlockUtils.addDB(db, dbFile.getAbsolutePath(), conf);
   }
 
   /**
