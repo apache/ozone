@@ -104,6 +104,9 @@ execute_robot_test(){
 
   FULL_CONTAINER_NAME=$(docker-compose -f "$COMPOSE_FILE" ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
+
+  copy_daemon_logs
+
   set -e
 
   if [[ ${rc} -gt 0 ]]; then
@@ -111,6 +114,16 @@ execute_robot_test(){
   fi
 
   return ${rc}
+}
+
+## @description Copy any 'out' files for daemon processes to the result dir
+copy_daemon_logs() {
+  local c f
+  for c in $(docker-compose -f "$COMPOSE_FILE" ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
+    for f in $(docker exec "${c}" ls -1 /var/log/hadoop | grep -F '.out'); do
+      docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
+    done
+  done
 }
 
 
