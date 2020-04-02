@@ -250,11 +250,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
               getNotLeaderException(exception);
           if (notLeaderException != null &&
               notLeaderException.getSuggestedLeaderNodeId() != null) {
-            // We need to failover manually to the suggested Leader OM Node.
+            // TODO: NotLeaderException should include the host
+            //  address of the suggested leader along with the nodeID.
+            //  Failing over just based on nodeID is not very robust.
+
             // OMFailoverProxyProvider#performFailover() is a dummy call and
-            // does not perform any failover.
-            omFailoverProxyProvider.performFailoverIfRequired(
-                notLeaderException.getSuggestedLeaderNodeId());
+            // does not perform any failover. Failover manually to the next OM.
+            omFailoverProxyProvider.performFailoverToNextProxy();
             return getRetryAction(FAILOVER_AND_RETRY, failovers);
           }
 
@@ -263,7 +265,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           // As in this case, current OM node is leader, but it is not ready.
           // OMFailoverProxyProvider#performFailover() is a dummy call and
           // does not perform any failover.
-          // So Just retry with same ON node.
+          // So Just retry with same OM node.
           if (leaderNotReadyException != null) {
             return getRetryAction(FAILOVER_AND_RETRY, failovers);
           }
