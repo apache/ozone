@@ -31,7 +31,7 @@ start_docker_env 4
 
 execute_robot_test scm basic/basic.robot
 
-execute_robot_test scm topology/scmcli.robot
+execute_robot_test scm topology/cli.robot
 
 stop_docker_env
 

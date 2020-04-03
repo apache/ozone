@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -605,9 +606,9 @@ public class SCMPipelineManager implements PipelineManager {
       MBeans.unregister(this.pmInfoBean);
       pmInfoBean = null;
     }
-    if(metrics != null) {
-      metrics.unRegister();
-    }
+
+    SCMPipelineMetrics.unRegister();
+
     // shutdown pipeline provider.
     pipelineFactory.shutdown();
   }
@@ -635,13 +636,20 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void setSafeModeStatus(boolean safeModeStatus) {
-    this.isInSafeMode.set(safeModeStatus);
+  public boolean getSafeModeStatus() {
+    return this.isInSafeMode.get();
   }
 
   @Override
-  public boolean getSafeModeStatus() {
-    return this.isInSafeMode.get();
+  public void handleSafeModeTransition(
+      SCMSafeModeManager.SafeModeStatus status) {
+    this.isInSafeMode.set(status.getSafeModeStatus());
+    if (!status.getSafeModeStatus()) {
+      // TODO: #CLUTIL if we reenter safe mode the fixed interval pipeline
+      // creation job needs to stop
+      startPipelineCreator();
+      triggerPipelineCreation();
+    }
   }
 
 }

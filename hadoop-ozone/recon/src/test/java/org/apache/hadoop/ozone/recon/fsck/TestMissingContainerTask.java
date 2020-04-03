@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,18 +21,19 @@ package org.apache.hadoop.ozone.recon.fsck;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
-import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
@@ -49,7 +50,7 @@ import org.junit.Test;
 public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
 
   @Test
-  public void testRun() throws IOException, SQLException, InterruptedException {
+  public void testRun() throws Exception {
     Configuration sqlConfiguration =
         getInjector().getInstance((Configuration.class));
 
@@ -64,13 +65,23 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
     ReconStorageContainerManagerFacade scmMock =
         mock(ReconStorageContainerManagerFacade.class);
     ContainerManager containerManagerMock = mock(ContainerManager.class);
+    ContainerReplica unhealthyReplicaMock = mock(ContainerReplica.class);
+    when(unhealthyReplicaMock.getState()).thenReturn(State.UNHEALTHY);
+    ContainerReplica healthyReplicaMock = mock(ContainerReplica.class);
+    when(healthyReplicaMock.getState()).thenReturn(State.CLOSED);
     when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
     when(containerManagerMock.getContainerIDs())
         .thenReturn(getMockContainerIDs(3));
+    // return one HEALTHY and one UNHEALTHY replica for container ID 1
     when(containerManagerMock.getContainerReplicas(new ContainerID(1L)))
-        .thenReturn(Collections.singleton(mock(ContainerReplica.class)));
+        .thenReturn(Collections.unmodifiableSet(
+            new HashSet<>(
+                Arrays.asList(healthyReplicaMock, unhealthyReplicaMock)
+            )));
+    // return one UNHEALTHY replica for container ID 2
     when(containerManagerMock.getContainerReplicas(new ContainerID(2L)))
-        .thenReturn(Collections.singleton(mock(ContainerReplica.class)));
+        .thenReturn(Collections.singleton(unhealthyReplicaMock));
+    // return 0 replicas for container ID 3
     when(containerManagerMock.getContainerReplicas(new ContainerID(3L)))
         .thenReturn(Collections.emptySet());
 
@@ -89,17 +100,20 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
             missingContainersDao);
     missingContainerTask.register();
     missingContainerTask.start();
-    Thread.sleep(5000L);
 
+    LambdaTestUtils.await(6000, 1000, () ->
+        (missingContainersTableHandle.findAll().size() == 2));
     all = missingContainersTableHandle.findAll();
-    Assert.assertEquals(1, all.size());
-    Assert.assertEquals(3, all.get(0).getContainerId().longValue());
-
+    // Container IDs 2 and 3 should be present in the missing containers table
+    Set<Long> missingContainerIDs = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList(2L, 3L))
+    );
+    Assert.assertTrue(all.stream().allMatch(r ->
+        missingContainerIDs.contains(r.getContainerId())));
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(missingContainerTask.getTaskName());
     Assert.assertTrue(taskStatus.getLastUpdatedTimestamp() >
         currentTime);
-
   }
 
   private Set<ContainerID> getMockContainerIDs(int num) {

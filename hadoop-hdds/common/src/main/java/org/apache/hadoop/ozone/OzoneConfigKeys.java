@@ -143,7 +143,7 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_CLIENT_MAX_RETRIES =
       "ozone.client.max.retries";
-  public static final int OZONE_CLIENT_MAX_RETRIES_DEFAULT = 100;
+  public static final int OZONE_CLIENT_MAX_RETRIES_DEFAULT = 5;
   public static final String OZONE_CLIENT_RETRY_INTERVAL =
       "ozone.client.retry.interval";
   public static final TimeDuration OZONE_CLIENT_RETRY_INTERVAL_DEFAULT =
@@ -365,9 +365,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_VERIFY_CHECKSUM =
       "ozone.client.verify.checksum";
   public static final boolean OZONE_CLIENT_VERIFY_CHECKSUM_DEFAULT = true;
-  public static final String OZONE_CLIENT_READ_TIMEOUT
-          = "ozone.client.read.timeout";
-  public static final String OZONE_CLIENT_READ_TIMEOUT_DEFAULT = "30s";
   public static final String OZONE_ACL_AUTHORIZER_CLASS =
       "ozone.acl.authorizer.class";
   public static final String OZONE_ACL_AUTHORIZER_CLASS_DEFAULT =

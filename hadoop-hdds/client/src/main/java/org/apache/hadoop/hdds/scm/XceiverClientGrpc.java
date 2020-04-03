@@ -189,14 +189,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     ManagedChannel channel = channelBuilder.build();
     XceiverClientProtocolServiceStub asyncStub =
         XceiverClientProtocolServiceGrpc.newStub(channel);
-    long duration = config.getTimeDuration(OzoneConfigKeys.
-            OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
-            .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
-
-    // set the grpc dealine here so as if the response is not received
-    // in the configured time, the rpc will fail with DEADLINE_EXCEEDED here
-    asyncStubs.put(dn.getUuid(), asyncStub.withDeadlineAfter(duration,
-            TimeUnit.SECONDS));
+    asyncStubs.put(dn.getUuid(), asyncStub);
     channels.put(dn.getUuid(), channel);
   }
 

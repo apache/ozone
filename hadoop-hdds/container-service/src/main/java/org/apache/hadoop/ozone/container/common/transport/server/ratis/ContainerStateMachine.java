@@ -609,19 +609,6 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   /**
-   * Reads the Entry from the Cache or loads it back by reading from disk.
-   */
-  private ByteString getCachedStateMachineData(Long logIndex, long term,
-      ContainerCommandRequestProto requestProto)
-      throws IOException {
-    ByteString data = stateMachineDataCache.get(logIndex);
-    if (data == null) {
-      data = readStateMachineData(requestProto, term, logIndex);
-    }
-    return data;
-  }
-
-  /**
    * Returns the combined future of all the writeChunks till the given log
    * index. The Raft log worker will wait for the stateMachineData to complete
    * flush as well.
@@ -659,11 +646,17 @@ public class ContainerStateMachine extends BaseStateMachine {
       Preconditions.checkArgument(!HddsUtils.isReadOnly(requestProto));
       if (requestProto.getCmdType() == Type.WriteChunk) {
         final CompletableFuture<ByteString> future = new CompletableFuture<>();
+        ByteString data = stateMachineDataCache.get(entry.getIndex());
+        if (data != null) {
+          future.complete(data);
+          return future;
+        }
+
         CompletableFuture.supplyAsync(() -> {
           try {
             future.complete(
-                getCachedStateMachineData(entry.getIndex(), entry.getTerm(),
-                    requestProto));
+                readStateMachineData(requestProto, entry.getTerm(),
+                    entry.getIndex()));
           } catch (IOException e) {
             metrics.incNumReadStateMachineFails();
             future.completeExceptionally(e);

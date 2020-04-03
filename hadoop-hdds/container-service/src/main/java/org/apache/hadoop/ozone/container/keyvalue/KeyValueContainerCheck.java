@@ -30,17 +30,17 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -57,7 +57,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_
 
 public class KeyValueContainerCheck {
 
-  private static final Logger LOG = LoggerFactory.getLogger(Container.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(KeyValueContainerCheck.class);
 
   private long containerID;
   private KeyValueContainerData onDiskContainerData; //loaded from fs/disk
@@ -213,10 +214,9 @@ public class KeyValueContainerCheck {
      */
     Preconditions.checkState(onDiskContainerData != null,
         "invoke loadContainerData prior to calling this function");
-    File dbFile;
-    File metaDir = new File(metadataPath);
 
-    dbFile = KeyValueContainerLocationUtil
+    File metaDir = new File(metadataPath);
+    File dbFile = KeyValueContainerLocationUtil
         .getContainerDBFile(metaDir, containerID);
 
     if (!dbFile.exists() || !dbFile.canRead()) {
@@ -227,6 +227,9 @@ public class KeyValueContainerCheck {
     }
 
     onDiskContainerData.setDbFile(dbFile);
+
+    ChunkLayOutVersion layout = onDiskContainerData.getLayOutVersion();
+
     try(ReferenceCountedDB db =
             BlockUtils.getDB(onDiskContainerData, checkConfig);
         KeyValueBlockIterator kvIter = new KeyValueBlockIterator(containerID,
@@ -235,8 +238,9 @@ public class KeyValueContainerCheck {
       while(kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
         for(ContainerProtos.ChunkInfo chunk : block.getChunks()) {
-          File chunkFile = ChunkUtils.getChunkFile(onDiskContainerData,
-              ChunkInfo.getFromProtoBuf(chunk));
+          File chunkFile = layout.getChunkFile(onDiskContainerData,
+              block.getBlockID(), ChunkInfo.getFromProtoBuf(chunk));
+
           if (!chunkFile.exists()) {
             // concurrent mutation in Block DB? lookup the block again.
             byte[] bdata = db.getStore().get(
@@ -246,48 +250,73 @@ public class KeyValueContainerCheck {
                   + chunkFile.getAbsolutePath());
             }
           } else if (chunk.getChecksumData().getType()
-              != ContainerProtos.ChecksumType.NONE){
-            int length = chunk.getChecksumData().getChecksumsList().size();
-            ChecksumData cData = new ChecksumData(
-                chunk.getChecksumData().getType(),
-                chunk.getChecksumData().getBytesPerChecksum(),
-                chunk.getChecksumData().getChecksumsList());
-            Checksum cal = new Checksum(cData.getChecksumType(),
-                cData.getBytesPerChecksum());
-            long bytesRead = 0;
-            byte[] buffer = new byte[cData.getBytesPerChecksum()];
-            try (InputStream fs = new FileInputStream(chunkFile)) {
-              for (int i = 0; i < length; i++) {
-                int v = fs.read(buffer);
-                if (v == -1) {
-                  break;
-                }
-                bytesRead += v;
-                throttler.throttle(v, canceler);
-                ByteString expected = cData.getChecksums().get(i);
-                ByteString actual = cal.computeChecksum(buffer, 0, v)
-                    .getChecksums().get(0);
-                if (!expected.equals(actual)) {
-                  throw new OzoneChecksumException(String
-                      .format("Inconsistent read for chunk=%s len=%d expected" +
-                              " checksum %s actual checksum %s for block %s",
-                          chunk.getChunkName(), chunk.getLen(),
-                          Arrays.toString(expected.toByteArray()),
-                          Arrays.toString(actual.toByteArray()),
-                          block.getBlockID()));
-                }
-
-              }
-              if (bytesRead != chunk.getLen()) {
-                throw new OzoneChecksumException(String
-                    .format("Inconsistent read for chunk=%s expected length=%d"
-                            + " actual length=%d for block %s",
-                        chunk.getChunkName(),
-                        chunk.getLen(), bytesRead, block.getBlockID()));
-              }
-            }
+              != ContainerProtos.ChecksumType.NONE) {
+            verifyChecksum(block, chunk, chunkFile, layout, throttler,
+                canceler);
           }
         }
+      }
+    }
+  }
+
+  private static void verifyChecksum(BlockData block,
+      ContainerProtos.ChunkInfo chunk, File chunkFile,
+      ChunkLayOutVersion layout,
+      DataTransferThrottler throttler, Canceler canceler) throws IOException {
+    ChecksumData checksumData =
+        ChecksumData.getFromProtoBuf(chunk.getChecksumData());
+    int checksumCount = checksumData.getChecksums().size();
+    int bytesPerChecksum = checksumData.getBytesPerChecksum();
+    Checksum cal = new Checksum(checksumData.getChecksumType(),
+        bytesPerChecksum);
+    ByteBuffer buffer = ByteBuffer.allocate(bytesPerChecksum);
+    long bytesRead = 0;
+    try (FileChannel channel = FileChannel.open(chunkFile.toPath(),
+        ChunkUtils.READ_OPTIONS, ChunkUtils.NO_ATTRIBUTES)) {
+      if (layout == ChunkLayOutVersion.FILE_PER_BLOCK) {
+        channel.position(chunk.getOffset());
+      }
+      for (int i = 0; i < checksumCount; i++) {
+        // limit last read for FILE_PER_BLOCK, to avoid reading next chunk
+        if (layout == ChunkLayOutVersion.FILE_PER_BLOCK &&
+            i == checksumCount - 1 &&
+            chunk.getLen() % bytesPerChecksum != 0) {
+          buffer.limit((int) (chunk.getLen() % bytesPerChecksum));
+        }
+
+        int v = channel.read(buffer);
+        if (v == -1) {
+          break;
+        }
+        bytesRead += v;
+        buffer.flip();
+
+        throttler.throttle(v, canceler);
+
+        ByteString expected = checksumData.getChecksums().get(i);
+        ByteString actual = cal.computeChecksum(buffer)
+            .getChecksums().get(0);
+        if (!expected.equals(actual)) {
+          throw new OzoneChecksumException(String
+              .format("Inconsistent read for chunk=%s" +
+                  " checksum item %d" +
+                  " expected checksum %s" +
+                  " actual checksum %s" +
+                  " for block %s",
+                  ChunkInfo.getFromProtoBuf(chunk),
+                  i,
+                  Arrays.toString(expected.toByteArray()),
+                  Arrays.toString(actual.toByteArray()),
+                  block.getBlockID()));
+        }
+
+      }
+      if (bytesRead != chunk.getLen()) {
+        throw new OzoneChecksumException(String
+            .format("Inconsistent read for chunk=%s expected length=%d"
+                    + " actual length=%d for block %s",
+                chunk.getChunkName(),
+                chunk.getLen(), bytesRead, block.getBlockID()));
       }
     }
   }

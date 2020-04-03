@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTra
 
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
+import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
@@ -86,7 +87,7 @@ public class SCMBlockProtocolServer implements
   private final OzoneConfiguration conf;
   private final RPC.Server blockRpcServer;
   private final InetSocketAddress blockRpcAddress;
-  private final ProtocolMessageMetrics
+  private final ProtocolMessageMetrics<ProtocolMessageEnum>
       protocolMessageMetrics;
 
   /**
@@ -104,7 +105,8 @@ public class SCMBlockProtocolServer implements
         ProtobufRpcEngine.class);
 
     protocolMessageMetrics =
-        ProtocolMessageMetrics.create("ScmBlockLocationProtocol",
+        ProtocolMessageMetrics.create(
+            "ScmBlockLocationProtocol",
             "SCM Block location protocol counters",
             ScmBlockLocationProtocolProtos.Type.values());
 
