@@ -1598,7 +1598,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param vol     - name of volume
    * @param bucket  - bucket name
    * @param key     - key
-   * @throws OMException
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied.
    */
   private void checkAcls(ResourceType resType, StoreType store,
       ACLType acl, String vol, String bucket, String key)
@@ -1606,26 +1606,53 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     checkAcls(resType, store, acl, vol, bucket, key,
         ProtobufRpcEngine.Server.getRemoteUser(),
         ProtobufRpcEngine.Server.getRemoteIp(),
-        ProtobufRpcEngine.Server.getRemoteIp().getHostName());
+        ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
+        true);
   }
 
   /**
+   * A variant of checkAcls that doesn't throw exception if permission denied.
+   * @return true if permission granted, false if permission denied.
+   */
+  private boolean hasAcls(ResourceType resType, StoreType store,
+      ACLType acl, String vol, String bucket, String key) {
+    try {
+      return checkAcls(resType, store, acl, vol, bucket, key,
+          ProtobufRpcEngine.Server.getRemoteUser(),
+          ProtobufRpcEngine.Server.getRemoteIp(),
+          ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
+          false);
+    } catch (OMException ex) {
+      // Should not trigger exception here at all
+      return false;
+    }
+  }
+
+
+  /**
    * CheckAcls for the ozone object.
-   * @param resType
-   * @param storeType
-   * @param aclType
-   * @param vol
-   * @param bucket
-   * @param key
-   * @param ugi
-   * @param remoteAddress
-   * @param hostName
-   * @throws OMException
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied.
    */
   @SuppressWarnings("parameternumber")
   public void checkAcls(ResourceType resType, StoreType storeType,
       ACLType aclType, String vol, String bucket, String key,
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName)
+      throws OMException {
+    checkAcls(resType, storeType, aclType, vol, bucket, key,
+        ugi, remoteAddress, hostName, true);
+  }
+
+  /**
+   * CheckAcls for the ozone object.
+   * @return true if permission granted, false if permission denied.
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
+   *                     and throwOnPermissionDenied set to true.
+   */
+  @SuppressWarnings("parameternumber")
+  private boolean checkAcls(ResourceType resType, StoreType storeType,
+      ACLType aclType, String vol, String bucket, String key,
+      UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
+      boolean throwIfPermissionDenied)
       throws OMException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(resType)
@@ -1641,11 +1668,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setAclRights(aclType)
         .build();
     if (!accessAuthorizer.checkAccess(obj, context)) {
-      LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
-          ugi.getUserName(), aclType, resType, vol, bucket, key);
-      throw new OMException("User " + ugi.getUserName() + " doesn't " +
-          "have " + aclType + " permission to access " + resType,
-          ResultCodes.PERMISSION_DENIED);
+      if (throwIfPermissionDenied) {
+        LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
+            ugi.getUserName(), aclType, resType, vol, bucket, key);
+        throw new OMException("User " + ugi.getUserName() + " doesn't have " +
+            aclType + " permission to access " + resType,
+            ResultCodes.PERMISSION_DENIED);
+      }
+      return false;
+    } else {
+      return true;
     }
   }
 
@@ -1845,12 +1877,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumVolumeLists();
       if (isAclEnabled) {
         // List all volumes first
-        List<OmVolumeArgs> listOfAllVolumes = volumeManager.listVolumes(
+        List<OmVolumeArgs> listAllVolumes = volumeManager.listVolumes(
             null, prefix, prevKey, maxKeys);
-        // Filter all volumes by ACL LIST permission of UGI
-        return listOfAllVolumes.stream().filter(v -> v.getAclMap()
-            .hasAccess(IAccessAuthorizer.ACLType.LIST, remoteUserUgi))
-            .collect(Collectors.toList());
+        List<OmVolumeArgs> result = new ArrayList<>();
+        // Filter all volumes by LIST ACL
+        for (OmVolumeArgs volumeArgs : listAllVolumes) {
+          if (hasAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
+              volumeArgs.getVolume(), null, null)) {
+            result.add(volumeArgs);
+          }
+        }
+        return result;
       } else {
         // When ACL is not enabled, fallback to filter by owner
         return volumeManager.listVolumes(userName, prefix, prevKey, maxKeys);
