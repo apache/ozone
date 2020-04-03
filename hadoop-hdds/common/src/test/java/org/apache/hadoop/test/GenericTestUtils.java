@@ -45,7 +45,7 @@ import org.apache.log4j.WriterAppender;
 import org.junit.Assert;
 
 /**
- * Test provides some very generic helpers which might be used across the tests
+ * Test provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
 
@@ -200,7 +200,7 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * @deprecated use {@link #setLogLevel(org.slf4j.Logger, org.slf4j.event.Level)} instead
+   * @deprecated use sl4fj based version
    */
   @Deprecated
   public static void setLogLevel(Logger logger, Level level) {
@@ -216,7 +216,10 @@ public abstract class GenericTestUtils {
     setLogLevel(LogManager.getRootLogger(), Level.toLevel(level.toString()));
   }
 
-  public static class LogCapturer {
+  /**
+   * Class to capture logs for doing assertions.
+   */
+  public static final class LogCapturer {
     private StringWriter sw = new StringWriter();
     private WriterAppender appender;
     private Logger logger;

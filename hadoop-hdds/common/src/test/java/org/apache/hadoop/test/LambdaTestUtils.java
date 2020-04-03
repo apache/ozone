@@ -30,8 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class containing methods and associated classes to make the most of Lambda
- * expressions in Hadoop tests.
+ * Class to make the most of Lambda expressions in Ozone tests.
  *
  * The code has been designed from the outset to be Java-8 friendly, but
  * to still be usable in Java 7.
@@ -253,7 +252,8 @@ public final class LambdaTestUtils {
         ex = e;
       }
       running = Time.now() < endTime;
-      if (running && (sleeptime = retry.call()) >= 0) {
+      sleeptime = retry.call();
+      if (running && sleeptime >= 0) {
         Thread.sleep(sleeptime);
       }
     } while (running);
