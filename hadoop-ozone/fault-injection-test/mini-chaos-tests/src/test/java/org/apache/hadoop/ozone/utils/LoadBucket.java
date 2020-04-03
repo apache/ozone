@@ -49,10 +49,15 @@ public class LoadBucket {
   private final OzoneBucket bucket;
   private final OzoneFileSystem fs;
 
-  public LoadBucket(OzoneBucket bucket, OzoneConfiguration conf)
-      throws Exception {
+  public LoadBucket(OzoneBucket bucket, OzoneConfiguration conf,
+      String omServiceID) throws Exception {
     this.bucket = bucket;
-    this.fs = (OzoneFileSystem)FileSystem.get(getFSUri(bucket), conf);
+    if (omServiceID == null) {
+      this.fs = (OzoneFileSystem) FileSystem.get(getFSUri(bucket), conf);
+    } else {
+      this.fs = (OzoneFileSystem) FileSystem.get(getFSUri(bucket, omServiceID),
+          conf);
+    }
   }
 
   private boolean isFsOp() {
@@ -97,6 +102,12 @@ public class LoadBucket {
       bucket.getName(), bucket.getVolumeName()));
   }
 
+  private static URI getFSUri(OzoneBucket bucket, String omServiceID)
+      throws URISyntaxException {
+    return new URI(String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
+        bucket.getName(), bucket.getVolumeName(), omServiceID));
+  }
+
   abstract class Op {
     private final boolean fsOp;
     private final String opName;
@@ -110,7 +121,7 @@ public class LoadBucket {
     }
 
     public void execute() throws Exception {
-      LOG.info("Going to {} key {}", this.opName, keyName);
+      LOG.info("Going to {}", this);
       try {
         if (fsOp) {
           Path p = new Path("/", keyName);
@@ -119,9 +130,9 @@ public class LoadBucket {
           doBucketOp(keyName);
         }
         doPostOp();
-        LOG.trace("Done: {} key {}", this.opName, keyName);
+        LOG.trace("Done: {}", this);
       } catch (Throwable t) {
-        LOG.error("Unable to {} key:{}", this.opName, keyName, t);
+        LOG.error("Unable to {}", this, t);
         throw t;
       }
     }
@@ -132,7 +143,7 @@ public class LoadBucket {
 
     @Override
     public String toString() {
-      return "opType=" + opName;
+      return "opType=" + opName + " keyName=" + keyName;
     }
   }
 
@@ -166,6 +177,11 @@ public class LoadBucket {
       } finally {
         os.close();
       }
+    }
+
+    @Override
+    public String toString() {
+      return super.toString() + " buffer:" + buffer.limit();
     }
   }
 
@@ -213,6 +229,11 @@ public class LoadBucket {
         is.close();
       }
     }
+
+    @Override
+    public String toString() {
+      return super.toString() + " buffer:" + buffer.limit();
+    }
   }
 
   /**
@@ -236,6 +257,11 @@ public class LoadBucket {
     @Override
     void doPostOp() {
       // Nothing to do here
+    }
+
+    @Override
+    public String toString() {
+      return super.toString();
     }
   }
 }

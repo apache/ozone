@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,18 +18,32 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManager;
+import org.apache.hadoop.hdds.recon.ReconConfig;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
+import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.security.SecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.codegen.ReconSchemaGenerationModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
 
 /**
  * Recon server main class that stops and starts recon services.
@@ -40,6 +54,12 @@ public class ReconServer extends GenericCli {
   private Injector injector;
 
   private ReconHttpServer httpServer;
+  private ContainerDBServiceProvider containerDBServiceProvider;
+  private OzoneManagerServiceProvider ozoneManagerServiceProvider;
+  private OzoneStorageContainerManager reconStorageContainerManager;
+  private OzoneConfiguration configuration;
+
+  private volatile boolean isStarted = false;
 
   public static void main(String[] args) {
     new ReconServer().run(args);
@@ -47,53 +67,51 @@ public class ReconServer extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    ConfigurationProvider.setConfiguration(ozoneConfiguration);
+    configuration = createOzoneConfiguration();
+    ConfigurationProvider.setConfiguration(configuration);
 
     injector =  Guice.createInjector(new
         ReconControllerModule(),
         new ReconRestServletModule() {
           @Override
           protected void configureServlets() {
-            rest("/api/*")
+            rest("/api/v1/*")
               .packages("org.apache.hadoop.ozone.recon.api");
           }
-        },
-        new ReconSchemaGenerationModule(),
-        new ReconTaskBindingModule());
+        }, new ReconSchemaGenerationModule());
 
     //Pass on injector to listener that does the Guice - Jersey HK2 bridging.
     ReconGuiceServletContextListener.setInjector(injector);
 
     LOG.info("Initializing Recon server...");
     try {
+      loginReconUserIfSecurityEnabled(configuration);
+      this.containerDBServiceProvider =
+          injector.getInstance(ContainerDBServiceProvider.class);
 
-      // Initialize the Container DB Service provider first since it creates
-      // the ozone.recon.db.dir which is needed by SQL schema.
-      getContainerDBServiceProvider().start();
-
+      ReconSchemaManager reconSchemaManager =
+          injector.getInstance(ReconSchemaManager.class);
       LOG.info("Creating Recon Schema.");
-      ReconSchemaManager reconSchemaManager = injector.getInstance(
-          ReconSchemaManager.class);
       reconSchemaManager.createReconSchema();
 
-      LOG.info("Recon server initialized successfully!");
-
       httpServer = injector.getInstance(ReconHttpServer.class);
-      LOG.info("Starting Recon server");
-      httpServer.start();
-
-      getOzoneManagerServiceProvider().start();
-      getReconStorageContainerManager().start();
+      this.ozoneManagerServiceProvider =
+          injector.getInstance(OzoneManagerServiceProvider.class);
+      this.reconStorageContainerManager =
+          injector.getInstance(OzoneStorageContainerManager.class);
+      LOG.info("Recon server initialized successfully!");
 
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
-      stop();
     }
+    // Start all services
+    start();
+    isStarted = true;
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
         stop();
+        join();
       } catch (Exception e) {
         LOG.error("Error during stop Recon server", e);
       }
@@ -101,26 +119,120 @@ public class ReconServer extends GenericCli {
     return null;
   }
 
-  public void stop() throws Exception {
-    LOG.info("Stopping Recon server");
-    if (httpServer != null) {
-      httpServer.stop();
+  /**
+   * Need a way to restart services from tests.
+   */
+  public void start() throws Exception {
+    if (!isStarted) {
+      LOG.info("Starting Recon server");
+      isStarted = true;
+      // Initialize metrics for Recon
+      HddsServerUtil.initializeMetrics(configuration, "Recon");
+      if (httpServer != null) {
+        httpServer.start();
+      }
+      if (ozoneManagerServiceProvider != null) {
+        ozoneManagerServiceProvider.start();
+      }
+      if (reconStorageContainerManager != null) {
+        reconStorageContainerManager.start();
+      }
     }
-
-    getReconStorageContainerManager().stop();
-    getOzoneManagerServiceProvider().stop();
-    getContainerDBServiceProvider().stop();
   }
 
-  private OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
-    return injector.getInstance(OzoneManagerServiceProvider.class);
+  public void stop() throws Exception {
+    if (isStarted) {
+      LOG.info("Stopping Recon server");
+      if (httpServer != null) {
+        httpServer.stop();
+      }
+      if (reconStorageContainerManager != null) {
+        reconStorageContainerManager.stop();
+      }
+      if (ozoneManagerServiceProvider != null) {
+        ozoneManagerServiceProvider.stop();
+      }
+      if (containerDBServiceProvider != null) {
+        containerDBServiceProvider.close();
+      }
+      isStarted = false;
+    }
   }
 
-  private ReconStorageContainerManager getReconStorageContainerManager() {
-    return injector.getInstance(ReconStorageContainerManager.class);
+  public void join() {
+    if (reconStorageContainerManager != null) {
+      reconStorageContainerManager.join();
+    }
   }
 
-  private ContainerDBServiceProvider getContainerDBServiceProvider() {
-    return injector.getInstance(ContainerDBServiceProvider.class);
+  /**
+   * Logs in the Recon user if security is enabled in the configuration.
+   *
+   * @param conf OzoneConfiguration
+   */
+  private static void loginReconUserIfSecurityEnabled(
+      OzoneConfiguration  conf) {
+    try {
+      if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+        loginReconUser(conf);
+      }
+    } catch (Exception ex) {
+      LOG.error("Error login in as Recon service. ", ex);
+    }
+  }
+
+  /**
+   * Login Recon service user if security is enabled.
+   *
+   * @param  conf OzoneConfiguration
+   * @throws IOException, AuthenticationException
+   */
+  private static void loginReconUser(OzoneConfiguration conf)
+      throws IOException, AuthenticationException {
+
+    if (SecurityUtil.getAuthenticationMethod(conf).equals(
+        UserGroupInformation.AuthenticationMethod.KERBEROS)) {
+      ReconConfig reconConfig = conf.getObject(ReconConfig.class);
+      LOG.info("Ozone security is enabled. Attempting login for Recon service. "
+              + "Principal: {}, keytab: {}",
+          reconConfig.getKerberosPrincipal(),
+          reconConfig.getKerberosKeytab());
+      UserGroupInformation.setConfiguration(conf);
+      InetSocketAddress socAddr = HddsUtils.getReconAddresses(conf);
+      SecurityUtil.login(conf,
+          OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
+          OZONE_RECON_KERBEROS_PRINCIPAL_KEY,
+          socAddr.getHostName());
+    } else {
+      throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
+          conf) + " authentication method not supported. "
+          + "Recon service login failed.");
+    }
+    LOG.info("Recon login successful.");
+  }
+
+  @VisibleForTesting
+  public OzoneManagerServiceProvider getOzoneManagerServiceProvider() {
+    return ozoneManagerServiceProvider;
+  }
+
+  @VisibleForTesting
+  public OzoneStorageContainerManager getReconStorageContainerManager() {
+    return reconStorageContainerManager;
+  }
+
+  @VisibleForTesting
+  public StorageContainerServiceProvider getStorageContainerServiceProvider() {
+    return injector.getInstance(StorageContainerServiceProvider.class);
+  }
+
+  @VisibleForTesting
+  public ContainerDBServiceProvider getContainerDBServiceProvider() {
+    return containerDBServiceProvider;
+  }
+
+  @VisibleForTesting
+  ReconHttpServer getHttpServer() {
+    return httpServer;
   }
 }

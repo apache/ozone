@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,29 +22,23 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
-import org.apache.hadoop.hdds.scm.HddsServerUtil;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ozone.protocol.ReconDatanodeProtocol;
+import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
+import org.apache.hadoop.security.authorize.PolicyProvider;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 
 /**
  * Recon's Datanode protocol server extended from SCM.
  */
-public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
-
-  private static final Logger LOG = LoggerFactory.getLogger(
-      ReconDatanodeProtocolServer.class);
+public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
+    implements ReconDatanodeProtocol {
 
   public ReconDatanodeProtocolServer(OzoneConfiguration conf,
                                      OzoneStorageContainerManager scm,
@@ -54,27 +48,14 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
   }
 
   @Override
-  public SCMHeartbeatResponseProto sendHeartbeat(
-      SCMHeartbeatRequestProto heartbeat) throws IOException {
-    LOG.info("Heartbeart from Datanode {}",
-        heartbeat.getDatanodeDetails().getHostName());
-    return super.sendHeartbeat(heartbeat);
+  public ProtocolMessageMetrics getProtocolMessageMetrics() {
+    return ProtocolMessageMetrics
+        .create("ReconDatanodeProtocol", "Recon Datanode protocol",
+            StorageContainerDatanodeProtocolProtos.Type.values());
   }
 
   @Override
-  public SCMRegisteredResponseProto register(
-      DatanodeDetailsProto datanodeDetails,
-      NodeReportProto nodeReport,
-      ContainerReportsProto containerReportsRequestProto,
-      PipelineReportsProto pipelineReports) throws IOException {
-    LOG.info("Datanode {} registered with Recon",
-        datanodeDetails.getHostName());
-    return super.register(datanodeDetails, nodeReport,
-        containerReportsRequestProto, pipelineReports);
-  }
-
-  @Override
-  protected String getScmDatanodeAddressKey() {
+  protected String getDatanodeAddressKey() {
     return OZONE_RECON_DATANODE_ADDRESS_KEY;
   }
 
@@ -82,4 +63,14 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer {
   public InetSocketAddress getDataNodeBindAddress(OzoneConfiguration conf) {
     return HddsServerUtil.getReconDataNodeBindAddress(conf);
   }
+
+  @Override
+  protected PolicyProvider getPolicyProvider() {
+    return ReconPolicyProvider.getInstance();
+  }
+
+  protected Class<ReconDatanodeProtocolPB> getProtocolClass() {
+    return ReconDatanodeProtocolPB.class;
+  }
+
 }

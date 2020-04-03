@@ -108,7 +108,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
     }
 
     if (add) {
-      LOG.info("Added a new node: " + node.getNetworkFullPath());
+      LOG.info("Added a new node: {}", node.getNetworkFullPath());
       if (LOG.isDebugEnabled()) {
         LOG.debug("NetworkTopology became:\n{}", this);
       }
@@ -132,7 +132,7 @@ public class NetworkTopologyImpl implements NetworkTopology{
     }finally {
       netlock.writeLock().unlock();
     }
-    LOG.info("Removed a node: " + node.getNetworkFullPath());
+    LOG.info("Removed a node: {}", node.getNetworkFullPath());
     if (LOG.isDebugEnabled()) {
       LOG.debug("NetworkTopology became:\n{}", this);
     }

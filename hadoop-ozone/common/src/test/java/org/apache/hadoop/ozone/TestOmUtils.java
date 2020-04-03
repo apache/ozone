@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.io.IOUtils;
 import org.junit.Rule;
@@ -31,9 +32,13 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Map;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -113,6 +118,26 @@ public class TestOmUtils {
     // expecting exception
   }
 
+  @Test
+  public void testGetOmHAAddressesById() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_SERVICE_IDS_KEY, "ozone1");
+    conf.set("ozone.om.nodes.ozone1", "node1,node2,node3");
+    conf.set("ozone.om.address.ozone1.node1", "1.1.1.1");
+    conf.set("ozone.om.address.ozone1.node2", "1.1.1.2");
+    conf.set("ozone.om.address.ozone1.node3", "1.1.1.3");
+    Map<String, List<InetSocketAddress>> addresses =
+        OmUtils.getOmHAAddressesById(conf);
+    assertFalse(addresses.isEmpty());
+    List<InetSocketAddress> rpcAddrs = addresses.get("ozone1");
+    assertFalse(rpcAddrs.isEmpty());
+    assertTrue(rpcAddrs.stream().anyMatch(
+        a -> a.getAddress().getHostAddress().equals("1.1.1.1")));
+    assertTrue(rpcAddrs.stream().anyMatch(
+        a -> a.getAddress().getHostAddress().equals("1.1.1.2")));
+    assertTrue(rpcAddrs.stream().anyMatch(
+        a -> a.getAddress().getHostAddress().equals("1.1.1.3")));
+  }
 }
 
 class TestDBCheckpoint implements DBCheckpoint {

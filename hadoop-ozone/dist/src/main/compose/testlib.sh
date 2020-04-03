@@ -32,7 +32,7 @@ create_results_dir() {
 }
 
 
-## @description wait until safemode exit (or 90 seconds)
+## @description wait until safemode exit (or 180 seconds)
 ## @param the docker-compose file
 wait_for_safemode_exit(){
   local compose_file=$1
@@ -40,11 +40,11 @@ wait_for_safemode_exit(){
   #Reset the timer
   SECONDS=0
 
-  #Don't give it up until 90 seconds
-  while [[ $SECONDS -lt 90 ]]; do
+  #Don't give it up until 180 seconds
+  while [[ $SECONDS -lt 180 ]]; do
 
      #This line checks the safemode status in scm
-     local command="ozone scmcli safemode status"
+     local command="ozone admin safemode status"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
          status=$(docker-compose -f "${compose_file}" exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
@@ -74,10 +74,8 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
   docker-compose -f "$COMPOSE_FILE" --no-ansi down
-  docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
-    && wait_for_safemode_exit "$COMPOSE_FILE"
-
-  if [[ $? -gt 0 ]]; then
+  if ! { docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
+      && wait_for_safemode_exit "$COMPOSE_FILE"; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
@@ -99,14 +97,33 @@ execute_robot_test(){
   set +e
   OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
   OUTPUT_PATH="$RESULT_DIR_INSIDE/robot-$OUTPUT_NAME.xml"
-  docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE"
   # shellcheck disable=SC2068
-  docker-compose -f "$COMPOSE_FILE" exec -T -e  SECURITY_ENABLED="${SECURITY_ENABLED}" "$CONTAINER" python -m robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+  docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
+    && docker-compose -f "$COMPOSE_FILE" exec -T -e SECURITY_ENABLED="${SECURITY_ENABLED}" -e OM_HA_PARAM="${OM_HA_PARAM}" "$CONTAINER" python -m robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+  local -i rc=$?
 
   FULL_CONTAINER_NAME=$(docker-compose -f "$COMPOSE_FILE" ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
+
+  copy_daemon_logs
+
   set -e
 
+  if [[ ${rc} -gt 0 ]]; then
+    stop_docker_env
+  fi
+
+  return ${rc}
+}
+
+## @description Copy any 'out' files for daemon processes to the result dir
+copy_daemon_logs() {
+  local c f
+  for c in $(docker-compose -f "$COMPOSE_FILE" ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
+    for f in $(docker exec "${c}" ls -1 /var/log/hadoop | grep -F '.out'); do
+      docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
+    done
+  done
 }
 
 
@@ -118,6 +135,52 @@ execute_command_in_container(){
   # shellcheck disable=SC2068
   docker-compose -f "$COMPOSE_FILE" exec -T "$@"
   set +e
+}
+
+## @description Stop a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+stop_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" --no-ansi stop $@
+  set +e
+}
+
+
+## @description Start a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+start_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" --no-ansi start $@
+  set +e
+}
+
+
+## @description wait until the port is available on the given host
+## @param The host to check for the port
+## @param The port to check for
+## @param The maximum time to wait in seconds
+wait_for_port(){
+  local host=$1
+  local port=$2
+  local timeout=$3
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     set +e
+     docker-compose -f "${COMPOSE_FILE}" exec -T scm /bin/bash -c "nc -z $host $port"
+     status=$?
+     set -e
+     if [ $status -eq 0 ] ; then
+         echo "Port $port is available on $host"
+         return;
+     fi
+     echo "Port $port is not available on $host yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $host $port to become available"
+   return 1
 }
 
 

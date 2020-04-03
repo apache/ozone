@@ -147,8 +147,7 @@ public class TestOzoneRpcClientForAclAuditLog {
   private static void deleteAuditLog() throws IOException {
     File file = new File("audit.log");
     if (FileUtils.deleteQuietly(file)) {
-      LOG.info(file.getName() +
-          " has been deleted.");
+      LOG.info("{} has been deleted.", file.getName());
     } else {
       LOG.info("audit.log could not be deleted.");
     }

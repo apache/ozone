@@ -30,11 +30,13 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * Tests Freon with Pipeline destroy.
  */
+@Ignore
 public class TestFreonWithPipelineDestroy {
 
   private static MiniOzoneCluster cluster;
@@ -53,6 +55,7 @@ public class TestFreonWithPipelineDestroy {
       .setHbProcessorInterval(1000)
       .setHbInterval(1000)
       .setNumDatanodes(3)
+      .setTotalPipelineNumLimit(8)
       .build();
     cluster.waitForClusterToBeReady();
   }

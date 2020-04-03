@@ -103,8 +103,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       // If this is a replay, then the response has already been returned to
       // the client. So take no further action and return a dummy
       // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs.getUpdateID(),
-          transactionLogIndex)) {
+      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
         LOG.debug("Replayed Transaction {} ignored. Request: {}",
             transactionLogIndex, deleteVolumeRequest);
         return new OMVolumeDeleteResponse(createReplayOMResponse(omResponse));
@@ -147,11 +146,8 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredUserLock) {
         omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);
       }

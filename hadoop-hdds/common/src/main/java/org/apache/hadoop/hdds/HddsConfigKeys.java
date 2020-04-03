@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.hdds;
 
-import org.apache.hadoop.hdds.utils.db.DBProfile;
-
 /**
  * This class contains constants for configuration keys and default values
  * used in hdds.
@@ -55,9 +53,9 @@ public final class HddsConfigKeys {
   // Configuration to allow volume choosing policy.
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
-  // DB PKIProfile used by ROCKDB instances.
+
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
-  public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
+
   // Once a container usage crosses this threshold, it is eligible for
   // closing.
   public static final String HDDS_CONTAINER_CLOSE_THRESHOLD =
@@ -106,9 +104,6 @@ public final class HddsConfigKeys {
   public static final double
       HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT = 0.90;
 
-  public static final String HDDS_LOCK_MAX_CONCURRENCY =
-      "hdds.lock.max.concurrency";
-  public static final int HDDS_LOCK_MAX_CONCURRENCY_DEFAULT = 100;
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.

@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
  * Dummy Recon task that has 3 modes of operations.
  * ALWAYS_FAIL / FAIL_ONCE / ALWAYS_PASS
  */
-public class DummyReconDBTask implements ReconDBUpdateTask {
+public class DummyReconDBTask implements ReconOmTask {
 
   private int numFailuresAllowed = Integer.MIN_VALUE;
   private int callCtr = 0;

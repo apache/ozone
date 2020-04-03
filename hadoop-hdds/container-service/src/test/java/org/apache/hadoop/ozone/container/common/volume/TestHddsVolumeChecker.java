@@ -20,13 +20,30 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
 import org.junit.Rule;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.rules.TemporaryFolder;
 import org.junit.Test;
 import org.junit.rules.TestName;
 import org.junit.rules.Timeout;
@@ -36,11 +53,14 @@ import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -59,37 +79,62 @@ public class TestHddsVolumeChecker {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestHddsVolumeChecker.class);
 
+  private static final int NUM_VOLUMES = 2;
+
+  @Rule
+  public TemporaryFolder folder = new TemporaryFolder();
+
   @Rule
   public TestName testName = new TestName();
 
   @Rule
   public Timeout globalTimeout = new Timeout(30_000);
 
-  /**
-   * Run each test case for each possible value of {@link VolumeCheckResult}.
-   * Including "null" for 'throw exception'.
-   * @return
-   */
-  @Parameters(name="{0}")
-  public static Collection<Object[]> data() {
-    List<Object[]> values = new ArrayList<>();
-    for (VolumeCheckResult result : VolumeCheckResult.values()) {
-      values.add(new Object[] {result});
-    }
-    values.add(new Object[] {null});
-    return values;
-  }
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
   /**
    * When null, the check call should throw an exception.
    */
   private final VolumeCheckResult expectedVolumeHealth;
-  private static final int NUM_VOLUMES = 2;
 
+  private final ChunkLayOutVersion layout;
 
-  public TestHddsVolumeChecker(VolumeCheckResult expectedVolumeHealth) {
-    this.expectedVolumeHealth = expectedVolumeHealth;
+  public TestHddsVolumeChecker(VolumeCheckResult result,
+      ChunkLayOutVersion layout) {
+    this.expectedVolumeHealth = result;
+    this.layout = layout;
   }
+
+  @Before
+  public void setup() throws IOException {
+    conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
+        .getAbsolutePath());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+        folder.newFolder().getAbsolutePath());
+  }
+
+  @After
+  public void cleanup() throws IOException {
+    FileUtils.deleteDirectory(folder.getRoot());
+  }
+
+  /**
+   * Run each test case for each possible value of {@link VolumeCheckResult}.
+   * Including "null" for 'throw exception'.
+   */
+  @Parameters
+  public static Collection<Object[]> data() {
+    List<Object[]> values = new ArrayList<>();
+    for (ChunkLayOutVersion layout : ChunkLayOutVersion.values()) {
+      for (VolumeCheckResult result : VolumeCheckResult.values()) {
+        values.add(new Object[]{result, layout});
+      }
+      values.add(new Object[]{null, layout});
+    }
+    return values;
+  }
+
 
   /**
    * Test {@link HddsVolumeChecker#checkVolume} propagates the
@@ -102,7 +147,7 @@ public class TestHddsVolumeChecker {
     LOG.info("Executing {}", testName.getMethodName());
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final HddsVolumeChecker checker =
-        new HddsVolumeChecker(new HdfsConfiguration(), new FakeTimer());
+        new HddsVolumeChecker(new OzoneConfiguration(), new FakeTimer());
     checker.setDelegateChecker(new DummyChecker());
     final AtomicLong numCallbackInvocations = new AtomicLong(0);
 
@@ -144,7 +189,7 @@ public class TestHddsVolumeChecker {
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
     final HddsVolumeChecker checker =
-        new HddsVolumeChecker(new HdfsConfiguration(), new FakeTimer());
+        new HddsVolumeChecker(new OzoneConfiguration(), new FakeTimer());
     checker.setDelegateChecker(new DummyChecker());
 
     Set<HddsVolume> failedVolumes = checker.checkAllVolumes(volumes);
@@ -160,6 +205,69 @@ public class TestHddsVolumeChecker {
     for (HddsVolume volume : volumes) {
       verify(volume, times(1)).check(anyObject());
     }
+  }
+
+
+  /**
+   * Test {@link HddsVolumeChecker#checkAllVolumes} propagates
+   * checks for all volumes to the delegate checker.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testVolumeDeletion() throws Exception {
+    LOG.info("Executing {}", testName.getMethodName());
+
+    conf.setTimeDuration(
+        DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY, 0,
+        TimeUnit.MILLISECONDS);
+
+    DatanodeDetails datanodeDetails =
+        ContainerTestUtils.createDatanodeDetails();
+    OzoneContainer ozoneContainer =
+        ContainerTestUtils.getOzoneContainer(datanodeDetails, conf);
+    MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
+    ContainerSet containerSet = ozoneContainer.getContainerSet();
+
+    HddsVolumeChecker volumeChecker = volumeSet.getVolumeChecker();
+    volumeChecker.setDelegateChecker(new DummyChecker());
+    File volParentDir =
+        new File(folder.getRoot(), UUID.randomUUID().toString());
+    volumeSet.addVolume(volParentDir.getPath());
+    File volRootDir = new File(volParentDir, "hdds");
+
+    int i = 0;
+    for (ContainerDataProto.State state : ContainerDataProto.State.values()) {
+      if (!state.equals(ContainerDataProto.State.INVALID)) {
+        // add containers to the created volume
+        Container container = ContainerTestUtils.getContainer(++i, layout,
+            state);
+        container.getContainerData()
+            .setVolume(volumeSet.getVolumeMap().get(volRootDir.getPath()));
+        ((KeyValueContainerData) container.getContainerData())
+            .setMetadataPath(volParentDir.getPath());
+        containerSet.addContainer(container);
+      }
+    }
+
+    // delete the volume directory
+    FileUtils.deleteDirectory(volParentDir);
+
+    Assert.assertEquals(2, volumeSet.getVolumesList().size());
+    volumeSet.checkAllVolumes();
+    // failed volume should be removed from volumeSet volume list
+    Assert.assertEquals(1, volumeSet.getVolumesList().size());
+    Assert.assertEquals(1, volumeSet.getFailedVolumesList().size());
+
+    i = 0;
+    for (ContainerDataProto.State state : ContainerDataProto.State.values()) {
+      if (!state.equals(ContainerDataProto.State.INVALID)) {
+        Assert.assertEquals(ContainerDataProto.State.UNHEALTHY,
+            containerSet.getContainer(++i).getContainerState());
+      }
+    }
+
+    ozoneContainer.stop();
   }
 
   /**
@@ -178,7 +286,7 @@ public class TestHddsVolumeChecker {
         return Optional.of(
             Futures.immediateFuture(target.check(context)));
       } catch (Exception e) {
-        LOG.info("check routine threw exception " + e);
+        LOG.info("check routine threw exception {}", e);
         return Optional.of(Futures.immediateFailedFuture(e));
       }
     }

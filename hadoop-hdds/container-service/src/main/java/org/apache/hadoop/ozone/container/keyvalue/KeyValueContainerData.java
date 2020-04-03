@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.yaml.snakeyaml.nodes.Tag;
 
@@ -54,9 +56,6 @@ public class KeyValueContainerData extends ContainerData {
   // Path to Container metadata Level DB/RocksDB Store and .container file.
   private String metadataPath;
 
-  // Path to Physical file system where chunks are stored.
-  private String chunksPath;
-
   //Type of DB used to store key to chunks mapping
   private String containerDBType;
 
@@ -83,26 +82,21 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Constructs KeyValueContainerData object.
    * @param id - ContainerId
+   * @param layOutVersion chunk layout
    * @param size - maximum size of the container in bytes
    */
-  public KeyValueContainerData(long id, long size,
-      String originPipelineId, String originNodeId) {
-    super(ContainerProtos.ContainerType.KeyValueContainer, id, size,
-        originPipelineId, originNodeId);
+  public KeyValueContainerData(long id, ChunkLayOutVersion layOutVersion,
+      long size, String originPipelineId, String originNodeId) {
+    super(ContainerProtos.ContainerType.KeyValueContainer, id, layOutVersion,
+        size, originPipelineId, originNodeId);
     this.numPendingDeletionBlocks = new AtomicInteger(0);
     this.deleteTransactionId = 0;
   }
 
-  /**
-   * Constructs KeyValueContainerData object.
-   * @param id - ContainerId
-   * @param layOutVersion
-   * @param size - maximum size of the container in bytes
-   */
-  public KeyValueContainerData(long id, int layOutVersion, long size,
-      String originPipelineId, String originNodeId) {
-    super(ContainerProtos.ContainerType.KeyValueContainer, id, layOutVersion,
-        size, originPipelineId, originNodeId);
+  public KeyValueContainerData(ContainerData source) {
+    super(source);
+    Preconditions.checkArgument(source.getContainerType()
+        == ContainerProtos.ContainerType.KeyValueContainer);
     this.numPendingDeletionBlocks = new AtomicInteger(0);
     this.deleteTransactionId = 0;
   }
@@ -165,22 +159,6 @@ public class KeyValueContainerData extends ContainerData {
    */
   public void updateBlockCommitSequenceId(long id) {
     this.blockCommitSequenceId = id;
-  }
-
-  /**
-   * Get chunks path.
-   * @return - Path where chunks are stored
-   */
-  public String getChunksPath() {
-    return chunksPath;
-  }
-
-  /**
-   * Set chunks Path.
-   * @param chunkPath - File path.
-   */
-  public void setChunksPath(String chunkPath) {
-    this.chunksPath = chunkPath;
   }
 
   /**

@@ -80,13 +80,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
           tarFilePath.toFile())) {
 
         Container container = controller.importContainer(
-            originalContainerData.getContainerType(),
-            containerID,
-            originalContainerData.getMaxSize(),
-            originalContainerData.getOriginPipelineId(),
-            originalContainerData.getOriginNodeId(),
-            tempContainerTarStream,
-            packer);
+            originalContainerData, tempContainerTarStream, packer);
 
         containerSet.addContainer(container);
       }

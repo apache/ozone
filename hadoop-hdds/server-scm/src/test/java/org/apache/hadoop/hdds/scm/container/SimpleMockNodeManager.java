@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -136,6 +137,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public int getPipelinesCount(DatanodeDetails datanodeDetails) {
+    return 0;
+  }
+
+  @Override
   public void setContainers(DatanodeDetails dn,
       Set<ContainerID> containerIds) throws NodeNotFoundException {
     containerMap.put(dn.getUuid(), containerIds);
@@ -242,6 +248,11 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
+    return null;
+  }
+
+  @Override
+  public NetworkTopology getClusterNetworkTopologyMap() {
     return null;
   }
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,11 +20,15 @@ package org.apache.hadoop.ozone.freon;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.Assert;
 import org.junit.Test;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
@@ -33,22 +37,31 @@ public abstract class TestDataValidate {
 
   private static MiniOzoneCluster cluster = null;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
   static void startCluster(OzoneConfiguration conf) throws Exception {
-    conf.set(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, "5000ms");
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.
+                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
+            10, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "rpc.request.timeout",
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "watch.request.timeout",
+            10, TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5).build();
+        .setNumDatanodes(5).setTotalPipelineNumLimit(8).build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
+            180000);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   static void shutdownCluster() {
     if (cluster != null) {
       cluster.shutdown();
@@ -66,24 +79,6 @@ public abstract class TestDataValidate {
     randomKeyGenerator.setFactor(ReplicationFactor.THREE);
     randomKeyGenerator.setKeySize(20971520);
     randomKeyGenerator.setValidateWrites(true);
-    randomKeyGenerator.call();
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
-  }
-
-  @Test
-  public void standaloneTestLargeKey() throws Exception {
-    RandomKeyGenerator randomKeyGenerator =
-        new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());
-    randomKeyGenerator.setNumOfVolumes(1);
-    randomKeyGenerator.setNumOfBuckets(1);
-    randomKeyGenerator.setNumOfKeys(1);
-    randomKeyGenerator.setKeySize(20971520);
-    randomKeyGenerator.setValidateWrites(true);
-    randomKeyGenerator.setType(ReplicationType.RATIS);
-    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
     randomKeyGenerator.call();
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
     Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());

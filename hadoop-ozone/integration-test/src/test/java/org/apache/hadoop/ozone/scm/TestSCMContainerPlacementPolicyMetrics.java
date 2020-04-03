@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -61,6 +62,7 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
+@Ignore("HDDS-2961")
 public class TestSCMContainerPlacementPolicyMetrics {
 
   private MiniOzoneCluster cluster;
@@ -74,7 +76,8 @@ public class TestSCMContainerPlacementPolicyMetrics {
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         "org.apache.hadoop.hdds.scm.container.placement.algorithms." +
             "SCMContainerPlacementRackAware");
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
+    // TODO enable when RATIS-788 is fixed
+    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostNames(
@@ -82,6 +85,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
         "/rack1");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(4)
+        .setTotalPipelineNumLimit(10)
         .build();
     cluster.waitForClusterToBeReady();
     metrics = getMetrics(SCMContainerPlacementMetrics.class.getSimpleName());

@@ -99,10 +99,85 @@ jobs:
             args: ./hadoop-ozone/dev-support/checks/build.sh
         - run: sudo pip install robotframework
         - run: sudo chown runner -R .
-        - run: cd ./hadoop-ozone/dist/target/ozone-*-SNAPSHOT/ && mkdir .aws && sudo chown 1000 .aws 
+        - run: cd ./hadoop-ozone/dist/target/ozone-*/ && mkdir .aws && sudo chown 1000 .aws
         - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: acceptance
             path: target/acceptance
+  it-filesystem:
+    name: it-filesystem
+    runs-on: ubuntu-18.04
+    needs:
+        - build
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/buildenv
+          with:
+             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem
+        - uses: actions/upload-artifact@master
+          if: always()
+          with:
+            name: it-filesystem
+            path: target/integration
+  it-filesystem-contract:
+    name: it-filesystem-contract
+    runs-on: ubuntu-18.04
+    needs:
+        - build
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/buildenv
+          with:
+             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem-contract
+        - uses: actions/upload-artifact@master
+          if: always()
+          with:
+            name: it-filesystem-contract
+            path: target/integration
+  it-client:
+    name: it-client
+    runs-on: ubuntu-18.04
+    needs:
+        - build
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/buildenv
+          with:
+             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pclient
+        - uses: actions/upload-artifact@master
+          if: always()
+          with:
+            name: it-client
+            path: target/integration
+  it-hdds-om:
+    name: it-hdds-om
+    runs-on: ubuntu-18.04
+    needs:
+        - build
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/buildenv
+          with:
+             args: ./hadoop-ozone/dev-support/checks/integration.sh -Phdds-om
+        - uses: actions/upload-artifact@master
+          if: always()
+          with:
+            name: it-hdds-om
+            path: target/integration
+  it-ozone:
+    name: it-ozone
+    runs-on: ubuntu-18.04
+    needs:
+        - build
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/buildenv
+          with:
+             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pozone
+        - uses: actions/upload-artifact@master
+          if: always()
+          with:
+            name: it-ozone
+            path: target/integration

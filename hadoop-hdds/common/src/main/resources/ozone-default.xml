@@ -204,14 +204,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.leader.num.pending.requests</name>
-    <value>4096</value>
-    <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum number of pending requests after which the leader
-      starts rejecting requests from client.
-    </description>
-  </property>
-  <property>
     <name>dfs.container.ratis.leader.pending.bytes.limit</name>
     <value>1GB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
@@ -253,14 +245,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.client.request.timeout.duration</name>
-    <value>3s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for ratis client request.It should be
-        set greater than leader election timeout in Ratis.
-    </description>
-  </property>
-  <property>
     <name>dfs.ratis.client.request.max.retries</name>
     <value>180</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
@@ -280,26 +264,11 @@
     <description>Retry Cache entry timeout for ratis server.</description>
   </property>
   <property>
-    <name>dfs.ratis.server.request.timeout.duration</name>
-    <value>3s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for ratis server request.</description>
-  </property>
-  <property>
     <name>dfs.ratis.leader.election.minimum.timeout.duration</name>
     <value>5s</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for ratis leader election.
         Default is 5s.
-    </description>
-  </property>
-  <property>
-    <name>dfs.ratis.server.failure.duration</name>
-    <value>120s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The timeout duration for ratis server failure detection,
-      once the threshold has reached, the ratis state machine will be informed
-      about the failure in the ratis ring
     </description>
   </property>
   <property>
@@ -418,34 +387,32 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.stream.buffer.flush.size</name>
-    <value>64MB</value>
+    <name>ozone.client.stream.buffer.size</name>
+    <value>4MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position , a partial
-      flush will be initiated during write. It should be ideally a multiple
-      of chunkSize.
+    <description>The size of chunks the client will send to the server.</description>
+  </property>
+  <property>
+    <name>ozone.client.stream.buffer.flush.size</name>
+    <value>16MB</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>Size which determines at what buffer position a partial
+      flush will be initiated during write. It should be a multiple
+      of ozone.client.stream.buffer.size.
     </description>
   </property>
   <property>
     <name>ozone.client.stream.buffer.max.size</name>
-    <value>128MB</value>
+    <value>32MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position,
+    <description>Size which determines at what buffer position
       write call be blocked till acknowledgement of the first partial flush
       happens by all servers.
     </description>
   </property>
   <property>
-    <name>ozone.client.watch.request.timeout</name>
-    <value>30s</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Timeout for the watch API in Ratis client to acknowledge
-      a particular request getting replayed to all servers.
-    </description>
-  </property>
-  <property>
     <name>ozone.client.max.retries</name>
-    <value>100</value>
+    <value>5</value>
     <tag>OZONE, CLIENT</tag>
     <description>Maximum number of retries by Ozone Client on encountering
       exception while writing a key.
@@ -483,10 +450,8 @@
     <value></value>
     <tag>OM, HA</tag>
     <description>
-      Comma-separated list of OM service Ids.
-
-      If not set, the default value of "omServiceIdDefault" is assigned as the
-      OM service ID.
+      Comma-separated list of OM service Ids. This property allows the client
+      to figure out quorum of OzoneManager address.
     </description>
   </property>
   <property>
@@ -540,7 +505,7 @@
   </property>
   <property>
     <name>ozone.om.handler.count.key</name>
-    <value>20</value>
+    <value>100</value>
     <tag>OM, PERFORMANCE</tag>
     <description>
       The number of RPC handler threads for OM service endpoints.
@@ -743,15 +708,30 @@
   </property>
   <property>
     <name>ozone.scm.chunk.size</name>
-    <value>16MB</value>
+    <value>4MB</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
       The chunk size for reading/writing chunk operations in bytes.
 
-      The chunk size defaults to 8MB. If the value configured is more than the
-      maximum size (16MB), it will be reset to the maximum size. This maps to
-      the network packet sizes and file write operations in the client to
-      datanode protocol.
+      The chunk size defaults to 4MB. If the value configured is more than the
+      maximum size (32MB), it will be reset to the maximum size (32MB). This
+      maps to the network packet sizes and file write operations in the
+      client to datanode protocol.
+
+      When tuning this parameter, flow control window parameter should be
+      tuned accordingly. Refer to
+      hdds.ratis.raft.grpc.flow.control.window for more information.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.chunk.layout</name>
+    <value>FILE_PER_BLOCK</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      Chunk layout defines how chunks, blocks and containers are stored on disk.
+      Each chunk is stored separately with FILE_PER_CHUNK.  All chunks of a
+      block are stored in the same file with FILE_PER_BLOCK.  The default is
+      FILE_PER_BLOCK.
     </description>
   </property>
   <property>
@@ -817,9 +797,11 @@
     </value>
     <tag>OZONE, MANAGEMENT</tag>
     <description>
-      The full name of class which implements org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicy.
+      The full name of class which implements
+      org.apache.hadoop.hdds.scm.PlacementPolicy.
       The class decides which datanode will be used to host the container replica. If not set,
-      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default value.
+      org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom will be used as default
+      value.
     </description>
   </property>
   <property>
@@ -827,6 +809,35 @@
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>Number of containers per owner in a pipeline.
+    </description>
+  </property>
+  <property>
+  <name>ozone.datanode.pipeline.limit</name>
+  <value>2</value>
+  <tag>OZONE, SCM, PIPELINE</tag>
+  <description>Max number of pipelines per datanode can be engaged in.
+  </description>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.pipeline.limit</name>
+    <value>0</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>Upper limit for how many pipelines can be OPEN in SCM.
+      0 as default means there is no limit. Otherwise, the number is the limit
+      of max amount of pipelines which are OPEN.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.pipeline.allocated.timeout</name>
+    <value>5m</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      Timeout for every pipeline to stay in ALLOCATED stage. When pipeline is created,
+      it should be at OPEN stage once pipeline report is successfully received by SCM.
+      If a pipeline stays at ALLOCATED longer than the specified period of time,
+      it should be scrubbed so that new pipeline can be created.
+      This timeout is for how long pipeline can stay at ALLOCATED
+      stage until it gets scrubbed.
     </description>
   </property>
   <property>
@@ -907,7 +918,7 @@
   </property>
   <property>
     <name>ozone.scm.handler.count.key</name>
-    <value>10</value>
+    <value>100</value>
     <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
     <description>
       The number of RPC handler threads for each SCM service
@@ -1402,16 +1413,6 @@
   </property>
 
   <property>
-    <name>hdds.lock.max.concurrency</name>
-    <value>100</value>
-    <tag>HDDS</tag>
-    <description>Locks in HDDS/Ozone uses object pool to maintain active locks
-      in the system, this property defines the max limit for the locks that
-      will be maintained in the pool.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.s3g.authentication.kerberos.principal</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
@@ -1682,6 +1683,17 @@
       loses the leader role. The scheduled check is an secondary
       check to ensure that the leader role is updated periodically
       .</description>
+  </property>
+
+  <property>
+    <name>ipc.client.rpc-timeout.ms</name>
+    <value>900000</value>
+    <description>
+      RpcClient timeout on waiting response from server. The default value is
+      set to 15 minutes. If ipc.client.ping is set to true and this rpc-timeout
+      is greater than the value of ipc.ping.interval, the effective value of
+      the rpc-timeout is rounded up to multiple of ipc.ping.interval.
+    </description>
   </property>
 
   <property>
@@ -2207,7 +2219,16 @@
     <value/>
     <tag>RECON, SECURITY</tag>
     <description>
-      The keytab file for Kerberos authentication in Recon.
+      DEPRECATED. Use "ozone.recon.http.kerberos.keytab.file" instead.
+      The keytab file for HTTP Kerberos authentication in Recon.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.http.kerberos.keytab.file</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      The keytab file for HTTP Kerberos authentication in Recon.
     </description>
   </property>
   <property>
@@ -2468,6 +2489,97 @@
     <tag>OZONE, CLIENT</tag>
     <description>
       The maximum number of keys to return for a list trash request.
+    </description>
+  </property>
+  <property>
+    <name>ozone.http.basedir</name>
+    <value></value>
+    <tag>OZONE, OM, SCM, MANAGEMENT</tag>
+    <description>
+      The base dir for HTTP Jetty server to extract contents. If this property
+      is not configured, by default, Jetty will create a directory inside the
+      directory named by the java.io.tmpdir System property（/tmp by default）.
+      While in production environment, it's strongly suggested to instruct Jetty
+      to use a different parent directory by setting this property to the name
+      of the desired parent directory. The value of the property will be used to
+      set Jetty context attribute 'org.eclipse.jetty.webapp.basetempdir'.
+      The directory named by this property must exist and be writeable.
+    </description>
+  </property>
+  <property>
+    <name>ozone.http.policy</name>
+    <value>HTTP_ONLY</value>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <description>Decide if HTTPS(SSL) is supported on Ozone
+      This configures the HTTP endpoint for Ozone daemons:
+      The following values are supported:
+      - HTTP_ONLY : Service is provided only on http
+      - HTTPS_ONLY : Service is provided only on https
+      - HTTP_AND_HTTPS : Service is provided both on http and https
+    </description>
+  </property>
+  <property>
+    <name>ozone.https.client.need-auth</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value>false</value>
+    <description>
+      Whether SSL client certificate authentication is required
+    </description>
+  </property>
+  <property>
+    <name>ozone.https.client.keystore.resource</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value>ssl-client.xml</value>
+    <description>
+      Resource file from which ssl client keystore
+      information will be extracted
+    </description>
+  </property>
+  <property>
+    <name>ozone.https.server.keystore.resource</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value>ssl-server.xml</value>
+    <description>Resource file from which ssl server keystore
+      information will be extracted
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.keystore.keypassword</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>Keystore key password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.keystore.location</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Keystore location for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.keystore.password</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Keystore password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.truststore.location</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Truststore location for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>ssl.server.truststore.password</name>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <value></value>
+    <description>
+      Truststore password for HTTPS SSL configuration
     </description>
   </property>
 </configuration>

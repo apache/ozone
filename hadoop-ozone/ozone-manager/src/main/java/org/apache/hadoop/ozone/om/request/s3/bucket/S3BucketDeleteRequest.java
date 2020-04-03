@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,30 +125,47 @@ public class S3BucketDeleteRequest extends OMVolumeRequest {
         String bucketKey = omMetadataManager.getBucketKey(volumeName,
             s3BucketName);
 
-        // Update bucket table cache and s3 table cache.
-        omMetadataManager.getBucketTable().addCacheEntry(
-            new CacheKey<>(bucketKey),
-            new CacheValue<>(Optional.absent(), transactionLogIndex));
-        omMetadataManager.getS3Table().addCacheEntry(
-            new CacheKey<>(s3BucketName),
-            new CacheValue<>(Optional.absent(), transactionLogIndex));
+        // Check if Bucket exists in DB.
+        OmBucketInfo dbBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+        if (dbBucketInfo != null) {
+          // Check if this transaction is a replay of ratis logs.
+          // If this is a replay, then the response has already been returned to
+          // the client. So take no further action and return a dummy
+          // OMClientResponse.
+          if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
+            LOG.debug("Replayed Transaction {} ignored. Request: {}",
+                transactionLogIndex, s3DeleteBucketRequest);
+            return new S3BucketDeleteResponse(
+                createReplayOMResponse(omResponse));
+          }
+
+          // Update bucket table cache and s3 table cache.
+          omMetadataManager.getBucketTable().addCacheEntry(
+              new CacheKey<>(bucketKey),
+              new CacheValue<>(Optional.absent(), transactionLogIndex));
+          omMetadataManager.getS3Table().addCacheEntry(
+              new CacheKey<>(s3BucketName),
+              new CacheValue<>(Optional.absent(), transactionLogIndex));
+        } else {
+          LOG.debug("bucket: {} not found ", bucketKey);
+          throw new OMException("Bucket doesn't exist",
+              OMException.ResultCodes.BUCKET_NOT_FOUND);
+        }
       }
 
       omResponse.setDeleteS3BucketResponse(
           OzoneManagerProtocolProtos.S3DeleteBucketResponse.newBuilder());
 
-      omClientResponse = new S3BucketDeleteResponse(s3BucketName, volumeName,
-          omResponse.build());
+      omClientResponse = new S3BucketDeleteResponse(omResponse.build(),
+          s3BucketName, volumeName);
     } catch (IOException ex) {
       exception = ex;
-      omClientResponse = new S3BucketDeleteResponse(null, null,
+      omClientResponse = new S3BucketDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             s3BucketName);

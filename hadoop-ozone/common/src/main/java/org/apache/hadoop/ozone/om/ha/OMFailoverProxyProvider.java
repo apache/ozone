@@ -112,7 +112,8 @@ public class OMFailoverProxyProvider implements
           continue;
         }
 
-        OMProxyInfo omProxyInfo = new OMProxyInfo(nodeId, rpcAddrStr);
+        OMProxyInfo omProxyInfo = new OMProxyInfo(serviceId, nodeId,
+            rpcAddrStr);
 
         if (omProxyInfo.getAddress() != null) {
 
@@ -191,20 +192,25 @@ public class OMFailoverProxyProvider implements
   private Text computeDelegationTokenService() {
     // For HA, this will return "," separated address of all OM's.
     StringBuilder rpcAddress = new StringBuilder();
-    int count = 0;
+
     for (Map.Entry<String, OMProxyInfo> omProxyInfoSet :
         omProxyInfos.entrySet()) {
-      count++;
-      rpcAddress =
-          rpcAddress.append(
-              omProxyInfoSet.getValue().getDelegationTokenService());
+      Text dtService = omProxyInfoSet.getValue().getDelegationTokenService();
 
-      if (omProxyInfos.size() != count) {
-        rpcAddress.append(",");
+      // During client object creation when one of the OM configured address
+      // in unreachable, dtService can be null.
+      if (dtService != null) {
+        rpcAddress.append(",").append(dtService);
       }
     }
 
-    return new Text(rpcAddress.toString());
+    if (!rpcAddress.toString().isEmpty()) {
+      return new Text(rpcAddress.toString().substring(1));
+    } else {
+      // If all OM addresses are unresolvable, set dt service to null. Let
+      // this fail in later step when during connection setup.
+      return null;
+    }
   }
 
   @Override

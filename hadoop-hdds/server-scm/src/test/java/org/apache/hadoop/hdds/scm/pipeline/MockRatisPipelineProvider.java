@@ -33,6 +33,16 @@ import java.util.List;
  */
 public class MockRatisPipelineProvider extends RatisPipelineProvider {
 
+  private boolean autoOpenPipeline;
+  private  boolean isHealthy;
+
+  public MockRatisPipelineProvider(NodeManager nodeManager,
+      PipelineStateManager stateManager, Configuration conf,
+      EventPublisher eventPublisher, boolean autoOpen) {
+    super(nodeManager, stateManager, conf, eventPublisher);
+    autoOpenPipeline = autoOpen;
+  }
+
   public MockRatisPipelineProvider(NodeManager nodeManager,
                             PipelineStateManager stateManager,
                             Configuration conf) {
@@ -40,13 +50,46 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
+                                   PipelineStateManager stateManager,
+                                   Configuration conf, boolean isHealthy) {
+    super(nodeManager, stateManager, conf, new EventQueue());
+    this.isHealthy = isHealthy;
+  }
+
+  public MockRatisPipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager, Configuration conf,
       EventPublisher eventPublisher) {
     super(nodeManager, stateManager, conf, eventPublisher);
+    autoOpenPipeline = true;
   }
 
   protected void initializePipeline(Pipeline pipeline) throws IOException {
     // do nothing as the datanodes do not exists
+  }
+
+  @Override
+  public Pipeline create(HddsProtos.ReplicationFactor factor)
+      throws IOException {
+    if (autoOpenPipeline) {
+      return super.create(factor);
+    } else {
+      Pipeline initialPipeline = super.create(factor);
+      Pipeline pipeline = Pipeline.newBuilder()
+          .setId(initialPipeline.getId())
+          // overwrite pipeline state to main ALLOCATED
+          .setState(Pipeline.PipelineState.ALLOCATED)
+          .setType(initialPipeline.getType())
+          .setFactor(factor)
+          .setNodes(initialPipeline.getNodes())
+          .build();
+      if (isHealthy) {
+        for (DatanodeDetails datanodeDetails : initialPipeline.getNodes()) {
+          pipeline.reportDatanode(datanodeDetails);
+        }
+        pipeline.setLeaderId(initialPipeline.getFirstNode().getUuid());
+      }
+      return pipeline;
+    }
   }
 
   @Override

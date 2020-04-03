@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.node;
 
 import java.util.Map;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;

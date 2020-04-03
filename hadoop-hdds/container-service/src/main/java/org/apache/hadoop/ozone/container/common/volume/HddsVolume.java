@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,10 +20,9 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import javax.annotation.Nullable;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.GetSpaceUsed;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
@@ -42,13 +41,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * HddsVolume represents volume in a datanode. {@link VolumeSet} maintains a
- * list of HddsVolumes, one for each volume in the Datanode.
+ * HddsVolume represents volume in a datanode. {@link MutableVolumeSet}
+ * maintains a list of HddsVolumes, one for each volume in the Datanode.
  * {@link VolumeInfo} in encompassed by this class.
  * <p>
  * The disk layout per volume is as follows:
@@ -97,6 +97,9 @@ public class HddsVolume
    */
   @Override
   public VolumeCheckResult check(@Nullable Boolean unused) throws Exception {
+    if (!hddsRootDir.exists()) {
+      return VolumeCheckResult.FAILED;
+    }
     DiskChecker.checkDir(hddsRootDir);
     return VolumeCheckResult.HEALTHY;
   }
@@ -108,11 +111,11 @@ public class HddsVolume
     private final String volumeRootStr;
     private Configuration conf;
     private StorageType storageType;
-    private long configuredCapacity;
 
     private String datanodeUuid;
     private String clusterID;
     private boolean failedVolume = false;
+    private SpaceUsageCheckFactory usageCheckFactory;
 
     public Builder(String rootDirStr) {
       this.volumeRootStr = rootDirStr;
@@ -125,11 +128,6 @@ public class HddsVolume
 
     public Builder storageType(StorageType st) {
       this.storageType = st;
-      return this;
-    }
-
-    public Builder configuredCapacity(long capacity) {
-      this.configuredCapacity = capacity;
       return this;
     }
 
@@ -151,6 +149,11 @@ public class HddsVolume
       return this;
     }
 
+    public Builder usageCheckFactory(SpaceUsageCheckFactory factory) {
+      usageCheckFactory = factory;
+      return this;
+    }
+
     public HddsVolume build() throws IOException {
       return new HddsVolume(this);
     }
@@ -165,15 +168,14 @@ public class HddsVolume
       this.datanodeUuid = b.datanodeUuid;
       this.volumeIOStats = new VolumeIOStats();
 
-      VolumeInfo.Builder volumeBuilder =
-          new VolumeInfo.Builder(b.volumeRootStr, b.conf)
-              .storageType(b.storageType)
-              .configuredCapacity(b.configuredCapacity);
-      this.volumeInfo = volumeBuilder.build();
+      volumeInfo = new VolumeInfo.Builder(b.volumeRootStr, b.conf)
+          .storageType(b.storageType)
+          .usageCheckFactory(b.usageCheckFactory)
+          .build();
       this.committedBytes = new AtomicLong(0);
 
-      LOG.info("Creating Volume: " + this.hddsRootDir + " of  storage type : " +
-          b.storageType + " and capacity : " + volumeInfo.getCapacity());
+      LOG.info("Creating Volume: {} of storage type : {} and capacity : {}",
+          hddsRootDir, b.storageType, volumeInfo.getCapacity());
 
       initialize();
     } else {
@@ -235,6 +237,9 @@ public class HddsVolume
     }
     if (!hddsRootDir.isDirectory()) {
       // Volume Root exists but is not a directory.
+      LOG.warn("Volume {} exists but is not a directory,"
+          + " current volume state: {}.",
+          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     File[] files = hddsRootDir.listFiles();
@@ -244,6 +249,9 @@ public class HddsVolume
     }
     if (!getVersionFile().exists()) {
       // Volume Root is non empty but VERSION file does not exist.
+      LOG.warn("VERSION file does not exist in volume {},"
+          + " current volume state: {}.",
+          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     // Volume Root and VERSION file exist.
@@ -364,18 +372,16 @@ public class HddsVolume
     return state;
   }
 
-  public long getCapacity() throws IOException {
-    if(volumeInfo != null) {
-      return volumeInfo.getCapacity();
-    }
-    return 0;
+  public long getCapacity() {
+    return volumeInfo != null ? volumeInfo.getCapacity() : 0;
   }
 
-  public long getAvailable() throws IOException {
-    if(volumeInfo != null) {
-      return volumeInfo.getAvailable();
-    }
-    return 0;
+  public long getAvailable() {
+    return volumeInfo != null ? volumeInfo.getAvailable() : 0;
+  }
+
+  public long getUsedSpace() {
+    return volumeInfo != null ? volumeInfo.getScmUsed() : 0;
   }
 
   public void setState(VolumeState state) {
@@ -442,14 +448,16 @@ public class HddsVolume
     return committedBytes.get();
   }
 
-  /**
-   * Only for testing. Do not use otherwise.
-   */
-  @VisibleForTesting
-  public void setScmUsageForTesting(GetSpaceUsed scmUsageForTest) {
-    if (volumeInfo != null) {
-      volumeInfo.setScmUsageForTesting(scmUsageForTest);
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(hddsRootDir);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    return this == other
+        || other instanceof HddsVolume && ((HddsVolume) other).hddsRootDir
+        .equals(this.hddsRootDir);
   }
 
   /**

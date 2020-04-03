@@ -72,6 +72,9 @@ public abstract class ContainerData {
   // This can hold information like volume name, owner etc.,
   private final Map<String, String> metadata;
 
+  // Path to Physical file system where chunks are stored.
+  private String chunksPath;
+
   // State of the Container
   private ContainerDataProto.State state;
 
@@ -124,33 +127,19 @@ public abstract class ContainerData {
    * Creates a ContainerData Object, which holds metadata of the container.
    * @param type - ContainerType
    * @param containerId - ContainerId
-   * @param size - container maximum size in bytes
-   * @param originPipelineId - Pipeline Id where this container is/was created
-   * @param originNodeId - Node Id where this container is/was created
-   */
-  protected ContainerData(ContainerType type, long containerId, long size,
-                          String originPipelineId, String originNodeId) {
-    this(type, containerId, ChunkLayOutVersion.getLatestVersion().getVersion(),
-        size, originPipelineId, originNodeId);
-  }
-
-  /**
-   * Creates a ContainerData Object, which holds metadata of the container.
-   * @param type - ContainerType
-   * @param containerId - ContainerId
    * @param layOutVersion - Container layOutVersion
    * @param size - Container maximum size in bytes
    * @param originPipelineId - Pipeline Id where this container is/was created
    * @param originNodeId - Node Id where this container is/was created
    */
   protected ContainerData(ContainerType type, long containerId,
-      int layOutVersion, long size, String originPipelineId,
+      ChunkLayOutVersion layOutVersion, long size, String originPipelineId,
       String originNodeId) {
     Preconditions.checkNotNull(type);
 
     this.containerType = type;
     this.containerID = containerId;
-    this.layOutVersion = layOutVersion;
+    this.layOutVersion = layOutVersion.getVersion();
     this.metadata = new TreeMap<>();
     this.state = ContainerDataProto.State.OPEN;
     this.readCount = new AtomicLong(0L);
@@ -163,6 +152,12 @@ public abstract class ContainerData {
     this.originPipelineId = originPipelineId;
     this.originNodeId = originNodeId;
     setChecksumTo0ByteArray();
+  }
+
+  protected ContainerData(ContainerData source) {
+    this(source.getContainerType(), source.getContainerID(),
+        source.getLayOutVersion(), source.getMaxSize(),
+        source.getOriginPipelineId(), source.getOriginNodeId());
   }
 
   /**
@@ -231,8 +226,24 @@ public abstract class ContainerData {
    * Returns the layOutVersion of the actual container data format.
    * @return layOutVersion
    */
-  public int getLayOutVersion() {
-    return ChunkLayOutVersion.getChunkLayOutVersion(layOutVersion).getVersion();
+  public ChunkLayOutVersion getLayOutVersion() {
+    return ChunkLayOutVersion.getChunkLayOutVersion(layOutVersion);
+  }
+
+  /**
+   * Get chunks path.
+   * @return - Path where chunks are stored
+   */
+  public String getChunksPath() {
+    return chunksPath;
+  }
+
+  /**
+   * Set chunks Path.
+   * @param chunkPath - File path.
+   */
+  public void setChunksPath(String chunkPath) {
+    this.chunksPath = chunkPath;
   }
 
   /**
@@ -595,5 +606,18 @@ public abstract class ContainerData {
    * Returns the blockCommitSequenceId.
    */
   public abstract long getBlockCommitSequenceId();
+
+  public void updateReadStats(long length) {
+    incrReadCount();
+    incrReadBytes(length);
+  }
+
+  public void updateWriteStats(long bytesWritten, boolean overwrite) {
+    if (!overwrite) {
+      incrBytesUsed(bytesWritten);
+    }
+    incrWriteCount();
+    incrWriteBytes(bytesWritten);
+  }
 
 }

@@ -97,6 +97,7 @@ public class TestOzoneFsHAURLs {
     conf.setTimeDuration(
         OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
     OMStorage omStore = new OMStorage(conf);
     omStore.setClusterId(clusterId);
@@ -106,6 +107,8 @@ public class TestOzoneFsHAURLs {
 
     // Start the cluster
     cluster = MiniOzoneCluster.newHABuilder(conf)
+        .setNumDatanodes(7)
+        .setTotalPipelineNumLimit(10)
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
@@ -159,8 +162,8 @@ public class TestOzoneFsHAURLs {
     String omLeaderAddrKey = OmUtils.addKeySuffixes(
         OMConfigKeys.OZONE_OM_ADDRESS_KEY, omServiceId, omNodeId);
     String omLeaderAddr = conf.get(omLeaderAddrKey);
-    LOG.info("OM leader: nodeId=" + omNodeId + ", " +
-        omLeaderAddrKey + "=" + omLeaderAddr);
+    LOG.info("OM leader: nodeId={}, {}={}", omNodeId, omLeaderAddrKey,
+            omLeaderAddr);
     return omLeaderAddr;
   }
 

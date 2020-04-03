@@ -1,12 +1,10 @@
 {
-  "stats": {
-    "datanodes": {
-      "total": 10,
-      "healthy": 9
-    },
+  "clusterState": {
+    "totalDatanodes": 10,
+    "healthyDatanodes": 9,
     "pipelines": 3,
-    "capacity": {
-      "total": 1099511627778,
+    "storageReport": {
+      "capacity": 1099511627778,
       "used": 681826058240,
       "remaining": 391915765760
     },
@@ -22,22 +20,22 @@
         "hostname": "localhost1.storage.enterprise.com",
         "state": "HEALTHY",
         "lastHeartbeat": 1574728876059,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 62725623808,
+          "used": 488288256,
+          "remaining": 21005319168
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 549755813888,
-            "used": 429496729600,
-            "remaining": 120259084288
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
           },
           {
-            "storageLocation": "/disk/2",
-            "total": 161061273600,
-            "used": 21474836480,
-            "remaining": 139586437120
+            "pipelineID": "09d3a478-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
         ],
         "containers": 80
       },
@@ -45,16 +43,22 @@
         "hostname": "localhost2.storage.enterprise.com",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724876059,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 549755813888,
+          "used": 450971566080,
+          "remaining": 95784247808
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 549755813888,
-            "used": 450971566080,
-            "remaining": 98784247808
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
         ],
         "containers": 8192
       },
@@ -62,16 +66,27 @@
         "hostname": "localhost3.storage.enterprise.com",
         "state": "STALE",
         "lastHeartbeat": 1343544879843,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 86757023244288
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 140737488355328,
-            "used": 43980465111040,
-            "remaining": 96757023244288
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
         ],
         "containers": 43
       },
@@ -79,31 +94,34 @@
         "hostname": "localhost4.storage.enterprise.com",
         "state": "DEAD",
         "lastHeartbeat": 1074724876059,
-        "storageReport": [
-          {
-            "storageLocation": "/disk/1",
-            "total": 140737488355328,
-            "used": 0,
-            "remaining": 140737488355328
-          }
-        ],
-        "pipelineIDs": [],
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 0,
+          "remaining": 110737488355328
+        },
+        "pipelines": [],
         "containers": 0
       },
       {
         "hostname": "localhost5.storage.enterprise.com",
         "state": "DECOMMISSIONING",
         "lastHeartbeat": 1574724876059,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 805306368000,
+          "used": 644245094400,
+          "remaining": 121061273600
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 805306368000,
-            "used": 644245094400,
-            "remaining": 161061273600
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
         ],
         "containers": 643
       },
@@ -111,16 +129,22 @@
         "hostname": "localhost6.storage.enterprise.com",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724876059,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 92757023244288
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 140737488355328,
-            "used": 43980465111040,
-            "remaining": 96757023244288
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
         ],
         "containers": 5
       },
@@ -128,16 +152,27 @@
         "hostname": "localhost7.storage.enterprise.com",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724876059,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 549755813888,
+          "used": 450971566080,
+          "remaining": 94784247808
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 549755813888,
-            "used": 450971566080,
-            "remaining": 98784247808
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
         ],
         "containers": 64
       },
@@ -145,16 +180,22 @@
         "hostname": "localhost8.storage.enterprise.com",
         "state": "DECOMMISSIONED",
         "lastHeartbeat": 1574724876059,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 92757023244288
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 140737488355328,
-            "used": 43980465111040,
-            "remaining": 96757023244288
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
         ],
         "containers": 21
       },
@@ -162,16 +203,22 @@
         "hostname": "localhost9.storage.enterprise.com",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724874011,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 76757023244288
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 140737488355328,
-            "used": 43980465111040,
-            "remaining": 96757023244288
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
         ],
         "containers": 897
       },
@@ -179,16 +226,27 @@
         "hostname": "localhost10.storage.enterprise.com",
         "state": "HEALTHY",
         "lastHeartbeat": 1574723876959,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 66757023244288
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 140737488355328,
-            "used": 43980465111040,
-            "remaining": 96757023244288
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          },
+          {
+            "pipelineID": "01f2e105-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
         ],
         "containers": 6754
       },
@@ -196,16 +254,22 @@
         "hostname": "localhost11.storage.enterprise.com",
         "state": "STALE",
         "lastHeartbeat": 1474724876783,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 96157023244288
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 140737488355328,
-            "used": 43980465111040,
-            "remaining": 96757023244288
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
           }
-        ],
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
         ],
         "containers": 78
       },
@@ -213,18 +277,166 @@
         "hostname": "localhost12.storage.enterprise.com",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724796532,
-        "storageReport": [
+        "storageReport": {
+          "capacity": 140737488355328,
+          "used": 43980465111040,
+          "remaining": 94757023244288
+        },
+        "pipelines": [
           {
-            "storageLocation": "/disk/1",
-            "total": 140737488355328,
-            "used": 43980465111040,
-            "remaining": 96757023244288
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
           }
         ],
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
-        ],
         "containers": 543
+      }
+    ]
+  },
+  "pipelines": {
+    "totalCount": 3,
+    "pipelines": [
+      {
+        "pipelineId": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+        "status": "OPEN",
+        "leaderNode": "localhost1.storage.enterprise.com",
+        "datanodes": [
+          "localhost1.storage.enterprise.com",
+          "localhost2.storage.enterprise.com",
+          "localhost3.storage.enterprise.com"
+        ],
+        "lastLeaderElection": 1578491471528,
+        "duration": 389445,
+        "leaderElections": 28,
+        "replicationType": "RATIS",
+        "replicationFactor": 3,
+        "containers": 1
+      },
+      {
+        "pipelineId": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+        "status": "OPEN",
+        "leaderNode": "localhost5.storage.enterprise.com",
+        "datanodes": [
+          "localhost4.storage.enterprise.com",
+          "localhost5.storage.enterprise.com",
+          "localhost6.storage.enterprise.com"
+        ],
+        "lastLeaderElection": 1578441471528,
+        "duration": 50073382,
+        "leaderElections": 7,
+        "replicationType": "RATIS",
+        "replicationFactor": 3,
+        "containers": 4
+      },
+      {
+        "pipelineId": "04a5d908-ff01-4ce6-ad75-f3ec73dfc8a2",
+        "status": "CLOSED",
+        "leaderNode": "localhost9.storage.enterprise.com",
+        "datanodes": [
+          "localhost7.storage.enterprise.com",
+          "localhost8.storage.enterprise.com",
+          "localhost9.storage.enterprise.com"
+        ],
+        "lastLeaderElection": 1578441871828,
+        "duration": 49712212,
+        "leaderElections": 5,
+        "replicationType": "RATIS",
+        "replicationFactor": 3,
+        "containers": 7
+      }
+    ]
+  },
+  "missingContainers": {
+    "totalCount": 2,
+    "containers": [
+      {
+        "id": 1,
+        "keys": 3876,
+        "datanodes": [
+          "localhost1.storage.enterprise.com",
+          "localhost3.storage.enterprise.com",
+          "localhost5.storage.enterprise.com"
+        ],
+        "missingSince": 1578491371528,
+        "pipelineId": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+      },
+      {
+        "id": 2,
+        "keys": 5943,
+        "datanodes": [
+          "localhost1.storage.enterprise.com",
+          "localhost3.storage.enterprise.com",
+          "localhost5.storage.enterprise.com"
+        ],
+        "missingSince": 1578491471528,
+        "pipelineId": "04a5d908-ff01-4ce6-ad75-f3ec73dfc8a2"
+      }
+    ]
+  },
+  "keys": {
+    "totalCount": 534,
+    "keys": [
+      {
+        "Volume": "vol-0-20448",
+        "Bucket": "bucket-0-12811",
+        "Key": "key-0-77505",
+        "DataSize": 10240,
+        "Versions": [
+          0
+        ],
+        "Blocks": {
+          "0": [
+            {
+              "containerID": 1,
+              "localID": 103206297511460860
+            }
+          ]
+        },
+        "CreationTime": "2019-11-26T21:18:43.688Z",
+        "ModificationTime": "2019-11-26T21:18:46.062Z"
+      },
+      {
+        "Volume": "vol-0-20448",
+        "Bucket": "bucket-0-12811",
+        "Key": "key-21-64511",
+        "DataSize": 5692407,
+        "Versions": [
+          0
+        ],
+        "Blocks": {
+          "0": [
+            {
+              "containerID": 1,
+              "localID": 103206299949795380
+            }
+          ]
+        },
+        "CreationTime": "2019-11-26T21:19:20.855Z",
+        "ModificationTime": "2019-11-26T21:19:20.991Z"
+      },
+      {
+        "Volume": "vol-0-20448",
+        "Bucket": "bucket-0-12811",
+        "Key": "key-22-69104",
+        "DataSize": 189407,
+        "Versions": [
+          0
+        ],
+        "Blocks": {
+          "0": [
+            {
+              "containerID": 1,
+              "localID": 103206300033091740
+            }
+          ]
+        },
+        "CreationTime": "2019-11-26T21:19:22.126Z",
+        "ModificationTime": "2019-11-26T21:19:22.251Z"
       }
     ]
   }

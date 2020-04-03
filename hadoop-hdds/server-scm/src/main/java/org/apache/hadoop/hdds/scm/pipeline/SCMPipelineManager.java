@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -45,6 +46,8 @@ import org.slf4j.LoggerFactory;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,13 +55,11 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.scm
-    .ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm
-    .ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_PIPELINE_DB;
 
 /**
@@ -72,8 +73,8 @@ public class SCMPipelineManager implements PipelineManager {
       LoggerFactory.getLogger(SCMPipelineManager.class);
 
   private final ReadWriteLock lock;
-  private final PipelineFactory pipelineFactory;
-  private final PipelineStateManager stateManager;
+  private PipelineFactory pipelineFactory;
+  private PipelineStateManager stateManager;
   private final BackgroundPipelineCreator backgroundPipelineCreator;
   private Scheduler scheduler;
   private MetadataStore pipelineStore;
@@ -86,22 +87,34 @@ public class SCMPipelineManager implements PipelineManager {
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
 
+  private final AtomicBoolean isInSafeMode;
+
   public SCMPipelineManager(Configuration conf, NodeManager nodeManager,
       EventPublisher eventPublisher)
       throws IOException {
+    this(conf, nodeManager, eventPublisher, null, null);
+    this.stateManager = new PipelineStateManager();
+    this.pipelineFactory = new PipelineFactory(nodeManager,
+        stateManager, conf, eventPublisher);
+    initializePipelineState();
+  }
+
+  protected SCMPipelineManager(Configuration conf, NodeManager nodeManager,
+                               EventPublisher eventPublisher,
+                               PipelineStateManager pipelineStateManager,
+                               PipelineFactory pipelineFactory)
+      throws IOException {
     this.lock = new ReentrantReadWriteLock();
     this.conf = conf;
-    this.stateManager = new PipelineStateManager();
-    this.pipelineFactory = new PipelineFactory(nodeManager, stateManager,
-        conf, eventPublisher);
+    this.pipelineFactory = pipelineFactory;
+    this.stateManager = pipelineStateManager;
     // TODO: See if thread priority needs to be set for these threads
     scheduler = new Scheduler("RatisPipelineUtilsThread", false, 1);
     this.backgroundPipelineCreator =
         new BackgroundPipelineCreator(this, scheduler, conf);
-    int cacheSize = conf.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
-        OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
-    final File metaDir = ServerUtils.getScmDbDir(conf);
-    final File pipelineDBPath = new File(metaDir, SCM_PIPELINE_DB);
+    int cacheSize = conf.getInt(ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB,
+        ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
+    final File pipelineDBPath = getPipelineDBPath(conf);
     this.pipelineStore =
         MetadataStoreBuilder.newBuilder()
             .setCreateIfMissing(true)
@@ -118,7 +131,9 @@ public class SCMPipelineManager implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-    initializePipelineState();
+    this.isInSafeMode = new AtomicBoolean(conf.getBoolean(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT));
   }
 
   public PipelineStateManager getStateManager() {
@@ -131,7 +146,7 @@ public class SCMPipelineManager implements PipelineManager {
     pipelineFactory.setProvider(replicationType, provider);
   }
 
-  private void initializePipelineState() throws IOException {
+  protected void initializePipelineState() throws IOException {
     if (pipelineStore.isEmpty()) {
       LOG.info("No pipeline exists in current db");
       return;
@@ -145,9 +160,45 @@ public class SCMPipelineManager implements PipelineManager {
           .newBuilder(HddsProtos.Pipeline.PARSER.parseFrom(entry.getValue()));
       Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.setState(
           HddsProtos.PipelineState.PIPELINE_ALLOCATED).build());
+      // When SCM is restarted, set Creation time with current time.
+      pipeline.setCreationTimestamp(Instant.now());
       Preconditions.checkNotNull(pipeline);
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
+    }
+  }
+
+  private void recordMetricsForPipeline(Pipeline pipeline) {
+    metrics.incNumPipelineAllocated();
+    if (pipeline.isOpen()) {
+      metrics.incNumPipelineCreated();
+      metrics.createPerPipelineMetrics(pipeline);
+    }
+    switch (pipeline.getType()) {
+    case STAND_ALONE:
+      return;
+    case RATIS:
+      List<Pipeline> overlapPipelines = RatisPipelineUtils
+          .checkPipelineContainSameDatanodes(stateManager, pipeline);
+      if (!overlapPipelines.isEmpty()) {
+        // Count 1 overlap at a time.
+        metrics.incNumPipelineContainSameDatanodes();
+        //TODO remove until pipeline allocation is proved equally distributed.
+        for (Pipeline overlapPipeline : overlapPipelines) {
+          LOG.info("Pipeline: " + pipeline.getId().toString() +
+              " contains same datanodes as previous pipelines: " +
+              overlapPipeline.getId().toString() + " nodeIds: " +
+              pipeline.getNodes().get(0).getUuid().toString() +
+              ", " + pipeline.getNodes().get(1).getUuid().toString() +
+              ", " + pipeline.getNodes().get(2).getUuid().toString());
+        }
+      }
+      return;
+    case CHAINED:
+      // Not supported.
+    default:
+      // Not supported.
+      return;
     }
   }
 
@@ -161,14 +212,8 @@ public class SCMPipelineManager implements PipelineManager {
           pipeline.getProtobufMessage().toByteArray());
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
-      metrics.incNumPipelineAllocated();
-      if (pipeline.isOpen()) {
-        metrics.incNumPipelineCreated();
-        metrics.createPerPipelineMetrics(pipeline);
-      }
+      recordMetricsForPipeline(pipeline);
       return pipeline;
-    } catch (InsufficientDatanodesException idEx) {
-      throw idEx;
     } catch (IOException ex) {
       metrics.incNumPipelineCreationFailed();
       throw ex;
@@ -179,7 +224,7 @@ public class SCMPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline createPipeline(ReplicationType type, ReplicationFactor factor,
-                                 List<DatanodeDetails> nodes) {
+      List<DatanodeDetails> nodes) {
     // This will mostly be used to create dummy pipeline for SimplePipelines.
     // We don't update the metrics for SimplePipelines.
     lock.writeLock().lock();
@@ -196,6 +241,19 @@ public class SCMPipelineManager implements PipelineManager {
     lock.readLock().lock();
     try {
       return stateManager.getPipeline(pipelineID);
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public boolean containsPipeline(PipelineID pipelineID) {
+    lock.readLock().lock();
+    try {
+      getPipeline(pipelineID);
+      return true;
+    } catch (PipelineNotFoundException e) {
+      return false;
     } finally {
       lock.readLock().unlock();
     }
@@ -330,7 +388,7 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
-    LOG.info("destroying pipeline:{}", pipeline);
+    LOG.info("Destroying pipeline:{}", pipeline);
     finalizePipeline(pipeline.getId());
     if (onTimeout) {
       long pipelineDestroyTimeoutInMillis =
@@ -342,6 +400,32 @@ public class SCMPipelineManager implements PipelineManager {
           String.format("Destroy pipeline failed for pipeline:%s", pipeline));
     } else {
       destroyPipeline(pipeline);
+    }
+  }
+
+  @Override
+  public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
+      throws IOException{
+    if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
+      // Only srub pipeline for RATIS THREE pipeline
+      return;
+    }
+    Instant currentTime = Instant.now();
+    Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    List<Pipeline> needToSrubPipelines = stateManager.getPipelines(type, factor,
+        Pipeline.PipelineState.ALLOCATED).stream()
+        .filter(p -> currentTime.toEpochMilli() - p.getCreationTimestamp()
+            .toEpochMilli() >= pipelineScrubTimeoutInMills)
+        .collect(Collectors.toList());
+    for (Pipeline p : needToSrubPipelines) {
+      LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
+          " since it stays at ALLOCATED stage for " +
+          Duration.between(currentTime, p.getCreationTimestamp()).toMinutes() +
+          " mins.");
+      finalizeAndDestroyPipeline(p, false);
     }
   }
 
@@ -465,7 +549,7 @@ public class SCMPipelineManager implements PipelineManager {
    * @param pipeline        - Pipeline to be destroyed
    * @throws IOException
    */
-  private void destroyPipeline(Pipeline pipeline) throws IOException {
+  protected void destroyPipeline(Pipeline pipeline) throws IOException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     // remove the pipeline from the pipeline manager
     removePipeline(pipeline.getId());
@@ -478,13 +562,16 @@ public class SCMPipelineManager implements PipelineManager {
    * @param pipelineId - ID of the pipeline to be removed
    * @throws IOException
    */
-  private void removePipeline(PipelineID pipelineId) throws IOException {
+  protected void removePipeline(PipelineID pipelineId) throws IOException {
+    byte[] key = pipelineId.getProtobuf().toByteArray();
     lock.writeLock().lock();
     try {
-      pipelineStore.delete(pipelineId.getProtobuf().toByteArray());
-      Pipeline pipeline = stateManager.removePipeline(pipelineId);
-      nodeManager.removePipeline(pipeline);
-      metrics.incNumPipelineDestroyed();
+      if (pipelineStore != null) {
+        pipelineStore.delete(key);
+        Pipeline pipeline = stateManager.removePipeline(pipelineId);
+        nodeManager.removePipeline(pipeline);
+        metrics.incNumPipelineDestroyed();
+      }
     } catch (IOException ex) {
       metrics.incNumPipelineDestroyFailed();
       throw ex;
@@ -505,18 +592,64 @@ public class SCMPipelineManager implements PipelineManager {
       scheduler = null;
     }
 
-    if (pipelineStore != null) {
-      pipelineStore.close();
-      pipelineStore = null;
+    lock.writeLock().lock();
+    try {
+      if (pipelineStore != null) {
+        pipelineStore.close();
+        pipelineStore = null;
+      }
+    } finally {
+      lock.writeLock().unlock();
     }
+
     if(pmInfoBean != null) {
       MBeans.unregister(this.pmInfoBean);
       pmInfoBean = null;
     }
-    if(metrics != null) {
-      metrics.unRegister();
-    }
+
+    SCMPipelineMetrics.unRegister();
+
     // shutdown pipeline provider.
     pipelineFactory.shutdown();
   }
+
+  protected File getPipelineDBPath(Configuration configuration) {
+    File metaDir = ServerUtils.getScmDbDir(configuration);
+    return new File(metaDir, SCM_PIPELINE_DB);
+  }
+
+  protected ReadWriteLock getLock() {
+    return lock;
+  }
+
+  @VisibleForTesting
+  public PipelineFactory getPipelineFactory() {
+    return pipelineFactory;
+  }
+
+  protected MetadataStore getPipelineStore() {
+    return pipelineStore;
+  }
+
+  protected NodeManager getNodeManager() {
+    return nodeManager;
+  }
+
+  @Override
+  public boolean getSafeModeStatus() {
+    return this.isInSafeMode.get();
+  }
+
+  @Override
+  public void handleSafeModeTransition(
+      SCMSafeModeManager.SafeModeStatus status) {
+    this.isInSafeMode.set(status.getSafeModeStatus());
+    if (!status.getSafeModeStatus()) {
+      // TODO: #CLUTIL if we reenter safe mode the fixed interval pipeline
+      // creation job needs to stop
+      startPipelineCreator();
+      triggerPipelineCreation();
+    }
+  }
+
 }

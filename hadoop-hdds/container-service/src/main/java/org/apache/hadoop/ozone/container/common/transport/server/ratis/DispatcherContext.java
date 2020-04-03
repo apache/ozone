@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import java.util.Map;
 

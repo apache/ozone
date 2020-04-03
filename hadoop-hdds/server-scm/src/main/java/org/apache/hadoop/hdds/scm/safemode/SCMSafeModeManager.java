@@ -75,7 +75,7 @@ import org.slf4j.LoggerFactory;
  * per pipeline is met or not.
  *
  */
-public class SCMSafeModeManager {
+public class SCMSafeModeManager implements SafeModeManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMSafeModeManager.class);
@@ -134,7 +134,6 @@ public class SCMSafeModeManager {
         exitRules.put(ATLEAST_ONE_DATANODE_REPORTED_PIPELINE_EXIT_RULE,
             oneReplicaPipelineSafeModeRule);
       }
-      emitSafeModeStatus();
       boolean createPipelineInSafemode = conf.getBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
@@ -205,9 +204,6 @@ public class SCMSafeModeManager {
     // register events anymore.
 
     emitSafeModeStatus();
-    // TODO: #CLUTIL if we reenter safe mode the fixed interval pipeline
-    // creation job needs to stop
-    pipelineManager.startPipelineCreator();
   }
 
   public boolean getInSafeMode() {

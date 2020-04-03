@@ -18,15 +18,21 @@
 
 package org.apache.hadoop.ozone.om.ratis.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
+import org.apache.hadoop.metrics2.lib.MutableRate;
 
 /**
  * Class which maintains metrics related to OzoneManager DoubleBuffer.
  */
 public class OzoneManagerDoubleBufferMetrics {
+
+  private static OzoneManagerDoubleBufferMetrics instance;
 
   private static final String SOURCE_NAME =
       OzoneManagerDoubleBufferMetrics.class.getSimpleName();
@@ -44,12 +50,26 @@ public class OzoneManagerDoubleBufferMetrics {
       "number of transactions flushed in a single flush iteration till now.")
   private MutableCounterLong maxNumberOfTransactionsFlushedInOneIteration;
 
+  @Metric(about = "DoubleBuffer flushTime. This metrics particularly captures" +
+      " rocksdb batch commit time.")
+  private MutableRate flushTime;
 
-  public static OzoneManagerDoubleBufferMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        "OzoneManager DoubleBuffer Metrics",
-        new OzoneManagerDoubleBufferMetrics());
+  @Metric(about = "Average number of transactions flushed in a single " +
+      "iteration")
+  private MutableGaugeFloat avgFlushTransactionsInOneIteration;
+
+  public synchronized static OzoneManagerDoubleBufferMetrics create() {
+    if (instance != null) {
+      return instance;
+    } else {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      OzoneManagerDoubleBufferMetrics omDoubleBufferMetrics =
+          ms.register(SOURCE_NAME,
+              "OzoneManager DoubleBuffer Metrics",
+              new OzoneManagerDoubleBufferMetrics());
+      instance = omDoubleBufferMetrics;
+      return omDoubleBufferMetrics;
+    }
   }
 
   public void incrTotalNumOfFlushOperations() {
@@ -80,6 +100,23 @@ public class OzoneManagerDoubleBufferMetrics {
 
   public long getMaxNumberOfTransactionsFlushedInOneIteration() {
     return maxNumberOfTransactionsFlushedInOneIteration.value();
+  }
+
+  public void updateFlushTime(long time) {
+    flushTime.add(time);
+  }
+
+  @VisibleForTesting
+  public MutableRate getFlushTime() {
+    return flushTime;
+  }
+
+  public float getAvgFlushTransactionsInOneIteration() {
+    return avgFlushTransactionsInOneIteration.value();
+  }
+
+  public void setAvgFlushTransactionsInOneIteration(float count) {
+    this.avgFlushTransactionsInOneIteration.set(count);
   }
 
   public void unRegister() {

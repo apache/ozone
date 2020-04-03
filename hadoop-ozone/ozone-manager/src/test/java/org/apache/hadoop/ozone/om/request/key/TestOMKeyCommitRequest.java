@@ -43,8 +43,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
-
-
 /**
  * Class tests OMKeyCommitRequest class.
  */
@@ -69,7 +67,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
         clientID, replicationType, replicationFactor, omMetadataManager);
-
 
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
@@ -112,8 +109,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omKeyInfo.getLatestVersionLocations().getLocationList());
 
   }
-
-
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
@@ -210,6 +205,85 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
 
     Assert.assertNull(omKeyInfo);
+  }
+
+  @Test
+  public void testReplayRequest() throws Exception {
+
+    // Manually add Volume, Bucket to DB
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    // Manually add Key to OpenKey table in DB
+    TestOMRequestUtils.addKeyToTable(true, false, volumeName, bucketName,
+        keyName, clientID, replicationType, replicationFactor, 1L,
+        omMetadataManager);
+
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
+
+    OMKeyCommitRequest omKeyCommitRequest = new OMKeyCommitRequest(
+        modifiedOmRequest);
+
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
+        keyName);
+
+    // Key should not be there in key table, as validateAndUpdateCache is
+    // still not called.
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
+    Assert.assertNull(omKeyInfo);
+
+    // Execute original KeyCommit request
+    omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 10L,
+        ozoneManagerDoubleBufferHelper);
+
+    // Replay the transaction - Execute the createKey request again
+    OMClientResponse replayResponse = omKeyCommitRequest.validateAndUpdateCache(
+        ozoneManager, 10L, ozoneManagerDoubleBufferHelper);
+
+    // Replay should result in Replay response
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+        replayResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testReplayRequestDeletesOpenKeyEntry() throws Exception {
+
+    // Manually add Volume, Bucket to DB
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+    // Manually add Key to OpenKey table in DB
+    TestOMRequestUtils.addKeyToTable(true, false, volumeName, bucketName,
+        keyName, clientID, replicationType, replicationFactor, 1L,
+        omMetadataManager);
+
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
+    OMKeyCommitRequest omKeyCommitRequest = new OMKeyCommitRequest(
+        modifiedOmRequest);
+
+    // Execute original KeyCommit request
+    omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 10L,
+        ozoneManagerDoubleBufferHelper);
+
+    // Replay the Key Create request - add Key to OpenKey table manually again
+    TestOMRequestUtils.addKeyToTable(true, true, volumeName, bucketName,
+        keyName, clientID, replicationType, replicationFactor, 1L,
+        omMetadataManager);
+
+    // Key should be present in OpenKey table
+    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, clientID);
+    OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    Assert.assertNotNull(openKeyInfo);
+
+    // Replay the transaction - Execute the createKey request again
+    OMClientResponse replayResponse = omKeyCommitRequest.validateAndUpdateCache(
+        ozoneManager, 10L, ozoneManagerDoubleBufferHelper);
+
+    // Replay should result in DELETE_OPEN_KEY_ONLY response and delete the
+    // key from OpenKey table
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        replayResponse.getOMResponse().getStatus());
+    openKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    Assert.assertNull(openKeyInfo);
   }
 
   /**

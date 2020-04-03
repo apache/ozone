@@ -19,14 +19,21 @@ package org.apache.hadoop.ozone.freon;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.codahale.metrics.ScheduledReporter;
+import com.codahale.metrics.Slf4jReporter;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -35,7 +42,6 @@ import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -252,7 +258,8 @@ public class BaseFreonGenerator {
 
     executor = Executors.newFixedThreadPool(threadNo);
 
-    progressBar = new ProgressBar(System.out, testNo, successCounter::get);
+    progressBar = new ProgressBar(System.out, testNo, successCounter::get,
+        freonCommand.isInteractive());
     progressBar.start();
 
     startTime = System.currentTimeMillis();
@@ -276,29 +283,34 @@ public class BaseFreonGenerator {
    * Print out reports from the executed tests.
    */
   public void printReport() {
-    ConsoleReporter reporter = ConsoleReporter.forRegistry(metrics).build();
+    ScheduledReporter reporter = freonCommand.isInteractive()
+        ? ConsoleReporter.forRegistry(metrics).build()
+        : Slf4jReporter.forRegistry(metrics).build();
     reporter.report();
-    System.out.println("Total execution time (sec): " + Math
-        .round((System.currentTimeMillis() - startTime) / 1000.0));
-    System.out.println("Failures: " + failureCounter.get());
-    System.out.println("Successful executions: " + successCounter.get());
+
+    List<String> messages = new LinkedList<>();
+    messages.add("Total execution time (sec): " +
+        Math.round((System.currentTimeMillis() - startTime) / 1000.0));
+    messages.add("Failures: " + failureCounter.get());
+    messages.add("Successful executions: " + successCounter.get());
+
+    Consumer<String> print = freonCommand.isInteractive()
+        ? System.out::println
+        : LOG::info;
+    messages.forEach(print);
   }
 
   /**
    * Create the OM RPC client to use it for testing.
    */
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
-      OzoneConfiguration conf) throws IOException {
+      OzoneConfiguration conf, String omServiceID) throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    long omVersion = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
-    InetSocketAddress omAddress = OmUtils.getOmAddressForClients(conf);
     RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
-    return new OzoneManagerProtocolClientSideTranslatorPB(
-        RPC.getProxy(OzoneManagerProtocolPB.class, omVersion, omAddress,
-            ugi, conf, NetUtils.getDefaultSocketFactory(conf),
-            Client.getRpcTimeout(conf)), clientId);
+    return new OzoneManagerProtocolClientSideTranslatorPB(conf, clientId,
+        omServiceID, ugi);
   }
 
   public StorageContainerLocationProtocol createStorageContainerLocationClient(
@@ -324,6 +336,29 @@ public class BaseFreonGenerator {
     return client;
   }
 
+  public static Pipeline findPipelineForTest(String pipelineId,
+      StorageContainerLocationProtocol client, Logger log) throws IOException {
+    List<Pipeline> pipelines = client.listPipelines();
+    Pipeline pipeline;
+    if (pipelineId != null && pipelineId.length() > 0) {
+      pipeline = pipelines.stream()
+          .filter(p -> p.getId().toString().equals(pipelineId))
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException(
+              "Pipeline ID is defined, but there is no such pipeline: "
+                  + pipelineId));
+    } else {
+      pipeline = pipelines.stream()
+          .filter(p -> p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException(
+              "Pipeline ID is NOT defined, and no pipeline " +
+                  "has been found with factor=THREE"));
+      log.info("Using pipeline {}", pipeline.getId());
+    }
+    return pipeline;
+  }
+
   /**
    * Generate a key/file name based on the prefix and counter.
    */
@@ -334,53 +369,39 @@ public class BaseFreonGenerator {
   /**
    * Create missing target volume/bucket.
    */
-  public void ensureVolumeAndBucketExist(OzoneConfiguration ozoneConfiguration,
+  public void ensureVolumeAndBucketExist(OzoneClient rpcClient,
       String volumeName, String bucketName) throws IOException {
 
-    try (OzoneClient rpcClient = OzoneClientFactory
-        .getRpcClient(ozoneConfiguration)) {
+    OzoneVolume volume;
+    ensureVolumeExists(rpcClient, volumeName);
+    volume = rpcClient.getObjectStore().getVolume(volumeName);
 
-      OzoneVolume volume = null;
-      try {
-        volume = rpcClient.getObjectStore().getVolume(volumeName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-          rpcClient.getObjectStore().createVolume(volumeName);
-          volume = rpcClient.getObjectStore().getVolume(volumeName);
-        } else {
-          throw ex;
-        }
-      }
-
-      try {
-        volume.getBucket(bucketName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-          volume.createBucket(bucketName);
-        } else {
-          throw ex;
-        }
+    try {
+      volume.getBucket(bucketName);
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
+        volume.createBucket(bucketName);
+      } else {
+        throw ex;
       }
     }
+
   }
 
   /**
    * Create missing target volume.
    */
   public void ensureVolumeExists(
-      OzoneConfiguration ozoneConfiguration,
+      OzoneClient rpcClient,
       String volumeName) throws IOException {
-    try (OzoneClient rpcClient = OzoneClientFactory
-        .getRpcClient(ozoneConfiguration)) {
-
-      try {
-        rpcClient.getObjectStore().getVolume(volumeName);
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-          rpcClient.getObjectStore().createVolume(volumeName);
-        }
+    try {
+      rpcClient.getObjectStore().getVolume(volumeName);
+    } catch (OMException ex) {
+      if (ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
+        rpcClient.getObjectStore().createVolume(volumeName);
+      } else {
+        throw ex;
       }
-
     }
   }
 
@@ -422,4 +443,20 @@ public class BaseFreonGenerator {
     void executeNextTask(long step) throws Exception;
   }
 
+  public AtomicLong getAttemptCounter() {
+    return attemptCounter;
+  }
+
+  public int getThreadNo() {
+    return threadNo;
+  }
+
+  protected OzoneClient createOzoneClient(String omServiceID,
+      OzoneConfiguration conf) throws Exception {
+    if (omServiceID != null) {
+      return OzoneClientFactory.getRpcClient(omServiceID, conf);
+    } else {
+      return OzoneClientFactory.getRpcClient(conf);
+    }
+  }
 }

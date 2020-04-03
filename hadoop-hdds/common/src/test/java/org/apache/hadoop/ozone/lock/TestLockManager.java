@@ -18,10 +18,13 @@
 package org.apache.hadoop.ozone.lock;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.Daemon;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Test-cases to test LockManager.
@@ -170,4 +173,31 @@ public class TestLockManager {
     Assert.assertTrue(gotLock.get());
   }
 
+  @Test
+  public void testConcurrentWriteLockWithDifferentResource() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    final int count = 100;
+    final LockManager<Integer> manager = new LockManager<>(conf);
+    final int sleep = 10;
+    final AtomicInteger done = new AtomicInteger();
+    for (int i = 0; i < count; i++) {
+      final Integer id = i;
+      Daemon d1 = new Daemon(() -> {
+        try {
+          manager.writeLock(id);
+          Thread.sleep(sleep);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        } finally {
+          manager.writeUnlock(id);
+        }
+        done.getAndIncrement();
+      });
+      d1.setName("Locker-" + i);
+      d1.start();
+    }
+    GenericTestUtils.waitFor(() -> done.get() == count, 100,
+        10 * count * sleep);
+    Assert.assertEquals(count, done.get());
+  }
 }

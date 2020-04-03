@@ -40,24 +40,34 @@ public class HeaderPreprocessor implements ContainerRequestFilter {
 
   public static final String MULTIPART_UPLOAD_MARKER = "ozone/mpu";
 
+  public static final String CONTENT_TYPE = "Content-Type";
+
+  public static final String ORIGINAL_CONTENT_TYPE =
+      "X-Ozone-Original-Content-Type";
+
   @Override
   public void filter(ContainerRequestContext requestContext) throws
       IOException {
     MultivaluedMap<String, String> queryParameters =
         requestContext.getUriInfo().getQueryParameters();
 
+    if (requestContext.getHeaderString(CONTENT_TYPE) != null) {
+      requestContext.getHeaders().putSingle(ORIGINAL_CONTENT_TYPE,
+          requestContext.getHeaderString(CONTENT_TYPE));
+    }
+
     if (queryParameters.containsKey("delete")) {
       //aws cli doesn't send proper Content-Type and by default POST requests
       //processed as form-url-encoded. Here we can fix this.
       requestContext.getHeaders()
-          .putSingle("Content-Type", MediaType.APPLICATION_XML);
+          .putSingle(CONTENT_TYPE, MediaType.APPLICATION_XML);
     }
 
     if (queryParameters.containsKey("uploadId")) {
       //aws cli doesn't send proper Content-Type and by default POST requests
       //processed as form-url-encoded. Here we can fix this.
       requestContext.getHeaders()
-          .putSingle("Content-Type", MediaType.APPLICATION_XML);
+          .putSingle(CONTENT_TYPE, MediaType.APPLICATION_XML);
     } else if (queryParameters.containsKey("uploads")) {
       // uploads defined but uploadId is not --> this is the creation of the
       // multi-part-upload requests.
@@ -68,7 +78,7 @@ public class HeaderPreprocessor implements ContainerRequestFilter {
       //Should be empty instead of XML as the body is empty which can not be
       //serialized as as CompleteMultipartUploadRequest
       requestContext.getHeaders()
-          .putSingle("Content-Type", MULTIPART_UPLOAD_MARKER);
+          .putSingle(CONTENT_TYPE, MULTIPART_UPLOAD_MARKER);
     }
 
   }

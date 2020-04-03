@@ -74,6 +74,8 @@ public interface ContainerManager extends Closeable {
   ContainerInfo getContainer(ContainerID containerID)
       throws ContainerNotFoundException;
 
+  boolean exists(ContainerID containerID);
+
   /**
    * Returns containers under certain conditions.
    * Search container IDs from start ID(exclusive),

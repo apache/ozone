@@ -185,6 +185,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
+  public short getDefaultReplication() {
+    return (short) replicationFactor.getValue();
+  }
+
+  @Override
   public void close() throws IOException {
     ozoneClient.close();
   }
@@ -210,13 +215,21 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public OzoneFSOutputStream createFile(String key, boolean overWrite,
-      boolean recursive) throws IOException {
+  public OzoneFSOutputStream createFile(String key, short replication,
+      boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED);
     try {
-      OzoneOutputStream ozoneOutputStream = bucket
-          .createFile(key, 0, replicationType, replicationFactor, overWrite,
-              recursive);
+      OzoneOutputStream ozoneOutputStream = null;
+      if (replication == ReplicationFactor.ONE.getValue()
+          || replication == ReplicationFactor.THREE.getValue()) {
+        ReplicationFactor clientReplication = ReplicationFactor
+            .valueOf(replication);
+        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
+            clientReplication, overWrite, recursive);
+      } else {
+        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
+            replicationFactor, overWrite, recursive);
+      }
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
@@ -483,6 +496,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         omKeyLocationInfoGroup.getBlocksLatestVersionOnly().size()];
 
     int i = 0;
+    long offsetOfBlockInFile = 0L;
     for (OmKeyLocationInfo omKeyLocationInfo :
         omKeyLocationInfoGroup.getBlocksLatestVersionOnly()) {
       List<String> hostList = new ArrayList<>();
@@ -501,8 +515,9 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       String[] hosts = hostList.toArray(new String[hostList.size()]);
       String[] names = nameList.toArray(new String[nameList.size()]);
       BlockLocation blockLocation = new BlockLocation(
-          names, hosts, omKeyLocationInfo.getOffset(),
+          names, hosts, offsetOfBlockInFile,
           omKeyLocationInfo.getLength());
+      offsetOfBlockInFile += omKeyLocationInfo.getLength();
       blockLocations[i++] = blockLocation;
     }
     return blockLocations;

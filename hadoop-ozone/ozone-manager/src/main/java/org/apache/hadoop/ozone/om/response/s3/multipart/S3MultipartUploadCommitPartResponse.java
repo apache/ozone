@@ -35,7 +35,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Status.OK;
 
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 /**
@@ -45,22 +44,61 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
 
   private String multipartKey;
   private String openKey;
-  private OmKeyInfo deletePartKeyInfo;
   private OmMultipartKeyInfo omMultipartKeyInfo;
-  private OzoneManagerProtocolProtos.PartKeyInfo oldMultipartKeyInfo;
+  private OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo;
+  private OmKeyInfo openPartKeyInfoToBeDeleted;
+  private boolean isRatisEnabled;
 
-
-  public S3MultipartUploadCommitPartResponse(String multipartKey,
-      String openKey, @Nullable OmKeyInfo deletePartKeyInfo,
-      @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
-      @Nonnull OMResponse omResponse) {
+  /**
+   * Regular response.
+   * 1. Update MultipartKey in MultipartInfoTable with new PartKeyInfo
+   * 2. Delete openKey from OpenKeyTable
+   * 3. If old PartKeyInfo exists, put it in DeletedKeyTable
+   * @param omResponse
+   * @param multipartKey
+   * @param openKey
+   * @param omMultipartKeyInfo
+   * @param oldPartKeyInfo
+   */
+  public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
+      String multipartKey, String openKey,
+      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
+      @Nonnull OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
+      boolean isRatisEnabled) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
-    this.deletePartKeyInfo = deletePartKeyInfo;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
-    this.oldMultipartKeyInfo = oldPartKeyInfo;
+    this.oldPartKeyInfo = oldPartKeyInfo;
+    this.isRatisEnabled = isRatisEnabled;
+  }
+
+  /**
+   * For the case when Multipart Upload does not exist (could have been
+   * aborted).
+   * 1. Put the partKeyInfo from openKeyTable into DeletedTable
+   * 2. Deleted openKey from OpenKeyTable
+   * @param omResponse
+   * @param openKey
+   * @param openPartKeyInfoToBeDeleted
+   */
+  public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
+      String openKey, @Nonnull OmKeyInfo openPartKeyInfoToBeDeleted,
+      boolean isRatisEnabled) {
+    super(omResponse);
+    checkStatusNotOK();
+    this.openKey = openKey;
+    this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
+    this.isRatisEnabled = isRatisEnabled;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
@@ -74,12 +112,11 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
           omMetadataManager.getDeletedTable().get(openKey);
 
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          deletePartKeyInfo, repeatedOmKeyInfo);
-
+          openPartKeyInfoToBeDeleted, repeatedOmKeyInfo,
+          openPartKeyInfoToBeDeleted.getUpdateID(), isRatisEnabled);
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          openKey,
-          repeatedOmKeyInfo);
+          openKey, repeatedOmKeyInfo);
     }
 
     if (getOMResponse().getStatus() == OK) {
@@ -100,20 +137,19 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
 
     // This means for this multipart upload part upload, we have an old
     // part information, so delete it.
-    if (oldMultipartKeyInfo != null) {
-      OmKeyInfo partKey =
-          OmKeyInfo.getFromProtobuf(oldMultipartKeyInfo.getPartKeyInfo());
+    if (oldPartKeyInfo != null) {
+      OmKeyInfo partKeyToBeDeleted =
+          OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
 
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable()
-              .get(oldMultipartKeyInfo.getPartName());
+              .get(oldPartKeyInfo.getPartName());
 
-      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(partKey,
-          repeatedOmKeyInfo);
+      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(partKeyToBeDeleted,
+          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID(), isRatisEnabled);
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          oldMultipartKeyInfo.getPartName(),
-          repeatedOmKeyInfo);
+          oldPartKeyInfo.getPartName(), repeatedOmKeyInfo);
     }
 
     omMetadataManager.getMultipartInfoTable().putWithBatch(batchOperation,

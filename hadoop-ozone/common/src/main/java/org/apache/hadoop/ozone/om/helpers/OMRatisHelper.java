@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.TextFormat;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -65,5 +67,24 @@ public final class OMRatisHelper {
     return OMResponse.newBuilder(OMResponse.parseFrom(bytes))
         .setLeaderOMNodeId(reply.getReplierId())
         .build();
+  }
+
+  /**
+   * Convert StateMachineLogEntryProto to String.
+   * @param proto - {@link StateMachineLogEntryProto}
+   * @return String
+   */
+  public static String smProtoToString(StateMachineLogEntryProto proto) {
+    StringBuilder builder = new StringBuilder();
+    try {
+      builder.append(TextFormat.shortDebugString(
+          OMRatisHelper.convertByteStringToOMRequest(proto.getLogData())));
+
+    } catch (Throwable ex) {
+      LOG.info("smProtoToString failed", ex);
+      builder.append("smProtoToString failed with");
+      builder.append(ex.getMessage());
+    }
+    return builder.toString();
   }
 }

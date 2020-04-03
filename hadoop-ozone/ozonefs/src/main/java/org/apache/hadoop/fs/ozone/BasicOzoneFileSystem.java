@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.EnumSet;
@@ -31,8 +32,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
@@ -140,7 +141,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       uri = new URIBuilder().setScheme(OZONE_URI_SCHEME)
           .setHost(authority)
           .build();
-      LOG.trace("Ozone URI for ozfs initialization is " + uri);
+      LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
       //isolated is the default for ozonefs-lib-legacy which includes the
       // /ozonefs.txt, otherwise the default is false. It could be overridden.
@@ -215,8 +216,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     statistics.incrementReadOps(1);
     LOG.trace("open() path:{}", f);
     final String key = pathToKey(f);
-    return new FSDataInputStream(
-        new OzoneFSInputStream(adapter.readFile(key), statistics));
+    InputStream inputStream = adapter.readFile(key);
+    return new FSDataInputStream(createFSInputStream(inputStream));
+  }
+
+  protected InputStream createFSInputStream(InputStream inputStream) {
+    return new OzoneFSInputStream(inputStream, statistics);
   }
 
   protected void incrementCounter(Statistic statistic) {
@@ -232,7 +237,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_CREATE);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
-    return createOutputStream(key, overwrite, true);
+    return createOutputStream(key, replication, overwrite, true);
   }
 
   @Override
@@ -246,13 +251,14 @@ public class BasicOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_CREATE_NON_RECURSIVE);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(path);
-    return createOutputStream(key, flags.contains(CreateFlag.OVERWRITE), false);
+    return createOutputStream(key,
+        replication, flags.contains(CreateFlag.OVERWRITE), false);
   }
 
-  private FSDataOutputStream createOutputStream(String key, boolean overwrite,
-      boolean recursive) throws IOException {
-    return new FSDataOutputStream(adapter.createFile(key, overwrite, recursive),
-        statistics);
+  private FSDataOutputStream createOutputStream(String key, short replication,
+      boolean overwrite, boolean recursive) throws IOException {
+    return new FSDataOutputStream(adapter.createFile(key,
+        replication, overwrite, recursive), statistics);
   }
 
   @Override
@@ -415,7 +421,7 @@ public class BasicOzoneFileSystem extends FileSystem {
         LOG.trace("Skipping deleting root directory");
         return true;
       } else {
-        LOG.trace("deleting key:" + key);
+        LOG.trace("deleting key:{}", key);
         boolean succeed = adapter.deleteObject(key);
         // if recursive delete is requested ignore the return value of
         // deleteObject and issue deletes for other keys.
@@ -436,6 +442,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     LOG.trace("delete() path:{} recursive:{}", f, recursive);
     try {
       DeleteIterator iterator = new DeleteIterator(f, recursive);
+
+      if (f.isRoot()) {
+        LOG.warn("Cannot delete root directory.");
+        return false;
+      }
+
       return iterator.iterate();
     } catch (FileNotFoundException e) {
       if (LOG.isDebugEnabled()) {
@@ -463,12 +475,6 @@ public class BasicOzoneFileSystem extends FileSystem {
 
     if (status.isDirectory()) {
       LOG.debug("delete: Path is a directory: {}", f);
-      key = addTrailingSlashIfNeeded(key);
-
-      if (key.equals("/")) {
-        LOG.warn("Cannot delete root directory.");
-        return false;
-      }
 
       result = innerDelete(f, recursive);
     } else {
@@ -650,6 +656,11 @@ public class BasicOzoneFileSystem extends FileSystem {
     } else {
       return super.getFileBlockLocations(fileStatus, start, len);
     }
+  }
+
+  @Override
+  public short getDefaultReplication() {
+    return adapter.getDefaultReplication();
   }
 
   /**

@@ -312,6 +312,9 @@ enum Status {
     SCM_GET_PIPELINE_EXCEPTION = 57;
     INVALID_BUCKET_NAME = 58;
 
+    CANNOT_CREATE_DIRECTORY_AT_ROOT = 59;
+    DIRECTORY_ALREADY_EXISTS = 60;
+
     // When transactions are replayed
     REPLAY = 100;
 }
@@ -377,6 +380,7 @@ message UserInfo {
 */
 message UpdateGetDelegationTokenRequest {
     required GetDelegationTokenResponseProto getDelegationTokenResponse = 1;
+    optional uint64 tokenRenewInterval = 2;
 }
 
 /**
@@ -487,6 +491,8 @@ message BucketInfo {
     optional uint64 creationTime = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional BucketEncryptionInfoProto beinfo = 8;
+    optional uint64 objectID = 9;
+    optional uint64 updateID = 10;
 }
 
 enum StorageTypeProto {
@@ -562,6 +568,8 @@ message PrefixInfo {
     required string name = 1;
     repeated OzoneAclInfo acls = 2;
     repeated hadoop.hdds.KeyValue metadata = 3;
+    optional uint64 objectID = 4;
+    optional uint64 updateID = 5;
 }
 
 message OzoneObj {
@@ -737,6 +745,8 @@ message KeyInfo {
     repeated hadoop.hdds.KeyValue metadata = 11;
     optional FileEncryptionInfoProto fileEncryptionInfo = 12;
     repeated OzoneAclInfo acls = 13;
+    optional uint64 objectID = 14;
+    optional uint64 updateID = 15;
 }
 
 message RepeatedKeyInfo {
@@ -850,8 +860,14 @@ message DeleteKeyResponse {
     optional uint64 openVersion = 4;
 }
 
+message DeletedKeys {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    repeated string keys = 3;
+}
+
 message PurgeKeysRequest {
-    repeated string keys = 1;
+    repeated DeletedKeys deletedKeys = 1;
 }
 
 message PurgeKeysResponse {
@@ -1030,6 +1046,8 @@ message MultipartKeyInfo {
     required hadoop.hdds.ReplicationType type = 3;
     required hadoop.hdds.ReplicationFactor factor = 4;
     repeated PartKeyInfo partKeyInfoList = 5;
+    optional uint64 objectID = 6;
+    optional uint64 updateID = 7;
 }
 
 message PartKeyInfo {

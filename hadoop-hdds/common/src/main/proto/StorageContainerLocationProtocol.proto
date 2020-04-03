@@ -59,9 +59,10 @@ message ScmContainerLocationRequest {
   optional StartReplicationManagerRequestProto startReplicationManagerRequest = 21;
   optional StopReplicationManagerRequestProto stopReplicationManagerRequest = 22;
   optional ReplicationManagerStatusRequestProto seplicationManagerStatusRequest = 23;
-  optional DecommissionNodesRequestProto decommissionNodesRequest = 24;
-  optional RecommissionNodesRequestProto recommissionNodesRequest = 25;
-  optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 26;
+  optional GetPipelineRequestProto getPipelineRequest = 24;
+  optional DecommissionNodesRequestProto decommissionNodesRequest = 25;
+  optional RecommissionNodesRequestProto recommissionNodesRequest = 26;
+  optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 27;
 }
 
 message ScmContainerLocationResponse {
@@ -93,9 +94,10 @@ message ScmContainerLocationResponse {
   optional StartReplicationManagerResponseProto startReplicationManagerResponse = 21;
   optional StopReplicationManagerResponseProto stopReplicationManagerResponse = 22;
   optional ReplicationManagerStatusResponseProto replicationManagerStatusResponse = 23;
-  optional DecommissionNodesResponseProto decommissionNodesResponse = 24;
-  optional RecommissionNodesResponseProto recommissionNodesResponse = 25;
-  optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 26;
+  optional GetPipelineResponseProto getPipelineResponse = 24;
+  optional DecommissionNodesResponseProto decommissionNodesResponse = 25;
+  optional RecommissionNodesResponseProto recommissionNodesResponse = 26;
+  optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 27;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -123,9 +125,10 @@ enum Type {
   StartReplicationManager = 16;
   StopReplicationManager = 17;
   GetReplicationManagerStatus = 18;
-  DecommissionNodes = 19;
-  RecommissionNodes = 20;
-  StartMaintenanceNodes = 21;
+  GetPipeline = 19;
+  DecommissionNodes = 20;
+  RecommissionNodes = 21;
+  StartMaintenanceNodes = 22;
 }
 
 /**
@@ -282,6 +285,15 @@ message ListPipelineRequestProto {
 
 message ListPipelineResponseProto {
   repeated Pipeline pipelines = 1;
+}
+
+message GetPipelineRequestProto {
+  required PipelineID pipelineID = 1;
+  optional string traceID = 2;
+}
+
+message GetPipelineResponseProto {
+  required Pipeline pipeline = 1;
 }
 
 message ActivatePipelineRequestProto {

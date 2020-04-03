@@ -23,9 +23,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.web.ozShell.OzoneShell;
+import org.apache.hadoop.ozone.web.ozShell.Shell;
+import org.apache.hadoop.ozone.web.ozShell.s3.S3Shell;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -69,6 +73,7 @@ public class TestOzoneShellHA {
   public Timeout testTimeout = new Timeout(300000);
 
   private static File baseDir;
+  private static File testFile;
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
   private static OzoneShell ozoneShell = null;
@@ -97,6 +102,11 @@ public class TestOzoneShellHA {
         TestOzoneShellHA.class.getSimpleName());
     baseDir = new File(path);
     baseDir.mkdirs();
+
+    testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
+    testFile.getParentFile().mkdirs();
+    testFile.createNewFile();
+
     ozoneShell = new OzoneShell();
 
     // Init HA cluster
@@ -145,7 +155,7 @@ public class TestOzoneShellHA {
     System.setErr(OLD_ERR);
   }
 
-  private void execute(OzoneShell shell, String[] args) {
+  private void execute(Shell shell, String[] args) {
     LOG.info("Executing OzoneShell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
 
@@ -272,6 +282,59 @@ public class TestOzoneShellHA {
   }
 
   /**
+   * Helper function to generate keys for testing shell command of keys.
+   */
+  private void generateKeys(String volumeName, String bucketName) {
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId + volumeName};
+    execute(ozoneShell, args);
+
+    args = new String[] {
+        "bucket", "create", "o3://" + omServiceId + volumeName + bucketName};
+    execute(ozoneShell, args);
+
+    String keyName = volumeName + bucketName +
+        OzoneConsts.OZONE_URI_DELIMITER + "key";
+    for (int i = 0; i < 100; i++) {
+      args = new String[] {
+          "key", "put", "o3://" + omServiceId + keyName + i,
+          testFile.getPath()};
+      execute(ozoneShell, args);
+    }
+  }
+
+  /**
+   * Helper function to get nums of keys from info of listing command.
+   */
+  private int getNumOfKeys() {
+    return out.toString().split("key").length - 1;
+  }
+
+  /**
+   * Helper function to generate buckets for testing shell command of buckets.
+   */
+  private void generateBuckets(String volumeName, int numOfBuckets) {
+    String[] args = new String[] {
+        "volume", "create", "o3://" + omServiceId + volumeName};
+    execute(ozoneShell, args);
+
+    String bucketName = volumeName + OzoneConsts.OZONE_URI_DELIMITER + "bucket";
+    for (int i = 0; i < numOfBuckets; i++) {
+      args = new String[] {
+          "bucket", "create", "o3://" + omServiceId + bucketName + i};
+      execute(ozoneShell, args);
+    }
+  }
+
+  /**
+   * Helper function to get nums of buckets from info of listing command.
+   */
+  private int getNumOfBuckets(String bucketPrefix) {
+    return out.toString().split(bucketPrefix).length - 1;
+  }
+
+
+  /**
    * Tests ozone sh command URI parsing with volume and bucket create commands.
    */
   @Test
@@ -330,4 +393,82 @@ public class TestOzoneShellHA {
         "bucket", "create", "o3://" + omServiceId + "/volume/bucket"};
     execute(ozoneShell, args);
   }
+
+  /**
+   * Test ozone shell list command.
+   */
+  @Test
+  public void testOzoneShCmdList() {
+    // Part of listing keys test.
+    generateKeys("/volume4", "/bucket");
+    final String destinationBucket = "o3://" + omServiceId + "/volume4/bucket";
+
+    // Test case 1: test listing keys
+    // ozone sh key list /volume4/bucket
+    // Expectation: Get list including all keys.
+    String[] args = new String[] {"key", "list", destinationBucket};
+    out.reset();
+    execute(ozoneShell, args);
+    Assert.assertEquals(100, getNumOfKeys());
+
+    // Test case 2: test listing keys for setting --start with last key.
+    // ozone sh key list --start=key99 /volume4/bucket
+    // Expectation: Get empty list.
+    final String startKey = "--start=key99";
+    args = new String[] {"key", "list", startKey, destinationBucket};
+    out.reset();
+    execute(ozoneShell, args);
+    Assert.assertEquals(0, out.size());
+    Assert.assertEquals(0, getNumOfKeys());
+
+    // Part of listing buckets test.
+    generateBuckets("/volume5", 100);
+    final String destinationVolume = "o3://" + omServiceId + "/volume5";
+
+    // Test case 1: test listing buckets.
+    // ozone sh bucket list /volume5
+    // Expectation: Get list including all buckets.
+    args = new String[] {"bucket", "list", destinationVolume};
+    out.reset();
+    execute(ozoneShell, args);
+    Assert.assertEquals(100, getNumOfBuckets("bucket"));
+
+    // Test case 2: test listing buckets for setting --start with last bucket.
+    // ozone sh bucket list /volume5 --start=bucket99 /volume5
+    // Expectation: Get empty list.
+    final String startBucket = "--start=bucket99";
+    out.reset();
+    args = new String[] {"bucket", "list", startBucket, destinationVolume};
+    execute(ozoneShell, args);
+    Assert.assertEquals(0, out.size());
+    Assert.assertEquals(0, getNumOfBuckets("bucket"));
+  }
+
+
+  @Test
+  public void testS3PathCommand() throws Exception {
+
+    String s3Bucket = "b12345";
+    cluster.getRpcClient().getObjectStore().createS3Bucket(
+        UserGroupInformation.getCurrentUser().getUserName(), s3Bucket);
+
+    String[] args = new String[] {"path", s3Bucket,
+        "--om-service-id="+omServiceId};
+
+    S3Shell s3Shell = new S3Shell();
+    execute(s3Shell, args);
+
+
+    String volumeName =
+        cluster.getRpcClient().getObjectStore().getOzoneVolumeName(s3Bucket);
+
+    String ozoneFsUri = String.format("%s://%s.%s", OzoneConsts
+        .OZONE_URI_SCHEME, s3Bucket, volumeName);
+
+    Assert.assertTrue(out.toString().contains(volumeName));
+    Assert.assertTrue(out.toString().contains(ozoneFsUri));
+
+    out.reset();
+  }
+
 }

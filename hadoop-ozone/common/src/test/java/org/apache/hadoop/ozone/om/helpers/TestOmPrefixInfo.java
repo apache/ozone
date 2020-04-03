@@ -38,7 +38,7 @@ public class TestOmPrefixInfo {
     OmPrefixInfo omPrefixInfo = new OmPrefixInfo("/path",
         Collections.singletonList(new OzoneAcl(
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        IAccessAuthorizer.ACLType.WRITE, ACCESS)), new HashMap<>());
+        IAccessAuthorizer.ACLType.WRITE, ACCESS)), new HashMap<>(), 10, 100);
 
     OmPrefixInfo clonePrefixInfo = omPrefixInfo.copyObject();
 

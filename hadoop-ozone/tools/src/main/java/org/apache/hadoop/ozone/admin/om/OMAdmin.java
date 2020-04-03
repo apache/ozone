@@ -19,14 +19,17 @@ package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.MissingSubcommandException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import picocli.CommandLine;
 
-import java.io.IOException;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import picocli.CommandLine;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
 
 /**
  * Subcommand for admin operations related to OM.
@@ -44,20 +47,30 @@ public class OMAdmin extends GenericCli {
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
 
+  @Spec
+  private CommandSpec spec;
+
   public OzoneAdmin getParent() {
     return parent;
   }
 
   @Override
   public Void call() throws Exception {
-    throw new MissingSubcommandException(
-        this.parent.getCmd().getSubcommands().get("om"));
+    GenericCli.missingSubcommand(spec);
+    return null;
   }
 
-  public ClientProtocol createClient(String omServiceId) throws IOException {
+  public ClientProtocol createClient(String omServiceId) throws Exception {
     OzoneConfiguration conf = parent.getOzoneConf();
-    return OzoneClientFactory.getRpcClient(omServiceId, conf).getObjectStore()
+    if (OmUtils.isOmHAServiceId(conf, omServiceId)) {
+      return OzoneClientFactory.getRpcClient(omServiceId, conf).getObjectStore()
         .getClientProxy();
-
+    } else {
+      throw new OzoneClientException("This command works only on OzoneManager" +
+          " HA cluster. Service ID specified does not match" +
+          " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
+              "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
+              conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+    }
   }
 }

@@ -31,7 +31,6 @@ import java.util.function.LongSupplier;
 public class ProgressBar {
 
   private static final Logger LOG = LoggerFactory.getLogger(ProgressBar.class);
-  private static final long REFRESH_INTERVAL = 1000L;
 
   private final long maxValue;
   private final LongSupplier currentValue;
@@ -40,6 +39,11 @@ public class ProgressBar {
   private volatile boolean running;
 
   private volatile long startTime;
+
+  /**
+   * True if the progress bar is used from an interactive environment (shell).
+   */
+  private boolean interactive;
 
   /**
    * Creates a new ProgressBar instance which prints the progress on the given
@@ -51,10 +55,24 @@ public class ProgressBar {
    */
   public ProgressBar(final PrintStream stream, final long maxValue,
                      final LongSupplier currentValue) {
+    this(stream, maxValue, currentValue, System.console() != null);
+  }
+
+  /**
+   * Creates a new ProgressBar instance which prints the progress on the given
+   * PrintStream when started.
+   *
+   * @param stream       to display the progress
+   * @param maxValue     Maximum value of the progress
+   * @param currentValue Supplier that provides the current value
+   * @param interactive  Print progressbar for interactive environments.
+   */
+  public ProgressBar(final PrintStream stream, final long maxValue,
+      final LongSupplier currentValue, boolean interactive) {
     this.maxValue = maxValue;
     this.currentValue = currentValue;
     this.thread = new Thread(getProgressBar(stream));
-    this.running = false;
+    this.interactive = interactive;
   }
 
   /**
@@ -105,18 +123,18 @@ public class ProgressBar {
 
   private Runnable getProgressBar(final PrintStream stream) {
     return () -> {
-      stream.println();
+      println(stream);
       while (running && currentValue.getAsLong() < maxValue) {
         print(stream, currentValue.getAsLong());
         try {
-          Thread.sleep(REFRESH_INTERVAL);
+          Thread.sleep(1000L);
         } catch (InterruptedException e) {
           LOG.warn("ProgressBar was interrupted.");
           Thread.currentThread().interrupt();
         }
       }
       print(stream, maxValue);
-      stream.println();
+      println(stream);
       running = false;
     };
   }
@@ -126,7 +144,27 @@ public class ProgressBar {
    *
    * @param value current progress position
    */
-  private void print(final PrintStream stream, final long value) {
+  public void print(final PrintStream stream, final long value) {
+    if (interactive) {
+      printProgressBar(stream, value);
+    } else {
+      logProgressBar(stream, value);
+    }
+  }
+
+  private void println(PrintStream stream) {
+    if (interactive) {
+      stream.println();
+    }
+  }
+
+  private void logProgressBar(PrintStream stream, long value) {
+    double percent = 100.0 * value / maxValue;
+    LOG.info(String
+        .format("Progress: %.2f %% (%d out of %d)", percent, value, maxValue));
+  }
+
+  private void printProgressBar(PrintStream stream, long value) {
     stream.print('\r');
     double percent = 100.0 * value / maxValue;
     StringBuilder sb = new StringBuilder();
@@ -141,9 +179,9 @@ public class ProgressBar {
     sb.append("|  ");
     sb.append(value).append("/").append(maxValue);
     long timeInSec = TimeUnit.SECONDS.convert(
-            System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
+        System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
     String timeToPrint = String.format("%d:%02d:%02d", timeInSec / 3600,
-            (timeInSec % 3600) / 60, timeInSec % 60);
+        (timeInSec % 3600) / 60, timeInSec % 60);
     sb.append(" Time: ").append(timeToPrint);
     stream.print(sb.toString());
   }

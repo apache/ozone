@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -38,12 +39,14 @@ import org.junit.rules.TemporaryFolder;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.junit.Assert.fail;
 
 /**
  * This class tests SCM Safe mode with pipeline rules.
  */
 
+@Ignore
 public class TestSCMSafeModeWithPipelineRules {
 
   private static MiniOzoneCluster cluster;
@@ -62,6 +65,8 @@ public class TestSCMSafeModeWithPipelineRules {
         true);
     conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "10s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 50);
+
     clusterBuilder = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numDatanodes)
         .setHbInterval(1000)

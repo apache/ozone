@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.hdds.server.BaseHttpServer;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 
 import java.io.IOException;
 

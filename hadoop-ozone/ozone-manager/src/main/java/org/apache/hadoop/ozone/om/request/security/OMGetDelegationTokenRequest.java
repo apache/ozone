@@ -86,7 +86,9 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
                               SecurityProtos.GetDelegationTokenResponseProto
                               .newBuilder().setToken(OMPBHelper
                                   .convertToTokenProto(token)).build())
-                          .build()))
+                          .build())
+                  .setTokenRenewInterval(ozoneManager.getDelegationTokenMgr()
+                      .getTokenRenewInterval()))
           .setCmdType(getOmRequest().getCmdType())
           .setClientId(getOmRequest().getClientId());
 
@@ -151,8 +153,11 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
           readProtoBuf(ozoneTokenIdentifierToken.getIdentifier());
 
       // Update in memory map of token.
+      long tokenRenewInterval = updateGetDelegationTokenRequest
+          .getTokenRenewInterval();
       long renewTime = ozoneManager.getDelegationTokenMgr()
-          .updateToken(ozoneTokenIdentifierToken, ozoneTokenIdentifier);
+          .updateToken(ozoneTokenIdentifierToken, ozoneTokenIdentifier,
+              tokenRenewInterval);
 
      // Update Cache.
       omMetadataManager.getDelegationTokenTable().addCacheEntry(
@@ -170,11 +175,8 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
       omClientResponse = new OMGetDelegationTokenResponse(null, -1L,
           createErrorOMResponse(omResponse, ex));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
+      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+          ozoneManagerDoubleBufferHelper);
     }
 
     if (LOG.isDebugEnabled()) {

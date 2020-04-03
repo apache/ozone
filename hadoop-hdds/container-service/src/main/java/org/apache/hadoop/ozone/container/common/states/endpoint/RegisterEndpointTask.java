@@ -102,41 +102,44 @@ public final class RegisterEndpointTask implements
   public EndpointStateMachine.EndPointStates call() throws Exception {
 
     if (getDatanodeDetails() == null) {
-      LOG.error("DatanodeDetails cannot be null in RegisterEndpoint task, " +
-          "shutting down the endpoint.");
+      LOG.error("DatanodeDetails cannot be null in RegisterEndpoint task, "
+          + "shutting down the endpoint.");
       return rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
     }
 
     rpcEndPoint.lock();
     try {
 
-      ContainerReportsProto containerReport = datanodeContainerManager
-          .getController().getContainerReport();
-      NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
-      PipelineReportsProto pipelineReportsProto =
-              datanodeContainerManager.getPipelineReport();
-      // TODO : Add responses to the command Queue.
-      SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
-          .register(datanodeDetails.getProtoBufMessage(), nodeReport,
-                  containerReport, pipelineReportsProto);
-      Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
-              .equals(datanodeDetails.getUuid()),
-          "Unexpected datanode ID in the response.");
-      Preconditions.checkState(!StringUtils.isBlank(response.getClusterID()),
-          "Invalid cluster ID in the response.");
-      if (response.hasHostname() && response.hasIpAddress()) {
-        datanodeDetails.setHostName(response.getHostname());
-        datanodeDetails.setIpAddress(response.getIpAddress());
+      if (rpcEndPoint.getState()
+          .equals(EndpointStateMachine.EndPointStates.REGISTER)) {
+        ContainerReportsProto containerReport =
+            datanodeContainerManager.getController().getContainerReport();
+        NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
+        PipelineReportsProto pipelineReportsProto =
+            datanodeContainerManager.getPipelineReport();
+        // TODO : Add responses to the command Queue.
+        SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
+            .register(datanodeDetails.getProtoBufMessage(), nodeReport,
+                containerReport, pipelineReportsProto);
+        Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
+                .equals(datanodeDetails.getUuid()),
+            "Unexpected datanode ID in the response.");
+        Preconditions.checkState(!StringUtils.isBlank(response.getClusterID()),
+            "Invalid cluster ID in the response.");
+        if (response.hasHostname() && response.hasIpAddress()) {
+          datanodeDetails.setHostName(response.getHostname());
+          datanodeDetails.setIpAddress(response.getIpAddress());
+        }
+        if (response.hasNetworkName() && response.hasNetworkLocation()) {
+          datanodeDetails.setNetworkName(response.getNetworkName());
+          datanodeDetails.setNetworkLocation(response.getNetworkLocation());
+        }
+        EndpointStateMachine.EndPointStates nextState =
+            rpcEndPoint.getState().getNextState();
+        rpcEndPoint.setState(nextState);
+        rpcEndPoint.zeroMissedCount();
+        this.stateContext.configureHeartbeatFrequency();
       }
-      if (response.hasNetworkName() && response.hasNetworkLocation()) {
-        datanodeDetails.setNetworkName(response.getNetworkName());
-        datanodeDetails.setNetworkLocation(response.getNetworkLocation());
-      }
-      EndpointStateMachine.EndPointStates nextState =
-          rpcEndPoint.getState().getNextState();
-      rpcEndPoint.setState(nextState);
-      rpcEndPoint.zeroMissedCount();
-      this.stateContext.configureHeartbeatFrequency();
     } catch (IOException ex) {
       rpcEndPoint.logIfNeeded(ex);
     } finally {
