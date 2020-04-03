@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
@@ -202,10 +203,18 @@ public class TestOzoneManagerServiceProviderImpl extends
             getMockTaskController(), new ReconUtils(),
             getMockOzoneManagerClient(dbUpdatesWrapper));
 
+    OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
+    // To make sire averageNumUpdatesInDeltaRequest does not result in division
+    // by zero.
+    metrics.incrNumDeltaRequests();
+
     OMDBUpdatesHandler updatesHandler =
         new OMDBUpdatesHandler(omMetadataManager);
     ozoneManagerServiceProvider.getAndApplyDeltaUpdatesFromOM(
         0L, updatesHandler);
+
+    assertEquals(4.0,
+        metrics.getAverageNumUpdatesInDeltaRequest().value(), 0.0);
 
     // In this method, we have to assert the "GET" part and the "APPLY" path.
 
@@ -246,6 +255,9 @@ public class TestOzoneManagerServiceProviderImpl extends
         new MockOzoneServiceProvider(configuration, omMetadataManager,
             reconTaskControllerMock, new ReconUtils(), ozoneManagerProtocol);
 
+    OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
+    assertEquals(0, metrics.getNumSnapshotRequests().value());
+
     // Should trigger full snapshot request.
     ozoneManagerServiceProvider.syncDataFromOM();
 
@@ -257,6 +269,8 @@ public class TestOzoneManagerServiceProviderImpl extends
         .equals(OmSnapshotRequest.name()));
     verify(reconTaskControllerMock, times(1))
         .reInitializeTasks(omMetadataManager);
+    assertEquals(1, metrics.getNumSnapshotRequests().value());
+    assertEquals(0, metrics.getNumDeltaRequests().value());
   }
 
   @Test
@@ -281,6 +295,9 @@ public class TestOzoneManagerServiceProviderImpl extends
         new OzoneManagerServiceProviderImpl(configuration, omMetadataManager,
             reconTaskControllerMock, new ReconUtils(), ozoneManagerProtocol);
 
+    OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
+    assertEquals(0, metrics.getNumDeltaRequests().value());
+
     // Should trigger delta updates.
     ozoneManagerServiceProvider.syncDataFromOM();
 
@@ -293,6 +310,9 @@ public class TestOzoneManagerServiceProviderImpl extends
     verify(reconTaskControllerMock, times(1))
         .consumeOMEvents(any(OMUpdateEventBatch.class),
             any(OMMetadataManager.class));
+    assertEquals(1, metrics.getNumDeltaRequests().value());
+    assertEquals(0, metrics.getNumSnapshotRequests().value());
+    assertEquals(1, metrics.getDeltaRequestLatency().lastStat().numSamples());
   }
 
   private ReconTaskController getMockTaskController() {
