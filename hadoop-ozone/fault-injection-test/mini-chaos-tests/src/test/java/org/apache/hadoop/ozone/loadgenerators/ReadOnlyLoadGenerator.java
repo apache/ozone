@@ -15,48 +15,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.ozone.loadgenerators;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.ozone.utils.LoadBucket;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 
 /**
- * Random load generator which writes, read and deletes keys from
- * the bucket.
+ * This load generator writes some files and reads the same file multiple times.
  */
-public class RandomLoadGenerator extends LoadGenerator {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(RandomLoadGenerator.class);
-
-  private final List<LoadBucket> ozoneBuckets;
+public class ReadOnlyLoadGenerator extends LoadGenerator {
+  private final LoadBucket replBucket;
   private final DataBuffer dataBuffer;
+  private final int numKeys;
 
-  public RandomLoadGenerator(DataBuffer dataBuffer, List<LoadBucket> buckets) {
-    this.ozoneBuckets = buckets;
+  public ReadOnlyLoadGenerator(DataBuffer dataBuffer, LoadBucket replBucket,
+                               int numKeys) {
     this.dataBuffer = dataBuffer;
+    this.replBucket = replBucket;
+    this.numKeys = numKeys;
   }
 
   @Override
   public void generateLoad() throws Exception {
-    LoadBucket bucket =
-        ozoneBuckets.get((int) (Math.random() * ozoneBuckets.size()));
-    int index = RandomUtils.nextInt();
+    int index = RandomUtils.nextInt(0, numKeys);
     ByteBuffer buffer = dataBuffer.getBuffer(index);
     String keyName = getKeyName(index);
-    bucket.writeKey(buffer, keyName);
-
-    bucket.readKey(buffer, keyName);
-
-    bucket.deleteKey(keyName);
+    replBucket.readKey(buffer, keyName);
   }
 
-  public void initialize() {
-    // Nothing to do here
+
+  public void initialize() throws Exception {
+    for (int index = 0; index < numKeys; index++) {
+      ByteBuffer buffer = dataBuffer.getBuffer(index);
+      String keyName = getKeyName(index);
+      replBucket.writeKey(buffer, keyName);
+    }
   }
 }

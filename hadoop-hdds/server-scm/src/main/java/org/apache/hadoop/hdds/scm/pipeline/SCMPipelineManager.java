@@ -577,9 +577,9 @@ public class SCMPipelineManager implements PipelineManager {
       MBeans.unregister(this.pmInfoBean);
       pmInfoBean = null;
     }
-    if(metrics != null) {
-      metrics.unRegister();
-    }
+
+    SCMPipelineMetrics.unRegister();
+
     // shutdown pipeline provider.
     pipelineFactory.shutdown();
   }

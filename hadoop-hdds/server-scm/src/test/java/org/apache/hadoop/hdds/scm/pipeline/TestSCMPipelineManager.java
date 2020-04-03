@@ -258,7 +258,7 @@ public class TestSCMPipelineManager {
         SCMPipelineMetrics.class.getSimpleName());
     long numPipelineAllocated = getLongCounter("NumPipelineAllocated",
         metrics);
-    Assert.assertTrue(numPipelineAllocated == 0);
+    Assert.assertEquals(0, numPipelineAllocated);
 
     // 3 DNs are unhealthy.
     // Create 5 pipelines (Use up 15 Datanodes)
@@ -272,11 +272,11 @@ public class TestSCMPipelineManager {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertTrue(numPipelineAllocated == 5);
+    Assert.assertEquals(5, numPipelineAllocated);
 
     long numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
-    Assert.assertTrue(numPipelineCreateFailed == 0);
+    Assert.assertEquals(0, numPipelineCreateFailed);
 
     //This should fail...
     try {
@@ -292,11 +292,11 @@ public class TestSCMPipelineManager {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertTrue(numPipelineAllocated == 5);
+    Assert.assertEquals(5, numPipelineAllocated);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
-    Assert.assertTrue(numPipelineCreateFailed == 1);
+    Assert.assertEquals(1, numPipelineCreateFailed);
 
     // clean up
     pipelineManager.close();
@@ -426,8 +426,8 @@ public class TestSCMPipelineManager {
         .createPipeline(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE);
     // At this point, pipeline is not at OPEN stage.
-    Assert.assertEquals(pipeline.getPipelineState(),
-        Pipeline.PipelineState.ALLOCATED);
+    Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
+        pipeline.getPipelineState());
 
     // pipeline should be seen in pipelineManager as ALLOCATED.
     Assert.assertTrue(pipelineManager
