@@ -305,6 +305,7 @@ public interface MiniOzoneCluster {
     protected int numOfOmHandlers = 20;
     protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
+    protected int numOfDatanodesDirs = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected int pipelineNumLimit = DEFAULT_PIPELIME_LIMIT;
@@ -391,6 +392,19 @@ public interface MiniOzoneCluster {
      */
     public Builder setNumDatanodes(int val) {
       numOfDatanodes = val;
+      return this;
+    }
+
+    /**
+     * Sets the number of HddsDatanodes data dirs to be started as part of
+     * MiniOzoneCluster.
+     *
+     * @param val number of datanodes dirs
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setNumDatanodesDirs(int val) {
+      numOfDatanodesDirs = val;
       return this;
     }
 

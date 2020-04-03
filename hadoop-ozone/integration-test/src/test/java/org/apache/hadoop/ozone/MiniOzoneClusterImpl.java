@@ -699,17 +699,21 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);
         String datanodeBaseDir = path + "/datanode-" + Integer.toString(i);
         Path metaDir = Paths.get(datanodeBaseDir, "meta");
-        Path dataDir = Paths.get(datanodeBaseDir, "data", "containers");
+        List<String> dataDirs = new ArrayList<>();
+        for (int j = 0; j < numOfDatanodesDirs; j++) {
+          Path dir = Paths.get(datanodeBaseDir, "data-" + j, "containers");
+          Files.createDirectories(dir);
+          dataDirs.add(dir.toString());
+        }
+        String listOfDirs = String.join(",", dataDirs);
         Path ratisDir = Paths.get(datanodeBaseDir, "data", "ratis");
         Path wrokDir = Paths.get(datanodeBaseDir, "data", "replication",
             "work");
         Files.createDirectories(metaDir);
-        Files.createDirectories(dataDir);
         Files.createDirectories(ratisDir);
         Files.createDirectories(wrokDir);
         dnConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
-        dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
-            dataDir.toString());
+        dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, listOfDirs);
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
         dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,

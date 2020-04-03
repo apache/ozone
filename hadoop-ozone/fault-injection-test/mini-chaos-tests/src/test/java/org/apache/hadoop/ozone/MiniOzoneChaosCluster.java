@@ -360,6 +360,19 @@ public abstract class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);
     }
 
+    /**
+     * Sets the number of HddsDatanodes data dirs to be started as part of
+     * MiniOzoneCluster.
+     *
+     * @param val number of datanodes dirs
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setNumDatanodesDirs(int val) {
+      numOfDatanodesDirs = val;
+      return this;
+    }
+
     @Override
     public MiniOzoneChaosCluster build() throws IOException {
 

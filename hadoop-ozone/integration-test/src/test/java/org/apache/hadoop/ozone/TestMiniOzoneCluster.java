@@ -65,7 +65,6 @@ import org.yaml.snakeyaml.Yaml;
 /**
  * Test cases for mini ozone cluster.
  */
-@Ignore
 public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
@@ -325,5 +324,23 @@ public class TestMiniOzoneCluster {
       Assert.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
           endpoint.getState());
     }
+  }
+
+  /**
+   * Test that multiple datanode directories are created in MiniOzoneCluster.
+   * @throws Exception
+   */
+  @Test (timeout = 60000)
+  public void testMultipleDataDirs() throws Exception {
+    // Start a cluster with 3 DN
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .setNumDatanodesDirs(3)
+        .build();
+    cluster.waitForClusterToBeReady();
+
+    Assert.assertEquals(3, cluster.getHddsDatanodes().get(0)
+        .getDatanodeStateMachine().getContainer().getVolumeSet()
+        .getVolumesList().size());
   }
 }
