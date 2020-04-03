@@ -16,10 +16,10 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-main-ozone</artifactId>
-    <version>0.5.0-SNAPSHOT</version>
+    <version>0.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone</artifactId>
-  <version>0.5.0-SNAPSHOT</version>
+  <version>0.6.0-SNAPSHOT</version>
   <description>Apache Hadoop Ozone Project</description>
   <name>Apache Hadoop Ozone</name>
   <packaging>pom</packaging>
@@ -245,6 +245,7 @@
             <exclude>**/target/**</exclude>
             <exclude>.gitattributes</exclude>
             <exclude>.idea/**</exclude>
+            <exclude>**/.ssh/id_rsa*</exclude>
             <exclude>dev-support/*tests</exclude>
             <exclude>dev-support/checkstyle*</exclude>
             <exclude>dev-support/jdiff/**</exclude>

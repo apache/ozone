@@ -16,24 +16,26 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.server.impl.RaftServerImpl;
-import org.apache.ratis.server.raftlog.RaftLog;
-import org.junit.Before;
-import org.junit.Test;
-import org.slf4j.event.Level;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.test.GenericTestUtils;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.ratis.server.impl.RaftServerImpl;
+import org.apache.ratis.server.raftlog.RaftLog;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Test;
+import org.slf4j.event.Level;
+
 /**
  * Test for OzoneClientKeyGenerator.
  */
+@Ignore("HDDS-3297")
 public class TestOzoneClientKeyGenerator {
 
   private String path;
@@ -68,7 +70,6 @@ public class TestOzoneClientKeyGenerator {
     if (conf == null) {
       conf = new OzoneConfiguration();
     }
-    conf.set(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, "5000ms");
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
         .build();

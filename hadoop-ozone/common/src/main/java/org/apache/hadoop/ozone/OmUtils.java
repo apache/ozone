@@ -29,8 +29,12 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.stream.Collectors;
@@ -87,6 +91,34 @@ public final class OmUtils {
    */
   public static InetSocketAddress getOmAddress(Configuration conf) {
     return NetUtils.createSocketAddr(getOmRpcAddress(conf));
+  }
+
+  /**
+   * Return list of OM addresses by service ids - when HA is enabled.
+   *
+   * @param conf {@link Configuration}
+   * @return {service.id -> [{@link InetSocketAddress}]}
+   */
+  public static Map<String, List<InetSocketAddress>> getOmHAAddressesById(
+      Configuration conf) {
+    Map<String, List<InetSocketAddress>> result = new HashMap<>();
+    for (String serviceId : conf.getTrimmedStringCollection(
+        OZONE_OM_SERVICE_IDS_KEY)) {
+      if (!result.containsKey(serviceId)) {
+        result.put(serviceId, new ArrayList<>());
+      }
+      for (String nodeId : getOMNodeIds(conf, serviceId)) {
+        String rpcAddr = getOmRpcAddress(conf,
+            addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
+        if (rpcAddr != null) {
+          result.get(serviceId).add(NetUtils.createSocketAddr(rpcAddr));
+        } else {
+          LOG.warn("Address undefined for nodeId: {} for service {}", nodeId,
+              serviceId);
+        }
+      }
+    }
+    return result;
   }
 
   /**
@@ -460,13 +492,19 @@ public final class OmUtils {
    * implies that no entry for the object key exists in deletedTable so we
    * create a new instance to include this key, else we update the existing
    * repeatedOmKeyInfo instance.
+   * 3. Set the updateID to the transactionLogIndex.
    * @param keyInfo args supplied by client
    * @param repeatedOmKeyInfo key details from deletedTable
+   * @param trxnLogIndex For Multipart keys, this is the transactionLogIndex
+   *                     of the MultipartUploadAbort request which needs to
+   *                     be set as the updateID of the partKeyInfos.
+   *                     For regular Key deletes, this value should be set to
+   *                     the same updaeID as is in keyInfo.
    * @return {@link RepeatedOmKeyInfo}
-   * @throws IOException if I/O Errors when checking for key
    */
   public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
-      RepeatedOmKeyInfo repeatedOmKeyInfo) throws IOException{
+      RepeatedOmKeyInfo repeatedOmKeyInfo, long trxnLogIndex,
+      boolean isRatisEnabled) {
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
@@ -476,6 +514,9 @@ public final class OmUtils {
       keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
       keyInfo.clearFileEncryptionInfo();
     }
+
+    // Set the updateID
+    keyInfo.setUpdateID(trxnLogIndex, isRatisEnabled);
 
     if(repeatedOmKeyInfo == null) {
       //The key doesn't exist in deletedTable, so create a new instance.

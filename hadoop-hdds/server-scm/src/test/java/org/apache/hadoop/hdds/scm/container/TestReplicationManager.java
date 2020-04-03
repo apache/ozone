@@ -28,8 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager
     .ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms
-    .ContainerPlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -68,7 +67,7 @@ public class TestReplicationManager {
 
   private ReplicationManager replicationManager;
   private ContainerStateManager containerStateManager;
-  private ContainerPlacementPolicy containerPlacementPolicy;
+  private PlacementPolicy containerPlacementPolicy;
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
   private SimpleMockNodeManager nodeManager;
@@ -99,7 +98,7 @@ public class TestReplicationManager {
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas((ContainerID)invocation.getArguments()[0]));
 
-    containerPlacementPolicy = Mockito.mock(ContainerPlacementPolicy.class);
+    containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
 
     Mockito.when(containerPlacementPolicy.chooseDatanodes(
         Mockito.anyListOf(DatanodeDetails.class),

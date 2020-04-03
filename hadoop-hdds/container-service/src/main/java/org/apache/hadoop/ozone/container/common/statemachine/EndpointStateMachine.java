@@ -32,8 +32,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.apache.hadoop.hdds.scm.HddsServerUtil.getLogWarnInterval;
-import static org.apache.hadoop.hdds.scm.HddsServerUtil.getScmHeartbeatInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 
 /**
  * Endpoint is used as holder class that keeps state around the RPC endpoint.
@@ -218,7 +218,7 @@ public class EndpointStateMachine
           "Unable to communicate to {} server at {} for past {} seconds.",
           serverName,
           getAddress().getHostString() + ":" + getAddress().getPort(),
-          TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() * 10 *
+          TimeUnit.MILLISECONDS.toSeconds(this.getMissedCount() *
                   getScmHeartbeatInterval(this.conf)), ex);
     }
 

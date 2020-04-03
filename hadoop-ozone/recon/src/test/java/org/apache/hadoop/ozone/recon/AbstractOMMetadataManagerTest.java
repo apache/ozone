@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.junit.Assert.assertNotNull;
@@ -29,6 +30,7 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -132,8 +134,8 @@ public abstract class AbstractOMMetadataManagerTest {
    * Write a key to OM instance.
    * @throws IOException while writing.
    */
-  public void writeDataToOm(OMMetadataManager omMetadataManager,
-                                   String key) throws IOException {
+  protected void writeDataToOm(OMMetadataManager omMetadataManager,
+                               String key) throws IOException {
 
     String omKey = omMetadataManager.getOzoneKey("sampleVol",
         "bucketOne", key);
@@ -206,11 +208,19 @@ public abstract class AbstractOMMetadataManagerTest {
    * Return random pipeline.
    * @return pipeline
    */
-  protected Pipeline getRandomPipeline() {
+  public static Pipeline getRandomPipeline() {
+    return getRandomPipeline(randomDatanodeDetails());
+  }
+
+  /**
+   * Return random pipeline with datanode.
+   * @return pipeline
+   */
+  public static Pipeline getRandomPipeline(DatanodeDetails datanodeDetails) {
     return Pipeline.newBuilder()
         .setFactor(HddsProtos.ReplicationFactor.ONE)
         .setId(PipelineID.randomId())
-        .setNodes(Collections.EMPTY_LIST)
+        .setNodes(Collections.singletonList(datanodeDetails))
         .setState(Pipeline.PipelineState.OPEN)
         .setType(HddsProtos.ReplicationType.STAND_ALONE)
         .build();

@@ -165,6 +165,7 @@ public abstract class TestOzoneRpcClientAbstract {
   static void startCluster(OzoneConfiguration conf) throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
+        .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
         .build();
     cluster.waitForClusterToBeReady();
@@ -307,8 +308,8 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
-    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
+    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
   }
 
   @Test
@@ -322,8 +323,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
-    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
+    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
   }
 
   @Test
@@ -331,7 +332,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Instant testStartTime = Instant.now();
     String userName = "ozone/localhost@EXAMPLE.COM";
     String bucketName = UUID.randomUUID().toString();
-    String s3VolumeName = OzoneS3Util.getVolumeName(userName);
+    String s3VolumeName = OzoneS3Util.getS3Username(userName);
     store.createS3Bucket(s3VolumeName, bucketName);
     String volumeName = store.getOzoneVolumeName(bucketName);
     assertEquals(volumeName, "s3" + s3VolumeName);
@@ -339,8 +340,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
-    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
+    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
   }
 
 
@@ -383,8 +384,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertTrue(bucket.getCreationTime().isAfter(testStartTime));
-    Assert.assertTrue(volume.getCreationTime().isAfter(testStartTime));
+    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
     store.deleteS3Bucket(bucketName);
 
     OzoneTestUtils.expectOmException(ResultCodes.S3_BUCKET_NOT_FOUND,
@@ -704,8 +705,8 @@ public abstract class TestOzoneRpcClientAbstract {
           keyName, STAND_ALONE,
           ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
-      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
+      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
   }
 
@@ -771,8 +772,8 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, ReplicationType.RATIS, ONE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
-      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
+      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
   }
 
@@ -806,8 +807,8 @@ public abstract class TestOzoneRpcClientAbstract {
           keyName, ReplicationType.RATIS,
           ReplicationFactor.THREE));
       Assert.assertEquals(value, new String(fileContent));
-      Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
-      Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
+      Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+      Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
   }
 
@@ -848,8 +849,8 @@ public abstract class TestOzoneRpcClientAbstract {
               keyName, ReplicationType.RATIS,
               ReplicationFactor.THREE));
           Assert.assertEquals(data, new String(fileContent));
-          Assert.assertTrue(key.getCreationTime().isAfter(testStartTime));
-          Assert.assertTrue(key.getModificationTime().isAfter(testStartTime));
+          Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
+          Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
         }
         latch.countDown();
       } catch (IOException ex) {
@@ -1216,16 +1217,15 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertNotNull("Block not found", blockData);
 
       // Get the location of the chunk file
-      String chunkName = blockData.getChunks().get(0).getChunkName();
       String containreBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
           .getChunksLocationPath(containreBaseDir, scmId, containerID);
-      File chunkFile = new File(chunksLocationPath, chunkName);
-
-      // Corrupt the contents of the chunk file
-      String newData = new String("corrupted data");
-      FileUtils.writeByteArrayToFile(chunkFile, newData.getBytes());
+      byte[] corruptData = "corrupted data".getBytes();
+      // Corrupt the contents of chunk files
+      for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {
+        FileUtils.writeByteArrayToFile(file, corruptData);
+      }
     }
   }
 

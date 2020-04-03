@@ -406,9 +406,10 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       Node ancestorToExclude = node.getAncestor(genToExclude);
       Node ancestorToReturn = node.getAncestor(genToReturn);
       if (ancestorToExclude == null || ancestorToReturn == null) {
-        LOG.warn("Ancestor not found, node: " + node.getNetworkFullPath() +
-            ", generation to exclude: " + genToExclude +
-            ", generation to return:" + genToReturn);
+        LOG.warn("Ancestor not found, node: {}"
+            + ", generation to exclude: {}"
+            + ", generation to return: {}", node.getNetworkFullPath(),
+                genToExclude, genToReturn);
         continue;
       }
       ancestorMap.put(ancestorToExclude, ancestorToReturn);

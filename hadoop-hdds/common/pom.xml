@@ -20,22 +20,48 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-hdds</artifactId>
-    <version>0.5.0-SNAPSHOT</version>
+    <version>0.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-hdds-common</artifactId>
-  <version>0.5.0-SNAPSHOT</version>
+  <version>0.6.0-SNAPSHOT</version>
   <description>Apache Hadoop Distributed Data Store Common</description>
   <name>Apache Hadoop HDDS Common</name>
   <packaging>jar</packaging>
 
   <properties>
-    <hdds.version>0.5.0-SNAPSHOT</hdds.version>
+    <hdds.version>0.6.0-SNAPSHOT</hdds.version>
     <log4j2.version>2.11.0</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <version>${hadoop.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdfs</artifactId>
+      <version>${hadoop.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli</artifactId>
+      <version>3.9.6</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-java</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <scope>compile</scope>
+    </dependency>
+
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-config</artifactId>
@@ -88,7 +114,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
-      <version>6.0.1</version>
+      <version>6.6.4</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -148,10 +174,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>1.16</version>
     </dependency>
     <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.fasterxml.jackson.datatype</groupId>
       <artifactId>jackson-datatype-jsr310</artifactId>
       <version>${jackson2.version}</version>
     </dependency>
+
   </dependencies>
 
   <build>

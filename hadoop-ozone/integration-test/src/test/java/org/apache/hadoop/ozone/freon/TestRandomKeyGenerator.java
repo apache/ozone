@@ -18,19 +18,25 @@
 
 package org.apache.hadoop.ozone.freon;
 
+import java.util.concurrent.TimeUnit;
+
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
  */
+@Ignore("HDDS-3290")
 public class TestRandomKeyGenerator {
 
   private static MiniOzoneCluster cluster;
@@ -45,7 +51,23 @@ public class TestRandomKeyGenerator {
   @BeforeClass
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.set(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, "5000ms");
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+                    DatanodeRatisServerConfig.
+                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "rpc.request.timeout",
+            3, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
+                    "watch.request.timeout",
+            3, TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
   }
@@ -110,6 +132,7 @@ public class TestRandomKeyGenerator {
   }
 
   @Test
+  @Ignore("HDDS-2011")
   public void bigFileThan2GB() throws Exception {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator((OzoneConfiguration) cluster.getConf());

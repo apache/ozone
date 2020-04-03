@@ -37,57 +37,13 @@ import com.google.common.base.Preconditions;
 /**
  * A class that encapsulates the OmVolumeArgs Args.
  */
-public final class OmVolumeArgs extends WithMetadata implements Auditable {
+public final class OmVolumeArgs extends WithObjectID implements Auditable {
   private final String adminName;
   private String ownerName;
   private final String volume;
   private long creationTime;
   private long quotaInBytes;
   private final OmOzoneAclMap aclMap;
-  private long objectID;
-  private long updateID;
-
-  /**
-   * Set the Object ID. If this value is already set then this function throws.
-   * There is a reason why we cannot use the final here. The OmVolumeArgs is
-   * deserialized from the protobuf in many places in code. We need to set
-   * this object ID, after it is deserialized.
-   *
-   * @param obId - long
-   */
-  public void setObjectID(long obId) {
-    if(this.objectID != 0) {
-      throw new UnsupportedOperationException("Attempt to modify object ID " +
-          "which is not zero. Current Object ID is " + this.objectID);
-    }
-    this.objectID = obId;
-  }
-
-  /**
-   * Returns a monotonically increasing ID, that denotes the last update.
-   * Each time an update happens, this ID is incremented.
-   * @return long
-   */
-  public long getUpdateID() {
-    return updateID;
-  }
-
-  /**
-   * Sets the update ID. For each modification of this object, we will set
-   * this to a value greater than the current value.
-   * @param updateID  long
-   */
-  public void setUpdateID(long updateID) {
-    this.updateID = updateID;
-  }
-
-  /**
-   * A immutable identity field for this object.
-   * @return  long.
-   */
-  public long getObjectID() {
-    return objectID;
-  }
 
   /**
    * Private constructor, constructed via builder.
@@ -261,8 +217,6 @@ public final class OmVolumeArgs extends WithMetadata implements Auditable {
       return this;
     }
 
-
-
     /**
      * Constructs a builder.
      */
@@ -357,6 +311,17 @@ public final class OmVolumeArgs extends WithMetadata implements Auditable {
         volInfo.getCreationTime(),
         volInfo.getObjectID(),
         volInfo.getUpdateID());
+  }
+
+  @Override
+  public String getObjectInfo() {
+    return "OMVolumeArgs{" +
+        "volume='" + volume + '\'' +
+        ", admin='" + adminName + '\'' +
+        ", owner='" + ownerName + '\'' +
+        ", creationTime='" + creationTime + '\'' +
+        ", quota='" + quotaInBytes + '\'' +
+        '}';
   }
 
   /**

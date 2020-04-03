@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.container.ContainerCommands;
 import org.apache.hadoop.hdds.scm.cli.pipeline.PipelineCommands;
 import org.apache.hadoop.hdds.scm.cli.node.DatanodeAdminCommands;
-import org.apache.hadoop.hdds.scm.client.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.util.NativeCodeLoader;

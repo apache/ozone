@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -49,6 +50,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.REPLAY;
+
 /**
  * OMClientRequest provides methods which every write OM request should
  * implement.
@@ -56,6 +59,18 @@ import javax.annotation.Nonnull;
 public abstract class OMClientRequest implements RequestAuditor {
 
   private OMRequest omRequest;
+
+  /**
+   * Stores the result of request execution in
+   * OMClientRequest#validateAndUpdateCache.
+   */
+  public enum Result {
+    SUCCESS, // The request was executed successfully
+
+    REPLAY, // The request is a replay and was ignored
+
+    FAILURE // The request failed and exception was thrown
+  }
 
   public OMClientRequest(OMRequest omRequest) {
     Preconditions.checkNotNull(omRequest);
@@ -205,6 +220,26 @@ public abstract class OMClientRequest implements RequestAuditor {
     return omResponse.build();
   }
 
+  /**
+   * Add the client response to double buffer and set the flush future.
+   * For responses which has status set to REPLAY it is a no-op.
+   * @param trxIndex
+   * @param omClientResponse
+   * @param omDoubleBufferHelper
+   */
+  protected void addResponseToDoubleBuffer(long trxIndex,
+      OMClientResponse omClientResponse,
+      OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+    if (omClientResponse != null) {
+      // For replay transaction we do not need to add to double buffer, as
+      // for these transactions there is nothing needs to be done for
+      // addDBToBatch.
+      if (omClientResponse.getOMResponse().getStatus() != REPLAY) {
+        omClientResponse.setFlushFuture(
+            omDoubleBufferHelper.add(omClientResponse, trxIndex));
+      }
+    }
+  }
 
   private String exceptionErrorMessage(IOException ex) {
     if (ex instanceof OMException) {
@@ -247,13 +282,16 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   /**
    * Check if the transaction is a replay.
-   * @param updateID last updateID of the entity in the DB
+   * @param ozoneObj OMVolumeArgs or OMBucketInfo or OMKeyInfo object whose 
+   *                 updateID needs to be compared with
    * @param transactionID the current transaction ID
    * @return true if transactionID is less than or equal to updateID, false
    * otherwise.
    */
-  public boolean isReplay(OzoneManager om, long updateID, long transactionID) {
-    return om.isRatisEnabled() && transactionID <= updateID;
+  protected boolean isReplay(OzoneManager om, WithObjectID ozoneObj,
+      long transactionID) {
+    return om.isRatisEnabled() && ozoneObj.isUpdateIDset() &&
+        transactionID <= ozoneObj.getUpdateID();
   }
 
   /**
@@ -263,7 +301,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       @Nonnull OMResponse.Builder omResponse) {
 
     omResponse.setSuccess(false);
-    omResponse.setStatus(OzoneManagerProtocolProtos.Status.REPLAY);
+    omResponse.setStatus(REPLAY);
     return omResponse.build();
   }
 }

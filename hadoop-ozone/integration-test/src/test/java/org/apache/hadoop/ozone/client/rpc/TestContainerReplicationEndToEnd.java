@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -31,12 +32,12 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.ozone.container.TestHelper;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -44,6 +45,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -56,11 +58,13 @@ import java.util.function.Predicate;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 
 /**
  * Tests delete key operation with a slow follower in the datanode
  * pipeline.
  */
+@Ignore
 public class TestContainerReplicationEndToEnd {
 
   private static MiniOzoneCluster cluster;
@@ -95,19 +99,27 @@ public class TestContainerReplicationEndToEnd {
         2 * containerReportInterval, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_SERVER_FAILURE_DURATION_KEY,
+    conf.setTimeDuration(
+        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+        DatanodeRatisServerConfig.RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
+        1000, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
+        DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
         1000, TimeUnit.SECONDS);
     conf.setLong("hdds.scm.replication.thread.interval",
         containerReportInterval);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
     conf.setQuietMode(false);
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4).setHbInterval(200)
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4)
+            .setTotalPipelineNumLimit(6).setHbInterval(200)
             .build();
     cluster.waitForClusterToBeReady();
     cluster.getStorageContainerManager().getReplicationManager().start();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     xceiverClientManager = new XceiverClientManager(conf);
     volumeName = "testcontainerstatemachinefailures";

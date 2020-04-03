@@ -54,8 +54,8 @@ public class TestHealthyPipelineSafeModeRule {
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
     try {
       EventQueue eventQueue = new EventQueue();
-      List<ContainerInfo> containers = new ArrayList<>();
-      containers.addAll(HddsTestUtils.getContainerInfo(1));
+      List<ContainerInfo> containers =
+          new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
       OzoneConfiguration config = new OzoneConfiguration();
       MockNodeManager nodeManager = new MockNodeManager(true, 0);
@@ -94,11 +94,10 @@ public class TestHealthyPipelineSafeModeRule {
 
     try {
       EventQueue eventQueue = new EventQueue();
-      List<ContainerInfo> containers = new ArrayList<>();
-      containers.addAll(HddsTestUtils.getContainerInfo(1));
+      List<ContainerInfo> containers =
+          new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
       OzoneConfiguration config = new OzoneConfiguration();
-
       // In Mock Node Manager, first 8 nodes are healthy, next 2 nodes are
       // stale and last one is dead, and this repeats. So for a 12 node, 9
       // healthy, 2 stale and one dead.
@@ -115,7 +114,7 @@ public class TestHealthyPipelineSafeModeRule {
 
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
-              pipelineManager.getStateManager(), config);
+              pipelineManager.getStateManager(), config, true);
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
 
@@ -130,13 +129,11 @@ public class TestHealthyPipelineSafeModeRule {
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
 
-
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
           config, containers, pipelineManager, eventQueue);
 
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
           scmSafeModeManager.getHealthyPipelineSafeModeRule();
-
 
       // No datanodes have sent pipelinereport from datanode
       Assert.assertFalse(healthyPipelineSafeModeRule.validate());
@@ -169,8 +166,8 @@ public class TestHealthyPipelineSafeModeRule {
 
     try {
       EventQueue eventQueue = new EventQueue();
-      List<ContainerInfo> containers = new ArrayList<>();
-      containers.addAll(HddsTestUtils.getContainerInfo(1));
+      List<ContainerInfo> containers =
+          new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
       OzoneConfiguration config = new OzoneConfiguration();
 
@@ -189,7 +186,7 @@ public class TestHealthyPipelineSafeModeRule {
           nodeManager, eventQueue);
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
-              pipelineManager.getStateManager(), config);
+              pipelineManager.getStateManager(), config, true);
       pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
           mockRatisProvider);
 

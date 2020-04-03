@@ -63,7 +63,7 @@ public class AbstractContainerReportHandler {
    *
    * @throws IOException In case of any Exception while processing the report
    */
-  void processContainerReplica(final DatanodeDetails datanodeDetails,
+  protected void processContainerReplica(final DatanodeDetails datanodeDetails,
                                final ContainerReplicaProto replicaProto)
       throws IOException {
     final ContainerID containerId = ContainerID

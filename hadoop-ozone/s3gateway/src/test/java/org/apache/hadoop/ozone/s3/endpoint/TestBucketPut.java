@@ -25,11 +25,11 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
+import org.apache.hadoop.ozone.s3.SignatureProcessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.header.AuthenticationHeaderParser;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static org.apache.hadoop.ozone.s3.AWSV4AuthParser.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.AWSV4SignatureProcessor.DATE_FORMATTER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -58,14 +58,27 @@ public class TestBucketPut {
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(clientStub);
+    bucketEndpoint.setSignatureProcessor(new SignatureProcessor() {
+      @Override
+      public String getStringToSign() throws Exception {
+        return null;
+      }
+
+      @Override
+      public String getSignature() {
+        return null;
+      }
+
+      @Override
+      public String getAwsAccessId() {
+        return OzoneConsts.OZONE;
+      }
+    });
   }
 
   @Test
   public void testBucketFailWithAuthHeaderMissing() throws Exception {
 
-    bucketEndpoint.setAuthenticationHeaderParser(
-        new AuthenticationHeaderParser());
-    bucketEndpoint.getAuthenticationHeaderParser().setAuthHeader(null);
     try {
       bucketEndpoint.put(bucketName, null);
     } catch (OS3Exception ex) {
@@ -77,9 +90,7 @@ public class TestBucketPut {
   @Test
   public void testBucketPut() throws Exception {
     String auth = generateAuthHeader();
-    bucketEndpoint.setAuthenticationHeaderParser(
-        new AuthenticationHeaderParser());
-    bucketEndpoint.getAuthenticationHeaderParser().setAuthHeader(auth);
+
     Response response = bucketEndpoint.put(bucketName, null);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getLocation());
@@ -87,9 +98,6 @@ public class TestBucketPut {
 
   @Test
   public void testBucketFailWithInvalidHeader() throws Exception {
-    bucketEndpoint.setAuthenticationHeaderParser(
-        new AuthenticationHeaderParser());
-    bucketEndpoint.getAuthenticationHeaderParser().setAuthHeader("auth");
     try {
       bucketEndpoint.put(bucketName, null);
     } catch (OS3Exception ex) {

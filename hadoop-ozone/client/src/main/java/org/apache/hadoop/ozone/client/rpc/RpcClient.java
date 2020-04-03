@@ -99,7 +99,6 @@ import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.SecureRandom;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -125,10 +124,10 @@ public class RpcClient implements ClientProtocol {
   private final UserGroupInformation ugi;
   private final ACLType userRights;
   private final ACLType groupRights;
+  private final int streamBufferSize;
   private final long streamBufferFlushSize;
   private final long streamBufferMaxSize;
   private final long blockSize;
-  private final long watchTimeout;
   private final ClientId clientId = ClientId.randomId();
   private final int maxRetryCount;
   private final long retryInterval;
@@ -178,6 +177,10 @@ public class RpcClient implements ClientProtocol {
     } else {
       chunkSize = configuredChunkSize;
     }
+    streamBufferSize = (int) conf
+        .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE,
+            OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT,
+            StorageUnit.BYTES);
     streamBufferFlushSize = (long) conf
         .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
             OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE_DEFAULT,
@@ -188,10 +191,6 @@ public class RpcClient implements ClientProtocol {
             StorageUnit.BYTES);
     blockSize = (long) conf.getStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
-    watchTimeout =
-        conf.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT,
-            OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS);
 
     int configuredChecksumSize = (int) conf.getStorageSize(
         OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM,
@@ -273,7 +272,7 @@ public class RpcClient implements ClientProtocol {
     userGroups.stream().forEach((group) -> listOfAcls.add(
         new OzoneAcl(ACLIdentityType.GROUP, group, groupRights, ACCESS)));
     //ACLs from VolumeArgs
-    if(volArgs.getAcls() != null) {
+    if (volArgs.getAcls() != null) {
       listOfAcls.addAll(volArgs.getAcls());
     }
 
@@ -888,9 +887,9 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(openKey.getKeyInfo().getType())
             .setFactor(openKey.getKeyInfo().getFactor())
+            .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferMaxSize(streamBufferMaxSize)
-            .setWatchTimeout(watchTimeout)
             .setBlockSize(blockSize)
             .setBytesPerChecksum(bytesPerChecksum)
             .setChecksumType(checksumType)
@@ -1191,9 +1190,9 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
             .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+            .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferMaxSize(streamBufferMaxSize)
-            .setWatchTimeout(watchTimeout)
             .setBlockSize(blockSize)
             .setChecksumType(checksumType)
             .setBytesPerChecksum(bytesPerChecksum)

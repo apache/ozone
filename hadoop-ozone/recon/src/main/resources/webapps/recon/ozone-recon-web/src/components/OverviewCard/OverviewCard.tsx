@@ -17,9 +17,11 @@
  */
 
 import React, {ReactElement} from 'react';
-import {Icon, Card, Row, Col, Progress} from 'antd';
+import {Icon, Card, Row, Col} from 'antd';
 import {withRouter, Link} from 'react-router-dom';
 import {RouteComponentProps} from 'react-router';
+import StorageBar from "../StorageBar/StorageBar";
+import {StorageReport} from "types/datanode.types";
 import './OverviewCard.less';
 
 const {Meta} = Card;
@@ -31,14 +33,15 @@ interface OverviewCardProps extends RouteComponentProps<any> {
   hoverable?: boolean;
   loading?: boolean;
   linkToUrl?: string;
-  capacityPercent?: number;
+  storageReport?: StorageReport;
+  error?: boolean;
 }
 
 const defaultProps = {
   hoverable: false,
   loading: false,
-  capacityPercent: -1,
-  linkToUrl: ''
+  linkToUrl: '',
+  error: false
 };
 
 interface OverviewCardWrapperProps {
@@ -62,19 +65,22 @@ class OverviewCard extends React.Component<OverviewCardProps> {
   static defaultProps = defaultProps;
 
   render() {
-    let {icon, data, title, loading, hoverable, capacityPercent, linkToUrl} = this.props;
+    let {icon, data, title, loading, hoverable, storageReport, linkToUrl, error} = this.props;
     let meta = <Meta title={data} description={title}/>;
-    if (capacityPercent && capacityPercent > -1) {
+    const errorClass = error ? 'card-error' : '';
+    if (storageReport) {
       meta = <div className="ant-card-percentage">
         {meta}
-        <Progress strokeLinecap="square" percent={capacityPercent} className="capacity-bar" strokeWidth={3}/>
+        <div className="storage-bar">
+          <StorageBar total={storageReport.capacity} used={storageReport.used} remaining={storageReport.remaining} showMeta={false}/>
+        </div>
       </div>;
     }
     linkToUrl = linkToUrl || '';
 
     return (
         <OverviewCardWrapper linkToUrl={linkToUrl}>
-          <Card className="overview-card" loading={loading} hoverable={hoverable}>
+          <Card className={`overview-card ${errorClass}`} loading={loading} hoverable={hoverable}>
             <Row type="flex" justify="space-between">
               <Col span={18}>
                 <Row>
@@ -82,7 +88,7 @@ class OverviewCard extends React.Component<OverviewCardProps> {
                 </Row>
               </Col>
               <Col span={6}>
-                <Icon type={icon} style={{"fontSize": "50px"}}/>
+                <Icon type={icon} style={{"fontSize": "50px", "float": "right"}}/>
               </Col>
             </Row>
           </Card>

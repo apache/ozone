@@ -18,6 +18,7 @@ Documentation       Smoketest ozone cluster startup
 Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 ${user}              hadoop

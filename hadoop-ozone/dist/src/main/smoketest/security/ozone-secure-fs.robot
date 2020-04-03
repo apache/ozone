@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 ${ENDPOINT_URL}    http://s3g:9878
@@ -35,6 +36,11 @@ Create volume bucket with wrong credentials
     Execute             kdestroy
     ${rc}               ${output} =          Run And Return Rc And Output       ozone sh volume create o3://om/fstest
     Should contain      ${output}       Client cannot authenticate via
+
+Create volume with non-admin user
+    Run Keyword         Kinit test user     testuser2     testuser2.keytab
+    ${rc}               ${output} =          Run And Return Rc And Output       ozone sh volume create o3://om/fstest
+    Should contain      ${output}       Only admin users are authorized to create
 
 Create volume bucket with credentials
                         # Authenticate testuser

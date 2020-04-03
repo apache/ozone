@@ -106,9 +106,10 @@ public class PrefixManagerImpl implements PrefixManager {
       OmPrefixInfo prefixInfo =
           metadataManager.getPrefixTable().get(prefixPath);
 
-      OMPrefixAclOpResult omPrefixAclOpResult = addAcl(obj, acl, prefixInfo);
+      OMPrefixAclOpResult omPrefixAclOpResult = addAcl(obj, acl, prefixInfo,
+          0L);
 
-      return omPrefixAclOpResult.isOperationsResult();
+      return omPrefixAclOpResult.isSuccess();
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Add acl operation failed for prefix path:{} acl:{}",
@@ -138,7 +139,7 @@ public class PrefixManagerImpl implements PrefixManager {
           metadataManager.getPrefixTable().get(prefixPath);
       OMPrefixAclOpResult omPrefixAclOpResult = removeAcl(obj, acl, prefixInfo);
 
-      if (!omPrefixAclOpResult.isOperationsResult()) {
+      if (!omPrefixAclOpResult.isSuccess()) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("acl {} does not exist for prefix path {} ",
               acl, prefixPath);
@@ -146,7 +147,7 @@ public class PrefixManagerImpl implements PrefixManager {
         return false;
       }
 
-      return omPrefixAclOpResult.isOperationsResult();
+      return omPrefixAclOpResult.isSuccess();
 
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
@@ -176,9 +177,10 @@ public class PrefixManagerImpl implements PrefixManager {
       OmPrefixInfo prefixInfo =
           metadataManager.getPrefixTable().get(prefixPath);
 
-      OMPrefixAclOpResult omPrefixAclOpResult = setAcl(obj, acls, prefixInfo);
+      OMPrefixAclOpResult omPrefixAclOpResult = setAcl(obj, acls, prefixInfo,
+          0L);
 
-      return omPrefixAclOpResult.isOperationsResult();
+      return omPrefixAclOpResult.isSuccess();
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Set prefix acl operation failed for prefix path:{} acls:{}",
@@ -307,12 +309,18 @@ public class PrefixManagerImpl implements PrefixManager {
   }
 
   public OMPrefixAclOpResult addAcl(OzoneObj ozoneObj, OzoneAcl ozoneAcl,
-      OmPrefixInfo prefixInfo) throws IOException {
-
+      OmPrefixInfo prefixInfo, long transactionLogIndex) throws IOException {
     if (prefixInfo == null) {
-      prefixInfo = new OmPrefixInfo.Builder().setName(ozoneObj
-          .getPath()).build();
+      OmPrefixInfo.Builder prefixInfoBuilder =
+          new OmPrefixInfo.Builder()
+          .setName(ozoneObj.getPath());
+      if (transactionLogIndex > 0) {
+        prefixInfoBuilder.setObjectID(transactionLogIndex);
+        prefixInfoBuilder.setUpdateID(transactionLogIndex);
+      }
+      prefixInfo = prefixInfoBuilder.build();
     }
+
     boolean changed = prefixInfo.addAcl(ozoneAcl);
     if (changed) {
       // update the in-memory prefix tree
@@ -351,10 +359,16 @@ public class PrefixManagerImpl implements PrefixManager {
   }
 
   public OMPrefixAclOpResult setAcl(OzoneObj ozoneObj, List<OzoneAcl> ozoneAcls,
-      OmPrefixInfo prefixInfo) throws IOException {
+      OmPrefixInfo prefixInfo, long transactionLogIndex) throws IOException {
     if (prefixInfo == null) {
-      prefixInfo = new OmPrefixInfo.Builder().setName(ozoneObj
-          .getPath()).build();
+      OmPrefixInfo.Builder prefixInfoBuilder =
+          new OmPrefixInfo.Builder()
+              .setName(ozoneObj.getPath());
+      if (transactionLogIndex > 0) {
+        prefixInfoBuilder.setObjectID(transactionLogIndex);
+        prefixInfoBuilder.setUpdateID(transactionLogIndex);
+      }
+      prefixInfo = prefixInfoBuilder.build();
     }
 
     boolean changed = prefixInfo.setAcls(ozoneAcls);
@@ -410,7 +424,7 @@ public class PrefixManagerImpl implements PrefixManager {
       return omPrefixInfo;
     }
 
-    public boolean isOperationsResult() {
+    public boolean isSuccess() {
       return operationsResult;
     }
   }

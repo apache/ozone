@@ -18,28 +18,20 @@
 
 import React from 'react';
 import axios from 'axios';
-import {Table, Icon, Progress} from 'antd';
-import prettyBytes from 'pretty-bytes';
-import './Datanodes.less';
-import {PaginationConfig} from "antd/lib/pagination";
+import {Table, Icon} from 'antd';
+import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
-import {getCapacityPercent} from "../../utils/common";
-
-export type DatanodeStatus = "HEALTHY" | "STALE" | "DEAD" | "DECOMMISSIONING" | "DECOMMISSIONED";
-
-interface StorageReport {
-  storageLocation: string;
-  total: number;
-  used: number;
-  remaining: number;
-}
+import {ReplicationIcon} from 'utils/themeIcons';
+import StorageBar from "components/StorageBar/StorageBar";
+import {DatanodeStatus, StorageReport} from "types/datanode.types";
+import './Datanodes.less';
 
 interface DatanodeResponse {
   hostname: string;
   state: DatanodeStatus;
   lastHeartbeat: number;
-  storageReport: StorageReport[];
-  pipelineIDs: string[];
+  storageReport: StorageReport;
+  pipelines: Pipeline[];
   containers: number;
 }
 
@@ -54,8 +46,15 @@ interface Datanode {
   lastHeartbeat: number;
   storageUsed: number;
   storageTotal: number;
-  pipelines: string;
+  storageRemaining: number;
+  pipelines: Pipeline[];
   containers: number;
+}
+
+interface Pipeline {
+  pipelineID: string;
+  replicationType: string;
+  replicationFactor: number;
 }
 
 interface DatanodesState {
@@ -81,38 +80,55 @@ const COLUMNS = [
     title: 'Status',
     dataIndex: 'state',
     key: 'state',
-    render: (text: DatanodeStatus) => renderDatanodeStatus(text)
+    render: (text: DatanodeStatus) => renderDatanodeStatus(text),
+    sorter: (a: Datanode, b: Datanode) => a.state.localeCompare(b.state)
   },
   {
     title: 'Hostname',
     dataIndex: 'hostname',
-    key: 'hostname'
+    key: 'hostname',
+    sorter: (a: Datanode, b: Datanode) => a.hostname.localeCompare(b.hostname),
+    defaultSortOrder: 'ascend' as const
   },
   {
     title: 'Storage Capacity',
     dataIndex: 'storageUsed',
     key: 'storageUsed',
-    render: (text: string, record: Datanode) => <div className="storage-cell-container">
-      <div>{prettyBytes(record.storageUsed)} / {prettyBytes(record.storageTotal)}</div>
-      <Progress strokeLinecap="square" percent={getCapacityPercent(record.storageUsed, record.storageTotal)}
-                className="capacity-bar" strokeWidth={3}/>
-    </div>
+    sorter: (a: Datanode, b: Datanode) => a.storageRemaining - b.storageRemaining,
+    render: (text: string, record: Datanode) =>
+        <StorageBar total={record.storageTotal} used={record.storageUsed}
+                    remaining={record.storageRemaining}/>
   },
   {
     title: 'Last Heartbeat',
     dataIndex: 'lastHeartbeat',
     key: 'lastHeartbeat',
-    render: (heartbeat: number) => moment(heartbeat).format('lll')
+    sorter: (a: Datanode, b: Datanode) => a.lastHeartbeat - b.lastHeartbeat,
+    render: (heartbeat: number) => {
+      return heartbeat > 0 ? moment(heartbeat).format('lll') : 'NA';
+    }
   },
   {
     title: 'Pipeline ID(s)',
     dataIndex: 'pipelines',
-    key: 'pipelines'
+    key: 'pipelines',
+    render: (pipelines: Pipeline[]) => {
+      return (<div>
+        {
+          pipelines.map((pipeline, index) =>
+              <div key={index} className="pipeline-container">
+                <ReplicationIcon replicationFactor={pipeline.replicationFactor} replicationType={pipeline.replicationType}/>
+                {pipeline.pipelineID}
+              </div>)
+        }
+      </div>);
+    }
   },
   {
     title: 'Containers',
     dataIndex: 'containers',
-    key: 'containers'
+    key: 'containers',
+    sorter: (a: Datanode, b: Datanode) => a.containers - b.containers
   }
 ];
 
@@ -137,20 +153,14 @@ export class Datanodes extends React.Component<any, DatanodesState> {
       const totalCount = datanodesResponse.totalCount;
       const datanodes: DatanodeResponse[] = datanodesResponse.datanodes;
       const dataSource: Datanode[] = datanodes.map(datanode => {
-        const storageTotal = datanode.storageReport.reduce((sum: number, storageReport) => {
-          return sum  + storageReport.total;
-        }, 0);
-        const storageUsed = datanode.storageReport.reduce((sum: number, storageReport) => {
-          return sum  + storageReport.used;
-        }, 0);
-        const pipelines = datanode.pipelineIDs ? datanode.pipelineIDs.join(', ') : '';
         return {
           hostname: datanode.hostname,
           state: datanode.state,
           lastHeartbeat: datanode.lastHeartbeat,
-          storageUsed,
-          storageTotal,
-          pipelines,
+          storageUsed: datanode.storageReport.used,
+          storageTotal: datanode.storageReport.capacity,
+          storageRemaining: datanode.storageReport.remaining,
+          pipelines: datanode.pipelines,
           containers: datanode.containers
         }
       });
@@ -158,11 +168,12 @@ export class Datanodes extends React.Component<any, DatanodesState> {
         loading: false,
         dataSource,
         totalCount
-      })
+      });
     });
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
+    // TODO: Implement this method once server side pagination is enabled
     console.log(current, pageSize);
   };
 

@@ -21,11 +21,10 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 /**
@@ -34,35 +33,52 @@ import javax.annotation.Nonnull;
 public class OMKeyCommitResponse extends OMClientResponse {
 
   private OmKeyInfo omKeyInfo;
-  private long openKeySessionID;
+  private String ozoneKeyName;
+  private String openKeyName;
 
-  public OMKeyCommitResponse(@Nullable OmKeyInfo omKeyInfo,
-      long openKeySessionID,
-      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse) {
+  public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
-    this.openKeySessionID = openKeySessionID;
+    this.ozoneKeyName = ozoneKeyName;
+    this.openKeyName = openKeyName;
+  }
+
+  /**
+   * When the KeyCommit request is a replay but the openKey should be deleted
+   * from the OpenKey table.
+   * Note that this response will result in openKey deletion only. Key will
+   * not be added to Key table.
+   * @param openKeyName openKey to be deleted from OpenKey table
+   */
+  public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
+      String openKeyName) {
+    super(omResponse);
+    this.omKeyInfo = null;
+    this.openKeyName = openKeyName;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeyCommitResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String volumeName = omKeyInfo.getVolumeName();
-      String bucketName = omKeyInfo.getBucketName();
-      String keyName = omKeyInfo.getKeyName();
-      String openKey = omMetadataManager.getOpenKey(volumeName,
-          bucketName, keyName, openKeySessionID);
-      String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-          keyName);
+    // Delete from OpenKey table
+    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
+        openKeyName);
 
-      // Delete from open key table and add entry to key table.
-      omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-          openKey);
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKey,
+    // Add entry to Key table if omKeyInfo is available i.e. it is not a
+    // replayed transaction.
+    if (omKeyInfo != null) {
+      omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
           omKeyInfo);
     }
   }

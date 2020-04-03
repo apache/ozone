@@ -19,45 +19,74 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import java.io.IOException;
-import javax.annotation.Nullable;
+import java.util.List;
 import javax.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Response for CreateKey request.
  */
 public class OMKeyCreateResponse extends OMClientResponse {
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(OMKeyCreateResponse.class);
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;
+  private List<OmKeyInfo> parentKeyInfos;
 
-  public OMKeyCreateResponse(@Nullable OmKeyInfo omKeyInfo,
-      long openKeySessionID, @Nonnull OMResponse omResponse) {
+  public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo,
+      List<OmKeyInfo> parentKeyInfos, long openKeySessionID) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
+    this.parentKeyInfos = parentKeyInfos;
+  }
+
+  /**
+   * For when the request is not successful or it is a replay transaction.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMKeyCreateResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+    checkStatusNotOK();
   }
 
   @Override
-  public void addToDBBatch(OMMetadataManager omMetadataManager,
+  protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    // For OmResponse with failure, this should do nothing. This method is
-    // not called in failure scenario in OM code.
-    if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
-          omKeyInfo.getBucketName(), omKeyInfo.getKeyName(),
-          openKeySessionID);
-      omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
-          openKey, omKeyInfo);
+    /**
+     * Create parent directory entries during Key Create - do not wait
+     * for Key Commit request.
+     * XXX handle stale directory entries.
+     */
+    if (parentKeyInfos != null) {
+      for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
+        String parentKey = omMetadataManager
+            .getOzoneDirKey(parentKeyInfo.getVolumeName(),
+                parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
+              parentKeyInfo);
+        }
+        omMetadataManager.getKeyTable()
+            .putWithBatch(batchOperation, parentKey, parentKeyInfo);
+      }
     }
+
+    String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
+    omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
+        openKey, omKeyInfo);
   }
 }
 

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -126,6 +126,8 @@ public class OMMetrics {
   // Metrics to track checkpointing statistics from last run.
   private @Metric MutableGaugeLong lastCheckpointCreationTimeTaken;
   private @Metric MutableGaugeLong lastCheckpointStreamingTimeTaken;
+  private @Metric MutableCounterLong numCheckpoints;
+  private @Metric MutableCounterLong numCheckpointFails;
 
   private @Metric MutableCounterLong numBucketS3Creates;
   private @Metric MutableCounterLong numBucketS3CreateFails;
@@ -525,6 +527,14 @@ public class OMMetrics {
     this.lastCheckpointStreamingTimeTaken.set(val);
   }
 
+  public void incNumCheckpoints() {
+    numCheckpoints.incr();
+  }
+
+  public void incNumCheckpointFails() {
+    numCheckpointFails.incr();
+  }
+
   @VisibleForTesting
   public long getNumVolumeCreates() {
     return numVolumeCreates.value();
@@ -769,6 +779,11 @@ public class OMMetrics {
   @VisibleForTesting
   public long getLastCheckpointCreationTimeTaken() {
     return lastCheckpointCreationTimeTaken.value();
+  }
+
+  @VisibleForTesting
+  public long getNumCheckpoints() {
+    return numCheckpoints.value();
   }
 
   @VisibleForTesting

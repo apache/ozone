@@ -19,11 +19,11 @@
 package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
-import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -32,13 +32,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
 
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
@@ -56,8 +51,8 @@ import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +62,16 @@ import org.slf4j.LoggerFactory;
  */
 public interface RatisHelper {
   Logger LOG = LoggerFactory.getLogger(RatisHelper.class);
+
+  // Prefix for Ratis Server GRPC and Ratis client conf.
+  String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis.";
+  String HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY =
+      HDDS_DATANODE_RATIS_PREFIX_KEY + RaftServerConfigKeys.PREFIX;
+  String HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY =
+      HDDS_DATANODE_RATIS_PREFIX_KEY + RaftClientConfigKeys.PREFIX;
+  String HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY =
+      HDDS_DATANODE_RATIS_PREFIX_KEY + GrpcConfigKeys.PREFIX;
+
 
   static String toRaftPeerIdString(DatanodeDetails id) {
     return id.getUuidString();
@@ -140,25 +145,12 @@ public interface RatisHelper {
   }
 
   static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
-      RetryPolicy retryPolicy, int maxOutStandingRequest,
-      GrpcTlsConfig tlsConfig, TimeDuration timeout) throws IOException {
+      RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
+      Configuration ozoneConfiguration) throws IOException {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
-            pipeline.getNodes()), retryPolicy, maxOutStandingRequest, tlsConfig,
-        timeout);
-  }
-
-  static TimeDuration getClientRequestTimeout(Configuration conf) {
-    // Set the client requestTimeout
-    final TimeUnit timeUnit =
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT
-            .getUnit();
-    final long duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_KEY,
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_TIMEOUT_DURATION_DEFAULT
-            .getDuration(), timeUnit);
-    return TimeDuration.valueOf(duration, timeUnit);
+            pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
 
   static RpcType getRpcType(Configuration conf) {
@@ -168,43 +160,40 @@ public interface RatisHelper {
   }
 
   static RaftClient newRaftClient(RaftPeer leader, Configuration conf) {
-    return newRaftClient(getRpcType(conf), leader, RetryPolicies.noRetry(),
-        GrpcConfigKeys.OutputStream.OUTSTANDING_APPENDS_MAX_DEFAULT,
-        getClientRequestTimeout(conf));
+    return newRaftClient(getRpcType(conf), leader,
+        RatisHelper.createRetryPolicy(conf), conf);
   }
 
   static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
-      RetryPolicy retryPolicy, int maxOutstandingRequests,
-      GrpcTlsConfig tlsConfig, TimeDuration clientRequestTimeout) {
+      RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
+      Configuration configuration) {
     return newRaftClient(rpcType, leader.getId(),
         newRaftGroup(Collections.singletonList(leader)), retryPolicy,
-        maxOutstandingRequests, tlsConfig, clientRequestTimeout);
+        tlsConfig, configuration);
   }
 
   static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
-      RetryPolicy retryPolicy, int maxOutstandingRequests,
-      TimeDuration clientRequestTimeout) {
+      RetryPolicy retryPolicy,
+      Configuration ozoneConfiguration) {
     return newRaftClient(rpcType, leader.getId(),
-        newRaftGroup(Collections.singletonList(leader)), retryPolicy,
-        maxOutstandingRequests, null, clientRequestTimeout);
+        newRaftGroup(Collections.singletonList(leader)), retryPolicy, null,
+        ozoneConfiguration);
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader,
-      RaftGroup group, RetryPolicy retryPolicy, int maxOutStandingRequest,
-      GrpcTlsConfig tlsConfig, TimeDuration clientRequestTimeout) {
+      RaftGroup group, RetryPolicy retryPolicy,
+      GrpcTlsConfig tlsConfig, Configuration ozoneConfiguration) {
     if (LOG.isTraceEnabled()) {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
     }
     final RaftProperties properties = new RaftProperties();
-    RaftConfigKeys.Rpc.setType(properties, rpcType);
-    RaftClientConfigKeys.Rpc
-        .setRequestTimeout(properties, clientRequestTimeout);
 
-    GrpcConfigKeys.setMessageSizeMax(properties,
-        SizeInBytes.valueOf(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE));
-    GrpcConfigKeys.OutputStream.setOutstandingAppendsMax(properties,
-        maxOutStandingRequest);
+    RaftConfigKeys.Rpc.setType(properties, rpcType);
+
+    // Set the ratis client headers which are matching with regex.
+    createRaftClientProperties(ozoneConfiguration, properties);
 
     RaftClient.Builder builder =  RaftClient.newBuilder()
         .setRaftGroup(group)
@@ -219,6 +208,55 @@ public interface RatisHelper {
     return builder.build();
   }
 
+  /**
+   * Set all the properties matching with regex
+   * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
+   * ozone configuration object and configure it to RaftProperties.
+   * @param ozoneConf
+   * @param raftProperties
+   */
+  static void createRaftClientProperties(Configuration ozoneConf,
+      RaftProperties raftProperties) {
+
+    // As for client we do not require server and grpc server/tls. exclude them.
+    Map<String, String> ratisClientConf =
+        ozoneConf.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
+    ratisClientConf.forEach((key, val) -> {
+      if (!(key.startsWith(RaftServerConfigKeys.PREFIX) ||
+          key.startsWith(GrpcConfigKeys.TLS.PREFIX) ||
+          key.startsWith(GrpcConfigKeys.Server.PREFIX))) {
+        raftProperties.set(key, val);
+      }
+    });
+  }
+
+
+  /**
+   * Set all the properties matching with prefix
+   * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
+   * ozone configuration object and configure it to RaftProperties.
+   * @param ozoneConf
+   * @param raftProperties
+   */
+  static void createRaftServerProperties(Configuration ozoneConf,
+       RaftProperties raftProperties) {
+
+    Map<String, String> ratisServerConf =
+        getDatanodeRatisPrefixProps(ozoneConf);
+    ratisServerConf.forEach((key, val) -> {
+      // Exclude ratis client configuration.
+      if (!key.startsWith(RaftClientConfigKeys.PREFIX)) {
+        raftProperties.set(key, val);
+      }
+    });
+  }
+
+
+  static Map<String, String> getDatanodeRatisPrefixProps(
+      Configuration configuration) {
+    return configuration.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
+  }
+
   // For External gRPC client to server with gRPC TLS.
   // No mTLS for external client as SCM CA does not issued certificates for them
   static GrpcTlsConfig createTlsClientConfig(SecurityConfig conf,
@@ -231,38 +269,9 @@ public interface RatisHelper {
     return tlsConfig;
   }
 
-  // For Internal gRPC client from SCM to DN with gRPC TLS
-  static GrpcTlsConfig createTlsClientConfigForSCM(SecurityConfig conf,
-      CertificateServer certificateServer) throws IOException {
-    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      try {
-        X509Certificate caCert =
-            CertificateCodec.getX509Certificate(
-                certificateServer.getCACertificate());
-        return new GrpcTlsConfig(null, null,
-            caCert, false);
-      } catch (CertificateException ex) {
-        throw new SCMSecurityException("Fail to find SCM CA certificate.", ex);
-      }
-    }
-    return null;
-  }
 
-  // For gRPC server running DN container service with gPRC TLS
-  // No mTLS as the channel is shared for for external client, which
-  // does not have SCM CA issued certificates.
-  // In summary:
-  // authenticate from server to client is via TLS.
-  // authenticate from client to server is via block token (or container token).
-  static GrpcTlsConfig createTlsServerConfigForDN(SecurityConfig conf,
-      CertificateClient caClient)  {
-    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
-      return new GrpcTlsConfig(
-          caClient.getPrivateKey(), caClient.getCertificate(),
-          null, false);
-    }
-    return null;
-  }
+
+
 
   static RetryPolicy createRetryPolicy(Configuration conf) {
     int maxRetryCount =

@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -34,6 +35,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -80,6 +82,19 @@ public interface MiniOzoneCluster {
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitForClusterToBeReady() throws TimeoutException, InterruptedException;
+
+  /**
+   * Waits for atleast one RATIS pipeline of given factor to be reported in open
+   * state.
+   *
+   * @param factor replication factor
+   * @param timeoutInMs timeout value in milliseconds
+   * @throws TimeoutException In case of timeout
+   * @throws InterruptedException In case of interrupt while waiting
+   */
+  void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
+                                int timeoutInMs)
+          throws TimeoutException, InterruptedException;
 
   /**
    * Sets the timeout value after which
@@ -218,6 +233,16 @@ public interface MiniOzoneCluster {
   void shutdownHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
+   * Start Recon.
+   */
+  void startRecon();
+
+  /**
+   * Stop Recon.
+   */
+  void stopRecon();
+
+  /**
    * Shutdown the MiniOzoneCluster and delete the storage dirs.
    */
   void shutdown();
@@ -251,6 +276,7 @@ public interface MiniOzoneCluster {
     protected static final int DEFAULT_HB_INTERVAL_MS = 1000;
     protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
+    protected static final int DEFAULT_PIPELIME_LIMIT = 3;
 
     protected final OzoneConfiguration conf;
     protected String path;
@@ -268,16 +294,20 @@ public interface MiniOzoneCluster {
     
     protected Boolean randomContainerPort = true;
     protected Optional<Integer> chunkSize = Optional.empty();
+    protected OptionalInt streamBufferSize = OptionalInt.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
     protected Optional<Long> streamBufferMaxSize = Optional.empty();
     protected Optional<Long> blockSize = Optional.empty();
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
+    protected boolean includeRecon = false;
+
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
     protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
+    protected int pipelineNumLimit = DEFAULT_PIPELIME_LIMIT;
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
@@ -365,6 +395,16 @@ public interface MiniOzoneCluster {
     }
 
     /**
+     * Sets the total number of pipelines to create.
+     * @param val number of pipelines
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setTotalPipelineNumLimit(int val) {
+      pipelineNumLimit = val;
+      return this;
+    }
+
+    /**
      * Sets the number of HeartBeat Interval of Datanodes, the value should be
      * in MilliSeconds.
      *
@@ -409,6 +449,11 @@ public interface MiniOzoneCluster {
      */
     public Builder setChunkSize(int size) {
       chunkSize = Optional.of(size);
+      return this;
+    }
+
+    public Builder setStreamBufferSize(int size) {
+      streamBufferSize = OptionalInt.of(size);
       return this;
     }
 
@@ -459,6 +504,11 @@ public interface MiniOzoneCluster {
 
     public Builder setOMServiceId(String serviceId) {
       this.omServiceId = serviceId;
+      return this;
+    }
+
+    public Builder includeRecon(boolean include) {
+      this.includeRecon = include;
       return this;
     }
 

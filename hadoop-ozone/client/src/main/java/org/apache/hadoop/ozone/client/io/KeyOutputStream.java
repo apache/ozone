@@ -75,7 +75,13 @@ public class KeyOutputStream extends OutputStream {
   private FileEncryptionInfo feInfo;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
+  // how much of data is actually written yet to underlying stream
   private long offset;
+  // how much data has been ingested into the stream
+  private long writeOffset;
+  // whether an exception is encountered while write and whole write could
+  // not succeed
+  private boolean isException;
   private final BlockOutputStreamEntryPool blockOutputStreamEntryPool;
 
   /**
@@ -118,22 +124,25 @@ public class KeyOutputStream extends OutputStream {
       XceiverClientManager xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationFactor factor, ReplicationType type,
-      long bufferFlushSize, long bufferMaxSize, long size, long watchTimeout,
+      int bufferSize, long bufferFlushSize, long bufferMaxSize,
+      long size, long watchTimeout,
       ChecksumType checksumType, int bytesPerChecksum,
       String uploadID, int partNumber, boolean isMultipart,
       int maxRetryCount, long retryInterval) {
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(omClient, chunkSize, requestId, factor,
-            type, bufferFlushSize, bufferMaxSize, size, watchTimeout,
-            checksumType, bytesPerChecksum, uploadID, partNumber, isMultipart,
-            info, xceiverClientManager, handler.getId());
+            type, bufferSize, bufferFlushSize, bufferMaxSize, size,
+            watchTimeout, checksumType, bytesPerChecksum, uploadID, partNumber,
+            isMultipart, info, xceiverClientManager, handler.getId());
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
     this.feInfo = info.getFileEncryptionInfo();
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         maxRetryCount, retryInterval);
     this.retryCount = 0;
+    this.isException = false;
+    this.writeOffset = 0;
   }
 
   /**
@@ -188,6 +197,7 @@ public class KeyOutputStream extends OutputStream {
       return;
     }
     handleWrite(b, off, len, false);
+    writeOffset += len;
   }
 
   private void handleWrite(byte[] b, int off, long len, boolean retry)
@@ -199,23 +209,29 @@ public class KeyOutputStream extends OutputStream {
         // length(len) will be in int range if the call is happening through
         // write API of blockOutputStream. Length can be in long range if it
         // comes via Exception path.
-        int writeLen = Math.min((int) len, (int) current.getRemaining());
+        int expectedWriteLen = Math.min((int) len,
+                (int) current.getRemaining());
         long currentPos = current.getWrittenDataLength();
-        writeToOutputStream(current, retry, len, b, writeLen, off, currentPos);
+        // writeLen will be updated based on whether the write was succeeded
+        // or if it sees an exception, how much the actual write was
+        // acknowledged.
+        int writtenLength =
+                writeToOutputStream(current, retry, len, b, expectedWriteLen,
+                off, currentPos);
         if (current.getRemaining() <= 0) {
           // since the current block is already written close the stream.
           handleFlushOrClose(StreamAction.FULL);
         }
-        len -= writeLen;
-        off += writeLen;
+        len -= writtenLength;
+        off += writtenLength;
       } catch (Exception e) {
         markStreamClosed();
-        throw new IOException("Allocate any more blocks for write failed", e);
+        throw new IOException(e);
       }
     }
   }
 
-  private void writeToOutputStream(BlockOutputStreamEntry current,
+  private int writeToOutputStream(BlockOutputStreamEntry current,
       boolean retry, long len, byte[] b, int writeLen, int off, long currentPos)
       throws IOException {
     try {
@@ -234,7 +250,7 @@ public class KeyOutputStream extends OutputStream {
       // The len specified here is the combined sum of the data length of
       // the buffers
       Preconditions.checkState(!retry || len <= blockOutputStreamEntryPool
-          .getStreamBufferMaxSize());
+              .getStreamBufferMaxSize());
       int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
       writeLen = retry ? (int) len : dataWritten;
       // In retry path, the data written is already accounted in offset.
@@ -244,6 +260,7 @@ public class KeyOutputStream extends OutputStream {
       LOG.debug("writeLen {}, total len {}", writeLen, len);
       handleException(current, ioe);
     }
+    return writeLen;
   }
 
   /**
@@ -344,11 +361,11 @@ public class KeyOutputStream extends OutputStream {
     if (retryPolicy == null) {
       retryPolicy = retryPolicyMap.get(Exception.class);
     }
-    RetryPolicy.RetryAction action;
+    RetryPolicy.RetryAction action = null;
     try {
       action = retryPolicy.shouldRetry(exception, retryCount, 0, true);
     } catch (Exception e) {
-      throw new IOException(e);
+      setExceptionAndThrow(new IOException(e));
     }
     if (action.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
       String msg = "";
@@ -356,13 +373,13 @@ public class KeyOutputStream extends OutputStream {
         msg = "Retry request failed. " + action.reason;
         LOG.error(msg, exception);
       }
-      throw new IOException(msg, exception);
+      setExceptionAndThrow(new IOException(msg, exception));
     }
 
     // Throw the exception if the thread is interrupted
     if (Thread.currentThread().isInterrupted()) {
       LOG.warn("Interrupted while trying for retry");
-      throw exception;
+      setExceptionAndThrow(exception);
     }
     Preconditions.checkArgument(
         action.action == RetryPolicy.RetryAction.RetryDecision.RETRY);
@@ -371,9 +388,10 @@ public class KeyOutputStream extends OutputStream {
         Thread.sleep(action.delayMillis);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        throw (IOException) new InterruptedIOException(
+        IOException ioe =  (IOException) new InterruptedIOException(
             "Interrupted: action=" + action + ", retry policy=" + retryPolicy)
             .initCause(e);
+        setExceptionAndThrow(ioe);
       }
     }
     retryCount++;
@@ -382,6 +400,11 @@ public class KeyOutputStream extends OutputStream {
           "retry policy is {} ", retryCount, retryPolicy);
     }
     handleWrite(null, 0, len, true);
+  }
+
+  private void setExceptionAndThrow(IOException ioe) throws IOException {
+    isException = true;
+    throw ioe;
   }
 
   /**
@@ -484,6 +507,9 @@ public class KeyOutputStream extends OutputStream {
     closed = true;
     try {
       handleFlushOrClose(StreamAction.CLOSE);
+      if (!isException) {
+        Preconditions.checkArgument(writeOffset == offset);
+      }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
       blockOutputStreamEntryPool.cleanup();
@@ -514,6 +540,7 @@ public class KeyOutputStream extends OutputStream {
     private String requestID;
     private ReplicationType type;
     private ReplicationFactor factor;
+    private int streamBufferSize;
     private long streamBufferFlushSize;
     private long streamBufferMaxSize;
     private long blockSize;
@@ -571,6 +598,11 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public Builder setStreamBufferSize(int size) {
+      this.streamBufferSize = size;
+      return this;
+    }
+
     public Builder setStreamBufferFlushSize(long size) {
       this.streamBufferFlushSize = size;
       return this;
@@ -583,11 +615,6 @@ public class KeyOutputStream extends OutputStream {
 
     public Builder setBlockSize(long size) {
       this.blockSize = size;
-      return this;
-    }
-
-    public Builder setWatchTimeout(long timeout) {
-      this.watchTimeout = timeout;
       return this;
     }
 
@@ -618,8 +645,9 @@ public class KeyOutputStream extends OutputStream {
 
     public KeyOutputStream build() {
       return new KeyOutputStream(openHandler, xceiverManager, omClient,
-          chunkSize, requestID, factor, type, streamBufferFlushSize,
-          streamBufferMaxSize, blockSize, watchTimeout, checksumType,
+          chunkSize, requestID, factor, type,
+          streamBufferSize, streamBufferFlushSize, streamBufferMaxSize,
+          blockSize, watchTimeout, checksumType,
           bytesPerChecksum, multipartUploadID, multipartNumber, isMultipartKey,
           maxRetryCount, retryInterval);
     }

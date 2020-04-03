@@ -110,8 +110,8 @@ public final class BlockOutputStreamEntry extends OutputStream {
       }
       this.outputStream =
           new BlockOutputStream(blockID, xceiverClientManager,
-              pipeline, chunkSize, streamBufferFlushSize,
-              streamBufferMaxSize, watchTimeout, bufferPool, checksumType,
+              pipeline, streamBufferFlushSize,
+              streamBufferMaxSize, bufferPool, checksumType,
               bytesPerChecksum);
     }
   }

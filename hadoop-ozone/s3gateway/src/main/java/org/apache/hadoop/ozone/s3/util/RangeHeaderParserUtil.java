@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.s3.util;
 
 import java.util.regex.Matcher;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_MATCH_PATTERN;
 /**

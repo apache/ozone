@@ -38,12 +38,15 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicy;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeNotification;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -72,7 +75,7 @@ import org.slf4j.LoggerFactory;
  * that the containers are properly replicated. Replication Manager deals only
  * with Quasi Closed / Closed container.
  */
-public class ReplicationManager implements MetricsSource {
+public class ReplicationManager implements MetricsSource, SafeModeNotification {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
@@ -88,7 +91,7 @@ public class ReplicationManager implements MetricsSource {
    * PlacementPolicy which is used to identify where a container
    * should be replicated.
    */
-  private final ContainerPlacementPolicy containerPlacement;
+  private final PlacementPolicy containerPlacement;
 
   /**
    * EventPublisher to fire Replicate and Delete container events.
@@ -144,12 +147,12 @@ public class ReplicationManager implements MetricsSource {
    *
    * @param conf OzoneConfiguration
    * @param containerManager ContainerManager
-   * @param containerPlacement ContainerPlacementPolicy
+   * @param containerPlacement PlacementPolicy
    * @param eventPublisher EventPublisher
    */
   public ReplicationManager(final ReplicationManagerConfiguration conf,
                             final ContainerManager containerManager,
-                            final ContainerPlacementPolicy containerPlacement,
+                            final PlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
                             final LockManager<ContainerID> lockManager,
                             final NodeManager nodeManager) {
@@ -339,6 +342,8 @@ public class ReplicationManager implements MetricsSource {
 
     } catch (ContainerNotFoundException ex) {
       LOG.warn("Missing container {}.", id);
+    } catch (Exception ex) {
+      LOG.warn("Process container {} error: ", id, ex);
     } finally {
       lockManager.writeUnlock(id);
     }
@@ -503,7 +508,7 @@ public class ReplicationManager implements MetricsSource {
 
   /**
    * If the given container is under replicated, identify a new set of
-   * datanode(s) to replicate the container using ContainerPlacementPolicy
+   * datanode(s) to replicate the container using PlacementPolicy
    * and send replicate container command to the identified datanode(s).
    *
    * @param container ContainerInfo
@@ -836,6 +841,14 @@ public class ReplicationManager implements MetricsSource {
         .addGauge(ReplicationManagerMetrics.INFLIGHT_DELETION,
             inflightDeletion.size())
         .endRecord();
+  }
+
+  @Override
+  public void handleSafeModeTransition(
+      SCMSafeModeManager.SafeModeStatus status) {
+    if (!status.getSafeModeStatus() && !this.isRunning()) {
+      this.start();
+    }
   }
 
   /**

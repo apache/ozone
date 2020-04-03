@@ -36,7 +36,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
  * Set acl handler for bucket.
  */
 @Command(name = "setacl",
-    description = "Set acls.")
+    description = "Set one or more ACLs, replacing the existing ones.")
 public class SetAclBucketHandler extends Handler {
 
   @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
@@ -44,22 +44,22 @@ public class SetAclBucketHandler extends Handler {
 
   @CommandLine.Option(names = {"--acls", "-al"},
       required = true,
-      description = "Comma seperated acls." +
-          "r = READ," +
-          "w = WRITE," +
-          "c = CREATE," +
-          "d = DELETE," +
-          "l = LIST," +
-          "a = ALL," +
-          "n = NONE," +
-          "x = READ_AC," +
-          "y = WRITE_AC" +
-          "Ex user:user1:rw,user:user2:a,group:hadoop:a")
+      description = "A comma separated list of ACLs to be set.\n" +
+          "Ex: user:user1:rw,user:user2:a,group:hadoop:a\n" +
+          "r = READ, " +
+          "w = WRITE, " +
+          "c = CREATE, " +
+          "d = DELETE, " +
+          "l = LIST, " +
+          "a = ALL, " +
+          "n = NONE, " +
+          "x = READ_ACL, " +
+          "y = WRITE_ACL.")
   private String acls;
 
   @CommandLine.Option(names = {"--store", "-s"},
       required = false,
-      description = "store type. i.e OZONE or S3")
+      description = "Store type. i.e OZONE or S3")
   private String storeType;
 
   /**
@@ -67,7 +67,8 @@ public class SetAclBucketHandler extends Handler {
    */
   @Override
   public Void call() throws Exception {
-    Objects.requireNonNull(acls, "Acls to be set not specified.");
+    Objects.requireNonNull(acls,
+        "You need to specify one or more ACLs to be set.");
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureBucketAddress();
     try (OzoneClient client =
@@ -90,7 +91,7 @@ public class SetAclBucketHandler extends Handler {
           .build();
 
       client.getObjectStore().setAcl(obj, OzoneAcl.parseAcls(acls));
-      System.out.println("Acl set successfully.");
+      System.out.println("ACL(s) set successfully.");
     }
 
     return null;

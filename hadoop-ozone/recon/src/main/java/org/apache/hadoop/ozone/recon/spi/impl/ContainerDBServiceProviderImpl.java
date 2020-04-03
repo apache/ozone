@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_COUNT_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_TABLE;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider.getNewDBStore;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -29,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.inject.Inject;
@@ -46,7 +48,9 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,22 +82,22 @@ public class ContainerDBServiceProviderImpl
   private ReconUtils reconUtils;
 
   @Inject
+  private MissingContainersDao missingContainersDao;
+
+  @Inject
   public ContainerDBServiceProviderImpl(DBStore dbStore,
                                         Configuration sqlConfiguration) {
+    containerDbStore = dbStore;
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
-    initializeTables(dbStore);
+    initializeTables();
   }
 
   @Override
-  public void start() {
-    // Makes sure the ContainerDBServiceProvider is injected and
-    // available. Nothing else to do here.
-  }
-
-  @Override
-  public void stop() throws Exception {
+  public void close() throws Exception {
     if (containerDbStore != null) {
+      LOG.info("Stopping ContainerKeyDB Service Provider");
       containerDbStore.close();
+      containerDbStore = null;
     }
   }
 
@@ -111,11 +115,10 @@ public class ContainerDBServiceProviderImpl
       throws IOException {
 
     File oldDBLocation = containerDbStore.getDbLocation();
-    containerDbStore = ReconContainerDBProvider
-        .getNewDBStore(configuration, reconUtils);
+    containerDbStore = getNewDBStore(configuration, reconUtils);
     LOG.info("Creating new Recon Container DB at {}",
         containerDbStore.getDbLocation().getAbsolutePath());
-    initializeTables(containerDbStore);
+    initializeTables();
 
     if (oldDBLocation.exists()) {
       LOG.info("Cleaning up old Recon Container DB at {}.",
@@ -136,18 +139,18 @@ public class ContainerDBServiceProviderImpl
 
   /**
    * Initialize the container DB tables.
-   * @param dbStore
    */
-  private void initializeTables(DBStore dbStore) {
+  private void initializeTables() {
     try {
-      this.containerKeyTable = dbStore.getTable(CONTAINER_KEY_TABLE,
+      this.containerKeyTable = containerDbStore.getTable(CONTAINER_KEY_TABLE,
           ContainerKeyPrefix.class, Integer.class);
-      this.containerKeyCountTable = dbStore.getTable(CONTAINER_KEY_COUNT_TABLE,
-          Long.class, Long.class);
+      this.containerKeyCountTable = containerDbStore
+          .getTable(CONTAINER_KEY_COUNT_TABLE, Long.class, Long.class);
     } catch (IOException e) {
-      LOG.error("Unable to create Container Key tables." + e);
+      LOG.error("Unable to create Container Key tables.", e);
     }
   }
+
   /**
    * Concatenate the containerID and Key Prefix using a delimiter and store the
    * count into the container DB store.
@@ -286,7 +289,8 @@ public class ContainerDBServiceProviderImpl
               containerKeyPrefix.getKeyVersion()),
               keyValue.getValue());
         } else {
-          LOG.warn("Null key prefix returned for containerId = " + containerId);
+          LOG.warn("Null key prefix returned for containerId = {} ",
+              containerId);
         }
       } else {
         break; //Break when the first mismatch occurs.
@@ -352,6 +356,10 @@ public class ContainerDBServiceProviderImpl
       containers.put(containerID, containerMetadata);
     }
     return containers;
+  }
+
+  public List<MissingContainers> getMissingContainers() {
+    return missingContainersDao.findAll();
   }
 
   @Override

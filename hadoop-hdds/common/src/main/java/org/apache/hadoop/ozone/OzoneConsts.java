@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
@@ -120,7 +120,6 @@ public final class OzoneConsts {
   public static final String DELETED_BLOCK_DB = "deletedBlock.db";
   public static final String OM_DB_NAME = "om.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
-  public static final String OM_DB_CHECKPOINTS_DIR_NAME = "om.db.checkpoints";
   public static final String OZONE_MANAGER_TOKEN_DB_NAME = "om-token.db";
   public static final String SCM_DB_NAME = "scm.db";
 
@@ -238,6 +237,8 @@ public final class OzoneConsts {
   public static final String VOLUME = "volume";
   public static final String BUCKET = "bucket";
   public static final String KEY = "key";
+  public static final String SRC_KEY = "srcKey";
+  public static final String DST_KEY = "dstKey";
   public static final String QUOTA = "quota";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
   public static final String OBJECT_ID = "objectID";

@@ -75,7 +75,6 @@ public class TestKeyInputStream {
     flushSize = 4 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
-    conf.set(OzoneConfigKeys.OZONE_CLIENT_WATCH_REQUEST_TIMEOUT, "5000ms");
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
@@ -83,6 +82,7 @@ public class TestKeyInputStream {
         StorageUnit.MB);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
+        .setTotalPipelineNumLimit(5)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
@@ -91,7 +91,7 @@ public class TestKeyInputStream {
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
-    client = OzoneClientFactory.getClient(conf);
+    client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     keyString = UUID.randomUUID().toString();
     volumeName = "test-key-input-stream-volume";

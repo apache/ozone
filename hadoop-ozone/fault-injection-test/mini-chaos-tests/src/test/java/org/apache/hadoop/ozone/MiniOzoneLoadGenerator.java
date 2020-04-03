@@ -17,26 +17,23 @@
  */
 package org.apache.hadoop.ozone;
 
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.conf.StorageUnit;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.loadgenerators.FilesystemLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.AgedLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.DataBuffer;
+import org.apache.hadoop.ozone.loadgenerators.LoadExecutors;
+import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import org.apache.hadoop.ozone.utils.LoadBucket;
-import org.apache.hadoop.ozone.utils.TestProbability;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A Simple Load generator for testing.
@@ -46,213 +43,62 @@ public class MiniOzoneLoadGenerator {
   private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneLoadGenerator.class);
 
-  private static String keyNameDelimiter = "_";
+  private final List<LoadExecutors> loadExecutors;
 
-  private ThreadPoolExecutor writeExecutor;
-  private int numThreads;
-  // number of buffer to be allocated, each is allocated with length which
-  // is multiple of 2, each buffer is populated with random data.
-  private int numBuffers;
-  private List<ByteBuffer> buffers;
+  private final OzoneVolume volume;
+  private final OzoneConfiguration conf;
+  private final String omServiceID;
 
-  private AtomicBoolean isIOThreadRunning;
+  MiniOzoneLoadGenerator(OzoneVolume volume, int numClients, int numThreads,
+      int numBuffers, OzoneConfiguration conf, String omServiceId)
+      throws Exception {
+    DataBuffer buffer = new DataBuffer(numBuffers);
+    loadExecutors = new ArrayList<>();
+    this.volume = volume;
+    this.conf = conf;
+    this.omServiceID = omServiceId;
 
-  private final List<LoadBucket> ozoneBuckets;
-
-  private final AtomicInteger agedFileWrittenIndex;
-  private final ExecutorService agedFileExecutor;
-  private final LoadBucket agedLoadBucket;
-  private final TestProbability agedWriteProbability;
-
-  private final ThreadPoolExecutor fsExecutor;
-  private final LoadBucket fsBucket;
-
-  MiniOzoneLoadGenerator(List<LoadBucket> bucket,
-                         LoadBucket agedLoadBucket, LoadBucket fsBucket,
-                         int numThreads, int numBuffers) {
-    this.ozoneBuckets = bucket;
-    this.numThreads = numThreads;
-    this.numBuffers = numBuffers;
-    this.writeExecutor = createExecutor();
-
-    this.agedFileWrittenIndex = new AtomicInteger(0);
-    this.agedFileExecutor = Executors.newSingleThreadExecutor();
-    this.agedLoadBucket = agedLoadBucket;
-    this.agedWriteProbability = TestProbability.valueOf(10);
-
-    this.fsExecutor = createExecutor();
-    this.fsBucket = fsBucket;
-
-    this.isIOThreadRunning = new AtomicBoolean(false);
-
-    // allocate buffers and populate random data.
-    buffers = new ArrayList<>();
-    for (int i = 0; i < numBuffers; i++) {
-      int size = (int) StorageUnit.KB.toBytes(1 << i);
-      ByteBuffer buffer = ByteBuffer.allocate(size);
-      buffer.put(RandomUtils.nextBytes(size));
-      buffers.add(buffer);
+    // Random Load
+    String mixBucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    volume.createBucket(mixBucketName);
+    List<LoadBucket> ozoneBuckets = new ArrayList<>(numClients);
+    for (int i = 0; i < numClients; i++) {
+      ozoneBuckets.add(new LoadBucket(volume.getBucket(mixBucketName),
+          conf, omServiceId));
     }
+    RandomLoadGenerator loadGenerator =
+        new RandomLoadGenerator(buffer, ozoneBuckets);
+    loadExecutors.add(new LoadExecutors(numThreads, loadGenerator));
+
+    // Aged Load
+    addLoads(numThreads,
+        bucket -> new AgedLoadGenerator(buffer, bucket));
+
+    //Filesystem Load
+    addLoads(numThreads,
+        bucket -> new FilesystemLoadGenerator(buffer, bucket));
   }
 
-  private ThreadPoolExecutor createExecutor() {
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(numThreads, numThreads,
-        100, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1024),
-        new ThreadPoolExecutor.CallerRunsPolicy());
-    executor.prestartAllCoreThreads();
-    return executor;
-
-  }
-
-  // Start IO load on an Ozone bucket.
-  private void load(long runTimeMillis) {
-    long threadID = Thread.currentThread().getId();
-    LOG.info("Started Mixed IO Thread:{}.", threadID);
-    String threadName = Thread.currentThread().getName();
-    long startTime = Time.monotonicNow();
-
-    while (isIOThreadRunning.get() &&
-        (Time.monotonicNow() < startTime + runTimeMillis)) {
-      LoadBucket bucket =
-          ozoneBuckets.get((int) (Math.random() * ozoneBuckets.size()));
-      try {
-        int index = RandomUtils.nextInt();
-        ByteBuffer buffer = getBuffer(index);
-        String keyName = getKeyName(index, threadName);
-        bucket.writeKey(buffer, keyName);
-
-        bucket.readKey(buffer, keyName);
-
-        bucket.deleteKey(keyName);
-      } catch (Exception e) {
-        LOG.error("LOADGEN: Exiting due to exception", e);
-        break;
-      }
-    }
-    // This will terminate other threads too.
-    isIOThreadRunning.set(false);
-    LOG.info("Terminating IO thread:{}.", threadID);
-  }
-
-  private Optional<Integer> randomKeyToRead() {
-    int currentIndex = agedFileWrittenIndex.get();
-    return currentIndex != 0
-      ? Optional.of(RandomUtils.nextInt(0, currentIndex))
-      : Optional.empty();
-  }
-
-  private void startAgedLoad(long runTimeMillis) {
-    long threadID = Thread.currentThread().getId();
-    LOG.info("AGED LOADGEN: Started Aged IO Thread:{}.", threadID);
-    String threadName = Thread.currentThread().getName();
-    long startTime = Time.monotonicNow();
-
-    while (isIOThreadRunning.get() &&
-        (Time.monotonicNow() < startTime + runTimeMillis)) {
-
-      String keyName = null;
-      try {
-        if (agedWriteProbability.isTrue()) {
-          int index = agedFileWrittenIndex.getAndIncrement();
-          ByteBuffer buffer = getBuffer(index);
-          keyName = getKeyName(index, threadName);
-
-          agedLoadBucket.writeKey(buffer, keyName);
-        } else {
-          Optional<Integer> index = randomKeyToRead();
-          if (index.isPresent()) {
-            ByteBuffer buffer = getBuffer(index.get());
-            keyName = getKeyName(index.get(), threadName);
-            agedLoadBucket.readKey(buffer, keyName);
-          }
-        }
-      } catch (Throwable t) {
-        LOG.error("AGED LOADGEN: {} Exiting due to exception", keyName, t);
-        break;
-      }
-    }
-    // This will terminate other threads too.
-    isIOThreadRunning.set(false);
-    LOG.info("Terminating IO thread:{}.", threadID);
-  }
-
-  // Start IO load on an Ozone bucket.
-  private void startFsLoad(long runTimeMillis) {
-    long threadID = Thread.currentThread().getId();
-    LOG.info("Started Filesystem IO Thread:{}.", threadID);
-    String threadName = Thread.currentThread().getName();
-    long startTime = Time.monotonicNow();
-
-    while (isIOThreadRunning.get() &&
-      (Time.monotonicNow() < startTime + runTimeMillis)) {
-      try {
-        int index = RandomUtils.nextInt();
-        ByteBuffer buffer = getBuffer(index);
-        String keyName = getKeyName(index, threadName);
-        fsBucket.writeKey(true, buffer, keyName);
-
-        fsBucket.readKey(true, buffer, keyName);
-
-        fsBucket.deleteKey(true, keyName);
-      } catch (Exception e) {
-        LOG.error("LOADGEN: Exiting due to exception", e);
-        break;
-      }
-    }
-    // This will terminate other threads too.
-    isIOThreadRunning.set(false);
-    LOG.info("Terminating IO thread:{}.", threadID);
+  private void addLoads(int numThreads,
+                        Function<LoadBucket, LoadGenerator> function)
+      throws Exception {
+    String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    volume.createBucket(bucketName);
+    LoadBucket bucket = new LoadBucket(volume.getBucket(bucketName), conf,
+        omServiceID);
+    LoadGenerator loadGenerator = function.apply(bucket);
+    loadExecutors.add(new LoadExecutors(numThreads, loadGenerator));
   }
 
   void startIO(long time, TimeUnit timeUnit) {
-    List<CompletableFuture<Void>> writeFutures = new ArrayList<>();
-    LOG.info("Starting MiniOzoneLoadGenerator for time {}:{} with {} buffers " +
-            "and {} threads", time, timeUnit, numBuffers, numThreads);
-    if (isIOThreadRunning.compareAndSet(false, true)) {
-      // Start the IO thread
-      for (int i = 0; i < numThreads; i++) {
-        writeFutures.add(
-            CompletableFuture.runAsync(() -> load(timeUnit.toMillis(time)),
-                writeExecutor));
-      }
-
-      for (int i = 0; i < numThreads; i++) {
-        writeFutures.add(
-            CompletableFuture.runAsync(() -> startAgedLoad(
-                timeUnit.toMillis(time)), agedFileExecutor));
-      }
-
-      for (int i = 0; i < numThreads; i++) {
-        writeFutures.add(
-            CompletableFuture.runAsync(() -> startFsLoad(
-              timeUnit.toMillis(time)), fsExecutor));
-      }
-
-      // Wait for IO to complete
-      for (CompletableFuture<Void> f : writeFutures) {
-        try {
-          f.get();
-        } catch (Throwable t) {
-          LOG.error("startIO failed with exception", t);
-        }
-      }
-    }
+    LOG.info("Starting MiniOzoneLoadGenerator for time {}:{}", time, timeUnit);
+    long runTime = timeUnit.toMillis(time);
+    // start and wait for executors to finish
+    loadExecutors.forEach(le -> le.startLoad(runTime));
+    loadExecutors.forEach(LoadExecutors::waitForCompletion);
   }
 
-  public void shutdownLoadGenerator() {
-    try {
-      writeExecutor.shutdown();
-      writeExecutor.awaitTermination(1, TimeUnit.DAYS);
-    } catch (Exception e) {
-      LOG.error("error while closing ", e);
-    }
-  }
-
-  private ByteBuffer getBuffer(int keyIndex) {
-    return buffers.get(keyIndex % numBuffers);
-  }
-
-  private String getKeyName(int keyIndex, String threadName) {
-    return threadName + keyNameDelimiter + keyIndex;
+  void shutdownLoadGenerator() {
+    loadExecutors.forEach(LoadExecutors::shutdown);
   }
 }

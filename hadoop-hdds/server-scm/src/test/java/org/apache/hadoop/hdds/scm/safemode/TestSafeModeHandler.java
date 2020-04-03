@@ -26,8 +26,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms
-    .ContainerPlacementPolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -74,13 +73,13 @@ public class TestSafeModeHandler {
     nodeManager = new MockNodeManager(false, 0);
     replicationManager = new ReplicationManager(
         new ReplicationManagerConfiguration(),
-        containerManager, Mockito.mock(ContainerPlacementPolicy.class),
+        containerManager, Mockito.mock(PlacementPolicy.class),
         eventQueue, new LockManager(configuration), nodeManager);
     scmPipelineManager = Mockito.mock(SCMPipelineManager.class);
     blockManager = Mockito.mock(BlockManagerImpl.class);
-    safeModeHandler =
-        new SafeModeHandler(configuration, scmClientProtocolServer,
-            blockManager, replicationManager, scmPipelineManager);
+    safeModeHandler = new SafeModeHandler(configuration);
+    safeModeHandler.notifyImmediately(scmClientProtocolServer, blockManager);
+    safeModeHandler.notifyAfterDelay(replicationManager, scmPipelineManager);
 
     eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, safeModeHandler);
     safeModeStatus = new SCMSafeModeManager.SafeModeStatus(false);
