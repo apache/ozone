@@ -51,18 +51,17 @@ public class LoadExecutors {
 
   private void load(long runTimeMillis) {
     long threadID = Thread.currentThread().getId();
-    LOG.info("{} LOADGEN: Started Aged IO Thread:{}.",
-        generator.name(), threadID);
+    LOG.info("{} LOADGEN: Started {} IO Thread:{}.",
+        generator, threadID);
     long startTime = Time.monotonicNow();
 
     while (Time.monotonicNow() - startTime < runTimeMillis) {
 
-      String keyName = null;
       try {
-        keyName = generator.generateLoad();
+        generator.generateLoad();
       } catch (Throwable t) {
-        LOG.error("{} LOADGEN: {} Exiting due to exception",
-            generator.name(), keyName, t);
+        LOG.error("{} LOADGEN: Exiting due to exception",
+            generator, t);
         ExitUtil.terminate(new ExitUtil.ExitException(1, t));
         break;
       }
@@ -71,11 +70,15 @@ public class LoadExecutors {
 
 
   public void startLoad(long time) {
-    LOG.info("Starting {} threads for {}", numThreads, generator.name());
-    generator.initialize();
-    for (int i = 0; i < numThreads; i++) {
-      futures.add(CompletableFuture.runAsync(
-          () -> load(time), executor));
+    LOG.info("Starting {} threads for {}", numThreads, generator);
+    try {
+      generator.initialize();
+      for (int i = 0; i < numThreads; i++) {
+        futures.add(CompletableFuture.runAsync(
+            () -> load(time), executor));
+      }
+    } catch (Throwable t) {
+      LOG.error("Failed to initialize loadgen:{}", generator, t);
     }
   }
 
