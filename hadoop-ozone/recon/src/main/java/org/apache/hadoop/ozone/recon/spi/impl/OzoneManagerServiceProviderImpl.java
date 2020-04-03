@@ -353,9 +353,11 @@ public class OzoneManagerServiceProviderImpl
     if (null != dbUpdates) {
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
       RocksDB rocksDB = rocksDBStore.getDb();
-      LOG.debug("Number of updates received from OM : {}",
-          dbUpdates.getData().size());
-      metrics.incrNumUpdatesInDeltaTotal(dbUpdates.getData().size());
+      int numUpdates = dbUpdates.getData().size();
+      LOG.info("Number of updates received from OM : {}", numUpdates);
+      if (numUpdates > 0) {
+        metrics.incrNumUpdatesInDeltaTotal(numUpdates);
+      }
       for (byte[] data : dbUpdates.getData()) {
         try (WriteBatch writeBatch = new WriteBatch(data)) {
           writeBatch.iterate(omdbUpdatesHandler);

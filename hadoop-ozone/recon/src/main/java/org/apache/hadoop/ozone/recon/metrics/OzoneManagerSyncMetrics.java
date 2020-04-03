@@ -65,6 +65,10 @@ public final class OzoneManagerSyncMetrics {
   @Metric(about = "Number of OM delta requests made by Recon.")
   private MutableCounterLong numDeltaRequests;
 
+  @Metric(about = "Number of OM delta requests made by Recon that had " +
+      "at least 1 update in the response.")
+  private MutableCounterLong numNonZeroDeltaRequests;
+
   @Metric(about = "Number of OM delta requests that failed.")
   private MutableCounterLong numDeltaRequestsFailed;
 
@@ -99,9 +103,10 @@ public final class OzoneManagerSyncMetrics {
 
   public void incrNumUpdatesInDeltaTotal(long n) {
     this.numUpdatesInDeltaTotal.incr(n);
+    this.numNonZeroDeltaRequests.incr();
     setAverageNumUpdatesInDeltaRequest(
         (float) this.numUpdatesInDeltaTotal.value() /
-            (float) this.numDeltaRequests.value());
+            (float) this.numNonZeroDeltaRequests.value());
   }
 
   public void updateDeltaRequestLatency(long time) {
