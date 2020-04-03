@@ -49,8 +49,10 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -528,4 +530,30 @@ public final class OmUtils {
 
     return repeatedOmKeyInfo;
   }
+
+  /**
+   * Verify volume name is a valid DNS name.
+   */
+  public static void validateVolumeName(String volumeName) throws OMException {
+    try {
+      HddsClientUtils.verifyResourceName(volumeName);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid volume name: " + volumeName,
+          OMException.ResultCodes.INVALID_VOLUME_NAME);
+    }
+  }
+
+  /**
+   * Verify bucket name is a valid DNS name.
+   */
+  public static void validateBucketName(String bucketName)
+      throws OMException {
+    try {
+      HddsClientUtils.verifyResourceName(bucketName);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid bucket name: " + bucketName,
+          OMException.ResultCodes.INVALID_BUCKET_NAME);
+    }
+  }
+
 }

@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.slf4j.Logger;
@@ -71,17 +73,17 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
     VolumeInfo volumeInfo  =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
+    // Verify resource name
+    OmUtils.validateVolumeName(volumeInfo.getVolume());
 
     // Set creation time
     VolumeInfo updatedVolumeInfo =
         volumeInfo.toBuilder().setCreationTime(Time.now()).build();
 
-
     return getOmRequest().toBuilder().setCreateVolumeRequest(
         CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
         .setUserInfo(getUserInfo())
         .build();
-
   }
 
   @Override
