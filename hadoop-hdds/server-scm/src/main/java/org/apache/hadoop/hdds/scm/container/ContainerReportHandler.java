@@ -57,8 +57,10 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   private final ContainerManager containerManager;
   private final String unknownContainerHandleAction;
 
-  /** The action taken by ContainerReportHandler to handle
-   *  unknown containers */
+  /**
+   * The action taken by ContainerReportHandler to handle
+   * unknown containers.
+   */
   static final String UNKNOWN_CONTAINER_ACTION_WARN = "WARN";
   static final String UNKNOWN_CONTAINER_ACTION_DELETE = "DELETE";
 
@@ -156,13 +158,13 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             UNKNOWN_CONTAINER_ACTION_WARN)) {
           LOG.error("Received container report for an unknown container" +
               " {} from datanode {}.", replicaProto.getContainerID(),
-          datanodeDetails, e);
+              datanodeDetails, e);
         } else if (unknownContainerHandleAction.equals(
             UNKNOWN_CONTAINER_ACTION_DELETE)) {
           final ContainerID containerId = ContainerID
               .valueof(replicaProto.getContainerID());
-          final DeleteContainerCommand deleteCommand = new DeleteContainerCommand(
-              containerId.getId(), true);
+          final DeleteContainerCommand deleteCommand =
+              new DeleteContainerCommand(containerId.getId(), true);
           final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
               datanodeDetails.getUuid(), deleteCommand);
           publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
