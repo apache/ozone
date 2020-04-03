@@ -389,7 +389,7 @@ public final class OzoneManagerRatisServer {
 
     // Set Ratis storage directory
     String storageDir = OzoneManagerRatisServer.getOMRatisDirectory(conf);
-    RaftServerConfigKeys.setStorageDirs(properties,
+    RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(storageDir)));
 
     // Set RAFT segment size
@@ -473,7 +473,7 @@ public final class OzoneManagerRatisServer {
         serverMaxTimeout);
 
     // Set the number of maximum cached segments
-    RaftServerConfigKeys.Log.setMaxCachedSegmentNum(properties, 2);
+    RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // TODO: set max write buffer size
 

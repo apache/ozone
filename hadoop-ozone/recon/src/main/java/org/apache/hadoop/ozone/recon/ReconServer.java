@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
@@ -56,6 +57,7 @@ public class ReconServer extends GenericCli {
   private ContainerDBServiceProvider containerDBServiceProvider;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
   private OzoneStorageContainerManager reconStorageContainerManager;
+  private OzoneConfiguration configuration;
 
   private volatile boolean isStarted = false;
 
@@ -65,8 +67,8 @@ public class ReconServer extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    ConfigurationProvider.setConfiguration(ozoneConfiguration);
+    configuration = createOzoneConfiguration();
+    ConfigurationProvider.setConfiguration(configuration);
 
     injector =  Guice.createInjector(new
         ReconControllerModule(),
@@ -83,7 +85,7 @@ public class ReconServer extends GenericCli {
 
     LOG.info("Initializing Recon server...");
     try {
-      loginReconUserIfSecurityEnabled(ozoneConfiguration);
+      loginReconUserIfSecurityEnabled(configuration);
       this.containerDBServiceProvider =
           injector.getInstance(ContainerDBServiceProvider.class);
 
@@ -124,6 +126,8 @@ public class ReconServer extends GenericCli {
     if (!isStarted) {
       LOG.info("Starting Recon server");
       isStarted = true;
+      // Initialize metrics for Recon
+      HddsServerUtil.initializeMetrics(configuration, "Recon");
       if (httpServer != null) {
         httpServer.start();
       }

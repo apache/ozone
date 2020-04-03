@@ -188,14 +188,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     setRatisLeaderElectionTimeout(properties);
 
     // Set the maximum cache segments
-    RaftServerConfigKeys.Log.setMaxCachedSegmentNum(properties, 2);
+    RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // set the node failure timeout
     setNodeFailureTimeout(properties);
 
     // Set the ratis storage directory
     String storageDir = HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
-    RaftServerConfigKeys.setStorageDirs(properties,
+    RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(storageDir)));
 
     // For grpc set the maximum message size
@@ -359,7 +359,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Write.setByteLimit(properties,
-        pendingRequestsByteLimit);
+        SizeInBytes.valueOf(pendingRequestsByteLimit));
   }
 
   public static XceiverServerRatis newXceiverServerRatis(

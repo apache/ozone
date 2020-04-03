@@ -305,6 +305,8 @@ IFS=$OIFS
 
 hadoop_add_client_opts
 
+hadoop_add_default_gc_opts
+
 if [[ ${HADOOP_WORKER_MODE} = true ]]; then
   hadoop_common_worker_mode_execute "${HADOOP_HDFS_HOME}/bin/ozone" "${HADOOP_USER_PARAMS[@]}"
   exit $?

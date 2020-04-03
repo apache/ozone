@@ -21,8 +21,6 @@ package org.apache.hadoop.ozone.loadgenerators;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.ozone.utils.LoadBucket;
 import org.apache.hadoop.ozone.utils.TestProbability;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.Optional;
@@ -36,9 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The default writes to read ratio is 10:90.
  */
 public class AgedLoadGenerator extends LoadGenerator {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(AgedLoadGenerator.class);
   private static String agedSuffix = "aged";
 
   private final AtomicInteger agedFileWrittenIndex;
@@ -56,25 +51,21 @@ public class AgedLoadGenerator extends LoadGenerator {
   }
 
   @Override
-  public String generateLoad() throws Exception {
+  public void generateLoad() throws Exception {
     if (agedWriteProbability.isTrue()) {
       synchronized (agedFileAllocationIndex) {
         int index = agedFileAllocationIndex.getAndIncrement();
         ByteBuffer buffer = dataBuffer.getBuffer(index);
-        String keyName = getKeyName(index, agedSuffix);
+        String keyName = getKeyName(index);
         agedLoadBucket.writeKey(buffer, keyName);
         agedFileWrittenIndex.getAndIncrement();
-        return keyName;
       }
     } else {
       Optional<Integer> index = randomKeyToRead();
       if (index.isPresent()) {
         ByteBuffer buffer = dataBuffer.getBuffer(index.get());
-        String keyName = getKeyName(index.get(), agedSuffix);
+        String keyName = getKeyName(index.get());
         agedLoadBucket.readKey(buffer, keyName);
-        return keyName;
-      } else {
-        return "NoKey";
       }
     }
   }
@@ -89,10 +80,5 @@ public class AgedLoadGenerator extends LoadGenerator {
   @Override
   public void initialize() {
     // Nothing to do here
-  }
-
-  @Override
-  public String name() {
-    return "Aged";
   }
 }
