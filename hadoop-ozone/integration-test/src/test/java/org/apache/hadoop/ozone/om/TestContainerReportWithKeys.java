@@ -36,13 +36,12 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 
 /**
  * This class tests container report with DN container state info.

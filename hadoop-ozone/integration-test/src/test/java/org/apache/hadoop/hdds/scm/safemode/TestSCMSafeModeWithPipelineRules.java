@@ -35,12 +35,11 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.Timeout;
 
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.junit.Assert.fail;
 
