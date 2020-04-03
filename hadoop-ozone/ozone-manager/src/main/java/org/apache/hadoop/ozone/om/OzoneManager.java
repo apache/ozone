@@ -1844,12 +1844,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       metrics.incNumVolumeLists();
       if (isAclEnabled) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("ACL is enabled. Listing volumes accessible by user. "
-                  + "Principal: {}, keytab: {}",
-              configuration.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY),
-              configuration.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY));
-        }
         // List all volumes first
         List<OmVolumeArgs> listOfAllVolumes = volumeManager.listVolumes(
             null, prefix, prevKey, maxKeys);
@@ -1858,12 +1852,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .hasAccess(IAccessAuthorizer.ACLType.LIST, remoteUserUgi))
             .collect(Collectors.toList());
       } else {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("ACL is disabled. Listing volumes owned by user. "
-                  + "Principal: {}, keytab: {}",
-              configuration.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY),
-              configuration.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY));
-        }
         // When ACL is not enabled, fallback to filter by owner
         return volumeManager.listVolumes(userName, prefix, prevKey, maxKeys);
       }
