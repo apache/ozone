@@ -148,4 +148,8 @@ public final class OzoneManagerSyncMetrics {
   public MutableGaugeFloat getAverageNumUpdatesInDeltaRequest() {
     return averageNumUpdatesInDeltaRequest;
   }
+
+  public MutableCounterLong getNumNonZeroDeltaRequests() {
+    return numNonZeroDeltaRequests;
+  }
 }

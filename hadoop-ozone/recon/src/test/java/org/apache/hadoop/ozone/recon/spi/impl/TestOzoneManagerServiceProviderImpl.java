@@ -203,18 +203,15 @@ public class TestOzoneManagerServiceProviderImpl extends
             getMockTaskController(), new ReconUtils(),
             getMockOzoneManagerClient(dbUpdatesWrapper));
 
-    OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
-    // To make sire averageNumUpdatesInDeltaRequest does not result in division
-    // by zero.
-    metrics.incrNumDeltaRequests();
-
     OMDBUpdatesHandler updatesHandler =
         new OMDBUpdatesHandler(omMetadataManager);
     ozoneManagerServiceProvider.getAndApplyDeltaUpdatesFromOM(
         0L, updatesHandler);
 
+    OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
     assertEquals(4.0,
         metrics.getAverageNumUpdatesInDeltaRequest().value(), 0.0);
+    assertEquals(1, metrics.getNumNonZeroDeltaRequests().value());
 
     // In this method, we have to assert the "GET" part and the "APPLY" path.
 
