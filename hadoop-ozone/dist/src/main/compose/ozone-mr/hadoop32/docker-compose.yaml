@@ -33,6 +33,7 @@ services:
       - ../../..:/opt/hadoop
     ports:
       - 9874:9874
+      - 9862:9862
     environment:
       WAITFOR: scm:9876
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION

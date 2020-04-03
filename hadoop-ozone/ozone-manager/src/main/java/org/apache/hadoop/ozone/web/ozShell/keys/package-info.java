@@ -18,6 +18,6 @@
  */
 
 /**
- * Netty-based HTTP server implementation for Ozone.
+ * Commands for Ozone keys.
  */
 package org.apache.hadoop.ozone.web.ozShell.keys;

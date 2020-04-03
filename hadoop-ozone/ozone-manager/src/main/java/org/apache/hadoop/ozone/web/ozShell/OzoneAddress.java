@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.web.ozShell;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 
@@ -26,6 +27,8 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
@@ -38,6 +41,7 @@ import org.apache.http.client.utils.URIBuilder;
  */
 public class OzoneAddress {
 
+  private static final int DEFAULT_OZONE_PORT = 50070;
   private static final String EMPTY_HOST = "___DEFAULT___";
 
   private URI ozoneURI;
@@ -166,8 +170,6 @@ public class OzoneAddress {
    *
    * @param uri - UriString
    * @return URI
-   * @throws URISyntaxException
-   * @throws OzoneException
    */
   protected URI parseURI(String uri)
       throws OzoneClientException {
@@ -177,7 +179,7 @@ public class OzoneAddress {
     }
     URIBuilder uriBuilder = new URIBuilder(stringToUri(uri));
     if (uriBuilder.getPort() == 0) {
-      uriBuilder.setPort(Shell.DEFAULT_OZONE_PORT);
+      uriBuilder.setPort(DEFAULT_OZONE_PORT);
     }
 
     try {
@@ -296,6 +298,41 @@ public class OzoneAddress {
         || volumeName.length() != 0) {
       throw new OzoneClientException(
           "Invalid URI. Volume/bucket/key elements should not been used");
+    }
+  }
+
+  public OzoneObj toOzoneObj(OzoneObj.StoreType storeType) {
+    return OzoneObjInfo.Builder.newBuilder()
+        .setBucketName(bucketName)
+        .setVolumeName(volumeName)
+        .setKeyName(keyName)
+        .setResType(getResourceType())
+        .setStoreType(storeType)
+        .build();
+  }
+
+  private OzoneObj.ResourceType getResourceType() {
+    if (!keyName.isEmpty()) {
+      return OzoneObj.ResourceType.KEY;
+    }
+    if (!bucketName.isEmpty()) {
+      return OzoneObj.ResourceType.BUCKET;
+    }
+    if (!volumeName.isEmpty()) {
+      return OzoneObj.ResourceType.VOLUME;
+    }
+    return null;
+  }
+
+  public void print(PrintStream out) {
+    if (!volumeName.isEmpty()) {
+      out.printf("Volume Name : %s%n", volumeName);
+    }
+    if (!bucketName.isEmpty()) {
+      out.printf("Bucket Name : %s%n", bucketName);
+    }
+    if (!keyName.isEmpty()) {
+      out.printf("Key Name : %s%n", keyName);
     }
   }
 }
