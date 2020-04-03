@@ -41,12 +41,20 @@ import org.junit.rules.ExpectedException;
 import java.io.IOException;
 import java.util.UUID;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 
 /**
  * Test for XceiverClientManager caching and eviction.
  */
 public class TestXceiverClientManager {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static OzoneConfiguration config;
   private static MiniOzoneCluster cluster;
   private static StorageContainerLocationProtocolClientSideTranslatorPB

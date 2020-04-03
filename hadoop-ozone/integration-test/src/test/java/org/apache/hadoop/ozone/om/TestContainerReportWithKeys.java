@@ -41,11 +41,19 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * This class tests container report with DN container state info.
  */
 public class TestContainerReportWithKeys {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static final Logger LOG = LoggerFactory.getLogger(
       TestContainerReportWithKeys.class);
   private static MiniOzoneCluster cluster = null;

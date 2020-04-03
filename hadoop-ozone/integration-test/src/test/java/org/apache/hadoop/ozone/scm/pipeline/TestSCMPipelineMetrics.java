@@ -38,6 +38,8 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.Optional;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -47,6 +49,12 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
  */
 @Ignore
 public class TestSCMPipelineMetrics {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster;
 

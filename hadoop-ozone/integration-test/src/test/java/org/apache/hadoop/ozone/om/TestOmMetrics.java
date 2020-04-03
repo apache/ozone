@@ -38,7 +38,9 @@ import org.apache.hadoop.test.MetricsAsserts;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.mockito.Mockito;
 
 /**
@@ -46,6 +48,12 @@ import org.mockito.Mockito;
  */
 @SuppressWarnings("deprecation")
 public class TestOmMetrics {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private MiniOzoneCluster cluster;
   private OzoneManager ozoneManager;
 

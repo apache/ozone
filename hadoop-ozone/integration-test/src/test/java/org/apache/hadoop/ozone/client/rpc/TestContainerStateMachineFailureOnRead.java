@@ -59,13 +59,21 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
 /**
  * Test to verify pipeline is closed on readStateMachine failure.
  */
 @Ignore("see HDDS-3294")
 public class TestContainerStateMachineFailureOnRead {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private MiniOzoneCluster cluster;
   private ObjectStore objectStore;
   private String volumeName;

@@ -49,12 +49,20 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.UUID;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 
 /**
  * Tests DeleteContainerCommand Handler.
  */
 public class TestDeleteContainerHandler {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
 
   private static MiniOzoneCluster cluster;

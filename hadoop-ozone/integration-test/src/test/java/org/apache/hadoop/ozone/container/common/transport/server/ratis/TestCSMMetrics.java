@@ -65,12 +65,20 @@ import java.util.function.BiConsumer;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.Assert;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * This class tests the metrics of ContainerStateMachine.
  */
 @Ignore
 public class TestCSMMetrics {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   static final String TEST_DIR =
       GenericTestUtils.getTestDir("dfs").getAbsolutePath()
           + File.separator;

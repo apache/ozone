@@ -54,6 +54,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
@@ -77,6 +79,12 @@ import static org.junit.Assert.assertTrue;
 @Ignore("Fix this after adding audit support for HA Acl code. This will be " +
     "fixed by HDDS-2038")
 public class TestOzoneRpcClientForAclAuditLog {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneRpcClientForAclAuditLog.class);

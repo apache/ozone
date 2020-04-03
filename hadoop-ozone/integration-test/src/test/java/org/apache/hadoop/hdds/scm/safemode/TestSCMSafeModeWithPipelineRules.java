@@ -39,6 +39,8 @@ import org.junit.rules.TemporaryFolder;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.junit.Assert.fail;
 
@@ -48,6 +50,12 @@ import static org.junit.Assert.fail;
 
 @Ignore
 public class TestSCMSafeModeWithPipelineRules {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();

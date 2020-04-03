@@ -59,7 +59,9 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.yaml.snakeyaml.Yaml;
 
 /**
@@ -67,6 +69,12 @@ import org.yaml.snakeyaml.Yaml;
  */
 @Ignore
 public class TestMiniOzoneCluster {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
