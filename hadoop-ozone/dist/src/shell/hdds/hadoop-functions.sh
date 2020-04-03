@@ -1541,6 +1541,21 @@ function hadoop_translate_cygwin_path
   fi
 }
 
+## @description  Adds default GC parameters
+## @description  Only for server components and only if no other -XX parameters
+## @description  are set
+## @audience     private
+## @stability    evolving
+## @replaceable  yes
+function hadoop_add_default_gc_opts
+{
+  if [[ "${HADOOP_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
+    if [[ ! "$HADOOP_OPTS" =~ "-XX" ]] ; then
+       hadoop_error "No '-XX:...' jvm parameters are used. Adding safer GC settings to the HADOOP_OPTS"
+       HADOOP_OPTS="${HADOOP_OPTS} -XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
+    fi
+  fi
+}
 ## @description  Adds the HADOOP_CLIENT_OPTS variable to
 ## @description  HADOOP_OPTS if HADOOP_SUBCMD_SUPPORTDAEMONIZATION is false
 ## @audience     public
