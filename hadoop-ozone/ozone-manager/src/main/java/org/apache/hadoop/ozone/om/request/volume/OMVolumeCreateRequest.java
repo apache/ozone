@@ -128,13 +128,13 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       auditMap = omVolumeArgs.toAuditMap();
 
       // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        if (!ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
-            !ozAdmins.contains(getUserInfo().getUserName())) {
-          throw new OMException("Only admin users are authorized to create " +
-              "Ozone volumes. User: " + getUserInfo().getUserName(),
-              OMException.ResultCodes.PERMISSION_DENIED);
-        }
+      if (ozoneManager.getAclsEnabled() &&
+          !ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
+            !ozAdmins.contains(getOmRequest().getUserInfo().getUserName())) {
+        throw new OMException("Only admin users are authorized to create " +
+            "Ozone volumes. User: " +
+            getOmRequest().getUserInfo().getUserName(),
+            OMException.ResultCodes.PERMISSION_DENIED);
       }
 
       // acquire lock.
