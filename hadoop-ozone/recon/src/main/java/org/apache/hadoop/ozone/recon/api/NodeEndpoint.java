@@ -77,7 +77,12 @@ public class NodeEndpoint {
 
     datanodeDetails.forEach(datanode -> {
       DatanodeStorageReport storageReport = getStorageReport(datanode);
-      NodeState nodeState = nodeManager.getNodeState(datanode);
+      NodeState nodeState = null;
+      try {
+        nodeState = nodeManager.getNodeStatus(datanode).getHealth();
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Cannot get nodeState for datanode {}", datanode, e);
+      }
       String hostname = datanode.getHostName();
       Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanode);
       List<DatanodePipeline> pipelines = new ArrayList<>();
