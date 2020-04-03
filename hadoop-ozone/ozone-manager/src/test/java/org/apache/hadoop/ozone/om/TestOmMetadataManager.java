@@ -150,7 +150,7 @@ public class TestOmMetadataManager {
     TreeSet<String> volumeABucketsPrefixWithOzoneOwner = new TreeSet<>();
     TreeSet<String> volumeABucketsPrefixWithHadoopOwner = new TreeSet<>();
 
-    // Add strict name in prefixBucketNameWithOzoneOwner without postfix.
+    // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
     volumeABucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
     addBucketsToCache(volumeName1, prefixBucketNameWithOzoneOwner);
     for (int i = 1; i < 100; i++) {
@@ -170,7 +170,7 @@ public class TestOmMetadataManager {
     TreeSet<String> volumeBBucketsPrefixWithHadoopOwner = new TreeSet<>();
     TestOMRequestUtils.addVolumeToDB(volumeName2, omMetadataManager);
 
-    // Add strict name in prefixBucketNameWithOzoneOwner without postfix.
+    // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
     volumeBBucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
     addBucketsToCache(volumeName2, prefixBucketNameWithOzoneOwner);
     for (int i = 1; i < 100; i++) {
@@ -190,7 +190,7 @@ public class TestOmMetadataManager {
         omMetadataManager.listBuckets(volumeName1,
             null, prefixBucketNameWithOzoneOwner, 100);
 
-    // Cause adding a strict name in prefixBucketNameWithOzoneOwner
+    // Cause adding a exact name in prefixBucketNameWithOzoneOwner
     // and another 49 buckets, so if we list buckets with --prefix
     // prefixBucketNameWithOzoneOwner, we should get 50 buckets.
     Assert.assertEquals(omBucketInfoList.size(), 50);
@@ -231,7 +231,7 @@ public class TestOmMetadataManager {
     omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
         null, prefixBucketNameWithHadoopOwner, 100);
 
-    // Cause adding a strict name in prefixBucketNameWithOzoneOwner
+    // Cause adding a exact name in prefixBucketNameWithOzoneOwner
     // and another 49 buckets, so if we list buckets with --prefix
     // prefixBucketNameWithOzoneOwner, we should get 50 buckets.
     Assert.assertEquals(omBucketInfoList.size(), 50);
