@@ -15,24 +15,24 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.web.ozShell;
+package org.apache.hadoop.ozone.web.ozShell.acl;
+
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 import java.io.IOException;
-
-import org.apache.hadoop.ozone.web.utils.JsonUtils;
+import java.util.List;
 
 /**
- * Utility to print out response object in human readable form.
+ * Get ACLs.
  */
-public final class ObjectPrinter {
-  private ObjectPrinter() {
+public abstract class GetAclHandler extends AclHandler {
+
+  @Override
+  protected void execute(OzoneClient client, OzoneObj obj) throws IOException {
+    List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
+    printObjectAsJson(result);
   }
 
-  public static String getObjectAsJson(Object o) throws IOException {
-    return JsonUtils.toJsonStringWithDefaultPrettyPrinter(o);
-  }
-
-  public static void printObjectAsJson(Object o) throws IOException {
-    System.out.println(getObjectAsJson(o));
-  }
 }

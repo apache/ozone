@@ -21,9 +21,6 @@ package org.apache.hadoop.ozone.web.ozShell;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * Ozone user interface commands.
  *
@@ -32,29 +29,11 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class Shell extends GenericCli {
 
-  private static final Logger LOG = LoggerFactory.getLogger(Shell.class);
-
   public static final String OZONE_URI_DESCRIPTION = "Ozone URI could start "
       + "with o3:// or without prefix. URI may contain the host and port "
       + "of the OM server. Both are optional. "
       + "If they are not specified it will be identified from "
       + "the config files.";
-
-  public static final String OZONE_VOLUME_URI_DESCRIPTION =
-      "URI of the volume.\n" + OZONE_URI_DESCRIPTION;
-
-  public static final String OZONE_BUCKET_URI_DESCRIPTION =
-      "URI of the volume/bucket.\n" + OZONE_URI_DESCRIPTION;
-
-  public static final String OZONE_KEY_URI_DESCRIPTION =
-      "URI of the volume/bucket/key.\n" + OZONE_URI_DESCRIPTION;
-
-  public static final String OZONE_S3BUCKET_URI_DESCRIPTION = "URI of the " +
-      "S3Bucket.\n" + OZONE_URI_DESCRIPTION;
-
-  // General options
-  public static final int DEFAULT_OZONE_PORT = 50070;
-
 
 
   @Override

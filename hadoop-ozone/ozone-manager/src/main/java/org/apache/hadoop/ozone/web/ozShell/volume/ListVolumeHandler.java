@@ -18,16 +18,19 @@
 
 package org.apache.hadoop.ozone.web.ozShell.volume;
 
+import java.io.IOException;
 import java.util.Iterator;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.ozShell.ObjectPrinter;
+import org.apache.hadoop.ozone.web.ozShell.ListOptions;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
 import org.apache.hadoop.ozone.web.ozShell.Shell;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -41,71 +44,51 @@ import picocli.CommandLine.Parameters;
 public class ListVolumeHandler extends Handler {
 
   @Parameters(arity = "1..1",
-      description = Shell.OZONE_VOLUME_URI_DESCRIPTION,
+      description = Shell.OZONE_URI_DESCRIPTION,
       defaultValue = "/")
   private String uri;
 
-  @Option(names = {"--length", "-l"},
-      description = "Limit of the max results",
-      defaultValue = "100")
-  private int maxVolumes;
-
-  @Option(names = {"--start", "-s"},
-      description = "The volume to start the listing from.\n" +
-          "This will be excluded from the result.")
-  private String startVolume;
-
-  @Option(names = {"--prefix", "-p"},
-      description = "Prefix to filter the volumes")
-  private String prefix;
+  @CommandLine.Mixin
+  private ListOptions listOptions;
 
   @Option(names = {"--user", "-u"},
       description = "Owner of the volumes to list.")
   private String userName;
 
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
-
+  protected OzoneAddress getAddress() throws OzoneClientException {
     OzoneAddress address = new OzoneAddress(uri);
     address.ensureRootAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+    return address;
+  }
 
-      if (userName == null) {
-        userName = UserGroupInformation.getCurrentUser().getUserName();
-      }
+  @Override
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-      if (maxVolumes < 1) {
-        throw new IllegalArgumentException(
-            "the length should be a positive number");
-      }
-
-      Iterator<? extends OzoneVolume> volumeIterator;
-      if (userName != null) {
-        volumeIterator = client.getObjectStore()
-            .listVolumesByUser(userName, prefix, startVolume);
-      } else {
-        volumeIterator = client.getObjectStore().listVolumes(prefix);
-      }
-
-      int counter = 0;
-      while (maxVolumes > 0 && volumeIterator.hasNext()) {
-        OzoneVolume next = volumeIterator.next();
-        ObjectPrinter.printObjectAsJson(next);
-        maxVolumes -= 1;
-        counter++;
-      }
-
-      if (isVerbose()) {
-        System.out.printf("Found : %d volumes for user : %s ", counter,
-            userName);
-      }
+    if (userName == null) {
+      userName = UserGroupInformation.getCurrentUser().getUserName();
     }
 
-    return null;
+    Iterator<? extends OzoneVolume> volumeIterator;
+    if (userName != null) {
+      volumeIterator = client.getObjectStore().listVolumesByUser(userName,
+          listOptions.getPrefix(), listOptions.getStartItem());
+    } else {
+      volumeIterator = client.getObjectStore().listVolumes(
+          listOptions.getPrefix());
+    }
+
+    int counter = 0;
+    while (listOptions.getLimit() > counter && volumeIterator.hasNext()) {
+      printObjectAsJson(volumeIterator.next());
+      counter++;
+    }
+
+    if (isVerbose()) {
+      out().printf("Found : %d volumes for user : %s ", counter,
+          userName);
+    }
   }
 }
 
