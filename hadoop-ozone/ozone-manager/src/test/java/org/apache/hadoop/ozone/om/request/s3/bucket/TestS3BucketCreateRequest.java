@@ -60,7 +60,7 @@ public class TestS3BucketCreateRequest extends TestS3BucketRequest {
       doPreExecute(userName, s3BucketName);
       fail("testPreExecuteInvalidBucketLength failed");
     } catch (OMException ex) {
-      GenericTestUtils.assertExceptionContains("S3_BUCKET_INVALID_LENGTH", ex);
+      GenericTestUtils.assertExceptionContains("INVALID_BUCKET_NAME", ex);
     }
 
     // set bucket name which is greater than 63 characters length
@@ -70,7 +70,7 @@ public class TestS3BucketCreateRequest extends TestS3BucketRequest {
       doPreExecute(userName, s3BucketName);
       fail("testPreExecuteInvalidBucketLength failed");
     } catch (OMException ex) {
-      GenericTestUtils.assertExceptionContains("S3_BUCKET_INVALID_LENGTH", ex);
+      GenericTestUtils.assertExceptionContains("INVALID_BUCKET_NAME", ex);
     }
   }
 

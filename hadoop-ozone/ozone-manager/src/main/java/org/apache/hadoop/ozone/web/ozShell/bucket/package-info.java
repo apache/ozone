@@ -18,6 +18,6 @@
  */
 
 /**
- * Netty-based HTTP server implementation for Ozone.
+ * Commands for Ozone buckets.
  */
 package org.apache.hadoop.ozone.web.ozShell.bucket;

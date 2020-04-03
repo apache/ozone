@@ -17,84 +17,37 @@
  */
 package org.apache.hadoop.ozone.web.ozShell.bucket;
 
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
+import org.apache.hadoop.ozone.web.ozShell.acl.AclHandler;
+import org.apache.hadoop.ozone.web.ozShell.acl.AclOption;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
 
-import java.util.Objects;
-
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import java.io.IOException;
 
 /**
- * Set acl handler for bucket.
+ * Set ACL on bucket.
  */
-@Command(name = "setacl",
-    description = "Set one or more ACLs, replacing the existing ones.")
-public class SetAclBucketHandler extends Handler {
+@CommandLine.Command(name = AclHandler.SET_ACL_NAME,
+    description = AclHandler.SET_ACL_DESC)
+public class SetAclBucketHandler extends AclHandler {
 
-  @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
-  private String uri;
+  @CommandLine.Mixin
+  private BucketUri address;
 
-  @CommandLine.Option(names = {"--acls", "-al"},
-      required = true,
-      description = "A comma separated list of ACLs to be set.\n" +
-          "Ex: user:user1:rw,user:user2:a,group:hadoop:a\n" +
-          "r = READ, " +
-          "w = WRITE, " +
-          "c = CREATE, " +
-          "d = DELETE, " +
-          "l = LIST, " +
-          "a = ALL, " +
-          "n = NONE, " +
-          "x = READ_ACL, " +
-          "y = WRITE_ACL.")
-  private String acls;
+  @CommandLine.Mixin
+  private AclOption acls;
 
-  @CommandLine.Option(names = {"--store", "-s"},
-      required = false,
-      description = "Store type. i.e OZONE or S3")
-  private String storeType;
-
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
-    Objects.requireNonNull(acls,
-        "You need to specify one or more ACLs to be set.");
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureBucketAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+  protected OzoneAddress getAddress() {
+    return address.getValue();
+  }
 
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
-
-      if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("Bucket Name : %s%n", bucketName);
-      }
-
-      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-          .setBucketName(bucketName)
-          .setVolumeName(volumeName)
-          .setResType(OzoneObj.ResourceType.BUCKET)
-          .setStoreType(storeType == null ? OZONE :
-              OzoneObj.StoreType.valueOf(storeType))
-          .build();
-
-      client.getObjectStore().setAcl(obj, OzoneAcl.parseAcls(acls));
-      System.out.println("ACL(s) set successfully.");
-    }
-
-    return null;
+  @Override
+  protected void execute(OzoneClient client, OzoneObj obj)
+      throws IOException {
+    acls.setOn(obj, client.getObjectStore(), out());
   }
 
 }

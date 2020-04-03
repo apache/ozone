@@ -18,20 +18,20 @@
 
 package org.apache.hadoop.ozone.web.ozShell.keys;
 
+import java.io.IOException;
 import java.util.Iterator;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.ozShell.ObjectPrinter;
+import org.apache.hadoop.ozone.web.ozShell.ListOptions;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
+import org.apache.hadoop.ozone.web.ozShell.bucket.BucketHandler;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 
 /**
  * Executes List Keys.
@@ -39,75 +39,40 @@ import picocli.CommandLine.Parameters;
 @Command(name = "list",
     aliases = "ls",
     description = "list all keys in a given bucket")
-public class ListKeyHandler extends Handler {
+public class ListKeyHandler extends BucketHandler {
 
-  @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
-  private String uri;
+  @CommandLine.Mixin
+  private ListOptions listOptions;
 
-  @Option(names = {"--length", "-l"},
-      description = "Limit of the max results",
-      defaultValue = "100")
-  private int maxKeys;
-
-  @Option(names = {"--start", "-s"},
-      description = "The key to start the listing from.\n" +
-              "This will be excluded from the result.")
-  private String startKey;
-
-  @Option(names = {"--prefix", "-p"},
-      description = "Prefix to filter the key")
-  private String prefix;
-
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException, OzoneClientException {
 
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureBucketAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+    String volumeName = address.getVolumeName();
+    String bucketName = address.getBucketName();
 
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
+    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = vol.getBucket(bucketName);
+    Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(
+        listOptions.getPrefix(), listOptions.getStartItem());
 
-      if (maxKeys < 1) {
-        throw new IllegalArgumentException(
-            "the length should be a positive number");
-      }
+    int maxKeyLimit = listOptions.getLimit();
 
-      if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("bucket Name : %s%n", bucketName);
-      }
-
-      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-      OzoneBucket bucket = vol.getBucket(bucketName);
-      Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(prefix,
-          startKey);
-
-      int maxKeyLimit = maxKeys;
-
-      int counter = 0;
-      while (maxKeys > 0 && keyIterator.hasNext()) {
-        OzoneKey ozoneKey = keyIterator.next();
-        ObjectPrinter.printObjectAsJson(ozoneKey);
-        maxKeys -= 1;
-        counter++;
-      }
-
-      // More keys were returned notify about max length
-      if (keyIterator.hasNext()) {
-        System.out.println("Listing first " + maxKeyLimit + " entries of the " +
-            "result. Use --length (-l) to override max returned keys.");
-      } else if (isVerbose()) {
-        System.out.printf("Found : %d keys for bucket %s in volume : %s ",
-            counter, bucketName, volumeName);
-      }
+    int counter = 0;
+    while (maxKeyLimit > counter && keyIterator.hasNext()) {
+      OzoneKey ozoneKey = keyIterator.next();
+      printObjectAsJson(ozoneKey);
+      counter++;
     }
 
-    return null;
+    // More keys were returned notify about max length
+    if (keyIterator.hasNext()) {
+      out().println("Listing first " + maxKeyLimit + " entries of the " +
+          "result. Use --length (-l) to override max returned keys.");
+    } else if (isVerbose()) {
+      out().printf("Found : %d keys for bucket %s in volume : %s ",
+          counter, bucketName, volumeName);
+    }
   }
 
 }

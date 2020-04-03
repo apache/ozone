@@ -59,7 +59,6 @@ import java.util.List;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.S3_BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.web.ozShell.s3.GetS3SecretHandler.OZONE_GETS3SECRET_ERROR;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -181,21 +180,6 @@ public class TestS3Shell {
     // Invalid bucket name
     args = new String[] {setOmAddress, "path", "/asd/multipleslash"};
     executeWithError(s3Shell, args, S3_BUCKET_NOT_FOUND);
-  }
-
-  @Test
-  public void testS3SecretUnsecuredCluster() throws Exception {
-    String setOmAddress =
-        "--set=" + OZONE_OM_ADDRESS_KEY + "=" + getOmAddress();
-
-    String output;
-
-    String[] args = new String[] {setOmAddress, "getsecret"};
-    execute(s3Shell, args);
-    // Get the first line of output
-    output = out.toString().split("\n")[0];
-
-    assertTrue(output.equals(OZONE_GETS3SECRET_ERROR));
   }
 
   private void createS3Bucket(String userName, String s3Bucket) {

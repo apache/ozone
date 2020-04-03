@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.loadgenerators.FilesystemLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.AgedLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.ReadOnlyLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.DataBuffer;
 import org.apache.hadoop.ozone.loadgenerators.LoadExecutors;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
@@ -77,6 +78,10 @@ public class MiniOzoneLoadGenerator {
     //Filesystem Load
     addLoads(numThreads,
         bucket -> new FilesystemLoadGenerator(buffer, bucket));
+
+    //Repl Load
+    addLoads(numThreads,
+        bucket -> new ReadOnlyLoadGenerator(buffer, bucket, 20));
   }
 
   private void addLoads(int numThreads,
