@@ -29,7 +29,6 @@ import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
 import org.jooq.DSLContext;
 import org.jooq.Record2;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Provide a high level API to access the Container Schema.
@@ -68,19 +67,18 @@ public class ContainerSchemaManager {
 
   public void upsertContainerHistory(long containerID, String datanode,
                                      long time) {
-    DSLContext ctx = containerSchemaDefinition.getDSLContext();
-    Record2<Long, String> record =
-        ctx.newRecord(
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    Record2<Long, String> recordToFind =
+        dslContext.newRecord(
         CONTAINER_HISTORY.CONTAINER_ID,
         CONTAINER_HISTORY.DATANODE_HOST).value1(containerID).value2(datanode);
     ContainerHistory newRecord = new ContainerHistory();
     newRecord.setContainerId(containerID);
     newRecord.setDatanodeHost(datanode);
     newRecord.setLastReportTimestamp(time);
-    if (containerHistoryDao.existsById(record)) {
-      newRecord.setFirstReportTimestamp(
-          containerHistoryDao.findById(record).getFirstReportTimestamp()
-      );
+    ContainerHistory record = containerHistoryDao.findById(recordToFind);
+    if (record != null) {
+      newRecord.setFirstReportTimestamp(record.getFirstReportTimestamp());
       containerHistoryDao.update(newRecord);
     } else {
       newRecord.setFirstReportTimestamp(time);
@@ -94,12 +92,13 @@ public class ContainerSchemaManager {
 
   public List<ContainerHistory> getLatestContainerHistory(long containerID,
                                                           int limit) {
-    // Get container history sorted in descending order of timestamp
-    List<ContainerHistory> containerHistory =
-        getAllContainerHistory(containerID).stream().sorted(
-            (o1, o2) -> o2.getLastReportTimestamp().compareTo(
-                o1.getLastReportTimestamp())).collect(Collectors.toList());
-
-    return containerHistory.stream().limit(limit).collect(Collectors.toList());
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    // Get container history sorted in descending order of last report timestamp
+    return dslContext.select()
+        .from(CONTAINER_HISTORY)
+        .where(CONTAINER_HISTORY.CONTAINER_ID.eq(containerID))
+        .orderBy(CONTAINER_HISTORY.LAST_REPORT_TIMESTAMP.desc())
+        .limit(limit)
+        .fetchInto(ContainerHistory.class);
   }
 }
