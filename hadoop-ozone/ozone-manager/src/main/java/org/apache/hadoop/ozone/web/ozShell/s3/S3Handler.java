@@ -18,19 +18,19 @@
 
 package org.apache.hadoop.ozone.web.ozShell.s3;
 
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import java.io.IOException;
+
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
+
 import picocli.CommandLine;
 
 /**
  * Common interface for S3 command handling.
  */
-@CommandLine.Command(mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class)
-public class S3Handler extends Handler {
-  protected static final Logger LOG = LoggerFactory.getLogger(S3Handler.class);
+public abstract class S3Handler extends Handler {
 
   @CommandLine.Option(names = {"--om-service-id"},
       required = false,
@@ -41,4 +41,16 @@ public class S3Handler extends Handler {
   public String getOmServiceID() {
     return omServiceID;
   }
+
+  @Override
+  protected OzoneAddress getAddress() throws OzoneClientException {
+    return new OzoneAddress();
+  }
+
+  @Override
+  protected OzoneClient createClient(OzoneAddress address)
+      throws IOException, OzoneClientException {
+    return address.createClientForS3Commands(getConf(), omServiceID);
+  }
+
 }

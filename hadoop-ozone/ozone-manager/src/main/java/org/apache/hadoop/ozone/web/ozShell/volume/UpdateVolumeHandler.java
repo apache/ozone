@@ -21,24 +21,19 @@ package org.apache.hadoop.ozone.web.ozShell.volume;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.ozShell.ObjectPrinter;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
 
 /**
  * Executes update volume calls.
  */
 @Command(name = "update",
     description = "Updates parameter of the volumes")
-public class UpdateVolumeHandler extends Handler {
-
-  @Parameters(arity = "1..1", description = Shell.OZONE_VOLUME_URI_DESCRIPTION)
-  private String uri;
+public class UpdateVolumeHandler extends VolumeHandler {
 
   @Option(names = {"--user"},
       description = "Owner of the volume to set")
@@ -49,30 +44,21 @@ public class UpdateVolumeHandler extends Handler {
           + "(eg. 1G)")
   private String quota;
 
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureVolumeAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+    String volumeName = address.getVolumeName();
 
-      String volumeName = address.getVolumeName();
-
-      OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-      if (quota != null && !quota.isEmpty()) {
-        volume.setQuota(OzoneQuota.parseQuota(quota));
-      }
-
-      if (ownerName != null && !ownerName.isEmpty()) {
-        volume.setOwner(ownerName);
-      }
-
-      ObjectPrinter.printObjectAsJson(volume);
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    if (quota != null && !quota.isEmpty()) {
+      volume.setQuota(OzoneQuota.parseQuota(quota));
     }
-    return null;
+
+    if (ownerName != null && !ownerName.isEmpty()) {
+      volume.setOwner(ownerName);
+    }
+
+    printObjectAsJson(volume);
   }
 }

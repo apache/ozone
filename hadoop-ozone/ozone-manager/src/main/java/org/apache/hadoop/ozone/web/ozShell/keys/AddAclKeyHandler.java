@@ -17,93 +17,36 @@
  */
 package org.apache.hadoop.ozone.web.ozShell.keys;
 
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
+import org.apache.hadoop.ozone.web.ozShell.acl.AclHandler;
+import org.apache.hadoop.ozone.web.ozShell.acl.AclOption;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
 
-import java.util.Objects;
-
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import java.io.IOException;
 
 /**
- * Add  acl handler for key.
+ * Add ACL to key.
  */
-@Command(name = "addacl",
-    description = "Add a new ACL.")
-public class AddAclKeyHandler extends Handler {
+@CommandLine.Command(name = AclHandler.ADD_ACL_NAME,
+    description = AclHandler.ADD_ACL_DESC)
+public class AddAclKeyHandler extends AclHandler {
 
-  @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
-  private String uri;
+  @CommandLine.Mixin
+  private KeyUri address;
 
-  @CommandLine.Option(names = {"--acl", "-a"},
-      required = true,
-      description = "The new ACL to be added.\n" +
-          "Ex: user:user1:rw or group:hadoop:rw\n" +
-          "r = READ, " +
-          "w = WRITE, " +
-          "c = CREATE, " +
-          "d = DELETE, " +
-          "l = LIST, " +
-          "a = ALL, " +
-          "n = NONE, " +
-          "x = READ_ACL, " +
-          "y = WRITE_ACL.")
-  private String acl;
+  @CommandLine.Mixin
+  private AclOption acls;
 
-  @CommandLine.Option(names = {"--store", "-s"},
-      required = false,
-      description = "Store type. i.e OZONE or S3")
-  private String storeType;
-
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
-    Objects.requireNonNull(acl,
-        "You need to specify a new ACL to be added.");
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureKeyAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+  protected OzoneAddress getAddress() {
+    return address.getValue();
+  }
 
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
-      String keyName = address.getKeyName();
-
-      if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("Bucket Name : %s%n", bucketName);
-        System.out.printf("Key Name : %s%n", keyName);
-      }
-
-      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-          .setBucketName(bucketName)
-          .setVolumeName(volumeName)
-          .setKeyName(address.getKeyName())
-          .setResType(OzoneObj.ResourceType.KEY)
-          .setStoreType(storeType == null ? OZONE :
-              OzoneObj.StoreType.valueOf(storeType))
-          .build();
-
-      boolean result = client.getObjectStore().addAcl(obj,
-          OzoneAcl.parseAcl(acl));
-
-      String message = result
-          ? ("ACL added successfully.")
-          : ("ACL already exists.");
-
-      System.out.println(message);
-    }
-
-    return null;
+  @Override
+  protected void execute(OzoneClient client, OzoneObj obj) throws IOException {
+    acls.addTo(obj, client.getObjectStore(), out());
   }
 
 }
