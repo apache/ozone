@@ -17,11 +17,12 @@
  */
 package org.apache.hadoop.hdds.scm.cli.node;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.cli.MissingSubcommandException;
+import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
-import org.apache.hadoop.hdds.scm.cli.SCMCLI;
 
 import java.util.concurrent.Callable;
 
@@ -40,16 +41,19 @@ import java.util.concurrent.Callable;
     })
 public class DatanodeAdminCommands implements Callable<Void> {
 
-  @ParentCommand
-  private SCMCLI parent;
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
-  public SCMCLI getParent() {
+  @ParentCommand
+  private WithScmClient parent;
+
+  public WithScmClient getParent() {
     return parent;
   }
 
   @Override
   public Void call() throws Exception {
-    throw new MissingSubcommandException(
-        this.parent.getCmd().getSubcommands().get("nodeadmin"));
+    GenericCli.missingSubcommand(spec);
+    return null;
   }
 }

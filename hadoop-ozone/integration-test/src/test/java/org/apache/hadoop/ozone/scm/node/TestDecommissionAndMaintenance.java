@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,6 +83,7 @@ public class TestDecommissionAndMaintenance {
   }
 
   @Test
+  @Ignore // HDDS-3345
   public void testNodeCanBeDecommMaintAndRecommissioned()
       throws IOException {
     NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
