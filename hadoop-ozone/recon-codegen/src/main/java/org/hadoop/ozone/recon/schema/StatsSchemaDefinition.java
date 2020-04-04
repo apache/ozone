@@ -19,6 +19,7 @@
 package org.hadoop.ozone.recon.schema;
 
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 
@@ -29,6 +30,7 @@ import java.sql.SQLException;
 /**
  * Class used to create tables that are required for storing Ozone statistics.
  */
+@Singleton
 public class StatsSchemaDefinition implements ReconSchemaDefinition {
 
   public static final String GLOBAL_STATS_TABLE_NAME = "global_stats";
