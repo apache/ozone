@@ -129,7 +129,7 @@ public class JooqCodeGenerator {
   public static void main(String[] args) {
     if (args.length < 1) {
       throw new IllegalArgumentException("Missing required arguments: " +
-          "Need a ouput directory for generated code.\nUsage: " +
+          "Need an output directory for generated code.\nUsage: " +
           "org.apache.hadoop.ozone.recon.persistence.JooqCodeGenerator " +
           "<outputDirectory>.");
     }
