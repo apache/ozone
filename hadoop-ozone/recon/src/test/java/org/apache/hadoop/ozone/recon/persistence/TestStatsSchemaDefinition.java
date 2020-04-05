@@ -19,14 +19,11 @@ package org.apache.hadoop.ozone.recon.persistence;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.Test;
 
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -40,17 +37,11 @@ import static org.hadoop.ozone.recon.schema.StatsSchemaDefinition.GLOBAL_STATS_T
 /**
  * Class used to test StatsSchemaDefinition.
  */
-public class TestStatsSchemaDefinition extends AbstractSqlDatabaseTest {
+public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
   @Test
   public void testIfStatsSchemaCreated() throws Exception {
-    StatsSchemaDefinition schemaDefinition = getInjector().getInstance(
-        StatsSchemaDefinition.class);
-
-    schemaDefinition.initializeSchema();
-
-    Connection connection =
-        getInjector().getInstance(DataSource.class).getConnection();
+    Connection connection = getConnection();
     // Verify table definition
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getColumns(null, null,
@@ -76,14 +67,7 @@ public class TestStatsSchemaDefinition extends AbstractSqlDatabaseTest {
 
   @Test
   public void testGlobalStatsCRUDOperations() throws Exception {
-    // Verify table exists
-    StatsSchemaDefinition schemaDefinition = getInjector().getInstance(
-        StatsSchemaDefinition.class);
-
-    schemaDefinition.initializeSchema();
-
-    DataSource ds = getInjector().getInstance(DataSource.class);
-    Connection connection = ds.getConnection();
+    Connection connection = getConnection();
 
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getTables(null, null,
@@ -94,8 +78,7 @@ public class TestStatsSchemaDefinition extends AbstractSqlDatabaseTest {
           resultSet.getString("TABLE_NAME"));
     }
 
-    GlobalStatsDao dao = new GlobalStatsDao(
-        getInjector().getInstance(Configuration.class));
+    GlobalStatsDao dao = getDao(GlobalStatsDao.class);
 
     long now = System.currentTimeMillis();
     GlobalStats newRecord = new GlobalStats();

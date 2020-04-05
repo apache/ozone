@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeEmptyOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
@@ -47,7 +51,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
@@ -60,7 +63,9 @@ import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.ArgumentCaptor;
 import org.rocksdb.RocksDB;
 import org.rocksdb.TransactionLogIterator;
@@ -69,8 +74,10 @@ import org.rocksdb.WriteBatch;
 /**
  * Class to test Ozone Manager Service Provider Implementation.
  */
-public class TestOzoneManagerServiceProviderImpl extends
-    AbstractOMMetadataManagerTest {
+public class TestOzoneManagerServiceProviderImpl {
+
+  @Rule
+  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private OzoneConfiguration configuration;
   private OzoneManagerProtocol ozoneManagerProtocol;
@@ -89,9 +96,11 @@ public class TestOzoneManagerServiceProviderImpl extends
   @Test
   public void testUpdateReconOmDBWithNewSnapshot() throws Exception {
 
-    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager();
+    OMMetadataManager omMetadataManager =
+        initializeNewOmMetadataManager(temporaryFolder.newFolder());
     ReconOMMetadataManager reconOMMetadataManager =
-        getTestMetadataManager(omMetadataManager);
+        getTestReconOmMetadataManager(omMetadataManager,
+            temporaryFolder.newFolder());
 
     writeDataToOm(omMetadataManager, "key_one");
     writeDataToOm(omMetadataManager, "key_two");
@@ -176,7 +185,8 @@ public class TestOzoneManagerServiceProviderImpl extends
 
     // Writing 2 Keys into a source OM DB and collecting it in a
     // DBUpdatesWrapper.
-    OMMetadataManager sourceOMMetadataMgr = initializeNewOmMetadataManager();
+    OMMetadataManager sourceOMMetadataMgr =
+        initializeNewOmMetadataManager(temporaryFolder.newFolder());
     writeDataToOm(sourceOMMetadataMgr, "key_one");
     writeDataToOm(sourceOMMetadataMgr, "key_two");
 
@@ -194,11 +204,13 @@ public class TestOzoneManagerServiceProviderImpl extends
     }
 
     // OM Service Provider's Metadata Manager.
-    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager();
+    OMMetadataManager omMetadataManager =
+        initializeNewOmMetadataManager(temporaryFolder.newFolder());
 
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
-            getTestMetadataManager(omMetadataManager),
+            getTestReconOmMetadataManager(omMetadataManager,
+                temporaryFolder.newFolder()),
             getMockTaskController(), new ReconUtils(),
             getMockOzoneManagerClient(dbUpdatesWrapper));
 
@@ -229,8 +241,9 @@ public class TestOzoneManagerServiceProviderImpl extends
   public void testSyncDataFromOMFullSnapshot() throws Exception {
 
     // Empty OM DB to start with.
-    ReconOMMetadataManager omMetadataManager = getTestMetadataManager(
-        initializeEmptyOmMetadataManager());
+    ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
+        initializeEmptyOmMetadataManager(temporaryFolder.newFolder()),
+        temporaryFolder.newFolder());
     ReconTaskStatusDao reconTaskStatusDaoMock =
         mock(ReconTaskStatusDao.class);
     doNothing().when(reconTaskStatusDaoMock)
@@ -263,8 +276,9 @@ public class TestOzoneManagerServiceProviderImpl extends
   public void testSyncDataFromOMDeltaUpdates() throws Exception {
 
     // Non-Empty OM DB to start with.
-    ReconOMMetadataManager omMetadataManager = getTestMetadataManager(
-        initializeNewOmMetadataManager());
+    ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
+        temporaryFolder.newFolder());
     ReconTaskStatusDao reconTaskStatusDaoMock =
         mock(ReconTaskStatusDao.class);
     doNothing().when(reconTaskStatusDaoMock)
