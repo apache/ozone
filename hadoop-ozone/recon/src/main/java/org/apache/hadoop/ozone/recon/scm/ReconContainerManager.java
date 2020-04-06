@@ -27,10 +27,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +46,7 @@ public class ReconContainerManager extends SCMContainerManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconContainerManager.class);
   private StorageContainerServiceProvider scmClient;
+  private ContainerSchemaManager containerSchemaManager;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -58,9 +62,11 @@ public class ReconContainerManager extends SCMContainerManager {
    */
   public ReconContainerManager(
       Configuration conf, PipelineManager pipelineManager,
-      StorageContainerServiceProvider scm) throws IOException {
+      StorageContainerServiceProvider scm,
+      ContainerSchemaManager containerSchemaManager) throws IOException {
     super(conf, pipelineManager);
     this.scmClient = scm;
+    this.containerSchemaManager = containerSchemaManager;
   }
 
   @Override
@@ -127,5 +133,23 @@ public class ReconContainerManager extends SCMContainerManager {
     } finally {
       getLock().unlock();
     }
+  }
+
+  /**
+   * Add a container Replica for given DataNode.
+   *
+   * @param containerID
+   * @param replica
+   */
+  @Override
+  public void updateContainerReplica(ContainerID containerID,
+                                     ContainerReplica replica)
+      throws ContainerNotFoundException {
+    super.updateContainerReplica(containerID, replica);
+    // Update container_history table
+    long currentTime = System.currentTimeMillis();
+    String datanodeHost = replica.getDatanodeDetails().getHostName();
+    containerSchemaManager.upsertContainerHistory(containerID.getId(),
+        datanodeHost, currentTime);
   }
 }

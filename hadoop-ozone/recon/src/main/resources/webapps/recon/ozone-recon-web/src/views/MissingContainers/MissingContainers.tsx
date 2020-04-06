@@ -18,18 +18,26 @@
 
 import React from 'react';
 import axios from 'axios';
-import {Table} from 'antd';
+import {Icon, Table, Tooltip} from 'antd';
 import './MissingContainers.less';
 import {PaginationConfig} from "antd/lib/pagination";
 import prettyBytes from "pretty-bytes";
 import moment from "moment";
+import {timeFormat} from "../../utils/common";
 
 interface MissingContainerResponse {
   containerID: number;
   keys: number;
-  datanodes: string[];
+  replicas: ContainerReplica[];
   missingSince: number;
   pipelineID: string;
+}
+
+export interface ContainerReplica {
+  containerId: number;
+  datanodeHost: string;
+  firstReportTimestamp: number;
+  lastReportTimestamp: number;
 }
 
 export interface MissingContainersResponse  {
@@ -68,9 +76,28 @@ const COLUMNS = [
   },
   {
     title: 'Datanodes',
-    dataIndex: 'datanodes',
-    key: 'datanodes',
-    render: (datanodes: string[]) => <div>{datanodes.map(datanode => <div key={datanode}>{datanode}</div>)}</div>
+    dataIndex: 'replicas',
+    key: 'replicas',
+    render: (replicas: ContainerReplica[]) => <div>
+      {replicas.map(replica => {
+        const tooltip = <div>
+          <div>First Report Time: {timeFormat(replica.firstReportTimestamp)}</div>
+          <div>Last Report Time: {timeFormat(replica.lastReportTimestamp)}</div>
+        </div>;
+        return(
+            <div key={replica.datanodeHost}>
+              <Tooltip placement="left"
+                       title={tooltip}>
+                <Icon type="info-circle" className="icon-small"/>
+              </Tooltip>
+              <span className="pl-5">
+                {replica.datanodeHost}
+              </span>
+            </div>
+        );
+          }
+      )}
+    </div>
   },
   {
     title: 'Pipeline ID',
@@ -82,8 +109,7 @@ const COLUMNS = [
     title: 'Missing Since',
     dataIndex: 'missingSince',
     key: 'missingSince',
-    render: (missingSince: number) => missingSince > 0 ?
-        moment(missingSince).format('lll') : 'NA',
+    render: (missingSince: number) => timeFormat(missingSince),
     sorter: (a: MissingContainerResponse, b: MissingContainerResponse) => a.missingSince - b.missingSince
   },
 ];
@@ -114,13 +140,13 @@ const KEY_TABLE_COLUMNS = [
     title: 'Date Created',
     dataIndex: 'CreationTime',
     key: 'CreationTime',
-    render: (date: number) => moment(date).format('lll')
+    render: (date: string) => moment(date).format('lll')
   },
   {
     title: 'Date Modified',
     dataIndex: 'ModificationTime',
     key: 'ModificationTime',
-    render: (date: number) => moment(date).format('lll')
+    render: (date: string) => moment(date).format('lll')
   }
 ];
 

@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.jooq.Configuration;
@@ -67,7 +68,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import javax.ws.rs.core.Response;
-import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -91,7 +91,7 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
   private DatanodeDetailsProto datanodeDetailsProto;
   private Pipeline pipeline;
 
-  private void initializeInjector() throws IOException {
+  private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestMetadataManager(
         initializeNewOmMetadataManager());
     OzoneManagerServiceProviderImpl omServiceProviderMock =
@@ -159,10 +159,13 @@ public class TestEndpoints extends AbstractOMMetadataManagerTest {
     clusterStateEndpoint = injector.getInstance(ClusterStateEndpoint.class);
     reconScm = (ReconStorageContainerManagerFacade)
         injector.getInstance(OzoneStorageContainerManager.class);
+    ContainerSchemaDefinition containerSchemaDefinition =
+        injector.getInstance(ContainerSchemaDefinition.class);
+    containerSchemaDefinition.initializeSchema();
   }
 
   @Before
-  public void setUp() throws IOException {
+  public void setUp() throws Exception {
     // The following setup runs only once
     if (!isSetupDone) {
       initializeInjector();
