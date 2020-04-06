@@ -113,11 +113,6 @@
                     <include>org.apache.commons.validator.**.*</include>
                     <include>org.sqlite.**.*</include>
                     <include>org.apache.thrift.**.*</include>
-                    <!-- level db -->
-                    <include>org.iq80.**.*</include>
-                    <include>org.fusesource.**.*</include>
-                    <!-- http client and core -->
-                    <include>org.apache.http.**.*</include>
                   </includes>
                 </relocation>
                 <relocation>
