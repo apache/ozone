@@ -1503,7 +1503,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.security.kerberos.http.enabled</name>
+    <name>ozone.security.http.kerberos.enabled</name>
     <value>false</value>
     <tag>OZONE, SECURITY</tag>
     <description>True if Kerberos authentication for Ozone HTTP web consoles

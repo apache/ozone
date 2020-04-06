@@ -135,8 +135,6 @@ public abstract class BaseHttpServer {
     }
   }
 
-
-
   /**
    * Return a HttpServer.Builder that the OzoneManager/SCM/Datanode/S3Gateway/
    * Recon to initialize their HTTP / HTTPS server.
@@ -146,8 +144,7 @@ public abstract class BaseHttpServer {
       final InetSocketAddress httpsAddr, String name, String spnegoUserNameKey,
       String spnegoKeytabFileKey) throws IOException {
     HttpConfig.Policy policy = getHttpPolicy(conf);
-    boolean isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf) &&
-        UserGroupInformation.isSecurityEnabled() &&
+    boolean isSecurityEnabled = UserGroupInformation.isSecurityEnabled() &&
         OzoneSecurityUtil.isHttpSecurityEnabled(conf);
 
     HttpServer2.Builder builder = new HttpServer2.Builder().setName(name)

@@ -64,7 +64,8 @@ public final class OzoneSecurityUtil {
   }
 
   public static boolean isHttpSecurityEnabled(Configuration conf) {
-    return conf.getBoolean(OZONE_HTTP_SECURITY_ENABLED_KEY,
+    return isSecurityEnabled(conf) &&
+        conf.getBoolean(OZONE_HTTP_SECURITY_ENABLED_KEY,
         OZONE_HTTP_SECURITY_ENABLED_DEFAULT);
   }
 
