@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.PendingDeleteStatusList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -31,6 +33,8 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,6 +55,14 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
   private final NodeManager nodeManager;
   private final ContainerManager containerManager;
+  private final String unknownContainerHandleAction;
+
+  /**
+   * The action taken by ContainerReportHandler to handle
+   * unknown containers.
+   */
+  static final String UNKNOWN_CONTAINER_ACTION_WARN = "WARN";
+  static final String UNKNOWN_CONTAINER_ACTION_DELETE = "DELETE";
 
   /**
    * Constructs ContainerReportHandler instance with the
@@ -58,12 +70,26 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
    *
    * @param nodeManager NodeManager instance
    * @param containerManager ContainerManager instance
+   * @param conf OzoneConfiguration instance
    */
   public ContainerReportHandler(final NodeManager nodeManager,
-                                final ContainerManager containerManager) {
+                                final ContainerManager containerManager,
+                                OzoneConfiguration conf) {
     super(containerManager, LOG);
     this.nodeManager = nodeManager;
     this.containerManager = containerManager;
+
+    if (conf != null) {
+      ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+      unknownContainerHandleAction = scmConfig.getUnknownContainerAction();
+    } else {
+      unknownContainerHandleAction = UNKNOWN_CONTAINER_ACTION_WARN;
+    }
+  }
+
+  public ContainerReportHandler(final NodeManager nodeManager,
+      final ContainerManager containerManager) {
+    this(nodeManager, containerManager, null);
   }
 
   /**
@@ -94,7 +120,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
       missingReplicas.removeAll(containersInDn);
 
-      processContainerReplicas(datanodeDetails, replicas);
+      processContainerReplicas(datanodeDetails, replicas, publisher);
       processMissingReplicas(datanodeDetails, missingReplicas);
       updateDeleteTransaction(datanodeDetails, replicas, publisher);
 
@@ -114,20 +140,37 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   }
 
   /**
-   * Processes the ContainerReport.
+   * Processes the ContainerReport, unknown container reported
+   * that will be deleted by SCM.
    *
    * @param datanodeDetails Datanode from which this report was received
    * @param replicas list of ContainerReplicaProto
+   * @param publisher EventPublisher reference
    */
   private void processContainerReplicas(final DatanodeDetails datanodeDetails,
-      final List<ContainerReplicaProto> replicas) {
+      final List<ContainerReplicaProto> replicas,
+      final EventPublisher publisher) {
     for (ContainerReplicaProto replicaProto : replicas) {
       try {
         processContainerReplica(datanodeDetails, replicaProto);
       } catch (ContainerNotFoundException e) {
-        LOG.error("Received container report for an unknown container" +
-                " {} from datanode {}.", replicaProto.getContainerID(),
-            datanodeDetails, e);
+        if(unknownContainerHandleAction.equals(
+            UNKNOWN_CONTAINER_ACTION_WARN)) {
+          LOG.error("Received container report for an unknown container" +
+              " {} from datanode {}.", replicaProto.getContainerID(),
+              datanodeDetails, e);
+        } else if (unknownContainerHandleAction.equals(
+            UNKNOWN_CONTAINER_ACTION_DELETE)) {
+          final ContainerID containerId = ContainerID
+              .valueof(replicaProto.getContainerID());
+          final DeleteContainerCommand deleteCommand =
+              new DeleteContainerCommand(containerId.getId(), true);
+          final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
+              datanodeDetails.getUuid(), deleteCommand);
+          publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+          LOG.info("Sending delete container command for unknown container {}"
+              + " to datanode {}", containerId.getId(), datanodeDetails);
+        }
       } catch (IOException e) {
         LOG.error("Exception while processing container report for container" +
                 " {} from datanode {}.", replicaProto.getContainerID(),
