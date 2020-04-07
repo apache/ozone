@@ -106,6 +106,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -3354,12 +3355,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws SequenceNumberNotFoundException if db is unable to read the data.
    */
   @Override
-  public DBUpdatesWrapper getDBUpdates(
+  public DBUpdates getDBUpdates(
       DBUpdatesRequest dbUpdatesRequest)
       throws SequenceNumberNotFoundException {
-    return metadataManager.getStore()
+    DBUpdatesWrapper updatesSince = metadataManager.getStore()
         .getUpdatesSince(dbUpdatesRequest.getSequenceNumber());
-
+    DBUpdates dbUpdates = new DBUpdates(updatesSince.getData());
+    dbUpdates.setCurrentSequenceNumber(updatesSince.getCurrentSequenceNumber());
+    return dbUpdates;
   }
 
   public OzoneDelegationTokenSecretManager getDelegationTokenMgr() {

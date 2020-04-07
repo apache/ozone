@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryProxy;
@@ -40,6 +39,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -1572,7 +1572,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public DBUpdatesWrapper getDBUpdates(DBUpdatesRequest dbUpdatesRequest)
+  public DBUpdates getDBUpdates(DBUpdatesRequest dbUpdatesRequest)
       throws IOException {
     OMRequest omRequest = createOMRequest(Type.DBUpdates)
         .setDbUpdatesRequest(dbUpdatesRequest)
@@ -1581,7 +1581,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     DBUpdatesResponse dbUpdatesResponse =
         handleError(submitRequest(omRequest)).getDbUpdatesResponse();
 
-    DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
+    DBUpdates dbUpdatesWrapper = new DBUpdates();
     for (ByteString byteString : dbUpdatesResponse.getDataList()) {
       dbUpdatesWrapper.addWriteBatch(byteString.toByteArray(), 0L);
     }

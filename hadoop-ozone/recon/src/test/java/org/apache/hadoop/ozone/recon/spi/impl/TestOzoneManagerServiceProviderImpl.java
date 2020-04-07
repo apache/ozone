@@ -18,23 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
-import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
-import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doCallRealMethod;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
@@ -44,7 +27,10 @@ import java.io.InputStream;
 import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest;
@@ -53,15 +39,29 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
+
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
+import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
+import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.junit.Assert;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.rocksdb.RocksDB;
 import org.rocksdb.TransactionLogIterator;
 import org.rocksdb.WriteBatch;
@@ -83,7 +83,7 @@ public class TestOzoneManagerServiceProviderImpl extends
     configuration.set(OZONE_RECON_DB_DIR,
         temporaryFolder.newFolder().getAbsolutePath());
     configuration.set("ozone.om.address", "localhost:9862");
-    ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdatesWrapper());
+    ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdates());
   }
 
   @Test
@@ -182,7 +182,7 @@ public class TestOzoneManagerServiceProviderImpl extends
 
     RocksDB rocksDB = ((RDBStore)sourceOMMetadataMgr.getStore()).getDb();
     TransactionLogIterator transactionLogIterator = rocksDB.getUpdatesSince(0L);
-    DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
+    DBUpdates dbUpdatesWrapper = new DBUpdates();
     while(transactionLogIterator.isValid()) {
       TransactionLogIterator.BatchResult result =
           transactionLogIterator.getBatch();
@@ -309,7 +309,7 @@ public class TestOzoneManagerServiceProviderImpl extends
   }
 
   private OzoneManagerProtocol getMockOzoneManagerClient(
-      DBUpdatesWrapper dbUpdatesWrapper) throws IOException {
+      DBUpdates dbUpdatesWrapper) throws IOException {
     OzoneManagerProtocol ozoneManagerProtocolMock =
         mock(OzoneManagerProtocol.class);
     when(ozoneManagerProtocolMock.getDBUpdates(any(OzoneManagerProtocolProtos
