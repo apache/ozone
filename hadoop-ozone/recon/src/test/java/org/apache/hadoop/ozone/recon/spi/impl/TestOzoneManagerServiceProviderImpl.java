@@ -48,7 +48,10 @@ import java.io.InputStream;
 import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.recon.ReconUtils;
@@ -56,9 +59,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
+
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.junit.Assert;
@@ -90,7 +91,7 @@ public class TestOzoneManagerServiceProviderImpl {
     configuration.set(OZONE_RECON_DB_DIR,
         temporaryFolder.newFolder().getAbsolutePath());
     configuration.set("ozone.om.address", "localhost:9862");
-    ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdatesWrapper());
+    ozoneManagerProtocol = getMockOzoneManagerClient(new DBUpdates());
   }
 
   @Test
@@ -192,7 +193,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     RocksDB rocksDB = ((RDBStore)sourceOMMetadataMgr.getStore()).getDb();
     TransactionLogIterator transactionLogIterator = rocksDB.getUpdatesSince(0L);
-    DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
+    DBUpdates dbUpdatesWrapper = new DBUpdates();
     while(transactionLogIterator.isValid()) {
       TransactionLogIterator.BatchResult result =
           transactionLogIterator.getBatch();
@@ -323,7 +324,7 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   private OzoneManagerProtocol getMockOzoneManagerClient(
-      DBUpdatesWrapper dbUpdatesWrapper) throws IOException {
+      DBUpdates dbUpdatesWrapper) throws IOException {
     OzoneManagerProtocol ozoneManagerProtocolMock =
         mock(OzoneManagerProtocol.class);
     when(ozoneManagerProtocolMock.getDBUpdates(any(OzoneManagerProtocolProtos
