@@ -23,56 +23,36 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.ozShell.ObjectPrinter;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
 
 /**
  * Executes Info Object.
  */
 @Command(name = "info",
     description = "returns information about an existing key")
-public class InfoKeyHandler extends Handler {
+public class InfoKeyHandler extends KeyHandler {
 
-  @Parameters(arity = "1..1", description = Shell.OZONE_KEY_URI_DESCRIPTION)
-  private String uri;
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureKeyAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+    String volumeName = address.getVolumeName();
+    String bucketName = address.getBucketName();
+    String keyName = address.getKeyName();
 
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
-      String keyName = address.getKeyName();
+    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = vol.getBucket(bucketName);
+    OzoneKeyDetails key = bucket.getKey(keyName);
+    // For compliance/security, GDPR Secret & Algorithm details are removed
+    // from local copy of metadata before printing. This doesn't remove these
+    // from Ozone Manager's actual metadata.
+    key.getMetadata().remove(OzoneConsts.GDPR_SECRET);
+    key.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
 
-      if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("Bucket Name : %s%n", bucketName);
-        System.out.printf("Key Name : %s%n", keyName);
-      }
-
-      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-      OzoneBucket bucket = vol.getBucket(bucketName);
-      OzoneKeyDetails key = bucket.getKey(keyName);
-      // For compliance/security, GDPR Secret & Algorithm details are removed
-      // from local copy of metadata before printing. This doesn't remove these
-      // from Ozone Manager's actual metadata.
-      key.getMetadata().remove(OzoneConsts.GDPR_SECRET);
-      key.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
-
-      ObjectPrinter.printObjectAsJson(key);
-    }
-
-    return null;
+    printObjectAsJson(key);
   }
 }

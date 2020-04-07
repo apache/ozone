@@ -20,42 +20,26 @@ package org.apache.hadoop.ozone.web.ozShell.volume;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.ozShell.ObjectPrinter;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
 
 /**
  * Executes volume Info calls.
  */
 @Command(name = "info",
     description = "returns information about a specific volume")
-public class InfoVolumeHandler extends Handler{
+public class InfoVolumeHandler extends VolumeHandler {
 
-  @Parameters(arity = "1..1", description = Shell.OZONE_VOLUME_URI_DESCRIPTION)
-  private String uri;
-
-  /**
-   * Executes volume Info.
-   */
   @Override
-  public Void call() throws Exception {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureVolumeAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
-
-      String volumeName = address.getVolumeName();
-
-      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-      ObjectPrinter.printObjectAsJson(vol);
-    }
-
-    return null;
+    OzoneVolume vol = client.getObjectStore()
+        .getVolume(address.getVolumeName());
+    printObjectAsJson(vol);
   }
 
 }

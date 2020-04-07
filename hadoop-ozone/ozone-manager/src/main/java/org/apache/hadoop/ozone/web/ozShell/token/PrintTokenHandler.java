@@ -18,54 +18,32 @@
 
 package org.apache.hadoop.ozone.web.ozShell.token;
 
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.utils.JsonUtils;
+import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.util.concurrent.Callable;
 
 /**
- * Executes getDelegationToken api.
+ * Prints token decoded from file.
  */
 @Command(name = "print",
     description = "print a delegation token.")
-public class PrintTokenHandler extends Handler {
+@SuppressWarnings("squid:S106") // CLI
+public class PrintTokenHandler implements Callable<Void> {
 
-  @CommandLine.Option(names = {"--token", "-t"},
-      description = "file containing encoded token",
-      defaultValue = "/tmp/token.txt",
-      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-  private String tokenFile;
+  @CommandLine.Mixin
+  private TokenOption tokenFile;
 
-  /**
-   * Executes the Client Calls.
-   */
   @Override
   public Void call() throws Exception {
-    if (!OzoneSecurityUtil.isSecurityEnabled(createOzoneConfiguration())) {
-      System.err.println("Error:Token operations work only when security is " +
-          "enabled. To enable security set ozone.security.enabled to true.");
-      return null;
+    if (tokenFile.exists()) {
+      Token<OzoneTokenIdentifier> token = tokenFile.decode();
+      System.out.print(JsonUtils.toJsonStringWithDefaultPrettyPrinter(token));
     }
-
-    if (Files.notExists(Paths.get(tokenFile))) {
-      System.err.println("Error: Print token operation failed as token file: "
-          + tokenFile + " containing encoded token doesn't exist.");
-      return null;
-    }
-
-    String encodedToken = new String(Files.readAllBytes(Paths.get(tokenFile)),
-        StandardCharsets.UTF_8);
-    Token token = new Token();
-    token.decodeFromUrlString(encodedToken);
-
-    System.out.printf("%s", JsonUtils.toJsonStringWithDefaultPrettyPrinter(
-        token.toString()));
     return null;
   }
 }

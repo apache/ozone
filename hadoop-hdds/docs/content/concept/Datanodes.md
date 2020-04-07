@@ -71,5 +71,5 @@ thousand containers. Compare that with HDFS block count of million and half
 blocks that get reported. That is a 40x reduction in the block reports.
 
 This extra indirection helps tremendously with scaling Ozone. SCM has far
-less block data to process and the name node is a different service are
-critical to scaling Ozone.
+less block data to process and the namespace service (Ozone Manager) as a
+different service are critical to scaling Ozone.

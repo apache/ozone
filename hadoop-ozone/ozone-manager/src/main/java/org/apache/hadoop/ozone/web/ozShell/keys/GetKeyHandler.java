@@ -21,19 +21,17 @@ package org.apache.hadoop.ozone.web.ozShell.keys;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
@@ -47,67 +45,46 @@ import picocli.CommandLine.Parameters;
  */
 @Command(name = "get",
     description = "Gets a specific key from ozone server")
-public class GetKeyHandler extends Handler {
-
-  @Parameters(index = "0", arity = "1..1", description =
-      Shell.OZONE_KEY_URI_DESCRIPTION)
-  private String uri;
+public class GetKeyHandler extends KeyHandler {
 
   @Parameters(index = "1", arity = "1..1",
       description = "File path to download the key to")
   private String fileName;
 
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException, OzoneClientException {
 
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureKeyAddress();
+    String volumeName = address.getVolumeName();
+    String bucketName = address.getBucketName();
+    String keyName = address.getKeyName();
 
-    OzoneConfiguration conf = createOzoneConfiguration();
+    File dataFile = new File(fileName);
 
-    try (OzoneClient client = address.createClient(conf)) {
+    if (dataFile.exists() && dataFile.isDirectory()) {
+      dataFile = new File(fileName, keyName);
+    }
 
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
-      String keyName = address.getKeyName();
+    if (dataFile.exists()) {
+      throw new OzoneClientException(dataFile.getPath() + " exists."
+          + " Download would overwrite an existing file. Aborting.");
+    }
 
-      if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("Bucket Name : %s%n", bucketName);
-        System.out.printf("Key Name : %s%n", keyName);
-      }
+    int chunkSize = (int) getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
+        OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
 
-      File dataFile = new File(fileName);
+    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = vol.getBucket(bucketName);
+    try (InputStream input = bucket.readKey(keyName);
+        OutputStream output = new FileOutputStream(dataFile)) {
+      IOUtils.copyBytes(input, output, chunkSize);
+    }
 
-      if (dataFile.exists() && dataFile.isDirectory()) {
-        dataFile = new File(fileName, keyName);
-      }
-
-      if (dataFile.exists()) {
-        throw new OzoneClientException(dataFile.getPath() + " exists."
-            + " Download would overwrite an existing file. Aborting.");
-      }
-
-      int chunkSize = (int) conf.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
-          OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
-
-      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-      OzoneBucket bucket = vol.getBucket(bucketName);
-      try (InputStream input = bucket.readKey(keyName);
-          OutputStream output = new FileOutputStream(dataFile)) {
-        IOUtils.copyBytes(input, output, chunkSize);
-      }
-
-      if (isVerbose()) {
-        try (InputStream stream = new FileInputStream(dataFile)) {
-          String hash = DigestUtils.md5Hex(stream);
-          System.out.printf("Downloaded file hash : %s%n", hash);
-        }
+    if (isVerbose()) {
+      try (InputStream stream = new FileInputStream(dataFile)) {
+        String hash = DigestUtils.md5Hex(stream);
+        out().printf("Downloaded file hash : %s%n", hash);
       }
     }
-    return null;
   }
 }

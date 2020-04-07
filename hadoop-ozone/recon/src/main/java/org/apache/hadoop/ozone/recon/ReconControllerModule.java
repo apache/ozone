@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -59,6 +60,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.ratis.protocol.ClientId;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -88,6 +90,7 @@ public class ReconControllerModule extends AbstractModule {
         .to(ReconOmMetadataManagerImpl.class);
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
 
+    bind(ContainerSchemaManager.class).in(Singleton.class);
     bind(ContainerDBServiceProvider.class)
         .to(ContainerDBServiceProviderImpl.class).in(Singleton.class);
     bind(OzoneManagerServiceProvider.class)
@@ -115,6 +118,11 @@ public class ReconControllerModule extends AbstractModule {
   @Provides
   MissingContainersDao getMissingContainersDao(final Configuration sqlConfig) {
     return new MissingContainersDao(sqlConfig);
+  }
+
+  @Provides
+  ContainerHistoryDao getContainerHistoryDao(final Configuration sqlConfig) {
+    return new ContainerHistoryDao(sqlConfig);
   }
 
   @Provides

@@ -24,6 +24,7 @@ import com.google.inject.Injector;
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -33,6 +34,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.jooq.Configuration;
 import org.junit.Assert;
@@ -108,7 +110,11 @@ public interface GuiceInjectorUtilsForTests {
             baseInjector.getInstance((Configuration.class));
         MissingContainersDao missingContainersDao =
             new MissingContainersDao(sqlConfiguration);
+        ContainerHistoryDao containerHistoryDao =
+            new ContainerHistoryDao(sqlConfiguration);
         bind(MissingContainersDao.class).toInstance(missingContainersDao);
+        bind(ContainerHistoryDao.class).toInstance(containerHistoryDao);
+        bind(ContainerSchemaManager.class).in(Singleton.class);
         bind(ContainerDBServiceProvider.class).to(
             ContainerDBServiceProviderImpl.class).in(Singleton.class);
       }
