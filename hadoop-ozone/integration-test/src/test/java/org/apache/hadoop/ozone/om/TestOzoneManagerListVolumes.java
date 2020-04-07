@@ -19,31 +19,34 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.test.GenericTestUtils;
-
-import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
-import org.junit.After;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import org.junit.Assert;
-import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
@@ -51,165 +54,195 @@ import org.junit.Test;
 import org.junit.rules.Timeout;
 
 /**
- * Test some client operations after cluster starts. And perform restart and
- * then performs client operations and check the behavior is expected or not.
+ * Test OzoneManager list volume operation under combinations of configs.
  */
 @Ignore
 public class TestOzoneManagerListVolumes {
-  private MiniOzoneCluster cluster = null;
-  private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omId;
 
   @Rule
-  public Timeout timeout = new Timeout(60000);
+  public Timeout timeout = new Timeout(120_000);
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
+  private UserGroupInformation loginUser;
+  private UserGroupInformation user1 =
+      UserGroupInformation.createRemoteUser("user1");  // Admin user
+  private UserGroupInformation user2 =
+      UserGroupInformation.createRemoteUser("user2");  // Non-admin user
+
   @Before
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
-    conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
-    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
-    cluster =  MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
-        .build();
-    cluster.waitForClusterToBeReady();
-
+    loginUser = UserGroupInformation.getLoginUser();
   }
 
   /**
-   * Shutdown MiniDFSCluster.
+   * Create a MiniDFSCluster for testing.
    */
-  @After
-  public void shutdown() {
+  private MiniOzoneCluster startCluster(boolean aclEnabled,
+      boolean volListAllAllowed) throws Exception {
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String clusterId = UUID.randomUUID().toString();
+    String scmId = UUID.randomUUID().toString();
+    String omId = UUID.randomUUID().toString();
+    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
+    conf.set(OZONE_ADMINISTRATORS, "user1");
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
+
+    // Use native impl here, default impl doesn't do actual checks
+    conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    // Note: OM doesn't support live config reloading
+    conf.setBoolean(OZONE_ACL_ENABLED, aclEnabled);
+    conf.setBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED, volListAllAllowed);
+
+    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setClusterId(clusterId).setScmId(scmId).setOmId(omId).build();
+    cluster.waitForClusterToBeReady();
+
+    // loginUser is the user running this test.
+    // Implication: loginUser is automatically added to the OM admin list.
+    UserGroupInformation.setLoginUser(loginUser);
+    // Create volumes with non-default owners and ACLs
+    OzoneClient client = cluster.getClient();
+    ObjectStore objectStore = client.getObjectStore();
+
+    /* r = READ, w = WRITE, c = CREATE, d = DELETE
+       l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
+    String aclUser1All = "user:user1:a";
+    String aclUser2All = "user:user2:a";
+    String aclWorldAll = "world::a";
+    createVolumeWithOwnerAndAcl(objectStore, "volume1", "user1", aclUser1All);
+    createVolumeWithOwnerAndAcl(objectStore, "volume2", "user2", aclUser2All);
+    createVolumeWithOwnerAndAcl(objectStore, "volume3", "user1", aclUser2All);
+    createVolumeWithOwnerAndAcl(objectStore, "volume4", "user2", aclUser1All);
+    createVolumeWithOwnerAndAcl(objectStore, "volume5", "user1", aclWorldAll);
+
+    return cluster;
+  }
+
+  private void stopCluster(MiniOzoneCluster cluster) {
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  @Test
-  public void testRestartOMWithVolumeOperation() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+  private void createVolumeWithOwnerAndAcl(ObjectStore objectStore,
+      String volumeName, String ownerName, String aclString)
+      throws IOException {
+    ClientProtocol proxy = objectStore.getClientProxy();
+    objectStore.createVolume(volumeName);
+    proxy.setVolumeOwner(volumeName, ownerName);
+//    OzoneAcl acl1 = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
+//        "johndoe", IAccessAuthorizer.ACLType.ALL, ACCESS);
+//    List<OzoneAcl> aclList = new ArrayList<>();
+//    aclList.add(acl1);
+    setVolumeAcl(objectStore, volumeName, aclString);
+  }
 
+  /**
+   * Helper function to set volume ACL.
+   */
+  private void setVolumeAcl(ObjectStore objectStore, String volumeName,
+      String aclString) throws IOException {
+    OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
+        .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
+    Assert.assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
+  }
+
+  /**
+   * Helper function to reduce code redundancy for test checks with each user
+   * under different config combination.
+   */
+  private void checkUser(MiniOzoneCluster cluster, UserGroupInformation user,
+      List<String> expectVol, boolean expectListAllSuccess) throws IOException {
+
+    UserGroupInformation.setLoginUser(user);
     OzoneClient client = cluster.getClient();
-
     ObjectStore objectStore = client.getObjectStore();
 
-    objectStore.createVolume(volumeName);
-
-    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
-
-    cluster.restartOzoneManager();
-    cluster.restartStorageContainerManager(true);
-
-    // After restart, try to create same volume again, it should fail.
-    try {
-      objectStore.createVolume(volumeName);
-      fail("testRestartOM failed");
-    } catch (IOException ex) {
-      GenericTestUtils.assertExceptionContains("VOLUME_ALREADY_EXISTS", ex);
+    // `ozone sh volume list` shall return volumes with LIST permission of user.
+    Iterator<? extends OzoneVolume> it = objectStore.listVolumesByUser(
+        null, "", "");
+    Set<String> accessibleVolumes = new HashSet<>();
+    while (it.hasNext()) {
+      OzoneVolume vol = it.next();
+      String volumeName = vol.getName();
+      accessibleVolumes.add(volumeName);
     }
+    Assert.assertEquals(new HashSet<>(expectVol), accessibleVolumes);
 
-    // Get Volume.
-    ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
-
-  }
-
-
-  @Test
-  public void testRestartOMWithBucketOperation() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-
-    OzoneClient client = cluster.getClient();
-
-    ObjectStore objectStore = client.getObjectStore();
-
-    objectStore.createVolume(volumeName);
-
-    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
-
-    ozoneVolume.createBucket(bucketName);
-
-    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
-
-    cluster.restartOzoneManager();
-    cluster.restartStorageContainerManager(true);
-
-    // After restart, try to create same bucket again, it should fail.
-    try {
-      ozoneVolume.createBucket(bucketName);
-      fail("testRestartOMWithBucketOperation failed");
-    } catch (IOException ex) {
-      GenericTestUtils.assertExceptionContains("BUCKET_ALREADY_EXISTS", ex);
+    // `ozone sh volume list --all` returns all volumes,
+    //  or throws exception (for non-admin if acl enabled & listall disallowed).
+    if (expectListAllSuccess) {
+      it = objectStore.listVolumes("volume");
+      int count = 0;
+      while (it.hasNext()) {
+        it.next();
+        count++;
+      }
+      Assert.assertEquals(5, count);
+    } else {
+      try {
+        objectStore.listVolumes("volume");
+        Assert.fail("listAllVolumes should fail for " + user.getUserName());
+      } catch (OMException ex) {
+        // Expect PERMISSION_DENIED if user is not admin and listall disallowed
+        if (ex.getResult() != OMException.ResultCodes.PERMISSION_DENIED) {
+          throw ex;
+        }
+      } catch (RuntimeException ex) {
+        // Current listAllVolumes throws RuntimeException
+        if (ex.getCause() instanceof OMException) {
+          if (((OMException) ex.getCause()).getResult() !=
+              OMException.ResultCodes.PERMISSION_DENIED) {
+            throw ex;
+          }
+        } else {
+          throw ex;
+        }
+      }
     }
-
-    // Get bucket.
-    ozoneBucket = ozoneVolume.getBucket(bucketName);
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
-
   }
-
 
   @Test
-  public void testRestartOMWithKeyOperation() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-    String key = "key" + RandomStringUtils.randomNumeric(5);
-
-    OzoneClient client = cluster.getClient();
-
-    ObjectStore objectStore = client.getObjectStore();
-
-    objectStore.createVolume(volumeName);
-
-    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
-
-    ozoneVolume.createBucket(bucketName);
-
-    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
-
-    String data = "random data";
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
-        data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
-        new HashMap<>());
-
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
-    ozoneOutputStream.close();
-
-    cluster.restartOzoneManager();
-    cluster.restartStorageContainerManager(true);
-
-
-    // As we allow override of keys, not testing re-create key. We shall see
-    // after restart key exists or not.
-
-    // Get key.
-    OzoneKey ozoneKey = ozoneBucket.getKey(key);
-    Assert.assertTrue(ozoneKey.getName().equals(key));
-    Assert.assertTrue(ozoneKey.getReplicationType().equals(
-        ReplicationType.RATIS));
+  public void testAclEnabledListAllAllowed() throws Exception {
+    // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = true
+    MiniOzoneCluster cluster = startCluster(true, true);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
+        true);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
+        true);
+    stopCluster(cluster);
   }
 
+  @Test
+  public void testAclEnabledListAllDisallowed() throws Exception {
+    // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = false
+    MiniOzoneCluster cluster = startCluster(true, false);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
+        true);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
+        false);
+    stopCluster(cluster);
+  }
 
+  @Test
+  public void testAclDisabledListAllAllowed() throws Exception {
+    // ozone.acl.enabled = false, ozone.om.volume.listall.allowed = true
+    MiniOzoneCluster cluster = startCluster(false, true);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume3", "volume5"),
+        true);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume4"),
+        true);
+    stopCluster(cluster);
+  }
+
+  @Test
+  public void testAclDisabledListAllDisallowed() throws Exception {
+    // ozone.acl.enabled = false, ozone.om.volume.listall.allowed = false
+    MiniOzoneCluster cluster = startCluster(false, false);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume3", "volume5"),
+        true);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume4"),
+        true);  // listall will succeed since acl is disabled
+    stopCluster(cluster);
+  }
 }
