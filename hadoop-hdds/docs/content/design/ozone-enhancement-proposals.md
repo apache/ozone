@@ -129,7 +129,7 @@ This the proposed template to document any proposal. It's recommended but not re
 
 Defined in the markdown header. Proposed statuses:
 
- * `accepted`: (Use this as by default. If not accapted, won't be merged)
+ * `accepted`: (Use this as by default. If not accepted, won't be merged)
 
  * `implemented`: The discussed technical solution is implemented (maybe with some minor implementation difference)
 
