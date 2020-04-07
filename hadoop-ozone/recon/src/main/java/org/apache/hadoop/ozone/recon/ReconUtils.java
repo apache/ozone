@@ -51,6 +51,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 
 /**
  * Recon Utility class.
@@ -243,6 +244,16 @@ public class ReconUtils {
       throw new IOException("Unexpected null in http payload," +
           " while processing request");
     }
+  }
+
+  public InputStream makeHttpCall(URLConnectionFactory connectionFactory,
+                                  String url)
+      throws IOException {
+
+    java.net.URLConnection urlConnection =
+          connectionFactory.openConnection(new java.net.URL(url));
+     urlConnection.connect();
+     return urlConnection.getInputStream();
   }
 
   /**

@@ -37,7 +37,9 @@ import java.nio.file.Paths;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.http.HttpEntity;
 import org.apache.http.StatusLine;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -166,9 +168,11 @@ public class TestReconUtils {
       }
     });
 
-    InputStream inputStream = new ReconUtils()
-        .makeHttpCall(httpClientMock, url);
-    String contents = IOUtils.toString(inputStream, Charset.defaultCharset());
+    String contents;
+    try (InputStream inputStream = new ReconUtils()
+        .makeHttpCall(httpClientMock, url)) {
+      contents = IOUtils.toString(inputStream, Charset.defaultCharset());
+    }
 
     assertEquals("File 1 Contents", contents);
   }
