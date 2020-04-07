@@ -11,11 +11,11 @@ int main(int argc, char **argv) {
     char* buffer;
     tSize curSize;
 
-    if (argc != 4) {
-        fprintf(stderr, "Usage: hdfs_read <filename> <filesize> <buffersize>\n");
+    if (argc ! = 4) {
+        fprintf(stderr, "Usage: ozfs_read <filename> <filesize> <buffersize>\n");
         exit(-1);
     }
-    fs=ozfsConnect("127.0.0.1", 9862,"bucket4","vol4");
+    fs = ozfsConnect("127.0.0.1", 9862, "bucket4", "vol4");
     if (!fs) {
         fprintf(stderr, "Oops! Failed to connect to ozfs!\n");
         exit(-1);

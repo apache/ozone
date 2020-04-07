@@ -1,5 +1,4 @@
 #include "ozfs.h"
-
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,10 +17,10 @@ int main(int argc, char **argv) {
     tSize curSize;
     tSize written;
     if (argc != 4) {
-        fprintf(stderr, "Usage: hdfs_write <filename> <filesize> <buffersize>\n");
+        fprintf(stderr, "Usage: ozfs_write <filename> <filesize> <buffersize>\n");
         exit(-1);
     }
-    fs = ozfsConnect("127.0.0.1", 9862,"bucket4","vol4");
+    fs = ozfsConnect("127.0.0.1", 9862, "bucket4", "vol4");
     if (!fs) {
         fprintf(stderr, "Oops! Failed to connect to ozfs!\n");
         exit(-1);
@@ -31,7 +30,7 @@ int main(int argc, char **argv) {
       exit(-3);
     }
     if(tmpBufferSize > INT_MAX) {
-      fprintf(stderr, "invalid buffer size libhdfs API write chunks must be <= %d\n",INT_MAX);
+      fprintf(stderr, "invalid buffer size libhdfs API write chunks must be <= %d\n", INT_MAX);
       exit(-3);
     }
     bufferSize = (tSize)tmpBufferSize;
