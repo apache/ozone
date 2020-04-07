@@ -18,12 +18,16 @@
 
 package org.apache.hadoop.ozone.client;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 
@@ -31,6 +35,8 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -157,6 +163,53 @@ public final class OzoneClientFactory {
         OzoneClientInvocationHandler.class.getClassLoader(),
         new Class<?>[]{ClientProtocol.class}, clientHandler);
     return new OzoneClient(config, proxy);
+  }
+
+  /**
+   * Create OzoneClient for token renew/cancel operations.
+   * @param conf Configuration to be used for OzoneCient creation
+   * @param token ozone token is involved
+   * @return
+   * @throws IOException
+   */
+  public static OzoneClient getOzoneClient(Configuration conf,
+      Token<OzoneTokenIdentifier> token) throws IOException {
+    Preconditions.checkNotNull(token, "Null token is not allowed");
+    OzoneTokenIdentifier tokenId = new OzoneTokenIdentifier();
+    ByteArrayInputStream buf = new ByteArrayInputStream(
+        token.getIdentifier());
+    DataInputStream in = new DataInputStream(buf);
+    tokenId.readFields(in);
+    String omServiceId = tokenId.getOmServiceId();
+    if (StringUtils.isNotEmpty(omServiceId)) {
+      // new OM should always issue token with omServiceId
+      if (!OmUtils.isServiceIdsDefined(conf)
+          && omServiceId.equals(OzoneConsts.OM_SERVICE_ID_DEFAULT)) {
+        // Non-HA or single-node Ratis HA
+        return OzoneClientFactory.getRpcClient(conf);
+      } else if (OmUtils.isOmHAServiceId(conf, omServiceId)) {
+        // HA with matching service id
+        return OzoneClientFactory.getRpcClient(omServiceId, conf);
+      } else {
+        // HA with mismatched service id
+        throw new IOException("Service ID specified " + omServiceId +
+            " does not match" + " with " + OZONE_OM_SERVICE_IDS_KEY +
+            " defined in the " + "configuration. Configured " +
+            OZONE_OM_SERVICE_IDS_KEY + " are" + conf.getTrimmedStringCollection(
+            OZONE_OM_SERVICE_IDS_KEY));
+      }
+    } else {
+      // Old OM may issue token without omServiceId that should work
+      // with non-HA case
+      if (!OmUtils.isServiceIdsDefined(conf)) {
+        return OzoneClientFactory.getRpcClient(conf);
+      } else {
+        throw new IOException("OzoneToken with no service ID can't "
+            + "be renewed or canceled with local OM HA setup because we "
+            + "don't know if the token is issued from local OM HA cluster "
+            + "or not.");
+      }
+    }
   }
 
   /**

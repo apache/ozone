@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
+import org.apache.hadoop.ozone.web.ozShell.Shell;
 import org.apache.hadoop.security.token.Token;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -38,12 +39,16 @@ import java.util.Objects;
     description = "get a delegation token.")
 public class GetTokenHandler extends Handler {
 
+  @CommandLine.Parameters(arity = "1..1",
+      description = Shell.OZONE_URI_DESCRIPTION)
+  private String uri;
+
   @CommandLine.Mixin
   private RenewerOption renewer;
 
   @Override
   protected OzoneAddress getAddress() throws OzoneClientException {
-    return new OzoneAddress();
+    return new OzoneAddress(uri);
   }
 
   @Override

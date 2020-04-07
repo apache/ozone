@@ -404,8 +404,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         throws IOException, InterruptedException {
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
-      OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+      OzoneClient ozoneClient = OzoneClientFactory.getOzoneClient(conf,
+          ozoneDt);
       return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
     }
 
@@ -414,8 +414,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         throws IOException, InterruptedException {
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
-      OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+      OzoneClient ozoneClient = OzoneClientFactory.getOzoneClient(conf,
+          ozoneDt);
       ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
     }
   }

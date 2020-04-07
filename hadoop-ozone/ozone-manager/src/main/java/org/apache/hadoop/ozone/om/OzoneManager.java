@@ -658,9 +658,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
 
-    return new OzoneDelegationTokenSecretManager(conf, tokenMaxLifetime,
-        tokenRenewInterval, tokenRemoverScanInterval, omRpcAddressTxt,
-        s3SecretManager, certClient);
+    return new OzoneDelegationTokenSecretManager.Builder()
+        .setConf(conf)
+        .setTokenMaxLifetime(tokenMaxLifetime)
+        .setTokenRenewInterval(tokenRenewInterval)
+        .setTokenRemoverScanInterval(tokenRemoverScanInterval)
+        .setService(omRpcAddressTxt)
+        .setS3SecretManager(s3SecretManager)
+        .setCertificateClient(certClient)
+        .setOmServiceId(omNodeDetails.getOMServiceId())
+        .build();
   }
 
   private OzoneBlockTokenSecretManager createBlockTokenSecretManager(

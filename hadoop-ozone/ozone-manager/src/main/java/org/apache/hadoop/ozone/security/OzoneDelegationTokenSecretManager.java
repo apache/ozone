@@ -66,6 +66,8 @@ public class OzoneDelegationTokenSecretManager
   private Thread tokenRemoverThread;
   private final long tokenRemoverScanInterval;
   private String omCertificateSerialId;
+  private String omServiceId;
+
   /**
    * If the delegation token update thread holds this lock, it will not get
    * interrupted.
@@ -75,34 +77,82 @@ public class OzoneDelegationTokenSecretManager
   private boolean isRatisEnabled;
 
   /**
-   * Create a secret manager.
+   * Create a secret manager with a builder object.
    *
-   * @param conf configuration.
-   * @param tokenMaxLifetime the maximum lifetime of the delegation tokens in
-   * milliseconds
-   * @param tokenRenewInterval how often the tokens must be renewed in
-   * milliseconds
-   * @param dtRemoverScanInterval how often the tokens are scanned for expired
-   * tokens in milliseconds
-   * @param certClient certificate client to SCM CA
-   */
-  public OzoneDelegationTokenSecretManager(OzoneConfiguration conf,
-      long tokenMaxLifetime, long tokenRenewInterval,
-      long dtRemoverScanInterval, Text service,
-      S3SecretManager s3SecretManager, CertificateClient certClient)
-      throws IOException {
-    super(new SecurityConfig(conf), tokenMaxLifetime, tokenRenewInterval,
-        service, LOG);
-    setCertClient(certClient);
+   **/
+  public OzoneDelegationTokenSecretManager(Builder b) throws IOException {
+    super(new SecurityConfig(b.ozoneConf), b.tokenMaxLifetime,
+        b.tokenRenewInterval, b.service, LOG);
+    setCertClient(b.certClient);
+    this.omServiceId = b.omServiceId;
     currentTokens = new ConcurrentHashMap();
-    this.tokenRemoverScanInterval = dtRemoverScanInterval;
-    this.s3SecretManager = (S3SecretManagerImpl) s3SecretManager;
-    this.store = new OzoneSecretStore(conf,
+    this.tokenRemoverScanInterval = b.tokenRemoverScanInterval;
+    this.s3SecretManager = (S3SecretManagerImpl) b.s3SecretManager;
+    this.store = new OzoneSecretStore(b.ozoneConf,
         this.s3SecretManager.getOmMetadataManager());
-    isRatisEnabled = conf.getBoolean(
+    isRatisEnabled = b.ozoneConf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
     loadTokenSecretState(store.loadState());
+
+  }
+
+  /**
+   * Builder to help construct OzoneDelegationTokenSecretManager.
+   */
+  public static class Builder {
+    private OzoneConfiguration ozoneConf;
+    private long tokenMaxLifetime;
+    private long tokenRenewInterval;
+    private long tokenRemoverScanInterval;
+    private Text service;
+    private S3SecretManager s3SecretManager;
+    private CertificateClient certClient;
+    private String omServiceId;
+
+    public OzoneDelegationTokenSecretManager build() throws IOException {
+      return new OzoneDelegationTokenSecretManager(this);
+    }
+
+    public Builder setConf(OzoneConfiguration conf) {
+      this.ozoneConf = conf;
+      return this;
+    }
+
+    public Builder setTokenMaxLifetime(long dtMaxLifetime) {
+      this.tokenMaxLifetime = dtMaxLifetime;
+      return this;
+    }
+
+    public Builder setTokenRenewInterval(long dtRenewInterval) {
+      this.tokenRenewInterval = dtRenewInterval;
+      return this;
+    }
+
+    public Builder setTokenRemoverScanInterval(long dtRemoverScanInterval) {
+      this.tokenRemoverScanInterval = dtRemoverScanInterval;
+      return this;
+    }
+
+    public Builder setService(Text dtService) {
+      this.service = dtService;
+      return this;
+    }
+
+    public Builder setS3SecretManager(S3SecretManager s3SecManager) {
+      this.s3SecretManager = s3SecManager;
+      return this;
+    }
+
+    public Builder setCertificateClient(CertificateClient certificateClient) {
+      this.certClient = certificateClient;
+      return this;
+    }
+
+    public Builder setOmServiceId(String serviceId) {
+      this.omServiceId = serviceId;
+      return this;
+    }
   }
 
   @Override
@@ -200,6 +250,7 @@ public class OzoneDelegationTokenSecretManager
     identifier.setSequenceNumber(sequenceNum);
     identifier.setMaxDate(now + getTokenMaxLifetime());
     identifier.setOmCertSerialId(getOmCertificateSerialId());
+    identifier.setOmServiceId(getOmServiceId());
   }
 
   /**
@@ -211,6 +262,10 @@ public class OzoneDelegationTokenSecretManager
           getCertClient().getCertificate().getSerialNumber().toString();
     }
     return omCertificateSerialId;
+  }
+
+  private String getOmServiceId() {
+    return omServiceId;
   }
 
   /**
