@@ -61,6 +61,7 @@ public class InfoSubcommand implements Callable<Void> {
 
       // Print container report info.
       LOG.info("Container id: {}", containerID);
+      LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
       LOG.info("Container State: {}", container.getContainerInfo().getState());
 
       // Print pipeline of an existing container.
