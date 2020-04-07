@@ -89,8 +89,9 @@ public class StateContext {
    * @param state  - State
    * @param parent Parent State Machine
    */
-  public StateContext(ConfigurationSource conf, DatanodeStateMachine.DatanodeStates
-      state, DatanodeStateMachine parent) {
+  public StateContext(ConfigurationSource conf,
+      DatanodeStateMachine.DatanodeStates
+          state, DatanodeStateMachine parent) {
     this.conf = conf;
     this.state = state;
     this.parent = parent;

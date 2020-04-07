@@ -54,8 +54,8 @@ public class MetadataStoreBuilder {
   private Optional<ConfigurationSource> optionalConf = Optional.empty();
   private String dbType;
   @VisibleForTesting
-  public static final Map<ConfigurationSource, org.rocksdb.Options> CACHED_OPTS =
-      new ConcurrentHashMap<>();
+  public static final Map<ConfigurationSource, org.rocksdb.Options>
+      CACHED_OPTS = new ConcurrentHashMap<>();
   @VisibleForTesting
   public static final OzoneConfiguration DEFAULT_CONF =
       new OzoneConfiguration();

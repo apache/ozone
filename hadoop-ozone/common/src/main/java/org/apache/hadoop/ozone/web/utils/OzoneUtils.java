@@ -148,7 +148,8 @@ public final class OzoneUtils {
    * Return the TimeDuration configured for the given key. If not configured,
    * return the default value.
    */
-  public static TimeDuration getTimeDuration(ConfigurationSource conf, String key,
+  public static TimeDuration getTimeDuration(ConfigurationSource conf,
+      String key,
       TimeDuration defaultValue) {
     TimeUnit defaultTimeUnit = defaultValue.getUnit();
     long timeDurationInDefaultUnit = conf.getTimeDuration(key,

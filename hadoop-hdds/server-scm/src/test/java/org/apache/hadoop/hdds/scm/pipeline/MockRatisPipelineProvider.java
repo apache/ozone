@@ -18,15 +18,15 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import java.io.IOException;
+import java.util.List;
+
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-
-import java.io.IOException;
-import java.util.List;
 
 /**
  * Mock Ratis Pipeline Provider for Mock Nodes.
@@ -44,14 +44,14 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
-                            PipelineStateManager stateManager,
-                            ConfigurationSource conf) {
+      PipelineStateManager stateManager,
+      ConfigurationSource conf) {
     super(nodeManager, stateManager, conf, new EventQueue());
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
-                                   PipelineStateManager stateManager,
-                                   ConfigurationSource conf, boolean isHealthy) {
+      PipelineStateManager stateManager,
+      ConfigurationSource conf, boolean isHealthy) {
     super(nodeManager, stateManager, conf, new EventQueue());
     this.isHealthy = isHealthy;
   }

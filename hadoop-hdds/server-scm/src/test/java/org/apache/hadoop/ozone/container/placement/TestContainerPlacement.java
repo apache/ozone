@@ -77,7 +77,8 @@ public class TestContainerPlacement {
         .getStandardDeviation(), 0.001);
 
     SCMContainerPlacementCapacity capacityPlacer = new
-        SCMContainerPlacementCapacity(nodeManagerCapacity, new OzoneConfiguration(),
+        SCMContainerPlacementCapacity(nodeManagerCapacity,
+        new OzoneConfiguration(),
         null, true, null);
     SCMContainerPlacementRandom randomPlacer = new
         SCMContainerPlacementRandom(nodeManagerRandom, new OzoneConfiguration(),

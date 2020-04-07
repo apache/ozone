@@ -89,7 +89,8 @@ public final class HddsUtils {
    *
    * @return Target {@code InetSocketAddress} for the SCM client endpoint.
    */
-  public static InetSocketAddress getScmAddressForClients(ConfigurationSource conf) {
+  public static InetSocketAddress getScmAddressForClients(
+      ConfigurationSource conf) {
     Optional<String> host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
 
@@ -278,7 +279,8 @@ public final class HddsUtils {
    * @throws IllegalArgumentException if {@code conf} has more than one SCM
    *         address or it has none
    */
-  public static InetSocketAddress getSingleSCMAddress(ConfigurationSource conf) {
+  public static InetSocketAddress getSingleSCMAddress(
+      ConfigurationSource conf) {
     Collection<InetSocketAddress> singleton = getSCMAddresses(conf);
     Preconditions.checkArgument(singleton.size() == 1,
         MULTIPLE_SCM_NOT_YET_SUPPORTED);

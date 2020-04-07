@@ -36,9 +36,9 @@ import org.apache.hadoop.security.token.DelegationTokenIssuer;
  * The Ozone Filesystem implementation.
  * <p>
  * This subclass is marked as private as code should not be creating it
- * directly; use {@link FileSystem#get(ConfigurationSource)} and variants to create
- * one. If cast to {@link OzoneFileSystem}, extra methods and features may be
- * accessed. Consider those private and unstable.
+ * directly; use {@link FileSystem#get(org.apache.hadoop.conf.Configuration)}
+ * and variants to create one. If cast to {@link OzoneFileSystem}, extra
+ * methods and features may be accessed. Consider those private and unstable.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving

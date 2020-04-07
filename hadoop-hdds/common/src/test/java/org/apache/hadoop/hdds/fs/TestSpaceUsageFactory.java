@@ -106,8 +106,8 @@ public class TestSpaceUsageFactory {
         "in log output, but only got: " + output);
   }
 
-  private static <T extends SpaceUsageCheckFactory> OzoneConfiguration configFor(
-      Class<T> factoryClass) {
+  private static <T extends SpaceUsageCheckFactory> OzoneConfiguration
+      configFor(Class<T> factoryClass) {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setClass(configKeyForClassName(),
@@ -174,7 +174,8 @@ public class TestSpaceUsageFactory {
   }
 
   /**
-   * Spy factory to verify {@link SpaceUsageCheckFactory#create(ConfigurationSource)}
+   * Spy factory to verify
+   * {@link SpaceUsageCheckFactory#create(ConfigurationSource)}
    * properly configures it.
    */
   public static final class SpyFactory implements SpaceUsageCheckFactory {
