@@ -17,11 +17,11 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.shell.CommandFactory;
 import org.apache.hadoop.fs.shell.FsCommand;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.util.ToolRunner;
 
 /** Provide command line access to a Ozone FileSystem. */
@@ -45,7 +45,7 @@ public class OzoneFsShell extends FsShell {
    * Commands can be executed via {@link #run(String[])}
    * @param conf the hadoop configuration
    */
-  public OzoneFsShell(Configuration conf) {
+  public OzoneFsShell(OzoneConfiguration conf) {
     super(conf);
   }
 
@@ -71,7 +71,7 @@ public class OzoneFsShell extends FsShell {
    */
   public static void main(String[] argv) throws Exception {
     OzoneFsShell shell = newShellInstance();
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setQuietMode(false);
     shell.setConf(conf);
     int res;

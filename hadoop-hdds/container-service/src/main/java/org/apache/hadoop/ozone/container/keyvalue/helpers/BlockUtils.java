@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -55,7 +55,7 @@ public final class BlockUtils {
    * @throws StorageContainerException
    */
   public static ReferenceCountedDB getDB(KeyValueContainerData containerData,
-                                    Configuration conf) throws
+                                    ConfigurationSource conf) throws
       StorageContainerException {
     Preconditions.checkNotNull(containerData);
     ContainerCache cache = ContainerCache.getInstance(conf);
@@ -78,7 +78,7 @@ public final class BlockUtils {
    * @param container - Container data.
    * @param conf - Configuration.
    */
-  public static void removeDB(KeyValueContainerData container, Configuration
+  public static void removeDB(KeyValueContainerData container, ConfigurationSource
       conf) {
     Preconditions.checkNotNull(container);
     ContainerCache cache = ContainerCache.getInstance(conf);

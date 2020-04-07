@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -44,11 +44,11 @@ public class VersionEndpointTask implements
   public static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask
       .class);
   private final EndpointStateMachine rpcEndPoint;
-  private final Configuration configuration;
+  private final ConfigurationSource configuration;
   private final OzoneContainer ozoneContainer;
 
   public VersionEndpointTask(EndpointStateMachine rpcEndPoint,
-                             Configuration conf, OzoneContainer container) {
+                             ConfigurationSource conf, OzoneContainer container) {
     this.rpcEndPoint = rpcEndPoint;
     this.configuration = conf;
     this.ozoneContainer = container;

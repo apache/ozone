@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -35,9 +34,11 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -57,6 +58,7 @@ import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,7 +114,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   public BasicOzoneClientAdapterImpl(String omHost, int omPort,
-      Configuration hadoopConf, String volumeStr, String bucketStr)
+      ConfigurationSource hadoopConf, String volumeStr, String bucketStr)
       throws IOException {
 
     ClassLoader contextClassLoader =
@@ -405,7 +407,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
       OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+          OzoneClientFactory
+              .getRpcClient(new LegacyHadoopConfigurationSource(conf));
       return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
     }
 
@@ -415,7 +418,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
       OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+          OzoneClientFactory
+              .getRpcClient(new LegacyHadoopConfigurationSource(conf));
       ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
     }
   }

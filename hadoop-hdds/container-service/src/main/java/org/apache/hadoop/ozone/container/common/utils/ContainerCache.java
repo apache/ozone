@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.container.common.utils;
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
@@ -57,7 +57,7 @@ public final class ContainerCache extends LRUMap {
    * @param conf - Configuration.
    * @return A instance of {@link ContainerCache}.
    */
-  public synchronized static ContainerCache getInstance(Configuration conf) {
+  public synchronized static ContainerCache getInstance(ConfigurationSource conf) {
     if (cache == null) {
       int cacheSize = conf.getInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE,
           OzoneConfigKeys.OZONE_CONTAINER_CACHE_DEFAULT);
@@ -111,7 +111,7 @@ public final class ContainerCache extends LRUMap {
    * @return ReferenceCountedDB.
    */
   public ReferenceCountedDB getDB(long containerID, String containerDBType,
-                             String containerDBPath, Configuration conf)
+                             String containerDBPath, ConfigurationSource conf)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative.");

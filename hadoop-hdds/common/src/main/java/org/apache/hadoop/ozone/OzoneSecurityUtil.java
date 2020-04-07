@@ -24,7 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 import org.apache.commons.validator.routines.InetAddressValidator;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +56,7 @@ public final class OzoneSecurityUtil {
   private OzoneSecurityUtil() {
   }
 
-  public static boolean isSecurityEnabled(Configuration conf) {
+  public static boolean isSecurityEnabled(ConfigurationSource conf) {
     return conf.getBoolean(OZONE_SECURITY_ENABLED_KEY,
         OZONE_SECURITY_ENABLED_DEFAULT);
   }

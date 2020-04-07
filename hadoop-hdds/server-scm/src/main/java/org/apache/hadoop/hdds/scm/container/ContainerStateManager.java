@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
-    .FAILED_TO_CHANGE_CONTAINER_STATE;
-
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
@@ -29,8 +26,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -43,15 +40,15 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.ozone.common.statemachine
-    .InvalidStateTransitionException;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicLongMap;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_CHANGE_CONTAINER_STATE;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A container state manager keeps track of container states and returns
@@ -132,7 +129,7 @@ public class ContainerStateManager {
    * TODO : Add Container Tags so we know which containers are owned by SCM.
    */
   @SuppressWarnings("unchecked")
-  public ContainerStateManager(final Configuration configuration) {
+  public ContainerStateManager(final ConfigurationSource configuration) {
 
     // Initialize the container state machine.
     final Set<HddsProtos.LifeCycleState> finalStates = new HashSet();

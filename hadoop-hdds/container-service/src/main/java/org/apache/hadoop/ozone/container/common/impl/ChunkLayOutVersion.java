@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.impl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -94,7 +94,7 @@ public enum ChunkLayOutVersion {
   /**
    * @return the latest version.
    */
-  public static ChunkLayOutVersion getConfiguredVersion(Configuration conf) {
+  public static ChunkLayOutVersion getConfiguredVersion(ConfigurationSource conf) {
     try {
       return conf.getEnum(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY,
           DEFAULT_LAYOUT);

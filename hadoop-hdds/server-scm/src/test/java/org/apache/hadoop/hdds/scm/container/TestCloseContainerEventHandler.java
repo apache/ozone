@@ -17,11 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+import java.io.IOException;
+
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -33,25 +35,23 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
+
+import org.apache.commons.lang3.RandomUtils;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import java.io.File;
-import java.io.IOException;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 
 /**
  * Tests the closeContainerEventHandler class.
  */
 public class TestCloseContainerEventHandler {
 
-  private static Configuration configuration;
+  private static OzoneConfiguration configuration;
   private static MockNodeManager nodeManager;
   private static SCMPipelineManager pipelineManager;
   private static SCMContainerManager containerManager;

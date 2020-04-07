@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.scm.node;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -144,7 +144,7 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * @param conf Configuration
    */
-  public NodeStateManager(Configuration conf, EventPublisher eventPublisher) {
+  public NodeStateManager(ConfigurationSource conf, EventPublisher eventPublisher) {
     this.nodeStateMap = new NodeStateMap();
     this.node2PipelineMap = new Node2PipelineMap();
     this.eventPublisher = eventPublisher;

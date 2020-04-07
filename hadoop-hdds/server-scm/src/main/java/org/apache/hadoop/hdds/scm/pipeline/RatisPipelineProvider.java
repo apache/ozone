@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -51,14 +51,14 @@ public class RatisPipelineProvider implements PipelineProvider {
 
   private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   private final PipelinePlacementPolicy placementPolicy;
   private int pipelineNumberLimit;
   private int maxPipelinePerDatanode;
 
   RatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, Configuration conf,
+      PipelineStateManager stateManager, ConfigurationSource conf,
       EventPublisher eventPublisher) {
     this.nodeManager = nodeManager;
     this.stateManager = stateManager;

@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -46,7 +46,7 @@ public class ReconPipelineReportHandler extends PipelineReportHandler {
 
   public ReconPipelineReportHandler(SafeModeManager scmSafeModeManager,
       PipelineManager pipelineManager,
-      Configuration conf,
+      ConfigurationSource conf,
       StorageContainerServiceProvider scmServiceProvider) {
     super(scmSafeModeManager, pipelineManager, conf);
     this.scmServiceProvider = scmServiceProvider;

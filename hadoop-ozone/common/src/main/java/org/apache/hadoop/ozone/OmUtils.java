@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone;
 
-import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -40,15 +39,7 @@ import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.apache.commons.compress.utils.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.net.NetUtils;
@@ -57,6 +48,15 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
+import com.google.common.base.Joiner;
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorOutputStream;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.commons.compress.utils.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -70,7 +70,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,18 +90,18 @@ public final class OmUtils {
    * @param conf
    * @return Target InetSocketAddress for the SCM service endpoint.
    */
-  public static InetSocketAddress getOmAddress(Configuration conf) {
+  public static InetSocketAddress getOmAddress(ConfigurationSource conf) {
     return NetUtils.createSocketAddr(getOmRpcAddress(conf));
   }
 
   /**
    * Return list of OM addresses by service ids - when HA is enabled.
    *
-   * @param conf {@link Configuration}
+   * @param conf {@link ConfigurationSource}
    * @return {service.id -> [{@link InetSocketAddress}]}
    */
   public static Map<String, List<InetSocketAddress>> getOmHAAddressesById(
-      Configuration conf) {
+      ConfigurationSource conf) {
     Map<String, List<InetSocketAddress>> result = new HashMap<>();
     for (String serviceId : conf.getTrimmedStringCollection(
         OZONE_OM_SERVICE_IDS_KEY)) {
@@ -128,7 +127,7 @@ public final class OmUtils {
    * @param conf
    * @return Target InetSocketAddress for the SCM service endpoint.
    */
-  public static String getOmRpcAddress(Configuration conf) {
+  public static String getOmRpcAddress(ConfigurationSource conf) {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         OZONE_OM_ADDRESS_KEY);
 
@@ -143,7 +142,8 @@ public final class OmUtils {
    * @param confKey configuration key to lookup address from
    * @return Target InetSocketAddress for the OM RPC server.
    */
-  public static String getOmRpcAddress(Configuration conf, String confKey) {
+  public static String getOmRpcAddress(ConfigurationSource conf,
+      String confKey) {
     final Optional<String> host = getHostNameFromConfigKeys(conf, confKey);
 
     if (host.isPresent()) {
@@ -161,7 +161,7 @@ public final class OmUtils {
    * @return Target InetSocketAddress for the OM service endpoint.
    */
   public static InetSocketAddress getOmAddressForClients(
-      Configuration conf) {
+      ConfigurationSource conf) {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         OZONE_OM_ADDRESS_KEY);
 
@@ -182,7 +182,7 @@ public final class OmUtils {
    * @return true if OZONE_OM_SERVICE_IDS_KEY is defined and not empty;
    * else false.
    */
-  public static boolean isServiceIdsDefined(Configuration conf) {
+  public static boolean isServiceIdsDefined(ConfigurationSource conf) {
     String val = conf.get(OZONE_OM_SERVICE_IDS_KEY);
     return val != null && val.length() > 0;
   }
@@ -193,13 +193,14 @@ public final class OmUtils {
    * @param serviceId OM HA cluster service ID
    * @return true if HA is configured in the configuration; else false.
    */
-  public static boolean isOmHAServiceId(Configuration conf, String serviceId) {
+  public static boolean isOmHAServiceId(ConfigurationSource conf,
+      String serviceId) {
     Collection<String> omServiceIds = conf.getTrimmedStringCollection(
         OZONE_OM_SERVICE_IDS_KEY);
     return omServiceIds.contains(serviceId);
   }
 
-  public static int getOmRpcPort(Configuration conf) {
+  public static int getOmRpcPort(ConfigurationSource conf) {
     return getPortNumberFromConfigKeys(conf, OZONE_OM_ADDRESS_KEY)
         .orElse(OZONE_OM_PORT_DEFAULT);
   }
@@ -211,12 +212,12 @@ public final class OmUtils {
    * @param confKey configuration key to lookup address from
    * @return Port on which OM RPC server will listen on
    */
-  public static int getOmRpcPort(Configuration conf, String confKey) {
+  public static int getOmRpcPort(ConfigurationSource conf, String confKey) {
     return getPortNumberFromConfigKeys(conf, confKey)
         .orElse(OZONE_OM_PORT_DEFAULT);
   }
 
-  public static int getOmRestPort(Configuration conf) {
+  public static int getOmRestPort(ConfigurationSource conf) {
     return getPortNumberFromConfigKeys(conf, OZONE_OM_HTTP_ADDRESS_KEY)
         .orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
   }
@@ -347,7 +348,7 @@ public final class OmUtils {
   /**
    * Get a collection of all omNodeIds for the given omServiceId.
    */
-  public static Collection<String> getOMNodeIds(Configuration conf,
+  public static Collection<String> getOMNodeIds(ConfigurationSource conf,
       String omServiceId) {
     String key = addSuffix(OZONE_OM_NODES_KEY, omServiceId);
     return conf.getTrimmedStringCollection(key);
@@ -421,7 +422,7 @@ public final class OmUtils {
    * @return if the value is set for key suffixed with OM Node ID, return the
    * value, else return null.
    */
-  public static String getConfSuffixedWithOMNodeId(Configuration conf,
+  public static String getConfSuffixedWithOMNodeId(ConfigurationSource conf,
       String confKey, String omServiceID, String omNodeId) {
     String suffixedConfKey = OmUtils.addKeySuffixes(
         confKey, omServiceID, omNodeId);
@@ -439,7 +440,7 @@ public final class OmUtils {
    * @param omNodeHostAddr peer OM node host address
    * @return http address of peer OM node in the format <hostName>:<port>
    */
-  public static String getHttpAddressForOMPeerNode(Configuration conf,
+  public static String getHttpAddressForOMPeerNode(ConfigurationSource conf,
       String omServiceId, String omNodeId, String omNodeHostAddr) {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTP_BIND_HOST_KEY, omServiceId, omNodeId));
@@ -462,7 +463,7 @@ public final class OmUtils {
    * @param omNodeHostAddr peer OM node host address
    * @return https address of peer OM node in the format <hostName>:<port>
    */
-  public static String getHttpsAddressForOMPeerNode(Configuration conf,
+  public static String getHttpsAddressForOMPeerNode(ConfigurationSource conf,
       String omServiceId, String omNodeId, String omNodeHostAddr) {
     final Optional<String> bindHost = getHostNameFromConfigKeys(conf,
         addKeySuffixes(OZONE_OM_HTTPS_BIND_HOST_KEY, omServiceId, omNodeId));

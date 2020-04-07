@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -37,7 +37,7 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   private  boolean isHealthy;
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, Configuration conf,
+      PipelineStateManager stateManager, ConfigurationSource conf,
       EventPublisher eventPublisher, boolean autoOpen) {
     super(nodeManager, stateManager, conf, eventPublisher);
     autoOpenPipeline = autoOpen;
@@ -45,19 +45,19 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
                             PipelineStateManager stateManager,
-                            Configuration conf) {
+                            ConfigurationSource conf) {
     super(nodeManager, stateManager, conf, new EventQueue());
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
                                    PipelineStateManager stateManager,
-                                   Configuration conf, boolean isHealthy) {
+                                   ConfigurationSource conf, boolean isHealthy) {
     super(nodeManager, stateManager, conf, new EventQueue());
     this.isHealthy = isHealthy;
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, Configuration conf,
+      PipelineStateManager stateManager, ConfigurationSource conf,
       EventPublisher eventPublisher) {
     super(nodeManager, stateManager, conf, eventPublisher);
     autoOpenPipeline = true;

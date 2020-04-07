@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
@@ -62,11 +62,11 @@ public class KeyValueContainerCheck {
 
   private long containerID;
   private KeyValueContainerData onDiskContainerData; //loaded from fs/disk
-  private Configuration checkConfig;
+  private ConfigurationSource checkConfig;
 
   private String metadataPath;
 
-  public KeyValueContainerCheck(String metadataPath, Configuration conf,
+  public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
       long containerID) {
     Preconditions.checkArgument(metadataPath != null);
 

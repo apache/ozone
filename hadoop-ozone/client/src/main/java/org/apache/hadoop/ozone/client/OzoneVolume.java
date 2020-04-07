@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -88,7 +88,7 @@ public class OzoneVolume extends WithMetadata {
    * @param metadata custom key value metadata.
    */
   @SuppressWarnings("parameternumber")
-  public OzoneVolume(Configuration conf, ClientProtocol proxy, String name,
+  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy, String name,
                      String admin, String owner, long quotaInBytes,
                      long creationTime, List<OzoneAcl> acls,
                      Map<String, String> metadata) {
@@ -105,7 +105,7 @@ public class OzoneVolume extends WithMetadata {
   }
 
   @SuppressWarnings("parameternumber")
-  public OzoneVolume(Configuration conf, ClientProtocol proxy, String name,
+  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy, String name,
                      String admin, String owner, long quotaInBytes,
                      long creationTime, List<OzoneAcl> acls) {
     this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls,

@@ -26,8 +26,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
@@ -63,7 +63,7 @@ public class TestVolumeSetDiskChecks {
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
-  private Configuration conf = null;
+  private OzoneConfiguration conf = null;
 
   /**
    * Cleanup volume directories.
@@ -115,7 +115,7 @@ public class TestVolumeSetDiskChecks {
     final MutableVolumeSet volumeSet = new MutableVolumeSet(
         UUID.randomUUID().toString(), conf) {
       @Override
-      HddsVolumeChecker getVolumeChecker(Configuration configuration)
+      HddsVolumeChecker getVolumeChecker(ConfigurationSource configuration)
           throws DiskErrorException {
         return new DummyChecker(configuration, new Timer(), numBadVolumes);
       }
@@ -139,7 +139,7 @@ public class TestVolumeSetDiskChecks {
     final MutableVolumeSet volumeSet = new MutableVolumeSet(
         UUID.randomUUID().toString(), conf) {
       @Override
-      HddsVolumeChecker getVolumeChecker(Configuration configuration)
+      HddsVolumeChecker getVolumeChecker(ConfigurationSource configuration)
           throws DiskErrorException {
         return new DummyChecker(configuration, new Timer(), numVolumes);
       }
@@ -155,8 +155,8 @@ public class TestVolumeSetDiskChecks {
    * storage directories.
    * @param numDirs
    */
-  private Configuration getConfWithDataNodeDirs(int numDirs) {
-    final Configuration ozoneConf = new OzoneConfiguration();
+  private OzoneConfiguration getConfWithDataNodeDirs(int numDirs) {
+    final OzoneConfiguration ozoneConf = new OzoneConfiguration();
     final List<String> dirs = new ArrayList<>();
     for (int i = 0; i < numDirs; ++i) {
       dirs.add(GenericTestUtils.getRandomizedTestDir().getPath());
@@ -173,7 +173,7 @@ public class TestVolumeSetDiskChecks {
   static class DummyChecker extends HddsVolumeChecker {
     private final int numBadVolumes;
 
-    DummyChecker(Configuration conf, Timer timer, int numBadVolumes)
+    DummyChecker(ConfigurationSource conf, Timer timer, int numBadVolumes)
         throws DiskErrorException {
       super(conf, timer);
       this.numBadVolumes = numBadVolumes;

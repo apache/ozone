@@ -29,11 +29,11 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
@@ -357,7 +357,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
    * @param config
    * */
   @VisibleForTesting
-  public PKCS10CertificationRequest getCSR(Configuration config)
+  public PKCS10CertificationRequest getCSR(ConfigurationSource config)
       throws IOException {
     CertificateSignRequest.Builder builder = dnCertClient.getCSRBuilder();
     KeyPair keyPair = new KeyPair(dnCertClient.getPublicKey(),

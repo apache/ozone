@@ -31,7 +31,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -216,7 +216,7 @@ public final class HddsClientUtils {
    * @param conf Configuration object
    * @return list cache size
    */
-  public static int getListCacheSize(Configuration conf) {
+  public static int getListCacheSize(ConfigurationSource conf) {
     return conf.getInt(OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE,
         OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE_DEFAULT);
   }
@@ -225,7 +225,7 @@ public final class HddsClientUtils {
    * @return a default instance of {@link CloseableHttpClient}.
    */
   public static CloseableHttpClient newHttpClient() {
-    return HddsClientUtils.newHttpClient(new Configuration());
+    return HddsClientUtils.newHttpClient(new OzoneConfiguration());
   }
 
   /**
@@ -235,7 +235,7 @@ public final class HddsClientUtils {
    * @param conf configuration
    * @return a {@link CloseableHttpClient} instance.
    */
-  public static CloseableHttpClient newHttpClient(Configuration conf) {
+  public static CloseableHttpClient newHttpClient(ConfigurationSource conf) {
     long socketTimeout = OzoneConfigKeys
         .OZONE_CLIENT_SOCKET_TIMEOUT_DEFAULT;
     long connectionTimeout = OzoneConfigKeys
@@ -265,7 +265,7 @@ public final class HddsClientUtils {
    * Returns the maximum no of outstanding async requests to be handled by
    * Standalone and Ratis client.
    */
-  public static int getMaxOutstandingRequests(Configuration config) {
+  public static int getMaxOutstandingRequests(ConfigurationSource config) {
     return OzoneConfiguration.of(config)
         .getObject(RatisClientConfig.class)
         .getMaxOutstandingRequests();
