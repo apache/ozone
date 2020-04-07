@@ -54,7 +54,7 @@ public class CancelTokenHandler extends Handler {
       try (OzoneClient ozoneClient = OzoneClientFactory.getOzoneClient(
           getConf(), token)) {
         ozoneClient.getObjectStore().cancelDelegationToken(token);
-        out().printf("Token canceled successfully.");
+        out().printf("Token canceled successfully.%n");
       }
     }
   }

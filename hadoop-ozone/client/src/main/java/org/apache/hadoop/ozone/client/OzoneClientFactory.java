@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.client;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 
@@ -173,7 +175,12 @@ public final class OzoneClientFactory {
   public static OzoneClient getOzoneClient(Configuration conf,
       Token<OzoneTokenIdentifier> token) throws IOException {
     Preconditions.checkNotNull(token, "Null token is not allowed");
-    String omServiceId = token.decodeIdentifier().getOmServiceId();
+    OzoneTokenIdentifier tokenId = new OzoneTokenIdentifier();
+    ByteArrayInputStream buf = new ByteArrayInputStream(
+        token.getIdentifier());
+    DataInputStream in = new DataInputStream(buf);
+    tokenId.readFields(in);
+    String omServiceId = tokenId.getOmServiceId();
     if (StringUtils.isNotEmpty(omServiceId)) {
       // new OM should always issue token with omServiceId
       if (!OmUtils.isServiceIdsDefined(conf)

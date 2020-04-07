@@ -55,7 +55,7 @@ public class RenewTokenHandler extends Handler {
           getConf(), token)) {
         long expiryTime = ozoneClient.getObjectStore()
             .renewDelegationToken(token);
-        out().printf("Token renewed successfully, expiry time: %s",
+        out().printf("Token renewed successfully, expiry time: %s.%n",
             expiryTime);
       }
     }
