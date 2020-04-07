@@ -130,10 +130,6 @@ public class TestOzoneManagerListVolumes {
     ClientProtocol proxy = objectStore.getClientProxy();
     objectStore.createVolume(volumeName);
     proxy.setVolumeOwner(volumeName, ownerName);
-//    OzoneAcl acl1 = new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
-//        "johndoe", IAccessAuthorizer.ACLType.ALL, ACCESS);
-//    List<OzoneAcl> aclList = new ArrayList<>();
-//    aclList.add(acl1);
     setVolumeAcl(objectStore, volumeName, aclString);
   }
 
@@ -183,14 +179,10 @@ public class TestOzoneManagerListVolumes {
       try {
         objectStore.listVolumes("volume");
         Assert.fail("listAllVolumes should fail for " + user.getUserName());
-      } catch (OMException ex) {
-        // Expect PERMISSION_DENIED if user is not admin and listall disallowed
-        if (ex.getResult() != OMException.ResultCodes.PERMISSION_DENIED) {
-          throw ex;
-        }
       } catch (RuntimeException ex) {
         // Current listAllVolumes throws RuntimeException
         if (ex.getCause() instanceof OMException) {
+          // Expect PERMISSION_DENIED
           if (((OMException) ex.getCause()).getResult() !=
               OMException.ResultCodes.PERMISSION_DENIED) {
             throw ex;
