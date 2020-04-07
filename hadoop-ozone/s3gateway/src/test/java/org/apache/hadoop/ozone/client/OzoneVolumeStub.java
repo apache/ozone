@@ -39,10 +39,9 @@ public class OzoneVolumeStub extends OzoneVolume {
   private Map<String, OzoneBucketStub> buckets = new HashMap<>();
 
   public OzoneVolumeStub(String name, String admin, String owner,
-      long quotaInBytes, long creationTime,
-      long modificationTime, List<OzoneAcl> acls) {
+      long quotaInBytes, long creationTime, List<OzoneAcl> acls) {
     super(name, admin, owner, quotaInBytes,
-        creationTime, modificationTime, acls);
+        creationTime, acls);
   }
 
   @Override
@@ -55,13 +54,12 @@ public class OzoneVolumeStub extends OzoneVolume {
 
   @Override
   public void createBucket(String bucketName, BucketArgs bucketArgs) {
-    long initialTime = Time.now();
     buckets.put(bucketName, new OzoneBucketStub(
         getName(),
         bucketName,
         bucketArgs.getStorageType(),
         bucketArgs.getVersioning(),
-        initialTime, initialTime));
+        Time.now()));
   }
 
   @Override

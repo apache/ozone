@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.util.Time;
 
 /**
  * A class that encapsulates OzoneVolume.
@@ -88,15 +89,13 @@ public class OzoneVolume extends WithMetadata {
    * @param owner Volume owner.
    * @param quotaInBytes Volume quota in bytes.
    * @param creationTime creation time of the volume
-   * @param modificationTime modification time of the volume.
    * @param acls ACLs associated with the volume.
    * @param metadata custom key value metadata.
    */
   @SuppressWarnings("parameternumber")
   public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
       String name, String admin, String owner, long quotaInBytes,
-      long creationTime, long modificationTime, List<OzoneAcl> acls,
-      Map<String, String> metadata) {
+      long creationTime, List<OzoneAcl> acls, Map<String, String> metadata) {
     Preconditions.checkNotNull(proxy, "Client proxy is not set.");
     this.proxy = proxy;
     this.name = name;
@@ -104,33 +103,77 @@ public class OzoneVolume extends WithMetadata {
     this.owner = owner;
     this.quotaInBytes = quotaInBytes;
     this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.acls = acls;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.metadata = metadata;
+    long modificationTime = Time.now();
+    if (modificationTime < creationTime) {
+      this.modificationTime = Instant.ofEpochMilli(creationTime);
+    } else {
+      this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    }
   }
 
+  /**
+   * @param modificationTime modification time of the volume.
+   */
   @SuppressWarnings("parameternumber")
   public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
       String name, String admin, String owner, long quotaInBytes,
-      long creationTime, long modificationTime, List<OzoneAcl> acls) {
+      long creationTime, long modificationTime, List<OzoneAcl> acls,
+      Map<String, String> metadata) {
     this(conf, proxy, name, admin, owner, quotaInBytes,
-        creationTime, modificationTime, acls, new HashMap<>());
+        creationTime, acls, metadata);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy, String name,
+      String admin, String owner, long quotaInBytes,
+      long creationTime, List<OzoneAcl> acls) {
+    this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls,
+        new HashMap<>());
+    long modificationTime = Time.now();
+    if (modificationTime < creationTime) {
+      this.modificationTime = Instant.ofEpochMilli(creationTime);
+    } else {
+      this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    }
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneVolume(ConfigurationSourceq conf, ClientProtocol proxy, String name,
+      String admin, String owner, long quotaInBytes, long creationTime,
+      long modificationTime, List<OzoneAcl> acls) {
+    this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   @VisibleForTesting
   protected OzoneVolume(String name, String admin, String owner,
-      long quotaInBytes, long creationTime,
-      long modificationTime, List<OzoneAcl> acls) {
+      long quotaInBytes, long creationTime, List<OzoneAcl> acls) {
     this.proxy = null;
     this.name = name;
     this.admin = admin;
     this.owner = owner;
     this.quotaInBytes = quotaInBytes;
     this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.acls = acls;
     this.metadata = new HashMap<>();
+    long modificationTime = Time.now();
+    if (modificationTime < creationTime) {
+      this.modificationTime = Instant.ofEpochMilli(creationTime);
+    } else {
+      this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    }
+  }
+
+  @VisibleForTesting
+  protected OzoneVolume(String name, String admin, String owner,
+      long quotaInBytes, long creationTime, long modificationTime,
+      List<OzoneAcl> acls) {
+    this(name, admin, owner, quotaInBytes, creationTime, acls);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   /**

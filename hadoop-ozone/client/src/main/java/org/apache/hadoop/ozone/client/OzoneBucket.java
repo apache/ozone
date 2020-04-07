@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -140,16 +141,31 @@ public class OzoneBucket extends WithMetadata {
   @SuppressWarnings("parameternumber")
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName) {
+      Boolean versioning, long creationTime, Map<String, String> metadata,
+      String encryptionKeyName) {
     this(conf, volumeName, bucketName, null, null, proxy);
     this.storageType = storageType;
     this.versioning = versioning;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.metadata = metadata;
     this.encryptionKeyName = encryptionKeyName;
+    long modificationTime = Time.now();
+    if (modificationTime < creationTime) {
+      this.modificationTime = Instant.ofEpochMilli(creationTime);
+    } else {
+      this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    }
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(Configuration conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata, String encryptionKeyName) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, metadata, encryptionKeyName);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   /**
@@ -161,20 +177,36 @@ public class OzoneBucket extends WithMetadata {
    * @param storageType StorageType of the bucket.
    * @param versioning versioning status of the bucket.
    * @param creationTime creation time of the bucket.
-   * @param modificationTime modification time of the bucket.
    */
   @SuppressWarnings("parameternumber")
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata) {
+      Boolean versioning, long creationTime, Map<String, String> metadata) {
     this(conf, volumeName, bucketName, null, null, proxy);
     this.storageType = storageType;
     this.versioning = versioning;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.metadata = metadata;
+    long modificationTime = Time.now();
+    if (modificationTime < creationTime) {
+      this.modificationTime = Instant.ofEpochMilli(creationTime);
+    } else {
+      this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    }
+  }
+
+  /**
+   * @param modificationTime modification time of the bucket.
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(Configuration conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, metadata);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   @VisibleForTesting
@@ -182,7 +214,7 @@ public class OzoneBucket extends WithMetadata {
   OzoneBucket(String volumeName, String name,
       ReplicationFactor defaultReplication,
       ReplicationType defaultReplicationType, StorageType storageType,
-      Boolean versioning, long creationTime, long modificationTime) {
+      Boolean versioning, long creationTime) {
     this.proxy = null;
     this.volumeName = volumeName;
     this.name = name;
@@ -191,14 +223,18 @@ public class OzoneBucket extends WithMetadata {
     this.storageType = storageType;
     this.versioning = versioning;
     this.creationTime = Instant.ofEpochMilli(creationTime);
-    this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(name)
         .setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
+    long modificationTime = Time.now();
+    if (modificationTime < creationTime) {
+      this.modificationTime = Instant.ofEpochMilli(creationTime);
+    } else {
+      this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    }
   }
-
 
   /**
    * Returns Volume Name.

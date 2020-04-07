@@ -60,16 +60,13 @@ public class ObjectStoreStub extends ObjectStore {
   }
 
   @Override
-  public void createVolume(String volumeName, VolumeArgs volumeArgs)
-      throws IOException {
-    long initialTime = Time.now();
+  public void createVolume(String volumeName, VolumeArgs volumeArgs) {
     OzoneVolumeStub volume =
         new OzoneVolumeStub(volumeName,
             volumeArgs.getAdmin(),
             volumeArgs.getOwner(),
             Long.parseLong(volumeArgs.getQuota()),
-            initialTime,
-            initialTime,
+            Time.now(),
             volumeArgs.getAcls());
     volumes.put(volumeName, volume);
   }
