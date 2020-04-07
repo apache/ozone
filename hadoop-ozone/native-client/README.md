@@ -54,21 +54,26 @@ For example
 
 #Common Problems:
 
-CLASSPATH is not set. CLASSPATH can be set using the following command: 
+CLASSPATH is not set. CLASSPATH can be set using the following command:
+ 
            export CLASSPATH=$({OZONE_HOME}/hadoop-ozone/dist/target/ozone-0.5.0-SNAPSHOT/bin/ozone classpath hadoop-ozone-filesystem --glob)
 
            export CLASSPATH=$CLASSPATH:{OZONE_HOME}/hadoop-ozone/dist/target/ozone-0.5.0-SNAPSHOT/share/ozone/lib/hadoop-ozone-filesystem-0.5.0-SNAPSHOT.jar
+
 LD_LIBRARY_PATH is not set. LD_LIBRARY_PATH can be set using the following command:  
+
            export LD_LIBRARY_PATH={HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib:
                   /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08-0.el7_7.x86_64/jre/lib/amd64/server:
                   {OZONE_HOME}/ozone-native-client/libozone
+
 Ozone-site.xml is not configured. Save the minimal snippet to hadoop-ozone/dist/target/ozone-*/etc/hadoop/ozone-site.xml in the compiled distribution.
-    <configuration>
-    <properties>
-     <property><name>ozone.scm.datanode.id.dir</name><value>/tmp/ozone/data</value></property>
-     <property><name>ozone.replication</name><value>1</value></property>
-     <property><name>ozone.metadata.dirs</name><value>/tmp/ozone/data/metadata</value></property>
-     <property><name>ozone.scm.names</name><value>localhost</value></property>
-     <property><name>ozone.om.address</name><value>localhost</value></property>
-    </properties>
-    </configuration>
+
+            <configuration>
+            <properties>
+             <property><name>ozone.scm.datanode.id.dir</name><value>/tmp/ozone/data</value></property>
+             <property><name>ozone.replication</name><value>1</value></property>
+             <property><name>ozone.metadata.dirs</name><value>/tmp/ozone/data/metadata</value></property>
+             <property><name>ozone.scm.names</name><value>localhost</value></property>
+             <property><name>ozone.om.address</name><value>localhost</value></property>
+            </properties>
+            </configuration>
