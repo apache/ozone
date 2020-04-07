@@ -15,7 +15,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-package org.apache.hadoop.ozone.web.utils;
+package org.apache.hadoop.hdds.server;
 
 import java.io.IOException;
 
@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 
 import org.junit.Test;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Test the json object printer.
@@ -41,7 +41,7 @@ public class TestJsonUtils {
   }
 
   private static void assertContains(String str, String part) {
-    assertTrue(str.contains(part),
-        () -> "Expected JSON to contain '" + part + "', but didn't: " + str);
+    assertTrue("Expected JSON to contain '" + part + "', but didn't: " + str,
+        str.contains(part));
   }
 }

@@ -18,9 +18,10 @@
 
 package org.apache.hadoop.ozone.web.ozShell.token;
 
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.ozone.web.utils.JsonUtils;
 import org.apache.hadoop.security.token.Token;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
