@@ -79,7 +79,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     // Set creation time & set modification time
     long initialTime = Time.now();
     VolumeInfo updatedVolumeInfo =
-        volumeInfo.toBuilder().setCreationTime(Time.now()).build();
         volumeInfo.toBuilder()
             .setCreationTime(initialTime)
             .setModificationTime(initialTime)

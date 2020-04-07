@@ -241,6 +241,8 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
         updated.getOwnerName());
     Assert.assertNotEquals(original.getCreationTime(),
         updated.getCreationTime());
+    Assert.assertNotEquals(original.getModificationTime(),
+        updated.getModificationTime());
   }
 
   @Test
