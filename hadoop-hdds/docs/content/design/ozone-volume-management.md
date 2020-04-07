@@ -83,11 +83,11 @@ Ozone FileSystem Uri is : o3fs://bucket1.s3c89e813c80ffcea9543004d57b2a1239
 
 ## Proposed solution[1]
 
-### Supporting multiple access keys
+### Supporting multiple access keys (#5 from the problem listing)
 
 Problem #5 can be easily supported with improving the `ozone s3` CLI. Ozone has a separated table for the S3 secrets and the API can be improved to handle multiple secrets for one specific kerberos user.
 
-### Solving the mapping problem (2-5)
+### Solving the mapping problem (#2-4 from the problem listing)
 
  1. Let's always use `s3` volume for all the s3 buckets **if the bucket is created from the s3 interface**.
 
