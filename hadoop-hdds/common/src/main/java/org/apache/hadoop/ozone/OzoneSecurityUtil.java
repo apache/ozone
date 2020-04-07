@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
@@ -59,6 +61,12 @@ public final class OzoneSecurityUtil {
   public static boolean isSecurityEnabled(Configuration conf) {
     return conf.getBoolean(OZONE_SECURITY_ENABLED_KEY,
         OZONE_SECURITY_ENABLED_DEFAULT);
+  }
+
+  public static boolean isHttpSecurityEnabled(Configuration conf) {
+    return isSecurityEnabled(conf) &&
+        conf.getBoolean(OZONE_HTTP_SECURITY_ENABLED_KEY,
+        OZONE_HTTP_SECURITY_ENABLED_DEFAULT);
   }
 
   /**
