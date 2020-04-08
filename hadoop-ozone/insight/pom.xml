@@ -59,16 +59,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hadoop-hdds-tools</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
       <groupId>com.sun.xml.bind</groupId>
       <artifactId>jaxb-core</artifactId>
     </dependency>
