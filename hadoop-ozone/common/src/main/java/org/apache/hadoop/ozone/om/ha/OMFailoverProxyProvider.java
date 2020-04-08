@@ -282,12 +282,6 @@ public class OMFailoverProxyProvider implements
    * not match the current leaderOMNodeId cached by the proxy provider.
    */
   public void performFailoverToNextProxy() {
-
-    // Before failing over to next proxy, add the proxy OM (which has
-    // returned an exception) to the list of attemptedOMs.
-    lastAttemptedOM = currentProxyOMNodeId;
-    attemptedOMs.add(currentProxyOMNodeId);
-
     int newProxyIndex = incrementProxyIndex();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Incrementing OM proxy index to {}, nodeId: {}",
@@ -300,6 +294,11 @@ public class OMFailoverProxyProvider implements
    * @return the new proxy index
    */
   private synchronized int incrementProxyIndex() {
+    // Before failing over to next proxy, add the proxy OM (which has
+    // returned an exception) to the list of attemptedOMs.
+    lastAttemptedOM = currentProxyOMNodeId;
+    attemptedOMs.add(currentProxyOMNodeId);
+
     currentProxyIndex = (currentProxyIndex + 1) % omProxies.size();
     currentProxyOMNodeId = omNodeIDList.get(currentProxyIndex);
     return currentProxyIndex;
@@ -325,7 +324,7 @@ public class OMFailoverProxyProvider implements
     return currentProxyIndex;
   }
 
-  public long getWaitTime() {
+  public synchronized long getWaitTime() {
     if (currentProxyOMNodeId.equals(lastAttemptedOM)) {
       // Clear attemptedOMs list as round robin has been broken. Add only the
       attemptedOMs.clear();
