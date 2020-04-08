@@ -361,7 +361,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   @Override
   public void handleSafeModeTransition(
       SCMSafeModeManager.SafeModeStatus status) {
-    this.safeModePrecheck.setInSafeMode(status.getSafeModeStatus());
+    this.safeModePrecheck.setInSafeMode(status.isInSafeMode());
   }
   /**
    * Returns status of scm safe mode determined by SAFE_MODE_STATUS event.
