@@ -372,6 +372,13 @@ public class SCMContainerManager implements ContainerManager {
     }
   }
 
+  @Override
+  public void flushDB() throws IOException {
+    if (containerStore != null) {
+      containerStore.flushDB(true);
+    }
+  }
+
     /**
      * Update deleteTransactionId according to deleteTransactionMap.
      *

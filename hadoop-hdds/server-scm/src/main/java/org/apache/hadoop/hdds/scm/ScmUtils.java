@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.scm.safemode.Precheck;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+
 /**
  * SCM utility class.
  */
@@ -48,4 +50,14 @@ public final class ScmUtils {
     }
   }
 
+  /**
+   * Create SCM directory file based on given path.
+   */
+  public static File createSCMDir(String dirPath) {
+    File dirFile = new File(dirPath);
+    if (!dirFile.mkdirs() && !dirFile.exists()) {
+      throw new IllegalArgumentException("Unable to create path: " + dirFile);
+    }
+    return dirFile;
+  }
 }
