@@ -82,9 +82,7 @@ public class TestMissingContainerTask extends AbstractReconSqlDBTest {
     when(containerManagerMock.getContainerReplicas(new ContainerID(3L)))
         .thenReturn(Collections.emptySet());
 
-    MissingContainersDao missingContainersDao =
-        getDao(MissingContainersDao.class);
-    List<MissingContainers> all = missingContainersDao.findAll();
+    List<MissingContainers> all = missingContainersTableHandle.findAll();
     Assert.assertTrue(all.isEmpty());
 
     long currentTime = System.currentTimeMillis();
