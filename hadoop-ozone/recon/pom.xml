@@ -16,8 +16,8 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
-    <artifactId>hadoop-ozone</artifactId>
     <groupId>org.apache.hadoop</groupId>
+    <artifactId>hadoop-ozone</artifactId>
     <version>0.6.0-SNAPSHOT</version>
   </parent>
   <name>Apache Hadoop Ozone Recon</name>
@@ -294,9 +294,8 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
+      <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
-      <type>test-jar</type>
       <exclusions>
         <exclusion>
           <artifactId>jersey-server</artifactId>

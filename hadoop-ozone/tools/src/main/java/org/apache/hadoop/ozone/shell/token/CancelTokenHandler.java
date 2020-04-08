@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell.token;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.Handler;
@@ -50,8 +51,11 @@ public class CancelTokenHandler extends Handler {
 
     if (securityEnabled("token cancel") && tokenFile.exists()) {
       Token<OzoneTokenIdentifier> token = tokenFile.decode();
-      client.getObjectStore().cancelDelegationToken(token);
+      try (OzoneClient ozoneClient = OzoneClientFactory.getOzoneClient(
+          getConf(), token)) {
+        ozoneClient.getObjectStore().cancelDelegationToken(token);
+        out().printf("Token canceled successfully.%n");
+      }
     }
   }
-
 }
