@@ -27,8 +27,9 @@ declare -i rc
 mvn ${MAVEN_OPTIONS} checkstyle:check > "${REPORT_DIR}/output.log"
 rc=$?
 if [[ ${rc} -ne 0 ]]; then
-  mvn ${MAVEN_OPTIONS} test-compile checkstyle:check
+  mvn ${MAVEN_OPTIONS} clean test-compile checkstyle:check
   rc=$?
+  mkdir -p "$REPORT_DIR" # removed by mvn clean
 else
   cat "${REPORT_DIR}/output.log"
 fi
