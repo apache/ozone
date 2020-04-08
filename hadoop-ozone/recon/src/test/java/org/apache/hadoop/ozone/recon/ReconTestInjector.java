@@ -160,10 +160,6 @@ public class ReconTestInjector {
             bind(ReconOMMetadataManager.class)
                 .toInstance(reconOMMetadataManager);
           }
-          if (reconOMMetadataManager != null) {
-            bind(ReconOMMetadataManager.class)
-                .toInstance(reconOMMetadataManager);
-          }
 
           if (ozoneManagerServiceProvider != null) {
             bind(OzoneManagerServiceProvider.class)
