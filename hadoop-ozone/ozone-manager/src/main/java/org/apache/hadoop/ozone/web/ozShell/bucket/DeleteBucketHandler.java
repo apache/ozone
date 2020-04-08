@@ -20,45 +20,28 @@ package org.apache.hadoop.ozone.web.ozShell.bucket;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
 
 /**
  * Delete bucket Handler.
  */
 @Command(name = "delete",
     description = "deletes an empty bucket")
-public class DeleteBucketHandler extends Handler {
+public class DeleteBucketHandler extends BucketHandler {
 
-  @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
-  private String uri;
-
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureBucketAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+    String volumeName = address.getVolumeName();
+    String bucketName = address.getBucketName();
 
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
-
-      if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("Bucket Name : %s%n", bucketName);
-      }
-
-      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-      vol.deleteBucket(bucketName);
-    }
-    return null;
+    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+    vol.deleteBucket(bucketName);
   }
+
 }

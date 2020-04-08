@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -48,6 +50,9 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     doPreExecute(volumeName, bucketName);
+    // Verify invalid bucket name throws exception
+    LambdaTestUtils.intercept(OMException.class, "Invalid bucket name: b1",
+        () -> doPreExecute("volume1", "b1"));
   }
 
 

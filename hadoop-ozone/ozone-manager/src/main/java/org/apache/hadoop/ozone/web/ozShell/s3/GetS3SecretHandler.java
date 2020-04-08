@@ -17,13 +17,12 @@
  */
 package org.apache.hadoop.ozone.web.ozShell.s3;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine.Command;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import java.io.IOException;
 
 /**
  * Executes getsecret calls.
@@ -32,32 +31,13 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
     description = "Returns s3 secret for current user")
 public class GetS3SecretHandler extends S3Handler {
 
-  public static final String OZONE_GETS3SECRET_ERROR = "This command is not" +
-      " supported in unsecure clusters.";
-
-  /**
-   * Executes getS3Secret.
-   */
   @Override
-  public Void call() throws Exception {
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    try (OzoneClient client =
-        new OzoneAddress().createClientForS3Commands(ozoneConfiguration,
-            getOmServiceID())) {
-
-      // getS3Secret works only with secured clusters
-      if (ozoneConfiguration.getBoolean(OZONE_SECURITY_ENABLED_KEY, false)) {
-        System.out.println(
-            client.getObjectStore().getS3Secret(
-                UserGroupInformation.getCurrentUser().getUserName()
-            ).toString()
-        );
-      } else {
-        // log a warning message for unsecured cluster
-        System.out.println(OZONE_GETS3SECRET_ERROR);
-      }
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
+    if (securityEnabled("s3 getsecret")) {
+      String userName = UserGroupInformation.getCurrentUser().getUserName();
+      out().println(client.getObjectStore().getS3Secret(userName));
     }
-
-    return null;
   }
+
 }

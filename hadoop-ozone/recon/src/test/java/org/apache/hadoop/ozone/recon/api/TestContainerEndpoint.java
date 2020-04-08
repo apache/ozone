@@ -24,15 +24,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -50,6 +54,7 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -59,12 +64,11 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
+import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
 import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.Before;
@@ -83,8 +87,8 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
   private GuiceInjectorUtilsForTestsImpl guiceInjectorTest =
       new GuiceInjectorUtilsForTestsImpl();
   private boolean isSetupDone = false;
+  private ContainerSchemaManager containerSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private MissingContainersDao missingContainersDao;
   private ContainerID containerID = new ContainerID(1L);
   private PipelineID pipelineID;
   private long keyCount = 5L;
@@ -110,19 +114,19 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
         new ContainerInfo.Builder()
             .setContainerID(containerID.getId())
             .setNumberOfKeys(keyCount)
+            .setReplicationFactor(ReplicationFactor.THREE)
             .setPipelineID(pipelineID)
             .build()
     );
     when(mockReconSCM.getContainerManager())
         .thenReturn(mockContainerManager);
 
+    Configuration sqlConfiguration =
+        parentInjector.getInstance((Configuration.class));
     Injector injector = parentInjector.createChildInjector(
         new AbstractModule() {
           @Override
           protected void configure() {
-            Configuration sqlConfiguration =
-                parentInjector.getInstance((Configuration.class));
-
             try {
               ReconTaskSchemaDefinition taskSchemaDefinition = parentInjector
                   .getInstance(ReconTaskSchemaDefinition.class);
@@ -133,7 +137,6 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
 
             ReconTaskStatusDao reconTaskStatusDao =
                 new ReconTaskStatusDao(sqlConfiguration);
-
             bind(ReconTaskStatusDao.class).toInstance(reconTaskStatusDao);
 
             StorageContainerServiceProvider mockScmServiceProvider = mock(
@@ -145,16 +148,17 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
             bind(ContainerEndpoint.class);
           }
         });
+
     containerEndpoint = injector.getInstance(ContainerEndpoint.class);
     containerDbServiceProvider = injector.getInstance(
         ContainerDBServiceProvider.class);
     StatsSchemaDefinition schemaDefinition = injector.getInstance(
         StatsSchemaDefinition.class);
     schemaDefinition.initializeSchema();
-    UtilizationSchemaDefinition utilizationSchemaDefinition =
-        injector.getInstance(UtilizationSchemaDefinition.class);
-    utilizationSchemaDefinition.initializeSchema();
-    missingContainersDao = injector.getInstance(MissingContainersDao.class);
+    ContainerSchemaDefinition containerSchemaDefinition =
+        injector.getInstance(ContainerSchemaDefinition.class);
+    containerSchemaDefinition.initializeSchema();
+    containerSchemaManager = injector.getInstance(ContainerSchemaManager.class);
   }
 
   @Before
@@ -426,9 +430,13 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
 
     // Add missing containers to the database
     long missingSince = System.currentTimeMillis();
-    MissingContainers newRecord =
-        new MissingContainers(1L, missingSince);
-    missingContainersDao.insert(newRecord);
+    containerSchemaManager.addMissingContainer(1L, missingSince);
+
+    // Add container history for id 1
+    containerSchemaManager.upsertContainerHistory(1L, "host1", 1L);
+    containerSchemaManager.upsertContainerHistory(1L, "host2", 2L);
+    containerSchemaManager.upsertContainerHistory(1L, "host3", 3L);
+    containerSchemaManager.upsertContainerHistory(1L, "host4", 4L);
 
     response = containerEndpoint.getMissingContainers();
     responseObject = (MissingContainersResponse) response.getEntity();
@@ -440,7 +448,38 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
     assertEquals(containerID.getId(), container.getContainerID());
     assertEquals(keyCount, container.getKeys());
     assertEquals(pipelineID.getId(), container.getPipelineID());
-    assertEquals(0, container.getDatanodes().size());
+    assertEquals(3, container.getReplicas().size());
     assertEquals(missingSince, container.getMissingSince());
+
+    Set<String> datanodes = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList("host2", "host3", "host4")));
+    List<ContainerHistory> containerReplicas = container.getReplicas();
+    containerReplicas.forEach(history -> {
+      Assert.assertTrue(datanodes.contains(history.getDatanodeHost()));
+    });
+  }
+
+  @Test
+  public void testGetReplicaHistoryForContainer() {
+    // Add container history for id 1
+    containerSchemaManager.upsertContainerHistory(1L, "host1", 1L);
+    containerSchemaManager.upsertContainerHistory(1L, "host2", 2L);
+    containerSchemaManager.upsertContainerHistory(1L, "host3", 3L);
+    containerSchemaManager.upsertContainerHistory(1L, "host4", 4L);
+    containerSchemaManager.upsertContainerHistory(1L, "host1", 5L);
+
+    Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
+    List<ContainerHistory> histories =
+        (List<ContainerHistory>) response.getEntity();
+    Set<String> datanodes = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList("host1", "host2", "host3", "host4")));
+    Assert.assertEquals(4, histories.size());
+    histories.forEach(history -> {
+      Assert.assertTrue(datanodes.contains(history.getDatanodeHost()));
+      if (history.getDatanodeHost().equals("host1")) {
+        Assert.assertEquals(1L, (long) history.getFirstReportTimestamp());
+        Assert.assertEquals(5L, (long) history.getLastReportTimestamp());
+      }
+    });
   }
 }

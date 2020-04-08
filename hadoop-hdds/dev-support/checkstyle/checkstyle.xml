@@ -49,6 +49,10 @@
 
 <module name="Checker">
 
+    <module name="BeforeExecutionExclusionFileFilter">
+      <property name="fileNamePattern" value=".*/target/generated.*"/>
+    </module>
+
     <module name="SuppressWarningsFilter"/>
 
     <!-- Checks that a package.html file exists for each package.     -->
@@ -192,5 +196,4 @@
         <module name="UpperEll"/>
 
     </module>
-
 </module>

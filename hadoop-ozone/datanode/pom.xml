@@ -29,7 +29,7 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
+      <artifactId>hadoop-hdds-hadoop-dependency-server</artifactId>
       <scope>compile</scope>
       <exclusions>
         <exclusion>

@@ -20,24 +20,22 @@ package org.apache.hadoop.ozone.web.ozShell.keys;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
@@ -55,11 +53,7 @@ import picocli.CommandLine.Parameters;
  */
 @Command(name = "put",
     description = "creates or overwrites an existing key")
-public class PutKeyHandler extends Handler {
-
-  @Parameters(index = "0", arity = "1..1", description =
-      Shell.OZONE_KEY_URI_DESCRIPTION)
-  private String uri;
+public class PutKeyHandler extends KeyHandler {
 
   @Parameters(index = "1", arity = "1..1", description = "File to upload")
   private String fileName;
@@ -68,62 +62,47 @@ public class PutKeyHandler extends Handler {
       description = "Replication factor of the new key. (use ONE or THREE) "
           + "Default is specified in the cluster-wide config.")
   private ReplicationFactor replicationFactor;
-  /**
-   * Executes the Client Calls.
-   */
+
   @Override
-  public Void call() throws Exception {
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureKeyAddress();
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException, OzoneClientException {
 
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+    String volumeName = address.getVolumeName();
+    String bucketName = address.getBucketName();
+    String keyName = address.getKeyName();
 
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
-      String keyName = address.getKeyName();
+    File dataFile = new File(fileName);
 
-      if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("Bucket Name : %s%n", bucketName);
-        System.out.printf("Key Name : %s%n", keyName);
-      }
-
-      File dataFile = new File(fileName);
-
-      if (isVerbose()) {
-        try (InputStream stream = new FileInputStream(dataFile)) {
-          String hash = DigestUtils.md5Hex(stream);
-          System.out.printf("File Hash : %s%n", hash);
-        }
-      }
-
-      Configuration conf = new OzoneConfiguration();
-      if (replicationFactor == null) {
-        replicationFactor = ReplicationFactor.valueOf(
-            conf.getInt(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
-      }
-
-      ReplicationType replicationType = ReplicationType.valueOf(
-          conf.get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
-      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-      OzoneBucket bucket = vol.getBucket(bucketName);
-
-      Map<String, String> keyMetadata = new HashMap<>();
-      String gdprEnabled = bucket.getMetadata().get(OzoneConsts.GDPR_FLAG);
-      if (Boolean.parseBoolean(gdprEnabled)) {
-        keyMetadata.put(OzoneConsts.GDPR_FLAG, Boolean.TRUE.toString());
-      }
-
-      int chunkSize = (int) conf.getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
-          OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
-      try (InputStream input = new FileInputStream(dataFile);
-           OutputStream output = bucket.createKey(keyName, dataFile.length(),
-               replicationType, replicationFactor, keyMetadata)) {
-        IOUtils.copyBytes(input, output, chunkSize);
+    if (isVerbose()) {
+      try (InputStream stream = new FileInputStream(dataFile)) {
+        String hash = DigestUtils.md5Hex(stream);
+        out().printf("File Hash : %s%n", hash);
       }
     }
-    return null;
+
+    if (replicationFactor == null) {
+      replicationFactor = ReplicationFactor.valueOf(
+          getConf().getInt(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
+    }
+
+    ReplicationType replicationType = ReplicationType.valueOf(
+        getConf().get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
+    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = vol.getBucket(bucketName);
+
+    Map<String, String> keyMetadata = new HashMap<>();
+    String gdprEnabled = bucket.getMetadata().get(OzoneConsts.GDPR_FLAG);
+    if (Boolean.parseBoolean(gdprEnabled)) {
+      keyMetadata.put(OzoneConsts.GDPR_FLAG, Boolean.TRUE.toString());
+    }
+
+    int chunkSize = (int) getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
+        OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
+    try (InputStream input = new FileInputStream(dataFile);
+         OutputStream output = bucket.createKey(keyName, dataFile.length(),
+             replicationType, replicationFactor, keyMetadata)) {
+      IOUtils.copyBytes(input, output, chunkSize);
+    }
   }
 
 }

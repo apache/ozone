@@ -24,11 +24,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 
 import org.slf4j.Logger;
@@ -42,6 +45,7 @@ public class ReconContainerManager extends SCMContainerManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconContainerManager.class);
   private StorageContainerServiceProvider scmClient;
+  private ContainerSchemaManager containerSchemaManager;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -51,8 +55,6 @@ public class ReconContainerManager extends SCMContainerManager {
    * CacheSize is specified
    * in MB.
    *
-   * @param conf            - {@link Configuration}
-   * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
   public ReconContainerManager(
@@ -60,9 +62,11 @@ public class ReconContainerManager extends SCMContainerManager {
       Table<Long, ContainerInfo> containerStore,
       BatchOperationHandler batchHandler,
       PipelineManager pipelineManager,
-      StorageContainerServiceProvider scm) throws IOException {
+      StorageContainerServiceProvider scm,
+      ContainerSchemaManager containerSchemaManager) throws IOException {
     super(conf, containerStore, batchHandler, pipelineManager);
     this.scmClient = scm;
+    this.containerSchemaManager = containerSchemaManager;
   }
 
   /**
@@ -123,5 +127,23 @@ public class ReconContainerManager extends SCMContainerManager {
     } finally {
       getLock().unlock();
     }
+  }
+
+  /**
+   * Add a container Replica for given DataNode.
+   *
+   * @param containerID
+   * @param replica
+   */
+  @Override
+  public void updateContainerReplica(ContainerID containerID,
+      ContainerReplica replica)
+      throws ContainerNotFoundException {
+    super.updateContainerReplica(containerID, replica);
+    // Update container_history table
+    long currentTime = System.currentTimeMillis();
+    String datanodeHost = replica.getDatanodeDetails().getHostName();
+    containerSchemaManager.upsertContainerHistory(containerID.getId(),
+        datanodeHost, currentTime);
   }
 }

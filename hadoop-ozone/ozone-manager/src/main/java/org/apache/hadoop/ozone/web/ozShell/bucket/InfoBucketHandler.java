@@ -19,50 +19,28 @@ package org.apache.hadoop.ozone.web.ozShell.bucket;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.ozShell.ObjectPrinter;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
 
 /**
  * Executes Info bucket.
  */
 @Command(name = "info",
     description = "returns information about a bucket")
-public class InfoBucketHandler extends Handler {
+public class InfoBucketHandler extends BucketHandler {
 
-  @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
-  private String uri;
-
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureBucketAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+  public void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
+    OzoneBucket bucket = client.getObjectStore()
+        .getVolume(address.getVolumeName())
+        .getBucket(address.getBucketName());
 
-      if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("Bucket Name : %s%n", bucketName);
-      }
-
-      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-      OzoneBucket bucket = vol.getBucket(bucketName);
-
-      ObjectPrinter.printObjectAsJson(bucket);
-    }
-
-    return null;
+    printObjectAsJson(bucket);
   }
 
 }

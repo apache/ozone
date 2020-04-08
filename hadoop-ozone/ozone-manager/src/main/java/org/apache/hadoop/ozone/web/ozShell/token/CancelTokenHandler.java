@@ -18,17 +18,17 @@
 
 package org.apache.hadoop.ozone.web.ozShell.token;
 
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
 import org.apache.hadoop.security.token.Token;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.io.IOException;
 
 /**
  * Executes cancelDelegationToken api.
@@ -37,40 +37,25 @@ import java.nio.file.Paths;
     description = "cancel a delegation token.")
 public class CancelTokenHandler extends Handler {
 
-  @CommandLine.Option(names = {"--token", "-t"},
-      description = "file containing encoded token",
-      defaultValue = "/tmp/token.txt",
-      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
-  private String tokenFile;
+  @CommandLine.Mixin
+  private TokenOption tokenFile;
 
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
-    OzoneAddress address = new OzoneAddress("");
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+  protected OzoneAddress getAddress() throws OzoneClientException {
+    return new OzoneAddress();
+  }
 
-      if (!OzoneSecurityUtil.isSecurityEnabled(createOzoneConfiguration())) {
-        System.err.println("Error:Token operations work only when security is" +
-            " " + "enabled. To enable security set ozone.security.enabled to " +
-            "true.");
-        return null;
-      }
+  @Override
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException, OzoneClientException {
 
-      if (Files.notExists(Paths.get(tokenFile))) {
-        System.err.println("Error:Cancel token operation failed as token file: "
-            + tokenFile + " containing encoded token doesn't exist.");
-        return null;
+    if (securityEnabled("token cancel") && tokenFile.exists()) {
+      Token<OzoneTokenIdentifier> token = tokenFile.decode();
+      try (OzoneClient ozoneClient = OzoneClientFactory.getOzoneClient(
+          getConf(), token)) {
+        ozoneClient.getObjectStore().cancelDelegationToken(token);
+        out().printf("Token canceled successfully.%n");
       }
-      Token token = new Token();
-      token.decodeFromUrlString(
-          new String(Files.readAllBytes(Paths.get(tokenFile)),
-              StandardCharsets.UTF_8));
-      client.getObjectStore().cancelDelegationToken(token);
     }
-
-    return null;
   }
 }
