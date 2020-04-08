@@ -204,7 +204,13 @@ public class OMFailoverProxyProvider implements
       }
     }
 
-    return new Text(rpcAddress.toString().substring(1));
+    if (!rpcAddress.toString().isEmpty()) {
+      return new Text(rpcAddress.toString().substring(1));
+    } else {
+      // If all OM addresses are unresolvable, set dt service to null. Let
+      // this fail in later step when during connection setup.
+      return null;
+    }
   }
 
   @Override

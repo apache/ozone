@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
@@ -25,43 +29,37 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.test.GenericTestUtils;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.junit.Assert.assertEquals;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
-
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.mockito.Mockito;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import org.mockito.Mockito;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.times;
 
-
-import java.io.File;
-import java.io.IOException;
-import java.util.HashSet;
-import java.util.UUID;
 
 /**
  * Unit tests for {@link KeyValueHandler}.
@@ -94,28 +92,27 @@ public class TestKeyValueHandler {
   public void setup() throws StorageContainerException {
     // Create mock HddsDispatcher and KeyValueHandler.
     handler = Mockito.mock(KeyValueHandler.class);
-    dispatcher = Mockito.mock(HddsDispatcher.class);
-    Mockito.when(dispatcher.getHandler(any())).thenReturn(handler);
-    Mockito.when(dispatcher.dispatch(any(), any())).thenCallRealMethod();
-    Mockito.when(dispatcher.getContainer(anyLong())).thenReturn(
-        Mockito.mock(KeyValueContainer.class));
-    Mockito.when(dispatcher.getMissingContainerSet())
-        .thenReturn(new HashSet<>());
-    Mockito.when(handler.handle(any(), any(), any())).thenCallRealMethod();
-    doCallRealMethod().when(dispatcher).setMetricsForTesting(any());
-    dispatcher.setMetricsForTesting(Mockito.mock(ContainerMetrics.class));
-    Mockito.when(dispatcher.buildAuditMessageForFailure(any(), any(), any()))
-        .thenCallRealMethod();
-    Mockito.when(dispatcher.buildAuditMessageForSuccess(any(), any()))
-        .thenCallRealMethod();
+
+    HashMap<ContainerType, Handler> handlers = new HashMap<>();
+    handlers.put(ContainerType.KeyValueContainer, handler);
+
+    dispatcher = new HddsDispatcher(
+        new OzoneConfiguration(),
+        Mockito.mock(ContainerSet.class),
+        Mockito.mock(VolumeSet.class),
+        handlers,
+        Mockito.mock(StateContext.class),
+        Mockito.mock(ContainerMetrics.class),
+        Mockito.mock(TokenVerifier.class)
+    );
+
   }
 
   /**
    * Test that Handler handles different command types correctly.
    */
-  @Test
-  public void testHandlerCommandHandling() {
-
+  public void testHandlerCommandHandling() throws Exception {
+    Mockito.reset(handler);
     // Test Create Container Request handling
     ContainerCommandRequestProto createContainerRequest =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
@@ -125,113 +122,132 @@ public class TestKeyValueHandler {
             .setCreateContainer(ContainerProtos.CreateContainerRequestProto
                 .getDefaultInstance())
             .build();
+
+    KeyValueContainer container = Mockito.mock(KeyValueContainer.class);
+
     DispatcherContext context = new DispatcherContext.Builder().build();
-    dispatcher.dispatch(createContainerRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, createContainerRequest, container, context);
     Mockito.verify(handler, times(1)).handleCreateContainer(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Read Container Request handling
     ContainerCommandRequestProto readContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ReadContainer);
-    dispatcher.dispatch(readContainerRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, readContainerRequest, container, context);
     Mockito.verify(handler, times(1)).handleReadContainer(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Update Container Request handling
     ContainerCommandRequestProto updateContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.UpdateContainer);
-    dispatcher.dispatch(updateContainerRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, updateContainerRequest, container, context);
     Mockito.verify(handler, times(1)).handleUpdateContainer(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Delete Container Request handling
     ContainerCommandRequestProto deleteContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.DeleteContainer);
-    dispatcher.dispatch(deleteContainerRequest, null);
+    KeyValueHandler
+        .dispatchRequest(handler, deleteContainerRequest, container, context);
     Mockito.verify(handler, times(1)).handleDeleteContainer(
         any(ContainerCommandRequestProto.class), any());
 
     // Test List Container Request handling
     ContainerCommandRequestProto listContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListContainer);
-    dispatcher.dispatch(listContainerRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, listContainerRequest, container, context);
     Mockito.verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Close Container Request handling
     ContainerCommandRequestProto closeContainerRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.CloseContainer);
-    dispatcher.dispatch(closeContainerRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, closeContainerRequest, container, context);
     Mockito.verify(handler, times(1)).handleCloseContainer(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Put Block Request handling
     ContainerCommandRequestProto putBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.PutBlock);
-    dispatcher.dispatch(putBlockRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, putBlockRequest, container, context);
     Mockito.verify(handler, times(1)).handlePutBlock(
         any(ContainerCommandRequestProto.class), any(), any());
 
     // Test Get Block Request handling
     ContainerCommandRequestProto getBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.GetBlock);
-    dispatcher.dispatch(getBlockRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, getBlockRequest, container, context);
     Mockito.verify(handler, times(1)).handleGetBlock(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Delete Block Request handling
     ContainerCommandRequestProto deleteBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.DeleteBlock);
-    dispatcher.dispatch(deleteBlockRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, deleteBlockRequest, container, context);
     Mockito.verify(handler, times(1)).handleDeleteBlock(
         any(ContainerCommandRequestProto.class), any());
 
     // Test List Block Request handling
     ContainerCommandRequestProto listBlockRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListBlock);
-    dispatcher.dispatch(listBlockRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, listBlockRequest, container, context);
     Mockito.verify(handler, times(2)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Read Chunk Request handling
     ContainerCommandRequestProto readChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ReadChunk);
-    dispatcher.dispatch(readChunkRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, readChunkRequest, container, context);
     Mockito.verify(handler, times(1)).handleReadChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
     // Test Delete Chunk Request handling
     ContainerCommandRequestProto deleteChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.DeleteChunk);
-    dispatcher.dispatch(deleteChunkRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, deleteChunkRequest, container, context);
     Mockito.verify(handler, times(1)).handleDeleteChunk(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Write Chunk Request handling
     ContainerCommandRequestProto writeChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.WriteChunk);
-    dispatcher.dispatch(writeChunkRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, writeChunkRequest, container, context);
     Mockito.verify(handler, times(1)).handleWriteChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
     // Test List Chunk Request handling
     ContainerCommandRequestProto listChunkRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.ListChunk);
-    dispatcher.dispatch(listChunkRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, listChunkRequest, container, context);
     Mockito.verify(handler, times(3)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Put Small File Request handling
     ContainerCommandRequestProto putSmallFileRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.PutSmallFile);
-    dispatcher.dispatch(putSmallFileRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, putSmallFileRequest, container, context);
     Mockito.verify(handler, times(1)).handlePutSmallFile(
         any(ContainerCommandRequestProto.class), any(), any());
 
     // Test Get Small File Request handling
     ContainerCommandRequestProto getSmallFileRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.GetSmallFile);
-    dispatcher.dispatch(getSmallFileRequest, context);
+    KeyValueHandler
+        .dispatchRequest(handler, getSmallFileRequest, container, context);
     Mockito.verify(handler, times(1)).handleGetSmallFile(
         any(ContainerCommandRequestProto.class), any());
   }

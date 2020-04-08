@@ -54,8 +54,8 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.fsck.MissingContainerTask;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,9 +83,9 @@ public class ReconStorageContainerManagerFacade
 
   @Inject
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
-      StorageContainerServiceProvider scmServiceProvider,
-      MissingContainersDao missingContainersDao,
-      ReconTaskStatusDao reconTaskStatusDao)
+            StorageContainerServiceProvider scmServiceProvider,
+            ReconTaskStatusDao reconTaskStatusDao,
+            ContainerSchemaManager containerSchemaManager)
       throws IOException {
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -99,7 +99,7 @@ public class ReconStorageContainerManagerFacade
     this.pipelineManager =
         new ReconPipelineManager(conf, nodeManager, eventQueue);
     this.containerManager = new ReconContainerManager(conf, pipelineManager,
-        scmServiceProvider);
+        scmServiceProvider, containerSchemaManager);
     this.scmServiceProvider = scmServiceProvider;
 
     NodeReportHandler nodeReportHandler =
@@ -148,12 +148,12 @@ public class ReconStorageContainerManagerFacade
     reconScmTasks.add(new MissingContainerTask(
         this,
         reconTaskStatusDao,
-        missingContainersDao));
+        containerSchemaManager));
     reconScmTasks.forEach(ReconScmTask::register);
   }
 
   /**
-   *  For every config key which is prefixed by 'recon.scm', create a new
+   *  For every config key which is prefixed by 'recon.scmconfig', create a new
    *  config key without the prefix keeping the same value.
    *  For example, if recon.scm.a.b. = xyz, we add a new config like
    *  a.b.c = xyz. This is done to override Recon's passive SCM configs if

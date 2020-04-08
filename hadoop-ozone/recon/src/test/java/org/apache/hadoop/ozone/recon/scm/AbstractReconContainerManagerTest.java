@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.junit.After;
 import org.junit.Before;
@@ -72,7 +73,7 @@ public class AbstractReconContainerManagerTest {
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
     pipelineManager = new ReconPipelineManager(conf, nodeManager, eventQueue);
     containerManager = new ReconContainerManager(conf, pipelineManager,
-        getScmServiceProvider());
+        getScmServiceProvider(), mock(ContainerSchemaManager.class));
   }
 
   @After

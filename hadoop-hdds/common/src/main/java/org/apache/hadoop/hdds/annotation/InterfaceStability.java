@@ -21,9 +21,6 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience.LimitedPrivate;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience.Public;
 
 /**
  * Annotation to inform users of how much to rely on a particular package,

@@ -15,30 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.container.replication;
+package org.apache.hadoop.ozone.web.ozShell.keys;
 
-import javax.ws.rs.core.StreamingOutput;
-import java.io.IOException;
-import java.io.OutputStream;
+import org.apache.hadoop.ozone.web.ozShell.Handler;
+import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
+import picocli.CommandLine;
 
 /**
- * JAX-RS streaming output to return the binary container data.
+ * Base class for key command handlers.
  */
-public class ContainerStreamingOutput implements StreamingOutput {
+public abstract class KeyHandler extends Handler {
 
-  private long containerId;
-
-  private ContainerReplicationSource containerReplicationSource;
-
-  public ContainerStreamingOutput(long containerId,
-      ContainerReplicationSource containerReplicationSource) {
-    this.containerId = containerId;
-    this.containerReplicationSource = containerReplicationSource;
-  }
+  @CommandLine.Mixin
+  private KeyUri address;
 
   @Override
-  public void write(OutputStream outputStream)
-      throws IOException {
-    containerReplicationSource.copyData(containerId, outputStream);
+  protected OzoneAddress getAddress() {
+    return address.getValue();
   }
+
 }

@@ -30,6 +30,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>pom</packaging>
 
   <modules>
+    <module>hadoop-dependency-client</module>
+    <module>hadoop-dependency-test</module>
+    <module>hadoop-dependency-server</module>
     <module>client</module>
     <module>common</module>
     <module>framework</module>
@@ -68,6 +71,25 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-common</artifactId>
         <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-hadoop-dependency-client</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-hadoop-dependency-server</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
       </dependency>
 
       <dependency>

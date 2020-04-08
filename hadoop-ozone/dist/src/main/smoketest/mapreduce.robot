@@ -21,7 +21,7 @@ Test Timeout        4 minute
 
 
 *** Variables ***
-${volume}          vol1
+${volume}          volume1
 ${bucket}          bucket1
 ${hadoop.version}  3.2.0
 
@@ -33,5 +33,5 @@ Execute PI calculation
 
 Execute WordCount
                     ${random}        Generate Random String  2   [NUMBERS]
-                    ${output} =      Execute                 yarn jar ./share/hadoop/mapreduce/hadoop-mapreduce-examples-${hadoop.version}.jar wordcount o3fs://bucket1.vol1/key1 o3fs://bucket1.vol1/key1-${random}.count
+                    ${output} =      Execute                 yarn jar ./share/hadoop/mapreduce/hadoop-mapreduce-examples-${hadoop.version}.jar wordcount o3fs://bucket1.volume1/key1 o3fs://bucket1.volume1/key1-${random}.count
                     Should Contain   ${output}               completed successfully

@@ -17,69 +17,24 @@
  */
 package org.apache.hadoop.ozone.web.ozShell.bucket;
 
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
-import org.apache.hadoop.ozone.web.utils.JsonUtils;
+import org.apache.hadoop.ozone.web.ozShell.acl.AclHandler;
+import org.apache.hadoop.ozone.web.ozShell.acl.GetAclHandler;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
-
-import java.util.List;
-
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 
 /**
- * Get acl handler for bucket.
+ * Get ACL of bucket.
  */
-@Command(name = "getacl",
-    description = "List all ACLs.")
-public class GetAclBucketHandler extends Handler {
+@CommandLine.Command(name = AclHandler.GET_ACL_NAME,
+    description = AclHandler.GET_ACL_DESC)
+public class GetAclBucketHandler extends GetAclHandler {
 
-  @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
-  private String uri;
+  @CommandLine.Mixin
+  private BucketUri address;
 
-  @CommandLine.Option(names = {"--store", "-s"},
-      required = false,
-      description = "Store type. i.e OZONE or S3")
-  private String storeType;
-
-  /**
-   * Executes the Client Calls.
-   */
   @Override
-  public Void call() throws Exception {
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureBucketAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
-
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
-
-      if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("Bucket Name : %s%n", bucketName);
-      }
-
-      OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
-          .setBucketName(bucketName)
-          .setVolumeName(volumeName)
-          .setResType(OzoneObj.ResourceType.BUCKET)
-          .setStoreType(storeType == null ? OZONE :
-              OzoneObj.StoreType.valueOf(storeType))
-          .build();
-
-      List<OzoneAcl> result = client.getObjectStore().getAcl(obj);
-
-      System.out.printf("%s%n",
-          JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
-    }
-    return null;
+  protected OzoneAddress getAddress() {
+    return address.getValue();
   }
 
 }

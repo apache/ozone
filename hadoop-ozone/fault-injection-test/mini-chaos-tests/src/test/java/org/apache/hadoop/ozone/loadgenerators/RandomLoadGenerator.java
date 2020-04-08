@@ -43,26 +43,20 @@ public class RandomLoadGenerator extends LoadGenerator {
   }
 
   @Override
-  public String generateLoad() throws Exception {
+  public void generateLoad() throws Exception {
     LoadBucket bucket =
         ozoneBuckets.get((int) (Math.random() * ozoneBuckets.size()));
     int index = RandomUtils.nextInt();
     ByteBuffer buffer = dataBuffer.getBuffer(index);
-    String keyName = getKeyName(index, name());
+    String keyName = getKeyName(index);
     bucket.writeKey(buffer, keyName);
 
     bucket.readKey(buffer, keyName);
 
     bucket.deleteKey(keyName);
-    return keyName;
   }
 
   public void initialize() {
     // Nothing to do here
-  }
-
-  @Override
-  public String name() {
-    return "Random";
   }
 }

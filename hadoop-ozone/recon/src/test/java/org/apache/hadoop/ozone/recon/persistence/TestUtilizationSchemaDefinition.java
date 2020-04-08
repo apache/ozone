@@ -221,8 +221,6 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
     dbRecord = fileCountBySizeDao.findById(1024L);
     assertEquals(Long.valueOf(2), dbRecord.getCount());
 
-
-
     Table<FileCountBySizeRecord> fileCountBySizeRecordTable =
         fileCountBySizeDao.getTable();
     List<UniqueKey<FileCountBySizeRecord>> tableKeys =

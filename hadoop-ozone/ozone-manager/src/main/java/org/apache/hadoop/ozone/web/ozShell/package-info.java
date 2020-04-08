@@ -17,11 +17,6 @@
  */
 
 /**
- *  ozShell Class acts as the command line interface to
- *  the ozone Rest Client.
- */
-package org.apache.hadoop.ozone.web.ozShell;
-
-/**
  A simple CLI to work against Ozone.
  **/
+package org.apache.hadoop.ozone.web.ozShell;

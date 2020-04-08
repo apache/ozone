@@ -23,23 +23,19 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.ozShell.ObjectPrinter;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
+
 /**
  * create bucket handler.
  */
 @Command(name = "create",
     description = "creates a bucket in a given volume")
-public class CreateBucketHandler extends Handler {
-
-  @Parameters(arity = "1..1", description = Shell.OZONE_BUCKET_URI_DESCRIPTION)
-  private String uri;
+public class CreateBucketHandler extends BucketHandler {
 
   @Option(names = {"--bucketkey", "-k"},
       description = "bucket encryption key name")
@@ -54,54 +50,39 @@ public class CreateBucketHandler extends Handler {
    * Executes create bucket.
    */
   @Override
-  public Void call() throws Exception {
+  public void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
 
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureBucketAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+    BucketArgs.Builder bb = new BucketArgs.Builder()
+        .setStorageType(StorageType.DEFAULT)
+        .setVersioning(false);
 
-      String volumeName = address.getVolumeName();
-      String bucketName = address.getBucketName();
+    if (isGdprEnforced != null) {
+      bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(isGdprEnforced));
+    }
 
-      BucketArgs.Builder bb = new BucketArgs.Builder()
-              .setStorageType(StorageType.DEFAULT)
-              .setVersioning(false);
-
-      if (isGdprEnforced != null) {
-        if (isGdprEnforced) {
-          bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(Boolean.TRUE));
-        } else {
-          bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(Boolean.FALSE));
-        }
+    if (bekName != null) {
+      if (!bekName.isEmpty()) {
+        bb.setBucketEncryptionKey(bekName);
+      } else {
+        throw new IllegalArgumentException("Bucket encryption key name must" +
+            " " + "be specified to enable bucket encryption!");
       }
-
-      if (bekName != null) {
-        if (!bekName.isEmpty()) {
-          bb.setBucketEncryptionKey(bekName);
-        } else {
-          throw new IllegalArgumentException("Bucket encryption key name must" +
-              " " + "be specified to enable bucket encryption!");
-        }
-      }
-
       if (isVerbose()) {
-        System.out.printf("Volume Name : %s%n", volumeName);
-        System.out.printf("Bucket Name : %s%n", bucketName);
-        if (bekName != null) {
-          System.out.printf("Bucket Encryption enabled with Key Name: %s%n",
-                  bekName);
-        }
-      }
-
-      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-      vol.createBucket(bucketName, bb.build());
-
-      if (isVerbose()) {
-        OzoneBucket bucket = vol.getBucket(bucketName);
-        ObjectPrinter.printObjectAsJson(bucket);
+        out().printf("Bucket Encryption enabled with Key Name: %s%n",
+            bekName);
       }
     }
-    return null;
+
+    String volumeName = address.getVolumeName();
+    String bucketName = address.getBucketName();
+
+    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+    vol.createBucket(bucketName, bb.build());
+
+    if (isVerbose()) {
+      OzoneBucket bucket = vol.getBucket(bucketName);
+      printObjectAsJson(bucket);
+    }
   }
 }

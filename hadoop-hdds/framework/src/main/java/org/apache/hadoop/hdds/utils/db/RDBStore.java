@@ -182,7 +182,7 @@ public class RDBStore implements DBStore {
       statMBeanName = null;
     }
 
-    rdbMetrics.unRegister();
+    RDBMetrics.unRegister();
     if (db != null) {
       db.close();
     }

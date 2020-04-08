@@ -25,13 +25,16 @@ public abstract class LoadGenerator {
 
   private final String keyNameDelimiter = "_";
 
-  public abstract void initialize();
+  public abstract void initialize() throws Exception;
 
-  public abstract String generateLoad() throws Exception;
+  public abstract void generateLoad() throws Exception;
 
-  public abstract String name();
+  String getKeyName(int keyIndex) {
+    return toString() + keyNameDelimiter + keyIndex;
+  }
 
-  String getKeyName(int keyIndex, String prefix) {
-    return prefix + keyNameDelimiter + keyIndex;
+  @Override
+  public String toString() {
+    return this.getClass().getSimpleName();
   }
 }

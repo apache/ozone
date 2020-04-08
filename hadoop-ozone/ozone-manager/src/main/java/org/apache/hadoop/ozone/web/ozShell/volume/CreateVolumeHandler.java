@@ -21,25 +21,20 @@ package org.apache.hadoop.ozone.web.ozShell.volume;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.web.ozShell.Handler;
-import org.apache.hadoop.ozone.web.ozShell.ObjectPrinter;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.Shell;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+
+import java.io.IOException;
 
 /**
  * Executes the create volume call for the shell.
  */
 @Command(name = "create",
     description = "Creates a volume for the specified user")
-public class CreateVolumeHandler extends Handler {
-
-  @Parameters(arity = "1..1", description = Shell.OZONE_VOLUME_URI_DESCRIPTION)
-  private String uri;
+public class CreateVolumeHandler extends VolumeHandler {
 
   @Option(names = {"--user", "-u"},
       description = "Owner of of the volume")
@@ -50,42 +45,29 @@ public class CreateVolumeHandler extends Handler {
           "Quota of the newly created volume (eg. 1G)")
   private String quota;
 
-  /**
-   * Executes the Create Volume.
-   */
   @Override
-  public Void call() throws Exception {
+  protected void execute(OzoneClient client, OzoneAddress address)
+      throws IOException {
     if (ownerName == null) {
       ownerName = UserGroupInformation.getCurrentUser().getUserName();
     }
 
-    OzoneAddress address = new OzoneAddress(uri);
-    address.ensureVolumeAddress();
-    try (OzoneClient client =
-             address.createClient(createOzoneConfiguration())) {
+    String volumeName = address.getVolumeName();
 
-      String volumeName = address.getVolumeName();
-
-      if (isVerbose()) {
-        System.out.printf("Volume name : %s%n", volumeName);
-      }
-
-      String adminName = UserGroupInformation.getCurrentUser().getUserName();
-      VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
-          .setAdmin(adminName)
-          .setOwner(ownerName);
-      if (quota != null) {
-        volumeArgsBuilder.setQuota(quota);
-      }
-      client.getObjectStore().createVolume(volumeName,
-          volumeArgsBuilder.build());
-
-      if (isVerbose()) {
-        OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-        ObjectPrinter.printObjectAsJson(vol);
-      }
+    String adminName = UserGroupInformation.getCurrentUser().getUserName();
+    VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
+        .setAdmin(adminName)
+        .setOwner(ownerName);
+    if (quota != null) {
+      volumeArgsBuilder.setQuota(quota);
     }
-    return null;
+    client.getObjectStore().createVolume(volumeName,
+        volumeArgsBuilder.build());
+
+    if (isVerbose()) {
+      OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
+      printObjectAsJson(vol);
+    }
   }
 
 }

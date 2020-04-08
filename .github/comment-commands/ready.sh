@@ -27,3 +27,9 @@ curl -s "$URL" |
     --data "$(jq --arg message "$MESSAGE" -n '{message: $message}')" \
     --header "authorization: Bearer $GITHUB_TOKEN" \
     "$URL"/ISSUE_ID/dismissals
+
+curl -s -o /dev/null \
+  -X DELETE \
+  --header "authorization: Bearer $GITHUB_TOKEN" \
+  "$(jq -r '.issue.url' "$GITHUB_EVENT_PATH")/labels/pending"
+
