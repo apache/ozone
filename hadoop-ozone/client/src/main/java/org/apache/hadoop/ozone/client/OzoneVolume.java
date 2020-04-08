@@ -106,11 +106,11 @@ public class OzoneVolume extends WithMetadata {
     this.acls = acls;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.metadata = metadata;
-    long modificationTime = Time.now();
-    if (modificationTime < creationTime) {
+    long modifiedTime = Time.now();
+    if (modifiedTime < creationTime) {
       this.modificationTime = Instant.ofEpochMilli(creationTime);
     } else {
-      this.modificationTime = Instant.ofEpochMilli(modificationTime);
+      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
     }
   }
 
@@ -133,11 +133,11 @@ public class OzoneVolume extends WithMetadata {
       long creationTime, List<OzoneAcl> acls) {
     this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls,
         new HashMap<>());
-    long modificationTime = Time.now();
-    if (modificationTime < creationTime) {
+    long modifiedTime = Time.now();
+    if (modifiedTime < creationTime) {
       this.modificationTime = Instant.ofEpochMilli(creationTime);
     } else {
-      this.modificationTime = Instant.ofEpochMilli(modificationTime);
+      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
     }
   }
 
@@ -160,11 +160,11 @@ public class OzoneVolume extends WithMetadata {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.acls = acls;
     this.metadata = new HashMap<>();
-    long modificationTime = Time.now();
-    if (modificationTime < creationTime) {
+    long modifiedTime = Time.now();
+    if (modifiedTime < creationTime) {
       this.modificationTime = Instant.ofEpochMilli(creationTime);
     } else {
-      this.modificationTime = Instant.ofEpochMilli(modificationTime);
+      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
     }
   }
 
