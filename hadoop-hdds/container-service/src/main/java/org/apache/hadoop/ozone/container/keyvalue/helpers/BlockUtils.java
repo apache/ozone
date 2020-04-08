@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -65,8 +64,7 @@ public final class BlockUtils {
   private static void initCache(Configuration conf) {
     if (Objects.isNull(cache)) {
       cache = CacheBuilder.newBuilder()
-          .maximumSize(conf.getInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE,
-              OzoneConfigKeys.OZONE_CONTAINER_CACHE_DEFAULT))
+          .weakValues()
           .removalListener((notification) ->
               ((ReferenceDB) notification.getValue()).cleanup())
           .concurrencyLevel(1)
