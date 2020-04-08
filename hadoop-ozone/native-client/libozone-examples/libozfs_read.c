@@ -7,15 +7,19 @@ int main(int argc, char **argv) {
     ozfsFS fs;
     const char *rfile = argv[1];
     tSize bufferSize = strtoul(argv[3], NULL, 10);
+    const char *host = argv[4];
+    tPort port = atoi(argv[5]);
+    const char *bucket = argv[6];
+    const char *volume = argv[7];
     ozfsFile readFile;
     char* buffer;
     tSize curSize;
 
-    if (argc ! = 4) {
-        fprintf(stderr, "Usage: ozfs_read <filename> <filesize> <buffersize>\n");
+    if (argc ! = 8) {
+        fprintf(stderr, "Usage: ozfs_read <filename> <filesize> <buffersize> <host-name> <port> <bucket-name> <volume-name>\n");
         exit(-1);
     }
-    fs = ozfsConnect("127.0.0.1", 9862, "bucket4", "vol4");
+    fs = ozfsConnect(host, port, bucket, volume);
     if (!fs) {
         fprintf(stderr, "Oops! Failed to connect to ozfs!\n");
         exit(-1);

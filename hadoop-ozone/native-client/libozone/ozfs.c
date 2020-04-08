@@ -9,12 +9,12 @@
 ozfsFS ozfsConnect(const char *host, tPort port, const char *bucket, const char *vol)
 {
     struct hdfsBuilder *bld = hdfsNewBuilder();
-    char string[100] = "";
     int len = 0;
     if (!bld)
         return NULL;
     len = strlen(host) + strlen(bucket) + strlen(vol) + strlen("o3fs://");
-    snprintf(string, len + 5, "o3fs://%s.%s.%s", bucket, vol, host);
+    char string[len+2];
+    snprintf(string, len + 3, "o3fs://%s.%s.%s", bucket, vol, host);
     printf("URI : %s\n", string);
     hdfsBuilderSetNameNode(bld, string);
     hdfsBuilderSetNameNodePort(bld, port);

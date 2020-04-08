@@ -9,6 +9,10 @@ int main(int argc, char **argv) {
     const char *writeFileName = argv[1];
     off_t fileTotalSize = strtoul(argv[2], NULL, 10);
     long long tmpBufferSize = strtoul(argv[3], NULL, 10);
+    const char *host = argv[4];
+    tPort port = atoi(argv[5]);
+    const char *bucket = argv[6];
+    const char *volume = argv[7];
     tSize bufferSize;
     ozfsFile writeFile;
     char* buffer;
@@ -16,11 +20,11 @@ int main(int argc, char **argv) {
     off_t nrRemaining;
     tSize curSize;
     tSize written;
-    if (argc != 4) {
-        fprintf(stderr, "Usage: ozfs_write <filename> <filesize> <buffersize>\n");
+    if (argc != 8) {
+        fprintf(stderr, "Usage: ozfs_write <filename> <filesize> <buffersize> <host-name> <port> <bucket-name> <volume-name>\n");
         exit(-1);
     }
-    fs = ozfsConnect("127.0.0.1", 9862, "bucket4", "vol4");
+    fs = ozfsConnect(host, port, bucket, volume);
     if (!fs) {
         fprintf(stderr, "Oops! Failed to connect to ozfs!\n");
         exit(-1);

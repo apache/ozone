@@ -9,8 +9,8 @@ The libozfs APIs are a subset of the Ozone FileSystem APIs. The header file for 
 #Requirements:
 
 1.Hadoop with compiled libhdfs.so
-2.Linux kernel > 2.6.9 with fuse, which is the default or Fuse 2.7.x, 2.8.x installed. See: http://fuse.sourceforge.net/ or even easier: http://dag.wieers.com/rpm/packages/fuse
-3.libozfs.so compiled with Ozone
+2.Linux kernel > 2.6.9 
+3.Compiled Ozone
 
 #Compilation
 
@@ -46,11 +46,11 @@ The libozfs APIs are a subset of the Ozone FileSystem APIs. The header file for 
 
 In root shell execute the following:
 
-    ./ozfs_write filename file_size buffer_size
+    ./ozfs_write filename file_size buffer_size host_name port_number bucket_name volume_name
 
 For example
 
-    ./ozfs_write file1 100 100 , where file1 is name of the file, 100 is file size and buffer size.
+    ./ozfs_write file1 100 100 127.0.0.1 9862 bucket4 vol4 , where file1 is name of the file, 100 is file size and buffer size, "127.0.0.1 is host", 9862 is the port number, "bucket4" is bucket name and "vol4" is the volume name.
 
 #Common Problems:
 
