@@ -334,7 +334,7 @@ public class TestMiniOzoneCluster {
     // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
-        .setNumDatanodesDirs(3)
+        .setNumDataVolumes(3)
         .build();
     cluster.waitForClusterToBeReady();
 
