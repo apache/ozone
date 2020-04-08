@@ -62,18 +62,12 @@ public final class OzoneManagerSyncMetrics {
   @Metric(about = "OM snapshot request latency")
   private MutableRate snapshotRequestLatency;
 
-  @Metric(about = "Number of OM delta requests made by Recon.")
-  private MutableCounterLong numDeltaRequests;
-
   @Metric(about = "Number of OM delta requests made by Recon that had " +
       "at least 1 update in the response.")
   private MutableCounterLong numNonZeroDeltaRequests;
 
   @Metric(about = "Number of OM delta requests that failed.")
   private MutableCounterLong numDeltaRequestsFailed;
-
-  @Metric(about = "OM delta request latency")
-  private MutableRate deltaRequestLatency;
 
   @Metric(about = "Total number of updates got through OM delta request")
   private MutableCounterLong numUpdatesInDeltaTotal;
@@ -93,10 +87,6 @@ public final class OzoneManagerSyncMetrics {
     this.snapshotRequestLatency.add(time);
   }
 
-  public void incrNumDeltaRequests() {
-    this.numDeltaRequests.incr();
-  }
-
   public void incrNumDeltaRequestsFailed() {
     this.numSnapshotRequestsFailed.incr();
   }
@@ -107,10 +97,6 @@ public final class OzoneManagerSyncMetrics {
     setAverageNumUpdatesInDeltaRequest(
         (float) this.numUpdatesInDeltaTotal.value() /
             (float) this.numNonZeroDeltaRequests.value());
-  }
-
-  public void updateDeltaRequestLatency(long time) {
-    this.deltaRequestLatency.add(time);
   }
 
   public void setAverageNumUpdatesInDeltaRequest(float avg) {
@@ -129,16 +115,8 @@ public final class OzoneManagerSyncMetrics {
     return snapshotRequestLatency;
   }
 
-  public MutableCounterLong getNumDeltaRequests() {
-    return numDeltaRequests;
-  }
-
   public MutableCounterLong getNumDeltaRequestsFailed() {
     return numDeltaRequestsFailed;
-  }
-
-  public MutableRate getDeltaRequestLatency() {
-    return deltaRequestLatency;
   }
 
   public MutableCounterLong getNumUpdatesInDeltaTotal() {

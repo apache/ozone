@@ -344,9 +344,7 @@ public class OzoneManagerServiceProviderImpl
       throws IOException, RocksDBException {
     DBUpdatesRequest dbUpdatesRequest = DBUpdatesRequest.newBuilder()
         .setSequenceNumber(fromSequenceNumber).build();
-    long startTime = Time.monotonicNowNanos();
     DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
-    metrics.updateDeltaRequestLatency(Time.monotonicNowNanos() - startTime);
     if (null != dbUpdates) {
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
       RocksDB rocksDB = rocksDBStore.getDb();
@@ -383,7 +381,6 @@ public class OzoneManagerServiceProviderImpl
     if (currentSequenceNumber <= 0) {
       fullSnapshot = true;
     } else {
-      metrics.incrNumDeltaRequests();
       try (OMDBUpdatesHandler omdbUpdatesHandler =
                new OMDBUpdatesHandler(omMetadataManager)) {
         LOG.info("Obtaining delta updates from Ozone Manager");
