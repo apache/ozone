@@ -700,7 +700,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         String datanodeBaseDir = path + "/datanode-" + Integer.toString(i);
         Path metaDir = Paths.get(datanodeBaseDir, "meta");
         List<String> dataDirs = new ArrayList<>();
-        for (int j = 0; j < numOfDatanodesDirs; j++) {
+        for (int j = 0; j < numDataVolumes; j++) {
           Path dir = Paths.get(datanodeBaseDir, "data-" + j, "containers");
           Files.createDirectories(dir);
           dataDirs.add(dir.toString());

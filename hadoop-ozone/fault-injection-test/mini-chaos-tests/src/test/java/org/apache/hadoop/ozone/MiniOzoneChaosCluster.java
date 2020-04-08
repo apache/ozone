@@ -361,15 +361,14 @@ public abstract class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     }
 
     /**
-     * Sets the number of HddsDatanodes data dirs to be started as part of
-     * MiniOzoneCluster.
+     * Sets the number of data volumes per datanode.
      *
-     * @param val number of datanodes dirs
+     * @param val number of volumes per datanode.
      *
      * @return MiniOzoneCluster.Builder
      */
-    public Builder setNumDatanodesDirs(int val) {
-      numOfDatanodesDirs = val;
+    public Builder setNumDataVolumes(int val) {
+      numDataVolumes = val;
       return this;
     }
 
