@@ -20,7 +20,7 @@ Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
-Test Timeout        5 minutes
+Test Timeout        15 minutes
 
 *** Variables ***
 ${ENDPOINT_URL}     http://s3g:9878
