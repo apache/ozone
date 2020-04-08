@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -544,9 +545,7 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
       final List<DatanodeDetails> source = replicas.stream()
           .filter(r ->
               r.getState() == State.QUASI_CLOSED ||
-              r.getState() == State.CLOSED ||
-              r.getState() == State.DECOMMISSIONED ||
-              r.getState() == State.MAINTENANCE)
+              r.getState() == State.CLOSED)
           // Exclude stale and dead nodes. This is particularly important for
           // maintenance nodes, as the replicas will remain present in the
           // container manager, even when they go dead.
@@ -623,9 +622,9 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
       // Replica which are maintenance or decommissioned are not eligible to
       // be removed, as they do not count toward over-replication and they also
       // many not be available
-      eligibleReplicas.removeIf(r -> (r.getState() == State.MAINTENANCE
-          || r.getState() == State.DECOMMISSIONED));
-
+      eligibleReplicas.removeIf(r ->
+          r.getDatanodeDetails().getPersistedOpState() !=
+              HddsProtos.NodeOperationalState.IN_SERVICE);
       final List<ContainerReplica> unhealthyReplicas = eligibleReplicas
           .stream()
           .filter(r -> !compareState(container.getState(), r.getState()))

@@ -20,8 +20,6 @@ package org.apache.hadoop.hdds.scm.container.states;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -31,16 +29,19 @@ import org.junit.Test;
 import java.util.*;
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertTrue;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
-import static org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
-import static org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State
-    .DECOMMISSIONED;
-import static org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State
-    .MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 import static org.junit.Assert.assertFalse;
 
 /**
@@ -54,7 +55,8 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testThreeHealthyReplica() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED);
+    Set<ContainerReplica> replica =
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -63,7 +65,7 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testTwoHealthyReplica() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -72,7 +74,7 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneHealthyReplica() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -82,7 +84,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testTwoHealthyAndInflightAdd() {
 
-    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 1, 0, 3, 2);
@@ -96,7 +98,8 @@ public class TestContainerReplicaCount {
    * completes there will be 4 healthy and it will get taken care of then.
    */
   public void testThreeHealthyAndInflightAdd() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED);
+    Set<ContainerReplica> replica =
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 1, 0, 3, 2);
@@ -109,7 +112,8 @@ public class TestContainerReplicaCount {
    * under replicated, we go ahead and schedule another replica to be added.
    */
   public void testThreeHealthyAndInflightDelete() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED);
+    Set<ContainerReplica> replica =
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 1, 3, 2);
@@ -122,7 +126,8 @@ public class TestContainerReplicaCount {
    * inflight del could succeed, leaving only 2 healthy replicas.
    */
   public void testThreeHealthyAndInflightAddAndInFlightDelete() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED);
+    Set<ContainerReplica> replica =
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 1, 1, 3, 2);
@@ -132,7 +137,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testFourHealthyReplicas() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, CLOSED, CLOSED, CLOSED);
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -142,7 +147,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testFourHealthyReplicasAndInFlightDelete() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, CLOSED, CLOSED, CLOSED);
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 1, 3, 2);
@@ -152,7 +157,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testFourHealthyReplicasAndTwoInFlightDelete() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, CLOSED, CLOSED, CLOSED);
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 2, 3, 2);
@@ -161,7 +166,7 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneHealthyReplicaRepFactorOne() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 1, 2);
@@ -170,7 +175,7 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneHealthyReplicaRepFactorOneInFlightDelete() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 1, 1, 2);
@@ -179,7 +184,7 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testTwoHealthyReplicaTwoInflightAdd() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 2, 0, 3, 2);
@@ -192,8 +197,8 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testThreeHealthyAndTwoDecommission() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED,
-        DECOMMISSIONED, DECOMMISSIONED);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE,
+        IN_SERVICE, DECOMMISSIONING, DECOMMISSIONING);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -203,7 +208,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testOneDecommissionedReplica() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, CLOSED, DECOMMISSIONED);
+        registerNodes(IN_SERVICE, IN_SERVICE, DECOMMISSIONING);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -213,7 +218,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testTwoHealthyOneDecommissionedneInFlightAdd() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, CLOSED, DECOMMISSIONED);
+        registerNodes(IN_SERVICE, IN_SERVICE, DECOMMISSIONED);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 1, 0, 3, 2);
@@ -251,7 +256,7 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneHealthyOneDecommissioningRepFactorOne() {
-    Set<ContainerReplica> replica = registerNodes(DECOMMISSIONED, CLOSED);
+    Set<ContainerReplica> replica = registerNodes(DECOMMISSIONED, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 1, 2);
@@ -265,7 +270,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testOneHealthyTwoMaintenanceMinRepOfTwo() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, MAINTENANCE, MAINTENANCE);
+        registerNodes(IN_SERVICE, IN_MAINTENANCE, IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -274,8 +279,8 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneHealthyThreeMaintenanceMinRepOfTwo() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED,
-        MAINTENANCE, MAINTENANCE, MAINTENANCE);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE,
+        IN_MAINTENANCE, IN_MAINTENANCE, ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -285,7 +290,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testOneHealthyTwoMaintenanceMinRepOfOne() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, MAINTENANCE, MAINTENANCE);
+        registerNodes(IN_SERVICE, IN_MAINTENANCE, ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 1);
@@ -294,8 +299,8 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneHealthyThreeMaintenanceMinRepOfTwoInFlightAdd() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED,
-        MAINTENANCE, MAINTENANCE, MAINTENANCE);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE,
+        IN_MAINTENANCE, ENTERING_MAINTENANCE, IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 1, 0, 3, 2);
@@ -305,7 +310,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testAllMaintenance() {
     Set<ContainerReplica> replica =
-        registerNodes(MAINTENANCE, MAINTENANCE, MAINTENANCE);
+        registerNodes(IN_MAINTENANCE, ENTERING_MAINTENANCE, IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -319,8 +324,8 @@ public class TestContainerReplicaCount {
    * come back online, and then deal with them.
    */
   public void testThreeHealthyTwoInMaintenance() {
-    Set<ContainerReplica> replica = registerNodes(CLOSED, CLOSED, CLOSED,
-        MAINTENANCE, MAINTENANCE);
+    Set<ContainerReplica> replica = registerNodes(IN_SERVICE, IN_SERVICE,
+        IN_SERVICE, IN_MAINTENANCE, ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -335,7 +340,8 @@ public class TestContainerReplicaCount {
    */
   public void testFourHealthyOneInMaintenance() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, CLOSED, CLOSED, CLOSED, MAINTENANCE);
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE, IN_SERVICE,
+            IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -344,7 +350,7 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneMaintenanceMinRepOfTwoRepFactorOne() {
-    Set<ContainerReplica> replica = registerNodes(MAINTENANCE);
+    Set<ContainerReplica> replica = registerNodes(IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 1, 2);
@@ -353,7 +359,7 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneMaintenanceMinRepOfTwoRepFactorOneInFlightAdd() {
-    Set<ContainerReplica> replica = registerNodes(MAINTENANCE);
+    Set<ContainerReplica> replica = registerNodes(IN_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 1, 0, 1, 2);
@@ -362,7 +368,7 @@ public class TestContainerReplicaCount {
 
   @Test
   public void testOneHealthyOneMaintenanceRepFactorOne() {
-    Set<ContainerReplica> replica = registerNodes(MAINTENANCE, CLOSED);
+    Set<ContainerReplica> replica = registerNodes(IN_MAINTENANCE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 1, 2);
@@ -372,7 +378,8 @@ public class TestContainerReplicaCount {
   @Test
   public void testTwoDecomTwoMaintenanceOneInflightAdd() {
     Set<ContainerReplica> replica =
-        registerNodes(DECOMMISSIONED, DECOMMISSIONED, MAINTENANCE, MAINTENANCE);
+        registerNodes(DECOMMISSIONED, DECOMMISSIONING,
+            IN_MAINTENANCE, ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 1, 0, 3, 2);
@@ -382,7 +389,7 @@ public class TestContainerReplicaCount {
   @Test
   public void testHealthyContainerIsHealthy() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, CLOSED, CLOSED);
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -392,7 +399,21 @@ public class TestContainerReplicaCount {
   @Test
   public void testIsHealthyWithDifferentReplicaStateNotHealthy() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, CLOSED, OPEN);
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_SERVICE);
+    for (ContainerReplica r : replica) {
+      DatanodeDetails dn = r.getDatanodeDetails();
+
+      ContainerReplica replace = new ContainerReplica.ContainerReplicaBuilder()
+          .setContainerID(new ContainerID(1))
+          .setContainerState(OPEN)
+          .setDatanodeDetails(dn)
+          .setOriginNodeId(dn.getUuid())
+          .setSequenceId(1)
+          .build();
+      replica.remove(r);
+      replica.add(replace);
+      break;
+    }
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -402,7 +423,8 @@ public class TestContainerReplicaCount {
   @Test
   public void testIsHealthyWithMaintReplicaIsHealthy() {
     Set<ContainerReplica> replica =
-        registerNodes(CLOSED, CLOSED, MAINTENANCE, MAINTENANCE);
+        registerNodes(IN_SERVICE, IN_SERVICE, IN_MAINTENANCE,
+            ENTERING_MAINTENANCE);
     ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED);
     ContainerReplicaCount rcnt =
         new ContainerReplicaCount(container, replica, 0, 0, 3, 2);
@@ -418,13 +440,14 @@ public class TestContainerReplicaCount {
   }
 
   private Set<ContainerReplica> registerNodes(
-      ContainerReplicaProto.State... states) {
+      HddsProtos.NodeOperationalState... states) {
     Set<ContainerReplica> replica = new HashSet<>();
-    for (ContainerReplicaProto.State s : states) {
+    for (HddsProtos.NodeOperationalState s : states) {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dn.setPersistedOpState(s);
       replica.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(new ContainerID(1))
-          .setContainerState(s)
+          .setContainerState(CLOSED)
           .setDatanodeDetails(dn)
           .setOriginNodeId(dn.getUuid())
           .setSequenceId(1)
