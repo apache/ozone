@@ -20,8 +20,11 @@ package org.apache.hadoop.ozone.web.ozShell.token;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.web.ozShell.Handler;
 import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
+import org.apache.hadoop.security.token.Token;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -47,11 +50,14 @@ public class RenewTokenHandler extends Handler {
       throws IOException, OzoneClientException {
 
     if (securityEnabled("token renew") && tokenFile.exists()) {
-      long expiryTime = client.getObjectStore()
-          .renewDelegationToken(tokenFile.decode());
-
-      out().printf("Token renewed successfully, expiry time: %s",
-          expiryTime);
+      Token<OzoneTokenIdentifier> token = tokenFile.decode();
+      try (OzoneClient ozoneClient = OzoneClientFactory.getOzoneClient(
+          getConf(), token)) {
+        long expiryTime = ozoneClient.getObjectStore()
+            .renewDelegationToken(token);
+        out().printf("Token renewed successfully, expiry time: %s.%n",
+            expiryTime);
+      }
     }
   }
 }

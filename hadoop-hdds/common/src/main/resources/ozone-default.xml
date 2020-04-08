@@ -1497,9 +1497,19 @@
   <property>
     <name>ozone.security.enabled</name>
     <value>false</value>
-    <tag> OZONE, SECURITY</tag>
+    <tag>OZONE, SECURITY</tag>
     <description>True if security is enabled for ozone. When this property is
      true, hadoop.security.authentication should be Kerberos.
+    </description>
+  </property>
+  <property>
+    <name>ozone.security.http.kerberos.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY</tag>
+    <description>True if Kerberos authentication for Ozone HTTP web consoles
+      is enabled using the SPNEGO protocol. When this property is
+      true, hadoop.security.authentication should be Kerberos and
+      ozone.security.enabled should be set to true.
     </description>
   </property>
 
