@@ -39,7 +39,7 @@ import java.util.Objects;
     description = "get a delegation token.")
 public class GetTokenHandler extends Handler {
 
-  @CommandLine.Parameters(arity = "1..1",
+  @CommandLine.Parameters(arity = "0..1",
       description = Shell.OZONE_URI_DESCRIPTION)
   private String uri;
 

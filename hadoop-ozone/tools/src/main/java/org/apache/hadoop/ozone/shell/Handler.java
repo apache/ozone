@@ -58,14 +58,24 @@ public abstract class Handler implements Callable<Void> {
     return parent.createOzoneConfiguration();
   }
 
-  protected abstract OzoneAddress getAddress() throws OzoneClientException;
+  protected OzoneAddress getAddress() throws OzoneClientException {
+    return new OzoneAddress();
+  }
 
   protected abstract void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException;
 
+  protected boolean isApplicable() {
+    return true;
+  }
+
   @Override
   public Void call() throws Exception {
     conf = createOzoneConfiguration();
+
+    if (!isApplicable()) {
+      return null;
+    }
 
     OzoneAddress address = getAddress();
     try (OzoneClient client = createClient(address)) {
