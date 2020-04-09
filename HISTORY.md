@@ -41,7 +41,7 @@ In the October of 2017 a [discussion](https://lists.apache.org/thread.html/3b5b6
  > * Hadoop's trunk will only build HDSL if a non-default profile is enabled. When Hadoop creates a release branch, the RM will delete the HDSL module from the branch.
  > * HDSL will have their own Yetus checks and won't cause failures in the Hadoop patch check.
 
-This proposal is passed and after reorganizing the code (see HDFS-13258) and Ozone [has been voted](https://lists.apache.org/thread.html/ad0fe160ae84be97a0a87865059761ad7cd747be7b2fe060707d4f28@%3Chdfs-dev.hadoop.apache.org%3E) to be merged to the Hadoop trunk at the March of 2018.
+This proposal was passed and after reorganizing the code (see HDFS-13258) and Ozone [has been voted](https://lists.apache.org/thread.html/ad0fe160ae84be97a0a87865059761ad7cd747be7b2fe060707d4f28@%3Chdfs-dev.hadoop.apache.org%3E) to be merged to the Hadoop trunk at the March of 2018.
 
 As the CBlock feature was not stable enough it was not merged and archived on a separated feature branch which was not synced with the newer Ozone/HDDS features. (Somewhat similar functionality is provided later with S3 Fuse file system and an S3 compatible REST gateway.)
 
