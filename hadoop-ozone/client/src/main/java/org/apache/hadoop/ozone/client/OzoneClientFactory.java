@@ -181,28 +181,30 @@ public final class OzoneClientFactory {
     DataInputStream in = new DataInputStream(buf);
     tokenId.readFields(in);
     String omServiceId = tokenId.getOmServiceId();
+    OzoneConfiguration ozoneConf = OzoneConfiguration.of(conf);
+    // Must check with OzoneConfiguration so that ozone-site.xml is loaded.
     if (StringUtils.isNotEmpty(omServiceId)) {
       // new OM should always issue token with omServiceId
-      if (!OmUtils.isServiceIdsDefined(conf)
+      if (!OmUtils.isServiceIdsDefined(ozoneConf)
           && omServiceId.equals(OzoneConsts.OM_SERVICE_ID_DEFAULT)) {
         // Non-HA or single-node Ratis HA
-        return OzoneClientFactory.getRpcClient(conf);
-      } else if (OmUtils.isOmHAServiceId(conf, omServiceId)) {
+        return OzoneClientFactory.getRpcClient(ozoneConf);
+      } else if (OmUtils.isOmHAServiceId(ozoneConf, omServiceId)) {
         // HA with matching service id
-        return OzoneClientFactory.getRpcClient(omServiceId, conf);
+        return OzoneClientFactory.getRpcClient(omServiceId, ozoneConf);
       } else {
         // HA with mismatched service id
         throw new IOException("Service ID specified " + omServiceId +
             " does not match" + " with " + OZONE_OM_SERVICE_IDS_KEY +
             " defined in the " + "configuration. Configured " +
-            OZONE_OM_SERVICE_IDS_KEY + " are" + conf.getTrimmedStringCollection(
-            OZONE_OM_SERVICE_IDS_KEY));
+            OZONE_OM_SERVICE_IDS_KEY + " are" +
+            ozoneConf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
       }
     } else {
       // Old OM may issue token without omServiceId that should work
       // with non-HA case
-      if (!OmUtils.isServiceIdsDefined(conf)) {
-        return OzoneClientFactory.getRpcClient(conf);
+      if (!OmUtils.isServiceIdsDefined(ozoneConf)) {
+        return OzoneClientFactory.getRpcClient(ozoneConf);
       } else {
         throw new IOException("OzoneToken with no service ID can't "
             + "be renewed or canceled with local OM HA setup because we "
