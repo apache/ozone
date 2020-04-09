@@ -6,19 +6,32 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.shell.volume;
+
+import org.apache.hadoop.ozone.shell.Handler;
+import org.apache.hadoop.ozone.shell.OzoneAddress;
+import picocli.CommandLine;
 
 /**
- * This package contains class that support ozone implementation on the datanode
- * side.  Datanode container classes support persistence of ozone objects on
- * datanode. These classes live under container directory.
+ * Base class for volume command handlers.
  */
-package org.apache.hadoop.ozone;
+public abstract class VolumeHandler extends Handler {
+
+  @CommandLine.Mixin
+  private VolumeUri address;
+
+  @Override
+  protected OzoneAddress getAddress() {
+    return address.getValue();
+  }
+
+}
