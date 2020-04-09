@@ -257,16 +257,5 @@ public class OzoneConfiguration extends Configuration
     }
     return configMap;
   }
-
-  @Override
-  public <T> T getObject(Class<T> configurationClass) {
-    return null;
-  }
-
-  @Override
-  public double getStorageSize(String ozoneScmContainerSize,
-      String ozoneScmContainerSizeDefault, StorageUnit bytes) {
-    return 0;
-  }
-
+  
 }
