@@ -51,7 +51,7 @@ In the next year multiple Ozone releases has been published in separated release
 
 Originally, Ozone depended on the in-tree (SNAPSHOT) Hadoop artifacts. It was required to compile the core hadoop-hdfs/hadoop-common artifacts before compiling the Ozone subprojects. During the development this dependency was reduced more and more. With the 0.4.1 release this dependency has been totally removed and it became possible to compile Ozone with the help of the released Hadoop artifacts which made it possible to separate the development of Ozone from the main Hadoop trunk branch.
 
-At the October of 2019 the Ozone sources are moved out to the [apache/hadoop-ozone](https://github.com/apache/hadoop-ozone) git reposity. During this move the git history has been transformed to remove old YARN/HDFS/MAPREDUCE tasks. 
+In October 2019, the Ozone sources were moved out to the [apache/hadoop-ozone](https://github.com/apache/hadoop-ozone) git repository. During this move the git history was transformed to remove old YARN/HDFS/MAPREDUCE tasks. 
 
  * The first git commit of the new repository is the commit which created the new maven subprojects for Ozone (before the trunk merge)
  * Some of the oldest Ozone commits are available only from the Hadoop repository.
