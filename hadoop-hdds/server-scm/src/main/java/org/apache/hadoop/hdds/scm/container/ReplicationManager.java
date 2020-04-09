@@ -778,7 +778,7 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
   @Override
   public void handleSafeModeTransition(
       SCMSafeModeManager.SafeModeStatus status) {
-    if (!status.getSafeModeStatus() && !this.isRunning()) {
+    if (!status.isInSafeMode() && !this.isRunning()) {
       this.start();
     }
   }

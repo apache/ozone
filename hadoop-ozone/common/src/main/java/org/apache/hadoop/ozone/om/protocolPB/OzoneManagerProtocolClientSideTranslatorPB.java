@@ -151,6 +151,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
+import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -296,13 +297,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Unwrap exception to check if it is a {@link AccessControlException}.
+   * Unwrap exception to check if it is some kind of access control problem
+   * ({@link AccessControlException} or {@link SecretManager.InvalidToken}).
    */
   private boolean isAccessControlException(Exception ex) {
     if (ex instanceof ServiceException) {
       Throwable t = ex.getCause();
+      if (t instanceof RemoteException) {
+        t = ((RemoteException) t).unwrapRemoteException();
+      }
       while (t != null) {
-        if (t instanceof AccessControlException) {
+        if (t instanceof AccessControlException ||
+            t instanceof SecretManager.InvalidToken) {
           return true;
         }
         t = t.getCause();

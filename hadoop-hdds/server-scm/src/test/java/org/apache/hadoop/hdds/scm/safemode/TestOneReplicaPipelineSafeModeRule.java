@@ -69,6 +69,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     pipelineManager =
         new SCMPipelineManager(ozoneConfiguration, mockNodeManager,
             eventQueue);
+    pipelineManager.allowPipelineCreation();
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,
