@@ -30,9 +30,24 @@ public final class ConfigurationReflectionUtil {
   private ConfigurationReflectionUtil() {
   }
 
+  public static <T> void injectConfiguration(
+      ConfigurationSource configuration,
+      Class<T> configurationClass,
+      T configObject, String prefix) {
+    injectConfigurationToObject(configuration, configurationClass, configObject,
+        prefix);
+    Class<? super T> superClass = configurationClass.getSuperclass();
+    while (superClass != null) {
+      injectConfigurationToObject(configuration, superClass, configObject,
+          prefix);
+      superClass = superClass.getSuperclass();
+    }
+  }
+
   public static <T> void injectConfigurationToObject(ConfigurationSource from,
       Class<T> configurationClass,
-      T configuration, String prefix) {
+      T configuration,
+      String prefix) {
     for (Field field : configurationClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
 

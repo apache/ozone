@@ -94,7 +94,8 @@ public interface SpaceUsageCheckFactory {
             aClass.getConstructor();
         instance = constructor.newInstance();
       } catch (IllegalAccessException | InstantiationException |
-          InvocationTargetException | NoSuchMethodException e) {
+          InvocationTargetException | NoSuchMethodException |
+          ClassCastException e) {
 
         Logger log = LoggerFactory.getLogger(SpaceUsageCheckFactory.class);
         log.warn("Error trying to create {}", aClass, e);

@@ -147,7 +147,7 @@ public interface ConfigurationSource {
     String prefix = configGroup.prefix();
 
     ConfigurationReflectionUtil
-        .injectConfigurationToObject(this, configurationClass, configObject,
+        .injectConfiguration(this, configurationClass, configObject,
             prefix);
 
     ConfigurationReflectionUtil
