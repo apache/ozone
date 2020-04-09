@@ -23,5 +23,5 @@ weight: 7
 -->
 
 {{<jumbotron title="进阶">}}
-  本部分介绍 Ozone 的自定义配置，包括如何将 Ozone 以并存的方式部署到已有的 HDFS 集群，以及如何运行 Ozone 内置的 profilers 和追踪报告。
+  本部分介绍 Ozone 的自定义配置，包括如何将 Ozone 以并存的方式部署到已有的 HDFS 集群，以及如何运行 Ozone 内置的 profilers 和 tracing 功能。
 {{</jumbotron>}}
