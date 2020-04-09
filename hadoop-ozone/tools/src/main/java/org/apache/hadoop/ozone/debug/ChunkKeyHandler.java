@@ -116,14 +116,17 @@ public class ChunkKeyHandler  extends KeyHandler {
               + File.separator
               + chunkInfo.getChunkName());
       }
-      containerChunkInfoVerbose.setContainerPath(containerData.getContainerPath());
-      containerChunkInfoVerbose.setDataNodeList(container.getPipeline().getNodes());
+      containerChunkInfoVerbose
+              .setContainerPath(containerData.getContainerPath());
+      containerChunkInfoVerbose
+              .setDataNodeList(container.getPipeline().getNodes());
       containerChunkInfoVerbose.setPipeline(container.getPipeline());
       containerChunkInfoVerbose.setChunkInfos(chunkDetailsList);
       containerChunkInfo.setChunks(chunkPaths);
       List<ChunkDataNodeDetails> chunkDataNodeDetails = new
               ArrayList<ChunkDataNodeDetails>();
-      for (DatanodeDetails datanodeDetails:container.getPipeline().getNodes()) {
+      for (DatanodeDetails datanodeDetails:container
+              .getPipeline().getNodes()) {
         chunkDataNodeDetails.add(
                 new ChunkDataNodeDetails(datanodeDetails.getIpAddress(),
                 datanodeDetails.getHostName()));
@@ -142,7 +145,7 @@ public class ChunkKeyHandler  extends KeyHandler {
                 + "blockId :" + blockId + "", element);
       }
     }
-    xceiverClientManager.releaseClient(xceiverClient,false);
+    xceiverClientManager.releaseClient(xceiverClient, false);
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String prettyJson = gson.toJson(jsonObj);
     System.out.println(prettyJson);
