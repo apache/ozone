@@ -46,7 +46,8 @@ import picocli.CommandLine.Parameters;
  * Class that gives chunk location given a specific key.
  */
 @Command(name = "chunkinfo",
-        description = "returns chunk location information about an existing key")
+        description = "returns chunk location"
+                + " information about an existing key")
 public class ChunkKeyHandler  extends KeyHandler {
 
   @Parameters(arity = "1..1", description = "key to be located")
@@ -63,8 +64,10 @@ public class ChunkKeyHandler  extends KeyHandler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException, OzoneClientException {
-    containerOperationClient = new ContainerOperationClient(createOzoneConfiguration());
-    xceiverClientManager = new XceiverClientManager(createOzoneConfiguration());
+    containerOperationClient = new
+            ContainerOperationClient(createOzoneConfiguration());
+    xceiverClientManager = new
+            XceiverClientManager(createOzoneConfiguration());
     address.ensureKeyAddress();
     JsonObject jsonObj = new JsonObject();
     JsonElement element;
@@ -86,21 +89,23 @@ public class ChunkKeyHandler  extends KeyHandler {
       ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
       long containerId = keyLocation.getContainerID();
       long blockId = keyLocation.getLocalID();
-      // scmClient is used to get container specific information like ContainerPath amd so on
+      // scmClient is used to get container specific
+      // information like ContainerPath amd so on
       ContainerWithPipeline container = containerOperationClient
               .getContainerWithPipeline(containerId);
-      xceiverClient = xceiverClientManager.acquireClient(container.getPipeline());
-      // Datanode is queried to get chunk information.Thus querying the OM,SCM
-      // and datanode helps us get chunk location information
+      xceiverClient = xceiverClientManager
+              .acquireClient(container.getPipeline());
+      // Datanode is queried to get chunk information.Thus querying the
+      // OM,SCM and datanode helps us get chunk location information
       ContainerProtos.DatanodeBlockID datanodeBlockID =
-              new BlockID(containerId,keyLocation.getLocalID())
+              new BlockID(containerId, keyLocation.getLocalID())
                 .getDatanodeBlockIDProtobuf();
       ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls
                  .getBlock(xceiverClient, datanodeBlockID);
       tempchunks = response.getBlockData().getChunksList();
       Preconditions.checkNotNull(container, "Container cannot be null");
-      ContainerProtos.ContainerDataProto containerData = containerOperationClient
-              .readContainer(container
+      ContainerProtos.ContainerDataProto containerData =
+              containerOperationClient.readContainer(container
               .getContainerInfo().getContainerID(), container.getPipeline());
       for (ContainerProtos.ChunkInfo chunkInfo:tempchunks) {
         ChunkDetails chunkDetails = new ChunkDetails();
@@ -116,24 +121,28 @@ public class ChunkKeyHandler  extends KeyHandler {
       containerChunkInfoVerbose.setPipeline(container.getPipeline());
       containerChunkInfoVerbose.setChunkInfos(chunkDetailsList);
       containerChunkInfo.setChunks(chunkPaths);
-      List<ChunkDataNodeDetails> chunkDataNodeDetails = new ArrayList<ChunkDataNodeDetails>();
+      List<ChunkDataNodeDetails> chunkDataNodeDetails = new
+              ArrayList<ChunkDataNodeDetails>();
       for (DatanodeDetails datanodeDetails:container.getPipeline().getNodes()) {
-        chunkDataNodeDetails.add(new ChunkDataNodeDetails(datanodeDetails.getIpAddress(),
+        chunkDataNodeDetails.add(
+                new ChunkDataNodeDetails(datanodeDetails.getIpAddress(),
                 datanodeDetails.getHostName()));
       }
       containerChunkInfo.setChunkDataNodeDetails(chunkDataNodeDetails);
-      containerChunkInfo.setPipelineID(container.getPipeline().getId().getId());
+      containerChunkInfo.setPipelineID(container
+              .getPipeline().getId().getId());
       Gson gson = new GsonBuilder().create();
       if (isVerbose()) {
         element = gson.toJsonTree(containerChunkInfoVerbose);
         jsonObj.add("container Id :" + containerId + ""
-                + "blockId :" + blockId + "",element);
+                + "blockId :" + blockId + "", element);
       } else {
         element = gson.toJsonTree(containerChunkInfo);
         jsonObj.add("container Id :" + containerId + ""
-                + "blockId :" + blockId + "",element);
+                + "blockId :" + blockId + "", element);
       }
     }
+    xceiverClientManager.releaseClient(xceiverClient,false);
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     String prettyJson = gson.toJson(jsonObj);
     System.out.println(prettyJson);

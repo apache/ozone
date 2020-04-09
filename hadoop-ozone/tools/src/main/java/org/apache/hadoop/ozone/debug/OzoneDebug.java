@@ -36,10 +36,9 @@ import picocli.CommandLine;
         },
         mixinStandardHelpOptions = true)
 public class OzoneDebug extends GenericCli {
-  private OzoneConfiguration ozoneConf;
 
   /**
-     * Main for the Ozone Admin shell Command handling.
+     * Main for the Ozone Debug shell Command handling.
      *
      * @param argv - System Args Strings[]
      * @throws Exception

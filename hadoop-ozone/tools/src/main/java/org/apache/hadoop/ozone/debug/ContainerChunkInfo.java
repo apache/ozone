@@ -37,7 +37,8 @@ public class ContainerChunkInfo {
   private UUID pipelineID;
   private Pipeline pipeline;
 
-  public void setChunkDataNodeDetails(List<ChunkDataNodeDetails> chunkDataNodeDetails) {
+  public void setChunkDataNodeDetails(List<ChunkDataNodeDetails>
+                                              chunkDataNodeDetails) {
     this.chunkDataNodeDetails = chunkDataNodeDetails;
   }
 
