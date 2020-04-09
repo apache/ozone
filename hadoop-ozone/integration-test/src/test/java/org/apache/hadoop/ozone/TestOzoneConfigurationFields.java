@@ -44,7 +44,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     errorIfMissingXmlProps = true;
     xmlPropsToSkipCompare.add("hadoop.tags.custom");
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
-    xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     addPropertiesNotInXml();
   }
 
