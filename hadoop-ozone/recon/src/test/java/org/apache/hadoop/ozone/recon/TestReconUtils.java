@@ -34,6 +34,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
+import java.net.URLConnection;
+import java.net.URL;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -49,7 +51,6 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
 /**
  * Test Recon Utility methods.
  */
@@ -169,12 +170,20 @@ public class TestReconUtils {
     });
 
     String contents;
+    URLConnectionFactory connectionFactoryMock =
+        mock(URLConnectionFactory.class);
+    URLConnection urlConnectionMock = mock(URLConnection.class);
+    // when(urlConnectionMock.connect()).thenReturn();
+    when(urlConnectionMock.getInputStream()).thenReturn(fileInputStream);
+    when(connectionFactoryMock.openConnection(any(URL.class)))
+        .thenReturn(urlConnectionMock);
     try (InputStream inputStream = new ReconUtils()
-        .makeHttpCall(httpClientMock, url)) {
+        .makeHttpCall(connectionFactoryMock, url)) {
       contents = IOUtils.toString(inputStream, Charset.defaultCharset());
     }
 
     assertEquals("File 1 Contents", contents);
+
   }
 
   @Test

@@ -34,6 +34,8 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.zip.GZIPOutputStream;
+import java.net.URLConnection;
+import java.net.URL;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -225,33 +227,12 @@ public class ReconUtils {
    * @return Inputstream to the response of the HTTP call.
    * @throws IOException While reading the response.
    */
-  public InputStream makeHttpCall(CloseableHttpClient httpClient, String url)
-      throws IOException {
-
-    HttpGet httpGet = new HttpGet(url);
-    HttpResponse response = httpClient.execute(httpGet);
-    int errorCode = response.getStatusLine().getStatusCode();
-    HttpEntity entity = response.getEntity();
-
-    if ((errorCode == HTTP_OK) || (errorCode == HTTP_CREATED)) {
-      return entity.getContent();
-    }
-
-    if (entity != null) {
-      throw new IOException("Unexpected exception when trying to reach Ozone " +
-          "Manager, " + EntityUtils.toString(entity));
-    } else {
-      throw new IOException("Unexpected null in http payload," +
-          " while processing request");
-    }
-  }
-
   public InputStream makeHttpCall(URLConnectionFactory connectionFactory,
                                   String url)
       throws IOException {
 
-    java.net.URLConnection urlConnection =
-          connectionFactory.openConnection(new java.net.URL(url));
+    URLConnection urlConnection =
+          connectionFactory.openConnection(new URL(url));
      urlConnection.connect();
      return urlConnection.getInputStream();
   }
