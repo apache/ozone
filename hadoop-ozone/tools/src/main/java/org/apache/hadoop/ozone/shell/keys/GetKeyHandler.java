@@ -37,6 +37,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -50,6 +51,13 @@ public class GetKeyHandler extends KeyHandler {
   @Parameters(index = "1", arity = "1..1",
       description = "File path to download the key to")
   private String fileName;
+
+  @CommandLine.Option(
+      names = {"-f", "--force"},
+      description = "Overwrite local file if it exists",
+      defaultValue = "false"
+  )
+  private boolean force;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -65,7 +73,7 @@ public class GetKeyHandler extends KeyHandler {
       dataFile = new File(fileName, keyName);
     }
 
-    if (dataFile.exists()) {
+    if (dataFile.exists() && !force) {
       throw new OzoneClientException(dataFile.getPath() + " exists."
           + " Download would overwrite an existing file. Aborting.");
     }
@@ -80,7 +88,7 @@ public class GetKeyHandler extends KeyHandler {
       IOUtils.copyBytes(input, output, chunkSize);
     }
 
-    if (isVerbose()) {
+    if (isVerbose() && !"/dev/null".equals(dataFile.getAbsolutePath())) {
       try (InputStream stream = new FileInputStream(dataFile)) {
         String hash = DigestUtils.md5Hex(stream);
         out().printf("Downloaded file hash : %s%n", hash);
