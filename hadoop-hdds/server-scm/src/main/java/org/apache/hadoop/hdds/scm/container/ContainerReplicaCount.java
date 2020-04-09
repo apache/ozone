@@ -18,9 +18,13 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import java.util.Set;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
  * Immutable object that is created with a set of ContainerReplica objects and
@@ -57,10 +61,11 @@ public class ContainerReplicaCount {
     this.container = container;
 
     for (ContainerReplica cr : this.replica) {
-      ContainerReplicaProto.State state = cr.getState();
-      if (state == ContainerReplicaProto.State.DECOMMISSIONED) {
+      HddsProtos.NodeOperationalState state =
+          cr.getDatanodeDetails().getPersistedOpState();
+      if (state == DECOMMISSIONED || state == DECOMMISSIONING) {
         decommissionCount++;
-      } else if (state == ContainerReplicaProto.State.MAINTENANCE) {
+      } else if (state == IN_MAINTENANCE || state == ENTERING_MAINTENANCE) {
         maintenanceCount++;
       } else {
         healthyCount++;
@@ -259,8 +264,7 @@ public class ContainerReplicaCount {
     return (container.getState() == HddsProtos.LifeCycleState.CLOSED
         || container.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED)
         && replica.stream()
-        .filter(r -> r.getState() != ContainerReplicaProto.State.DECOMMISSIONED)
-        .filter(r -> r.getState() != ContainerReplicaProto.State.MAINTENANCE)
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
         .allMatch(r -> ReplicationManager.compareState(
             container.getState(), r.getState()));
   }

@@ -202,6 +202,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
         if (status.isDecommissioning() || status.isEnteringMaintenance()) {
           if (checkPipelinesClosedOnNode(dn)
+              // Ensure the DN has received and persisted the current maint
+              // state.
+              && status.getOperationalState()
+                  == dn.getDatanodeDetails().getPersistedOpState()
               && checkContainersReplicatedOnNode(dn)) {
             // CheckContainersReplicatedOnNode may take a short time to run
             // so after it completes, re-get the nodestatus to check the health

@@ -52,10 +52,14 @@ public class SimpleMockNodeManager implements NodeManager {
   private Map<UUID, Set<ContainerID>> containerMap = new ConcurrentHashMap<>();
 
   public void register(DatanodeDetails dd, NodeStatus status) {
+    dd.setPersistedOpState(status.getOperationalState());
+    dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
     nodeMap.put(dd.getUuid(), new DatanodeInfo(dd, status));
   }
 
   public void setNodeStatus(DatanodeDetails dd, NodeStatus status) {
+    dd.setPersistedOpState(status.getOperationalState());
+    dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
     DatanodeInfo dni = nodeMap.get(dd.getUuid());
     dni.setNodeStatus(status);
   }
