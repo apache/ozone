@@ -140,20 +140,7 @@ public class TestReconUtils {
 
   @Test
   public void testMakeHttpCall() throws Exception {
-
-    CloseableHttpClient httpClientMock = mock(CloseableHttpClient.class);
     String url = "http://localhost:9874/dbCheckpoint";
-
-    CloseableHttpResponse httpResponseMock = mock(CloseableHttpResponse.class);
-    when(httpClientMock.execute(any(HttpGet.class)))
-        .thenReturn(httpResponseMock);
-
-    StatusLine statusLineMock = mock(StatusLine.class);
-    when(statusLineMock.getStatusCode()).thenReturn(200);
-    when(httpResponseMock.getStatusLine()).thenReturn(statusLineMock);
-
-    HttpEntity httpEntityMock = mock(HttpEntity.class);
-    when(httpResponseMock.getEntity()).thenReturn(httpEntityMock);
     File file1 = Paths.get(folder.getRoot().getPath(), "file1")
         .toFile();
     BufferedWriter writer = new BufferedWriter(new FileWriter(
@@ -162,18 +149,10 @@ public class TestReconUtils {
     writer.close();
     InputStream fileInputStream = new FileInputStream(file1);
 
-    when(httpEntityMock.getContent()).thenReturn(new InputStream() {
-      @Override
-      public int read() throws IOException {
-        return fileInputStream.read();
-      }
-    });
-
     String contents;
     URLConnectionFactory connectionFactoryMock =
         mock(URLConnectionFactory.class);
     URLConnection urlConnectionMock = mock(URLConnection.class);
-    // when(urlConnectionMock.connect()).thenReturn();
     when(urlConnectionMock.getInputStream()).thenReturn(fileInputStream);
     when(connectionFactoryMock.openConnection(any(URL.class)))
         .thenReturn(urlConnectionMock);
@@ -183,7 +162,6 @@ public class TestReconUtils {
     }
 
     assertEquals("File 1 Contents", contents);
-
   }
 
   @Test
