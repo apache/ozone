@@ -317,7 +317,7 @@ public class TestScmSafeMode {
     final List<ContainerInfo> containers = scm.getContainerManager()
         .getContainers();
     scm.getEventQueue().fireEvent(SCMEvents.SAFE_MODE_STATUS,
-        new SCMSafeModeManager.SafeModeStatus(true));
+        new SCMSafeModeManager.SafeModeStatus(true, true));
     GenericTestUtils.waitFor(() -> {
       return clientProtocolServer.getSafeModeStatus();
     }, 50, 1000 * 30);
