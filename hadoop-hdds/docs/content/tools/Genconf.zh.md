@@ -20,6 +20,6 @@ summary: 用于生成默认配置的工具
   limitations under the License.
 -->
 
-Genconf 工具可以在指定路径下生成 ozone-site.xml 模板文件，然后用户可以进行编辑，对配置进行替换。
+Genconf 工具可以在指定路径下生成 ozone-site.xml 模板文件，用户可以进行根据需求编辑此文件。
 
 `ozone genconf <path>`
