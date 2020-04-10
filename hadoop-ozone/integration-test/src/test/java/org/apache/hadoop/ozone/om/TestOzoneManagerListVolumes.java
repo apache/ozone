@@ -48,7 +48,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_AL
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -56,7 +55,6 @@ import org.junit.rules.Timeout;
 /**
  * Test OzoneManager list volume operation under combinations of configs.
  */
-@Ignore
 public class TestOzoneManagerListVolumes {
 
   @Rule
