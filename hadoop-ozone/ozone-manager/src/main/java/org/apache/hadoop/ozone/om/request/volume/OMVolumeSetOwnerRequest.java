@@ -143,6 +143,11 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
       oldOwner = omVolumeArgs.getOwnerName();
 
+      if (oldOwner.equals(newOwner)) {
+        throw new OMException("Owner of volume " + volume + " is already " +
+            newOwner, OMException.ResultCodes.ACCESS_DENIED);
+      }
+
       acquiredUserLocks =
           omMetadataManager.getLock().acquireMultiUserLock(newOwner, oldOwner);
 

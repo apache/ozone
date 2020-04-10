@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
@@ -95,7 +96,14 @@ public class TestOzoneManagerSetOwner {
     ClientProtocol proxy = objectStore.getClientProxy();
     objectStore.createVolume(volumeName);
     proxy.setVolumeOwner(volumeName, ownerName);
-    proxy.setVolumeOwner(volumeName, ownerName);
+    try {
+      proxy.setVolumeOwner(volumeName, ownerName);
+    } catch (OMException ex) {
+      // Expect OMException if setting volume owner to the same user
+      if (ex.getResult() != OMException.ResultCodes.ACCESS_DENIED) {
+        throw ex;
+      }
+    }
   }
 
   @Test
