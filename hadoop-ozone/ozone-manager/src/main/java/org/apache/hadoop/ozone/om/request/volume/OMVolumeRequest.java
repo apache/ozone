@@ -106,6 +106,13 @@ public abstract class OMVolumeRequest extends OMClientRequest {
       objectID = volumeList.getObjectID();
     }
 
+    // Sanity check, a user should not own same volume twice
+    //  TODO: May want to remove this due to perf if user owns a lot of volumes.
+    if (prevVolList.contains(volume)) {
+      throw new IOException("Invalid operation: User " + owner +
+          " is about to own a same volume " + volume + " twice!" +
+          " Check for DB consistency error.");
+    }
 
     // Add the new volume to the list
     prevVolList.add(volume);
