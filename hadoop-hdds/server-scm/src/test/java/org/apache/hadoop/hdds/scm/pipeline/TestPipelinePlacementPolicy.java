@@ -44,6 +44,8 @@ import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -66,6 +68,9 @@ public class TestPipelinePlacementPolicy {
 
   private List<DatanodeDetails> nodesWithOutRackAwareness = new ArrayList<>();
   private List<DatanodeDetails> nodesWithRackAwareness = new ArrayList<>();
+
+  static final Logger LOG =
+      LoggerFactory.getLogger(TestPipelinePlacementPolicy.class);
 
   @Before
   public void init() throws Exception {
@@ -118,8 +123,11 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> excludedNodes =
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     excludedNodes.add(anchor);
-    DatanodeDetails nextNode = placementPolicy.chooseNodeFromNetworkTopology(
-        nodeManager.getClusterNetworkTopologyMap(), anchor, excludedNodes);
+    DatanodeDetails nextNode = placementPolicy.chooseNodeBasedOnSameRack(
+        nodesWithRackAwareness, excludedNodes,
+        nodeManager.getClusterNetworkTopologyMap(), anchor);
+    //DatanodeDetails nextNode = placementPolicy.chooseNodeFromNetworkTopology(
+    //    nodeManager.getClusterNetworkTopologyMap(), anchor, excludedNodes);
     Assert.assertFalse(excludedNodes.contains(nextNode));
     // next node should not be the same as anchor.
     Assert.assertTrue(anchor.getUuid() != nextNode.getUuid());
