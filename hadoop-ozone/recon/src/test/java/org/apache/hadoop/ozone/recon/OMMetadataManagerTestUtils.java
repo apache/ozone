@@ -44,24 +44,22 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOmMetadataManagerImpl;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
 
 /**
- * Utility methods for test classes.
+ * Utility methods for creating OM related metadata managers and objects.
  */
-public abstract class AbstractOMMetadataManagerTest {
+public final class OMMetadataManagerTestUtils {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  private OMMetadataManagerTestUtils() {
+  }
 
   /**
    * Create a new OM Metadata manager instance with default volume and bucket.
    * @throws IOException ioEx
    */
-  protected OMMetadataManager initializeNewOmMetadataManager()
+  public static OMMetadataManager initializeNewOmMetadataManager(
+      File omDbDir)
       throws IOException {
-    File omDbDir = temporaryFolder.newFolder();
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
@@ -94,9 +92,9 @@ public abstract class AbstractOMMetadataManagerTest {
    * Create an empty OM Metadata manager instance.
    * @throws IOException ioEx
    */
-  protected OMMetadataManager initializeEmptyOmMetadataManager()
+  public static OMMetadataManager initializeEmptyOmMetadataManager(
+      File omDbDir)
       throws IOException {
-    File omDbDir = temporaryFolder.newFolder();
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
@@ -104,19 +102,19 @@ public abstract class AbstractOMMetadataManagerTest {
   }
 
   /**
-   * Get an instance of Recon OM Metadata manager.
+   * Given an underlying OM DB, return an instance of Recon OM Metadata
+   * manager.
    * @return ReconOMMetadataManager
    * @throws IOException when creating the RocksDB instance.
    */
-  protected ReconOMMetadataManager getTestMetadataManager(
-      OMMetadataManager omMetadataManager)
+  public static ReconOMMetadataManager getTestReconOmMetadataManager(
+      OMMetadataManager omMetadataManager, File reconOmDbDir)
       throws IOException {
 
     DBCheckpoint checkpoint = omMetadataManager.getStore()
         .getCheckpoint(true);
     assertNotNull(checkpoint.getCheckpointLocation());
 
-    File reconOmDbDir = temporaryFolder.newFolder();
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir
         .getAbsolutePath());
@@ -134,7 +132,7 @@ public abstract class AbstractOMMetadataManagerTest {
    * Write a key to OM instance.
    * @throws IOException while writing.
    */
-  protected void writeDataToOm(OMMetadataManager omMetadataManager,
+  public static void writeDataToOm(OMMetadataManager omMetadataManager,
                                String key) throws IOException {
 
     String omKey = omMetadataManager.getOzoneKey("sampleVol",
@@ -154,7 +152,7 @@ public abstract class AbstractOMMetadataManagerTest {
    * Write a key to OM instance.
    * @throws IOException while writing.
    */
-  protected void writeDataToOm(OMMetadataManager omMetadataManager,
+  public static  void writeDataToOm(OMMetadataManager omMetadataManager,
                                String key,
                                String bucket,
                                String volume,
@@ -170,34 +168,6 @@ public abstract class AbstractOMMetadataManagerTest {
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
-            .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
-            .build());
-  }
-
-  /**
-   * Write a key to OM instance.
-   * @throws IOException while writing.
-   */
-  protected void writeDataToOm(OMMetadataManager omMetadataManager,
-      String key,
-      String bucket,
-      String volume,
-      Long dataSize,
-      List<OmKeyLocationInfoGroup>
-          omKeyLocationInfoGroupList)
-      throws IOException {
-
-    String omKey = omMetadataManager.getOzoneKey(volume,
-        bucket, key);
-
-    omMetadataManager.getKeyTable().put(omKey,
-        new OmKeyInfo.Builder()
-            .setBucketName(bucket)
-            .setVolumeName(volume)
-            .setKeyName(key)
-            .setDataSize(dataSize)
             .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
             .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
@@ -232,7 +202,7 @@ public abstract class AbstractOMMetadataManagerTest {
    * @param pipeline pipeline
    * @return new instance of OmKeyLocationInfo
    */
-  protected OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,
+  public static OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,
                                                    Pipeline pipeline) {
     return new OmKeyLocationInfo.Builder()
         .setBlockID(blockID)
