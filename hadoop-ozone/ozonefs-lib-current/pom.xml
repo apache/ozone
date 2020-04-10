@@ -181,6 +181,14 @@
         </exclusion>
         <exclusion>
           <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-hdds-server-framework</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-hdds-container-service</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-hdfs</artifactId>
         </exclusion>
         <exclusion>
