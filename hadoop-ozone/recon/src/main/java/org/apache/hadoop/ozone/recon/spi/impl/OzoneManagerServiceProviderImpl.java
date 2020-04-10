@@ -30,7 +30,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -91,7 +90,7 @@ public class OzoneManagerServiceProviderImpl
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerServiceProviderImpl.class);
-  private static URLConnectionFactory connectionFactory;
+  private URLConnectionFactory connectionFactory;
 
   private final CloseableHttpClient httpClient;
   private File omSnapshotDBParentDir = null;
