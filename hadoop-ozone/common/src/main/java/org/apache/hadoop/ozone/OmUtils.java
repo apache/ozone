@@ -506,4 +506,17 @@ public final class OmUtils {
     return OzoneConfiguration.of(configuration)
         .getObject(OMClientConfig.class).getRpcTimeOut();
   }
+
+  /**
+   * Verify key name is a valid name.
+   */
+  public static void validateKeyName(String keyName)
+          throws OMException {
+    try {
+      HddsClientUtils.verifyKeyName(keyName);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid key name: " + keyName,
+              OMException.ResultCodes.INVALID_KEY_NAME);
+    }
+  }
 }

@@ -618,6 +618,7 @@ public class RpcClient implements ClientProtocol {
       Map<String, String> metadata)
       throws IOException {
     HddsClientUtils.verifyResourceName(volumeName, bucketName);
+    HddsClientUtils.verifyKeyName(keyName);
     HddsClientUtils.checkNotNull(keyName, type, factor);
     String requestId = UUID.randomUUID().toString();
 

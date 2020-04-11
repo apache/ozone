@@ -197,6 +197,27 @@ public final class HddsClientUtils {
   }
 
   /**
+   * verifies that key name is a valid name.
+   *
+   * @param keyName key name to be validated
+   *
+   * @throws IllegalArgumentException
+   */
+  public static void verifyKeyName(String keyName) {
+    if (keyName == null) {
+      throw new IllegalArgumentException("Key name is null");
+    }
+    String regex = "^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]$";
+    for (int index = 0; index < keyName.length(); index++) {
+      char currChar = keyName.charAt(index);
+      if (!(Character.toString(currChar).matches(regex))){
+        throw new IllegalArgumentException("Key name has an " +
+                "unsupported character : " + currChar);
+      }
+    }
+  }
+
+  /**
    * Checks that object parameters passed as reference is not null.
    *
    * @param references Array of object references to be checked.
