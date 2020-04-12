@@ -2323,15 +2323,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean recoverTrash(String volumeName, String bucketName,
       String keyName, String destinationBucket) throws IOException {
 
-    if (isAclEnabled) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-          volumeName, bucketName, keyName);
-    }
-
     //TODO: audit log and metric would be updated in later patch.
     try {
-      return keyManager.recoverTrash(volumeName, bucketName, keyName,
-          destinationBucket);
+      return metadataManager
+          .recoverTrash(volumeName, bucketName, keyName, destinationBucket);
     } catch (IOException ex) {
       throw ex;
     }

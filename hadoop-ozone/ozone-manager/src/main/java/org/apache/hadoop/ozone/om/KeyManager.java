@@ -170,18 +170,6 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
-   * Recover trash allows the user to recover the keys
-   * that were marked as deleted, but not actually deleted by Ozone Manager.
-   * @param volumeName - The volume name.
-   * @param bucketName - The bucket name.
-   * @param keyName - The key user want to recover.
-   * @param destinationBucket - The bucket user want to recover to.
-   * @return The result of recovering operation is success or not.
-   */
-  boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException;
-
-  /**
    * Returns a list of pending deletion key info that ups to the given count.
    * Each entry is a {@link BlockGroup}, which contains the info about the
    * key name and all its associated block IDs. A pending deletion key is

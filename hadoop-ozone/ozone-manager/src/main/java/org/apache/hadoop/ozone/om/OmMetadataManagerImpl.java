@@ -804,9 +804,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return deletedKeys;
   }
 
-  /**
-   * @param userName volume owner, null for listing all volumes.
-   */
   @Override
   public boolean recoverTrash(String volumeName, String bucketName,
       String keyName, String destinationBucket) throws IOException {
@@ -819,6 +816,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return recoverOperation;
   }
 
+  /**
+   * @param userName volume owner, null for listing all volumes.
+   */
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {

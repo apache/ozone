@@ -887,19 +887,6 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException {
-
-    Preconditions.checkNotNull(volumeName);
-    Preconditions.checkNotNull(bucketName);
-    Preconditions.checkNotNull(keyName);
-    Preconditions.checkNotNull(destinationBucket);
-
-    return metadataManager.recoverTrash(volumeName, bucketName, keyName,
-        destinationBucket);
-  }
-
-  @Override
   public List<BlockGroup> getPendingDeletionKeys(final int count)
       throws IOException {
     return  metadataManager.getPendingDeletionKeys(count);

@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.key.OMTrashRecoverResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,10 +86,9 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
     boolean acquireLock = false;
     OMClientResponse omClientResponse = null;
     try {
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, destinationBucket, keyName,
-          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
+      // Check acl for the destination bucket.
+      checkBucketAcls(ozoneManager, volumeName, destinationBucket, keyName,
+          IAccessAuthorizer.ACLType.WRITE);
 
       acquireLock = omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, destinationBucket);
