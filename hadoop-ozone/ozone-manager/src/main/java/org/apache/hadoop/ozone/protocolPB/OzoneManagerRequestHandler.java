@@ -61,8 +61,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyRequest;
@@ -422,21 +420,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
 
     return resp.build();
-  }
-
-  private RecoverTrashResponse recoverTrash(RecoverTrashRequest request)
-      throws IOException {
-
-    RecoverTrashResponse.Builder resp =
-        RecoverTrashResponse.newBuilder();
-
-    boolean recoverKeys = impl.recoverTrash(
-        request.getVolumeName(),
-        request.getBucketName(),
-        request.getKeyName(),
-        request.getDestinationBucket());
-
-    return resp.setResponse(recoverKeys).build();
   }
 
   private AllocateBlockResponse allocateBlock(AllocateBlockRequest request)

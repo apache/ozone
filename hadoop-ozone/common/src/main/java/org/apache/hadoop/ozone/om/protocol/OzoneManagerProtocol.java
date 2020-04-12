@@ -503,7 +503,9 @@ public interface OzoneManagerProtocol
    * @return The result of recovering operation is success or not.
    * @throws IOException
    */
-  boolean recoverTrash(String volumeName, String bucketName, String keyName,
-      String destinationBucket) throws IOException;
+  default boolean recoverTrash(String volumeName, String bucketName,
+      String keyName, String destinationBucket) throws IOException {
+    return false;
+  }
 
 }

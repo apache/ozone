@@ -2319,19 +2319,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  @Override
-  public boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException {
-
-    //TODO: audit log and metric would be updated in later patch.
-    try {
-      return metadataManager
-          .recoverTrash(volumeName, bucketName, keyName, destinationBucket);
-    } catch (IOException ex) {
-      throw ex;
-    }
-  }
-
   /**
    * Sets bucket property from args.
    *
