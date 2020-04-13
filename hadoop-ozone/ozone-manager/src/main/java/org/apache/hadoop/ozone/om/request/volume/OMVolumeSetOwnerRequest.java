@@ -71,7 +71,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
-
     Preconditions.checkNotNull(setVolumePropertyRequest);
 
     OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
@@ -112,7 +111,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       }
 
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();
-
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
 
       OzoneManagerProtocolProtos.UserVolumeInfo oldOwnerVolumeList = null;
@@ -121,7 +119,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
-
       omVolumeArgs = omMetadataManager.getVolumeTable().get(dbVolumeKey);
 
       if (omVolumeArgs == null) {
