@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 
+import java.util.concurrent.TimeUnit;
+
 import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
@@ -39,6 +41,7 @@ public class OMClientConfig {
       defaultValue = "15m",
       type = ConfigType.TIME,
       tags = {OZONE, OM, CLIENT},
+      timeUnit = TimeUnit.MILLISECONDS,
       description = "RpcClient timeout on waiting for the response from " +
           "OzoneManager. The default value is set to 15 minutes. " +
           "If ipc.client.ping is set to true and this rpc-timeout " +
