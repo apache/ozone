@@ -91,8 +91,13 @@ class BackgroundPipelineCreator {
   private boolean skipCreation(HddsProtos.ReplicationFactor factor,
                                HddsProtos.ReplicationType type,
                                boolean autoCreate) {
-    return factor == HddsProtos.ReplicationFactor.ONE &&
-        type == HddsProtos.ReplicationType.RATIS && (!autoCreate);
+    if (type == HddsProtos.ReplicationType.RATIS) {
+      return factor == HddsProtos.ReplicationFactor.ONE && (!autoCreate);
+    } else {
+      // For STAND_ALONE Replication Type, Replication Factor 3 should not be
+      // used.
+      return factor == HddsProtos.ReplicationFactor.THREE;
+    }
   }
 
   private void createPipelines() {
