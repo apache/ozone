@@ -21,7 +21,7 @@ libo3fs is a JNI based C API for Ozone File System. It provides with read and wr
 
 #The APIs
 
-The libo3fs APIs are a subset of the Ozone FileSystem APIs. The header file for libo3fs describes each API in detail and is available in $HADOOP_HDFS_HOME/include/ozfs.h.
+The libo3fs APIs are a subset of the Ozone FileSystem APIs. The header file for libo3fs describes each API in detail and is available in ${OZONE_HOME}/native-client/libo3fs/o3fs.h.
 
 #Requirements:
 
@@ -32,11 +32,11 @@ The libo3fs APIs are a subset of the Ozone FileSystem APIs. The header file for 
 #Compilation
 
       1.Compilation of .c files
-            In libo3fs directory there is one file ozfs.c.
+            In libo3fs directory there is one file o3fs.c.
 
                 Execute the following command to compile it: 
 
-           gcc -fPIC -pthread -I {OZONE_HOME}/native-client/libo3fs -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c ozfs.c
+           gcc -fPIC -pthread -I {OZONE_HOME}/native-client/libo3fs -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c o3fs.c
            In the libo3fs-examples directory there are two .c files: libo3fs_read.c and libo3fs_write.c.
 
                Execute the following command to compile libo3fs_read.c and libo3fs_write.c:
@@ -47,27 +47,27 @@ The libo3fs APIs are a subset of the Ozone FileSystem APIs. The header file for 
       2. Generation of libo3fs.so
            Execute the following command to generate a .so:
 
-           gcc -shared ozfs.o hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/mybuild/hdfs.o -o libo3fs.so.
+           gcc -shared o3fs.o hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/mybuild/hdfs.o -o libo3fs.so.
 
       3. Generation of binary(executable)
-           Two binaries have to be generated namely ozfs_read and ozfs_write.
-           Execute the following command to generate ozfs_red:
+           Two binaries have to be generated namely o3fs_read and o3fs_write.
+           Execute the following command to generate o3fs_red:
 
-           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_read libo3fs_read.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08-0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/native-client/libo3fs -lozfs
+           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o o3fs_read libo3fs_read.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08-0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/native-client/libo3fs -lo3fs
            
-           Execute the following command to execute ozfs_write:
+           Execute the following command to execute o3fs_write:
 
-           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_write libo3fs_write.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08- 0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/native-client/libo3fs -lozfs
+           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o o3fs_write libo3fs_write.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08- 0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/native-client/libo3fs -lo3fs
 
 #Deploying
 
 In root shell execute the following:
 
-    ./ozfs_write filename file_size buffer_size host_name port_number bucket_name volume_name
+    ./o3fs_write filename file_size buffer_size host_name port_number bucket_name volume_name
 
 For example
 
-    ./ozfs_write file1 100 100 127.0.0.1 9862 bucket4 vol4 , where file1 is name of the file, 100 is file size and buffer size, "127.0.0.1 is host", 9862 is the port number, "bucket4" is bucket name and "vol4" is the volume name.
+    ./o3fs_write file1 100 100 127.0.0.1 9862 bucket4 vol4 , where file1 is name of the file, 100 is file size and buffer size, "127.0.0.1 is host", 9862 is the port number, "bucket4" is bucket name and "vol4" is the volume name.
 
 #Common Problems:
 
