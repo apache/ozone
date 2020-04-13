@@ -106,6 +106,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
 
+
+  public OzoneManagerRequestHandler(OzoneManager om) {
+    this.impl = om;
+    this.ozoneManagerDoubleBuffer = null;
+  }
+
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
     this.impl = om;

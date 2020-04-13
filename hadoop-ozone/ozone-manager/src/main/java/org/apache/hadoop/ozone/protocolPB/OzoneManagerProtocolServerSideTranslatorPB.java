@@ -74,13 +74,19 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       boolean enableRatis) {
     this.ozoneManager = impl;
     this.isRatisEnabled = enableRatis;
-    this.ozoneManagerDoubleBuffer =
-        new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(), (i) -> {
-          // Do nothing.
-          // For OM NON-HA code, there is no need to save transaction index.
-          // As we wait until the double buffer flushes DB to disk.
-        }, isRatisEnabled);
-    handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
+
+    if (!isRatisEnabled) {
+      this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer(
+          ozoneManager.getMetadataManager(), (i) -> {
+            // Do nothing.
+            // For OM NON-HA code, there is no need to save transaction index.
+            // As we wait until the double buffer flushes DB to disk.
+      }, isRatisEnabled);
+      handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
+    } else {
+      this.ozoneManagerDoubleBuffer = null;
+      handler = new OzoneManagerRequestHandler(impl);
+    }
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG);
