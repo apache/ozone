@@ -36,13 +36,13 @@ The libo3fs APIs are a subset of the Ozone FileSystem APIs. The header file for 
 
                 Execute the following command to compile it: 
 
-           gcc -fPIC -pthread -I {OZONE_HOME}/ozone-native-client/libo3fs -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c ozfs.c
+           gcc -fPIC -pthread -I {OZONE_HOME}/native-client/libo3fs -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c ozfs.c
            In the libo3fs-examples directory there are two .c files: libo3fs_read.c and libo3fs_write.c.
 
                Execute the following command to compile libo3fs_read.c and libo3fs_write.c:
 
-           gcc -fPIC -pthread -I {OZONE_HOME}/ozone-native-client/libo3fs -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c libo3fs_read.c               
-           gcc -fPIC -pthread -I {OZONE_HOME}/ozone-native-client/libo3fs -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c libo3fs_write.c
+           gcc -fPIC -pthread -I {OZONE_HOME}/native-client/libo3fs -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c libo3fs_read.c               
+           gcc -fPIC -pthread -I {OZONE_HOME}/native-client/libo3fs -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c libo3fs_write.c
 
       2. Generation of libo3fs.so
            Execute the following command to generate a .so:
@@ -53,11 +53,11 @@ The libo3fs APIs are a subset of the Ozone FileSystem APIs. The header file for 
            Two binaries have to be generated namely ozfs_read and ozfs_write.
            Execute the following command to generate ozfs_red:
 
-           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_read libo3fs_read.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08-0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/ozone-native-client/libo3fs -lozfs
+           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_read libo3fs_read.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08-0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/native-client/libo3fs -lozfs
            
            Execute the following command to execute ozfs_write:
 
-           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_write libo3fs_write.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08- 0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/ozone-native-client/libo3fs -lozfs
+           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_write libo3fs_write.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08- 0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/native-client/libo3fs -lozfs
 
 #Deploying
 
@@ -81,7 +81,7 @@ LD_LIBRARY_PATH is not set. LD_LIBRARY_PATH can be set using the following comma
 
            export LD_LIBRARY_PATH={HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib:
                   /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08-0.el7_7.x86_64/jre/lib/amd64/server:
-                  {OZONE_HOME}/ozone-native-client/libo3fs
+                  {OZONE_HOME}/native-client/libo3fs
 
 Ozone-site.xml is not configured. Save the minimal snippet to hadoop-ozone/dist/target/ozone-*/etc/hadoop/ozone-site.xml in the compiled distribution.
 
