@@ -212,31 +212,28 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     setOwnerRequest.preExecute(ozoneManager);
     OMClientResponse omClientResponse = setOwnerRequest.validateAndUpdateCache(
         ozoneManager, 1, ozoneManagerDoubleBufferHelper);
-    // Response status should be OK
+    // Response status should be OK and success flag should be true.
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
+    Assert.assertTrue(omClientResponse.getOMResponse().getSuccess());
 
-    OMRequest omRequest2 =
-        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
-    OMVolumeSetOwnerRequest setOwnerRequest2 =
-        new OMVolumeSetOwnerRequest(omRequest2);
-    // Execute the same request again but with index+1
-    setOwnerRequest2.preExecute(ozoneManager);
-    omClientResponse = setOwnerRequest2.validateAndUpdateCache(
-        ozoneManager, 3, ozoneManagerDoubleBufferHelper);
-    // Response status should be OK
+    // Execute the same request again but with higher index
+    setOwnerRequest.preExecute(ozoneManager);
+    omClientResponse = setOwnerRequest.validateAndUpdateCache(
+        ozoneManager, 2, ozoneManagerDoubleBufferHelper);
+    // Response status should be OK, but success flag should be false.
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
+    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
 
-    // Check list
+    // Check volume names list
     OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo =
         omMetadataManager.getUserTable().get(newOwner);
     Assert.assertNotNull(userVolumeInfo);
     List<String> volumeNamesList = userVolumeInfo.getVolumeNamesList();
-    // TODO: Somehow after the second request go through the list become 0 size
-//    Assert.assertNotEquals(0, volumeNamesList.size());
-    Set<String> volumeNamesSet = new HashSet<>(volumeNamesList);
+    Assert.assertEquals(1, volumeNamesList.size());
 
+    Set<String> volumeNamesSet = new HashSet<>(volumeNamesList);
     // If the set size isn't equal to list size, there are duplicates
     // in the list (which was the bug before the fix).
     Assert.assertEquals(volumeNamesList.size(), volumeNamesSet.size());

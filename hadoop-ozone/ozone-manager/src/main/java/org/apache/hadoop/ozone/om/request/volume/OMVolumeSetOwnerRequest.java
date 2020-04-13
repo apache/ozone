@@ -143,21 +143,14 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
       oldOwner = omVolumeArgs.getOwnerName();
 
+      // Return OK immediately if newOwner is the same as oldOwner.
       if (oldOwner.equals(newOwner)) {
         LOG.warn("Volume '{}' owner is already user '{}'.", volume, oldOwner);
-        // TODO: Optimization: Skip the logic entirely.
-        //  I tried to use the chunk of code commented below, only to find
-        //  that it causes NPE in OzoneManagerProtocolServerSideTranslatorPB at
-        //  line 218: omClientResponse.getFlushFuture().get() due to
-        //  omClientResponse.getFlushFuture() is null.
-        //  -- This might be some other bug?
-        /*
-        omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
+        omResponse.setStatus(OzoneManagerProtocolProtos.Status.OK)
           .setMessage(
             "Volume '" + volume + "' owner is already '" + newOwner + "'.")
           .setSuccess(false);
         return new OMVolumeSetOwnerResponse(omResponse.build());
-         */
       }
 
       acquiredUserLocks =
@@ -182,8 +175,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       // Update cache.
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(newOwner)),
-              new CacheValue<>(Optional.of(newOwnerVolumeList),
-                  transactionLogIndex));
+          new CacheValue<>(Optional.of(newOwnerVolumeList),
+              transactionLogIndex));
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(oldOwner)),
           new CacheValue<>(Optional.of(oldOwnerVolumeList),
