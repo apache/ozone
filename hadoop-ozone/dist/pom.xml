@@ -167,11 +167,6 @@
                   <artifactId>protobuf-java</artifactId>
                   <version>3.5.1</version>
                 </artifactItem>
-                <artifactItem>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>26.0-android</version>
-                </artifactItem>
               </artifactItems>
             </configuration>
           </execution>
