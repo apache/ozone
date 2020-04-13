@@ -34,7 +34,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Defines common methods required for volume requests.
@@ -104,30 +106,18 @@ public abstract class OMVolumeRequest extends OMClientRequest {
           OMException.ResultCodes.USER_TOO_MANY_VOLUMES);
     }
 
-    List<String> prevVolList = new ArrayList<>();
+    Set<String> volumeSet = new HashSet<>();
     long objectID = txID;
     if (volumeList != null) {
-      prevVolList.addAll(volumeList.getVolumeNamesList());
+      volumeSet.addAll(volumeList.getVolumeNamesList());
       objectID = volumeList.getObjectID();
     }
 
-    UserVolumeInfo newVolList;
-    // Sanity check, a user should not own the same volume twice.
-    // Caution: Might be slow if a user owns a lot of volumes.
-    if (!prevVolList.contains(volume)) {
-      // Add the new volume to the list
-      prevVolList.add(volume);
-      newVolList = UserVolumeInfo.newBuilder()
-          .setObjectID(objectID)
-          .setUpdateID(txID)
-          .addAllVolumeNames(prevVolList).build();
-    } else {
-      newVolList = volumeList;
-      LOG.warn("Caller attempted to add volume '{}' to list which user '{}' "
-          + "already own. Ignored.", volume, owner);
-    }
-
-    return newVolList;
+    volumeSet.add(volume);
+    return UserVolumeInfo.newBuilder()
+        .setObjectID(objectID)
+        .setUpdateID(txID)
+        .addAllVolumeNames(volumeSet).build();
   }
 
   /**
