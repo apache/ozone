@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserVolumeInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -38,6 +40,9 @@ import java.util.List;
  * Defines common methods required for volume requests.
  */
 public abstract class OMVolumeRequest extends OMClientRequest {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMVolumeRequest.class);
 
   public OMVolumeRequest(OMRequest omRequest) {
     super(omRequest);
@@ -106,20 +111,21 @@ public abstract class OMVolumeRequest extends OMClientRequest {
       objectID = volumeList.getObjectID();
     }
 
-    // Sanity check, a user should not own same volume twice
-    //  TODO: May want to remove this due to perf if user owns a lot of volumes.
-    if (prevVolList.contains(volume)) {
-      throw new IOException("Invalid operation: User " + owner +
-          " is about to own a same volume " + volume + " twice!" +
-          " Check for DB consistency error.");
+    UserVolumeInfo newVolList;
+    // Sanity check, a user should not own the same volume twice.
+    // Caution: Might be slow if a user owns a lot of volumes.
+    if (!prevVolList.contains(volume)) {
+      // Add the new volume to the list
+      prevVolList.add(volume);
+      newVolList = UserVolumeInfo.newBuilder()
+          .setObjectID(objectID)
+          .setUpdateID(txID)
+          .addAllVolumeNames(prevVolList).build();
+    } else {
+      newVolList = volumeList;
+      LOG.warn("Caller attempted to add volume '{}' to list which user '{}' "
+          + "already own. Ignored.", volume, owner);
     }
-
-    // Add the new volume to the list
-    prevVolList.add(volume);
-    UserVolumeInfo newVolList = UserVolumeInfo.newBuilder()
-        .setObjectID(objectID)
-        .setUpdateID(txID)
-        .addAllVolumeNames(prevVolList).build();
 
     return newVolList;
   }
