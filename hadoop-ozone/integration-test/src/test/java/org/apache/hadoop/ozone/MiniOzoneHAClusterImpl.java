@@ -434,5 +434,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       conf.set(omNodesKey, omNodesKeyValue.substring(1));
     }
+
+    public void setHandlers(int count) {
+      this.numOfOmHandlers = count;
+    }
   }
 }

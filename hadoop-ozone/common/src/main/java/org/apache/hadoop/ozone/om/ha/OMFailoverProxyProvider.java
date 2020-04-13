@@ -153,7 +153,7 @@ public class OMFailoverProxyProvider implements
         ProtobufRpcEngine.class);
     return RPC.getProxy(OzoneManagerProtocolPB.class, omVersion, omAddress, ugi,
         conf, NetUtils.getDefaultSocketFactory(conf),
-        Client.getRpcTimeout(conf));
+        (int) OmUtils.getOMClientRpcTimeOut(conf));
   }
 
   /**
