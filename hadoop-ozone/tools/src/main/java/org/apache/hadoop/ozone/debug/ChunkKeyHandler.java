@@ -82,7 +82,6 @@ public class ChunkKeyHandler  extends KeyHandler {
     OzoneKeyDetails key = bucket.getKey(keyName);
     // querying  the keyLocations.The OM is queried to get containerID and
     // localID pertaining to a given key
-    System.out.println("Key:" + keyName);
     List<OzoneKeyLocation> keyLocationList = key.getOzoneKeyLocations();
     for (OzoneKeyLocation keyLocation:keyLocationList) {
       ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
