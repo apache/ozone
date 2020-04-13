@@ -417,6 +417,12 @@
                 <!-- work. -->
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
+              <properties>
+                <property>
+                  <name>listener</name>
+                  <value>org.apache.hadoop.test.TimedOutTestsListener</value>
+                </property>
+              </properties>
             </configuration>
           </plugin>
         </plugins>
