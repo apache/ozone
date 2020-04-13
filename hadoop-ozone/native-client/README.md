@@ -17,11 +17,11 @@
 
 #Overview
 
-libozfs is a JNI based C API for Ozone File System. It provides with read and write functionality on OzoneFileSystem. It also uses some functions from HDFS(Hadoop Distributed File System) for which it uses libhdfs, which is a JNI based C API for Hadoop’s Distributed File System (HDFS). It provides C APIs to a subset of the HDFS APIs to manipulate HDFS files and the filesystem. libhdfs is part of the Hadoop distribution and comes pre-compiled in $HADOOP_HDFS_HOME/lib/native/libhdfs.so .
+libo3fs is a JNI based C API for Ozone File System. It provides with read and write functionality on OzoneFileSystem. It also uses some functions from HDFS(Hadoop Distributed File System) for which it uses libhdfs, which is a JNI based C API for Hadoop’s Distributed File System (HDFS). It provides C APIs to a subset of the HDFS APIs to manipulate HDFS files and the filesystem. libhdfs is part of the Hadoop distribution and comes pre-compiled in $HADOOP_HDFS_HOME/lib/native/libhdfs.so .
 
 #The APIs
 
-The libozfs APIs are a subset of the Ozone FileSystem APIs. The header file for libozfs describes each API in detail and is available in $HADOOP_HDFS_HOME/include/ozfs.h.
+The libo3fs APIs are a subset of the Ozone FileSystem APIs. The header file for libo3fs describes each API in detail and is available in $HADOOP_HDFS_HOME/include/ozfs.h.
 
 #Requirements:
 
@@ -32,32 +32,32 @@ The libozfs APIs are a subset of the Ozone FileSystem APIs. The header file for 
 #Compilation
 
       1.Compilation of .c files
-            In libozfs directory there is one file ozfs.c.
+            In libo3fs directory there is one file ozfs.c.
 
                 Execute the following command to compile it: 
 
            gcc -fPIC -pthread -I {OZONE_HOME}/ozone-native-client/libozone -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c ozfs.c
-           In the libozfs-examples directory there are two .c files: libozfs_read.c and libozfs_write.c.
+           In the libo3fs-examples directory there are two .c files: libo3fs_read.c and libo3fs_write.c.
 
-               Execute the following command to compile libozfs_read.c and libozfs_write.c:
+               Execute the following command to compile libo3fs_read.c and libo3fs_write.c:
 
-           gcc -fPIC -pthread -I {OZONE_HOME}/ozone-native-client/libozone -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c libozfs_read.c               
-           gcc -fPIC -pthread -I {OZONE_HOME}/ozone-native-client/libozone -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c libozfs_write.c
+           gcc -fPIC -pthread -I {OZONE_HOME}/ozone-native-client/libozone -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c libo3fs_read.c               
+           gcc -fPIC -pthread -I {OZONE_HOME}/ozone-native-client/libozone -I {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/include -g -c libo3fs_write.c
 
-      2. Generation of libozfs.so
+      2. Generation of libo3fs.so
            Execute the following command to generate a .so:
 
-           gcc -shared ozfs.o hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/mybuild/hdfs.o -o libozfs.so.
+           gcc -shared ozfs.o hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/mybuild/hdfs.o -o libo3fs.so.
 
       3. Generation of binary(executable)
            Two binaries have to be generated namely ozfs_read and ozfs_write.
            Execute the following command to generate ozfs_red:
 
-           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_read libozfs_read.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08-0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/ozone-native-client/libozone -lozfs
+           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_read libo3fs_read.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08-0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/ozone-native-client/libozone -lozfs
            
            Execute the following command to execute ozfs_write:
 
-           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_write libozfs_write.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08- 0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/ozone-native-client/libozone -lozfs
+           gcc -L {HADOOP_HOME}/hadoop-hdfs-project/hadoop-hdfs-native-client/target/native/target/usr/local/lib -o ozfs_write libo3fs_write.o -lhdfs -pthread -L/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.242.b08- 0.el7_7.x86_64/jre/lib/amd64/server -ljvm -L {OZONE_HOME}/ozone-native-client/libozone -lozfs
 
 #Deploying
 
