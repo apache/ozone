@@ -27,9 +27,11 @@ typedef struct hdfs_internal* ozfsFS;
 struct hdfsFile_internal;
 typedef struct hdfsFile_internal* ozfsFile;
 
-ozfsFS ozfsConnect(const char* nn, tPort port, const char* bucket, const char* volume);
+ozfsFS ozfsConnect(const char* nn, tPort port, const char* bucket,
+ const char* volume);
 
-ozfsFile ozfsOpenFile(ozfsFS fs, const char *path, int flags, int bufferSize, short replication, tSize blockSize);
+ozfsFile ozfsOpenFile(ozfsFS fs, const char *path, int flags, int bufferSize,
+ short replication, tSize blockSize);
 
 tSize ozfsRead(ozfsFS fs, ozfsFile f, void* buffer, tSize length);
 

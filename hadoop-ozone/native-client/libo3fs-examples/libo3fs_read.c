@@ -19,7 +19,7 @@
 #include "ozfs.h"
 #include <stdio.h>
 #include <stdlib.h>
-
+#include<string.h>
 
 int main(int argc, char **argv) {
     ozfsFS fs;
@@ -32,9 +32,10 @@ int main(int argc, char **argv) {
     ozfsFile readFile;
     char* buffer;
     tSize curSize;
-
+    char message[110] = "Usage: ozfs_read <filename> <filesize> <buffersize>";
+    strcat(message, " <host-name> <port> <bucket-name> <volume-name>\n");
     if (argc ! = 8) {
-        fprintf(stderr, "Usage: ozfs_read <filename> <filesize> <buffersize> <host-name> <port> <bucket-name> <volume-name>\n");
+        fprintf(stderr, message);
         exit(-1);
     }
     fs = ozfsConnect(host, port, bucket, volume);

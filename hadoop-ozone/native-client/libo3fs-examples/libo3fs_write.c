@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include<string.h>
 
 int main(int argc, char **argv) {
     ozfsFS fs;
@@ -38,8 +39,10 @@ int main(int argc, char **argv) {
     off_t nrRemaining;
     tSize curSize;
     tSize written;
+    char message[110] = "Usage: ozfs_write <filename> <filesize> <buffersize>";
+    strcat(message, " <host-name> <port> <bucket-name> <volume-name>\n");
     if (argc != 8) {
-        fprintf(stderr, "Usage: ozfs_write <filename> <filesize> <buffersize> <host-name> <port> <bucket-name> <volume-name>\n");
+        fprintf(stderr, message);
         exit(-1);
     }
     fs = ozfsConnect(host, port, bucket, volume);
@@ -48,11 +51,13 @@ int main(int argc, char **argv) {
         exit(-1);
     }
     if(fileTotalSize == ULONG_MAX && errno == ERANGE) {
-      fprintf(stderr, "invalid file size %s - must be <= %lu\n", argv[2], ULONG_MAX);
+      fprintf(stderr, "invalid file size %s - must be <= %lu\n",
+       argv[2], ULONG_MAX);
       exit(-3);
     }
     if(tmpBufferSize > INT_MAX) {
-      fprintf(stderr, "invalid buffer size libhdfs API write chunks must be <= %d\n", INT_MAX);
+      fprintf(stderr,
+       "invalid buffer size libhdfs API write chunks must be <= %d\n", INT_MAX);
       exit(-3);
     }
     bufferSize = (tSize)tmpBufferSize;
@@ -69,10 +74,13 @@ int main(int argc, char **argv) {
     for (i=0; i < bufferSize; ++i) {
         buffer[i] = 'a' + (i%26);
     }
-    for (nrRemaining = fileTotalSize; nrRemaining > 0; nrRemaining -= bufferSize ) {
+    for (nrRemaining = fileTotalSize; nrRemaining > 0;
+     nrRemaining -= bufferSize ) {
       curSize = ( bufferSize < nrRemaining ) ? bufferSize : (tSize)nrRemaining;
-      if ((written = ozfsWrite(fs, writeFile, (void*)buffer, curSize)) != curSize) {
-        fprintf(stderr, "ERROR: ozfsWrite returned an error on write: %d\n", written);
+      if ((written = ozfsWrite(fs, writeFile, (void*)buffer,
+       curSize)) != curSize) {
+        fprintf(stderr, "ERROR: ozfsWrite returned an error on write: %d\n",
+         written);
         exit(-3);
       }
     }

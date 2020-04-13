@@ -22,24 +22,32 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+#define O3FS "o3fs://"
 
-
-ozfsFS ozfsConnect(const char *host, tPort port, const char *bucket, const char *vol)
+ozfsFS ozfsConnect(const char *host, tPort port,
+ const char *bucket, const char *vol)
 {
     struct hdfsBuilder *bld = hdfsNewBuilder();
     int len = 0;
-    if (!bld)
+    if (!bld){
         return NULL;
-    len = strlen(host) + strlen(bucket) + strlen(vol) + strlen("o3fs://");
+    }
+    len = strlen(host) + strlen(bucket) + strlen(vol) + strlen(O3FS);
     char string[len + 2];
-    snprintf(string, len + 3, "o3fs://%s.%s.%s", bucket, vol, host);
-    printf("URI : %s\n", string);
+    snprintf(string, len + 3, "%s%s.%s.%s", O3FS, bucket, vol, host);
+    // After snprintf command,
+    // string = o3fs://bucket4.vol4.127.0.0.1 (URI without port)
+    //printf("URI : %s\n", string);
+    //port will be added to URI in hdfsBuilerConnect() function below.
+    //finally URI: o3fs://bucket4.vol4.127.0.0.1:9862
     hdfsBuilderSetNameNode(bld, string);
     hdfsBuilderSetNameNodePort(bld, port);
     return (ozfsFS)hdfsBuilderConnect(bld);
 }
-ozfsFile ozfsOpenFile(ozfsFS fs, const char *path, int flags, int bufferSize, short replication, tSize blockSize){
-    return (ozfsFile)hdfsOpenFile((hdfsFS)fs, path, flags, bufferSize, replication, blockSize);
+ozfsFile ozfsOpenFile(ozfsFS fs, const char *path, int flags, int bufferSize,
+ short replication, tSize blockSize){
+    return (ozfsFile)hdfsOpenFile((hdfsFS)fs, path, flags, bufferSize,
+     replication, blockSize);
 }
 
 tSize ozfsRead(ozfsFS fs, ozfsFile f, void* buffer, tSize length){
