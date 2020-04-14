@@ -303,7 +303,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new PendingDeleteHandler(scmBlockManager.getSCMBlockDeletingService());
 
     ContainerReportHandler containerReportHandler =
-        new ContainerReportHandler(scmNodeManager, containerManager);
+        new ContainerReportHandler(scmNodeManager, containerManager, conf);
 
     IncrementalContainerReportHandler incrementalContainerReportHandler =
         new IncrementalContainerReportHandler(
@@ -333,9 +333,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     clientProtocolServer = new SCMClientProtocolServer(conf, this);
     httpServer = new StorageContainerManagerHttpServer(conf);
 
-    safeModeHandler = new SafeModeHandler(configuration,
-        clientProtocolServer, scmBlockManager, replicationManager,
-        pipelineManager);
+    safeModeHandler = new SafeModeHandler(configuration);
+    safeModeHandler.notifyImmediately(clientProtocolServer, scmBlockManager);
+    safeModeHandler.notifyAfterDelay(replicationManager, pipelineManager);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
@@ -358,6 +358,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, safeModeHandler);
+
+    // Emit initial safe mode status, as now handlers are registered.
+    scmSafeModeManager.emitSafeModeStatus();
     registerMXBean();
     registerMetricsSource(this);
   }

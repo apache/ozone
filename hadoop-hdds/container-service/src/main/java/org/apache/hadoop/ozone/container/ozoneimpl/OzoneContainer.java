@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGr
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.replication.GrpcReplicationService;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
@@ -73,7 +73,7 @@ public class OzoneContainer {
   private final HddsDispatcher hddsDispatcher;
   private final Map<ContainerType, Handler> handlers;
   private final OzoneConfiguration config;
-  private final VolumeSet volumeSet;
+  private final MutableVolumeSet volumeSet;
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
   private final XceiverServerSpi readChannel;
@@ -93,14 +93,15 @@ public class OzoneContainer {
   public OzoneContainer(DatanodeDetails datanodeDetails, OzoneConfiguration
       conf, StateContext context, CertificateClient certClient)
       throws IOException {
-    this.config = conf;
-    this.volumeSet = new VolumeSet(datanodeDetails.getUuidString(), conf);
-    this.containerSet = new ContainerSet();
-    this.metadataScanner = null;
+    config = conf;
+    volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(), conf);
+    volumeSet.setFailedVolumeListener(this::handleVolumeFailures);
+    containerSet = new ContainerSet();
+    metadataScanner = null;
 
     buildContainerSet();
     final ContainerMetrics metrics = ContainerMetrics.create(conf);
-    this.handlers = Maps.newHashMap();
+    handlers = Maps.newHashMap();
 
     Consumer<ContainerReplicaProto> icrSender = containerReplicaProto -> {
       IncrementalContainerReportProto icr = IncrementalContainerReportProto
@@ -120,7 +121,7 @@ public class OzoneContainer {
     }
 
     SecurityConfig secConf = new SecurityConfig(conf);
-    this.hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
+    hddsDispatcher = new HddsDispatcher(config, containerSet, volumeSet,
         handlers, context, metrics, secConf.isBlockTokenEnabled()?
         new BlockTokenVerifier(secConf, certClient) : null);
 
@@ -129,11 +130,11 @@ public class OzoneContainer {
      * XceiverServerRatis is the write channel
      * XceiverServerGrpc is the read channel
      */
-    this.controller = new ContainerController(containerSet, handlers);
-    this.writeChannel = XceiverServerRatis.newXceiverServerRatis(
+    controller = new ContainerController(containerSet, handlers);
+    writeChannel = XceiverServerRatis.newXceiverServerRatis(
         datanodeDetails, config, hddsDispatcher, controller, certClient,
         context);
-    this.readChannel = new XceiverServerGrpc(
+    readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient,
         createReplicationService());
     long svcInterval = config
@@ -144,7 +145,7 @@ public class OzoneContainer {
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
-    this.blockDeletingService =
+    blockDeletingService =
         new BlockDeletingService(this, svcInterval, serviceTimeout,
             TimeUnit.MILLISECONDS, config);
   }
@@ -252,6 +253,12 @@ public class OzoneContainer {
     ContainerMetrics.remove();
   }
 
+  public void handleVolumeFailures() {
+    if (containerSet != null) {
+      containerSet.handleVolumeFailures();
+    }
+  }
+
   @VisibleForTesting
   public ContainerSet getContainerSet() {
     return containerSet;
@@ -295,7 +302,7 @@ public class OzoneContainer {
     return this.hddsDispatcher;
   }
 
-  public VolumeSet getVolumeSet() {
+  public MutableVolumeSet getVolumeSet() {
     return volumeSet;
   }
 }

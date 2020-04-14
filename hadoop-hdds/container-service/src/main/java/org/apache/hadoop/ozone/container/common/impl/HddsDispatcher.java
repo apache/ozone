@@ -18,23 +18,28 @@
 
 package org.apache.hadoop.ozone.container.common.impl;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerAction;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .ContainerNotOpenException;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .InvalidContainerStateException;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -42,40 +47,25 @@ import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMarker;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
-import org.apache.hadoop.ozone.container.common.helpers
-    .ContainerCommandRequestPBHelper;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerCommandRequestPBHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis
-    .DispatcherContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
-    ContainerDataProto.State;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
-import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-
-import io.opentracing.Scope;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import io.opentracing.Scope;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
+import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Container dispatcher takes a call from the netty server and routes it
@@ -92,6 +82,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final VolumeSet volumeSet;
   private final StateContext context;
   private final float containerCloseThreshold;
+  private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
   private String scmID;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
@@ -118,14 +109,22 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED,
         HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
     this.tokenVerifier = tokenVerifier;
+
+    protocolMetrics =
+        new ProtocolMessageMetrics<ProtocolMessageEnum>(
+            "HddsDispatcher",
+            "HDDS dispatcher metrics",
+            ContainerProtos.Type.values());
   }
 
   @Override
   public void init() {
+    protocolMetrics.register();
   }
 
   @Override
   public void shutdown() {
+    protocolMetrics.unregister();
   }
 
   /**
@@ -157,9 +156,13 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   public ContainerCommandResponseProto dispatch(
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
     String spanName = "HddsDispatcher." + msg.getCmdType().name();
+    long startTime = System.nanoTime();
     try (Scope scope = TracingUtil
         .importAndCreateScope(spanName, msg.getTraceID())) {
       return dispatchRequest(msg, dispatcherContext);
+    } finally {
+      protocolMetrics
+          .increment(msg.getCmdType(), System.nanoTime() - startTime);
     }
   }
 

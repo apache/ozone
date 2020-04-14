@@ -37,7 +37,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_HANDLER_COUNT_KEY =
       "ozone.om.handler.count.key";
-  public static final int OZONE_OM_HANDLER_COUNT_DEFAULT = 20;
+  public static final int OZONE_OM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_OM_INTERNAL_SERVICE_ID =
       "ozone.om.internal.service.id";
@@ -228,10 +228,4 @@ public final class OMConfigKeys {
   // hadoop-policy.xml, "*" allows all users/groups to access.
   public static final String OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL =
       "ozone.om.security.client.protocol.acl";
-
-  //Ozone FS Config parameters.
-  public static final String OZONE_FS_CREATE_PREFIX_DIRECTORIES =
-      "ozone.manager.fs.prefix.create";
-  public static final Boolean OZONE_FS_CREATE_PREFIX_DIRECTORIES_DEFAULT =
-      Boolean.TRUE;
 }

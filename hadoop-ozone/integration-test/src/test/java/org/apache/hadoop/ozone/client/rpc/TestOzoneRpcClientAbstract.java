@@ -1217,16 +1217,15 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertNotNull("Block not found", blockData);
 
       // Get the location of the chunk file
-      String chunkName = blockData.getChunks().get(0).getChunkName();
       String containreBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
           .getChunksLocationPath(containreBaseDir, scmId, containerID);
-      File chunkFile = new File(chunksLocationPath, chunkName);
-
-      // Corrupt the contents of the chunk file
-      String newData = new String("corrupted data");
-      FileUtils.writeByteArrayToFile(chunkFile, newData.getBytes());
+      byte[] corruptData = "corrupted data".getBytes();
+      // Corrupt the contents of chunk files
+      for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {
+        FileUtils.writeByteArrayToFile(file, corruptData);
+      }
     }
   }
 

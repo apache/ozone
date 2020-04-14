@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -24,6 +24,7 @@ import com.google.inject.Injector;
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -33,12 +34,16 @@ import org.apache.hadoop.ozone.recon.spi.impl.ContainerDBServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
+import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
+import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
 
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
@@ -70,7 +75,7 @@ public interface GuiceInjectorUtilsForTests {
     JooqPersistenceModule jooqPersistenceModule =
         new JooqPersistenceModule(configurationProvider);
 
-    return Guice.createInjector(jooqPersistenceModule,
+    Injector baseInjector = Guice.createInjector(jooqPersistenceModule,
         new AbstractModule() {
           @Override
           protected void configure() {
@@ -92,13 +97,28 @@ public interface GuiceInjectorUtilsForTests {
 
               bind(DBStore.class).toProvider(ReconContainerDBProvider.class).
                   in(Singleton.class);
-              bind(ContainerDBServiceProvider.class).to(
-                  ContainerDBServiceProviderImpl.class).in(Singleton.class);
             } catch (IOException e) {
               Assert.fail();
             }
           }
         });
+
+    return baseInjector.createChildInjector(new AbstractModule() {
+      @Override
+      protected void configure() {
+        Configuration sqlConfiguration =
+            baseInjector.getInstance((Configuration.class));
+        MissingContainersDao missingContainersDao =
+            new MissingContainersDao(sqlConfiguration);
+        ContainerHistoryDao containerHistoryDao =
+            new ContainerHistoryDao(sqlConfiguration);
+        bind(MissingContainersDao.class).toInstance(missingContainersDao);
+        bind(ContainerHistoryDao.class).toInstance(containerHistoryDao);
+        bind(ContainerSchemaManager.class).in(Singleton.class);
+        bind(ContainerDBServiceProvider.class).to(
+            ContainerDBServiceProviderImpl.class).in(Singleton.class);
+      }
+    });
   }
 
   /**
@@ -115,6 +135,8 @@ public interface GuiceInjectorUtilsForTests {
         .getAbsolutePath());
     configuration.set(OZONE_RECON_SCM_DB_DIR, temporaryFolder.newFolder()
         .getAbsolutePath());
+    configuration.set(OZONE_RECON_DATANODE_ADDRESS_KEY,
+        "0.0.0.0:0");
     return configuration;
   }
 }

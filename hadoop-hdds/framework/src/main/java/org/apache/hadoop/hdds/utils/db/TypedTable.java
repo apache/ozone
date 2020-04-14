@@ -177,9 +177,33 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
+  @Override
+  public VALUE getIfExist(KEY key) throws IOException {
+    // Here the metadata lock will guarantee that cache is not updated for same
+    // key during get key.
+
+    CacheResult<CacheValue<VALUE>> cacheResult =
+        cache.lookup(new CacheKey<>(key));
+
+    if (cacheResult.getCacheStatus() == EXISTS) {
+      return codecRegistry.copyObject(cacheResult.getValue().getCacheValue(),
+          valueType);
+    } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
+      return null;
+    } else {
+      return getFromTableIfExist(key);
+    }
+  }
+
   private VALUE getFromTable(KEY key) throws IOException {
     byte[] keyBytes = codecRegistry.asRawData(key);
     byte[] valueBytes = rawTable.get(keyBytes);
+    return codecRegistry.asObject(valueBytes, valueType);
+  }
+
+  private VALUE getFromTableIfExist(KEY key) throws IOException {
+    byte[] keyBytes = codecRegistry.asRawData(key);
+    byte[] valueBytes = rawTable.getIfExist(keyBytes);
     return codecRegistry.asObject(valueBytes, valueType);
   }
 

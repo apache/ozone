@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -16,34 +16,39 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerImpl;
+import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 
 import com.codahale.metrics.Timer;
-import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.commons.lang3.RandomStringUtils.randomAscii;
 
 /**
  * Data generator to use pure datanode XCeiver interface.
@@ -65,36 +70,55 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
       defaultValue = "1024")
   private int chunkSize;
 
+  @Option(names = {"-c", "--chunks-per-block"},
+      description = "The number of chunks to write per block",
+      defaultValue = "16")
+  private int chunksPerBlock;
+
+  @Option(names = {"-l", "--layout"},
+      description = "Strategy to layout files in the container",
+      defaultValue = "FILE_PER_CHUNK"
+  )
+  private ChunkLayOutVersion chunkLayout;
+
   private ChunkManager chunkManager;
+
+  private final Map<Integer, KeyValueContainer> containersPerThread =
+      new ConcurrentHashMap<>();
+
+  private Timer timer;
 
   private byte[] data;
 
-  private OzoneConfiguration ozoneConfiguration;
+  private long blockSize;
 
-  private Map<Integer, KeyValueContainer> containersPerThread = new HashMap<>();
-
-  private Timer timer;
+  private final ThreadLocal<AtomicLong> bytesWrittenInThread =
+      ThreadLocal.withInitial(AtomicLong::new);
 
   @Override
   public Void call() throws Exception {
     try {
       init();
-      ozoneConfiguration = createOzoneConfiguration();
+      OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
 
       VolumeSet volumeSet =
-          new VolumeSet("dnid", "clusterid", ozoneConfiguration);
+          new MutableVolumeSet("dnid", "clusterid", ozoneConfiguration);
 
       Random random = new Random();
 
+      VolumeChoosingPolicy volumeChoicePolicy =
+          new RoundRobinVolumeChoosingPolicy();
+
+      final int threadCount = getThreadNo();
 
       //create a dedicated (NEW) container for each thread
-      for (int i = 1; i <= getThreadNo(); i++) {
-
+      for (int i = 1; i <= threadCount; i++) {
         //use a non-negative container id
         long containerId = random.nextLong() & 0x0F_FF_FF_FF_FF_FF_FF_FFL;
 
         KeyValueContainerData keyValueContainerData =
-            new KeyValueContainerData(Math.abs(containerId),
+            new KeyValueContainerData(containerId,
+                chunkLayout,
                 1_000_000L,
                 getPrefix(),
                 "nodeid");
@@ -102,18 +126,21 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
         KeyValueContainer keyValueContainer =
             new KeyValueContainer(keyValueContainerData, ozoneConfiguration);
 
-        keyValueContainer
-            .create(volumeSet, new RoundRobinVolumeChoosingPolicy(), "scmid");
+        keyValueContainer.create(volumeSet, volumeChoicePolicy, "scmid");
 
         containersPerThread.put(i, keyValueContainer);
       }
 
-      data = RandomStringUtils.randomAscii(chunkSize)
-          .getBytes(StandardCharsets.UTF_8);
+      blockSize = chunkSize * chunksPerBlock;
+      data = randomAscii(chunkSize).getBytes(UTF_8);
 
-      chunkManager = new ChunkManagerImpl(false);
+      chunkManager = ChunkManagerFactory.createChunkManager(ozoneConfiguration);
 
       timer = getMetrics().timer("chunk-write");
+
+      LOG.info("Running chunk write test: threads={} chunkSize={} " +
+              "chunksPerBlock={} layout={}",
+          threadCount, chunkSize, chunksPerBlock, chunkLayout);
 
       runTests(this::writeChunk);
 
@@ -125,19 +152,20 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
     return null;
   }
 
-  private void writeChunk(long l) throws Exception {
-    //based on the thread naming convention: pool-1-thread-n
-    int threadNo =
+  private void writeChunk(long l) {
+    //based on the thread naming convention: pool-N-thread-M
+    final int threadID =
         Integer.parseInt(Thread.currentThread().getName().split("-")[3]);
-
-    KeyValueContainer container = containersPerThread.get(threadNo);
-
-    Preconditions.checkNotNull(container,
-        "Container is not created for thread " + threadNo);
-
-    BlockID blockId = new BlockID(l % 10, l);
-    ChunkInfo chunkInfo = new ChunkInfo("chunk" + l, 0, chunkSize);
-    ByteBuffer byteBuffer = ByteBuffer.wrap(data);
+    KeyValueContainer container = containersPerThread.get(threadID);
+    final long containerID = container.getContainerData().getContainerID();
+    final long bytesWritten = bytesWrittenInThread.get().getAndAdd(chunkSize);
+    final long offset = bytesWritten % blockSize;
+    final long localID = bytesWritten / blockSize;
+    BlockID blockId = new BlockID(containerID, localID);
+    String chunkName = getPrefix() + "_chunk_" + l;
+    ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkSize);
+    LOG.debug("Writing chunk {}: containerID:{} localID:{} offset:{} " +
+            "bytesWritten:{}", l, containerID, localID, offset, bytesWritten);
     DispatcherContext context =
         new DispatcherContext.Builder()
             .setStage(WriteChunkStage.WRITE_DATA)
@@ -145,19 +173,14 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
             .setLogIndex(l)
             .setReadFromTmpFile(false)
             .build();
+    ByteBuffer buffer = ByteBuffer.wrap(data);
 
     timer.time(() -> {
       try {
-
-        chunkManager
-            .writeChunk(container, blockId, chunkInfo,
-                byteBuffer,
-                context);
-
+        chunkManager.writeChunk(container, blockId, chunkInfo, buffer, context);
       } catch (StorageContainerException e) {
-        throw new RuntimeException(e);
+        throw new UncheckedIOException(e);
       }
-      return null;
     });
 
   }

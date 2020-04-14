@@ -64,7 +64,7 @@ HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 
 CORE-SITE.XML_fs.AbstractFileSystem.o3fs.impl=org.apache.hadoop.fs.ozone.OzFs
-CORE-SITE.XML_fs.defaultFS=o3fs://bucket1.vol1/
+CORE-SITE.XML_fs.defaultFS=o3fs://bucket1.volume1/
 
 MAPRED-SITE.XML_mapreduce.framework.name=yarn
 MAPRED-SITE.XML_yarn.app.mapreduce.am.env=HADOOP_MAPRED_HOME=$HADOOP_HOME
@@ -99,6 +99,8 @@ YARN-SITE.XML_yarn.resourcemanager.system.metrics.publisher.enabled=true
 YARN-SITE.XML_yarn.log-aggregation-enable=true
 YARN-SITE.XML_yarn.nodemanager.log-aggregation.roll-monitoring-interval-seconds=3600
 YARN-SITE.XML_yarn.nodemanager.delete.debug-delay-sec=600
+YARN-SITE.XML_yarn.nodemanager.disk-health-checker.max-disk-utilization-per-disk-percentage=99
+YARN-SITE.XML_yarn.nodemanager.disk-health-checker.enable=false
 
 # Yarn LinuxContainer requires the /opt/hadoop/etc/hadoop to be owned by root and not modifiable by other users,
 # which prevents start.sh from changing the configurations based on docker-config

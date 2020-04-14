@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+@import "~antd/es/style/themes/default.less";
 @import "./components/NavBar/NavBar.less";
 
 .ant-layout-header {
@@ -83,4 +84,78 @@ body {
   .ant-tooltip-inner {
     background-color: rgba(0, 0, 0, 0.85);
   }
+}
+
+.hexagon-shape(@width, @height, @bg-color) {
+  @half-width: @width/2;
+  @half-height: @height/2;
+  width: ~"@{width}px";
+  height: ~"@{height}px";
+  background: @bg-color;
+  position: relative;
+  display: inline-block;
+  &:before {
+    content: "";
+    position: absolute;
+    top: ~"-@{half-height}px";
+    left: 0;
+    width: 0;
+    height: 0;
+    border-left: ~"@{half-width}px" solid transparent;
+    border-right: ~"@{half-width}px" solid transparent;
+    border-bottom: ~"@{half-height}px" solid @bg-color;
+  }
+  &:after {
+    content: "";
+    position: absolute;
+    bottom: ~"-@{half-height}px";
+    left: 0;
+    width: 0;
+    height: 0;
+    border-left: ~"@{half-width}px" solid transparent;
+    border-right: ~"@{half-width}px" solid transparent;
+    border-top: ~"@{half-height}px" solid @bg-color;
+  }
+}
+
+.ratis-icon {
+  .hexagon-shape(20, 12, @cyan-7);
+}
+
+.standalone-icon {
+  .hexagon-shape(20, 12, @orange-7);
+}
+
+.icon-text(@content) {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  position: relative;
+  top: -3px;
+  color: #fff;
+  &:after {
+    content: @content;
+    position: absolute;
+    left: 5px;
+    top: 4px;
+    width: 10px;
+    height: 0;
+    color: white;
+    font-size: 12px;
+    z-index: 2;
+  }
+}
+
+.icon-text-three-dots {
+  // In Unicode, \2026 is the horizontal ellipsis (...)
+  .icon-text("\2026");
+}
+
+.icon-text-one-dot {
+  .icon-text(".");
+}
+
+.replication-icon {
+  display: inline-block;
+  margin-right: 5px;
 }

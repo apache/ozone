@@ -37,6 +37,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.CompressorOutputStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -51,6 +52,8 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZIP;
@@ -58,6 +61,7 @@ import static org.apache.commons.compress.compressors.CompressorStreamFactory.GZ
 /**
  * Test the tar/untar for a given container.
  */
+@RunWith(Parameterized.class)
 public class TestTarContainerPacker {
 
   private static final String TEST_DB_FILE_NAME = "test1";
@@ -83,6 +87,17 @@ public class TestTarContainerPacker {
       Paths.get("target/test/data/packer-tmp-dir");
 
   private static final AtomicInteger CONTAINER_ID = new AtomicInteger(1);
+
+  private final ChunkLayOutVersion layout;
+
+  public TestTarContainerPacker(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
 
   @BeforeClass
   public static void init() throws IOException {
@@ -115,7 +130,8 @@ public class TestTarContainerPacker {
     Files.createDirectories(dataDir);
 
     KeyValueContainerData containerData = new KeyValueContainerData(
-        id, -1, UUID.randomUUID().toString(), UUID.randomUUID().toString());
+        id, layout,
+        -1, UUID.randomUUID().toString(), UUID.randomUUID().toString());
     containerData.setChunksPath(dataDir.toString());
     containerData.setMetadataPath(dbDir.getParent().toString());
     containerData.setDbFile(dbDir.toFile());

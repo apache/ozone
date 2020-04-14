@@ -191,7 +191,7 @@ public class TestOzoneContainer {
     }
   }
 
-  static void runTestOzoneContainerViaDataNode(
+  public static void runTestOzoneContainerViaDataNode(
       long testContainerID, XceiverClientSpi client) throws Exception {
     ContainerProtos.ContainerCommandRequestProto
         request, writeChunkRequest, putBlockRequest,

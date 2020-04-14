@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.BlockingQueue;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -43,6 +44,15 @@ public class BaseAppendLogGenerator extends BaseFreonGenerator {
       description = "Host:port of the Ratis server",
       defaultValue = "localhost:9858")
   protected String serverAddress = "localhost:9858";
+
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  @Option(names = {"--inflight-limit"},
+      description = "Maximum in-flight messages",
+      defaultValue = "10")
+  protected int inflightLimit;
+
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected BlockingQueue<Long> inFlightMessages;
 
   protected void setServerIdFromFile(OzoneConfiguration conf) throws
       IOException {

@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.conf.HddsConfServlet;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
@@ -134,8 +135,6 @@ public abstract class BaseHttpServer {
     }
   }
 
-
-
   /**
    * Return a HttpServer.Builder that the OzoneManager/SCM/Datanode/S3Gateway/
    * Recon to initialize their HTTP / HTTPS server.
@@ -145,16 +144,18 @@ public abstract class BaseHttpServer {
       final InetSocketAddress httpsAddr, String name, String spnegoUserNameKey,
       String spnegoKeytabFileKey) throws IOException {
     HttpConfig.Policy policy = getHttpPolicy(conf);
+    boolean isSecurityEnabled = UserGroupInformation.isSecurityEnabled() &&
+        OzoneSecurityUtil.isHttpSecurityEnabled(conf);
 
     HttpServer2.Builder builder = new HttpServer2.Builder().setName(name)
         .setConf(conf).setACL(new AccessControlList(conf.get(
             OZONE_ADMINISTRATORS, " ")))
-        .setSecurityEnabled(UserGroupInformation.isSecurityEnabled())
+        .setSecurityEnabled(isSecurityEnabled)
         .setUsernameConfKey(spnegoUserNameKey)
         .setKeytabConfKey(spnegoKeytabFileKey);
 
     // initialize the webserver for uploading/downloading files.
-    if (UserGroupInformation.isSecurityEnabled()) {
+    if (isSecurityEnabled) {
       LOG.info("Starting web server as: "
           + SecurityUtil.getServerPrincipal(conf.get(spnegoUserNameKey),
           httpAddr.getHostName()));

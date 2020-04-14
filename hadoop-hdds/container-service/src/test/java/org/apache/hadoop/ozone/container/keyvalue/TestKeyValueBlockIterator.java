@@ -29,8 +29,9 @@ import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -55,6 +56,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_METADATA_STORE_IMPL_LEVELDB;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_METADATA_STORE_IMPL_ROCKSDB;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -67,21 +70,26 @@ public class TestKeyValueBlockIterator {
 
   private KeyValueContainer container;
   private KeyValueContainerData containerData;
-  private VolumeSet volumeSet;
+  private MutableVolumeSet volumeSet;
   private Configuration conf;
   private File testRoot;
 
   private final String storeImpl;
+  private final ChunkLayOutVersion layout;
 
-  public TestKeyValueBlockIterator(String metadataImpl) {
+  public TestKeyValueBlockIterator(String metadataImpl,
+      ChunkLayOutVersion layout) {
     this.storeImpl = metadataImpl;
+    this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-        {OZONE_METADATA_STORE_IMPL_LEVELDB},
-        {OZONE_METADATA_STORE_IMPL_ROCKSDB}});
+        {OZONE_METADATA_STORE_IMPL_LEVELDB, FILE_PER_CHUNK},
+        {OZONE_METADATA_STORE_IMPL_ROCKSDB, FILE_PER_CHUNK},
+        {OZONE_METADATA_STORE_IMPL_LEVELDB, FILE_PER_BLOCK},
+        {OZONE_METADATA_STORE_IMPL_ROCKSDB, FILE_PER_BLOCK}});
   }
 
   @Before
@@ -90,7 +98,7 @@ public class TestKeyValueBlockIterator {
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
-    volumeSet = new VolumeSet(UUID.randomUUID().toString(), conf);
+    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
   }
 
 
@@ -249,6 +257,7 @@ public class TestKeyValueBlockIterator {
       normalBlocks, int deletedBlocks) throws
       Exception {
     containerData = new KeyValueContainerData(containerId,
+        layout,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     container = new KeyValueContainer(containerData, conf);

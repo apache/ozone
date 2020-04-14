@@ -30,11 +30,13 @@ import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume
     .RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
@@ -46,6 +48,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 import org.rocksdb.Options;
 
@@ -73,6 +77,7 @@ import static org.mockito.Mockito.mock;
 /**
  * Class to test KeyValue Container operations.
  */
+@RunWith(Parameterized.class)
 public class TestKeyValueContainer {
 
   @Rule
@@ -86,6 +91,17 @@ public class TestKeyValueContainer {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
+  private final ChunkLayOutVersion layout;
+
+  public TestKeyValueContainer(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
+
   @Before
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
@@ -94,12 +110,13 @@ public class TestKeyValueContainer {
         .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
         .toString()).build();
 
-    volumeSet = mock(VolumeSet.class);
+    volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
+        layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 
@@ -109,6 +126,7 @@ public class TestKeyValueContainer {
   @Test
   public void testBlockIterator() throws Exception{
     keyValueContainerData = new KeyValueContainerData(100L,
+        layout,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         datanodeId.toString());
     keyValueContainer = new KeyValueContainer(
@@ -154,7 +172,6 @@ public class TestKeyValueContainer {
     }
   }
 
-  @SuppressWarnings("RedundantCast")
   @Test
   public void testCreateContainer() throws Exception {
 
@@ -221,7 +238,8 @@ public class TestKeyValueContainer {
 
     //create a new one
     KeyValueContainerData containerData =
-        new KeyValueContainerData(containerId, 1,
+        new KeyValueContainerData(containerId,
+            keyValueContainerData.getLayOutVersion(),
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
     KeyValueContainer container = new KeyValueContainer(containerData, conf);
@@ -402,6 +420,7 @@ public class TestKeyValueContainer {
 
     // Create Container 2
     keyValueContainerData = new KeyValueContainerData(2L,
+        layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 

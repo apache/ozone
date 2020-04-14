@@ -109,7 +109,7 @@ public class OzoneClientProducer {
     }
 
     if (omServiceID == null) {
-      return OzoneClientFactory.getClient(ozoneConfiguration);
+      return OzoneClientFactory.getRpcClient(ozoneConfiguration);
     } else {
       // As in HA case, we need to pass om service ID.
       return OzoneClientFactory.getRpcClient(omServiceID, ozoneConfiguration);

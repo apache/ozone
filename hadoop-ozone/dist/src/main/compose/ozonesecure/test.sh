@@ -35,10 +35,9 @@ execute_robot_test scm ozonefs/ozonefs.robot
 
 execute_robot_test s3g s3
 
-execute_robot_test scm scmcli
+execute_robot_test scm admincli
 
-# TODO: https://issues.apache.org/jira/browse/HDDgS-3071
-# execute_robot_test scm recon
+execute_robot_test scm recon
 
 stop_docker_env
 

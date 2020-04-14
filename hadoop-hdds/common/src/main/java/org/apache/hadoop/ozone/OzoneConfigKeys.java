@@ -123,6 +123,12 @@ public final class OzoneConfigKeys {
    * */
   public static final String OZONE_ADMINISTRATORS_WILDCARD = "*";
 
+  public static final String OZONE_CLIENT_STREAM_BUFFER_SIZE =
+      "ozone.client.stream.buffer.size";
+
+  public static final String OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT =
+      "4MB";
+
   public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE =
       "ozone.client.stream.buffer.flush.size";
 
@@ -137,7 +143,7 @@ public final class OzoneConfigKeys {
 
   public static final String OZONE_CLIENT_MAX_RETRIES =
       "ozone.client.max.retries";
-  public static final int OZONE_CLIENT_MAX_RETRIES_DEFAULT = 100;
+  public static final int OZONE_CLIENT_MAX_RETRIES_DEFAULT = 5;
   public static final String OZONE_CLIENT_RETRY_INTERVAL =
       "ozone.client.retry.interval";
   public static final TimeDuration OZONE_CLIENT_RETRY_INTERVAL_DEFAULT =
@@ -340,6 +346,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SECURITY_ENABLED_KEY =
       "ozone.security.enabled";
   public static final boolean OZONE_SECURITY_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_HTTP_SECURITY_ENABLED_KEY =
+      "ozone.security.http.kerberos.enabled";
+  public static final boolean OZONE_HTTP_SECURITY_ENABLED_DEFAULT = false;
 
   public static final String OZONE_CONTAINER_COPY_WORKDIR =
       "hdds.datanode.replication.work.dir";

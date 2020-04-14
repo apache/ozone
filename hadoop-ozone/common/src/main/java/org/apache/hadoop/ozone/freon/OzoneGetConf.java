@@ -29,7 +29,6 @@ import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
@@ -98,8 +97,6 @@ public class OzoneGetConf extends Configured implements Tool {
 
   static final String USAGE;
   static {
-    HdfsConfiguration.init();
-
     /* Initialize USAGE based on Command values */
     StringBuilder usage = new StringBuilder(DESCRIPTION);
     usage.append("\nozone getconf \n");
@@ -253,7 +250,11 @@ public class OzoneGetConf extends Configured implements Tool {
     @Override
     public int doWorkInternal(OzoneGetConf tool, String[] args)
         throws IOException {
-      tool.printOut(OmUtils.getOmAddress(tool.getConf()).getHostName());
+      if (OmUtils.isServiceIdsDefined(tool.getConf())) {
+        tool.printOut(OmUtils.getOmHAAddressesById(tool.getConf()).toString());
+      } else {
+        tool.printOut(OmUtils.getOmAddress(tool.getConf()).getHostName());
+      }
       return 0;
     }
   }

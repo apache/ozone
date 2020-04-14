@@ -45,6 +45,16 @@ public class TestRatisNameRewrite {
   public static List<Object[]> parameters() {
     return Arrays.asList(
         new Object[] {
+            "ratis.log_appender"
+                + ".851cb00a-af97-455a-b079-d94a77d2a936@group-C14654DE8C2C"
+                + ".follower_65f881ea-8794-403d-be77-a030ed79c341_match_index",
+            "ratis.log_appender.follower_match_index",
+            new String[] {"instance", "group", "follower"},
+            new String[] {"851cb00a-af97-455a-b079-d94a77d2a936",
+                "group-C14654DE8C2C",
+                "65f881ea-8794-403d-be77-a030ed79c341"}
+        },
+        new Object[] {
             "ratis_grpc.log_appender.72caaf3a-fb1c-4da4-9cc0-a2ce21bb8e67@group"
                 + "-72caaf3a-fb1c-4da4-9cc0-a2ce21bb8e67"
                 + ".grpc_log_appender_follower_75fa730a-59f0-4547"

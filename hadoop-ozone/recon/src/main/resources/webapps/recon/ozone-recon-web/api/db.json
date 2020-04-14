@@ -1,12 +1,10 @@
 {
-  "stats": {
-    "datanodes": {
-      "total": 10,
-      "healthy": 9
-    },
+  "clusterState": {
+    "totalDatanodes": 10,
+    "healthyDatanodes": 9,
     "pipelines": 3,
-    "capacity": {
-      "total": 1099511627778,
+    "storageReport": {
+      "capacity": 1099511627778,
       "used": 681826058240,
       "remaining": 391915765760
     },
@@ -27,8 +25,17 @@
           "used": 488288256,
           "remaining": 21005319168
         },
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "09d3a478-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          }
         ],
         "containers": 80
       },
@@ -41,8 +48,17 @@
           "used": 450971566080,
           "remaining": 95784247808
         },
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          }
         ],
         "containers": 8192
       },
@@ -55,8 +71,22 @@
           "used": 43980465111040,
           "remaining": 86757023244288
         },
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          },
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1
+          }
         ],
         "containers": 43
       },
@@ -69,7 +99,7 @@
           "used": 0,
           "remaining": 110737488355328
         },
-        "pipelineIDs": [],
+        "pipelines": [],
         "containers": 0
       },
       {
@@ -81,8 +111,17 @@
           "used": 644245094400,
           "remaining": 121061273600
         },
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          }
         ],
         "containers": 643
       },
@@ -95,8 +134,17 @@
           "used": 43980465111040,
           "remaining": 92757023244288
         },
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          }
         ],
         "containers": 5
       },
@@ -109,8 +157,22 @@
           "used": 450971566080,
           "remaining": 94784247808
         },
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1
+          }
         ],
         "containers": 64
       },
@@ -123,8 +185,17 @@
           "used": 43980465111040,
           "remaining": 92757023244288
         },
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          }
         ],
         "containers": 21
       },
@@ -137,8 +208,17 @@
           "used": 43980465111040,
           "remaining": 76757023244288
         },
-        "pipelineIDs": [
-          "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          }
         ],
         "containers": 897
       },
@@ -151,8 +231,22 @@
           "used": 43980465111040,
           "remaining": 66757023244288
         },
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          },
+          {
+            "pipelineID": "01f2e105-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "STAND_ALONE",
+            "replicationFactor": 1
+          }
         ],
         "containers": 6754
       },
@@ -165,8 +259,17 @@
           "used": 43980465111040,
           "remaining": 96157023244288
         },
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          }
         ],
         "containers": 78
       },
@@ -179,8 +282,17 @@
           "used": 43980465111040,
           "remaining": 94757023244288
         },
-        "pipelineIDs": [
-          "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a"
+        "pipelines": [
+          {
+            "pipelineID": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
+            "replicationType": "RATIS",
+            "replicationFactor": 3
+          },
+          {
+            "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
+            "replicationType": "RATIS",
+            "replicationFactor": 1
+          }
         ],
         "containers": 543
       }
@@ -191,7 +303,7 @@
     "pipelines": [
       {
         "pipelineId": "02e3d908-ff01-4ce6-ad75-f3ec79bcc71a",
-        "status": "active",
+        "status": "OPEN",
         "leaderNode": "localhost1.storage.enterprise.com",
         "datanodes": [
           "localhost1.storage.enterprise.com",
@@ -200,11 +312,14 @@
         ],
         "lastLeaderElection": 1578491471528,
         "duration": 389445,
-        "leaderElections": 28
+        "leaderElections": 28,
+        "replicationType": "RATIS",
+        "replicationFactor": 3,
+        "containers": 1
       },
       {
         "pipelineId": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982",
-        "status": "active",
+        "status": "OPEN",
         "leaderNode": "localhost5.storage.enterprise.com",
         "datanodes": [
           "localhost4.storage.enterprise.com",
@@ -213,11 +328,14 @@
         ],
         "lastLeaderElection": 1578441471528,
         "duration": 50073382,
-        "leaderElections": 7
+        "leaderElections": 7,
+        "replicationType": "RATIS",
+        "replicationFactor": 3,
+        "containers": 4
       },
       {
         "pipelineId": "04a5d908-ff01-4ce6-ad75-f3ec73dfc8a2",
-        "status": "active",
+        "status": "CLOSED",
         "leaderNode": "localhost9.storage.enterprise.com",
         "datanodes": [
           "localhost7.storage.enterprise.com",
@@ -226,7 +344,10 @@
         ],
         "lastLeaderElection": 1578441871828,
         "duration": 49712212,
-        "leaderElections": 5
+        "leaderElections": 5,
+        "replicationType": "RATIS",
+        "replicationFactor": 3,
+        "containers": 7
       }
     ]
   },
@@ -236,20 +357,54 @@
       {
         "id": 1,
         "keys": 3876,
-        "datanodes": [
-          "localhost1.storage.enterprise.com",
-          "localhost3.storage.enterprise.com",
-          "localhost5.storage.enterprise.com"
-        ]
+        "replicas": [
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost1.storage.enterprise.com",
+            "firstReportTimestamp": 1578491371100,
+            "lastReportTimestamp": 1578491371528
+          },
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost3.storage.enterprise.com",
+            "firstReportTimestamp": 1578491370100,
+            "lastReportTimestamp": 1578491371328
+          },
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost5.storage.enterprise.com",
+            "firstReportTimestamp": 1578491371200,
+            "lastReportTimestamp": 1578491371528
+          }
+        ],
+        "missingSince": 1578491371528,
+        "pipelineId": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
       },
       {
         "id": 2,
         "keys": 5943,
-        "datanodes": [
-          "localhost1.storage.enterprise.com",
-          "localhost3.storage.enterprise.com",
-          "localhost5.storage.enterprise.com"
-        ]
+        "replicas": [
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost1.storage.enterprise.com",
+            "firstReportTimestamp": 1578491371100,
+            "lastReportTimestamp": 1578491371528
+          },
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost3.storage.enterprise.com",
+            "firstReportTimestamp": 1578491370100,
+            "lastReportTimestamp": 1578491371328
+          },
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost5.storage.enterprise.com",
+            "firstReportTimestamp": 1578491371200,
+            "lastReportTimestamp": 1578491371528
+          }
+        ],
+        "missingSince": 1578491471528,
+        "pipelineId": "04a5d908-ff01-4ce6-ad75-f3ec73dfc8a2"
       }
     ]
   },

@@ -106,6 +106,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -168,6 +169,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
+import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -202,8 +204,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FS_CREATE_PREFIX_DIRECTORIES;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_FS_CREATE_PREFIX_DIRECTORIES_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -257,7 +257,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private S3BucketManager s3BucketManager;
 
   private final OMMetrics metrics;
-  private final ProtocolMessageMetrics omClientProtocolMetrics;
+  private final ProtocolMessageMetrics<ProtocolMessageEnum>
+      omClientProtocolMetrics;
   private OzoneManagerHttpServer httpServer;
   private final OMStorage omStorage;
   private final ScmBlockLocationProtocol scmBlockClient;
@@ -306,7 +307,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private boolean isNativeAuthorizerEnabled;
 
-  private boolean createPrefixDirectories;
+  private enum State {
+    INITIALIZED,
+    RUNNING,
+    STOPPED
+  }
+  // Used in MiniOzoneCluster testing
+  private State omState;
 
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
@@ -326,10 +333,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // In case of single OM Node Service there will be no OM Node ID
     // specified, set it to value from om storage
     if (this.omNodeDetails.getOMNodeId() == null) {
-      this.omNodeDetails =
-          OMHANodeDetails.getOMNodeDetails(conf, omNodeDetails.getOMServiceId(),
-              omStorage.getOmId(), omNodeDetails.getRpcAddress(),
-              omNodeDetails.getRatisPort());
+      this.omNodeDetails = OMHANodeDetails.getOMNodeDetails(conf,
+          omNodeDetails.getOMServiceId(),
+          omStorage.getOmId(), omNodeDetails.getRpcAddress(),
+          omNodeDetails.getRatisPort());
     }
 
     loginOMUserIfSecurityEnabled(conf);
@@ -369,9 +376,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     isRatisEnabled = configuration.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
-    createPrefixDirectories = conf.getBoolean(
-        OZONE_FS_CREATE_PREFIX_DIRECTORIES,
-        OZONE_FS_CREATE_PREFIX_DIRECTORIES_DEFAULT);
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
@@ -420,7 +424,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo(
         omStorage.getCurrentDir());
-
     initializeRatisServer();
 
     if (isRatisEnabled) {
@@ -458,14 +461,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
-  }
-
-  /**
-   * Create separate entries for prefix directories in the object path.
-   * @return create directory entries if true
-   */
-  public boolean createPrefixEntries() {
-    return createPrefixDirectories;
+    omState = State.INITIALIZED;
   }
 
   /**
@@ -662,9 +658,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
 
-    return new OzoneDelegationTokenSecretManager(conf, tokenMaxLifetime,
-        tokenRenewInterval, tokenRemoverScanInterval, omRpcAddressTxt,
-        s3SecretManager, certClient);
+    return new OzoneDelegationTokenSecretManager.Builder()
+        .setConf(conf)
+        .setTokenMaxLifetime(tokenMaxLifetime)
+        .setTokenRenewInterval(tokenRenewInterval)
+        .setTokenRemoverScanInterval(tokenRemoverScanInterval)
+        .setService(omRpcAddressTxt)
+        .setS3SecretManager(s3SecretManager)
+        .setCertificateClient(certClient)
+        .setOmServiceId(omNodeDetails.getOMServiceId())
+        .build();
   }
 
   private OzoneBlockTokenSecretManager createBlockTokenSecretManager(
@@ -1150,6 +1153,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     registerMXBean();
     setStartTime();
+    omState = State.RUNNING;
   }
 
   /**
@@ -1183,14 +1187,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metricsTimer = new Timer();
     metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
 
-    omRpcServer = getRpcServer(configuration);
-    omRpcServer.start();
-    isOmRpcServerRunning = true;
-
     initializeRatisServer();
     if (omRatisServer != null) {
       omRatisServer.start();
     }
+
+    omRpcServer = getRpcServer(configuration);
+    omRpcServer.start();
+    isOmRpcServerRunning = true;
 
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
@@ -1206,6 +1210,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     jvmPauseMonitor.init(configuration);
     jvmPauseMonitor.start();
     setStartTime();
+    omState = State.RUNNING;
   }
 
   /**
@@ -1306,6 +1311,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (jvmPauseMonitor != null) {
         jvmPauseMonitor.stop();
       }
+      omState = State.STOPPED;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
     }
@@ -3356,12 +3362,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws SequenceNumberNotFoundException if db is unable to read the data.
    */
   @Override
-  public DBUpdatesWrapper getDBUpdates(
+  public DBUpdates getDBUpdates(
       DBUpdatesRequest dbUpdatesRequest)
       throws SequenceNumberNotFoundException {
-    return metadataManager.getStore()
+    DBUpdatesWrapper updatesSince = metadataManager.getStore()
         .getUpdatesSince(dbUpdatesRequest.getSequenceNumber());
-
+    DBUpdates dbUpdates = new DBUpdates(updatesSince.getData());
+    dbUpdates.setCurrentSequenceNumber(updatesSince.getCurrentSequenceNumber());
+    return dbUpdates;
   }
 
   public OzoneDelegationTokenSecretManager getDelegationTokenMgr() {
@@ -3381,5 +3389,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public boolean isNativeAuthorizerEnabled() {
     return isNativeAuthorizerEnabled;
+  }
+
+  @VisibleForTesting
+  public boolean isRunning() {
+    return omState == State.RUNNING;
   }
 }

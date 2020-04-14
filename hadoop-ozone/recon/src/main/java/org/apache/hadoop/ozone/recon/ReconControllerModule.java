@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_AUTO_COMMIT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_CONNECTION_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_DB_DRIVER;
@@ -38,6 +39,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -58,6 +60,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.ratis.protocol.ClientId;
+import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
@@ -87,6 +90,7 @@ public class ReconControllerModule extends AbstractModule {
         .to(ReconOmMetadataManagerImpl.class);
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
 
+    bind(ContainerSchemaManager.class).in(Singleton.class);
     bind(ContainerDBServiceProvider.class)
         .to(ContainerDBServiceProviderImpl.class).in(Singleton.class);
     bind(OzoneManagerServiceProvider.class)
@@ -117,6 +121,11 @@ public class ReconControllerModule extends AbstractModule {
   }
 
   @Provides
+  ContainerHistoryDao getContainerHistoryDao(final Configuration sqlConfig) {
+    return new ContainerHistoryDao(sqlConfig);
+  }
+
+  @Provides
   FileCountBySizeDao getFileCountBySizeDao(final Configuration sqlConfig) {
     return new FileCountBySizeDao(sqlConfig);
   }
@@ -140,7 +149,9 @@ public class ReconControllerModule extends AbstractModule {
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       ozoneManagerClient = new
           OzoneManagerProtocolClientSideTranslatorPB(
-          ozoneConfiguration, clientId.toString(), null, ugi);
+          ozoneConfiguration, clientId.toString(),
+          ozoneConfiguration.get(OZONE_OM_INTERNAL_SERVICE_ID),
+          ugi);
     } catch (IOException ioEx) {
       LOG.error("Error in provisioning OzoneManagerProtocol ", ioEx);
     }

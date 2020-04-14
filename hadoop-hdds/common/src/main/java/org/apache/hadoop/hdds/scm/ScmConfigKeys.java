@@ -139,6 +139,9 @@ public final class ScmConfigKeys {
   // 4 MB by default
   public static final String OZONE_SCM_CHUNK_SIZE_DEFAULT = "4MB";
 
+  public static final String OZONE_SCM_CHUNK_LAYOUT_KEY =
+      "ozone.scm.chunk.layout";
+
   public static final String OZONE_SCM_CLIENT_PORT_KEY =
       "ozone.scm.client.port";
   public static final int OZONE_SCM_CLIENT_PORT_DEFAULT = 9860;
@@ -218,7 +221,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HANDLER_COUNT_KEY =
       "ozone.scm.handler.count.key";
-  public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 10;
+  public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_SCM_SECURITY_HANDLER_COUNT_KEY =
       "ozone.scm.security.handler.count.key";

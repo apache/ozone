@@ -17,40 +17,32 @@
 
 package org.apache.hadoop.ozone;
 
-import com.google.common.base.Joiner;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.CompressorException;
-import org.apache.commons.compress.compressors.CompressorOutputStream;
-import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.apache.commons.compress.utils.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
+import com.google.common.base.Joiner;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -64,7 +56,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +78,34 @@ public final class OmUtils {
    */
   public static InetSocketAddress getOmAddress(Configuration conf) {
     return NetUtils.createSocketAddr(getOmRpcAddress(conf));
+  }
+
+  /**
+   * Return list of OM addresses by service ids - when HA is enabled.
+   *
+   * @param conf {@link Configuration}
+   * @return {service.id -> [{@link InetSocketAddress}]}
+   */
+  public static Map<String, List<InetSocketAddress>> getOmHAAddressesById(
+      Configuration conf) {
+    Map<String, List<InetSocketAddress>> result = new HashMap<>();
+    for (String serviceId : conf.getTrimmedStringCollection(
+        OZONE_OM_SERVICE_IDS_KEY)) {
+      if (!result.containsKey(serviceId)) {
+        result.put(serviceId, new ArrayList<>());
+      }
+      for (String nodeId : getOMNodeIds(conf, serviceId)) {
+        String rpcAddr = getOmRpcAddress(conf,
+            addKeySuffixes(OZONE_OM_ADDRESS_KEY, serviceId, nodeId));
+        if (rpcAddr != null) {
+          result.get(serviceId).add(NetUtils.createSocketAddr(rpcAddr));
+        } else {
+          LOG.warn("Address undefined for nodeId: {} for service {}", nodeId,
+              serviceId);
+        }
+      }
+    }
+    return result;
   }
 
   /**
@@ -332,54 +351,7 @@ public final class OmUtils {
     }
   }
 
-  /**
-   * Write OM DB Checkpoint to an output stream as a compressed file (tgz).
-   * @param checkpoint checkpoint file
-   * @param destination desination output stream.
-   * @throws IOException
-   */
-  public static void writeOmDBCheckpointToStream(DBCheckpoint checkpoint,
-                                                 OutputStream destination)
-      throws IOException {
 
-    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
-        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
-            destination)) {
-
-      try (ArchiveOutputStream archiveOutputStream =
-               new TarArchiveOutputStream(gzippedOut)) {
-
-        Path checkpointPath = checkpoint.getCheckpointLocation();
-        try (Stream<Path> files = Files.list(checkpointPath)) {
-          for (Path path : files.collect(Collectors.toList())) {
-            if (path != null) {
-              Path fileName = path.getFileName();
-              if (fileName != null) {
-                includeFile(path.toFile(), fileName.toString(),
-                    archiveOutputStream);
-              }
-            }
-          }
-        }
-      }
-    } catch (CompressorException e) {
-      throw new IOException(
-          "Can't compress the checkpoint: " +
-              checkpoint.getCheckpointLocation(), e);
-    }
-  }
-
-  private static void includeFile(File file, String entryName,
-                           ArchiveOutputStream archiveOutputStream)
-      throws IOException {
-    ArchiveEntry archiveEntry =
-        archiveOutputStream.createArchiveEntry(file, entryName);
-    archiveOutputStream.putArchiveEntry(archiveEntry);
-    try (FileInputStream fis = new FileInputStream(file)) {
-      IOUtils.copy(fis, archiveOutputStream);
-    }
-    archiveOutputStream.closeArchiveEntry();
-  }
 
   /**
    * If a OM conf is only set with key suffixed with OM Node ID, return the
@@ -496,4 +468,30 @@ public final class OmUtils {
 
     return repeatedOmKeyInfo;
   }
+
+  /**
+   * Verify volume name is a valid DNS name.
+   */
+  public static void validateVolumeName(String volumeName) throws OMException {
+    try {
+      HddsClientUtils.verifyResourceName(volumeName);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid volume name: " + volumeName,
+          OMException.ResultCodes.INVALID_VOLUME_NAME);
+    }
+  }
+
+  /**
+   * Verify bucket name is a valid DNS name.
+   */
+  public static void validateBucketName(String bucketName)
+      throws OMException {
+    try {
+      HddsClientUtils.verifyResourceName(bucketName);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid bucket name: " + bucketName,
+          OMException.ResultCodes.INVALID_BUCKET_NAME);
+    }
+  }
+
 }

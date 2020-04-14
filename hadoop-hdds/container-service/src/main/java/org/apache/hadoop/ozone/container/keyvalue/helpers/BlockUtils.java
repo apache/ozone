@@ -96,6 +96,20 @@ public final class BlockUtils {
   }
 
   /**
+   * Add a DB handler into cache.
+   *
+   * @param db - DB handler.
+   * @param containerDBPath - DB path of the container.
+   * @param conf configuration.
+   */
+  public static void addDB(ReferenceCountedDB db, String containerDBPath,
+      Configuration conf) {
+    ContainerCache cache = ContainerCache.getInstance(conf);
+    Preconditions.checkNotNull(cache);
+    cache.addDB(containerDBPath, db);
+  }
+
+  /**
    * Parses the {@link BlockData} from a bytes array.
    *
    * @param bytes Block data in bytes.

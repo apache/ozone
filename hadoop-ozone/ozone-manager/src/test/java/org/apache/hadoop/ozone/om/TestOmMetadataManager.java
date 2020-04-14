@@ -90,6 +90,54 @@ public class TestOmMetadataManager {
   }
 
   @Test
+  public void testListAllVolumes() throws Exception {
+    OmVolumeArgs.Builder argsBuilder =
+        OmVolumeArgs.newBuilder().setAdminName("admin");
+    String volName;
+    String ownerName;
+    for (int i = 0; i < 50; i++) {
+      ownerName = "owner" + i;
+      volName = "vola" + i;
+      OmVolumeArgs omVolumeArgs = argsBuilder.
+          setOwnerName(ownerName).setVolume(volName).build();
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+    for (int i = 0; i < 50; i++) {
+      ownerName = "owner" + i;
+      volName = "volb" + i;
+      OmVolumeArgs omVolumeArgs = argsBuilder.
+          setOwnerName(ownerName).setVolume(volName).build();
+      TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+      TestOMRequestUtils.addUserToDB(volName, ownerName, omMetadataManager);
+    }
+
+    String prefix = "";
+    String startKey = "";
+
+    // Test list all volumes
+    List<OmVolumeArgs> volListA = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListA.size(), 100);
+
+    // Test list all volumes with prefix
+    prefix = "volb";
+    List<OmVolumeArgs> volListB = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListB.size(), 50);
+
+    // Test list all volumes with setting startVolume
+    // that was not part of result.
+    prefix = "";
+    int totalVol = volListB.size();
+    int startOrder = 0;
+    startKey = "volb" + startOrder;
+    List<OmVolumeArgs> volListC = omMetadataManager.listVolumes(null,
+        prefix, startKey, 1000);
+    Assert.assertEquals(volListC.size(), totalVol - startOrder - 1);
+  }
+
+  @Test
   public void testListBuckets() throws Exception {
 
     String volumeName1 = "volumeA";
@@ -101,8 +149,12 @@ public class TestOmMetadataManager {
 
     TreeSet<String> volumeABucketsPrefixWithOzoneOwner = new TreeSet<>();
     TreeSet<String> volumeABucketsPrefixWithHadoopOwner = new TreeSet<>();
-    for (int i=1; i<= 100; i++) {
-      if (i % 2 == 0) {
+
+    // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
+    volumeABucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
+    addBucketsToCache(volumeName1, prefixBucketNameWithOzoneOwner);
+    for (int i = 1; i < 100; i++) {
+      if (i % 2 == 0) { // This part adds 49 buckets.
         volumeABucketsPrefixWithOzoneOwner.add(
             prefixBucketNameWithOzoneOwner + i);
         addBucketsToCache(volumeName1, prefixBucketNameWithOzoneOwner + i);
@@ -117,8 +169,12 @@ public class TestOmMetadataManager {
     TreeSet<String> volumeBBucketsPrefixWithOzoneOwner = new TreeSet<>();
     TreeSet<String> volumeBBucketsPrefixWithHadoopOwner = new TreeSet<>();
     TestOMRequestUtils.addVolumeToDB(volumeName2, omMetadataManager);
-    for (int i=1; i<= 100; i++) {
-      if (i % 2 == 0) {
+
+    // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
+    volumeBBucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
+    addBucketsToCache(volumeName2, prefixBucketNameWithOzoneOwner);
+    for (int i = 1; i < 100; i++) {
+      if (i % 2 == 0) { // This part adds 49 buckets.
         volumeBBucketsPrefixWithOzoneOwner.add(
             prefixBucketNameWithOzoneOwner + i);
         addBucketsToCache(volumeName2, prefixBucketNameWithOzoneOwner + i);
@@ -134,7 +190,10 @@ public class TestOmMetadataManager {
         omMetadataManager.listBuckets(volumeName1,
             null, prefixBucketNameWithOzoneOwner, 100);
 
-    Assert.assertEquals(omBucketInfoList.size(),  50);
+    // Cause adding a exact name in prefixBucketNameWithOzoneOwner
+    // and another 49 buckets, so if we list buckets with --prefix
+    // prefixBucketNameWithOzoneOwner, we should get 50 buckets.
+    Assert.assertEquals(omBucketInfoList.size(), 50);
 
     for (OmBucketInfo omBucketInfo : omBucketInfoList) {
       Assert.assertTrue(omBucketInfo.getBucketName().startsWith(
@@ -172,7 +231,10 @@ public class TestOmMetadataManager {
     omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
         null, prefixBucketNameWithHadoopOwner, 100);
 
-    Assert.assertEquals(omBucketInfoList.size(),  50);
+    // Cause adding a exact name in prefixBucketNameWithOzoneOwner
+    // and another 49 buckets, so if we list buckets with --prefix
+    // prefixBucketNameWithOzoneOwner, we should get 50 buckets.
+    Assert.assertEquals(omBucketInfoList.size(), 50);
 
     for (OmBucketInfo omBucketInfo : omBucketInfoList) {
       Assert.assertTrue(omBucketInfo.getBucketName().startsWith(

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeNotification;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -32,7 +33,8 @@ import java.util.NavigableSet;
 /**
  * Interface which exposes the api for pipeline management.
  */
-public interface PipelineManager extends Closeable, PipelineManagerMXBean {
+public interface PipelineManager extends Closeable, PipelineManagerMXBean,
+    SafeModeNotification {
 
   Pipeline createPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException;
@@ -112,4 +114,10 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   default void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
   }
+
+  /**
+   * Get SafeMode status.
+   * @return boolean
+   */
+  boolean getSafeModeStatus();
 }
