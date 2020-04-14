@@ -147,7 +147,12 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
           .setMessage(
             "Volume '" + volume + "' owner is already '" + newOwner + "'.")
           .setSuccess(false);
-        return new OMVolumeSetOwnerResponse(omResponse.build());
+        omResponse.setSetVolumePropertyResponse(
+            SetVolumePropertyResponse.newBuilder().build());
+        omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build());
+        addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
+            ozoneManagerDoubleBufferHelper);
+        return omClientResponse;
       }
 
       acquiredUserLocks =
