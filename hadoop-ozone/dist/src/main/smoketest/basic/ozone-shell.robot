@@ -120,7 +120,7 @@ Test key handling
                     Should Not Contain  ${result}       NOTICE.txt.1 exists
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
-    ${result} =     Execute             ozone debug chunkinfo ${protocol}${server}/${volume}/bb1/key1 | jq  '.[]'
+    ${result} =     Execute             ozone debug chunkinfo ${protocol}${server}/${volume}/bb1/key1 | jq -r '.[]'
                     Should contain      ${result}       chunks
     ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="key1") | .name'
                     Should Be Equal     ${result}       key1
