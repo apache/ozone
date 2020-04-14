@@ -32,16 +32,13 @@ import java.io.IOException;
  */
 public abstract class TokenHandler extends Handler {
 
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @CommandLine.Mixin
   private TokenOption tokenFile;
   private Token<OzoneTokenIdentifier> token;
 
   @Override
   protected boolean isApplicable() {
-    return securityEnabled(spec.qualifiedName()) && tokenFile.exists();
+    return securityEnabled() && tokenFile.exists();
   }
 
   @Override

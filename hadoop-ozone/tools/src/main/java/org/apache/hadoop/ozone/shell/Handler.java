@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
@@ -49,6 +50,9 @@ public abstract class Handler implements Callable<Void> {
 
   @ParentCommand
   private GenericParentCommand parent;
+
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
 
   public boolean isVerbose() {
     return parent.isVerbose();
@@ -93,12 +97,12 @@ public abstract class Handler implements Callable<Void> {
     return address.createClient(conf);
   }
 
-  protected boolean securityEnabled(String commandName) {
+  protected boolean securityEnabled() {
     boolean enabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (!enabled) {
       err().printf("Error: '%s' operation works only when security is " +
           "enabled. To enable security set ozone.security.enabled to " +
-          "true.%n", commandName);
+          "true.%n", spec.qualifiedName());
     }
     return enabled;
   }

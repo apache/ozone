@@ -55,7 +55,7 @@ public class GetTokenHandler extends Handler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
 
-    if (securityEnabled("token get")) {
+    if (securityEnabled()) {
       Token<OzoneTokenIdentifier> token = client.getObjectStore()
           .getDelegationToken(new Text(renewer.getValue()));
       if (Objects.isNull(token)) {
