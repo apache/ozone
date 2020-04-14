@@ -66,8 +66,8 @@ public class ChunkKeyHandler  extends KeyHandler {
           throws IOException, OzoneClientException {
     containerOperationClient = new
             ContainerOperationClient(createOzoneConfiguration());
-    xceiverClientManager = new
-            XceiverClientManager(createOzoneConfiguration());
+    xceiverClientManager = containerOperationClient
+            .getXceiverClientManager();
     address.ensureKeyAddress();
     JsonObject jsonObj = new JsonObject();
     JsonElement element;
