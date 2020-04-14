@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +36,6 @@ import org.apache.hadoop.util.Timer;
 
 import com.google.common.collect.Iterables;
 import org.apache.commons.io.FileUtils;
-import org.apache.curator.shaded.com.google.common.collect.ImmutableSet;
 import static org.hamcrest.CoreMatchers.is;
 import org.junit.After;
 import static org.junit.Assert.assertEquals;
