@@ -68,5 +68,7 @@ public class LegacyHadoopConfigurationSource implements ConfigurationSource {
     }
   }
 
-
+  public Configuration getOriginalHadoopConfiguration() {
+    return configuration;
+  }
 }

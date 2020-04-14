@@ -47,6 +47,7 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -156,8 +157,14 @@ public class BasicOzoneFileSystem extends FileSystem {
       boolean isolatedClassloader =
           conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
 
+      ConfigurationSource source;
+      if (conf instanceof OzoneConfiguration) {
+        source = (ConfigurationSource) conf;
+      } else {
+        source = new LegacyHadoopConfigurationSource(conf);
+      }
       this.adapter =
-          createAdapter(new LegacyHadoopConfigurationSource(conf), bucketStr,
+          createAdapter(source, bucketStr,
               volumeStr, omHost, omPort,
           isolatedClassloader);
 
