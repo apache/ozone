@@ -112,7 +112,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
-
       OzoneManagerProtocolProtos.UserVolumeInfo oldOwnerVolumeList = null;
       OzoneManagerProtocolProtos.UserVolumeInfo newOwnerVolumeList = null;
       OmVolumeArgs omVolumeArgs = null;
@@ -120,7 +119,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
       omVolumeArgs = omMetadataManager.getVolumeTable().get(dbVolumeKey);
-
       if (omVolumeArgs == null) {
         LOG.debug("Changing volume ownership failed for user:{} volume:{}",
             newOwner, volume);
@@ -157,13 +155,10 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
       acquiredUserLocks =
           omMetadataManager.getLock().acquireMultiUserLock(newOwner, oldOwner);
-
       oldOwnerVolumeList =
           omMetadataManager.getUserTable().get(oldOwner);
-
       oldOwnerVolumeList = delVolumeFromOwnerList(
           oldOwnerVolumeList, volume, oldOwner, transactionLogIndex);
-
       newOwnerVolumeList = omMetadataManager.getUserTable().get(newOwner);
       newOwnerVolumeList = addVolumeToOwnerList(
           newOwnerVolumeList, volume, newOwner,
