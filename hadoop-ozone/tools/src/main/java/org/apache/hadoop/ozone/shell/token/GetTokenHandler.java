@@ -52,18 +52,21 @@ public class GetTokenHandler extends Handler {
   }
 
   @Override
+  protected boolean isApplicable() {
+    return securityEnabled();
+  }
+
+  @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
 
-    if (securityEnabled()) {
-      Token<OzoneTokenIdentifier> token = client.getObjectStore()
-          .getDelegationToken(new Text(renewer.getValue()));
-      if (Objects.isNull(token)) {
-        err().println("Error: Get delegation token operation failed. " +
-            "Check OzoneManager logs for more details.");
-      } else {
-        printObjectAsJson(token.encodeToUrlString());
-      }
+    Token<OzoneTokenIdentifier> token = client.getObjectStore()
+        .getDelegationToken(new Text(renewer.getValue()));
+    if (Objects.isNull(token)) {
+      err().println("Error: Get delegation token operation failed. " +
+          "Check OzoneManager logs for more details.");
+    } else {
+      printObjectAsJson(token.encodeToUrlString());
     }
   }
 }

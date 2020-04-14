@@ -69,6 +69,13 @@ public abstract class Handler implements Callable<Void> {
   protected abstract void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException;
 
+  /**
+   * Checks whether the current command should be executed or not.
+   * If it is skipped, an informational message should be output.
+   * Eg. some commands only work in secure clusters.
+   *
+   * @return true if the command should be executed
+   */
   protected boolean isApplicable() {
     return true;
   }
