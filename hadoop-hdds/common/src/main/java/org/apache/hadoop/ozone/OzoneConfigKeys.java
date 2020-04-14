@@ -392,14 +392,10 @@ public final class OzoneConfigKeys {
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
       15;
-  public static final String OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_KEY =
-      "ozone.client.failover.sleep.base.millis";
-  public static final int OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT =
-      500;
-  public static final String OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_KEY =
-      "ozone.client.failover.sleep.max.millis";
-  public static final int OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_DEFAULT =
-      15000;
+  public static final String OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY =
+      "ozone.client.wait.between.retries.millis";
+  public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
+      2000;
 
   public static final String OZONE_FREON_HTTP_ENABLED_KEY =
       "ozone.freon.http.enabled";
