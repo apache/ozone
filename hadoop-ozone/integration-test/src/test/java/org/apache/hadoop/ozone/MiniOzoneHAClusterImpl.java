@@ -69,8 +69,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private int waitForOMToBeReadyTimeout = 120000; // 2 min
 
   private static final Random RANDOM = new Random();
-  private static final int RATIS_LEADER_ELECTION_TIMEOUT = 1000; // 1 seconds
-
   public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   /**
@@ -283,7 +281,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
-      initOMRatisConf();
+      conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
+      conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
       StorageContainerManager scm;
       ReconServer reconServer = null;
       try {
@@ -309,21 +308,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         cluster.startHddsDatanodes();
       }
       return cluster;
-    }
-
-    protected void initOMRatisConf() {
-      conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-      conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
-      conf.setLong(
-          OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-          100L);
-      conf.setLong(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, 200L);
-      conf.setTimeDuration(
-          OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-          RATIS_LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
-      conf.setTimeDuration(
-          OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
-          NODE_FAILURE_TIMEOUT, TimeUnit.MILLISECONDS);
     }
 
     /**
