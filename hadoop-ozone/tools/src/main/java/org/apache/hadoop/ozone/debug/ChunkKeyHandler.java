@@ -37,8 +37,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.*;
-import org.apache.hadoop.ozone.web.ozShell.OzoneAddress;
-import org.apache.hadoop.ozone.web.ozShell.keys.KeyHandler;
+import org.apache.hadoop.ozone.shell.OzoneAddress;
+import org.apache.hadoop.ozone.shell.keys.KeyHandler;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
