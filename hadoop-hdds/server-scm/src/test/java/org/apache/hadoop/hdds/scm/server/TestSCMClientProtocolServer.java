@@ -18,22 +18,22 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_DEFAULT;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.BlockManagerImpl;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.safemode.SafeModeHandler;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.test.LambdaTestUtils;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_DEFAULT;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -58,9 +58,7 @@ public class TestSCMClientProtocolServer {
     ReplicationManager replicationManager =
         Mockito.mock(ReplicationManager.class);
     PipelineManager pipelineManager = Mockito.mock(SCMPipelineManager.class);
-    SafeModeHandler safeModeHandler = new SafeModeHandler(config);
-    safeModeHandler.notifyImmediately(scmClientProtocolServer, blockManager);
-    safeModeHandler.notifyAfterDelay(replicationManager, pipelineManager);
+    SafeModeHandler safeModeHandler = new SafeModeHandler(config, eventQueue);
     eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, safeModeHandler);
   }
 

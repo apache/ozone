@@ -18,13 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
-import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,7 +28,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import com.google.common.base.Supplier;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -43,17 +35,24 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
-    .PipelineReportFromDatanode;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
+
+import com.google.common.base.Supplier;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
+import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
+import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import org.junit.After;
 import org.junit.Assert;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -354,8 +353,8 @@ public class TestSCMPipelineManager {
             pipelineManager.getStateManager(), conf);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    pipelineManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    pipelineManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(true, true), null);
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE);
@@ -475,8 +474,8 @@ public class TestSCMPipelineManager {
             HddsProtos.ReplicationFactor.ONE);
 
     // Simulate safemode check exiting.
-    pipelineManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    pipelineManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(true, true), null);
     GenericTestUtils.waitFor(new Supplier<Boolean>() {
       @Override
       public Boolean get() {
@@ -508,14 +507,14 @@ public class TestSCMPipelineManager {
     assertEquals(true, pipelineManager.getSafeModeStatus());
     assertEquals(false, pipelineManager.isPipelineCreationAllowed());
     // First pass pre-check as true, but safemode still on
-    pipelineManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    pipelineManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(true, true), null);
     assertEquals(true, pipelineManager.getSafeModeStatus());
     assertEquals(true, pipelineManager.isPipelineCreationAllowed());
 
     // Then also turn safemode off
-    pipelineManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(false, true));
+    pipelineManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(false, true), null);
     assertEquals(false, pipelineManager.getSafeModeStatus());
     assertEquals(true, pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();

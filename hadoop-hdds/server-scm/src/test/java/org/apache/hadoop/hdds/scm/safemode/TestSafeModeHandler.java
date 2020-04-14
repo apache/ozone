@@ -18,33 +18,37 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.BlockManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
+import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.test.GenericTestUtils;
+
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
 
-import java.util.HashSet;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
-
 /**
  * Tests SafeModeHandler behavior.
  */
-public class TestSafeModeHandler {
+public class TestSafeModeHandler implements EventHandler<SafeModeStatus> {
 
 
   private OzoneConfiguration configuration;
@@ -55,6 +59,7 @@ public class TestSafeModeHandler {
   private EventQueue eventQueue;
   private SCMSafeModeManager.SafeModeStatus safeModeStatus;
   private PipelineManager scmPipelineManager;
+  private List<SafeModeStatus> events = new CopyOnWriteArrayList<>();
 
   public void setup(boolean enabled) {
     configuration = new OzoneConfiguration();
@@ -65,6 +70,8 @@ public class TestSafeModeHandler {
     scmClientProtocolServer =
         Mockito.mock(SCMClientProtocolServer.class);
     eventQueue = new EventQueue();
+
+    eventQueue.addHandler(SCMEvents.DELAYED_SAFE_MODE_STATUS, this);
     final ContainerManager containerManager =
         Mockito.mock(ContainerManager.class);
     Mockito.when(containerManager.getContainerIDs())
@@ -75,9 +82,7 @@ public class TestSafeModeHandler {
         eventQueue, new LockManager(configuration));
     scmPipelineManager = Mockito.mock(SCMPipelineManager.class);
     blockManager = Mockito.mock(BlockManagerImpl.class);
-    safeModeHandler = new SafeModeHandler(configuration);
-    safeModeHandler.notifyImmediately(scmClientProtocolServer, blockManager);
-    safeModeHandler.notifyAfterDelay(replicationManager, scmPipelineManager);
+    safeModeHandler = new SafeModeHandler(configuration, eventQueue);
 
     eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, safeModeHandler);
     safeModeStatus = new SCMSafeModeManager.SafeModeStatus(false, false);
@@ -88,100 +93,20 @@ public class TestSafeModeHandler {
   public void testSafeModeHandlerWithSafeModeEnabled() throws Exception {
     setup(true);
 
+    Assert.assertEquals(0, events.size());
     Assert.assertTrue(safeModeHandler.getSafeModeStatus());
 
     eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-
-    GenericTestUtils.waitFor(() -> !safeModeHandler.getSafeModeStatus(),
-        1000, 5000);
-
-    Assert.assertFalse(scmClientProtocolServer.getSafeModeStatus());
-    Assert.assertFalse(((BlockManagerImpl) blockManager).isScmInSafeMode());
-    GenericTestUtils.waitFor(() ->
-            replicationManager.isRunning(), 1000, 5000);
-  }
-
-
-  @Test
-  public void testSafeModeHandlerWithSafeModeDisbaled() throws Exception{
-
-    setup(false);
-
-    Assert.assertFalse(safeModeHandler.getSafeModeStatus());
-
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS, safeModeStatus);
-
-    Assert.assertFalse(safeModeHandler.getSafeModeStatus());
-    Assert.assertFalse(scmClientProtocolServer.getSafeModeStatus());
-    Assert.assertFalse(((BlockManagerImpl) blockManager).isScmInSafeMode());
-    GenericTestUtils.waitFor(() ->
-        replicationManager.isRunning(), 1000, 5000);
-  }
-
-  @Test
-  public void testSafeModeHandlerPreCheckWhenPreCheckNotCompleted()
-      throws TimeoutException, InterruptedException {
-    setup(true);
-    // Create a new safemode handler and register some dummy listeners
-    SafeModeHandler smHandler = new SafeModeHandler(configuration);
-    SafeModeListener immediate = new SafeModeListener();
-    SafeModeListener delayed = new SafeModeListener();
-    safeModeHandler.notifyImmediately(immediate);
-    safeModeHandler.notifyAfterDelay(delayed);
-
-    // Fire an event to set preCheck to completed and then check the listeners
-    // receive the correct value.
-    Assert.assertFalse(safeModeHandler.getPreCheckComplete());
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS,
-        new SCMSafeModeManager.SafeModeStatus(true, true));
     eventQueue.processAll(5000);
-    Assert.assertTrue(safeModeHandler.getPreCheckComplete());
-    Assert.assertEquals(1, immediate.getCallCount());
-    Assert.assertEquals(true,
-        immediate.getSafeModeStatus().isPreCheckComplete());
-    Assert.assertEquals(true, immediate.getSafeModeStatus().isInSafeMode());
-    Assert.assertEquals(1, delayed.getCallCount());
-    Assert.assertEquals(true, delayed.getSafeModeStatus().isPreCheckComplete());
-    Assert.assertEquals(true, delayed.getSafeModeStatus().isInSafeMode());
 
-    // Now fire an event to set safemode off.
-    eventQueue.fireEvent(SCMEvents.SAFE_MODE_STATUS,
-        new SCMSafeModeManager.SafeModeStatus(false, true));
-    eventQueue.processAll(5000);
-    Assert.assertEquals(2, immediate.getCallCount());
-    Assert.assertEquals(true,
-        immediate.getSafeModeStatus().isPreCheckComplete());
-    Assert.assertEquals(false, immediate.getSafeModeStatus().isInSafeMode());
-    // The delayed one will not be updated yet
-    Assert.assertEquals(1, delayed.getCallCount());
-    Assert.assertEquals(true, delayed.getSafeModeStatus().isPreCheckComplete());
-    Assert.assertEquals(true, delayed.getSafeModeStatus().isInSafeMode());
-    // After a delay they should be updated
     GenericTestUtils.waitFor(() ->
-        delayed.getCallCount() == 2, 1000, 5000);
-    Assert.assertEquals(true, delayed.getSafeModeStatus().isPreCheckComplete());
-    Assert.assertEquals(false, delayed.getSafeModeStatus().isInSafeMode());
+        events.size() == 1, 1000, 5000);
   }
 
-  private static class SafeModeListener implements SafeModeNotification {
-
-    private String name;
-    private AtomicInteger callCount = new AtomicInteger(0);
-    private SCMSafeModeManager.SafeModeStatus safeModeStatus;
-
-    public SCMSafeModeManager.SafeModeStatus getSafeModeStatus() {
-      return safeModeStatus;
-    }
-
-    public int getCallCount() {
-      return callCount.get();
-    }
-
-    @Override
-    public void handleSafeModeTransition(
-        SCMSafeModeManager.SafeModeStatus status) {
-      this.callCount.incrementAndGet();
-      this.safeModeStatus = status;
-    }
+  @Override
+  public void onMessage(SafeModeStatus payload, EventPublisher publisher) {
+    events.add(payload);
   }
+
+
 }

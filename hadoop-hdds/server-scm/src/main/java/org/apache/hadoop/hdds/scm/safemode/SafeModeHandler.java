@@ -17,19 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Class to handle the activities needed to be performed after exiting safe
@@ -42,16 +41,18 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
 
   private final long waitTime;
   private final AtomicBoolean isInSafeMode = new AtomicBoolean(true);
+  private EventPublisher eventQueue;
   private final AtomicBoolean safeModePreChecksComplete
       = new AtomicBoolean(false);
-  private final List<SafeModeNotification> immediate = new ArrayList<>();
-  private final List<SafeModeNotification> delayed = new ArrayList<>();
+
 
   /**
    * SafeModeHandler, to handle the logic once we exit safe mode.
    * @param configuration
    */
-  public SafeModeHandler(Configuration configuration) {
+  public SafeModeHandler(Configuration configuration,
+      EventPublisher eventQueue) {
+    this.eventQueue = eventQueue;
     this.waitTime = configuration.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
@@ -61,30 +62,6 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT);
     isInSafeMode.set(safeModeEnabled);
-  }
-
-  /**
-   * Add any objects which should be notified immediately on a safemode status
-   * change.
-   * @param objs List of objects to be notified.
-   */
-  public void notifyImmediately(SafeModeNotification...objs) {
-    for (SafeModeNotification o : objs) {
-      Objects.requireNonNull(o, "Only non null objects can be notified");
-      immediate.add(o);
-    }
-  }
-
-  /**
-   * Add any object which should be notified when safemode is ended and after
-   * the configured safemode delay.
-   * @param objs List of objects to be notified.
-   */
-  public void notifyAfterDelay(SafeModeNotification...objs) {
-    for (SafeModeNotification o : objs) {
-      Objects.requireNonNull(o, "Only non null objects can be notified");
-      delayed.add(o);
-    }
   }
 
   /**
@@ -102,16 +79,11 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
                         EventPublisher publisher) {
     isInSafeMode.set(safeModeStatus.isInSafeMode());
     safeModePreChecksComplete.set(safeModeStatus.isPreCheckComplete());
-    // Always notify the immediate listeners
-    for (SafeModeNotification s : immediate) {
-      s.handleSafeModeTransition(safeModeStatus);
-    }
     // Only notify the delayed listeners if safemode remains on, as precheck
     // may have completed.
     if (safeModeStatus.isInSafeMode()) {
-      for (SafeModeNotification s : delayed) {
-        s.handleSafeModeTransition(safeModeStatus);
-      }
+      eventQueue.fireEvent(SCMEvents.DELAYED_SAFE_MODE_STATUS,
+          safeModeStatus);
     } else {
       // If safemode is off, then notify the delayed listeners with a delay.
       final Thread safeModeExitThread = new Thread(() -> {
@@ -120,9 +92,8 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
-        for (SafeModeNotification s : delayed) {
-          s.handleSafeModeTransition(safeModeStatus);
-        }
+        eventQueue.fireEvent(SCMEvents.DELAYED_SAFE_MODE_STATUS,
+            safeModeStatus);
       });
 
       safeModeExitThread.setDaemon(true);
