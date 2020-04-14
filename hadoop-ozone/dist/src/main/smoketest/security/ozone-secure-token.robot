@@ -21,20 +21,56 @@ Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
-*** Test Cases ***
-Get Token
+*** Keywords ***
+Get Token in Secure Cluster
     Execute                      ozone sh token get > /tmp/token.txt
     File Should Not Be Empty     /tmp/token.txt
 
-Print Token
+Get Token in Unsecure Cluster
+    ${output} =                  Execute             ozone sh token get
+    Should Contain               ${output}           ozone sh token get
+    Should Contain               ${output}           only when security is enabled
+
+# should be executed after Get Token
+Print Valid Token File
     ${output} =                  Execute             ozone sh token print
     Should Not Be Empty          ${output}
 
-Renew Token
+Print Nonexistent Token File
+    ${output} =                  Execute             ozone sh token print -t /asdf
+    Should Contain               ${output}           operation failed as token file: /asdf
+
+Renew Token in Secure Cluster
     ${output} =                  Execute             ozone sh token renew
     Should contain               ${output}           Token renewed successfully
 
-Cancel Token
+Renew Token in Unsecure Cluster
+    ${output} =                  Execute             ozone sh token renew
+    Should Contain               ${output}           ozone sh token renew
+    Should Contain               ${output}           only when security is enabled
+
+Cancel Token in Secure Cluster
     ${output} =                  Execute             ozone sh token cancel
     Should contain               ${output}           Token canceled successfully
 
+Cancel Token in Unsecure Cluster
+    ${output} =                  Execute             ozone sh token cancel
+    Should Contain               ${output}           ozone sh token cancel
+    Should Contain               ${output}           only when security is enabled
+
+Token Test in Secure Cluster
+    Get Token in Secure Cluster
+    Print Valid Token File
+    Renew Token in Secure Cluster
+    Cancel Token in Secure Cluster
+
+Token Test in Unsecure Cluster
+    Get Token in Unsecure Cluster
+    Renew Token in Unsecure Cluster
+    Cancel Token in Unsecure Cluster
+
+*** Test Cases ***
+Token Test
+    Run Keyword if    '${SECURITY_ENABLED}' == 'false'   Token Test in Unsecure Cluster
+    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Token Test in Secure Cluster
+    Print Nonexistent Token File
