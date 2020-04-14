@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -28,7 +29,8 @@ import org.junit.Ignore;
 import org.junit.Test;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
 
@@ -38,7 +40,9 @@ import java.util.concurrent.TimeUnit;
 @Ignore
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
-public class TestMiniChaosOzoneCluster implements Runnable {
+public class TestMiniChaosOzoneCluster extends GenericCli {
+  static final Logger LOG =
+      LoggerFactory.getLogger(TestMiniChaosOzoneCluster.class);
 
   @Option(names = {"-d", "--numDatanodes"},
       description = "num of datanodes")
@@ -69,6 +73,10 @@ public class TestMiniChaosOzoneCluster implements Runnable {
       description = "no of clients writing to OM")
   private static int numClients = 3;
 
+  @Option(names = {"-v", "--numDataVolume"},
+      description = "number of datanode volumes to create")
+  private static int numDataVolumes = 3;
+
   @Option(names = {"-i", "--failureInterval"},
       description = "time between failure events in seconds")
   private static int failureInterval = 300; // 5 minute period between failures.
@@ -90,6 +98,7 @@ public class TestMiniChaosOzoneCluster implements Runnable {
         .setNumOzoneManagers(numOzoneManagers)
         .setFailureService(failureService)
         .setOMServiceID(omServiceID)
+        .setNumDataVolumes(numDataVolumes)
         .build();
     cluster.waitForClusterToBeReady();
 
@@ -117,19 +126,20 @@ public class TestMiniChaosOzoneCluster implements Runnable {
     }
   }
 
-  public void run() {
+  @Override
+  public Void call() throws Exception {
     try {
       init();
       cluster.startChaos(failureInterval, failureInterval, TimeUnit.SECONDS);
       loadGenerator.startIO(numMinutes, TimeUnit.MINUTES);
-    } catch (Exception e) {
     } finally {
       shutdown();
     }
+    return null;
   }
 
   public static void main(String... args) {
-    CommandLine.run(new TestMiniChaosOzoneCluster(), System.err, args);
+    new TestMiniChaosOzoneCluster().run(args);
   }
 
   @Test

@@ -46,7 +46,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -62,13 +61,14 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+
 /**
  * Tests for Container ContainerManager.
  */
 public class TestSCMContainerManager {
   private static SCMContainerManager containerManager;
   private static MockNodeManager nodeManager;
-  private static PipelineManager pipelineManager;
+  private static SCMPipelineManager pipelineManager;
   private static File testDir;
   private static XceiverClientManager xceiverClientManager;
   private static Random random;
@@ -101,6 +101,7 @@ public class TestSCMContainerManager {
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
             SCMDBDefinition.PIPELINES.getTable(dbStore), new EventQueue());
+    pipelineManager.allowPipelineCreation();
     containerManager = new SCMContainerManager(conf,
         SCMDBDefinition.CONTAINERS.getTable(dbStore),
         dbStore,

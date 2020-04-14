@@ -145,15 +145,15 @@ function ozonecmd_case
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
     ;;
     sh | shell)
-      HADOOP_CLASSNAME=org.apache.hadoop.ozone.web.ozShell.OzoneShell
+      HADOOP_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       HDFS_OM_SH_OPTS="${HDFS_OM_SH_OPTS} -Dhadoop.log.file=ozone-shell.log
       -Dlog4j.configuration=file:${ozone_shell_log4j}"
       HADOOP_OPTS="${HADOOP_OPTS} ${HDFS_OM_SH_OPTS}"
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
+      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     s3)
-      HADOOP_CLASSNAME=org.apache.hadoop.ozone.web.ozShell.s3.S3Shell
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
+      HADOOP_CLASSNAME=org.apache.hadoop.ozone.shell.s3.S3Shell
+      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     scm)
       HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"

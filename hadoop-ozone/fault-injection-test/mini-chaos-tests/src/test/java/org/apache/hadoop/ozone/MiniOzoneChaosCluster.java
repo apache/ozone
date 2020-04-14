@@ -360,6 +360,18 @@ public abstract class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);
     }
 
+    /**
+     * Sets the number of data volumes per datanode.
+     *
+     * @param val number of volumes per datanode.
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setNumDataVolumes(int val) {
+      numDataVolumes = val;
+      return this;
+    }
+
     @Override
     public MiniOzoneChaosCluster build() throws IOException {
 
