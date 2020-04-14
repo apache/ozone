@@ -71,7 +71,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
-
     Preconditions.checkNotNull(setVolumePropertyRequest);
 
     OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
@@ -112,7 +111,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       }
 
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();
-
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
 
       OzoneManagerProtocolProtos.UserVolumeInfo oldOwnerVolumeList = null;
@@ -121,7 +119,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
-
       omVolumeArgs = omMetadataManager.getVolumeTable().get(dbVolumeKey);
 
       if (omVolumeArgs == null) {
@@ -142,6 +139,16 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       }
 
       oldOwner = omVolumeArgs.getOwnerName();
+
+      // Return OK immediately if newOwner is the same as oldOwner.
+      if (oldOwner.equals(newOwner)) {
+        LOG.warn("Volume '{}' owner is already user '{}'.", volume, oldOwner);
+        omResponse.setStatus(OzoneManagerProtocolProtos.Status.OK)
+          .setMessage(
+            "Volume '" + volume + "' owner is already '" + newOwner + "'.")
+          .setSuccess(false);
+        return new OMVolumeSetOwnerResponse(omResponse.build());
+      }
 
       acquiredUserLocks =
           omMetadataManager.getLock().acquireMultiUserLock(newOwner, oldOwner);
@@ -165,8 +172,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       // Update cache.
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(newOwner)),
-              new CacheValue<>(Optional.of(newOwnerVolumeList),
-                  transactionLogIndex));
+          new CacheValue<>(Optional.of(newOwnerVolumeList),
+              transactionLogIndex));
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(oldOwner)),
           new CacheValue<>(Optional.of(oldOwnerVolumeList),
