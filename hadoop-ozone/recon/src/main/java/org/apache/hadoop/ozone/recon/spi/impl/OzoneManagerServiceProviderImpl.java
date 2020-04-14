@@ -30,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
@@ -89,6 +90,7 @@ public class OzoneManagerServiceProviderImpl
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerServiceProviderImpl.class);
+  private URLConnectionFactory connectionFactory;
 
   private final CloseableHttpClient httpClient;
   private File omSnapshotDBParentDir = null;
@@ -119,6 +121,8 @@ public class OzoneManagerServiceProviderImpl
       ReconUtils reconUtils,
       OzoneManagerProtocol ozoneManagerClient) {
 
+    connectionFactory =
+        URLConnectionFactory.newDefaultURLConnectionFactory(configuration);
     String ozoneManagerHttpAddress = configuration.get(OMConfigKeys
         .OZONE_OM_HTTP_ADDRESS_KEY);
 
@@ -278,7 +282,7 @@ public class OzoneManagerServiceProviderImpl
     File targetFile = new File(omSnapshotDBParentDir, snapshotFileName +
         ".tar.gz");
     try {
-      try (InputStream inputStream = reconUtils.makeHttpCall(httpClient,
+      try (InputStream inputStream = reconUtils.makeHttpCall(connectionFactory,
           getOzoneManagerSnapshotUrl())) {
         FileUtils.copyInputStreamToFile(inputStream, targetFile);
       }

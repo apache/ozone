@@ -31,17 +31,13 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.sql.DataSource;
-
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ClusterGrowthDaily;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.hadoop.ozone.recon.schema.tables.records.FileCountBySizeRecord;
-import org.jooq.Configuration;
 import org.jooq.Table;
 import org.jooq.UniqueKey;
 import org.junit.Assert;
@@ -50,17 +46,11 @@ import org.junit.Test;
 /**
  * Test persistence module provides connection and transaction awareness.
  */
-public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
+public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
 
   @Test
   public void testReconSchemaCreated() throws Exception {
-    UtilizationSchemaDefinition schemaDefinition = getInjector().getInstance(
-        UtilizationSchemaDefinition.class);
-
-    schemaDefinition.initializeSchema();
-
-    Connection connection =
-        getInjector().getInstance(DataSource.class).getConnection();
+    Connection connection = getConnection();
     // Verify table definition
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getColumns(null, null,
@@ -111,12 +101,7 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
   @Test
   public void testClusterGrowthDailyCRUDOperations() throws Exception {
     // Verify table exists
-    UtilizationSchemaDefinition schemaDefinition = getInjector().getInstance(
-        UtilizationSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
-
-    DataSource ds = getInjector().getInstance(DataSource.class);
-    Connection connection = ds.getConnection();
+    Connection connection = getConnection();
 
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getTables(null, null,
@@ -127,9 +112,7 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
           resultSet.getString("TABLE_NAME"));
     }
 
-    ClusterGrowthDailyDao dao = new ClusterGrowthDailyDao(
-        getInjector().getInstance(Configuration.class));
-
+    ClusterGrowthDailyDao dao = getDao(ClusterGrowthDailyDao.class);
     long now = System.currentTimeMillis();
     ClusterGrowthDaily newRecord = new ClusterGrowthDaily();
     newRecord.setTimestamp(new Timestamp(now));
@@ -187,12 +170,7 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
 
   @Test
   public void testFileCountBySizeCRUDOperations() throws SQLException {
-    UtilizationSchemaDefinition schemaDefinition = getInjector().getInstance(
-        UtilizationSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
-
-    DataSource ds = getInjector().getInstance(DataSource.class);
-    Connection connection = ds.getConnection();
+    Connection connection = getConnection();
 
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getTables(null, null,
@@ -203,8 +181,7 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
           resultSet.getString("TABLE_NAME"));
     }
 
-    FileCountBySizeDao fileCountBySizeDao = new FileCountBySizeDao(
-        getInjector().getInstance(Configuration.class));
+    FileCountBySizeDao fileCountBySizeDao = getDao(FileCountBySizeDao.class);
 
     FileCountBySize newRecord = new FileCountBySize();
     newRecord.setFileSize(1024L);

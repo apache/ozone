@@ -31,45 +31,34 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.Test;
 
 /**
  * Class to test single run of Missing Container Task.
  */
-public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
+public class TestMissingContainerTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testRun() throws Exception {
-    Configuration sqlConfiguration =
-        getInjector().getInstance((Configuration.class));
-
-    ReconTaskSchemaDefinition taskSchemaDefinition = getInjector().getInstance(
-        ReconTaskSchemaDefinition.class);
-    taskSchemaDefinition.initializeSchema();
-
-    ContainerSchemaDefinition schemaDefinition =
-        getInjector().getInstance(ContainerSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
-
     MissingContainersDao missingContainersTableHandle =
-        new MissingContainersDao(sqlConfiguration);
+        getDao(MissingContainersDao.class);
 
     ContainerSchemaManager containerSchemaManager =
-        new ContainerSchemaManager(mock(ContainerHistoryDao.class),
-            schemaDefinition, missingContainersTableHandle);
+        new ContainerSchemaManager(
+            mock(ContainerHistoryDao.class),
+            getSchemaDefinition(ContainerSchemaDefinition.class),
+            missingContainersTableHandle);
     ReconStorageContainerManagerFacade scmMock =
         mock(ReconStorageContainerManagerFacade.class);
     ContainerManager containerManagerMock = mock(ContainerManager.class);
@@ -97,8 +86,7 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
     Assert.assertTrue(all.isEmpty());
 
     long currentTime = System.currentTimeMillis();
-    ReconTaskStatusDao reconTaskStatusDao =
-        new ReconTaskStatusDao(sqlConfiguration);
+    ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     MissingContainerTask missingContainerTask =
         new MissingContainerTask(scmMock, reconTaskStatusDao,
             containerSchemaManager);
@@ -107,7 +95,6 @@ public class TestMissingContainerTask extends AbstractSqlDatabaseTest {
 
     LambdaTestUtils.await(6000, 1000, () ->
         (containerSchemaManager.getAllMissingContainers().size() == 2));
-
     all = containerSchemaManager.getAllMissingContainers();
     // Container IDs 2 and 3 should be present in the missing containers table
     Set<Long> missingContainerIDs = Collections.unmodifiableSet(
