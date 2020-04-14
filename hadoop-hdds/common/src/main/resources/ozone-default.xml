@@ -199,10 +199,8 @@
     <name>dfs.container.ratis.num.write.chunk.threads</name>
     <value>60</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum number of threads in the thread pool that Datanode
-      will use for writing replicated chunks.
-      This is a per configured locations!
-      (10 thread per disk by default).
+    <description>Maximum number of threads in the thread pool that Ratis
+      will use for writing chunks (60 by default).
     </description>
   </property>
   <property>
