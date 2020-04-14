@@ -70,7 +70,9 @@ public class ReportPublisherFactory {
       throw new RuntimeException("No publisher found for report " + report);
     }
     try {
-      return publisherClass.newInstance();
+      ReportPublisher reportPublisher = publisherClass.newInstance();
+      reportPublisher.setConf(conf);
+      return reportPublisher;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
