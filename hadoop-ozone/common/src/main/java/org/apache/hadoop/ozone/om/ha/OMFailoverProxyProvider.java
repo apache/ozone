@@ -29,6 +29,7 @@ import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
@@ -43,8 +44,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
@@ -74,6 +77,16 @@ public class OMFailoverProxyProvider implements
 
   private final String omServiceId;
 
+  // OMFailoverProxyProvider, on encountering certain exception, tries each OM
+  // once in a round robin fashion. After that it waits for configured time
+  // before attempting to contact all the OMs again. For other exceptions
+  // such as LeaderNotReadyException, the same OM is contacted again with a
+  // linearly increasing wait time.
+  private Set<String> attemptedOMs = new HashSet<>();
+  private String lastAttemptedOM;
+  private int numAttemptsOnSameOM = 0;
+  private final long waitBetweenRetries;
+
   public OMFailoverProxyProvider(OzoneConfiguration configuration,
       UserGroupInformation ugi, String omServiceId) throws IOException {
     this.conf = configuration;
@@ -85,6 +98,10 @@ public class OMFailoverProxyProvider implements
 
     currentProxyIndex = 0;
     currentProxyOMNodeId = omNodeIDList.get(currentProxyIndex);
+
+    waitBetweenRetries = conf.getLong(
+        OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
   }
 
   public OMFailoverProxyProvider(OzoneConfiguration configuration,
@@ -261,7 +278,7 @@ public class OMFailoverProxyProvider implements
   }
 
   /**
-   * Performs failover if the leaderOMNodeId returned through OMReponse does
+   * Performs failover if the leaderOMNodeId returned through OMResponse does
    * not match the current leaderOMNodeId cached by the proxy provider.
    */
   public void performFailoverToNextProxy() {
@@ -277,6 +294,11 @@ public class OMFailoverProxyProvider implements
    * @return the new proxy index
    */
   private synchronized int incrementProxyIndex() {
+    // Before failing over to next proxy, add the proxy OM (which has
+    // returned an exception) to the list of attemptedOMs.
+    lastAttemptedOM = currentProxyOMNodeId;
+    attemptedOMs.add(currentProxyOMNodeId);
+
     currentProxyIndex = (currentProxyIndex + 1) % omProxies.size();
     currentProxyOMNodeId = omNodeIDList.get(currentProxyIndex);
     return currentProxyIndex;
@@ -300,6 +322,32 @@ public class OMFailoverProxyProvider implements
 
   private synchronized int getCurrentProxyIndex() {
     return currentProxyIndex;
+  }
+
+  public synchronized long getWaitTime() {
+    if (currentProxyOMNodeId.equals(lastAttemptedOM)) {
+      // Clear attemptedOMs list as round robin has been broken. Add only the
+      attemptedOMs.clear();
+
+      // The same OM will be contacted again. So wait and then retry.
+      numAttemptsOnSameOM++;
+      return (waitBetweenRetries * numAttemptsOnSameOM);
+    }
+    // Reset numAttemptsOnSameOM as we failed over to a different OM.
+    numAttemptsOnSameOM = 0;
+
+    // OMs are being contacted in round robin way. Check if all the OMs have
+    // been contacted in this attempt.
+    for (String omNodeID : omProxyInfos.keySet()) {
+      if (!attemptedOMs.contains(omNodeID)) {
+        return 0;
+      }
+    }
+    // This implies all the OMs have been contacted once. Return true and
+    // clear the list as we are going to inject a wait and the next check
+    // should not include these atttempts again.
+    attemptedOMs.clear();
+    return waitBetweenRetries;
   }
 
   /**

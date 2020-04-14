@@ -160,7 +160,7 @@ import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAILOVER_AND_RETRY;
+import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
@@ -210,15 +210,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
-    int sleepBase = conf.getInt(
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT);
-    int sleepMax = conf.getInt(
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_DEFAULT);
 
-    this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers,
-        sleepBase, sleepMax);
+    this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers);
     this.clientID = clientId;
   }
 
@@ -228,8 +221,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * exception or if the current proxy is not the leader OM.
    */
   private OzoneManagerProtocolPB createRetryProxy(
-      OMFailoverProxyProvider failoverProxyProvider,
-      int maxFailovers, int delayMillis, int maxDelayBase) {
+      OMFailoverProxyProvider failoverProxyProvider, int maxFailovers) {
 
     // Client attempts contacting each OM ipc.client.connect.max.retries
     // (default = 10) times before failing over to the next OM, if
@@ -256,7 +248,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             // OMFailoverProxyProvider#performFailover() is a dummy call and
             // does not perform any failover. Failover manually to the next OM.
             omFailoverProxyProvider.performFailoverToNextProxy();
-            return getRetryAction(FAILOVER_AND_RETRY, failovers);
+            return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
 
           OMLeaderNotReadyException leaderNotReadyException =
@@ -266,7 +258,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           // does not perform any failover.
           // So Just retry with same OM node.
           if (leaderNotReadyException != null) {
-            return getRetryAction(FAILOVER_AND_RETRY, failovers);
+            return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
         }
 
@@ -275,13 +267,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         // OMFailoverProxyProvider#performFailover() is a dummy call and
         // does not perform any failover.
         omFailoverProxyProvider.performFailoverToNextProxy();
-        return getRetryAction(FAILOVER_AND_RETRY, failovers);
+        return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
       }
 
-      private RetryAction getRetryAction(RetryAction fallbackAction,
+      private RetryAction getRetryAction(RetryDecision fallbackAction,
           int failovers) {
         if (failovers <= maxFailovers) {
-          return fallbackAction;
+          return new RetryAction(fallbackAction,
+              omFailoverProxyProvider.getWaitTime());
         } else {
           FAILOVER_PROXY_PROVIDER_LOG.error("Failed to connect to OMs: {}. " +
               "Attempted {} failovers.",
