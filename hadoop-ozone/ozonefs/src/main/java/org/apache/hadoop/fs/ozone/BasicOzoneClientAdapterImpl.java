@@ -114,7 +114,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   public BasicOzoneClientAdapterImpl(String omHost, int omPort,
-      ConfigurationSource conf, String volumeStr, String bucketStr)
+      ConfigurationSource hadoopConf, String volumeStr, String bucketStr)
       throws IOException {
 
     ClassLoader contextClassLoader =
@@ -122,7 +122,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     Thread.currentThread().setContextClassLoader(null);
 
     try {
-
+      OzoneConfiguration conf = OzoneConfiguration.of(hadoopConf);
       if (omHost == null && OmUtils.isServiceIdsDefined(conf)) {
         // When the host name or service id isn't given
         // but ozone.om.service.ids is defined, declare failure.
