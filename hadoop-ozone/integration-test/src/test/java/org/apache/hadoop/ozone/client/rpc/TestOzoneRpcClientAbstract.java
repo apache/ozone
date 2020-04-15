@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -239,6 +240,19 @@ public abstract class TestOzoneRpcClientAbstract {
     // should match the OM's RPC address.
     Assert.assertTrue(omProxies.get(0).getAddress().equals(
         ozoneManager.getOmRpcServerAddr()));
+  }
+
+  @Test
+  public void testVolumeSetOwner() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+
+    String ownerName = "someRandomUser1";
+
+    ClientProtocol proxy = store.getClientProxy();
+    proxy.setVolumeOwner(volumeName, ownerName);
+    // Set owner again
+    proxy.setVolumeOwner(volumeName, ownerName);
   }
 
   @Test
