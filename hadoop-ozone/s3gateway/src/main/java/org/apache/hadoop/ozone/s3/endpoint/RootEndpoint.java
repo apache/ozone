@@ -51,12 +51,9 @@ public class RootEndpoint extends EndpointBase {
   @GET
   public Response get()
       throws OS3Exception, IOException {
-    OzoneVolume volume;
     ListBucketResponse response = new ListBucketResponse();
 
-    String userName = getS3Username(getSignatureProcessor().getAwsAccessId());
-    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(
-        null);
+    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(null);
 
     while (bucketIterator.hasNext()) {
       OzoneBucket next = bucketIterator.next();
