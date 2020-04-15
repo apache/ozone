@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 
 import com.google.common.base.Preconditions;
 
@@ -52,6 +53,10 @@ public class OzoneConfiguration extends Configuration
   }
 
   public static OzoneConfiguration of(ConfigurationSource source) {
+    if (source instanceof LegacyHadoopConfigurationSource) {
+      return new OzoneConfiguration(((LegacyHadoopConfigurationSource) source)
+          .getOriginalHadoopConfiguration());
+    }
     return (OzoneConfiguration) source;
   }
 
