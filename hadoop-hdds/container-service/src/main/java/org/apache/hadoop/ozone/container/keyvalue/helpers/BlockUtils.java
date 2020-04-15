@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
+import org.apache.hadoop.ozone.*;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -83,8 +84,7 @@ public final class BlockUtils {
                         .build();
                 return new ReferenceDB(metadataStore, key.dbFile);
               } catch (Exception e) {
-                LOG.error("Error opening DB. Container:{} ContainerPath:{}",
-                    key.containerId, key.dbType, e);
+                LOG.error("Error opening DB. ContainerPath:{}", key.dbType, e);
                 throw e;
               }
             }
@@ -159,11 +159,22 @@ public final class BlockUtils {
    * @param containerDBPath - DB path of the container.
    * @param conf configuration.
    */
-  public static void addDB(ReferenceCountedDB db, String containerDBPath,
-      Configuration conf) {
-    ContainerCache cache = ContainerCache.getInstance(conf);
-    Preconditions.checkNotNull(cache);
-    cache.addDB(containerDBPath, db);
+  public static void addDB(ReferenceDB db, String containerDBPath,
+                           Configuration conf) {
+    try {
+      synchronized (CACHE_LOCK) {
+        initCache(conf);
+        Preconditions.checkNotNull(cache);
+        String dbType = conf.getTrimmed(
+            OzoneConfigKeys.OZONE_METADATA_STORE_IMPL,
+            OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_DEFAULT);
+        DbHandlerCacheKey key = new DbHandlerCacheKey(containerDBPath, dbType);
+        cache.get(key, () -> db);
+      }
+    } catch (ExecutionException ex) {
+      LOG.warn("Error putting DB handler into cache." +
+              " ContainerPath:{}", containerDBPath);
+    }
   }
 
   /**
@@ -186,19 +197,16 @@ public final class BlockUtils {
 
   @VisibleForTesting
   static class DbHandlerCacheKey {
-    private long containerId;
     private String dbFile;
     private String dbType;
 
     private DbHandlerCacheKey(KeyValueContainerData containerData) {
-      this.containerId = containerData.getContainerID();
       this.dbFile = containerData.getDbFile().getAbsolutePath();
       this.dbType = containerData.getContainerDBType();
     }
 
     @VisibleForTesting
-    DbHandlerCacheKey(long containerId, String dbFile, String dbType) {
-      this.containerId = containerId;
+    DbHandlerCacheKey(String dbFile, String dbType) {
       this.dbFile = dbFile;
       this.dbType = dbType;
     }
@@ -212,14 +220,13 @@ public final class BlockUtils {
         return false;
       }
       DbHandlerCacheKey that = (DbHandlerCacheKey) o;
-      return containerId == that.containerId &&
-          dbFile.equals(that.dbFile) &&
+      return dbFile.equals(that.dbFile) &&
           dbType.equals(that.dbType);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(containerId, dbFile, dbType);
+      return Objects.hash(dbFile, dbType);
     }
   }
 }

@@ -86,8 +86,8 @@ public final class KeyValueContainerUtil {
 
     MetadataStore store = MetadataStoreBuilder.newBuilder().setConf(conf)
         .setCreateIfMissing(true).setDbFile(dbFile).build();
-    ReferenceCountedDB db =
-        new ReferenceCountedDB(store, dbFile.getAbsolutePath());
+    ReferenceDB db =
+        new ReferenceDB(store, dbFile.getAbsolutePath());
     //add db handler into cache
     BlockUtils.addDB(db, dbFile.getAbsolutePath(), conf);
   }

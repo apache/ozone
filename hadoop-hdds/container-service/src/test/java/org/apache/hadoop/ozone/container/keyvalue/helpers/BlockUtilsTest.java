@@ -72,14 +72,13 @@ public class BlockUtilsTest {
 
     // Get 2 references out of the same db and verify the objects are same.
     ReferenceDB db1 = BlockUtils.cache.get(
-        new BlockUtils.DbHandlerCacheKey(1,
-            containerDir1.getPath(), "RocksDB"));
-    ReferenceDB db2 = BlockUtils.cache.get(new BlockUtils.DbHandlerCacheKey(1,
+        new BlockUtils.DbHandlerCacheKey(containerDir1.getPath(), "RocksDB"));
+    ReferenceDB db2 = BlockUtils.cache.get(new BlockUtils.DbHandlerCacheKey(
           containerDir1.getPath(), "RocksDB"));
     Assert.assertEquals(db1, db2);
 
     // add one more references to ContainerCache.
-    ReferenceDB db3 = BlockUtils.cache.get(new BlockUtils.DbHandlerCacheKey(2,
+    ReferenceDB db3 = BlockUtils.cache.get(new BlockUtils.DbHandlerCacheKey(
         containerDir2.getPath(), "RocksDB"));
 
     // and close the reference
@@ -87,7 +86,7 @@ public class BlockUtilsTest {
 
     // add one more reference to ContainerCache and verify that it will not
     // evict the least recent entry as it has reference.
-    ReferenceDB db4 = BlockUtils.cache.get(new BlockUtils.DbHandlerCacheKey(3,
+    ReferenceDB db4 = BlockUtils.cache.get(new BlockUtils.DbHandlerCacheKey(
         containerDir3.getPath(), "RocksDB"));
 
     Assert.assertEquals(2, BlockUtils.cache.size());
@@ -97,7 +96,7 @@ public class BlockUtilsTest {
     db2.close();
 
     // The reference count for container1 is 0 but it is not evicted.
-    ReferenceDB db5 = BlockUtils.cache.get(new BlockUtils.DbHandlerCacheKey(1,
+    ReferenceDB db5 = BlockUtils.cache.get(new BlockUtils.DbHandlerCacheKey(
         containerDir1.getPath(), "RocksDB"));
     Assert.assertEquals(db1, db5);
     db5.close();
