@@ -106,6 +106,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * Filter out viable nodes based on
    * 1. nodes that are healthy
    * 2. nodes that are not too heavily engaged in other pipelines
+   * The results are sorted based on pipeline count of each node.
    *
    * @param excludedNodes - excluded nodes
    * @param nodesRequired - number of datanodes required.
@@ -239,7 +240,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // Since nodes are widely distributed, the results should be selected
     // base on distance in topology, rack awareness and load balancing.
     List<DatanodeDetails> exclude = new ArrayList<>();
-    // First choose an anchor nodes randomly
+    // First choose an anchor node.
     DatanodeDetails anchor = chooseNode(healthyNodes);
     if (anchor != null) {
       results.add(anchor);
@@ -308,17 +309,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   }
 
   /**
-   * Get a list of nodes with higher load than max pipeline number.
-   */
-  private List<DatanodeDetails> getHigherLoadNodes(
-      List<DatanodeDetails> nodes, int mark) {
-    return nodes.stream()
-        // Skip the nodes with lower load than mark.
-        .filter(p -> nodeManager.getPipelinesCount(p) > mark)
-        .collect(Collectors.toList());
-  }
-
-  /**
    * Find a node from the healthy list and return it after removing it from the
    * list that we are operating on.
    *
@@ -373,12 +363,12 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       return null;
     }
 
-    List<DatanodeDetails> nodesOnOtherRack = healthyNodes.stream().filter(
+    List<DatanodeDetails> nodesOnSameRack = healthyNodes.stream().filter(
         p -> !excludedNodes.contains(p)
             && anchor.getNetworkLocation().equals(p.getNetworkLocation()))
         .collect(Collectors.toList());
-    if (!nodesOnOtherRack.isEmpty()) {
-      return nodesOnOtherRack.get(0);
+    if (!nodesOnSameRack.isEmpty()) {
+      return nodesOnSameRack.get(0);
     }
     return null;
   }
