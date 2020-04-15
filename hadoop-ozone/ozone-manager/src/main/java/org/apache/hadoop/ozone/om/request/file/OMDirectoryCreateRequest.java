@@ -362,7 +362,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
     return new OmKeyInfo.Builder()
         .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getKeyName())
+        .setBucketName(keyArgs.getBucketName())
         .setKeyName(dirName)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
