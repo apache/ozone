@@ -81,7 +81,7 @@ public class ChunkKeyHandler  extends KeyHandler {
             new OzoneManagerProtocolClientSideTranslatorPB(
             getConf(), clientId.toString(),
             null, UserGroupInformation.getCurrentUser()),
-            OzoneManagerProtocol.class,getConf());
+            OzoneManagerProtocol.class, getConf());
     address.ensureKeyAddress();
     JsonObject jsonObj = new JsonObject();
     JsonElement element;
@@ -120,7 +120,8 @@ public class ChunkKeyHandler  extends KeyHandler {
                  .getBlock(xceiverClient, datanodeBlockID);
       tempchunks = response.getBlockData().getChunksList();
       ContainerProtos.ContainerDataProto containerData =
-              containerOperationClient.readContainer(keyLocation.getContainerID(),
+              containerOperationClient.readContainer(
+                      keyLocation.getContainerID(),
                       keyLocation.getPipeline());
       for (ContainerProtos.ChunkInfo chunkInfo:tempchunks) {
         ChunkDetails chunkDetails = new ChunkDetails();
@@ -140,13 +141,15 @@ public class ChunkKeyHandler  extends KeyHandler {
       containerChunkInfo.setChunks(chunkPaths);
       List<ChunkDataNodeDetails> chunkDataNodeDetails = new
               ArrayList<ChunkDataNodeDetails>();
-      for (DatanodeDetails datanodeDetails:keyLocation.getPipeline().getNodes()) {
+      for (DatanodeDetails datanodeDetails:keyLocation
+              .getPipeline().getNodes()) {
         chunkDataNodeDetails.add(
                 new ChunkDataNodeDetails(datanodeDetails.getIpAddress(),
                 datanodeDetails.getHostName()));
       }
       containerChunkInfo.setChunkDataNodeDetails(chunkDataNodeDetails);
-      containerChunkInfo.setPipelineID(keyLocation.getPipeline().getId().getId());
+      containerChunkInfo.setPipelineID(
+              keyLocation.getPipeline().getId().getId());
       Gson gson = new GsonBuilder().create();
       if (isVerbose()) {
         element = gson.toJsonTree(containerChunkInfoVerbose);
