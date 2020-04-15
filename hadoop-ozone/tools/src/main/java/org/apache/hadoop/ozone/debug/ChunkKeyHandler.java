@@ -35,10 +35,22 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.protocol.ClientId;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -56,6 +68,8 @@ public class ChunkKeyHandler  extends KeyHandler {
   private ContainerOperationClient containerOperationClient;
   private  XceiverClientManager xceiverClientManager;
   private XceiverClientSpi xceiverClient;
+  private final ClientId clientId = ClientId.randomId();
+  private OzoneManagerProtocol ozoneManagerClient;
 
   private String getChunkLocationPath(String containerLocation) {
     return containerLocation + File.separator + OzoneConsts.STORAGE_DIR_CHUNKS;
@@ -68,6 +82,11 @@ public class ChunkKeyHandler  extends KeyHandler {
             ContainerOperationClient(createOzoneConfiguration());
     xceiverClientManager = containerOperationClient
             .getXceiverClientManager();
+    ozoneManagerClient = TracingUtil.createProxy(
+            new OzoneManagerProtocolClientSideTranslatorPB(
+            getConf(), clientId.toString(),
+            null, UserGroupInformation.getCurrentUser()),
+            OzoneManagerProtocol.class,getConf());
     address.ensureKeyAddress();
     JsonObject jsonObj = new JsonObject();
     JsonElement element;
@@ -77,35 +96,37 @@ public class ChunkKeyHandler  extends KeyHandler {
     List<ContainerProtos.ChunkInfo> tempchunks = null;
     List<ChunkDetails> chunkDetailsList = new ArrayList<ChunkDetails>();
     List<String> chunkPaths = new ArrayList<String>();
-    OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket = vol.getBucket(bucketName);
-    OzoneKeyDetails key = bucket.getKey(keyName);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setRefreshPipeline(true)
+            .build();
+    OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
+    List<OmKeyLocationInfo> locationInfos = keyInfo
+            .getLatestVersionLocations().getBlocksLatestVersionOnly();
     // querying  the keyLocations.The OM is queried to get containerID and
     // localID pertaining to a given key
-    List<OzoneKeyLocation> keyLocationList = key.getOzoneKeyLocations();
-    for (OzoneKeyLocation keyLocation:keyLocationList) {
+    for (OmKeyLocationInfo keyLocation:locationInfos) {
       ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
       ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
       long containerId = keyLocation.getContainerID();
-      long blockId = keyLocation.getLocalID();
-      // scmClient is used to get container specific
-      // information like ContainerPath amd so on
-      ContainerWithPipeline container = containerOperationClient
-              .getContainerWithPipeline(containerId);
+      Token<OzoneBlockTokenIdentifier> token = keyLocation.getToken();
       xceiverClient = xceiverClientManager
-              .acquireClient(container.getPipeline());
+              .acquireClient(keyLocation.getPipeline());
       // Datanode is queried to get chunk information.Thus querying the
       // OM,SCM and datanode helps us get chunk location information
-      ContainerProtos.DatanodeBlockID datanodeBlockID =
-              new BlockID(containerId, keyLocation.getLocalID())
-                .getDatanodeBlockIDProtobuf();
+      if (token != null) {
+        UserGroupInformation.getCurrentUser().addToken(token);
+      }
+      ContainerProtos.DatanodeBlockID datanodeBlockID = keyLocation.getBlockID()
+              .getDatanodeBlockIDProtobuf();
       ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls
                  .getBlock(xceiverClient, datanodeBlockID);
       tempchunks = response.getBlockData().getChunksList();
-      Preconditions.checkNotNull(container, "Container cannot be null");
       ContainerProtos.ContainerDataProto containerData =
-              containerOperationClient.readContainer(container
-              .getContainerInfo().getContainerID(), container.getPipeline());
+              containerOperationClient.readContainer(keyLocation.getContainerID(),
+                      keyLocation.getPipeline());
       for (ContainerProtos.ChunkInfo chunkInfo:tempchunks) {
         ChunkDetails chunkDetails = new ChunkDetails();
         chunkDetails.setChunkName(chunkInfo.getChunkName());
@@ -118,30 +139,28 @@ public class ChunkKeyHandler  extends KeyHandler {
       containerChunkInfoVerbose
               .setContainerPath(containerData.getContainerPath());
       containerChunkInfoVerbose
-              .setDataNodeList(container.getPipeline().getNodes());
-      containerChunkInfoVerbose.setPipeline(container.getPipeline());
+              .setDataNodeList(keyLocation.getPipeline().getNodes());
+      containerChunkInfoVerbose.setPipeline(keyLocation.getPipeline());
       containerChunkInfoVerbose.setChunkInfos(chunkDetailsList);
       containerChunkInfo.setChunks(chunkPaths);
       List<ChunkDataNodeDetails> chunkDataNodeDetails = new
               ArrayList<ChunkDataNodeDetails>();
-      for (DatanodeDetails datanodeDetails:container
-              .getPipeline().getNodes()) {
+      for (DatanodeDetails datanodeDetails:keyLocation.getPipeline().getNodes()) {
         chunkDataNodeDetails.add(
                 new ChunkDataNodeDetails(datanodeDetails.getIpAddress(),
                 datanodeDetails.getHostName()));
       }
       containerChunkInfo.setChunkDataNodeDetails(chunkDataNodeDetails);
-      containerChunkInfo.setPipelineID(container
-              .getPipeline().getId().getId());
+      containerChunkInfo.setPipelineID(keyLocation.getPipeline().getId().getId());
       Gson gson = new GsonBuilder().create();
       if (isVerbose()) {
         element = gson.toJsonTree(containerChunkInfoVerbose);
         jsonObj.add("container Id :" + containerId + ""
-                + "blockId :" + blockId + "", element);
+                + "blockId :" + keyLocation.getLocalID() + "", element);
       } else {
         element = gson.toJsonTree(containerChunkInfo);
         jsonObj.add("container Id :" + containerId + ""
-                + "blockId :" + blockId + "", element);
+                + "blockId :" + keyLocation.getLocalID() + "", element);
       }
     }
     xceiverClientManager.releaseClient(xceiverClient, false);
