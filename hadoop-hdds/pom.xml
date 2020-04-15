@@ -349,12 +349,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <!-- work. -->
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
-              <properties>
-                <property>
-                  <name>listener</name>
-                  <value>org.apache.hadoop.test.TimedOutTestsListener</value>
-                </property>
-              </properties>
             </configuration>
           </plugin>
         </plugins>
