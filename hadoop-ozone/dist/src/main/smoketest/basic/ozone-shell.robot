@@ -118,7 +118,7 @@ Test key handling
                     Should Contain      ${result}       NOTICE.txt.1 exists
     ${result} =     Execute             ozone sh key get --force ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Not Contain  ${result}       NOTICE.txt.1 exists
-    ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq '. | select(.name=="key1")'
+    ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
     ${result} =     Execute             ozone debug chunkinfo ${protocol}${server}/${volume}/bb1/key1 | jq -r '.[]'
                     Should contain      ${result}       chunks
