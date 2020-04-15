@@ -106,6 +106,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
+import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -168,6 +169,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
+import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -255,7 +257,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private S3BucketManager s3BucketManager;
 
   private final OMMetrics metrics;
-  private final ProtocolMessageMetrics omClientProtocolMetrics;
+  private final ProtocolMessageMetrics<ProtocolMessageEnum>
+      omClientProtocolMetrics;
   private OzoneManagerHttpServer httpServer;
   private final OMStorage omStorage;
   private final ScmBlockLocationProtocol scmBlockClient;
@@ -655,9 +658,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             OMConfigKeys.DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
 
-    return new OzoneDelegationTokenSecretManager(conf, tokenMaxLifetime,
-        tokenRenewInterval, tokenRemoverScanInterval, omRpcAddressTxt,
-        s3SecretManager, certClient);
+    return new OzoneDelegationTokenSecretManager.Builder()
+        .setConf(conf)
+        .setTokenMaxLifetime(tokenMaxLifetime)
+        .setTokenRenewInterval(tokenRenewInterval)
+        .setTokenRemoverScanInterval(tokenRemoverScanInterval)
+        .setService(omRpcAddressTxt)
+        .setS3SecretManager(s3SecretManager)
+        .setCertificateClient(certClient)
+        .setOmServiceId(omNodeDetails.getOMServiceId())
+        .build();
   }
 
   private OzoneBlockTokenSecretManager createBlockTokenSecretManager(
@@ -3352,12 +3362,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws SequenceNumberNotFoundException if db is unable to read the data.
    */
   @Override
-  public DBUpdatesWrapper getDBUpdates(
+  public DBUpdates getDBUpdates(
       DBUpdatesRequest dbUpdatesRequest)
       throws SequenceNumberNotFoundException {
-    return metadataManager.getStore()
+    DBUpdatesWrapper updatesSince = metadataManager.getStore()
         .getUpdatesSince(dbUpdatesRequest.getSequenceNumber());
-
+    DBUpdates dbUpdates = new DBUpdates(updatesSince.getData());
+    dbUpdates.setCurrentSequenceNumber(updatesSince.getCurrentSequenceNumber());
+    return dbUpdates;
   }
 
   public OzoneDelegationTokenSecretManager getDelegationTokenMgr() {

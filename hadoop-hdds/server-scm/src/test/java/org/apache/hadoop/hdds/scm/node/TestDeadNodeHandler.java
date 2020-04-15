@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FileUtil;
@@ -86,6 +87,8 @@ public class TestDeadNodeHandler {
   @Before
   public void setup() throws IOException, AuthenticationException {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        0, TimeUnit.SECONDS);
     storageDir = GenericTestUtils.getTempPath(
         TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
@@ -127,6 +130,10 @@ public class TestDeadNodeHandler {
     StorageReportProto storageOne = TestUtils.createStorageReport(
         datanode1.getUuid(), storagePath, 100, 10, 90, null);
 
+    // Exit safemode, as otherwise the safemode precheck will prevent pipelines
+    // from getting created. Due to how this test is wired up, safemode will
+    // not exit when the DNs are registered directly with the node manager.
+    scm.exitSafeMode();
     // Standalone pipeline now excludes the nodes which are already used,
     // is the a proper behavior. Adding 9 datanodes for now to make the
     // test case happy.
@@ -152,8 +159,11 @@ public class TestDeadNodeHandler {
     nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(),
         TestUtils.createNodeReport(storageOne), null);
 
-    LambdaTestUtils.await(120000, 10000,
-        () -> pipelineManager.getPipelines(RATIS, THREE).size() == 3);
+    LambdaTestUtils.await(120000, 1000,
+        () -> {
+          pipelineManager.triggerPipelineCreation();
+          return pipelineManager.getPipelines(RATIS, THREE).size() == 3;
+        });
     TestUtils.openAllRatisPipelines(pipelineManager);
 
     ContainerInfo container1 =

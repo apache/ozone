@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.security;
 
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -48,6 +49,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.TestSSLFactory;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.AfterClass;
@@ -301,5 +303,25 @@ public class TestOzoneTokenIdentifier {
     id.setSequenceNumber(1);
     id.setOmCertSerialId("123");
     return id;
+  }
+
+  @Test
+  public void testTokenSerialization() throws IOException {
+    OzoneTokenIdentifier idEncode = getIdentifierInst();
+    idEncode.setOmServiceId("defaultServiceId");
+    Token<OzoneTokenIdentifier> token = new Token<OzoneTokenIdentifier>(
+        idEncode.getBytes(), new byte[0], new Text("OzoneToken"),
+        new Text("om1:9862,om2:9852,om3:9852"));
+    String encodedStr = token.encodeToUrlString();
+
+    Token<OzoneTokenIdentifier> tokenDecode = new Token<>();
+    tokenDecode.decodeFromUrlString(encodedStr);
+
+    ByteArrayInputStream buf = new ByteArrayInputStream(
+        tokenDecode.getIdentifier());
+    DataInputStream in = new DataInputStream(buf);
+    OzoneTokenIdentifier idDecode = new OzoneTokenIdentifier();
+    idDecode.readFields(in);
+    Assert.assertEquals(idEncode, idDecode);
   }
 }

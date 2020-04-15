@@ -34,8 +34,8 @@ import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.Time;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

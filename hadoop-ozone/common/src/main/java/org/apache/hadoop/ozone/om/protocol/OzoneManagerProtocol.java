@@ -18,12 +18,16 @@
 
 package org.apache.hadoop.ozone.om.protocol;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.List;
+
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
-
-import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -44,17 +48,10 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.List;
-
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.TokenInfo;
-import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
-import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 
 /**
  * Protocol to talk to OM.
@@ -522,9 +519,8 @@ public interface OzoneManagerProtocol
    * Get DB updates since a specific sequence number.
    * @param dbUpdatesRequest request that encapsulates a sequence number.
    * @return Wrapper containing the updates.
-   * @throws SequenceNumberNotFoundException if db is unable to read the data.
    */
-  DBUpdatesWrapper getDBUpdates(
+  DBUpdates getDBUpdates(
       OzoneManagerProtocolProtos.DBUpdatesRequest dbUpdatesRequest)
       throws IOException;
 

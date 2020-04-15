@@ -18,29 +18,39 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_INDEX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_TERM;
-import static org.apache.hadoop.ozone.OzoneConsts.
-    OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
-
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.ozone.OzoneConsts;
+
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorOutputStream;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
+import org.apache.commons.compress.utils.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_INDEX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_TERM;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -154,7 +164,7 @@ public class OMDBCheckpointServlet extends HttpServlet {
                file.toString() + ".tgz\"");
 
       Instant start = Instant.now();
-      OmUtils.writeOmDBCheckpointToStream(checkpoint,
+      writeOmDBCheckpointToStream(checkpoint,
           response.getOutputStream());
       Instant end = Instant.now();
 
@@ -180,4 +190,53 @@ public class OMDBCheckpointServlet extends HttpServlet {
     }
   }
 
+  /**
+   * Write OM DB Checkpoint to an output stream as a compressed file (tgz).
+   *
+   * @param checkpoint  checkpoint file
+   * @param destination desination output stream.
+   * @throws IOException
+   */
+  public static void writeOmDBCheckpointToStream(DBCheckpoint checkpoint,
+      OutputStream destination)
+      throws IOException {
+
+    try (CompressorOutputStream gzippedOut = new CompressorStreamFactory()
+        .createCompressorOutputStream(CompressorStreamFactory.GZIP,
+            destination)) {
+
+      try (ArchiveOutputStream archiveOutputStream =
+          new TarArchiveOutputStream(gzippedOut)) {
+
+        Path checkpointPath = checkpoint.getCheckpointLocation();
+        try (Stream<Path> files = Files.list(checkpointPath)) {
+          for (Path path : files.collect(Collectors.toList())) {
+            if (path != null) {
+              Path fileName = path.getFileName();
+              if (fileName != null) {
+                includeFile(path.toFile(), fileName.toString(),
+                    archiveOutputStream);
+              }
+            }
+          }
+        }
+      }
+    } catch (CompressorException e) {
+      throw new IOException(
+          "Can't compress the checkpoint: " +
+              checkpoint.getCheckpointLocation(), e);
+    }
+  }
+
+  private static void includeFile(File file, String entryName,
+      ArchiveOutputStream archiveOutputStream)
+      throws IOException {
+    ArchiveEntry archiveEntry =
+        archiveOutputStream.createArchiveEntry(file, entryName);
+    archiveOutputStream.putArchiveEntry(archiveEntry);
+    try (FileInputStream fis = new FileInputStream(file)) {
+      IOUtils.copy(fis, archiveOutputStream);
+    }
+    archiveOutputStream.closeArchiveEntry();
+  }
 }

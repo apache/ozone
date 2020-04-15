@@ -25,41 +25,43 @@ import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-
-import com.google.protobuf.ProtocolMessageEnum;
+import org.apache.hadoop.metrics2.lib.Interns;
 
 /**
  * Metrics to count all the subtypes of a specific message.
  */
-public class ProtocolMessageMetrics implements MetricsSource {
+public class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   private String name;
 
   private String description;
 
-  private Map<ProtocolMessageEnum, AtomicLong> counters =
+  private Map<KEY, AtomicLong> counters =
       new ConcurrentHashMap<>();
 
-  public static ProtocolMessageMetrics create(String name,
-      String description, ProtocolMessageEnum[] types) {
-    ProtocolMessageMetrics protocolMessageMetrics =
-        new ProtocolMessageMetrics(name, description,
-            types);
-    return protocolMessageMetrics;
+  private Map<KEY, AtomicLong> elapsedTimes =
+      new ConcurrentHashMap<>();
+
+  public static <KEY> ProtocolMessageMetrics<KEY> create(String name,
+      String description, KEY[] types) {
+    return new ProtocolMessageMetrics<KEY>(name, description, types);
   }
 
   public ProtocolMessageMetrics(String name, String description,
-      ProtocolMessageEnum[] values) {
+      KEY[] values) {
     this.name = name;
     this.description = description;
-    for (ProtocolMessageEnum value : values) {
+    for (KEY value : values) {
       counters.put(value, new AtomicLong(0));
+      elapsedTimes.put(value, new AtomicLong(0));
     }
   }
 
-  public void increment(ProtocolMessageEnum key) {
+  public void increment(KEY key, long duration) {
     counters.get(key).incrementAndGet();
+    elapsedTimes.get(key).addAndGet(duration);
   }
 
   public void register() {
@@ -73,11 +75,19 @@ public class ProtocolMessageMetrics implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder builder = collector.addRecord(name);
     counters.forEach((key, value) -> {
-      builder.addCounter(new MetricName(key.toString(), ""), value.longValue());
+      MetricsRecordBuilder builder =
+          collector.addRecord(name);
+      builder.add(
+          new MetricsTag(Interns.info("type", "Message type"), key.toString()));
+      builder.addCounter(new MetricName("counter", "Number of distinct calls"),
+          value.longValue());
+      builder.addCounter(
+          new MetricName("time", "Sum of the duration of the calls"),
+          elapsedTimes.get(key).longValue());
+      builder.endRecord();
+
     });
-    builder.endRecord();
   }
 
   /**

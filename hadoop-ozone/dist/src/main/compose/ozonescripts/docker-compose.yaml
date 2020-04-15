@@ -38,6 +38,7 @@ services:
          - ../..:/opt/hadoop
       ports:
          - 9874:9874
+         - 9862:9862
       env_file:
           - ./docker-config
    scm:

@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
+import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
@@ -104,7 +105,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
    */
   public StorageContainerLocationProtocolServerSideTranslatorPB(
       StorageContainerLocationProtocol impl,
-      ProtocolMessageMetrics protocolMetrics) throws IOException {
+      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics)
+      throws IOException {
     this.impl = impl;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("ScmContainerLocation",

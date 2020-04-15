@@ -23,16 +23,13 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
-import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
-import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
-import org.jooq.Configuration;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.Arrays;
 
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
@@ -49,18 +46,13 @@ import static org.mockito.Mockito.when;
 /**
  * Unit test for File Size Count Task.
  */
-public class TestFileSizeCountTask extends AbstractSqlDatabaseTest {
+public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
 
   private FileCountBySizeDao fileCountBySizeDao;
 
   @Before
-  public void setUp() throws SQLException {
-    UtilizationSchemaDefinition schemaDefinition =
-        getInjector().getInstance(UtilizationSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
-    Configuration sqlConfiguration =
-        getInjector().getInstance((Configuration.class));
-    fileCountBySizeDao = new FileCountBySizeDao(sqlConfiguration);
+  public void setUp() {
+    fileCountBySizeDao = getDao(FileCountBySizeDao.class);
   }
 
   @Test

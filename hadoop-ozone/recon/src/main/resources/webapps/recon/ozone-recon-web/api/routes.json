@@ -1,4 +1,5 @@
 {
   "/api/v1/*": "/$1",
-  "/containers/:id/keys": "/keys"
+  "/containers/:id/keys": "/keys",
+  "/containers/missing": "/missingContainers"
 }
