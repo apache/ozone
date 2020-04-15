@@ -18,14 +18,22 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import com.google.protobuf.ByteString;
+import java.util.stream.Collectors;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .BucketEncryptionInfoProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CipherSuiteProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -192,4 +200,54 @@ public final class OMPBHelper {
   }
 
 
+  /**
+   * Creates BucketInfo protobuf from OmBucketInfo.
+   */
+  public static BucketInfo convert(OmBucketInfo omBucketInfo) {
+    BucketInfo.Builder bib =  BucketInfo.newBuilder()
+        .setVolumeName(omBucketInfo.getVolumeName())
+        .setBucketName(omBucketInfo.getBucketName())
+        .addAllAcls(OzoneAclUtil.toProtobuf(omBucketInfo.getAcls()))
+        .setIsVersionEnabled(omBucketInfo.getIsVersionEnabled())
+        .setStorageType(omBucketInfo.getStorageType().toProto())
+        .setCreationTime(omBucketInfo.getCreationTime())
+        .setObjectID(omBucketInfo.getObjectID())
+        .setUpdateID(omBucketInfo.getUpdateID())
+        .addAllMetadata(KeyValueUtil.toProtobuf(omBucketInfo.getMetadata()));
+    BucketEncryptionKeyInfo bekInfo = omBucketInfo.getEncryptionKeyInfo();
+    if (bekInfo != null && bekInfo.getKeyName() != null) {
+      bib.setBeinfo(OMPBHelper.convert(bekInfo));
+    }
+    return bib.build();
+  }
+
+  /**
+   * Parses BucketInfo protobuf and creates OmBucketInfo.
+   * @param bucketInfo
+   * @return instance of OmBucketInfo
+   */
+  public static OmBucketInfo convert(BucketInfo bucketInfo) {
+    OmBucketInfo.Builder obib = OmBucketInfo.newBuilder()
+        .setVolumeName(bucketInfo.getVolumeName())
+        .setBucketName(bucketInfo.getBucketName())
+        .setAcls(bucketInfo.getAclsList().stream().map(
+            OzoneAcl::fromProtobuf).collect(Collectors.toList()))
+        .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
+        .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
+        .setCreationTime(bucketInfo.getCreationTime());
+    if (bucketInfo.hasObjectID()) {
+      obib.setObjectID(bucketInfo.getObjectID());
+    }
+    if (bucketInfo.hasUpdateID()) {
+      obib.setUpdateID(bucketInfo.getUpdateID());
+    }
+    if (bucketInfo.getMetadataList() != null) {
+      obib.addAllMetadata(KeyValueUtil
+          .getFromProtobuf(bucketInfo.getMetadataList()));
+    }
+    if (bucketInfo.hasBeinfo()) {
+      obib.setBucketEncryptionKey(OMPBHelper.convert(bucketInfo.getBeinfo()));
+    }
+    return obib.build();
+  }
 }

@@ -131,7 +131,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
         OzoneManagerProtocolProtos.Type.CreateBucket).setStatus(
         OzoneManagerProtocolProtos.Status.OK);
-    OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
+    OmBucketInfo omBucketInfo = OMPBHelper.convert(bucketInfo);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();

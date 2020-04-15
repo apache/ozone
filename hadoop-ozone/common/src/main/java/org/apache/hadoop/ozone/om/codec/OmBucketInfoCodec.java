@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 
 /**
  * Codec to encode OmBucketInfo as byte array.
@@ -34,7 +35,7 @@ public class OmBucketInfoCodec implements Codec<OmBucketInfo> {
   public byte[] toPersistedFormat(OmBucketInfo object) throws IOException {
     Preconditions
         .checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.getProtobuf().toByteArray();
+    return OMPBHelper.convert(object).toByteArray();
   }
 
   @Override
@@ -43,7 +44,7 @@ public class OmBucketInfoCodec implements Codec<OmBucketInfo> {
         .checkNotNull(rawData,
             "Null byte array can't converted to real object.");
     try {
-      return OmBucketInfo.getFromProtobuf(BucketInfo.parseFrom(rawData));
+      return OMPBHelper.convert(BucketInfo.parseFrom(rawData));
     } catch (InvalidProtocolBufferException e) {
       throw new IllegalArgumentException(
           "Can't encode the the raw data from the byte array", e);

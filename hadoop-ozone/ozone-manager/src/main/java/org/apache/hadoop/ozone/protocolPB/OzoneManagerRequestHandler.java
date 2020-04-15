@@ -348,7 +348,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         InfoBucketResponse.newBuilder();
     OmBucketInfo omBucketInfo = impl.getBucketInfo(
         request.getVolumeName(), request.getBucketName());
-    resp.setBucketInfo(omBucketInfo.getProtobuf());
+    resp.setBucketInfo(OMPBHelper.convert(omBucketInfo));
 
     return resp.build();
   }
@@ -382,7 +382,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getPrefix(),
         request.getCount());
     for (OmBucketInfo bucket : buckets) {
-      resp.addBucketInfo(bucket.getProtobuf());
+      resp.addBucketInfo(OMPBHelper.convert(bucket));
     }
 
     return resp.build();
@@ -480,7 +480,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getPrefix(),
         request.getCount());
     for (OmBucketInfo bucket : buckets) {
-      resp.addBucketInfo(bucket.getProtobuf());
+      resp.addBucketInfo(OMPBHelper.convert(bucket));
     }
 
     return resp.build();

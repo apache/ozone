@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.hdds.protocol.StorageType;
 
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.Assert;
 import org.junit.Test;
@@ -43,7 +44,7 @@ public class TestOmBucketInfo {
         .build();
 
     OmBucketInfo afterSerialization =
-        OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+        OMPBHelper.convert(OMPBHelper.convert(bucket));
 
     Assert.assertEquals(bucket, afterSerialization);
   }

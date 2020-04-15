@@ -640,7 +640,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public void createBucket(OmBucketInfo bucketInfo) throws IOException {
     CreateBucketRequest.Builder req =
         CreateBucketRequest.newBuilder();
-    BucketInfo bucketInfoProtobuf = bucketInfo.getProtobuf();
+    BucketInfo bucketInfoProtobuf = OMPBHelper.convert(bucketInfo);
     req.setBucketInfo(bucketInfoProtobuf);
 
     OMRequest omRequest = createOMRequest(Type.CreateBucket)
@@ -674,7 +674,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     InfoBucketResponse resp =
         handleError(submitRequest(omRequest)).getInfoBucketResponse();
 
-    return OmBucketInfo.getFromProtobuf(resp.getBucketInfo());
+    return OMPBHelper.convert(resp.getBucketInfo());
   }
 
   /**
@@ -732,7 +732,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     buckets.addAll(
           resp.getBucketInfoList().stream()
-              .map(OmBucketInfo::getFromProtobuf)
+              .map(OMPBHelper::convert)
               .collect(Collectors.toList()));
     return buckets;
 
@@ -1054,7 +1054,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     buckets.addAll(
         resp.getBucketInfoList().stream()
-            .map(OmBucketInfo::getFromProtobuf)
+            .map(OMPBHelper::convert)
             .collect(Collectors.toList()));
     return buckets;
 

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -158,7 +159,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     Assert.assertNotNull(omMetadataManager.getBucketTable().get(bucketKey));
 
     // verify table data with actual request data.
-    OmBucketInfo bucketInfoFromProto = OmBucketInfo.getFromProtobuf(
+    OmBucketInfo bucketInfoFromProto = OMPBHelper.convert(
         modifiedRequest.getCreateBucketRequest().getBucketInfo());
 
     Assert.assertEquals(bucketInfoFromProto.getCreationTime(),

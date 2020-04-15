@@ -25,15 +25,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .BucketInfo;
-import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 
 import com.google.common.base.Preconditions;
 
@@ -349,56 +345,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
           storageType, creationTime, objectID, updateID, metadata, bekInfo);
     }
-  }
-
-  /**
-   * Creates BucketInfo protobuf from OmBucketInfo.
-   */
-  public BucketInfo getProtobuf() {
-    BucketInfo.Builder bib =  BucketInfo.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .addAllAcls(OzoneAclUtil.toProtobuf(acls))
-        .setIsVersionEnabled(isVersionEnabled)
-        .setStorageType(storageType.toProto())
-        .setCreationTime(creationTime)
-        .setObjectID(objectID)
-        .setUpdateID(updateID)
-        .addAllMetadata(KeyValueUtil.toProtobuf(metadata));
-    if (bekInfo != null && bekInfo.getKeyName() != null) {
-      bib.setBeinfo(OMPBHelper.convert(bekInfo));
-    }
-    return bib.build();
-  }
-
-  /**
-   * Parses BucketInfo protobuf and creates OmBucketInfo.
-   * @param bucketInfo
-   * @return instance of OmBucketInfo
-   */
-  public static OmBucketInfo getFromProtobuf(BucketInfo bucketInfo) {
-    OmBucketInfo.Builder obib = OmBucketInfo.newBuilder()
-        .setVolumeName(bucketInfo.getVolumeName())
-        .setBucketName(bucketInfo.getBucketName())
-        .setAcls(bucketInfo.getAclsList().stream().map(
-            OzoneAcl::fromProtobuf).collect(Collectors.toList()))
-        .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
-        .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
-        .setCreationTime(bucketInfo.getCreationTime());
-    if (bucketInfo.hasObjectID()) {
-      obib.setObjectID(bucketInfo.getObjectID());
-    }
-    if (bucketInfo.hasUpdateID()) {
-      obib.setUpdateID(bucketInfo.getUpdateID());
-    }
-    if (bucketInfo.getMetadataList() != null) {
-      obib.addAllMetadata(KeyValueUtil
-          .getFromProtobuf(bucketInfo.getMetadataList()));
-    }
-    if (bucketInfo.hasBeinfo()) {
-      obib.setBucketEncryptionKey(OMPBHelper.convert(bucketInfo.getBeinfo()));
-    }
-    return obib.build();
   }
 
   @Override
