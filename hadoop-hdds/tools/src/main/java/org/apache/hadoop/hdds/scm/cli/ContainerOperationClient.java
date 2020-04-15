@@ -69,6 +69,11 @@ public class ContainerOperationClient implements ScmClient {
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
+
+  public XceiverClientManager getXceiverClientManager() {
+    return xceiverClientManager;
+  }
+
   private final XceiverClientManager xceiverClientManager;
 
   public ContainerOperationClient(Configuration conf) throws IOException {
