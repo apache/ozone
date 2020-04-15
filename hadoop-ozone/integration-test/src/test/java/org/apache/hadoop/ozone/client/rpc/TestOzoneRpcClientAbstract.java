@@ -251,7 +251,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     ClientProtocol proxy = store.getClientProxy();
     proxy.setVolumeOwner(volumeName, ownerName);
-    // Set owner again. Expect no NPEs nor timeouts
+    // Set owner again
     proxy.setVolumeOwner(volumeName, ownerName);
   }
 
