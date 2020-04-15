@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.slf4j.Logger;
@@ -71,17 +73,17 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
     VolumeInfo volumeInfo  =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
+    // Verify resource name
+    OmUtils.validateVolumeName(volumeInfo.getVolume());
 
     // Set creation time
     VolumeInfo updatedVolumeInfo =
         volumeInfo.toBuilder().setCreationTime(Time.now()).build();
 
-
     return getOmRequest().toBuilder().setCreateVolumeRequest(
         CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
         .setUserInfo(getUserInfo())
         .build();
-
   }
 
   @Override
@@ -128,13 +130,13 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       auditMap = omVolumeArgs.toAuditMap();
 
       // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        if (!ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
-            !ozAdmins.contains(getUserInfo().getUserName())) {
-          throw new OMException("Only admin users are authorized to create " +
-              "Ozone volumes. User: " + getUserInfo().getUserName(),
-              OMException.ResultCodes.PERMISSION_DENIED);
-        }
+      if (ozoneManager.getAclsEnabled() &&
+          !ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
+            !ozAdmins.contains(getOmRequest().getUserInfo().getUserName())) {
+        throw new OMException("Only admin users are authorized to create " +
+            "Ozone volumes. User: " +
+            getOmRequest().getUserInfo().getUserName(),
+            OMException.ResultCodes.PERMISSION_DENIED);
       }
 
       // acquire lock.

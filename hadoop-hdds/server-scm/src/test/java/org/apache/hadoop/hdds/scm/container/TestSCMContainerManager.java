@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -67,7 +66,7 @@ import java.util.stream.IntStream;
 public class TestSCMContainerManager {
   private static SCMContainerManager containerManager;
   private static MockNodeManager nodeManager;
-  private static PipelineManager pipelineManager;
+  private static SCMPipelineManager pipelineManager;
   private static File testDir;
   private static XceiverClientManager xceiverClientManager;
   private static Random random;
@@ -97,6 +96,7 @@ public class TestSCMContainerManager {
     nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
+    pipelineManager.allowPipelineCreation();
     containerManager = new SCMContainerManager(conf, pipelineManager);
     xceiverClientManager = new XceiverClientManager(conf);
     replicationFactor = SCMTestUtils.getReplicationFactor(conf);

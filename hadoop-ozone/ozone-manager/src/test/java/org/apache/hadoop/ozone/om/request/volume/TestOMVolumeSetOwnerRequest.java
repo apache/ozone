@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.Assert;
@@ -188,5 +191,51 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     // Replay should result in Replay response
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
         omClientResponse.getOMResponse().getStatus());
+  }
+
+
+  @Test
+  public void testOwnSameVolumeTwice() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String owner = "user1";
+    TestOMRequestUtils.addVolumeToDB(volumeName, owner, omMetadataManager);
+    TestOMRequestUtils.addUserToDB(volumeName, owner, omMetadataManager);
+    String newOwner = "user2";
+
+    // Create request to set new owner
+    OMRequest omRequest =
+        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
+
+    OMVolumeSetOwnerRequest setOwnerRequest =
+        new OMVolumeSetOwnerRequest(omRequest);
+    // Execute the request
+    setOwnerRequest.preExecute(ozoneManager);
+    OMClientResponse omClientResponse = setOwnerRequest.validateAndUpdateCache(
+        ozoneManager, 1, ozoneManagerDoubleBufferHelper);
+    // Response status should be OK and success flag should be true.
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+    Assert.assertTrue(omClientResponse.getOMResponse().getSuccess());
+
+    // Execute the same request again but with higher index
+    setOwnerRequest.preExecute(ozoneManager);
+    omClientResponse = setOwnerRequest.validateAndUpdateCache(
+        ozoneManager, 2, ozoneManagerDoubleBufferHelper);
+    // Response status should be OK, but success flag should be false.
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
+
+    // Check volume names list
+    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo =
+        omMetadataManager.getUserTable().get(newOwner);
+    Assert.assertNotNull(userVolumeInfo);
+    List<String> volumeNamesList = userVolumeInfo.getVolumeNamesList();
+    Assert.assertEquals(1, volumeNamesList.size());
+
+    Set<String> volumeNamesSet = new HashSet<>(volumeNamesList);
+    // If the set size isn't equal to list size, there are duplicates
+    // in the list (which was the bug before the fix).
+    Assert.assertEquals(volumeNamesList.size(), volumeNamesSet.size());
   }
 }

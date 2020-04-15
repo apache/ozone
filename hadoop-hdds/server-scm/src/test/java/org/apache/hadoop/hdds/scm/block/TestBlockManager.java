@@ -107,6 +107,7 @@ public class TestBlockManager {
     eventQueue = new EventQueue();
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager, eventQueue);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf, eventQueue);
@@ -140,7 +141,7 @@ public class TestBlockManager {
     type = HddsProtos.ReplicationType.RATIS;
 
     blockManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(false));
+        new SCMSafeModeManager.SafeModeStatus(false, false));
   }
 
   @After
@@ -235,7 +236,7 @@ public class TestBlockManager {
   @Test
   public void testAllocateBlockFailureInSafeMode() throws Exception {
     blockManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(true));
+        new SCMSafeModeManager.SafeModeStatus(true, true));
     // Test1: In safe mode expect an SCMException.
     thrown.expectMessage("SafeModePrecheck failed for "
         + "allocateBlock");

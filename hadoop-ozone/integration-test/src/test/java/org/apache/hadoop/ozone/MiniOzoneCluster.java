@@ -305,6 +305,7 @@ public interface MiniOzoneCluster {
     protected int numOfOmHandlers = 20;
     protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
+    protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected int pipelineNumLimit = DEFAULT_PIPELIME_LIMIT;
@@ -391,6 +392,18 @@ public interface MiniOzoneCluster {
      */
     public Builder setNumDatanodes(int val) {
       numOfDatanodes = val;
+      return this;
+    }
+
+    /**
+     * Sets the number of data volumes per datanode.
+     *
+     * @param val number of volumes per datanode.
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setNumDataVolumes(int val) {
+      numDataVolumes = val;
       return this;
     }
 

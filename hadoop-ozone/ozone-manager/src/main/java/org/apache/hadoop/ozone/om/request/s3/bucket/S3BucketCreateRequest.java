@@ -26,6 +26,8 @@ import java.util.Map;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
@@ -64,8 +66,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_VOLUME_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.S3_BUCKET_MAX_LENGTH;
-import static org.apache.hadoop.ozone.OzoneConsts.S3_BUCKET_MIN_LENGTH;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
@@ -98,14 +98,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
     // TODO: Do we need to enforce the bucket rules in this code path?
     // https://docs.aws.amazon.com/AmazonS3/latest/dev/BucketRestrictions.html
 
-    // For now only checked the length.
-    int bucketLength = s3CreateBucketRequest.getS3Bucketname().length();
-    if (bucketLength < S3_BUCKET_MIN_LENGTH ||
-        bucketLength >= S3_BUCKET_MAX_LENGTH) {
-      throw new OMException("S3BucketName must be at least 3 and not more " +
-          "than 63 characters long",
-          OMException.ResultCodes.S3_BUCKET_INVALID_LENGTH);
-    }
+    OmUtils.validateBucketName(s3CreateBucketRequest.getS3Bucketname());
 
     return getOmRequest().toBuilder()
         .setCreateS3BucketRequest(newS3CreateBucketRequest)

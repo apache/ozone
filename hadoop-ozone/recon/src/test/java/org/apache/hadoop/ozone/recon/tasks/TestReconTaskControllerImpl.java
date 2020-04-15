@@ -33,12 +33,10 @@ import java.util.HashSet;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -46,32 +44,22 @@ import org.junit.Test;
 /**
  * Class used to test ReconTaskControllerImpl.
  */
-public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
+public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
   private ReconTaskController reconTaskController;
-  private Configuration sqlConfiguration;
   private ReconTaskStatusDao reconTaskStatusDao;
 
   @Before
-  public void setUp() throws Exception {
-
+  public void setUp() {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-
-    sqlConfiguration = getInjector()
-        .getInstance(Configuration.class);
-
-    reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
-    ReconTaskSchemaDefinition schemaDefinition = getInjector().
-        getInstance(ReconTaskSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
-
+    reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration,
         reconTaskStatusDao, new HashSet<>());
     reconTaskController.start();
   }
 
   @Test
-  public void testRegisterTask() throws Exception {
+  public void testRegisterTask() {
     String taskName = "Dummy_" + System.currentTimeMillis();
     DummyReconDBTask dummyReconDBTask =
         new DummyReconDBTask(taskName, DummyReconDBTask.TaskType.ALWAYS_PASS);
@@ -102,7 +90,7 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
         .process(any());
     long endTime = System.currentTimeMillis();
 
-    reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
+    reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskStatus reconTaskStatus = reconTaskStatusDao.findById("MockTask");
     long taskTimeStamp = reconTaskStatus.getLastUpdatedTimestamp();
     long seqNumber = reconTaskStatus.getLastUpdatedSeqNumber();
@@ -132,7 +120,7 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
     assertEquals(dummyReconDBTask, reconTaskController.getRegisteredTasks()
         .get(dummyReconDBTask.getTaskName()));
 
-    reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
+    reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskStatus dbRecord = reconTaskStatusDao.findById(taskName);
 
     Assert.assertEquals(taskName, dbRecord.getTaskName());
@@ -168,7 +156,7 @@ public class TestReconTaskControllerImpl extends AbstractSqlDatabaseTest {
         omMetadataManagerMock);
     assertTrue(reconTaskController.getRegisteredTasks().isEmpty());
 
-    reconTaskStatusDao = new ReconTaskStatusDao(sqlConfiguration);
+    reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskStatus dbRecord = reconTaskStatusDao.findById(taskName);
 
     Assert.assertEquals(taskName, dbRecord.getTaskName());

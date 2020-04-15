@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
+
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -88,6 +90,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     CreateBucketRequest createBucketRequest =
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
+    // Verify resource name
+    OmUtils.validateBucketName(bucketInfo.getBucketName());
 
     // Get KMS provider.
     KeyProviderCryptoExtension kmsProvider =
