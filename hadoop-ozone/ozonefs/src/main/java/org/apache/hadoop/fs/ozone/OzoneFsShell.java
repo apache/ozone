@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FsShell;
 import org.apache.hadoop.fs.shell.CommandFactory;
 import org.apache.hadoop.fs.shell.FsCommand;
@@ -71,7 +72,7 @@ public class OzoneFsShell extends FsShell {
    */
   public static void main(String[] argv) throws Exception {
     OzoneFsShell shell = newShellInstance();
-    OzoneConfiguration conf = new OzoneConfiguration();
+    Configuration conf = new Configuration();
     conf.setQuietMode(false);
     shell.setConf(conf);
     int res;
