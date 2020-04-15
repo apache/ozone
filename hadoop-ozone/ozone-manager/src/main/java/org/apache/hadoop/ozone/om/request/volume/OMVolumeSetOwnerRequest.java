@@ -148,8 +148,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
         omResponse.setSetVolumePropertyResponse(
             SetVolumePropertyResponse.newBuilder().build());
         omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build());
-        addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-            ozoneManagerDoubleBufferHelper);
+        // Note: addResponseToDoubleBuffer would be executed in finally block.
         return omClientResponse;
       }
 
