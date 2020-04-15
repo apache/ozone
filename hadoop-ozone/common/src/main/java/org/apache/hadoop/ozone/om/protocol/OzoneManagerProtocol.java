@@ -294,55 +294,6 @@ public interface OzoneManagerProtocol
    */
 
   /**
-   * Creates an S3 bucket inside Ozone manager and creates the mapping needed
-   * to access via both S3 and Ozone.
-   * @param userName - S3 user name.
-   * @param s3BucketName - S3 bucket Name.
-   * @throws IOException - On failure, throws an exception like Bucket exists.
-   */
-  void createS3Bucket(String userName, String s3BucketName) throws IOException;
-
-  /**
-   * Delets an S3 bucket inside Ozone manager and deletes the mapping.
-   * @param s3BucketName - S3 bucket Name.
-   * @throws IOException in case the bucket cannot be deleted.
-   */
-  void deleteS3Bucket(String s3BucketName) throws IOException;
-
-  /**
-   * Returns the Ozone Namespace for the S3Bucket. It will return the
-   * OzoneVolume/OzoneBucketName.
-   * @param s3BucketName  - S3 Bucket Name.
-   * @return String - The Ozone canonical name for this s3 bucket. This
-   * string is useful for mounting an OzoneFS.
-   * @throws IOException - Error is throw if the s3bucket does not exist.
-   */
-  String getOzoneBucketMapping(String s3BucketName) throws IOException;
-
-  /**
-   * Returns a list of buckets represented by {@link OmBucketInfo}
-   * for the given user. Argument username is required, others
-   * are optional.
-   *
-   * @param userName
-   *   user Name.
-   * @param startBucketName
-   *   the start bucket name, only the buckets whose name is
-   *   after this value will be included in the result.
-   * @param bucketPrefix
-   *   bucket name prefix, only the buckets whose name has
-   *   this prefix will be included in the result.
-   * @param maxNumOfBuckets
-   *   the maximum number of buckets to return. It ensures
-   *   the size of the result will not exceed this limit.
-   * @return a list of buckets.
-   * @throws IOException
-   */
-  List<OmBucketInfo> listS3Buckets(String userName, String startBucketName,
-                                   String bucketPrefix, int maxNumOfBuckets)
-      throws IOException;
-
-  /**
    * Initiate multipart upload for the specified key.
    * @param keyArgs
    * @return MultipartInfo

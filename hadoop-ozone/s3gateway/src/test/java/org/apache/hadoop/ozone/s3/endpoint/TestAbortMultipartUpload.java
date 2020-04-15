@@ -47,7 +47,7 @@ public class TestAbortMultipartUpload {
     String bucket = OzoneConsts.S3_BUCKET;
     String key = OzoneConsts.KEY;
     OzoneClientStub client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket(OzoneConsts.OZONE, bucket);
+    client.getObjectStore().createS3Bucket(bucket);
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
@@ -59,7 +59,7 @@ public class TestAbortMultipartUpload {
 
     Response response = rest.initializeMultipartUpload(bucket, key);
 
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
     assertNotNull(multipartUploadInitiateResponse.getUploadID());

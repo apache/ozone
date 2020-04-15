@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -76,11 +76,10 @@ public class TestS3Shell {
   @Rule
   public Timeout testTimeout = new Timeout(300000);
 
-  private static String url;
   private static File baseDir;
   private static OzoneConfiguration conf = null;
   private static MiniOzoneCluster cluster = null;
-  private static ClientProtocol client = null;
+  private static OzoneClient client;
   private static S3Shell s3Shell = null;
 
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -110,7 +109,7 @@ public class TestS3Shell {
         .build();
     conf.setInt(OZONE_REPLICATION, ReplicationFactor.THREE.getValue());
     conf.setQuietMode(false);
-    client = new RpcClient(conf, null);
+    client = new OzoneClient(conf, new RpcClient(conf, null));
     cluster.waitForClusterToBeReady();
   }
 
@@ -132,7 +131,6 @@ public class TestS3Shell {
   public void setup() {
     System.setOut(new PrintStream(out));
     System.setErr(new PrintStream(err));
-    url = "o3://" + getOmAddress();
   }
 
   @After
@@ -147,13 +145,13 @@ public class TestS3Shell {
   }
 
   @Test
-  public void testS3BucketMapping() throws IOException {
+  public void testS3BucketMapping() {
     String setOmAddress =
         "--set=" + OZONE_OM_ADDRESS_KEY + "=" + getOmAddress();
 
     String s3Bucket = "bucket1";
     String commandOutput;
-    createS3Bucket(OzoneConsts.OZONE, s3Bucket);
+    createS3Bucket(s3Bucket);
 
     // WHEN
     String[] args =
@@ -162,7 +160,7 @@ public class TestS3Shell {
 
     // THEN
     commandOutput = out.toString();
-    String volumeName = client.getOzoneVolumeName(s3Bucket);
+    String volumeName = OzoneConsts.S3_VOLUME_NAME;
     assertTrue(commandOutput.contains("Volume name for S3Bucket is : " +
         volumeName));
     assertTrue(commandOutput.contains(OzoneConsts.OZONE_URI_SCHEME + "://" +
@@ -182,11 +180,11 @@ public class TestS3Shell {
     executeWithError(s3Shell, args, S3_BUCKET_NOT_FOUND);
   }
 
-  private void createS3Bucket(String userName, String s3Bucket) {
+  private void createS3Bucket(String s3Bucket) {
     try {
-      client.createS3Bucket(OzoneConsts.OZONE, s3Bucket);
+      client.getObjectStore().createS3Bucket(s3Bucket);
     } catch (IOException ex) {
-      GenericTestUtils.assertExceptionContains("S3_BUCKET_ALREADY_EXISTS", ex);
+      GenericTestUtils.assertExceptionContains("BUCKET_ALREADY_EXISTS", ex);
     }
   }
 

@@ -18,14 +18,13 @@
 package org.apache.hadoop.ozone.shell.s3;
 
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
-import java.io.IOException;
+import java.util.concurrent.Callable;
+
+import static org.apache.hadoop.ozone.OzoneConsts.S3_VOLUME_NAME;
 
 /**
  * S3Bucket mapping handler, which returns volume name and Ozone fs uri for
@@ -33,28 +32,21 @@ import java.io.IOException;
  */
 @Command(name = "path",
     description = "Returns the ozone path for S3Bucket")
-public class S3BucketMapping extends S3Handler {
+@SuppressWarnings("squid:S106") // CLI
+public class S3BucketMapping implements Callable<Void> {
 
   @Parameters(arity = "1..1", description = "Name of the s3 bucket.")
   private String s3BucketName;
 
   @Override
-  protected void execute(OzoneClient client, OzoneAddress address)
-      throws IOException {
-
-    ObjectStore objectStore = client.getObjectStore();
-    String mapping = objectStore.getOzoneBucketMapping(s3BucketName);
-    String volumeName = objectStore.getOzoneVolumeName(s3BucketName);
-
-    if (isVerbose()) {
-      out().printf("Mapping created for S3Bucket is : %s%n", mapping);
-    }
-
-    out().printf("Volume name for S3Bucket is : %s%n", volumeName);
+  public Void call() {
+    System.out.printf("Volume name for S3Bucket is : %s%n", S3_VOLUME_NAME);
 
     String ozoneFsUri = String.format("%s://%s.%s", OzoneConsts
-        .OZONE_URI_SCHEME, s3BucketName, volumeName);
+        .OZONE_URI_SCHEME, s3BucketName, S3_VOLUME_NAME);
 
-    out().printf("Ozone FileSystem Uri is : %s%n", ozoneFsUri);
+    System.out.printf("Ozone FileSystem Uri is : %s%n", ozoneFsUri);
+
+    return null;
   }
 }

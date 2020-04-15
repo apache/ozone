@@ -21,9 +21,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -47,11 +45,7 @@ public class TestInitiateMultipartUpload {
     String bucket = OzoneConsts.S3_BUCKET;
     String key = OzoneConsts.KEY;
     OzoneClientStub client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket(OzoneConsts.OZONE, bucket);
-    String volumeName = client.getObjectStore().getOzoneVolumeName(bucket);
-    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket ozoneBucket = volume.getBucket(OzoneConsts.S3_BUCKET);
-
+    client.getObjectStore().createS3Bucket(bucket);
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
@@ -63,7 +57,7 @@ public class TestInitiateMultipartUpload {
 
     Response response = rest.initializeMultipartUpload(bucket, key);
 
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
     MultipartUploadInitiateResponse multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
@@ -71,7 +65,7 @@ public class TestInitiateMultipartUpload {
 
     // Calling again should return different uploadID.
     response = rest.initializeMultipartUpload(bucket, key);
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
     multipartUploadInitiateResponse =
         (MultipartUploadInitiateResponse) response.getEntity();
     assertNotNull(multipartUploadInitiateResponse.getUploadID());

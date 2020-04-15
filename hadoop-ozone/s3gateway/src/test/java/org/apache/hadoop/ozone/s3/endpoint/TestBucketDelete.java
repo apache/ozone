@@ -52,7 +52,7 @@ public class TestBucketDelete {
     clientStub = new OzoneClientStub();
     objectStoreStub = clientStub.getObjectStore();
 
-    objectStoreStub.createS3Bucket(OzoneConsts.OZONE, bucketName);
+    clientStub.getObjectStore().createS3Bucket(bucketName);
 
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = new BucketEndpoint();

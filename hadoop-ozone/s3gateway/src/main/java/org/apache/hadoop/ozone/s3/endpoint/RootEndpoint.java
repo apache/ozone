@@ -55,7 +55,7 @@ public class RootEndpoint extends EndpointBase {
     ListBucketResponse response = new ListBucketResponse();
 
     String userName = getS3Username(getSignatureProcessor().getAwsAccessId());
-    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(userName,
+    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(
         null);
 
     while (bucketIterator.hasNext()) {

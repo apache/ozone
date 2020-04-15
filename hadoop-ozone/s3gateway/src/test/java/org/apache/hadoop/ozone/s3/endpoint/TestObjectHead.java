@@ -26,7 +26,6 @@ import java.util.HashMap;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -44,22 +43,18 @@ import org.junit.Test;
  */
 public class TestObjectHead {
   private String bucketName = "b1";
-  private OzoneClientStub clientStub;
-  private ObjectStore objectStoreStub;
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
 
   @Before
   public void setup() throws IOException {
     //Create client stub and object store stub.
-    clientStub = new OzoneClientStub();
-    objectStoreStub = clientStub.getObjectStore();
+    OzoneClientStub clientStub = new OzoneClientStub();
 
     // Create volume and bucket
-    objectStoreStub.createS3Bucket("bilbo", bucketName);
-    String volName = objectStoreStub.getOzoneVolumeName(bucketName);
+    clientStub.getObjectStore().createS3Bucket(bucketName);
 
-    bucket = objectStoreStub.getVolume(volName).getBucket(bucketName);
+    bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
     // Create HeadBucket and setClient to OzoneClientStub
     keyEndpoint = new ObjectEndpoint();

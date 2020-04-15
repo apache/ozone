@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -753,69 +752,6 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getModificationTime(), ozoneKeyLocations, ReplicationType
         .valueOf(keyInfo.getType().toString()), keyInfo.getMetadata(),
         keyInfo.getFileEncryptionInfo(), keyInfo.getFactor().getNumber());
-  }
-
-  @Override
-  public void createS3Bucket(String userName, String s3BucketName)
-      throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(userName), "user name " +
-        "cannot be null or empty.");
-
-    Preconditions.checkArgument(Strings.isNotBlank(s3BucketName), "bucket " +
-        "name cannot be null or empty.");
-    OmUtils.validateBucketName(s3BucketName);
-    ozoneManagerClient.createS3Bucket(userName, s3BucketName);
-  }
-
-  @Override
-  public void deleteS3Bucket(String s3BucketName)
-      throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(s3BucketName), "bucket " +
-        "name cannot be null or empty.");
-    ozoneManagerClient.deleteS3Bucket(s3BucketName);
-  }
-
-  @Override
-  public String getOzoneBucketMapping(String s3BucketName) throws IOException {
-    Preconditions.checkArgument(Strings.isNotBlank(s3BucketName), "bucket " +
-        "name cannot be null or empty.");
-    return ozoneManagerClient.getOzoneBucketMapping(s3BucketName);
-  }
-
-  @Override
-  @SuppressWarnings("StringSplitter")
-  public String getOzoneVolumeName(String s3BucketName) throws IOException {
-    String mapping = getOzoneBucketMapping(s3BucketName);
-    return mapping.split("/")[0];
-
-  }
-
-  @Override
-  @SuppressWarnings("StringSplitter")
-  public String getOzoneBucketName(String s3BucketName) throws IOException {
-    String mapping = getOzoneBucketMapping(s3BucketName);
-    return mapping.split("/")[1];
-  }
-
-  @Override
-  public List<OzoneBucket> listS3Buckets(String userName, String bucketPrefix,
-                                         String prevBucket, int maxListResult)
-      throws IOException {
-    List<OmBucketInfo> buckets = ozoneManagerClient.listS3Buckets(
-        userName, prevBucket, bucketPrefix, maxListResult);
-
-    return buckets.stream().map(bucket -> new OzoneBucket(
-        conf,
-        this,
-        bucket.getVolumeName(),
-        bucket.getBucketName(),
-        bucket.getStorageType(),
-        bucket.getIsVersionEnabled(),
-        bucket.getCreationTime(),
-        bucket.getMetadata(),
-        bucket.getEncryptionKeyInfo() != null ?
-            bucket.getEncryptionKeyInfo().getKeyName(): null))
-        .collect(Collectors.toList());
   }
 
   @Override

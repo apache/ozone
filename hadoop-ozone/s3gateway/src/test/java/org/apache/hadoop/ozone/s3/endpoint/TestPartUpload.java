@@ -51,8 +51,7 @@ public class TestPartUpload {
   public static void setUp() throws Exception {
 
     OzoneClientStub client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket(OzoneConsts.OZONE,
-        OzoneConsts.S3_BUCKET);
+    client.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
@@ -74,7 +73,7 @@ public class TestPartUpload {
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
     String uploadID = multipartUploadInitiateResponse.getUploadID();
 
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
 
     String content = "Multipart Upload";
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());
@@ -95,7 +94,7 @@ public class TestPartUpload {
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
     String uploadID = multipartUploadInitiateResponse.getUploadID();
 
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
 
     String content = "Multipart Upload";
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());

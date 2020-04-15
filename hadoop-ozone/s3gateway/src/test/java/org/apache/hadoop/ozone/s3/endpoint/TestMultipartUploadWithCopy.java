@@ -35,7 +35,6 @@ import java.util.Scanner;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
@@ -69,11 +68,10 @@ public class TestMultipartUploadWithCopy {
 
   @BeforeClass
   public static void setUp() throws Exception {
+    CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
-    ObjectStore objectStore = CLIENT.getObjectStore();
-    objectStore.createS3Bucket(OzoneConsts.OZONE, OzoneConsts.S3_BUCKET);
-
-    OzoneBucket bucket = getOzoneBucket(objectStore, OzoneConsts.S3_BUCKET);
+    OzoneBucket bucket =
+        CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET);
 
     byte[] keyContent = EXISTING_KEY_CONTENT.getBytes();
     try (OutputStream stream = bucket
@@ -126,8 +124,8 @@ public class TestMultipartUploadWithCopy {
     completeMultipartUpload(KEY, completeMultipartUploadRequest,
         uploadID);
 
-    OzoneBucket bucket = getOzoneBucket(CLIENT.getObjectStore(),
-        OzoneConsts.S3_BUCKET);
+    OzoneBucket bucket =
+        CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET);
     try (InputStream is = bucket.readKey(KEY)) {
       String keyContent = new Scanner(is).useDelimiter("\\A").next();
       Assert.assertEquals(content + EXISTING_KEY_CONTENT + EXISTING_KEY_CONTENT
@@ -145,7 +143,7 @@ public class TestMultipartUploadWithCopy {
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
     String uploadID = multipartUploadInitiateResponse.getUploadID();
 
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
 
     return uploadID;
 
@@ -157,7 +155,7 @@ public class TestMultipartUploadWithCopy {
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
         partNumber, uploadID, body);
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString("ETag"));
     Part part = new Part();
     part.seteTag(response.getHeaderString("ETag"));
@@ -179,7 +177,7 @@ public class TestMultipartUploadWithCopy {
     ByteArrayInputStream body = new ByteArrayInputStream("".getBytes());
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, 0, partNumber,
         uploadID, body);
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
 
     CopyPartResult result = (CopyPartResult) response.getEntity();
     assertNotNull(result.getETag());
@@ -198,16 +196,16 @@ public class TestMultipartUploadWithCopy {
     Response response = REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
         uploadID, completeMultipartUploadRequest);
 
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
 
     CompleteMultipartUploadResponse completeMultipartUploadResponse =
         (CompleteMultipartUploadResponse) response.getEntity();
 
-    assertEquals(completeMultipartUploadResponse.getBucket(),
-        OzoneConsts.S3_BUCKET);
-    assertEquals(completeMultipartUploadResponse.getKey(), KEY);
-    assertEquals(completeMultipartUploadResponse.getLocation(),
-        OzoneConsts.S3_BUCKET);
+    assertEquals(OzoneConsts.S3_BUCKET,
+        completeMultipartUploadResponse.getBucket());
+    assertEquals(KEY, completeMultipartUploadResponse.getKey());
+    assertEquals(OzoneConsts.S3_BUCKET,
+        completeMultipartUploadResponse.getLocation());
     assertNotNull(completeMultipartUploadResponse.getETag());
   }
 
@@ -225,13 +223,4 @@ public class TestMultipartUploadWithCopy {
     setHeaders(new HashMap<>());
   }
 
-  private static OzoneBucket getOzoneBucket(ObjectStore objectStore,
-      String bucketName)
-      throws IOException {
-
-    String ozoneBucketName = objectStore.getOzoneBucketName(bucketName);
-    String ozoneVolumeName = objectStore.getOzoneVolumeName(bucketName);
-
-    return objectStore.getVolume(ozoneVolumeName).getBucket(ozoneBucketName);
-  }
 }

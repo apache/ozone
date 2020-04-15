@@ -26,7 +26,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
@@ -36,6 +35,8 @@ import com.google.common.collect.Sets;
 import org.junit.Assert;
 import org.junit.Test;
 
+import static java.util.Collections.singleton;
+
 /**
  * Test object multi delete.
  */
@@ -44,7 +45,7 @@ public class TestObjectMultiDelete {
   @Test
   public void delete() throws IOException, OS3Exception, JAXBException {
     //GIVEN
-    OzoneClient client = new OzoneClientStub();
+    OzoneClientStub client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);
 
     BucketEndpoint rest = new BucketEndpoint();
@@ -75,7 +76,7 @@ public class TestObjectMultiDelete {
   @Test
   public void deleteQuiet() throws IOException, OS3Exception, JAXBException {
     //GIVEN
-    OzoneClient client = new OzoneClientStub();
+    OzoneClientStub client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);
 
     BucketEndpoint rest = new BucketEndpoint();
@@ -96,17 +97,16 @@ public class TestObjectMultiDelete {
         .collect(Collectors.toSet());
 
     //THEN
+    Assert.assertEquals(singleton("key3"), keysAtTheEnd);
     Assert.assertEquals(0, response.getDeletedObjects().size());
     Assert.assertEquals(0, response.getErrors().size());
   }
 
-  private OzoneBucket initTestData(OzoneClient client) throws IOException {
-    client.getObjectStore().createS3Bucket("bilbo", "b1");
-
-    String volumeName = client.getObjectStore().getOzoneVolumeName("b1");
+  private OzoneBucket initTestData(OzoneClientStub client) throws IOException {
+    client.getObjectStore().createS3Bucket("b1");
 
     OzoneBucket bucket =
-        client.getObjectStore().getVolume(volumeName).getBucket("b1");
+        client.getObjectStore().getS3Bucket("b1");
 
     bucket.createKey("key1", 0).close();
     bucket.createKey("key2", 0).close();
