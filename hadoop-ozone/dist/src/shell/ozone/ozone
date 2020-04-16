@@ -134,12 +134,12 @@ function ozonecmd_case
       mkdir -p "$ARTIFACT_LIB_DIR"
       if [[ ! -f "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar" ]]; then
         echo "jmh-core jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: GPL + classpath execption)"
-        wget -O "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar"  https://repo1.maven.org/maven2/org/openjdk/jmh/jmh-core/1.23/jmh-core-1.23.jar
+        curl -o "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar"  https://repo1.maven.org/maven2/org/openjdk/jmh/jmh-core/1.23/jmh-core-1.23.jar
       fi
 
       if [[ ! -f "$ARTIFACT_LIB_DIR/jopt-simple-4.6.jar" ]]; then
         echo "jopt jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: MIT License)"
-        wget -O "$ARTIFACT_LIB_DIR/jopt-simple-4.6.jar" https://repo1.maven.org/maven2/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar
+        curl -o "$ARTIFACT_LIB_DIR/jopt-simple-4.6.jar" https://repo1.maven.org/maven2/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar
       fi
 
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.genesis.Genesis
