@@ -29,7 +29,6 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -143,6 +142,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now());
     }
 
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     newCreateKeyRequest =
         createKeyRequest.toBuilder().setKeyArgs(newKeyArgs)
             .setClientID(UniqueId.next());
@@ -169,7 +169,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OmKeyInfo omKeyInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
-    Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
+
     boolean acquireLock = false;
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OMResponse.newBuilder()
@@ -213,10 +213,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
-      encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
-          keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
+          keyArgs.getDataSize(), locations,  getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
           ozoneManager.isRatisEnabled());
 

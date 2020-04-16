@@ -709,6 +709,9 @@ message KeyArgs {
     // request type.
     optional uint64 modificationTime = 13;
     optional bool sortDatanodes = 14;
+
+    // This will be set by leader OM in HA and update the original request.
+    optional FileEncryptionInfoProto fileEncryptionInfo = 15;
 }
 
 message KeyLocation {
