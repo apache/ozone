@@ -133,7 +133,7 @@ function ozonecmd_case
       ARTIFACT_LIB_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib/hadoop-ozone-tools"
       mkdir -p "$ARTIFACT_LIB_DIR"
       if [[ ! -f "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar" ]]; then
-        echo "jmh-core jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: GPL + classpath execption)"
+        echo "jmh-core jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: GPL + classpath exception)"
         curl -o "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar"  https://repo1.maven.org/maven2/org/openjdk/jmh/jmh-core/1.23/jmh-core-1.23.jar
       fi
 
