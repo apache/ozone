@@ -504,4 +504,17 @@ public abstract class OMKeyRequest extends OMClientRequest {
       }
     }
   }
+
+  /**
+   * Get FileEncryptionInfoProto from KeyArgs.
+   * @param keyArgs
+   * @return
+   */
+  protected FileEncryptionInfo getFileEncryptionInfo(KeyArgs keyArgs) {
+    FileEncryptionInfo encryptionInfo = null;
+    if (keyArgs.hasFileEncryptionInfo()) {
+      encryptionInfo = OMPBHelper.convert(keyArgs.getFileEncryptionInfo());
+    }
+    return encryptionInfo;
+  }
 }

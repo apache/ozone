@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,7 +171,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OmKeyInfo omKeyInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
-    Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
+
     boolean acquireLock = false;
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OMResponse.newBuilder()
@@ -216,7 +217,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           omMetadataManager.getBucketKey(volumeName, bucketName));
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
-          keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
+          keyArgs.getDataSize(), locations,  getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
           ozoneManager.isRatisEnabled());
 

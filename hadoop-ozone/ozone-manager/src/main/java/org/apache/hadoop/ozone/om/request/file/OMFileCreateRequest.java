@@ -30,6 +30,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,7 +179,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     boolean acquiredLock = false;
-    Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
+
     OmKeyInfo omKeyInfo = null;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
     List<OmKeyInfo> missingParentInfos;
@@ -260,7 +261,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           omMetadataManager.getBucketKey(volumeName, bucketName));
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
-          keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
+          keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
           ozoneManager.isRatisEnabled());
 
