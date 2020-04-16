@@ -386,8 +386,7 @@ public abstract class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       initializeConfiguration();
 
       if (numOfOMs > 1) {
-        conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-        conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
+        initOMRatisConf();
       }
 
       StorageContainerManager scm;

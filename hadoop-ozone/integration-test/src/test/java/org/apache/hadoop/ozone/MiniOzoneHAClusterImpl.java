@@ -69,6 +69,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private int waitForOMToBeReadyTimeout = 120000; // 2 min
 
   private static final Random RANDOM = new Random();
+  private static final int RATIS_LEADER_ELECTION_TIMEOUT = 1000; // 1 second
   public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   /**
@@ -281,8 +282,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
-      conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-      conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
+      initOMRatisConf();
       StorageContainerManager scm;
       ReconServer reconServer = null;
       try {
@@ -308,6 +308,29 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         cluster.startHddsDatanodes();
       }
       return cluster;
+    }
+
+    protected void initOMRatisConf() {
+      conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
+      conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
+      // If test change the following config values we will respect, otherwise we will set lower timeout values.
+      long defaultDuration = OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT.getDuration();
+      long curLeaderElectionTimeout =
+              conf.getTimeDuration(OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+                      defaultDuration,
+                      TimeUnit.MILLISECONDS);
+      conf.setTimeDuration(
+              OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+              defaultDuration == curLeaderElectionTimeout ? RATIS_LEADER_ELECTION_TIMEOUT
+                      : curLeaderElectionTimeout, TimeUnit.MILLISECONDS);
+      long defaultNodeFailureTimeout
+              = OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT.getDuration();
+      long curNodeFailureTimeout = conf.getTimeDuration(OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
+              defaultNodeFailureTimeout, OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT.getUnit());
+      conf.setTimeDuration(
+              OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
+              curNodeFailureTimeout == defaultNodeFailureTimeout ? NODE_FAILURE_TIMEOUT
+                      : curNodeFailureTimeout, TimeUnit.MILLISECONDS);
     }
 
     /**

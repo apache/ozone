@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -108,7 +107,6 @@ import javax.management.ObjectName;
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Ignore
 public class TestOzoneManagerHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -123,7 +121,6 @@ public class TestOzoneManagerHA {
   /* Reduce max number of retries to speed up unit test. */
   private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
   private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
-  private static final int RATIS_LEADER_ELECTION_TIMEOUT = 1000; // 1 second
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -158,12 +155,6 @@ public class TestOzoneManagerHA {
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
-    conf.setTimeDuration(
-            OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-            RATIS_LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(
-            OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
-            NODE_FAILURE_TIMEOUT, TimeUnit.MILLISECONDS);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
@@ -679,6 +670,7 @@ public class TestOzoneManagerHA {
   /**
    * Test OMFailoverProxyProvider failover on connection exception to OM client.
    */
+  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
@@ -743,6 +735,7 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(leaderOMNodeId, newLeaderOMNodeId);
   }
 
+  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testOMRetryProxy() throws Exception {
     // Stop all the OMs.
@@ -1304,6 +1297,7 @@ public class TestOzoneManagerHA {
 
   }
 
+  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testListVolumes() throws Exception {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
