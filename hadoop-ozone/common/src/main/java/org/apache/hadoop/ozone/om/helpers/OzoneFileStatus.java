@@ -24,8 +24,8 @@ import java.net.URI;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.ozone.fs.FSProtos;
-import org.apache.hadoop.ozone.fs.FSProtos.FileStatusProto;
+import org.apache.hadoop.ozone.protocol.proto.FSProtos;
+import org.apache.hadoop.ozone.protocol.proto.FSProtos.FileStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
