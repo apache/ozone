@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -407,7 +406,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           (Token<OzoneTokenIdentifier>) token;
       OzoneClient ozoneClient =
           OzoneClientFactory
-              .getRpcClient(new LegacyHadoopConfigurationSource(conf));
+              .getRpcClient(OzoneConfiguration.of(conf));
       return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
     }
 
@@ -418,7 +417,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           (Token<OzoneTokenIdentifier>) token;
       OzoneClient ozoneClient =
           OzoneClientFactory
-              .getRpcClient(new LegacyHadoopConfigurationSource(conf));
+              .getRpcClient(OzoneConfiguration.of(conf));
       ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
     }
   }
