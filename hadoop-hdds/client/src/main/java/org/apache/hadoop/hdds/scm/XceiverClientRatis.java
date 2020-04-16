@@ -48,6 +48,8 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+
+import com.google.common.base.Supplier;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
@@ -63,9 +65,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-
-import io.opentracing.Scope;
-import io.opentracing.util.GlobalTracer;
 
 /**
  * An abstract implementation of {@link XceiverClientSpi} using Ratis.
@@ -209,24 +208,27 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   private CompletableFuture<RaftClientReply> sendRequestAsync(
       ContainerCommandRequestProto request) {
-    try (Scope scope = GlobalTracer.get()
-        .buildSpan("XceiverClientRatis." + request.getCmdType().name())
-        .startActive(true)) {
-      final ContainerCommandRequestMessage message
-          = ContainerCommandRequestMessage.toMessage(
+    return TracingUtil.executeInsideNewSpan(
+        "XceiverClientRatis." + request.getCmdType().name(),
+        (Supplier<CompletableFuture<RaftClientReply>>) () -> {
+          final ContainerCommandRequestMessage message
+              = ContainerCommandRequestMessage.toMessage(
               request, TracingUtil.exportCurrentSpan());
-      if (HddsUtils.isReadOnly(request)) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("sendCommandAsync ReadOnly {}", message);
+          if (HddsUtils.isReadOnly(request)) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("sendCommandAsync ReadOnly {}", message);
+            }
+            return getClient().sendReadOnlyAsync(message);
+          } else {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("sendCommandAsync {}", message);
+            }
+            return getClient().sendAsync(message);
+          }
+
         }
-        return getClient().sendReadOnlyAsync(message);
-      } else {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("sendCommandAsync {}", message);
-        }
-        return getClient().sendAsync(message);
-      }
-    }
+
+    );
   }
 
   // gets the minimum log index replicated to all servers

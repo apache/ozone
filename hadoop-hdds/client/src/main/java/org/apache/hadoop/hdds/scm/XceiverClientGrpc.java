@@ -18,10 +18,24 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -41,7 +55,10 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
+import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
@@ -51,21 +68,6 @@ import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.security.cert.X509Certificate;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * A Client for the storageContainer protocol for read object data.
@@ -265,14 +267,18 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private XceiverClientReply sendCommandWithTraceIDAndRetry(
       ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
       throws IOException {
-    try (Scope scope = GlobalTracer.get()
-        .buildSpan("XceiverClientGrpc." + request.getCmdType().name())
-        .startActive(true)) {
-      ContainerCommandRequestProto finalPayload =
-          ContainerCommandRequestProto.newBuilder(request)
-              .setTraceID(TracingUtil.exportCurrentSpan()).build();
-      return sendCommandWithRetry(finalPayload, validators);
-    }
+
+    String spanName = "XceiverClientGrpc." + request.getCmdType().name();
+
+    return TracingUtil.executeInsideNewSpan(spanName,
+        (SupplierWithIOException<XceiverClientReply>) () -> {
+
+          ContainerCommandRequestProto finalPayload =
+              ContainerCommandRequestProto.newBuilder(request)
+                  .setTraceID(TracingUtil.exportCurrentSpan()).build();
+          return sendCommandWithRetry(finalPayload, validators);
+
+        });
   }
 
   private XceiverClientReply sendCommandWithRetry(
@@ -387,9 +393,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request)
       throws IOException, ExecutionException, InterruptedException {
-    try (Scope scope = GlobalTracer.get()
-        .buildSpan("XceiverClientGrpc." + request.getCmdType().name())
-        .startActive(true)) {
+
+    Span span = GlobalTracer.get()
+        .buildSpan("XceiverClientGrpc." + request.getCmdType().name()).start();
+
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
 
       ContainerCommandRequestProto finalPayload =
           ContainerCommandRequestProto.newBuilder(request)
@@ -405,6 +413,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         asyncReply.getResponse().get();
       }
       return asyncReply;
+
+    } finally {
+      span.finish();
     }
   }
 
