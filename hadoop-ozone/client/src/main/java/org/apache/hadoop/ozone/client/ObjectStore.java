@@ -134,8 +134,16 @@ public class ObjectStore {
    * @throws  IOException in case the bucket cannot be deleted.
    */
   public void deleteS3Bucket(String bucketName) throws IOException {
-    OzoneVolume volume = getVolume(S3_VOLUME_NAME);
-    volume.deleteBucket(bucketName);
+    try {
+      OzoneVolume volume = getVolume(S3_VOLUME_NAME);
+      volume.deleteBucket(bucketName);
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND) {
+        throw new OMException(OMException.ResultCodes.BUCKET_NOT_FOUND);
+      } else {
+        throw ex;
+      }
+    }
   }
 
 
