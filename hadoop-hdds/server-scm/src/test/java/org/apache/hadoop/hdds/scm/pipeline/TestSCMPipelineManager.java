@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FileUtil;
@@ -42,12 +43,15 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 
+import com.google.common.base.Supplier;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import org.junit.After;
 import org.junit.Assert;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -83,6 +87,7 @@ public class TestSCMPipelineManager {
   public void testPipelineReload() throws IOException {
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -102,6 +107,7 @@ public class TestSCMPipelineManager {
     // new pipeline manager should be able to load the pipelines from the db
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
+    pipelineManager.allowPipelineCreation();
     mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -132,6 +138,7 @@ public class TestSCMPipelineManager {
   public void testRemovePipeline() throws IOException {
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -152,7 +159,7 @@ public class TestSCMPipelineManager {
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
     try {
       pipelineManager.getPipeline(pipeline.getId());
-      Assert.fail("Pipeline should not have been retrieved");
+      fail("Pipeline should not have been retrieved");
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().contains("not found"));
     }
@@ -166,6 +173,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, eventQueue);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -216,7 +224,7 @@ public class TestSCMPipelineManager {
 
     try {
       pipelineManager.getPipeline(pipeline.getId());
-      Assert.fail("Pipeline should not have been retrieved");
+      fail("Pipeline should not have been retrieved");
     } catch (IOException e) {
       Assert.assertTrue(e.getMessage().contains("not found"));
     }
@@ -231,6 +239,7 @@ public class TestSCMPipelineManager {
         20);
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManagerMock, new EventQueue());
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManagerMock,
             pipelineManager.getStateManager(), conf);
@@ -265,7 +274,7 @@ public class TestSCMPipelineManager {
     try {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
-      Assert.fail();
+      fail();
     } catch (SCMException ioe) {
       // pipeline creation failed this time.
       Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
@@ -289,6 +298,7 @@ public class TestSCMPipelineManager {
   public void testActivateDeactivatePipeline() throws IOException {
     final SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, new EventQueue());
+    pipelineManager.allowPipelineCreation();
     final PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -336,11 +346,14 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, eventQueue);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
+    pipelineManager.handleSafeModeTransition(
+        new SCMSafeModeManager.SafeModeStatus(true, true));
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE);
@@ -394,6 +407,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     final SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager, eventQueue);
+    pipelineManager.allowPipelineCreation();
     final PipelineProvider ratisProvider = new MockRatisPipelineProvider(
         nodeManager, pipelineManager.getStateManager(), conf, eventQueue,
         false);
@@ -422,6 +436,86 @@ public class TestSCMPipelineManager {
             HddsProtos.ReplicationFactor.THREE,
             Pipeline.PipelineState.ALLOCATED).contains(pipeline));
 
+    pipelineManager.close();
+  }
+
+  @Test
+  public void testPipelineNotCreatedUntilSafeModePrecheck()
+      throws IOException, TimeoutException, InterruptedException {
+    // No timeout for pipeline scrubber.
+    conf.setTimeDuration(
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
+        TimeUnit.MILLISECONDS);
+
+    EventQueue eventQueue = new EventQueue();
+    final SCMPipelineManager pipelineManager =
+        new SCMPipelineManager(conf, nodeManager, eventQueue);
+    final PipelineProvider ratisProvider = new MockRatisPipelineProvider(
+        nodeManager, pipelineManager.getStateManager(), conf, eventQueue,
+        false);
+
+    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        ratisProvider);
+
+    try {
+      Pipeline pipeline = pipelineManager
+          .createPipeline(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE);
+      fail("Pipelines should not have been created");
+    } catch (IOException e) {
+      // expected
+    }
+
+    // Ensure a pipeline of factor ONE can be created - no exceptions should be
+    // raised.
+    Pipeline pipeline = pipelineManager
+        .createPipeline(HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.ONE);
+
+    // Simulate safemode check exiting.
+    pipelineManager.handleSafeModeTransition(
+        new SCMSafeModeManager.SafeModeStatus(true, true));
+    GenericTestUtils.waitFor(new Supplier<Boolean>() {
+      @Override
+      public Boolean get() {
+        return pipelineManager.getPipelines().size() != 0;
+      }
+    }, 100, 10000);
+    pipelineManager.close();
+  }
+
+
+  @Test
+  public void testSafeModeUpdatedOnSafemodeExit()
+      throws IOException, TimeoutException, InterruptedException {
+    // No timeout for pipeline scrubber.
+    conf.setTimeDuration(
+        OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
+        TimeUnit.MILLISECONDS);
+
+    EventQueue eventQueue = new EventQueue();
+    final SCMPipelineManager pipelineManager =
+        new SCMPipelineManager(conf, nodeManager, eventQueue);
+    final PipelineProvider ratisProvider = new MockRatisPipelineProvider(
+        nodeManager, pipelineManager.getStateManager(), conf, eventQueue,
+        false);
+
+    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        ratisProvider);
+
+    assertEquals(true, pipelineManager.getSafeModeStatus());
+    assertEquals(false, pipelineManager.isPipelineCreationAllowed());
+    // First pass pre-check as true, but safemode still on
+    pipelineManager.handleSafeModeTransition(
+        new SCMSafeModeManager.SafeModeStatus(true, true));
+    assertEquals(true, pipelineManager.getSafeModeStatus());
+    assertEquals(true, pipelineManager.isPipelineCreationAllowed());
+
+    // Then also turn safemode off
+    pipelineManager.handleSafeModeTransition(
+        new SCMSafeModeManager.SafeModeStatus(false, true));
+    assertEquals(false, pipelineManager.getSafeModeStatus());
+    assertEquals(true, pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();
   }
 

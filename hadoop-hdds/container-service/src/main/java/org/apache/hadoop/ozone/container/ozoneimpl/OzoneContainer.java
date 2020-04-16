@@ -178,7 +178,8 @@ public class OzoneContainer {
         volumeThreads.get(i).join();
       }
     } catch (InterruptedException ex) {
-      LOG.info("Volume Threads Interrupted exception", ex);
+      LOG.error("Volume Threads Interrupted exception", ex);
+      Thread.currentThread().interrupt();
     }
 
   }

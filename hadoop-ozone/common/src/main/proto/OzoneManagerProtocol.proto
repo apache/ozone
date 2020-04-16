@@ -895,6 +895,7 @@ message OMTokenProto {
     optional string accessKeyId    = 12;
     optional string signature      = 13;
     optional string strToSign      = 14;
+    optional string omServiceId    = 15;
 }
 
 message SecretKeyProto {

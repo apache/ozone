@@ -55,7 +55,7 @@ function hadoop_usage
   hadoop_add_subcommand "dtutil" client "operations related to delegation tokens"
   hadoop_add_subcommand "upgrade" client "HDFS to Ozone in-place upgrade tool"
   hadoop_add_subcommand "admin" client "Ozone admin tool"
-  hadoop_add_subcommand "ratislogparser" client "ozone debug tool, to convert Ratis log files into readable text"
+  hadoop_add_subcommand "debug" client "Ozone debug tool"
 
   hadoop_generate_usage "${HADOOP_SHELL_EXECNAME}" false
 }
@@ -145,15 +145,15 @@ function ozonecmd_case
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
     ;;
     sh | shell)
-      HADOOP_CLASSNAME=org.apache.hadoop.ozone.web.ozShell.OzoneShell
+      HADOOP_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell
       HDFS_OM_SH_OPTS="${HDFS_OM_SH_OPTS} -Dhadoop.log.file=ozone-shell.log
       -Dlog4j.configuration=file:${ozone_shell_log4j}"
       HADOOP_OPTS="${HADOOP_OPTS} ${HDFS_OM_SH_OPTS}"
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
+      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     s3)
-      HADOOP_CLASSNAME=org.apache.hadoop.ozone.web.ozShell.s3.S3Shell
-      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
+      HADOOP_CLASSNAME=org.apache.hadoop.ozone.shell.s3.S3Shell
+      OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     scm)
       HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -207,8 +207,8 @@ function ozonecmd_case
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
-    ratislogparser)
-      HADOOP_CLASSNAME=org.apache.hadoop.ozone.segmentparser.RatisLogParser
+    debug)
+      HADOOP_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     *)

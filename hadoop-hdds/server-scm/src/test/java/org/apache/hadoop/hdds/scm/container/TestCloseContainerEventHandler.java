@@ -73,6 +73,7 @@ public class TestCloseContainerEventHandler {
     eventQueue = new EventQueue();
     pipelineManager =
         new SCMPipelineManager(configuration, nodeManager, eventQueue);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), configuration, eventQueue);

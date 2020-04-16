@@ -51,7 +51,6 @@ import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
-import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
@@ -65,8 +64,9 @@ public interface RatisHelper {
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
   String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis.";
+  String RAFT_SERVER_PREFIX_KEY = "raft.server";
   String HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_PREFIX_KEY + RaftServerConfigKeys.PREFIX;
+      HDDS_DATANODE_RATIS_PREFIX_KEY + RAFT_SERVER_PREFIX_KEY;
   String HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY =
       HDDS_DATANODE_RATIS_PREFIX_KEY + RaftClientConfigKeys.PREFIX;
   String HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY =
@@ -222,7 +222,7 @@ public interface RatisHelper {
     Map<String, String> ratisClientConf =
         ozoneConf.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
     ratisClientConf.forEach((key, val) -> {
-      if (!(key.startsWith(RaftServerConfigKeys.PREFIX) ||
+      if (!(key.startsWith(RAFT_SERVER_PREFIX_KEY) ||
           key.startsWith(GrpcConfigKeys.TLS.PREFIX) ||
           key.startsWith(GrpcConfigKeys.Server.PREFIX))) {
         raftProperties.set(key, val);

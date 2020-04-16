@@ -42,6 +42,8 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
 
   private final long waitTime;
   private final AtomicBoolean isInSafeMode = new AtomicBoolean(true);
+  private final AtomicBoolean safeModePreChecksComplete
+      = new AtomicBoolean(false);
   private final List<SafeModeNotification> immediate = new ArrayList<>();
   private final List<SafeModeNotification> delayed = new ArrayList<>();
 
@@ -98,11 +100,20 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
   @Override
   public void onMessage(SafeModeStatus safeModeStatus,
                         EventPublisher publisher) {
-    isInSafeMode.set(safeModeStatus.getSafeModeStatus());
+    isInSafeMode.set(safeModeStatus.isInSafeMode());
+    safeModePreChecksComplete.set(safeModeStatus.isPreCheckComplete());
+    // Always notify the immediate listeners
     for (SafeModeNotification s : immediate) {
       s.handleSafeModeTransition(safeModeStatus);
     }
-    if (!isInSafeMode.get()) {
+    // Only notify the delayed listeners if safemode remains on, as precheck
+    // may have completed.
+    if (safeModeStatus.isInSafeMode()) {
+      for (SafeModeNotification s : delayed) {
+        s.handleSafeModeTransition(safeModeStatus);
+      }
+    } else {
+      // If safemode is off, then notify the delayed listeners with a delay.
       final Thread safeModeExitThread = new Thread(() -> {
         try {
           Thread.sleep(waitTime);
@@ -122,5 +133,9 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
 
   public boolean getSafeModeStatus() {
     return isInSafeMode.get();
+  }
+
+  public boolean getPreCheckComplete() {
+    return safeModePreChecksComplete.get();
   }
 }

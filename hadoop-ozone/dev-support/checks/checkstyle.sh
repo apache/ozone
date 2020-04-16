@@ -21,12 +21,15 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/checkstyle"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
+MAVEN_OPTIONS='-B -fae -Dskip.yarn -Dskip.installyarn -Dcheckstyle.failOnViolation=false'
+
 declare -i rc
-mvn -B checkstyle:check -Dcheckstyle.failOnViolation=false > "${REPORT_DIR}/output.log"
+mvn ${MAVEN_OPTIONS} checkstyle:check > "${REPORT_DIR}/output.log"
 rc=$?
 if [[ ${rc} -ne 0 ]]; then
-  mvn -B test-compile checkstyle:check -Dcheckstyle.failOnViolation=false
+  mvn ${MAVEN_OPTIONS} clean test-compile checkstyle:check
   rc=$?
+  mkdir -p "$REPORT_DIR" # removed by mvn clean
 else
   cat "${REPORT_DIR}/output.log"
 fi
