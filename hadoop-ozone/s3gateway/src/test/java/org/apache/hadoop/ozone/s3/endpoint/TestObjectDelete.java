@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
@@ -36,7 +37,7 @@ public class TestObjectDelete {
   @Test
   public void delete() throws IOException, OS3Exception {
     //GIVEN
-    OzoneClientStub client = new OzoneClientStub();
+    OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("b1");
 
     OzoneBucket bucket =

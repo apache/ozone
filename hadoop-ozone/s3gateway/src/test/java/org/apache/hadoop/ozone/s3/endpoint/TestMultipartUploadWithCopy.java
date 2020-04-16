@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -62,7 +63,7 @@ public class TestMultipartUploadWithCopy {
   private final static String KEY = "key2";
   private final static String EXISTING_KEY = "key1";
   private static final String EXISTING_KEY_CONTENT = "testkey";
-  private final static OzoneClientStub CLIENT = new OzoneClientStub();
+  private final static OzoneClient CLIENT = new OzoneClientStub();
   private static final int RANGE_FROM = 2;
   private static final int RANGE_TO = 4;
 

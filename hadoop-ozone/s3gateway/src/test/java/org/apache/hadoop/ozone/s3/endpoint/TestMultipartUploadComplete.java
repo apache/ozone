@@ -21,6 +21,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -51,7 +52,7 @@ import static org.mockito.Mockito.when;
 public class TestMultipartUploadComplete {
 
   private final static ObjectEndpoint REST = new ObjectEndpoint();
-  private final static OzoneClientStub CLIENT = new OzoneClientStub();
+  private final static OzoneClient CLIENT = new OzoneClientStub();
 
   @BeforeClass
   public static void setUp() throws Exception {

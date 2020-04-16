@@ -365,7 +365,7 @@ public class TestBucketGet {
   }
 
   private OzoneClient createClientWithKeys(String... keys) throws IOException {
-    OzoneClientStub client = new OzoneClientStub();
+    OzoneClient client = new OzoneClientStub();
 
     client.getObjectStore().createS3Bucket("b1");
     OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");

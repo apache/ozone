@@ -24,7 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -110,9 +109,6 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws
       IOException {
-    Preconditions.checkArgument(!Strings.isNullOrEmpty(bucketName),
-        "bucket name cannot be null or empty.");
-
     OzoneVolume volume;
     try {
       volume = getVolume(S3_VOLUME_NAME);

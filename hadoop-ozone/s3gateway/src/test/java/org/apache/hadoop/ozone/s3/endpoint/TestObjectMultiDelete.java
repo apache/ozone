@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
@@ -45,7 +46,7 @@ public class TestObjectMultiDelete {
   @Test
   public void delete() throws IOException, OS3Exception, JAXBException {
     //GIVEN
-    OzoneClientStub client = new OzoneClientStub();
+    OzoneClient client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);
 
     BucketEndpoint rest = new BucketEndpoint();
@@ -76,7 +77,7 @@ public class TestObjectMultiDelete {
   @Test
   public void deleteQuiet() throws IOException, OS3Exception, JAXBException {
     //GIVEN
-    OzoneClientStub client = new OzoneClientStub();
+    OzoneClient client = new OzoneClientStub();
     OzoneBucket bucket = initTestData(client);
 
     BucketEndpoint rest = new BucketEndpoint();
@@ -102,7 +103,7 @@ public class TestObjectMultiDelete {
     Assert.assertEquals(0, response.getErrors().size());
   }
 
-  private OzoneBucket initTestData(OzoneClientStub client) throws IOException {
+  private OzoneBucket initTestData(OzoneClient client) throws IOException {
     client.getObjectStore().createS3Bucket("b1");
 
     OzoneBucket bucket =

@@ -21,6 +21,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -44,7 +45,7 @@ public class TestInitiateMultipartUpload {
 
     String bucket = OzoneConsts.S3_BUCKET;
     String key = OzoneConsts.KEY;
-    OzoneClientStub client = new OzoneClientStub();
+    OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(bucket);
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);

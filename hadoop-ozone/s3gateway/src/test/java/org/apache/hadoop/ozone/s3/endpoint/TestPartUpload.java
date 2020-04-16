@@ -21,6 +21,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.BeforeClass;
@@ -50,7 +51,7 @@ public class TestPartUpload {
   @BeforeClass
   public static void setUp() throws Exception {
 
-    OzoneClientStub client = new OzoneClientStub();
+    OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
 

@@ -27,6 +27,7 @@ import java.util.HashMap;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -49,7 +50,7 @@ public class TestObjectHead {
   @Before
   public void setup() throws IOException {
     //Create client stub and object store stub.
-    OzoneClientStub clientStub = new OzoneClientStub();
+    OzoneClient clientStub = new OzoneClientStub();
 
     // Create volume and bucket
     clientStub.getObjectStore().createS3Bucket(bucketName);

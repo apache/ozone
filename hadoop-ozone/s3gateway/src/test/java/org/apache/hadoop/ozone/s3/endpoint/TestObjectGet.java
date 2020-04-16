@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -49,7 +50,7 @@ public class TestObjectGet {
   @Test
   public void get() throws IOException, OS3Exception {
     //GIVEN
-    OzoneClientStub client = new OzoneClientStub();
+    OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("b1");
     OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
     OzoneOutputStream keyStream =

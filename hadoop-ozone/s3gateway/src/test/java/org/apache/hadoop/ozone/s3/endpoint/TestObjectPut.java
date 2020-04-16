@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -55,7 +56,7 @@ public class TestObjectPut {
   private String destBucket = "b2";
   private String destkey = "key2";
   private String nonexist = "nonexist";
-  private OzoneClientStub clientStub;
+  private OzoneClient clientStub;
   private ObjectEndpoint objectEndpoint;
 
   @Before

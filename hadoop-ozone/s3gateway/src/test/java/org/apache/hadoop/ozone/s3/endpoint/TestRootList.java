@@ -21,6 +21,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
 import static org.junit.Assert.assertEquals;
@@ -34,7 +35,7 @@ import org.junit.Test;
  */
 public class TestRootList {
 
-  private OzoneClientStub clientStub;
+  private OzoneClient clientStub;
   private RootEndpoint rootEndpoint;
 
   @Before
