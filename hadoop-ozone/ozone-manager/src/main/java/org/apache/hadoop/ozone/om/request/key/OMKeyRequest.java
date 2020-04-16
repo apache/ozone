@@ -458,8 +458,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
       KeyArgs.Builder newKeyArgs, OzoneManager ozoneManager)
       throws IOException {
 
-
-
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
 
