@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
