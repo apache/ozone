@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -48,7 +49,6 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension
     .EncryptedKeyVersion;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -74,6 +74,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
@@ -187,12 +188,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
     Optional<FileEncryptionInfo> encInfo = Optional.absent();
     BucketEncryptionKeyInfo ezInfo = bucketInfo.getEncryptionKeyInfo();
     if (ezInfo != null) {
-      if (ozoneManager.getKmsProvider() == null) {
-        throw new OMException("Invalid KMS provider, check configuration " +
-            CommonConfigurationKeys.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-            OMException.ResultCodes.INVALID_KMS_PROVIDER);
-      }
-
       final String ezKeyName = ezInfo.getKeyName();
       EncryptedKeyVersion edek = generateEDEK(ozoneManager, ezKeyName);
       encInfo = Optional.of(new FileEncryptionInfo(ezInfo.getSuite(),
@@ -450,5 +445,76 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     checkKeyAcls(ozoneManager, volume, bucket, keyNameForAclCheck,
           aclType, OzoneObj.ResourceType.KEY);
+  }
+
+  /**
+   * Generate EncryptionInfo and set in to newKeyArgs.
+   * @param keyArgs
+   * @param newKeyArgs
+   * @param ozoneManager
+   */
+  protected void generateRequiredEncryptionInfo(KeyArgs keyArgs,
+      KeyArgs.Builder newKeyArgs, OzoneManager ozoneManager)
+      throws IOException {
+
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+
+    boolean acquireLock = false;
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    // When TDE is enabled, we are doing a DB read in pre-execute. As for
+    // most of the operations we don't read from DB because of our isLeader
+    // semantics. This issue will be solved with implementation of leader
+    // leases which provider strong leader semantics in the system.
+
+    // If KMS is not enabled, follow the normal approach of execution of not
+    // reading DB in pre-execute.
+    if (ozoneManager.getKmsProvider() != null) {
+      try {
+        acquireLock = omMetadataManager.getLock().acquireReadLock(
+            BUCKET_LOCK, volumeName, bucketName);
+
+
+        OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(volumeName, bucketName));
+
+
+        // Don't throw exception of bucket not found when bucketinfo is not
+        // null. If bucketinfo is null, later when request
+        // is submitted and if bucket does not really exist it will fail in
+        // applyTransaction step. Why we are doing this is if OM thinks it is
+        // the leader, but it is not, we don't want to fail request in this
+        // case. As anyway when it submits request to ratis it will fail with
+        // not leader exception, and client will retry on correct leader and
+        // request will be executed.
+        if (bucketInfo != null) {
+          Optional< FileEncryptionInfo > encryptionInfo =
+              getFileEncryptionInfo(ozoneManager, bucketInfo);
+          if (encryptionInfo.isPresent()) {
+            newKeyArgs.setFileEncryptionInfo(
+                OMPBHelper.convert(encryptionInfo.get()));
+          }
+        }
+      } finally {
+        if (acquireLock) {
+          omMetadataManager.getLock().releaseReadLock(
+              BUCKET_LOCK, volumeName, bucketName);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get FileEncryptionInfoProto from KeyArgs.
+   * @param keyArgs
+   * @return
+   */
+  protected FileEncryptionInfo getFileEncryptionInfo(KeyArgs keyArgs) {
+    FileEncryptionInfo encryptionInfo = null;
+    if (keyArgs.hasFileEncryptionInfo()) {
+      encryptionInfo = OMPBHelper.convert(keyArgs.getFileEncryptionInfo());
+    }
+    return encryptionInfo;
   }
 }
