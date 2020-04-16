@@ -1699,7 +1699,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     Map<String, String> auditMap = buildAuditMap(volume);
-    auditMap.put(OzoneConsts.QUOTA, String.valueOf(quota));
+    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(quota));
     try {
       metrics.incNumVolumeUpdates();
       volumeManager.setQuota(volume, quota);
