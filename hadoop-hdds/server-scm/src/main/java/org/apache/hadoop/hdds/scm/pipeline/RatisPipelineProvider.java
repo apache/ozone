@@ -36,10 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Implements Api for creating ratis pipelines.
@@ -78,20 +75,22 @@ public class RatisPipelineProvider extends PipelineProvider {
     }
     // Per datanode limit
     if (maxPipelinePerDatanode > 0) {
-      return (stateManager.getPipelines(ReplicationType.RATIS, factor).size() -
-          stateManager.getPipelines(ReplicationType.RATIS, factor,
-              Pipeline.PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
-          nodeManager.getNodeCount(HddsProtos.NodeState.HEALTHY) /
+      return (getPipelineStateManager().getPipelines(
+          ReplicationType.RATIS, factor).size() -
+          getPipelineStateManager().getPipelines(ReplicationType.RATIS, factor,
+              PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
+          getNodeManager().getNodeCount(HddsProtos.NodeState.HEALTHY) /
           factor.getNumber();
     }
 
     // Global limit
     if (pipelineNumberLimit > 0) {
-      return (stateManager.getPipelines(ReplicationType.RATIS,
-          ReplicationFactor.THREE).size() - stateManager.getPipelines(
-          ReplicationType.RATIS, ReplicationFactor.THREE,
-          Pipeline.PipelineState.CLOSED).size()) >
-          (pipelineNumberLimit - stateManager.getPipelines(
+      return (getPipelineStateManager().getPipelines(ReplicationType.RATIS,
+          ReplicationFactor.THREE).size() -
+          getPipelineStateManager().getPipelines(
+              ReplicationType.RATIS, ReplicationFactor.THREE,
+              PipelineState.CLOSED).size()) >
+          (pipelineNumberLimit - getPipelineStateManager().getPipelines(
               ReplicationType.RATIS, ReplicationFactor.ONE).size());
     }
 

@@ -36,8 +36,8 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
  */
 public abstract class PipelineProvider {
 
-  final NodeManager nodeManager;
-  final PipelineStateManager stateManager;
+  private final NodeManager nodeManager;
+  private final PipelineStateManager stateManager;
 
   public PipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager) {
@@ -45,7 +45,21 @@ public abstract class PipelineProvider {
     this.stateManager = stateManager;
   }
 
-  protected abstract Pipeline create(ReplicationFactor factor) throws IOException;
+  public PipelineProvider() {
+    this.nodeManager = null;
+    this.stateManager = null;
+  }
+
+  public NodeManager getNodeManager() {
+    return nodeManager;
+  }
+
+  public PipelineStateManager getPipelineStateManager() {
+    return stateManager;
+  }
+
+  protected abstract Pipeline create(ReplicationFactor factor)
+      throws IOException;
 
   protected abstract Pipeline create(ReplicationFactor factor,
       List<DatanodeDetails> nodes);

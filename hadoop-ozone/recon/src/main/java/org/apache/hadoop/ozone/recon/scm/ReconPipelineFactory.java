@@ -41,10 +41,6 @@ public class ReconPipelineFactory extends PipelineFactory {
 
   static class ReconPipelineProvider extends PipelineProvider {
 
-    public ReconPipelineProvider() {
-      super(null, null);
-    }
-
     @Override
     public Pipeline create(HddsProtos.ReplicationFactor factor){
       // We don't expect this to be called at all. But adding this as a red
