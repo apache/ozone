@@ -41,6 +41,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>tools</module>
     <module>docs</module>
     <module>config</module>
+    <module>test-utils</module>
   </modules>
 
   <properties>
@@ -132,6 +133,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-config</artifactId>
         <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-test-utils</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
