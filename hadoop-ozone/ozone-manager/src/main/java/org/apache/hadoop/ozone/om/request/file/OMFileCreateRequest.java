@@ -139,6 +139,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
         .map(OmKeyLocationInfo::getProtobuf).collect(Collectors.toList()));
 
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     CreateFileRequest.Builder newCreateFileRequest =
         createFileRequest.toBuilder().setKeyArgs(newKeyArgs)
             .setClientID(UniqueId.next());
@@ -257,7 +258,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
-      encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, encryptionInfo.orNull(),

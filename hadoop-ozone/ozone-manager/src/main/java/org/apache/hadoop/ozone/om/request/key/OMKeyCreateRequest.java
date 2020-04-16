@@ -143,6 +143,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now());
     }
 
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     newCreateKeyRequest =
         createKeyRequest.toBuilder().setKeyArgs(newKeyArgs)
             .setClientID(UniqueId.next());
@@ -213,7 +214,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
-      encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
