@@ -35,11 +35,3 @@ Delete existing bucket
 Delete non-existent bucket
     ${result} =    Execute AWSS3APICli and checkrc    delete-bucket --bucket nosuchbucket    255
                    Should contain                     ${result}                              NoSuchBucket
-
-Delete bucket when /s3v volume does not exist
-# Delete keys, buckets, then volume
-                   Execute                            ozone sh bucket list /s3v | jq -r '.name' | xargs -n1 -IBUCKET ozone sh key list /s3v/BUCKET | jq -r '.volumeName, .bucketName, .name' | xargs -n3 echo | sed -e 's@ @/@g' | xargs -n1 ozone sh key delete
-                   Execute                            ozone sh bucket list /s3v | jq -r '.name' | xargs -n1 -IBUCKET ozone sh bucket delete /s3v/BUCKET
-                   Execute                            ozone sh volume delete /s3v
-    ${result} =    Execute AWSS3APICli and checkrc    delete-bucket --bucket nosuchbucket    255
-                   Should contain                     ${result}                              NoSuchBucket
