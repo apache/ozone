@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryInvocationHandler;
-import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -170,7 +169,7 @@ public class OMFailoverProxyProvider implements
         ProtobufRpcEngine.class);
     return RPC.getProxy(OzoneManagerProtocolPB.class, omVersion, omAddress, ugi,
         conf, NetUtils.getDefaultSocketFactory(conf),
-        Client.getRpcTimeout(conf));
+        (int) OmUtils.getOMClientRpcTimeOut(conf));
   }
 
   /**
