@@ -101,7 +101,7 @@ public final class BlockUtils {
    * @param conf configuration.
    */
   public static void addDB(ReferenceCountedDB db, String containerDBPath,
-      Configuration conf) {
+      ConfigurationSource conf) {
     ContainerCache cache = ContainerCache.getInstance(conf);
     Preconditions.checkNotNull(cache);
     cache.addDB(containerDBPath, db);
