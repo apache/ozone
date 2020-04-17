@@ -36,21 +36,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Implements Api for creating ratis pipelines.
  */
-public class RatisPipelineProvider implements PipelineProvider {
+public class RatisPipelineProvider extends PipelineProvider {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RatisPipelineProvider.class);
 
-  private final NodeManager nodeManager;
-  private final PipelineStateManager stateManager;
   private final Configuration conf;
   private final EventPublisher eventPublisher;
   private final PipelinePlacementPolicy placementPolicy;
@@ -60,8 +55,7 @@ public class RatisPipelineProvider implements PipelineProvider {
   RatisPipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager, Configuration conf,
       EventPublisher eventPublisher) {
-    this.nodeManager = nodeManager;
-    this.stateManager = stateManager;
+    super(nodeManager, stateManager);
     this.conf = conf;
     this.eventPublisher = eventPublisher;
     this.placementPolicy =
@@ -74,35 +68,6 @@ public class RatisPipelineProvider implements PipelineProvider {
         ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
   }
 
-  private List<DatanodeDetails> pickNodesNeverUsed(ReplicationFactor factor)
-      throws SCMException {
-    Set<DatanodeDetails> dnsUsed = new HashSet<>();
-    stateManager.getPipelines(ReplicationType.RATIS, factor)
-        .stream().filter(
-          p -> p.getPipelineState().equals(PipelineState.OPEN) ||
-              p.getPipelineState().equals(PipelineState.DORMANT) ||
-              p.getPipelineState().equals(PipelineState.ALLOCATED))
-        .forEach(p -> dnsUsed.addAll(p.getNodes()));
-
-    // Get list of healthy nodes
-    List<DatanodeDetails> dns = nodeManager
-        .getNodes(HddsProtos.NodeState.HEALTHY)
-        .parallelStream()
-        .filter(dn -> !dnsUsed.contains(dn))
-        .limit(factor.getNumber())
-        .collect(Collectors.toList());
-    if (dns.size() < factor.getNumber()) {
-      String e = String
-          .format("Cannot create pipeline of factor %d using %d nodes." +
-                  " Used %d nodes. Healthy nodes %d", factor.getNumber(),
-              dns.size(), dnsUsed.size(),
-              nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size());
-      throw new SCMException(e,
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
-    }
-    return dns;
-  }
-
   private boolean exceedPipelineNumberLimit(ReplicationFactor factor) {
     if (factor != ReplicationFactor.THREE) {
       // Only put limits for Factor THREE pipelines.
@@ -110,20 +75,22 @@ public class RatisPipelineProvider implements PipelineProvider {
     }
     // Per datanode limit
     if (maxPipelinePerDatanode > 0) {
-      return (stateManager.getPipelines(ReplicationType.RATIS, factor).size() -
-          stateManager.getPipelines(ReplicationType.RATIS, factor,
-              Pipeline.PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
-          nodeManager.getNodeCount(HddsProtos.NodeState.HEALTHY) /
+      return (getPipelineStateManager().getPipelines(
+          ReplicationType.RATIS, factor).size() -
+          getPipelineStateManager().getPipelines(ReplicationType.RATIS, factor,
+              PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
+          getNodeManager().getNodeCount(HddsProtos.NodeState.HEALTHY) /
           factor.getNumber();
     }
 
     // Global limit
     if (pipelineNumberLimit > 0) {
-      return (stateManager.getPipelines(ReplicationType.RATIS,
-          ReplicationFactor.THREE).size() - stateManager.getPipelines(
-          ReplicationType.RATIS, ReplicationFactor.THREE,
-          Pipeline.PipelineState.CLOSED).size()) >
-          (pipelineNumberLimit - stateManager.getPipelines(
+      return (getPipelineStateManager().getPipelines(ReplicationType.RATIS,
+          ReplicationFactor.THREE).size() -
+          getPipelineStateManager().getPipelines(
+              ReplicationType.RATIS, ReplicationFactor.THREE,
+              PipelineState.CLOSED).size()) >
+          (pipelineNumberLimit - getPipelineStateManager().getPipelines(
               ReplicationType.RATIS, ReplicationFactor.ONE).size());
     }
 
@@ -143,7 +110,7 @@ public class RatisPipelineProvider implements PipelineProvider {
 
     switch(factor) {
     case ONE:
-      dns = pickNodesNeverUsed(ReplicationFactor.ONE);
+      dns = pickNodesNeverUsed(ReplicationType.RATIS, ReplicationFactor.ONE);
       break;
     case THREE:
       dns = placementPolicy.chooseDatanodes(null,
