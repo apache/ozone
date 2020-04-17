@@ -112,6 +112,12 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-test-utils</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-hadoop-dependency-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
