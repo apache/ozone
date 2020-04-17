@@ -69,7 +69,7 @@ public class SCMContainerManager implements ContainerManager {
 
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
-  private Table<Long, ContainerInfo> containerStore;
+  private Table<ContainerID, ContainerInfo> containerStore;
 
   private BatchOperationHandler batchHandler;
 
@@ -86,7 +86,7 @@ public class SCMContainerManager implements ContainerManager {
    */
   public SCMContainerManager(
       final Configuration conf,
-      Table<Long, ContainerInfo> containerStore,
+      Table<ContainerID, ContainerInfo> containerStore,
       BatchOperationHandler batchHandler,
       PipelineManager pipelineManager)
       throws IOException {
@@ -107,8 +107,8 @@ public class SCMContainerManager implements ContainerManager {
 
   private void loadExistingContainers() throws IOException {
 
-    TableIterator<Long, ? extends KeyValue<Long, ContainerInfo>> iterator =
-        containerStore.iterator();
+    TableIterator<ContainerID, ? extends KeyValue<ContainerID, ContainerInfo>>
+        iterator = containerStore.iterator();
 
     while (iterator.hasNext()) {
       ContainerInfo container = iterator.next().getValue();
@@ -299,8 +299,8 @@ public class SCMContainerManager implements ContainerManager {
     lock.lock();
     try {
       containerStateManager.removeContainer(containerID);
-      if (containerStore.get(containerID.getId()) != null) {
-        containerStore.delete(containerID.getId());
+      if (containerStore.get(containerID) != null) {
+        containerStore.delete(containerID);
       } else {
         // Where did the container go? o_O
         LOG.warn("Unable to remove the container {} from container store," +
@@ -351,7 +351,7 @@ public class SCMContainerManager implements ContainerManager {
                   containerID);
         }
       }
-      containerStore.put(containerID.getId(), container);
+      containerStore.put(containerID, container);
       return newState;
     } catch (ContainerNotFoundException cnfe) {
       throw new SCMException(
@@ -371,8 +371,8 @@ public class SCMContainerManager implements ContainerManager {
      *                             transaction id for the container.
      * @throws IOException
      */
-  public void updateDeleteTransactionId(Map<Long, Long> deleteTransactionMap)
-      throws IOException {
+    public void updateDeleteTransactionId(
+        Map<Long, Long> deleteTransactionMap) throws IOException {
     if (deleteTransactionMap == null) {
       return;
     }
@@ -383,7 +383,9 @@ public class SCMContainerManager implements ContainerManager {
       for (Map.Entry<Long, Long> entry : deleteTransactionMap.entrySet()) {
         long containerID = entry.getKey();
 
-        ContainerInfo containerInfo = containerStore.get(containerID);
+        ContainerID containerIdObject = new ContainerID(containerID);
+        ContainerInfo containerInfo =
+            containerStore.get(containerIdObject);
         if (containerInfo == null) {
           throw new SCMException(
               "Failed to increment number of deleted blocks for container "
@@ -391,7 +393,8 @@ public class SCMContainerManager implements ContainerManager {
               SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
         }
         containerInfo.updateDeleteTransactionId(entry.getValue());
-        containerStore.putWithBatch(batchOperation, containerID, containerInfo);
+        containerStore
+            .putWithBatch(batchOperation, containerIdObject, containerInfo);
       }
       batchHandler.commitBatchOperation(batchOperation);
       containerStateManager
@@ -467,8 +470,8 @@ public class SCMContainerManager implements ContainerManager {
   protected void addContainerToDB(ContainerInfo containerInfo)
       throws IOException {
     try {
-      containerStore.put(containerInfo.getContainerID(),
-          containerInfo);
+      containerStore
+          .put(new ContainerID(containerInfo.getContainerID()), containerInfo);
       // Incrementing here, as allocateBlock to create a container calls
       // getMatchingContainer() and finally calls this API to add newly
       // created container to DB.

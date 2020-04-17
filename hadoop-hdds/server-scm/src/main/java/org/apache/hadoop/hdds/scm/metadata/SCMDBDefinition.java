@@ -22,6 +22,7 @@ import java.security.cert.X509Certificate;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -70,12 +71,12 @@ public class SCMDBDefinition implements DBDefinition {
           Pipeline.class,
           new PipelineCodec());
 
-  public static final DBColumnFamilyDefinition<Long, ContainerInfo>
+  public static final DBColumnFamilyDefinition<ContainerID, ContainerInfo>
       CONTAINERS =
-      new DBColumnFamilyDefinition<>(
+      new DBColumnFamilyDefinition<ContainerID, ContainerInfo>(
           "containers",
-          Long.class,
-          new LongCodec(),
+          ContainerID.class,
+          new ContainerIDCodec(),
           ContainerInfo.class,
           new ContainerInfoCodec());
 

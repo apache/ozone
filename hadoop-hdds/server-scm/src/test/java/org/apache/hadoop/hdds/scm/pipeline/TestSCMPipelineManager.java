@@ -96,7 +96,6 @@ public class TestSCMPipelineManager {
   @Test
   public void testPipelineReload() throws IOException {
     SCMPipelineManager pipelineManager =
-
         new SCMPipelineManager(conf,
             nodeManager,
             SCMDBDefinition.PIPELINES.getTable(store),

@@ -59,7 +59,7 @@ public class ReconContainerManager extends SCMContainerManager {
    */
   public ReconContainerManager(
       Configuration conf,
-      Table<Long, ContainerInfo> containerStore,
+      Table<ContainerID, ContainerInfo> containerStore,
       BatchOperationHandler batchHandler,
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,

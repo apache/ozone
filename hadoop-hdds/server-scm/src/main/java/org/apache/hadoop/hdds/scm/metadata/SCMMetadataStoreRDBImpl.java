@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -55,7 +56,7 @@ public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
 
   private Table<BigInteger, X509Certificate> revokedCertsTable;
 
-  private Table<Long, ContainerInfo> containerTable;
+  private Table<ContainerID, ContainerInfo> containerTable;
 
   private Table<PipelineID, Pipeline> pipelineTable;
 
@@ -162,7 +163,7 @@ public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
   }
 
   @Override
-  public Table<Long, ContainerInfo> getContainerTable() {
+  public Table<ContainerID, ContainerInfo> getContainerTable() {
     return containerTable;
   }
 
