@@ -909,7 +909,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
-        <version>4.1.47.Final</version>
+        <version>4.1.48.Final</version>
       </dependency>
 
       <dependency>
