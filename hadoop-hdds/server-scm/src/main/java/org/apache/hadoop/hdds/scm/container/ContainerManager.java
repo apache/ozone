@@ -189,4 +189,9 @@ public interface ContainerManager extends Closeable {
    * @param success
    */
   void notifyContainerReportProcessing(boolean isFullReport, boolean success);
+
+  /**
+   * Flush metadata of container manager if they are required to be persisted.
+   */
+  void flushDB() throws IOException;
 }

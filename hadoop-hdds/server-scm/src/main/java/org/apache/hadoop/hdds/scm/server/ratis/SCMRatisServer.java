@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ratis;
+package org.apache.hadoop.hdds.scm.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -42,6 +42,7 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
 import org.apache.ratis.util.SizeInBytes;
@@ -94,6 +95,10 @@ public final class SCMRatisServer {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
   }
 
+  /**
+   * Creates a SCM Ratis Server.
+   * @throws IOException
+   */
   private SCMRatisServer(Configuration conf,
                          StorageContainerManager scm,
                          String raftGroupIdStr, RaftPeerId localRaftPeerId,
@@ -139,6 +144,9 @@ public final class SCMRatisServer {
     }, roleCheckInitialDelayMs, roleCheckIntervalMs, TimeUnit.MILLISECONDS);
   }
 
+  /**
+   * Create a SCM Ratis Server instance.
+   */
   public static SCMRatisServer newSCMRatisServer(
       Configuration conf, StorageContainerManager scm,
       SCMNodeDetails scmNodeDetails, List<SCMNodeDetails> peers)
@@ -178,7 +186,7 @@ public final class SCMRatisServer {
     return new SCMStateMachine(this);
   }
 
-  private RaftProperties newRaftProperties(Configuration conf){
+  private RaftProperties newRaftProperties(Configuration conf) {
     final RaftProperties properties = new RaftProperties();
     // Set RPC type
     final String rpcType = conf.get(
@@ -403,6 +411,15 @@ public final class SCMRatisServer {
     }
   }
 
+  public StorageContainerManager getSCM() {
+    return scm;
+  }
+
+  @VisibleForTesting
+  public SCMStateMachine getScmStateMachine() {
+    return scmStateMachine;
+  }
+
   public int getServerPort() {
     return port;
   }
@@ -439,6 +456,10 @@ public final class SCMRatisServer {
           RaftProtos.RaftPeerRole.UNRECOGNIZED, e);
       setServerRole(null, null);
     }
+  }
+
+  public TermIndex getLastAppliedTermIndex() {
+    return scmStateMachine.getLastAppliedTermIndex();
   }
 
   private GroupInfoReply getGroupInfo() throws IOException {
