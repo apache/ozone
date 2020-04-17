@@ -33,9 +33,9 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Timer;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import org.apache.commons.io.FileUtils;
-import org.apache.curator.shaded.com.google.common.collect.ImmutableSet;
 import static org.hamcrest.CoreMatchers.is;
 import org.junit.After;
 import static org.junit.Assert.assertEquals;

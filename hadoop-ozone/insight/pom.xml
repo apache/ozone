@@ -37,6 +37,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-ozone-common</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <scope>test</scope>
+    </dependency>
     <!-- Genesis requires server side components -->
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -97,9 +102,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
+      <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
-      <type>test-jar</type>
     </dependency>
   </dependencies>
   <build>

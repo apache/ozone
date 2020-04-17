@@ -29,15 +29,22 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserVolumeInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Defines common methods required for volume requests.
  */
 public abstract class OMVolumeRequest extends OMClientRequest {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMVolumeRequest.class);
 
   public OMVolumeRequest(OMRequest omRequest) {
     super(omRequest);
@@ -99,22 +106,18 @@ public abstract class OMVolumeRequest extends OMClientRequest {
           OMException.ResultCodes.USER_TOO_MANY_VOLUMES);
     }
 
-    List<String> prevVolList = new ArrayList<>();
+    Set<String> volumeSet = new HashSet<>();
     long objectID = txID;
     if (volumeList != null) {
-      prevVolList.addAll(volumeList.getVolumeNamesList());
+      volumeSet.addAll(volumeList.getVolumeNamesList());
       objectID = volumeList.getObjectID();
     }
 
-
-    // Add the new volume to the list
-    prevVolList.add(volume);
-    UserVolumeInfo newVolList = UserVolumeInfo.newBuilder()
+    volumeSet.add(volume);
+    return UserVolumeInfo.newBuilder()
         .setObjectID(objectID)
         .setUpdateID(txID)
-        .addAllVolumeNames(prevVolList).build();
-
-    return newVolList;
+        .addAllVolumeNames(volumeSet).build();
   }
 
   /**

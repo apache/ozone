@@ -31,6 +31,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-ozone-common</artifactId>
     </dependency>
     <dependency>

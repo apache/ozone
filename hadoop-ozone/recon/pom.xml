@@ -23,10 +23,6 @@
   <name>Apache Hadoop Ozone Recon</name>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>hadoop-ozone-recon</artifactId>
-  <properties>
-    <jooq.version>3.11.10</jooq.version>
-    <spring.version>5.1.3.RELEASE</spring.version>
-  </properties>
   <build>
     <resources>
       <resource>
@@ -200,6 +196,11 @@
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <scope>test</scope>
     </dependency>
     <!-- visible only for ContainerOperationClient -->
     <dependency>
