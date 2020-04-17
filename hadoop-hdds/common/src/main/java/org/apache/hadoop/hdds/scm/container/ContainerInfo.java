@@ -21,6 +21,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 
@@ -46,7 +47,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       + " supported. Use protobuf instead.";
 
 
-
   private HddsProtos.LifeCycleState state;
   @JsonIgnore
   private PipelineID pipelineID;
@@ -54,9 +54,9 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   private ReplicationType replicationType;
   private long usedBytes;
   private long numberOfKeys;
-  private long lastUsed;
+  private Instant lastUsed;
   // The wall-clock ms since the epoch at which the current state enters.
-  private long stateEnterTime;
+  private Instant stateEnterTime;
   private String owner;
   private long containerID;
   private long deleteTransactionId;
@@ -88,9 +88,9 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
     this.numberOfKeys = numberOfKeys;
-    this.lastUsed = Time.monotonicNow();
+    this.lastUsed = Instant.ofEpochMilli(Time.now());
     this.state = state;
-    this.stateEnterTime = stateEnterTime;
+    this.stateEnterTime = Instant.ofEpochMilli(stateEnterTime);
     this.owner = owner;
     this.deleteTransactionId = deleteTransactionId;
     this.sequenceId = sequenceId;
@@ -132,7 +132,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.state = state;
   }
 
-  public long getStateEnterTime() {
+  public Instant getStateEnterTime() {
     return stateEnterTime;
   }
 
@@ -186,7 +186,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
    *
    * @return time in milliseconds.
    */
-  public long getLastUsed() {
+  public Instant getLastUsed() {
     return lastUsed;
   }
 
@@ -195,7 +195,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   public void updateLastUsedTime() {
-    lastUsed = Time.monotonicNow();
+    lastUsed = Instant.ofEpochMilli(Time.now());
   }
 
   public HddsProtos.ContainerInfoProto getProtobuf() {
@@ -205,7 +205,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return builder.setContainerID(getContainerID())
         .setUsedBytes(getUsedBytes())
         .setNumberOfKeys(getNumberOfKeys()).setState(getState())
-        .setStateEnterTime(getStateEnterTime()).setContainerID(getContainerID())
+        .setStateEnterTime(getStateEnterTime().toEpochMilli())
+        .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setPipelineID(getPipelineID().getProtobuf())
         .setReplicationFactor(getReplicationFactor())
@@ -282,7 +283,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
    */
   @Override
   public int compare(ContainerInfo o1, ContainerInfo o2) {
-    return Long.compare(o1.getLastUsed(), o2.getLastUsed());
+    return Long.compare(
+        o1.getLastUsed().toEpochMilli(), o2.getLastUsed().toEpochMilli());
   }
 
   /**
