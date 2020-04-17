@@ -17,14 +17,14 @@
  */
 package org.apache.hadoop.hdds.scm.safemode;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,6 +82,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMSafeModeManager.class);
   private final boolean isSafeModeEnabled;
+  private final long waitTime;
   private AtomicBoolean inSafeMode = new AtomicBoolean(true);
   private AtomicBoolean preCheckComplete = new AtomicBoolean(false);
 
@@ -111,6 +114,11 @@ public class SCMSafeModeManager implements SafeModeManager {
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT);
 
+
+    this.waitTime = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+        HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
+        TimeUnit.MILLISECONDS);
 
     if (isSafeModeEnabled) {
       this.safeModeMetrics = SafeModeMetrics.create();
@@ -166,8 +174,31 @@ public class SCMSafeModeManager implements SafeModeManager {
    */
   @VisibleForTesting
   public void emitSafeModeStatus() {
+    SafeModeStatus safeModeStatus =
+        new SafeModeStatus(getInSafeMode(), getPreCheckComplete());
     eventPublisher.fireEvent(SCMEvents.SAFE_MODE_STATUS,
-        new SafeModeStatus(getInSafeMode(), getPreCheckComplete()));
+        safeModeStatus);
+
+    // Only notify the delayed listeners if safemode remains on, as precheck
+    // may have completed.
+    if (safeModeStatus.isInSafeMode()) {
+      eventPublisher.fireEvent(SCMEvents.DELAYED_SAFE_MODE_STATUS,
+          safeModeStatus);
+    } else {
+      // If safemode is off, then notify the delayed listeners with a delay.
+      final Thread safeModeExitThread = new Thread(() -> {
+        try {
+          Thread.sleep(waitTime);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+        eventPublisher.fireEvent(SCMEvents.DELAYED_SAFE_MODE_STATUS,
+            safeModeStatus);
+      });
+
+      safeModeExitThread.setDaemon(true);
+      safeModeExitThread.start();
+    }
   }
 
 
