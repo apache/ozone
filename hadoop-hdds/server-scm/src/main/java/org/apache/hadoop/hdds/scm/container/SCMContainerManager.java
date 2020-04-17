@@ -365,13 +365,20 @@ public class SCMContainerManager implements ContainerManager {
     }
   }
 
-  /**
-   * Update deleteTransactionId according to deleteTransactionMap.
-   *
-   * @param deleteTransactionMap Maps the containerId to latest delete
-   *                             transaction id for the container.
-   * @throws IOException
-   */
+  @Override
+  public void flushDB() throws IOException {
+    if (containerStore != null) {
+      containerStore.flushDB(true);
+    }
+  }
+
+    /**
+     * Update deleteTransactionId according to deleteTransactionMap.
+     *
+     * @param deleteTransactionMap Maps the containerId to latest delete
+     *                             transaction id for the container.
+     * @throws IOException
+     */
   public void updateDeleteTransactionId(Map<Long, Long> deleteTransactionMap)
       throws IOException {
 

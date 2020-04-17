@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +28,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
 /**
  * Construct SCM node details.
@@ -153,6 +153,18 @@ public final class SCMNodeDetails {
   public static SCMNodeDetails initStandAlone(
       OzoneConfiguration conf) throws IOException {
     String localSCMServiceId = conf.getTrimmed(OZONE_SCM_INTERNAL_SERVICE_ID);
+    if (localSCMServiceId == null) {
+      // There is no internal om service id is being set, fall back to ozone
+      // .om.service.ids.
+      LOG.info("{} is not defined, falling back to {} to find serviceID for "
+              + "SCM if it is HA enabled cluster",
+          OZONE_SCM_INTERNAL_SERVICE_ID, OZONE_SCM_SERVICE_IDS_KEY);
+      localSCMServiceId = conf.getTrimmed(
+          OZONE_SCM_SERVICE_IDS_KEY);
+    } else {
+      LOG.info("ServiceID for SCM is {}", localSCMServiceId);
+    }
+    String localSCMNodeId = SCMHAUtils.getLocalSCMNodeId(localSCMServiceId);
     int ratisPort = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
         ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT);
@@ -161,8 +173,8 @@ public final class SCMNodeDetails {
     SCMNodeDetails scmNodeDetails = new SCMNodeDetails.Builder()
         .setRatisPort(ratisPort)
         .setRpcAddress(rpcAddress)
-        .setSCMNodeId(localSCMServiceId)
-        .setSCMServiceId(OzoneConsts.SCM_SERVICE_ID_DEFAULT)
+        .setSCMNodeId(localSCMNodeId)
+        .setSCMServiceId(localSCMServiceId)
         .build();
     return scmNodeDetails;
   }
