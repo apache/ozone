@@ -20,12 +20,7 @@ package org.apache.hadoop.ozone.shell.token;
 
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.security.token.Token;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
@@ -35,29 +30,12 @@ import java.io.IOException;
  */
 @Command(name = "renew",
     description = "renew a delegation token.")
-public class RenewTokenHandler extends Handler {
-
-  @CommandLine.Mixin
-  private TokenOption tokenFile;
-
-  @Override
-  protected OzoneAddress getAddress() throws OzoneClientException {
-    return new OzoneAddress();
-  }
+public class RenewTokenHandler extends TokenHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
-
-    if (securityEnabled("token renew") && tokenFile.exists()) {
-      Token<OzoneTokenIdentifier> token = tokenFile.decode();
-      try (OzoneClient ozoneClient = OzoneClientFactory.getOzoneClient(
-          getConf(), token)) {
-        long expiryTime = ozoneClient.getObjectStore()
-            .renewDelegationToken(token);
-        out().printf("Token renewed successfully, expiry time: %s.%n",
-            expiryTime);
-      }
-    }
+    long expiryTime = client.getObjectStore().renewDelegationToken(getToken());
+    out().printf("Token renewed successfully, expiry time: %s.%n", expiryTime);
   }
 }
