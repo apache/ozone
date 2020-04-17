@@ -241,6 +241,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
               getNotLeaderException(exception);
           if (notLeaderException != null &&
               notLeaderException.getSuggestedLeaderNodeId() != null) {
+            FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
+                notLeaderException.getMessage());
+
             // TODO: NotLeaderException should include the host
             //  address of the suggested leader along with the nodeID.
             //  Failing over just based on nodeID is not very robust.
@@ -258,6 +261,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           // does not perform any failover.
           // So Just retry with same OM node.
           if (leaderNotReadyException != null) {
+            FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
+                leaderNotReadyException.getMessage());
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
         }
@@ -266,6 +271,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         // NotLeaderException fail over manually to the next OM Node proxy.
         // OMFailoverProxyProvider#performFailover() is a dummy call and
         // does not perform any failover.
+        String exceptionMsg;
+        if (exception.getCause() != null) {
+          exceptionMsg = exception.getCause().getMessage();
+        } else {
+          exceptionMsg = exception.getMessage();
+        }
+        FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}", exceptionMsg);
         omFailoverProxyProvider.performFailoverToNextProxy();
         return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
       }
