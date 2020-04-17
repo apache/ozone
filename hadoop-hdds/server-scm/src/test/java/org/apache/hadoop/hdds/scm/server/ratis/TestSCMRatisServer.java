@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ratis;
+package org.apache.hadoop.hdds.scm.server.ratis;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.util.LifeCycle;
@@ -59,7 +58,6 @@ public class TestSCMRatisServer {
   private SCMRatisServer scmRatisServer;
   private StorageContainerManager scm;
   private String scmId;
-  private SCMNodeDetails scmNodeDetails;
   private static final long LEADER_ELECTION_TIMEOUT = 500L;
 
   @Before
@@ -69,25 +67,14 @@ public class TestSCMRatisServer {
     conf.setTimeDuration(
         ScmConfigKeys.OZONE_SCM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
-    int ratisPort = conf.getInt(
-        ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
-        ScmConfigKeys.OZONE_SCM_RATIS_PORT_DEFAULT);
-    InetSocketAddress rpcAddress = new InetSocketAddress(
-        InetAddress.getLocalHost(), 0);
-    scmNodeDetails = new SCMNodeDetails.Builder()
-        .setRatisPort(ratisPort)
-        .setRpcAddress(rpcAddress)
-        .setSCMNodeId(scmId)
-        .setSCMServiceId(OzoneConsts.SCM_SERVICE_ID_DEFAULT)
-        .build();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    conf.set(ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID, "scm-ha-test");
 
     // Standalone SCM Ratis server
     initSCM();
     scm = HddsTestUtils.getScm(conf);
     scm.start();
-    scmRatisServer = SCMRatisServer.newSCMRatisServer(
-        conf, scm, scmNodeDetails, Collections.EMPTY_LIST);
-    scmRatisServer.start();
+    scmRatisServer = scm.getScmRatisServer();
   }
 
   @After
@@ -101,7 +88,7 @@ public class TestSCMRatisServer {
   }
 
   @Test
-  public void testStartSCMRatisServer() throws Exception {
+  public void testStartSCMRatisServer() {
     Assert.assertEquals("Ratis Server should be in running state",
         LifeCycle.State.RUNNING, scmRatisServer.getServerState());
   }

@@ -25,6 +25,13 @@ import javax.management.ObjectName;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.protobuf.BlockingService;
+
+import java.io.File;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
@@ -45,7 +52,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
-import org.apache.hadoop.hdds.scm.ratis.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.server.ratis.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.server.ratis.SCMRatisSnapshotInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -114,13 +122,9 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.JvmPauseMonitor;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import com.google.protobuf.BlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -195,6 +199,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   // SCM HA related
   private SCMRatisServer scmRatisServer;
+  private SCMRatisSnapshotInfo scmRatisSnapshotInfo;
+  private File scmRatisSnapshotDir;
 
   private JvmPauseMonitor jvmPauseMonitor;
   private final OzoneConfiguration configuration;
@@ -264,6 +270,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
+      this.scmRatisSnapshotInfo = new SCMRatisSnapshotInfo(
+          scmStorageConfig.getCurrentDir());
+      this.scmRatisSnapshotDir = SCMHAUtils.createSCMRatisDir(conf);
       initializeRatisServer();
     } else {
       scmRatisServer = null;
@@ -796,6 +805,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           getClientRpcAddress()));
     }
 
+    if (scmRatisServer != null) {
+      scmRatisServer.start();
+    }
+
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
 
@@ -1136,5 +1149,39 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmRatisServer.getServerPort());
       }
     }
+  }
+
+  @VisibleForTesting
+  public SCMRatisServer getScmRatisServer() {
+    return scmRatisServer;
+  }
+
+  @VisibleForTesting
+  public SCMRatisSnapshotInfo getSnapshotInfo() {
+    return scmRatisSnapshotInfo;
+  }
+
+  @VisibleForTesting
+  public long getRatisSnapshotIndex() {
+    return scmRatisSnapshotInfo.getIndex();
+  }
+
+  /**
+   * Save ratis snapshot to SCM meta store and local disk.
+   */
+  public TermIndex saveRatisSnapshot() throws IOException {
+    TermIndex snapshotIndex = scmRatisServer.getLastAppliedTermIndex();
+    if (scmMetadataStore != null) {
+      // Flush the SCM state to disk
+      scmMetadataStore.getStore().flush();
+    }
+
+    if (containerManager != null) {
+      containerManager.flushDB();
+    }
+
+    scmRatisSnapshotInfo.saveRatisSnapshotToDisk(snapshotIndex);
+
+    return snapshotIndex;
   }
 }
