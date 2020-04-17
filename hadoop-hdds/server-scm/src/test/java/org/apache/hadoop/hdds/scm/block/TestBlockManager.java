@@ -112,7 +112,7 @@ public class TestBlockManager {
     scmMetadataStore.start(conf);
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(scmMetadataStore.getStore()),
+            scmMetadataStore.getPipelineTable(),
             eventQueue);
     pipelineManager.allowPipelineCreation();
 
