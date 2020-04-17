@@ -140,15 +140,15 @@ public class TestSCMSafeModeManager {
         (safeModeStatus, publisher) -> delayedSafeModeEvents
             .add(safeModeStatus));
 
-    OzoneConfiguration config = new OzoneConfiguration();
-    config
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration
         .setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
             3, TimeUnit.SECONDS);
-    config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
+    ozoneConfiguration.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         false);
 
     scmSafeModeManager = new SCMSafeModeManager(
-        config, containers, null, eventQueue);
+        ozoneConfiguration, containers, null, eventQueue);
 
     //when
     scmSafeModeManager.setInSafeMode(true);
