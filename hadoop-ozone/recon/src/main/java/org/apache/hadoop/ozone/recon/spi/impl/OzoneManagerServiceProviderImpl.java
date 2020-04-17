@@ -45,11 +45,13 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort.Type;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
@@ -104,6 +106,7 @@ public class OzoneManagerServiceProviderImpl
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
   private ReconUtils reconUtils;
+  private OzoneManagerSyncMetrics metrics;
 
   /**
    * OM Snapshot related task names.
@@ -175,6 +178,7 @@ public class OzoneManagerServiceProviderImpl
     this.reconTaskStatusDao = reconTaskController.getReconTaskStatusDao();
     this.ozoneManagerClient = ozoneManagerClient;
     this.configuration = configuration;
+    this.metrics = OzoneManagerSyncMetrics.create();
   }
 
   public void registerOMDBTasks() {
@@ -241,6 +245,7 @@ public class OzoneManagerServiceProviderImpl
     reconTaskController.stop();
     omMetadataManager.stop();
     scheduler.shutdownNow();
+    metrics.unRegister();
   }
 
   /**
@@ -310,7 +315,9 @@ public class OzoneManagerServiceProviderImpl
   boolean updateReconOmDBWithNewSnapshot() throws IOException {
     // Obtain the current DB snapshot from OM and
     // update the in house OM metadata managed DB instance.
+    long startTime = Time.monotonicNowNanos();
     DBCheckpoint dbSnapshot = getOzoneManagerDBSnapshot();
+    metrics.updateSnapshotRequestLatency(Time.monotonicNowNanos() - startTime);
     if (dbSnapshot != null && dbSnapshot.getCheckpointLocation() != null) {
       LOG.info("Got new checkpoint from OM : " +
           dbSnapshot.getCheckpointLocation());
@@ -341,13 +348,15 @@ public class OzoneManagerServiceProviderImpl
       throws IOException, RocksDBException {
     DBUpdatesRequest dbUpdatesRequest = DBUpdatesRequest.newBuilder()
         .setSequenceNumber(fromSequenceNumber).build();
-    DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(
-        dbUpdatesRequest);
+    DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
     if (null != dbUpdates) {
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
       RocksDB rocksDB = rocksDBStore.getDb();
-      LOG.debug("Number of updates received from OM : {}",
-          dbUpdates.getData().size());
+      int numUpdates = dbUpdates.getData().size();
+      LOG.info("Number of updates received from OM : {}", numUpdates);
+      if (numUpdates > 0) {
+        metrics.incrNumUpdatesInDeltaTotal(numUpdates);
+      }
       for (byte[] data : dbUpdates.getData()) {
         try (WriteBatch writeBatch = new WriteBatch(data)) {
           writeBatch.iterate(omdbUpdatesHandler);
@@ -394,6 +403,7 @@ public class OzoneManagerServiceProviderImpl
       } catch (InterruptedException intEx) {
         Thread.currentThread().interrupt();
       } catch (Exception e) {
+        metrics.incrNumDeltaRequestsFailed();
         LOG.warn("Unable to get and apply delta updates from OM.", e);
         fullSnapshot = true;
       }
@@ -401,6 +411,7 @@ public class OzoneManagerServiceProviderImpl
 
     if (fullSnapshot) {
       try {
+        metrics.incrNumSnapshotRequests();
         LOG.info("Obtaining full snapshot from Ozone Manager");
         // Update local Recon OM DB to new snapshot.
         boolean success = updateReconOmDBWithNewSnapshot();
@@ -419,6 +430,7 @@ public class OzoneManagerServiceProviderImpl
       } catch (InterruptedException intEx) {
         Thread.currentThread().interrupt();
       } catch (Exception e) {
+        metrics.incrNumSnapshotRequestsFailed();
         LOG.error("Unable to update Recon's metadata with new OM DB. ", e);
       }
     }
@@ -430,6 +442,10 @@ public class OzoneManagerServiceProviderImpl
    */
   private long getCurrentOMDBSequenceNumber() {
     return omMetadataManager.getLastSequenceNumberFromDB();
+  }
+
+  public OzoneManagerSyncMetrics getMetrics() {
+    return metrics;
   }
 }
 
