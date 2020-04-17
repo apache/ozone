@@ -149,6 +149,8 @@ public final class TracingUtil {
     } catch (Exception ex) {
       span.setTag("failed", true);
       throw ex;
+    } finally {
+      span.finish();
     }
   }
 
@@ -164,6 +166,8 @@ public final class TracingUtil {
     } catch (Exception ex) {
       span.setTag("failed", true);
       throw ex;
+    } finally {
+      span.finish();
     }
   }
 
