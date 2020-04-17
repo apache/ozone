@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -239,6 +240,19 @@ public abstract class TestOzoneRpcClientAbstract {
     // should match the OM's RPC address.
     Assert.assertTrue(omProxies.get(0).getAddress().equals(
         ozoneManager.getOmRpcServerAddr()));
+  }
+
+  @Test
+  public void testVolumeSetOwner() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+
+    String ownerName = "someRandomUser1";
+
+    ClientProtocol proxy = store.getClientProxy();
+    proxy.setVolumeOwner(volumeName, ownerName);
+    // Set owner again
+    proxy.setVolumeOwner(volumeName, ownerName);
   }
 
   @Test
@@ -1217,16 +1231,15 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertNotNull("Block not found", blockData);
 
       // Get the location of the chunk file
-      String chunkName = blockData.getChunks().get(0).getChunkName();
       String containreBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
           .getChunksLocationPath(containreBaseDir, scmId, containerID);
-      File chunkFile = new File(chunksLocationPath, chunkName);
-
-      // Corrupt the contents of the chunk file
-      String newData = new String("corrupted data");
-      FileUtils.writeByteArrayToFile(chunkFile, newData.getBytes());
+      byte[] corruptData = "corrupted data".getBytes();
+      // Corrupt the contents of chunk files
+      for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {
+        FileUtils.writeByteArrayToFile(file, corruptData);
+      }
     }
   }
 

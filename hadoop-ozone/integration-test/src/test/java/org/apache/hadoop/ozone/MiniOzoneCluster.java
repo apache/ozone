@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -81,6 +82,19 @@ public interface MiniOzoneCluster {
    * @throws InterruptedException In case of interrupt while waiting
    */
   void waitForClusterToBeReady() throws TimeoutException, InterruptedException;
+
+  /**
+   * Waits for atleast one RATIS pipeline of given factor to be reported in open
+   * state.
+   *
+   * @param factor replication factor
+   * @param timeoutInMs timeout value in milliseconds
+   * @throws TimeoutException In case of timeout
+   * @throws InterruptedException In case of interrupt while waiting
+   */
+  void waitForPipelineTobeReady(HddsProtos.ReplicationFactor factor,
+                                int timeoutInMs)
+          throws TimeoutException, InterruptedException;
 
   /**
    * Sets the timeout value after which
@@ -280,18 +294,18 @@ public interface MiniOzoneCluster {
     
     protected Boolean randomContainerPort = true;
     protected Optional<Integer> chunkSize = Optional.empty();
+    protected OptionalInt streamBufferSize = OptionalInt.empty();
     protected Optional<Long> streamBufferFlushSize = Optional.empty();
     protected Optional<Long> streamBufferMaxSize = Optional.empty();
     protected Optional<Long> blockSize = Optional.empty();
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
     protected boolean includeRecon = false;
-    protected OptionalInt reconHttpPort = OptionalInt.empty();
-    protected OptionalInt reconDatanodePort = OptionalInt.empty();
 
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
     protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
+    protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
     protected int pipelineNumLimit = DEFAULT_PIPELIME_LIMIT;
@@ -382,6 +396,18 @@ public interface MiniOzoneCluster {
     }
 
     /**
+     * Sets the number of data volumes per datanode.
+     *
+     * @param val number of volumes per datanode.
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setNumDataVolumes(int val) {
+      numDataVolumes = val;
+      return this;
+    }
+
+    /**
      * Sets the total number of pipelines to create.
      * @param val number of pipelines
      * @return MiniOzoneCluster.Builder
@@ -439,6 +465,11 @@ public interface MiniOzoneCluster {
       return this;
     }
 
+    public Builder setStreamBufferSize(int size) {
+      streamBufferSize = OptionalInt.of(size);
+      return this;
+    }
+
     /**
      * Sets the flush size for stream buffer.
      *
@@ -486,16 +517,6 @@ public interface MiniOzoneCluster {
 
     public Builder setOMServiceId(String serviceId) {
       this.omServiceId = serviceId;
-      return this;
-    }
-
-    public Builder setReconHttpPort(int port) {
-      this.reconHttpPort = OptionalInt.of(port);
-      return this;
-    }
-
-    public Builder setReconDatanodePort(int port) {
-      this.reconDatanodePort = OptionalInt.of(port);
       return this;
     }
 

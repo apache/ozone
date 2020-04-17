@@ -387,26 +387,32 @@
     </description>
   </property>
   <property>
+    <name>ozone.client.stream.buffer.size</name>
+    <value>4MB</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>The size of chunks the client will send to the server.</description>
+  </property>
+  <property>
     <name>ozone.client.stream.buffer.flush.size</name>
     <value>16MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position , a partial
-      flush will be initiated during write. It should be ideally a multiple
-      of chunkSize.
+    <description>Size which determines at what buffer position a partial
+      flush will be initiated during write. It should be a multiple
+      of ozone.client.stream.buffer.size.
     </description>
   </property>
   <property>
     <name>ozone.client.stream.buffer.max.size</name>
     <value>32MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position,
+    <description>Size which determines at what buffer position
       write call be blocked till acknowledgement of the first partial flush
       happens by all servers.
     </description>
   </property>
   <property>
     <name>ozone.client.max.retries</name>
-    <value>100</value>
+    <value>5</value>
     <tag>OZONE, CLIENT</tag>
     <description>Maximum number of retries by Ozone Client on encountering
       exception while writing a key.
@@ -499,7 +505,7 @@
   </property>
   <property>
     <name>ozone.om.handler.count.key</name>
-    <value>20</value>
+    <value>100</value>
     <tag>OM, PERFORMANCE</tag>
     <description>
       The number of RPC handler threads for OM service endpoints.
@@ -718,6 +724,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.chunk.layout</name>
+    <value>FILE_PER_BLOCK</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      Chunk layout defines how chunks, blocks and containers are stored on disk.
+      Each chunk is stored separately with FILE_PER_CHUNK.  All chunks of a
+      block are stored in the same file with FILE_PER_BLOCK.  The default is
+      FILE_PER_BLOCK.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.client.address</name>
     <value/>
     <tag>OZONE, SCM, REQUIRED</tag>
@@ -901,7 +918,7 @@
   </property>
   <property>
     <name>ozone.scm.handler.count.key</name>
-    <value>10</value>
+    <value>100</value>
     <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
     <description>
       The number of RPC handler threads for each SCM service
@@ -1396,16 +1413,6 @@
   </property>
 
   <property>
-    <name>hdds.lock.max.concurrency</name>
-    <value>100</value>
-    <tag>HDDS</tag>
-    <description>Locks in HDDS/Ozone uses object pool to maintain active locks
-      in the system, this property defines the max limit for the locks that
-      will be maintained in the pool.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.s3g.authentication.kerberos.principal</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
@@ -1490,9 +1497,19 @@
   <property>
     <name>ozone.security.enabled</name>
     <value>false</value>
-    <tag> OZONE, SECURITY</tag>
+    <tag>OZONE, SECURITY</tag>
     <description>True if security is enabled for ozone. When this property is
      true, hadoop.security.authentication should be Kerberos.
+    </description>
+  </property>
+  <property>
+    <name>ozone.security.http.kerberos.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY</tag>
+    <description>True if Kerberos authentication for Ozone HTTP web consoles
+      is enabled using the SPNEGO protocol. When this property is
+      true, hadoop.security.authentication should be Kerberos and
+      ozone.security.enabled should be set to true.
     </description>
   </property>
 
@@ -2121,29 +2138,13 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.failover.sleep.base.millis</name>
-    <value>500</value>
+    <name>ozone.client.wait.between.retries.millis</name>
+    <value>2000</value>
     <description>
-      Expert only. The time to wait, in milliseconds, between failover
-      attempts increases exponentially as a function of the number of
-      attempts made so far, with a random factor of +/- 50%. This option
-      specifies the base value used in the failover calculation. The
-      first failover will retry immediately. The 2nd failover attempt
-      will delay at least ozone.client.failover.sleep.base.millis
-      milliseconds. And so on.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.failover.sleep.max.millis</name>
-    <value>15000</value>
-    <description>
-      Expert only. The time to wait, in milliseconds, between failover
-      attempts increases exponentially as a function of the number of
-      attempts made so far, with a random factor of +/- 50%. This option
-      specifies the maximum value to wait between failovers.
-      Specifically, the time between two failover attempts will not
-      exceed +/- 50% of ozone.client.failover.sleep.max.millis
-      milliseconds.
+      Expert only. The time to wait, in milliseconds, between retry attempts
+      to contact OM. Wait time increases linearly if same OM is retried
+      again. If retrying on multiple OMs proxies in round robin fashion, the
+      wait time is introduced after all the OM proxies have been attempted once.
     </description>
   </property>
   <property>
@@ -2194,6 +2195,15 @@
       The address and the base port where the Recon web UI will listen
       on using HTTPS. If the port is 0 then the server will start on a free
       port.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.keytab.file</name>
+    <value/>
+    <tag>RECON, SECURITY</tag>
+    <description>
+      DEPRECATED. Use "ozone.recon.http.kerberos.keytab.file" instead.
+      The keytab file for HTTP Kerberos authentication in Recon.
     </description>
   </property>
   <property>

@@ -24,6 +24,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
+import java.net.InetSocketAddress;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -47,8 +48,8 @@ public class TestStateContext {
     StateContext stateContext = new StateContext(conf,
         DatanodeStates.getInitState(), datanodeStateMachineMock);
 
-    String scm1 = "scm1:9001";
-    String scm2 = "scm2:9001";
+    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
 
     // Try to add report with endpoint. Should not be stored.
     stateContext.addReport(mock(GeneratedMessage.class));
@@ -81,8 +82,8 @@ public class TestStateContext {
     StateContext stateContext = new StateContext(conf,
         DatanodeStates.getInitState(), datanodeStateMachineMock);
 
-    String scm1 = "scm1:9001";
-    String scm2 = "scm2:9001";
+    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
 
     // Try to get containerActions for endpoint which is not yet added.
     List<ContainerAction> containerActions =

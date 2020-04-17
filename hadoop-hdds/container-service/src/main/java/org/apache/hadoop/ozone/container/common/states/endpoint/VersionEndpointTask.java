@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
@@ -79,7 +79,7 @@ public class VersionEndpointTask implements
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
 
           // Check volumes
-          VolumeSet volumeSet = ozoneContainer.getVolumeSet();
+          MutableVolumeSet volumeSet = ozoneContainer.getVolumeSet();
           volumeSet.writeLock();
           try {
             Map<String, HddsVolume> volumeMap = volumeSet.getVolumeMap();

@@ -17,16 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import static java.lang.Math.max;
-
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.google.common.base.Preconditions;
 import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
@@ -34,13 +24,18 @@ import java.io.ObjectOutput;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
+
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.util.Time;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
+import static java.lang.Math.max;
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 
 /**
  * Class wraps ozone container info.
@@ -48,19 +43,9 @@ import org.apache.hadoop.util.Time;
 public class ContainerInfo implements Comparator<ContainerInfo>,
     Comparable<ContainerInfo>, Externalizable {
 
-  private static final ObjectWriter WRITER;
   private static final String SERIALIZATION_ERROR_MSG = "Java serialization not"
       + " supported. Use protobuf instead.";
 
-  static {
-    ObjectMapper mapper = new ObjectMapper()
-        .registerModule(new JavaTimeModule())
-        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-    mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
-    mapper
-        .setVisibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.NONE);
-    WRITER = mapper.writerWithDefaultPrettyPrinter();
-  }
 
   private HddsProtos.LifeCycleState state;
   @JsonIgnore
@@ -319,15 +304,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return this.compare(this, o);
   }
 
-  /**
-   * Returns a JSON string of this object.
-   *
-   * @return String - json string
-   * @throws IOException
-   */
-  public String toJsonString() throws IOException {
-    return WRITER.writeValueAsString(this);
-  }
+
 
   /**
    * Returns private data that is set on this containerInfo.

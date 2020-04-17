@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -47,7 +48,6 @@ import org.apache.hadoop.ozone.client.io.LengthInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
@@ -124,6 +124,7 @@ public class RpcClient implements ClientProtocol {
   private final UserGroupInformation ugi;
   private final ACLType userRights;
   private final ACLType groupRights;
+  private final int streamBufferSize;
   private final long streamBufferFlushSize;
   private final long streamBufferMaxSize;
   private final long blockSize;
@@ -176,6 +177,10 @@ public class RpcClient implements ClientProtocol {
     } else {
       chunkSize = configuredChunkSize;
     }
+    streamBufferSize = (int) conf
+        .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE,
+            OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT,
+            StorageUnit.BYTES);
     streamBufferFlushSize = (long) conf
         .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
             OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE_DEFAULT,
@@ -267,7 +272,7 @@ public class RpcClient implements ClientProtocol {
     userGroups.stream().forEach((group) -> listOfAcls.add(
         new OzoneAcl(ACLIdentityType.GROUP, group, groupRights, ACCESS)));
     //ACLs from VolumeArgs
-    if(volArgs.getAcls() != null) {
+    if (volArgs.getAcls() != null) {
       listOfAcls.addAll(volArgs.getAcls());
     }
 
@@ -758,12 +763,7 @@ public class RpcClient implements ClientProtocol {
 
     Preconditions.checkArgument(Strings.isNotBlank(s3BucketName), "bucket " +
         "name cannot be null or empty.");
-    try {
-      HddsClientUtils.verifyResourceName(s3BucketName);
-    } catch (IllegalArgumentException exception) {
-      throw new OMException("Invalid bucket name: " + s3BucketName,
-          OMException.ResultCodes.INVALID_BUCKET_NAME);
-    }
+    OmUtils.validateBucketName(s3BucketName);
     ozoneManagerClient.createS3Bucket(userName, s3BucketName);
   }
 
@@ -882,6 +882,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(openKey.getKeyInfo().getType())
             .setFactor(openKey.getKeyInfo().getFactor())
+            .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferMaxSize(streamBufferMaxSize)
             .setBlockSize(blockSize)
@@ -1184,6 +1185,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
             .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+            .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferMaxSize(streamBufferMaxSize)
             .setBlockSize(blockSize)

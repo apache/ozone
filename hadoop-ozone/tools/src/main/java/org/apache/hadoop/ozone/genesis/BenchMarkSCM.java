@@ -92,7 +92,7 @@ public class BenchMarkSCM {
           pipelineManager.openPipeline(pipeline.getId());
         }
         scm.getEventQueue().fireEvent(SCMEvents.SAFE_MODE_STATUS,
-            new SCMSafeModeManager.SafeModeStatus(false));
+            new SCMSafeModeManager.SafeModeStatus(false, false));
         Thread.sleep(1000);
       }
     } finally {

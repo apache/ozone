@@ -87,7 +87,7 @@ public class TestContainerReportWithKeys {
     final String keyName = "key" + RandomStringUtils.randomNumeric(5);
     final int keySize = 100;
 
-    OzoneClient client = OzoneClientFactory.getClient(conf);
+    OzoneClient client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore objectStore = client.getObjectStore();
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);

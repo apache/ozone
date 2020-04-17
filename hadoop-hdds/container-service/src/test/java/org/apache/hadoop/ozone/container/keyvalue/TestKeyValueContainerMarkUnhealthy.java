@@ -21,10 +21,12 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -33,6 +35,8 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +57,7 @@ import static org.mockito.Mockito.mock;
  * Tests unhealthy container functionality in the {@link KeyValueContainer}
  * class.
  */
+@RunWith(Parameterized.class)
 public class TestKeyValueContainerMarkUnhealthy {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueContainerMarkUnhealthy.class);
@@ -74,6 +79,17 @@ public class TestKeyValueContainerMarkUnhealthy {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
+  private final ChunkLayOutVersion layout;
+
+  public TestKeyValueContainerMarkUnhealthy(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
+
   @Before
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
@@ -82,12 +98,13 @@ public class TestKeyValueContainerMarkUnhealthy {
         .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
         .toString()).build();
 
-    volumeSet = mock(VolumeSet.class);
+    volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
+        layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
     final File metaDir = GenericTestUtils.getRandomizedTestDir();

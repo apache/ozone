@@ -106,16 +106,12 @@ public class PipelineReportHandler implements
 
     setReportedDatanode(pipeline, dn);
     setPipelineLeaderId(report, pipeline, dn);
-    // ONE replica pipeline doesn't have leader flag
-    if (report.getIsLeader() ||
-        pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
-      pipeline.setLeaderId(dn.getUuid());
-      metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
-    }
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
-      LOGGER.info("Pipeline {} {} reported by {}", pipeline.getFactor(),
-          pipeline.getId(), dn);
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Pipeline {} {} reported by {}", pipeline.getFactor(),
+            pipeline.getId(), dn);
+      }
       if (pipeline.isHealthy()) {
         pipelineManager.openPipeline(pipelineID);
         if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
@@ -138,6 +134,7 @@ public class PipelineReportHandler implements
     if (report.getIsLeader() ||
         pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
       pipeline.setLeaderId(dn.getUuid());
+      metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }
   }
 

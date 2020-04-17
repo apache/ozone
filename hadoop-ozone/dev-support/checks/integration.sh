@@ -24,7 +24,7 @@ mkdir -p "$REPORT_DIR"
 
 export MAVEN_OPTS="-Xmx4096m"
 mvn -B install -DskipTests
-mvn -B -fae test -pl :hadoop-ozone-integration-test "$@" \
+mvn -B -fae test -pl :hadoop-ozone-integration-test,:mini-chaos-tests "$@" \
   | tee "${REPORT_DIR}/output.log"
 rc=$?
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,16 +22,16 @@ import java.util.Set;
 
 import javax.inject.Inject;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.util.Time;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
@@ -46,16 +46,16 @@ public class MissingContainerTask extends ReconScmTask {
       LoggerFactory.getLogger(MissingContainerTask.class);
 
   private ContainerManager containerManager;
-  private MissingContainersDao missingContainersDao;
+  private ContainerSchemaManager containerSchemaManager;
   private static final long INTERVAL = 5 * 60 * 1000L;
 
   @Inject
   public MissingContainerTask(
       OzoneStorageContainerManager ozoneStorageContainerManager,
       ReconTaskStatusDao reconTaskStatusDao,
-      MissingContainersDao missingContainersDao) {
+      ContainerSchemaManager containerSchemaManager) {
     super(reconTaskStatusDao);
-    this.missingContainersDao = missingContainersDao;
+    this.containerSchemaManager = containerSchemaManager;
     this.containerManager = ozoneStorageContainerManager.getContainerManager();
   }
 
@@ -83,15 +83,23 @@ public class MissingContainerTask extends ReconScmTask {
     try {
       Set<ContainerReplica> containerReplicas =
           containerManager.getContainerReplicas(containerID);
-      if (CollectionUtils.isEmpty(containerReplicas)) {
-        if (!missingContainersDao.existsById(containerID.getId())) {
-          MissingContainers newRecord =
-              new MissingContainers(containerID.getId(), currentTime);
-          missingContainersDao.insert(newRecord);
+      // check if a container has 0 replicas or if all available replicas
+      // are marked UNHEALTHY.
+      boolean isAllUnhealthy =
+          containerReplicas.stream().allMatch(replica ->
+              replica.getState().equals(State.UNHEALTHY));
+      boolean isMissingContainer =
+          containerSchemaManager.isMissingContainer(containerID.getId());
+      if (CollectionUtils.isEmpty(containerReplicas) || isAllUnhealthy) {
+        if (!isMissingContainer) {
+          LOG.info("Found a missing container with ID {}. Adding it to the " +
+              "database", containerID.getId());
+          containerSchemaManager.addMissingContainer(containerID.getId(),
+              currentTime);
         }
       } else {
-        if (missingContainersDao.existsById(containerID.getId())) {
-          missingContainersDao.deleteById(containerID.getId());
+        if (isMissingContainer) {
+          containerSchemaManager.deleteMissingContainer(containerID.getId());
         }
       }
     } catch (ContainerNotFoundException e) {

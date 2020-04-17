@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -54,6 +55,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
@@ -84,6 +86,11 @@ public class SCMPipelineManager implements PipelineManager {
   private long pipelineWaitDefaultTimeout;
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
+
+  private final AtomicBoolean isInSafeMode;
+  // Used to track if the safemode pre-checks have completed. This is designed
+  // to prevent pipelines being created until sufficient nodes have registered.
+  private final AtomicBoolean pipelineCreationAllowed;
 
   public SCMPipelineManager(Configuration conf, NodeManager nodeManager,
       EventPublisher eventPublisher)
@@ -127,6 +134,12 @@ public class SCMPipelineManager implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+    this.isInSafeMode = new AtomicBoolean(conf.getBoolean(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT));
+    // Pipeline creation is only allowed after the safemode prechecks have
+    // passed, eg sufficient nodes have registered.
+    this.pipelineCreationAllowed = new AtomicBoolean(!this.isInSafeMode.get());
   }
 
   public PipelineStateManager getStateManager() {
@@ -137,6 +150,16 @@ public class SCMPipelineManager implements PipelineManager {
   public void setPipelineProvider(ReplicationType replicationType,
                                   PipelineProvider provider) {
     pipelineFactory.setProvider(replicationType, provider);
+  }
+
+  @VisibleForTesting
+  public void allowPipelineCreation() {
+    this.pipelineCreationAllowed.set(true);
+  }
+
+  @VisibleForTesting
+  public boolean isPipelineCreationAllowed() {
+    return pipelineCreationAllowed.get();
   }
 
   protected void initializePipelineState() throws IOException {
@@ -198,6 +221,12 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public synchronized Pipeline createPipeline(ReplicationType type,
       ReplicationFactor factor) throws IOException {
+    if (!isPipelineCreationAllowed() && factor != ReplicationFactor.ONE) {
+      LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
+          "complete");
+      throw new IOException("Pipeline creation is not allowed as safe mode " +
+          "prechecks have not yet passed");
+    }
     lock.writeLock().lock();
     try {
       Pipeline pipeline = pipelineFactory.create(type, factor);
@@ -208,6 +237,8 @@ public class SCMPipelineManager implements PipelineManager {
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {
+      LOG.error("Failed to create pipeline of type {} and factor {}. " +
+          "Exception: {}", type, factor, ex.getMessage());
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {
@@ -414,7 +445,7 @@ public class SCMPipelineManager implements PipelineManager {
             .toEpochMilli() >= pipelineScrubTimeoutInMills)
         .collect(Collectors.toList());
     for (Pipeline p : needToSrubPipelines) {
-      LOG.info("srubbing pipeline: id: " + p.getId().toString() +
+      LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
           " since it stays at ALLOCATED stage for " +
           Duration.between(currentTime, p.getCreationTimestamp()).toMinutes() +
           " mins.");
@@ -556,12 +587,15 @@ public class SCMPipelineManager implements PipelineManager {
    * @throws IOException
    */
   protected void removePipeline(PipelineID pipelineId) throws IOException {
+    byte[] key = pipelineId.getProtobuf().toByteArray();
     lock.writeLock().lock();
     try {
-      pipelineStore.delete(pipelineId.getProtobuf().toByteArray());
-      Pipeline pipeline = stateManager.removePipeline(pipelineId);
-      nodeManager.removePipeline(pipeline);
-      metrics.incNumPipelineDestroyed();
+      if (pipelineStore != null) {
+        pipelineStore.delete(key);
+        Pipeline pipeline = stateManager.removePipeline(pipelineId);
+        nodeManager.removePipeline(pipeline);
+        metrics.incNumPipelineDestroyed();
+      }
     } catch (IOException ex) {
       metrics.incNumPipelineDestroyFailed();
       throw ex;
@@ -582,17 +616,23 @@ public class SCMPipelineManager implements PipelineManager {
       scheduler = null;
     }
 
-    if (pipelineStore != null) {
-      pipelineStore.close();
-      pipelineStore = null;
+    lock.writeLock().lock();
+    try {
+      if (pipelineStore != null) {
+        pipelineStore.close();
+        pipelineStore = null;
+      }
+    } finally {
+      lock.writeLock().unlock();
     }
+
     if(pmInfoBean != null) {
       MBeans.unregister(this.pmInfoBean);
       pmInfoBean = null;
     }
-    if(metrics != null) {
-      metrics.unRegister();
-    }
+
+    SCMPipelineMetrics.unRegister();
+
     // shutdown pipeline provider.
     pipelineFactory.shutdown();
   }
@@ -618,4 +658,30 @@ public class SCMPipelineManager implements PipelineManager {
   protected NodeManager getNodeManager() {
     return nodeManager;
   }
+
+  @Override
+  public boolean getSafeModeStatus() {
+    return this.isInSafeMode.get();
+  }
+
+  @Override
+  public synchronized void handleSafeModeTransition(
+      SCMSafeModeManager.SafeModeStatus status) {
+    // TODO: #CLUTIL - handle safemode getting re-enabled
+    boolean currentAllowPipelines =
+        pipelineCreationAllowed.getAndSet(status.isPreCheckComplete());
+    boolean currentlyInSafeMode =
+        isInSafeMode.getAndSet(status.isInSafeMode());
+
+    // Trigger pipeline creation only if the preCheck status has changed to
+    // complete.
+    if (isPipelineCreationAllowed() && !currentAllowPipelines) {
+      triggerPipelineCreation();
+    }
+    // Start the pipeline creation thread only when safemode switches off
+    if (!getSafeModeStatus() && currentlyInSafeMode) {
+      startPipelineCreator();
+    }
+  }
+
 }

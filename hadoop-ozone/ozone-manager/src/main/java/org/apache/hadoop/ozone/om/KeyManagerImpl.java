@@ -820,7 +820,7 @@ public class KeyManagerImpl implements KeyManager {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           metadataManager.getDeletedTable().get(objectKey);
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(keyInfo,
-          repeatedOmKeyInfo, 0L);
+          repeatedOmKeyInfo, 0L, false);
       metadataManager.getKeyTable().delete(objectKey);
       metadataManager.getDeletedTable().put(objectKey, repeatedOmKeyInfo);
     } catch (OMException ex) {
@@ -1065,7 +1065,7 @@ public class KeyManagerImpl implements KeyManager {
         RepeatedOmKeyInfo repeatedOmKeyInfo =
             metadataManager.getDeletedTable().get(partName);
         repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            keyInfo, repeatedOmKeyInfo, 0L);
+            keyInfo, repeatedOmKeyInfo, 0L, false);
         metadataManager.getDeletedTable().put(partName, repeatedOmKeyInfo);
         throw new OMException("No such Multipart upload is with specified " +
             "uploadId " + uploadID, ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
@@ -1102,7 +1102,7 @@ public class KeyManagerImpl implements KeyManager {
                     .get(oldPartKeyInfo.getPartName());
 
             repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-                partKey, repeatedOmKeyInfo, 0L);
+                partKey, repeatedOmKeyInfo, 0L, false);
 
             metadataManager.getDeletedTable().put(partName, repeatedOmKeyInfo);
             metadataManager.getDeletedTable().putWithBatch(batch,
@@ -1220,7 +1220,7 @@ public class KeyManagerImpl implements KeyManager {
                     .get(partKeyInfo.getPartName());
 
             repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-                currentKeyPartInfo, repeatedOmKeyInfo, 0L);
+                currentKeyPartInfo, repeatedOmKeyInfo, 0L, false);
 
             metadataManager.getDeletedTable().putWithBatch(batch,
                 partKeyInfo.getPartName(), repeatedOmKeyInfo);
@@ -1707,11 +1707,6 @@ public class KeyManagerImpl implements KeyManager {
         return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
       }
 
-      List<OmKeyInfo> keys = metadataManager.listKeys(volumeName, bucketName,
-          null, dirKey, 1);
-      if (keys.iterator().hasNext()) {
-        return new OzoneFileStatus(keyName);
-      }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Unable to get file status for the key: volume: {}, bucket:" +
                 " {}, key: {}, with error: No such file exists.", volumeName,

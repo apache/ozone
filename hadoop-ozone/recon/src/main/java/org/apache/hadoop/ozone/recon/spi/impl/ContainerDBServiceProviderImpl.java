@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.inject.Inject;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -48,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +68,9 @@ public class ContainerDBServiceProviderImpl
   private Table<ContainerKeyPrefix, Integer> containerKeyTable;
   private Table<Long, Long> containerKeyCountTable;
   private GlobalStatsDao globalStatsDao;
+
+  @Inject
+  private ContainerSchemaManager containerSchemaManager;
 
   @Inject
   private OzoneConfiguration configuration;
@@ -141,9 +147,10 @@ public class ContainerDBServiceProviderImpl
       this.containerKeyCountTable = containerDbStore
           .getTable(CONTAINER_KEY_COUNT_TABLE, Long.class, Long.class);
     } catch (IOException e) {
-      LOG.error("Unable to create Container Key tables. {}", e);
+      LOG.error("Unable to create Container Key tables.", e);
     }
   }
+
   /**
    * Concatenate the containerID and Key Prefix using a delimiter and store the
    * count into the container DB store.
@@ -349,6 +356,10 @@ public class ContainerDBServiceProviderImpl
       containers.put(containerID, containerMetadata);
     }
     return containers;
+  }
+
+  public List<MissingContainers> getMissingContainers() {
+    return containerSchemaManager.getAllMissingContainers();
   }
 
   @Override

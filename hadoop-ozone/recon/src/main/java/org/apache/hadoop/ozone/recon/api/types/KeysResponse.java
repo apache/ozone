@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.ArrayList;
 import java.util.Collection;
 
 /**
@@ -26,57 +25,27 @@ import java.util.Collection;
  */
 public class KeysResponse {
   /**
-   * Contains a map with total count of keys inside the given container and a
-   * list of keys with metadata.
+   * Total count of the keys.
    */
-  @JsonProperty("data")
-  private KeysResponseData keysResponseData;
-
-  public KeysResponse() {
-    this(0, new ArrayList<>());
-  }
-
-  public KeysResponse(long totalCount,
-                      Collection<KeyMetadata> keys) {
-    this.keysResponseData =
-        new KeysResponseData(totalCount, keys);
-  }
-
-  public KeysResponseData getKeysResponseData() {
-    return keysResponseData;
-  }
-
-  public void setKeysResponseData(KeysResponseData keysResponseData) {
-    this.keysResponseData = keysResponseData;
-  }
+  @JsonProperty("totalCount")
+  private long totalCount;
 
   /**
-   * Class that encapsulates the data presented in Keys API Response.
+   * An array of keys.
    */
-  public static class KeysResponseData {
-    /**
-     * Total count of the keys.
-     */
-    @JsonProperty("totalCount")
-    private long totalCount;
+  @JsonProperty("keys")
+  private Collection<KeyMetadata> keys;
 
-    /**
-     * An array of keys.
-     */
-    @JsonProperty("keys")
-    private Collection<KeyMetadata> keys;
+  public KeysResponse(long totalCount, Collection<KeyMetadata> keys) {
+    this.totalCount = totalCount;
+    this.keys = keys;
+  }
 
-    KeysResponseData(long totalCount, Collection<KeyMetadata> keys) {
-      this.totalCount = totalCount;
-      this.keys = keys;
-    }
+  public long getTotalCount() {
+    return totalCount;
+  }
 
-    public long getTotalCount() {
-      return totalCount;
-    }
-
-    public Collection<KeyMetadata> getKeys() {
-      return keys;
-    }
+  public Collection<KeyMetadata> getKeys() {
+    return keys;
   }
 }

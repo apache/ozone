@@ -215,13 +215,21 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public OzoneFSOutputStream createFile(String key, boolean overWrite,
-      boolean recursive) throws IOException {
+  public OzoneFSOutputStream createFile(String key, short replication,
+      boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED);
     try {
-      OzoneOutputStream ozoneOutputStream = bucket
-          .createFile(key, 0, replicationType, replicationFactor, overWrite,
-              recursive);
+      OzoneOutputStream ozoneOutputStream = null;
+      if (replication == ReplicationFactor.ONE.getValue()
+          || replication == ReplicationFactor.THREE.getValue()) {
+        ReplicationFactor clientReplication = ReplicationFactor
+            .valueOf(replication);
+        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
+            clientReplication, overWrite, recursive);
+      } else {
+        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
+            replicationFactor, overWrite, recursive);
+      }
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.FILE_ALREADY_EXISTS
@@ -396,8 +404,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         throws IOException, InterruptedException {
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
-      OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+      OzoneClient ozoneClient = OzoneClientFactory.getOzoneClient(conf,
+          ozoneDt);
       return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
     }
 
@@ -406,8 +414,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         throws IOException, InterruptedException {
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
-      OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+      OzoneClient ozoneClient = OzoneClientFactory.getOzoneClient(conf,
+          ozoneDt);
       ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
     }
   }

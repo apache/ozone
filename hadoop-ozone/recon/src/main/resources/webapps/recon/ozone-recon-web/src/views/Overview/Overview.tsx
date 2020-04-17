@@ -22,18 +22,29 @@ import OverviewCard from 'components/OverviewCard/OverviewCard';
 import axios from 'axios';
 import prettyBytes from 'pretty-bytes';
 import './Overview.less';
-import {getCapacityPercent} from "../../utils/common";
+import {StorageReport} from "types/datanode.types";
+import {MissingContainersResponse} from "../MissingContainers/MissingContainers";
+
+interface ClusterStateResponse {
+  totalDatanodes: number;
+  healthyDatanodes: number;
+  pipelines: number;
+  storageReport: StorageReport;
+  containers: number;
+  volumes: number;
+  buckets: number;
+  keys: number;
+}
 
 interface OverviewState {
   loading: boolean;
   datanodes: string;
-  pipelines: string;
-  clusterCapacity: string;
-  clusterUsedPercent: number;
-  containers: string;
-  volumes: string;
-  buckets: string;
-  keys: string;
+  pipelines: number;
+  storageReport: StorageReport;
+  containers: number;
+  volumes: number;
+  buckets: number;
+  keys: number;
   missingContainersCount: number;
 }
 
@@ -44,13 +55,16 @@ export class Overview extends React.Component<any, OverviewState> {
     this.state = {
       loading: false,
       datanodes: '',
-      pipelines: '',
-      clusterCapacity: '',
-      clusterUsedPercent: 0,
-      containers: '',
-      volumes: '',
-      buckets: '',
-      keys: '',
+      pipelines: 0,
+      storageReport: {
+        capacity: 0,
+        used: 0,
+        remaining: 0
+      },
+      containers: 0,
+      volumes: 0,
+      buckets: 0,
+      keys: 0,
       missingContainersCount: 0
     }
   }
@@ -60,29 +74,28 @@ export class Overview extends React.Component<any, OverviewState> {
       loading: true
     });
     axios.all([
-        axios.get('/api/v1/stats'),
-        axios.get('/api/v1/missingContainers')
-    ]).then(axios.spread((statsResponse, missingContainersResponse) => {
-      const stats = statsResponse.data;
-      const missingContainers = missingContainersResponse.data;
-      const clusterUsedPercent = getCapacityPercent(stats.capacity.used, stats.capacity.total);
+        axios.get('/api/v1/clusterState'),
+        axios.get('/api/v1/containers/missing')
+    ]).then(axios.spread((clusterStateResponse, missingContainersResponse) => {
+      const clusterState: ClusterStateResponse = clusterStateResponse.data;
+      const missingContainers: MissingContainersResponse = missingContainersResponse.data;
+      const missingContainersCount = missingContainers.totalCount;
       this.setState({
         loading: false,
-        datanodes: `${stats.datanodes.healthy}/${stats.datanodes.total}`,
-        clusterCapacity: `${prettyBytes(stats.capacity.used)}/${prettyBytes(stats.capacity.total)}`,
-        clusterUsedPercent,
-        pipelines: stats.pipelines,
-        containers: stats.containers,
-        volumes: stats.volumes,
-        buckets: stats.buckets,
-        keys: stats.keys,
-        missingContainersCount: missingContainers.totalCount
+        datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
+        storageReport: clusterState.storageReport,
+        pipelines: clusterState.pipelines,
+        containers: clusterState.containers,
+        volumes: clusterState.volumes,
+        buckets: clusterState.buckets,
+        keys: clusterState.keys,
+        missingContainersCount
       });
     }));
   }
 
   render() {
-    const {loading, datanodes, pipelines, clusterCapacity, clusterUsedPercent, containers, volumes, buckets,
+    const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
       keys, missingContainersCount} = this.state;
     const datanodesElement = <span>
       <Icon type="check-circle" theme="filled" className="icon-success icon-small"/> {datanodes} <span className="ant-card-meta-description meta">HEALTHY</span>
@@ -94,9 +107,10 @@ export class Overview extends React.Component<any, OverviewState> {
           <Tooltip placement="bottom" title={`${missingContainersCount} ${containersTooltip}`}>
             <Icon type="exclamation-circle" theme="filled" className="icon-failure icon-small"/>
           </Tooltip>
-          <span className="padded-text">{containers}</span>
+          <span className="padded-text">{containers-missingContainersCount}/{containers}</span>
         </span>
-        : containers;
+        : containers.toString();
+    const clusterCapacity = `${prettyBytes(storageReport.capacity - storageReport.remaining)}/${prettyBytes(storageReport.capacity)}`;
     return (
         <div className="overview-content">
           <Row gutter={[25, 25]}>
@@ -105,12 +119,12 @@ export class Overview extends React.Component<any, OverviewState> {
                             linkToUrl="/Datanodes"/>
             </Col>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-              <OverviewCard loading={loading} title={"Pipelines"} data={pipelines} icon={"deployment-unit"} hoverable={true}
+              <OverviewCard loading={loading} title={"Pipelines"} data={pipelines.toString()} icon={"deployment-unit"} hoverable={true}
                             linkToUrl="/Pipelines"/>
             </Col>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-              <OverviewCard loading={loading} title={"Cluster Capacity (Used/Total)"} data={clusterCapacity} icon={"database"}
-                            capacityPercent={clusterUsedPercent}/>
+              <OverviewCard loading={loading} title={"Cluster Capacity"} data={clusterCapacity} icon={"database"}
+                            storageReport={storageReport}/>
             </Col>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
               <OverviewCard loading={loading} title={"Containers"} data={containersElement} icon={"container"}
@@ -119,13 +133,13 @@ export class Overview extends React.Component<any, OverviewState> {
           </Row>
           <Row gutter={[25, 25]}>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-              <OverviewCard loading={loading} title={"Volumes"} data={volumes} icon={"inbox"}/>
+              <OverviewCard loading={loading} title={"Volumes"} data={volumes.toString()} icon={"inbox"}/>
             </Col>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-              <OverviewCard loading={loading} title={"Buckets"} data={buckets} icon={"folder-open"}/>
+              <OverviewCard loading={loading} title={"Buckets"} data={buckets.toString()} icon={"folder-open"}/>
             </Col>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-              <OverviewCard loading={loading} title={"Keys"} data={keys} icon={"file-text"}/>
+              <OverviewCard loading={loading} title={"Keys"} data={keys.toString()} icon={"file-text"}/>
             </Col>
           </Row>
         </div>

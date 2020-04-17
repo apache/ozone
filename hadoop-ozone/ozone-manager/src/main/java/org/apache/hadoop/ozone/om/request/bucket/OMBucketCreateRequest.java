@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
+
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -88,6 +90,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     CreateBucketRequest createBucketRequest =
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
+    // Verify resource name
+    OmUtils.validateBucketName(bucketInfo.getBucketName());
 
     // Get KMS provider.
     KeyProviderCryptoExtension kmsProvider =
@@ -185,9 +189,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       // Add objectID and updateID
-      long objectId = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
-      omBucketInfo.setObjectID(objectId);
-      omBucketInfo.setUpdateID(transactionLogIndex);
+      omBucketInfo.setObjectID(
+          OMFileRequest.getObjIDFromTxId(transactionLogIndex));
+      omBucketInfo.setUpdateID(transactionLogIndex,
+          ozoneManager.isRatisEnabled());
 
       // Add default acls from volume.
       addDefaultAcls(omBucketInfo, omVolumeArgs);

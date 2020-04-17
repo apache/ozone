@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREF
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -53,8 +54,8 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.fsck.MissingContainerTask;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,9 +83,9 @@ public class ReconStorageContainerManagerFacade
 
   @Inject
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
-      StorageContainerServiceProvider scmServiceProvider,
-      MissingContainersDao missingContainersDao,
-      ReconTaskStatusDao reconTaskStatusDao)
+            StorageContainerServiceProvider scmServiceProvider,
+            ReconTaskStatusDao reconTaskStatusDao,
+            ContainerSchemaManager containerSchemaManager)
       throws IOException {
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
@@ -97,7 +98,8 @@ public class ReconStorageContainerManagerFacade
         conf, this, eventQueue);
     this.pipelineManager =
         new ReconPipelineManager(conf, nodeManager, eventQueue);
-    this.containerManager = new ReconContainerManager(conf, pipelineManager);
+    this.containerManager = new ReconContainerManager(conf, pipelineManager,
+        scmServiceProvider, containerSchemaManager);
     this.scmServiceProvider = scmServiceProvider;
 
     NodeReportHandler nodeReportHandler =
@@ -117,17 +119,17 @@ public class ReconStorageContainerManagerFacade
         pipelineManager, containerManager);
 
     ContainerReportHandler containerReportHandler =
-        new ReconContainerReportHandler(nodeManager, containerManager,
-            scmServiceProvider);
+        new ReconContainerReportHandler(nodeManager, containerManager);
 
     IncrementalContainerReportHandler icrHandler =
         new ReconIncrementalContainerReportHandler(nodeManager,
-            containerManager, scmServiceProvider);
+            containerManager);
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, containerManager);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     ReconNewNodeHandler newNodeHandler = new ReconNewNodeHandler(nodeManager);
 
+    eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, nodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
@@ -146,12 +148,12 @@ public class ReconStorageContainerManagerFacade
     reconScmTasks.add(new MissingContainerTask(
         this,
         reconTaskStatusDao,
-        missingContainersDao));
+        containerSchemaManager));
     reconScmTasks.forEach(ReconScmTask::register);
   }
 
   /**
-   *  For every config key which is prefixed by 'recon.scm', create a new
+   *  For every config key which is prefixed by 'recon.scmconfig', create a new
    *  config key without the prefix keeping the same value.
    *  For example, if recon.scm.a.b. = xyz, we add a new config like
    *  a.b.c = xyz. This is done to override Recon's passive SCM configs if
@@ -252,6 +254,11 @@ public class ReconStorageContainerManagerFacade
   @Override
   public ReplicationManager getReplicationManager() {
     return null;
+  }
+
+  @Override
+  public InetSocketAddress getDatanodeRpcAddress() {
+    return getDatanodeProtocolServer().getDatanodeRpcAddress();
   }
 
   public EventQueue getEventQueue() {

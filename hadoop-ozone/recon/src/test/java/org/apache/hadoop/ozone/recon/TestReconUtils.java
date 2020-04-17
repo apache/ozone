@@ -34,20 +34,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
+import java.net.URLConnection;
+import java.net.URL;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.http.HttpEntity;
-import org.apache.http.StatusLine;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
 /**
  * Test Recon Utility methods.
  */
@@ -137,20 +134,7 @@ public class TestReconUtils {
 
   @Test
   public void testMakeHttpCall() throws Exception {
-
-    CloseableHttpClient httpClientMock = mock(CloseableHttpClient.class);
     String url = "http://localhost:9874/dbCheckpoint";
-
-    CloseableHttpResponse httpResponseMock = mock(CloseableHttpResponse.class);
-    when(httpClientMock.execute(any(HttpGet.class)))
-        .thenReturn(httpResponseMock);
-
-    StatusLine statusLineMock = mock(StatusLine.class);
-    when(statusLineMock.getStatusCode()).thenReturn(200);
-    when(httpResponseMock.getStatusLine()).thenReturn(statusLineMock);
-
-    HttpEntity httpEntityMock = mock(HttpEntity.class);
-    when(httpResponseMock.getEntity()).thenReturn(httpEntityMock);
     File file1 = Paths.get(folder.getRoot().getPath(), "file1")
         .toFile();
     BufferedWriter writer = new BufferedWriter(new FileWriter(
@@ -159,16 +143,17 @@ public class TestReconUtils {
     writer.close();
     InputStream fileInputStream = new FileInputStream(file1);
 
-    when(httpEntityMock.getContent()).thenReturn(new InputStream() {
-      @Override
-      public int read() throws IOException {
-        return fileInputStream.read();
-      }
-    });
-
-    InputStream inputStream = new ReconUtils()
-        .makeHttpCall(httpClientMock, url);
-    String contents = IOUtils.toString(inputStream, Charset.defaultCharset());
+    String contents;
+    URLConnectionFactory connectionFactoryMock =
+        mock(URLConnectionFactory.class);
+    URLConnection urlConnectionMock = mock(URLConnection.class);
+    when(urlConnectionMock.getInputStream()).thenReturn(fileInputStream);
+    when(connectionFactoryMock.openConnection(any(URL.class)))
+        .thenReturn(urlConnectionMock);
+    try (InputStream inputStream = new ReconUtils()
+        .makeHttpCall(connectionFactoryMock, url)) {
+      contents = IOUtils.toString(inputStream, Charset.defaultCharset());
+    }
 
     assertEquals("File 1 Contents", contents);
   }
