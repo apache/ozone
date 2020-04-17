@@ -449,11 +449,11 @@ public class VolumeManagerImpl implements VolumeManager {
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
-    metadataManager.getLock().acquireWriteLock(USER_LOCK, userName);
+    metadataManager.getLock().acquireReadLock(USER_LOCK, userName);
     try {
       return metadataManager.listVolumes(userName, prefix, startKey, maxKeys);
     } finally {
-      metadataManager.getLock().releaseWriteLock(USER_LOCK, userName);
+      metadataManager.getLock().releaseReadLock(USER_LOCK, userName);
     }
   }
 
