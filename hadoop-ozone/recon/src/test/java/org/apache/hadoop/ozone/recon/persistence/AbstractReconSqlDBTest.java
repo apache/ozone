@@ -17,8 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule.RECON_DAO_LIST;
-import static org.junit.Assert.assertNotNull;
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.DERBY_DRIVER_CLASS;
 
 import java.io.File;
 import java.io.IOException;
@@ -40,7 +39,6 @@ import org.jooq.impl.DefaultConfiguration;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
-import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import com.google.inject.AbstractModule;
@@ -60,10 +58,22 @@ public class AbstractReconSqlDBTest {
 
   private Injector injector;
   private DSLContext dslContext;
+  private Provider<DataSourceConfiguration> configurationProvider;
 
   public AbstractReconSqlDBTest() {
     try {
       temporaryFolder.create();
+      configurationProvider =
+          new DerbyDataSourceConfigurationProvider(temporaryFolder.newFolder());
+    } catch (IOException e) {
+      Assert.fail();
+    }
+  }
+
+  protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
+    try {
+      temporaryFolder.create();
+      configurationProvider = provider;
     } catch (IOException e) {
       Assert.fail();
     }
@@ -80,12 +90,9 @@ public class AbstractReconSqlDBTest {
   /**
    * Get set of Guice modules needed to setup a Recon SQL DB.
    * @return List of modules.
-   * @throws IOException on Error.
    */
-  public List<Module> getReconSqlDBModules() throws IOException {
+  public List<Module> getReconSqlDBModules() {
     List<Module> modules = new ArrayList<>();
-    DataSourceConfigurationProvider configurationProvider =
-        new DataSourceConfigurationProvider(temporaryFolder.newFolder());
     modules.add(new JooqPersistenceModule(configurationProvider));
     modules.add(new AbstractModule() {
       @Override
@@ -146,30 +153,16 @@ public class AbstractReconSqlDBTest {
     return injector.getInstance(type);
   }
 
-  /**
-   * Make sure schema was created correctly.
-   * @throws SQLException
-   */
-  @Test
-  public void testSchemaSetup() throws SQLException {
-    assertNotNull(injector);
-    assertNotNull(getConfiguration());
-    assertNotNull(dslContext);
-    assertNotNull(getConnection());
-    RECON_DAO_LIST.forEach(dao -> {
-      assertNotNull(getDao(dao));
-    });
-  }
 
   /**
-   * Local Sqlite datasource provider.
+   * Local Derby datasource provider.
    */
-  public static class DataSourceConfigurationProvider implements
+  public static class DerbyDataSourceConfigurationProvider implements
       Provider<DataSourceConfiguration> {
 
     private final File tempDir;
 
-    public DataSourceConfigurationProvider(File tempDir) {
+    public DerbyDataSourceConfigurationProvider(File tempDir) {
       this.tempDir = tempDir;
     }
 
@@ -178,13 +171,13 @@ public class AbstractReconSqlDBTest {
       return new DataSourceConfiguration() {
         @Override
         public String getDriverClass() {
-          return "org.sqlite.JDBC";
+          return DERBY_DRIVER_CLASS;
         }
 
         @Override
         public String getJdbcUrl() {
-          return "jdbc:sqlite:" + tempDir.getAbsolutePath() +
-              File.separator + "sqlite_recon.db";
+          return "jdbc:derby:" + tempDir.getAbsolutePath() +
+              File.separator + "derby_recon.db";
         }
 
         @Override
@@ -209,7 +202,7 @@ public class AbstractReconSqlDBTest {
 
         @Override
         public String getSqlDialect() {
-          return SQLDialect.SQLITE.toString();
+          return SQLDialect.DERBY.toString();
         }
 
         @Override

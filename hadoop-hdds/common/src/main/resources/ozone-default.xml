@@ -2354,7 +2354,7 @@
   </property>
   <property>
     <name>ozone.recon.sql.db.driver</name>
-    <value>org.sqlite.JDBC</value>
+    <value>org.apache.derby.jdbc.EmbeddedDriver</value>
     <tag>OZONE, RECON</tag>
     <description>
       Database driver class name available on the
@@ -2363,7 +2363,7 @@
   </property>
   <property>
     <name>ozone.recon.sql.db.jdbc.url</name>
-    <value>jdbc:sqlite:${ozone.recon.db.dir}/ozone_recon_sqlite.db</value>
+    <value>jdbc:derby:${ozone.recon.db.dir}/ozone_recon_derby.db</value>
     <tag>OZONE, RECON</tag>
     <description>
       Ozone Recon SQL database jdbc url.

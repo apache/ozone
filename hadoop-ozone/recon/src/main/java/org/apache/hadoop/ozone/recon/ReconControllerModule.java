@@ -30,11 +30,13 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQ
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_MAX_CONNECTION_AGE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_MAX_IDLE_CONNECTION_AGE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_MAX_IDLE_CONNECTION_TEST_STMT;
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.DERBY_DRIVER_CLASS;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -62,6 +64,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.ratis.protocol.ClientId;
+import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
@@ -191,7 +194,7 @@ public class ReconControllerModule extends AbstractModule {
       @Override
       public String getDriverClass() {
         return ozoneConfiguration.get(OZONE_RECON_SQL_DB_DRIVER,
-            "org.sqlite.JDBC");
+            DERBY_DRIVER_CLASS);
       }
 
       @Override
@@ -223,7 +226,11 @@ public class ReconControllerModule extends AbstractModule {
 
       @Override
       public String getSqlDialect() {
-        return JooqPersistenceModule.DEFAULT_DIALECT.toString();
+        ReconSqlDbConfig sqlDbConfig =
+            ozoneConfiguration.getObject(ReconSqlDbConfig.class);
+        return StringUtils.isNotEmpty(sqlDbConfig.getSqlDbDialect()) ?
+            sqlDbConfig.getSqlDbDialect():
+            JooqPersistenceModule.DEFAULT_DIALECT.toString();
       }
 
       @Override

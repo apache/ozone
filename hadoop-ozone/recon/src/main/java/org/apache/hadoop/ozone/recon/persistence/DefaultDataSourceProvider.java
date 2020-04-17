@@ -17,9 +17,15 @@
  */
 package org.apache.hadoop.ozone.recon.persistence;
 
+import static org.hadoop.ozone.recon.codegen.JooqCodeGenerator.RECON_SCHEMA_NAME;
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.createNewDerbyDatabase;
+
 import javax.sql.DataSource;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.derby.jdbc.EmbeddedDataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.sqlite.SQLiteDataSource;
 
 import com.google.inject.Inject;
@@ -30,6 +36,9 @@ import com.jolbox.bonecp.BoneCPDataSource;
  * Provide a {@link javax.sql.DataSource} for the application.
  */
 public class DefaultDataSourceProvider implements Provider<DataSource> {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DefaultDataSourceProvider.class);
 
   @Inject
   private DataSourceConfiguration configuration;
@@ -43,14 +52,26 @@ public class DefaultDataSourceProvider implements Provider<DataSource> {
    */
   @Override
   public DataSource get() {
-    if (StringUtils.contains(configuration.getJdbcUrl(), "sqlite")) {
+    String jdbcUrl = configuration.getJdbcUrl();
+    LOG.info("JDBC Url for Recon : {} ", jdbcUrl);
+    if (StringUtils.contains(jdbcUrl, "derby")) {
+      EmbeddedDataSource dataSource = null;
+      try {
+        createNewDerbyDatabase(jdbcUrl, RECON_SCHEMA_NAME);
+      } catch (Exception e) {
+        LOG.error("Error creating Recon Derby DB.", e);
+      }
+      dataSource = new EmbeddedDataSource();
+      dataSource.setDatabaseName(jdbcUrl.split(":")[2]);
+      dataSource.setUser(RECON_SCHEMA_NAME);
+      return dataSource;
+    } else if (StringUtils.contains(jdbcUrl, "sqlite")) {
       SQLiteDataSource ds = new SQLiteDataSource();
       ds.setUrl(configuration.getJdbcUrl());
       return ds;
     }
 
     BoneCPDataSource cpDataSource = new BoneCPDataSource();
-
     cpDataSource.setDriverClass(configuration.getDriverClass());
     cpDataSource.setJdbcUrl(configuration.getJdbcUrl());
     cpDataSource.setUsername(configuration.getUserName());
