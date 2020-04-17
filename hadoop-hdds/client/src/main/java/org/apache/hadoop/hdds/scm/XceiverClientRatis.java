@@ -208,7 +208,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   private CompletableFuture<RaftClientReply> sendRequestAsync(
       ContainerCommandRequestProto request) {
-    return TracingUtil.executeInsideNewSpan(
+    return TracingUtil.executeInNewSpan(
         "XceiverClientRatis." + request.getCmdType().name(),
         (Supplier<CompletableFuture<RaftClientReply>>) () -> {
           final ContainerCommandRequestMessage message

@@ -139,7 +139,7 @@ public final class TracingUtil {
   /**
    * Execute a new function inside an activated span.
    */
-  public static <R> R executeInsideNewSpan(String spanName,
+  public static <R> R executeInNewSpan(String spanName,
       SupplierWithIOException<R> supplier)
       throws IOException {
     Span span = GlobalTracer.get()
@@ -157,7 +157,7 @@ public final class TracingUtil {
   /**
    * Execute a new function inside an activated span.
    */
-  public static <R> R executeInsideNewSpan(String spanName,
+  public static <R> R executeInNewSpan(String spanName,
       Supplier<R> supplier) {
     Span span = GlobalTracer.get()
         .buildSpan(spanName).start();

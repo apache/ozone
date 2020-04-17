@@ -270,7 +270,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     String spanName = "XceiverClientGrpc." + request.getCmdType().name();
 
-    return TracingUtil.executeInsideNewSpan(spanName,
+    return TracingUtil.executeInNewSpan(spanName,
         (SupplierWithIOException<XceiverClientReply>) () -> {
 
           ContainerCommandRequestProto finalPayload =

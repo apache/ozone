@@ -39,7 +39,7 @@ public class S3Shell extends Shell {
   @Override
   public void execute(String[] argv) {
     TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    TracingUtil.executeInsideNewSpan("s3shell",
+    TracingUtil.executeInNewSpan("s3shell",
         (Supplier<Void>) () -> {
           super.execute(argv);
           return null;
