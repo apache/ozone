@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -97,7 +98,7 @@ public class TestSCMContainerManager {
       throw new IOException("Unable to create test directory path");
     }
     nodeManager = new MockNodeManager(true, 10);
-    DBStore dbStore = new SCMDBDefinition().createDBStore(conf);
+    DBStore dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
             SCMDBDefinition.PIPELINES.getTable(dbStore), new EventQueue());

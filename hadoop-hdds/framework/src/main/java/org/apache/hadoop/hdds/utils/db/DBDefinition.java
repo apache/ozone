@@ -18,27 +18,24 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Paths;
-
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
-import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
-import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Simple interface to provide a db store.
+ * Simple interface to provide information to create a DBStore..
  */
 public interface DBDefinition {
 
   Logger LOG = LoggerFactory.getLogger(DBDefinition.class);
 
+  /**
+   * Logical name of the DB.
+   */
   String getName();
 
+  /**
+   * Configuration key defines the location of the DB.
+   */
   String getLocationConfigKey();
 
   /**
@@ -46,36 +43,4 @@ public interface DBDefinition {
    */
   DBColumnFamilyDefinition[] getColumnFamilies();
 
-  default void registerTables(DBStoreBuilder builder) {
-    for (DBColumnFamilyDefinition columnTableDefinition : getColumnFamilies()) {
-      columnTableDefinition.registerTable(builder);
-    }
-  }
-
-  default DBStoreBuilder createDBStoreBuilder(
-      OzoneConfiguration configuration) {
-
-    File metadataDir = getDirectoryFromConfig(configuration,
-        getLocationConfigKey(), getName());
-
-    if (metadataDir == null) {
-
-      LOG.warn("{} is not configured. We recommend adding this setting. " +
-              "Falling back to {} instead.",
-          getLocationConfigKey(), HddsConfigKeys.OZONE_METADATA_DIRS);
-      metadataDir = getOzoneMetaDirPath(configuration);
-    }
-
-    DBStoreBuilder builder = DBStoreBuilder.newBuilder(configuration)
-        .setName(getName())
-        .setPath(Paths.get(metadataDir.getPath()));
-    return builder;
-  }
-
-  default DBStore createDBStore(OzoneConfiguration configuration)
-      throws IOException {
-    DBStoreBuilder builder = createDBStoreBuilder(configuration);
-    registerTables(builder);
-    return builder.build();
-  }
 }

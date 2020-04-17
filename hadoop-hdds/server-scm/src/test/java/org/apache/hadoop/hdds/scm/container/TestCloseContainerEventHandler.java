@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -74,7 +75,8 @@ public class TestCloseContainerEventHandler {
     configuration.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 16);
     nodeManager = new MockNodeManager(true, 10);
     eventQueue = new EventQueue();
-    dbStore = new SCMDBDefinition().createDBStore(configuration);
+    dbStore =
+        DBStoreBuilder.createDBStore(configuration, new SCMDBDefinition());
     pipelineManager =
         new SCMPipelineManager(configuration, nodeManager,
             SCMDBDefinition.PIPELINES.getTable(dbStore), eventQueue);

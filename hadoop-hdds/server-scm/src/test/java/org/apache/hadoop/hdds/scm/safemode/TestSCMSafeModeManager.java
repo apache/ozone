@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.junit.After;
@@ -87,7 +88,7 @@ public class TestSCMSafeModeManager {
   public void initDbStore() throws IOException {
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempDir.newFolder().getAbsolutePath());
-    dbStore = new SCMDBDefinition().createDBStore(config);
+    dbStore = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
   }
 
   @After

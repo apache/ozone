@@ -28,15 +28,15 @@ import java.io.IOException;
  */
 public class DBColumnFamilyDefinition<KEY, VALUE> {
 
-  private String tableName;
+  private final String tableName;
 
-  private Class<KEY> keyType;
+  private final Class<KEY> keyType;
 
-  private Codec<KEY> keyCodec;
+  private final Codec<KEY> keyCodec;
 
-  private Class<VALUE> valueType;
+  private final Class<VALUE> valueType;
 
-  private Codec<VALUE> valueCodec;
+  private final Codec<VALUE> valueCodec;
 
   public DBColumnFamilyDefinition(
       String tableName,
@@ -55,13 +55,27 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
     return db.getTable(tableName, keyType, valueType);
   }
 
-  public void registerTable(DBStoreBuilder storeBuilder) {
-    storeBuilder.addTable(tableName)
-        .addCodec(keyType, keyCodec)
-        .addCodec(valueType, valueCodec);
-  }
-
   public String getName() {
     return tableName;
+  }
+
+  public String getTableName() {
+    return tableName;
+  }
+
+  public Class<KEY> getKeyType() {
+    return keyType;
+  }
+
+  public Codec<KEY> getKeyCodec() {
+    return keyCodec;
+  }
+
+  public Class<VALUE> getValueType() {
+    return valueType;
+  }
+
+  public Codec<VALUE> getValueCodec() {
+    return valueCodec;
   }
 }

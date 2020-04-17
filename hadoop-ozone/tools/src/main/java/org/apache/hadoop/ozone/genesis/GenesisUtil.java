@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -148,7 +149,7 @@ public final class GenesisUtil {
 
   static void addPipelines(HddsProtos.ReplicationFactor factor,
       int numPipelines, OzoneConfiguration conf) throws Exception {
-    DBStore dbStore = new SCMDBDefinition().createDBStore(conf);
+    DBStore dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
 
     Table<PipelineID, Pipeline> pipelineTable =
         SCMDBDefinition.PIPELINES.getTable(dbStore);

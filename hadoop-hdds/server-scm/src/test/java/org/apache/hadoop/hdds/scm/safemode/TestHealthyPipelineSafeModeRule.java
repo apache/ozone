@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.junit.Assert;
@@ -68,7 +69,7 @@ public class TestHealthyPipelineSafeModeRule {
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
       config.setBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-      store = new SCMDBDefinition().createDBStore(config);
+      store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
       SCMPipelineManager pipelineManager = new SCMPipelineManager(config,
           nodeManager, SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
       PipelineProvider mockRatisProvider =
@@ -112,7 +113,7 @@ public class TestHealthyPipelineSafeModeRule {
       config.setBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
-      store = new SCMDBDefinition().createDBStore(config);
+      store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
       SCMPipelineManager pipelineManager = new SCMPipelineManager(config,
           nodeManager, SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
       pipelineManager.allowPipelineCreation();
@@ -189,7 +190,7 @@ public class TestHealthyPipelineSafeModeRule {
       config.setBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
-      store = new SCMDBDefinition().createDBStore(config);
+      store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
       SCMPipelineManager pipelineManager = new SCMPipelineManager(config,
           nodeManager, SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
 

@@ -30,11 +30,14 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
@@ -261,6 +264,47 @@ public final class DBStoreBuilder {
       throw new IOException("A valid DB name is required.");
     }
     return Paths.get(dbPath.toString(), dbname).toFile();
+  }
+
+  private static DBStoreBuilder createDBStoreBuilder(
+      OzoneConfiguration configuration, DBDefinition definition) {
+
+    File metadataDir = getDirectoryFromConfig(configuration,
+        definition.getLocationConfigKey(), definition.getName());
+
+    if (metadataDir == null) {
+
+      LOG.warn("{} is not configured. We recommend adding this setting. " +
+              "Falling back to {} instead.",
+          definition.getLocationConfigKey(),
+          HddsConfigKeys.OZONE_METADATA_DIRS);
+      metadataDir = getOzoneMetaDirPath(configuration);
+    }
+
+    return DBStoreBuilder.newBuilder(configuration)
+        .setName(definition.getName())
+        .setPath(Paths.get(metadataDir.getPath()));
+  }
+
+  /**
+   * Create DBStoreBuilder from a generic DBDefinition.
+   */
+  public static DBStore createDBStore(OzoneConfiguration configuration,
+      DBDefinition definition)
+      throws IOException {
+    DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
+    for (DBColumnFamilyDefinition columnTableDefinition : definition
+        .getColumnFamilies()) {
+      builder.registerTable(columnTableDefinition);
+    }
+    return builder.build();
+  }
+
+  private <KEY, VALUE> void registerTable(
+      DBColumnFamilyDefinition<KEY, VALUE> definition) {
+    addTable(definition.getName())
+        .addCodec(definition.getKeyType(), definition.getKeyCodec())
+        .addCodec(definition.getValueType(), definition.getValueCodec());
   }
 
 }

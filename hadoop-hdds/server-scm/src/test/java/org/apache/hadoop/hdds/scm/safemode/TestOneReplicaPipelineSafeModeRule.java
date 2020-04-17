@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.junit.Assert;
@@ -69,7 +70,8 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     eventQueue = new EventQueue();
 
-    DBStore dbStore = new SCMDBDefinition().createDBStore(ozoneConfiguration);
+    DBStore dbStore =
+        DBStoreBuilder.createDBStore(ozoneConfiguration, new SCMDBDefinition());
 
     pipelineManager =
         new SCMPipelineManager(ozoneConfiguration, mockNodeManager,

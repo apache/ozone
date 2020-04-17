@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -81,7 +82,7 @@ public class TestSCMPipelineManager {
     }
     nodeManager = new MockNodeManager(true, 20);
 
-    store = new SCMDBDefinition().createDBStore(conf);
+    store = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
 
 
   }

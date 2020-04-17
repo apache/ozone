@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.PathUtils;
@@ -70,7 +71,8 @@ public class TestContainerPlacement {
 
   @Before
   public void createDbStore() throws IOException {
-    dbStore = new SCMDBDefinition().createDBStore(getConf());
+    dbStore =
+        DBStoreBuilder.createDBStore(getConf(), new SCMDBDefinition());
   }
 
   @After

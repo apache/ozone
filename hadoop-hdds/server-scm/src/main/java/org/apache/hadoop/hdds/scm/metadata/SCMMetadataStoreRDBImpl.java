@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -82,7 +83,7 @@ public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
       throws IOException {
     if (this.store == null) {
 
-      this.store = new SCMDBDefinition().createDBStore(config);
+      this.store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
 
       deletedBlocksTable =
           DELETED_BLOCKS.getTable(this.store);
