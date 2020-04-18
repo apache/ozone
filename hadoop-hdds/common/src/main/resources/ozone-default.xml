@@ -390,9 +390,9 @@
     <name>ozone.client.stream.buffer.flush.delay</name>
     <value>false</value>
     <tag>OZONE, CLIENT</tag>
-    <description>If set true, when call flush()，we'll determine whether the
+    <description>If set true, when call flush() and determine whether the
       data in the current buffer is greater than ozone.client.stream.buffer.size.
-      if greater than it we'll sent buffer to the datanode.
+      if greater than then send buffer to the datanode.
     </description>
   </property>
   <property>

@@ -151,7 +151,7 @@ public final class OzoneConfigKeys {
 
   /**
    * If this value is true, when the client calls the flush() method,
-   * we will checks whether the data in the buffer is greater than
+   * it checks whether the data in the buffer is greater than
    * OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT. If greater than,
    * send the data in the buffer to the datanode.
    * */
