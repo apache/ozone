@@ -1,6 +1,6 @@
 ---
 title: "测试工具"
-summary: Ozone 提供了负载生成、分片测试、验收测试等多种测试工具。
+summary: Ozone 提供了负载生成、网络分片测试、验收测试等多种测试工具。
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
