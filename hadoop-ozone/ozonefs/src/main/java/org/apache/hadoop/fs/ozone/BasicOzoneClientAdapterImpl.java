@@ -331,7 +331,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public Map<String, List<OzoneAcl>> getAcl(String keyName) throws IOException {
+  public Map<String, List<OzoneAcl>> getAcls(String keyName) throws IOException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(bucket.getName()).setVolumeName(volume.getName())
         .setKeyName(keyName).setResType(OzoneObj.ResourceType.KEY)
@@ -353,7 +353,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public void setAcl(String keyName, String acls) throws IOException {
+  public void setAcls(String keyName, String acls) throws IOException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(bucket.getName()).setVolumeName(volume.getName())
         .setKeyName(keyName).setResType(OzoneObj.ResourceType.KEY)

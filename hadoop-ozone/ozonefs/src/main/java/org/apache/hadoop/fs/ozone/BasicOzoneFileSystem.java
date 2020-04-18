@@ -52,7 +52,6 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
-import org.apache.hadoop.ozone.web.utils.JsonUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -721,13 +720,11 @@ public class BasicOzoneFileSystem extends FileSystem {
    */
   @Override
   public AclStatus getAclStatus(Path path) throws IOException {
-    Map<String, List<OzoneAcl>> ozoneAcls = adapter.getAcl(pathToKey(path));
+    Map<String, List<OzoneAcl>> ozoneAcls = adapter.getAcls(pathToKey(path));
     String userAcls =
-        JsonUtils.toJsonStringWithDefaultPrettyPrinter(
-            ozoneAcls.get(ACLIdentityType.USER.toString()));
+        ozoneAcls.get(ACLIdentityType.USER.toString()).toString();
     String groupAcls =
-        JsonUtils.toJsonStringWithDefaultPrettyPrinter(
-            ozoneAcls.get(ACLIdentityType.GROUP.toString()));
+        ozoneAcls.get(ACLIdentityType.GROUP.toString()).toString();
     return new AclStatus.Builder()
             .owner(userAcls)
             .group(groupAcls)
@@ -746,40 +743,7 @@ public class BasicOzoneFileSystem extends FileSystem {
    */
   @Override
   public void setAcl(Path path, List<AclEntry> aclSpec) throws IOException {
-    adapter.setAcl(pathToKey(path), aclSpecToString(aclSpec));
-  }
-
-  public String toAclString(AclEntry aclEntry) {
-    StringBuilder sb = new StringBuilder();
-
-    if (aclEntry.getType() != null) {
-      sb.append(StringUtils.toLowerCase(aclEntry.getType().toString()));
-    }
-    sb.append(':');
-    if (aclEntry.getName() != null) {
-      sb.append(aclEntry.getName());
-    }
-    sb.append(':');
-    // For example, change "r-x" to "rx"
-    if (aclEntry.getPermission() != null) {
-      sb.append(aclEntry.getPermission().SYMBOL.replace("-", ""));
-    }
-    return sb.toString();
-  }
-
-  /**
-   * Convert a List of AclEntries into a string.
-   *
-   * @param aclSpec List of AclEntries to convert
-   * @return String representation of aclSpec
-   */
-  public String aclSpecToString(List<AclEntry> aclSpec) {
-    StringBuilder buf = new StringBuilder();
-    for (AclEntry e : aclSpec) {
-      buf.append(toAclString(e));
-      buf.append(",");
-    }
-    return buf.substring(0, buf.length()-1);
+    adapter.setAcls(pathToKey(path), new OzoneAcl().aclSpecToString(aclSpec));
   }
 
   /**

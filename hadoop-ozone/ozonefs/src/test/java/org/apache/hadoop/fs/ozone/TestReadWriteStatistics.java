@@ -366,7 +366,7 @@ public class TestReadWriteStatistics {
         .setType(AclEntryType.USER).build();
     aclEntries.add(aclEntry);
 
-    assertFalse(fs.aclSpecToString(aclEntries).contains("-"));
+    assertFalse(new OzoneAcl().aclSpecToString(aclEntries).contains("-"));
   }
 
   // INTERNALS
@@ -501,6 +501,6 @@ public class TestReadWriteStatistics {
     ozoneAcls.put(IAccessAuthorizer.ACLIdentityType.USER.toString(), userAcl);
     ozoneAcls.put(IAccessAuthorizer.ACLIdentityType.GROUP.toString(), groupAcl);
 
-    when(fakeAdapter.getAcl(anyString())).thenReturn(ozoneAcls);
+    when(fakeAdapter.getAcls(anyString())).thenReturn(ozoneAcls);
   }
 }

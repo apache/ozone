@@ -21,11 +21,13 @@ package org.apache.hadoop.ozone;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.protobuf.ByteString;
+import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -339,5 +341,38 @@ public class OzoneAcl {
   public enum AclScope {
     ACCESS,
     DEFAULT;
+  }
+
+  public String toAclString(AclEntry aclEntry) {
+    StringBuilder sb = new StringBuilder();
+
+    if (aclEntry.getType() != null) {
+      sb.append(StringUtils.toLowerCase(aclEntry.getType().toString()));
+    }
+    sb.append(':');
+    if (aclEntry.getName() != null) {
+      sb.append(aclEntry.getName());
+    }
+    sb.append(':');
+    // For example, change "r-x" to "rx"
+    if (aclEntry.getPermission() != null) {
+      sb.append(aclEntry.getPermission().SYMBOL.replace("-", ""));
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Convert a List of AclEntries into a string.
+   *
+   * @param aclSpec List of AclEntries to convert
+   * @return String representation of aclSpec
+   */
+  public String aclSpecToString(List<AclEntry> aclSpec) {
+    StringBuilder buf = new StringBuilder();
+    for (AclEntry e : aclSpec) {
+      buf.append(toAclString(e));
+      buf.append(",");
+    }
+    return buf.substring(0, buf.length()-1);
   }
 }

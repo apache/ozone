@@ -54,9 +54,9 @@ public interface OzoneClientAdapter {
 
   Iterator<BasicKeyInfo> listKeys(String pathKey);
 
-  Map<String, List<OzoneAcl>> getAcl(String pathKey) throws IOException;
+  Map<String, List<OzoneAcl>> getAcls(String pathKey) throws IOException;
 
-  void setAcl(String keyName, String acls) throws IOException;
+  void setAcls(String keyName, String acls) throws IOException;
 
   List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries, URI uri,
