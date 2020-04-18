@@ -21,7 +21,7 @@ summary: Ozone 提供了负载生成、网络分片测试、验收测试等多�
 
 测试是开发分布式系统中最重要的部分，我们提供了以下类型的测试。
 
-本页面给出了 Ozone 自身的测试工具。
+本页面给出了 Ozone 自带的测试工具。
 
 注意：我们还进行了其它测试（比如通过 Spark 或 Hive 进行的 TCP-DS、TCP-H），但因为它们是外部工具，所以没有在此列出。
 
@@ -33,7 +33,7 @@ summary: Ozone 提供了负载生成、网络分片测试、验收测试等多�
 
 传统的单元测试只能测试一个单元，但我们也有更高层次的单元测试。它们使用 `MiniOzoneCluster` 辅助方法在单元测试中启动守护进程（SCM、OM、数据节点）。
 
-从 maven 或 java 的角度来看，集成测试也只是普通的单元测试而已（使用了 JUnit 库），但为了将它们分开（同时解决一些依赖问题），我们将集成测试移到了 `hadoop-ozone/integration-test` 目录下。
+从 maven 或 java 的角度来看，集成测试也只是普通的单元测试而已（使用了 JUnit 库），但为了解决一些依赖问题，我们将它们单独放在了 `hadoop-ozone/integration-test` 目录下。
 
 ## 冒烟测试
 
@@ -48,7 +48,7 @@ summary: Ozone 提供了负载生成、网络分片测试、验收测试等多�
 例如，一种测试分发包的简单方法是：
 
 ```
-cd compose/ozonze
+cd compose/ozone
 ./test.sh
 ```
 
