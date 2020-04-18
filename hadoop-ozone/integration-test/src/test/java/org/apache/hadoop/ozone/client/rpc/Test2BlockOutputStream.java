@@ -148,7 +148,7 @@ public class Test2BlockOutputStream {
 
     // we have just written data(length 10) less than chunk Size,
     // at this time we call flush will not  sync data.
-    Assert.assertEquals(0, blockOutputStream.getWrittenDataLength());
+    Assert.assertEquals(0, blockOutputStream.getTotalDataFlushedLength());
     key1.close();
     validateData(keyName1, data1);
 
@@ -169,8 +169,8 @@ public class Test2BlockOutputStream {
     // we have just written data(length 110) greater than chunk Size,
     // at this time we call flush will sync data.
     Assert.assertEquals(data2.length,
-            blockOutputStream.getWrittenDataLength());
-    key2.close();;
+            blockOutputStream.getTotalDataFlushedLength());
+    key2.close();
     validateData(keyName2, data2);
   }
 
