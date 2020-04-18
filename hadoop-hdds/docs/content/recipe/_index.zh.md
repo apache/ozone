@@ -1,5 +1,5 @@
 ---
-title: 食谱
+title: 使用配方
 date: "2017-10-10"
 menu: main
 weight: 9
@@ -23,6 +23,6 @@ weight: 9
 -->
 
 
-{{<jumbotron title="Ozone 食谱">}}
+{{<jumbotron title="Ozone 使用配方">}}
    关于如何通过其它软件使用 Ozone 的标准文档，比如通过 Apache Spark 使用 Ozone。
 {{</jumbotron>}}
