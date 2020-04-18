@@ -331,7 +331,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public Map<String, List<OzoneAcl>> getAcls(String keyName) throws IOException {
+  public Map<String, List<OzoneAcl>> getAcls(String keyName)
+      throws IOException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(bucket.getName()).setVolumeName(volume.getName())
         .setKeyName(keyName).setResType(OzoneObj.ResourceType.KEY)
