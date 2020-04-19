@@ -28,13 +28,11 @@ import java.nio.ByteBuffer;
 public class ReadOnlyLoadGenerator extends LoadGenerator {
   private final LoadBucket replBucket;
   private final DataBuffer dataBuffer;
-  private final int numKeys;
+  private final static int numKeys = 10;
 
-  public ReadOnlyLoadGenerator(DataBuffer dataBuffer, LoadBucket replBucket,
-                               int numKeys) {
+  public ReadOnlyLoadGenerator(DataBuffer dataBuffer, LoadBucket replBucket) {
     this.dataBuffer = dataBuffer;
     this.replBucket = replBucket;
-    this.numKeys = numKeys;
   }
 
   @Override
