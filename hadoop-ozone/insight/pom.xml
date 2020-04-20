@@ -81,16 +81,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>3.2.4</version>
     </dependency>
     <dependency>
-      <groupId>org.openjdk.jmh</groupId>
-      <artifactId>jmh-core</artifactId>
-      <version>1.19</version>
-    </dependency>
-    <dependency>
-      <groupId>org.openjdk.jmh</groupId>
-      <artifactId>jmh-generator-annprocess</artifactId>
-      <version>1.19</version>
-    </dependency>
-    <dependency>
       <groupId>com.github.spotbugs</groupId>
       <artifactId>spotbugs</artifactId>
       <scope>provided</scope>
