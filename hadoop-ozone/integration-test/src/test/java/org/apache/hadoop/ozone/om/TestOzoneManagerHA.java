@@ -468,6 +468,7 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(data, new String(fileContent));
   }
 
+  @Ignore("This test failing randomly and triggering HDDS-3465.     ` `4qa  wq")
   @Test
   public void testMultipartUploadWithOneOmNodeDown() throws Exception {
 
