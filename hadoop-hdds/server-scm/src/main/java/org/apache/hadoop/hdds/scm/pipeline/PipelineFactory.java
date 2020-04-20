@@ -43,7 +43,7 @@ public class PipelineFactory {
       ConfigurationSource conf, EventPublisher eventPublisher) {
     providers = new HashMap<>();
     providers.put(ReplicationType.STAND_ALONE,
-        new SimplePipelineProvider(nodeManager));
+        new SimplePipelineProvider(nodeManager, stateManager));
     providers.put(ReplicationType.RATIS,
         new RatisPipelineProvider(nodeManager, stateManager, conf,
             eventPublisher));

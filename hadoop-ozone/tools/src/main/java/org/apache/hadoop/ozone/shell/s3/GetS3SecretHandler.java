@@ -32,12 +32,15 @@ import java.io.IOException;
 public class GetS3SecretHandler extends S3Handler {
 
   @Override
+  protected boolean isApplicable() {
+    return securityEnabled();
+  }
+
+  @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-    if (securityEnabled("s3 getsecret")) {
-      String userName = UserGroupInformation.getCurrentUser().getUserName();
-      out().println(client.getObjectStore().getS3Secret(userName));
-    }
+    String userName = UserGroupInformation.getCurrentUser().getUserName();
+    out().println(client.getObjectStore().getS3Secret(userName));
   }
 
 }

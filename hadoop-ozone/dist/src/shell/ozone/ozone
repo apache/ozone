@@ -130,6 +130,18 @@ function ozonecmd_case
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     genesis)
+      ARTIFACT_LIB_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib/hadoop-ozone-tools"
+      mkdir -p "$ARTIFACT_LIB_DIR"
+      if [[ ! -f "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar" ]]; then
+        echo "jmh-core jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: GPL + classpath exception)"
+        curl -o "$ARTIFACT_LIB_DIR/jmh-core-1.23.jar"  https://repo1.maven.org/maven2/org/openjdk/jmh/jmh-core/1.23/jmh-core-1.23.jar
+      fi
+
+      if [[ ! -f "$ARTIFACT_LIB_DIR/jopt-simple-4.6.jar" ]]; then
+        echo "jopt jar is missing from $ARTIFACT_LIB_DIR, trying to download from maven central (License: MIT License)"
+        curl -o "$ARTIFACT_LIB_DIR/jopt-simple-4.6.jar" https://repo1.maven.org/maven2/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar
+      fi
+
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.genesis.Genesis
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
@@ -269,39 +281,7 @@ else
   ozonecmd_case "${HADOOP_SUBCMD}" "${HADOOP_SUBCMD_ARGS[@]}"
 fi
 
-
-#
-# Setting up classpath based on the generate classpath descriptors
-#
-if [ ! "$OZONE_RUN_ARTIFACT_NAME" ]; then
-   echo "ERROR: Ozone components require to set OZONE_RUN_ARTIFACT_NAME to set the classpath"
-   exit -1
-fi
-export HDDS_LIB_JARS_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib"
-CLASSPATH_FILE="${HADOOP_HDFS_HOME}/share/ozone/classpath/${OZONE_RUN_ARTIFACT_NAME}.classpath"
-if [ ! "$CLASSPATH_FILE" ]; then
-   echo "ERROR: Classpath file descriptor $CLASSPATH_FILE is missing"
-   exit -1
-fi
-# shellcheck disable=SC1090,SC2086
-source $CLASSPATH_FILE
-OIFS=$IFS
-IFS=':'
-# shellcheck disable=SC2154
-for jar in $classpath; do
-   hadoop_add_classpath "$jar"
-done
-hadoop_add_classpath "${HADOOP_HDFS_HOME}/share/ozone/web"
-
-#We need to add the artifact manually as it's not part the generated classpath desciptor
-ARTIFACT_LIB_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib"
-MAIN_ARTIFACT=$(find "$ARTIFACT_LIB_DIR" -name "${OZONE_RUN_ARTIFACT_NAME}-*.jar")
-if [ ! "$MAIN_ARTIFACT" ]; then
-   echo "ERROR: Component jar file $MAIN_ARTIFACT is missing from ${HADOOP_HDFS_HOME}/share/ozone/lib"
-fi
-hadoop_add_classpath "${MAIN_ARTIFACT}"
-IFS=$OIFS
-
+hadoop_assembly_classpath "$OZONE_RUN_ARTIFACT_NAME"
 
 hadoop_add_client_opts
 
