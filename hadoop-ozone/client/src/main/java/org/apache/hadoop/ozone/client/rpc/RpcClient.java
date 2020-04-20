@@ -696,6 +696,7 @@ public class RpcClient implements ClientProtocol {
   public void renameKey(String volumeName, String bucketName,
       String fromKeyName, String toKeyName) throws IOException {
     HddsClientUtils.verifyResourceName(volumeName, bucketName);
+    HddsClientUtils.verifyKeyName(toKeyName);
     HddsClientUtils.checkNotNull(fromKeyName, toKeyName);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -871,6 +872,7 @@ public class RpcClient implements ClientProtocol {
                                               String uploadID)
       throws IOException {
     HddsClientUtils.verifyResourceName(volumeName, bucketName);
+    HddsClientUtils.verifyKeyName(keyName);
     HddsClientUtils.checkNotNull(keyName, uploadID);
     Preconditions.checkArgument(partNumber > 0 && partNumber <=10000, "Part " +
         "number should be greater than zero and less than or equal to 10000");

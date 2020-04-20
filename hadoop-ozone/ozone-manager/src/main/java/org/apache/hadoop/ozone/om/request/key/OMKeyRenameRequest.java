@@ -23,6 +23,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -82,6 +83,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     Preconditions.checkNotNull(renameKeyRequest);
+
+    // Verify key name
+    OmUtils.validateKeyName(renameKeyRequest.getToKeyName());
 
     // Set modification time.
     KeyArgs.Builder newKeyArgs = renameKeyRequest.getKeyArgs().toBuilder()

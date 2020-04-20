@@ -338,4 +338,5 @@ public final class OzoneConsts {
   public static final String KEYNAME_AVOID_CHARACTERS_REGEX =
           "^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]$";
 
+  public static final String FS_FILE_COPYING_TEMP_SUFFIX= "._COPYING_";
 }

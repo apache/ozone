@@ -27,7 +27,10 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
@@ -89,6 +92,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
     Preconditions.checkNotNull(createFileRequest);
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
+
+    // Verify key name
+    OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
+                    OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
 
     if (keyArgs.getKeyName().length() == 0) {
       // Check if this is the root of the filesystem.
