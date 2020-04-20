@@ -81,7 +81,7 @@ public class SCMContainerManager implements ContainerManager {
    * passed to LevelDB and this memory is allocated in Native code space.
    * CacheSize is specified
    * in MB.
-   * @param conf - {@link org.apache.hadoop.hdds.conf.ConfigurationSource}
+   * @param conf - {@link ConfigurationSource}
    * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
