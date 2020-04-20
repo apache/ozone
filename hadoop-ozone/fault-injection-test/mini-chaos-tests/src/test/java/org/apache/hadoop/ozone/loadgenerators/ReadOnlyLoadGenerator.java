@@ -28,7 +28,7 @@ import java.nio.ByteBuffer;
 public class ReadOnlyLoadGenerator extends LoadGenerator {
   private final LoadBucket replBucket;
   private final DataBuffer dataBuffer;
-  private final static int numKeys = 10;
+  private final static int NUM_KEYS = 10;
 
   public ReadOnlyLoadGenerator(DataBuffer dataBuffer, LoadBucket replBucket) {
     this.dataBuffer = dataBuffer;
@@ -37,7 +37,7 @@ public class ReadOnlyLoadGenerator extends LoadGenerator {
 
   @Override
   public void generateLoad() throws Exception {
-    int index = RandomUtils.nextInt(0, numKeys);
+    int index = RandomUtils.nextInt(0, NUM_KEYS);
     ByteBuffer buffer = dataBuffer.getBuffer(index);
     String keyName = getKeyName(index);
     replBucket.readKey(buffer, keyName);
@@ -45,7 +45,7 @@ public class ReadOnlyLoadGenerator extends LoadGenerator {
 
 
   public void initialize() throws Exception {
-    for (int index = 0; index < numKeys; index++) {
+    for (int index = 0; index < NUM_KEYS; index++) {
       ByteBuffer buffer = dataBuffer.getBuffer(index);
       String keyName = getKeyName(index);
       replBucket.writeKey(buffer, keyName);

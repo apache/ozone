@@ -109,23 +109,23 @@ public class MiniOzoneLoadGenerator {
       return this;
     }
 
-    public Builder setConf(OzoneConfiguration conf) {
-      this.conf = conf;
+    public Builder setConf(OzoneConfiguration configuration) {
+      this.conf = configuration;
       return this;
     }
 
-    public Builder setNumBuffers(int numBuffers) {
-      this.numBuffers = numBuffers;
+    public Builder setNumBuffers(int buffers) {
+      this.numBuffers = buffers;
       return this;
     }
 
-    public Builder setNumThreads(int numThreads) {
-      this.numThreads = numThreads;
+    public Builder setNumThreads(int threads) {
+      this.numThreads = threads;
       return this;
     }
 
-    public Builder setVolume(OzoneVolume volume) {
-      this.volume = volume;
+    public Builder setVolume(OzoneVolume vol) {
+      this.volume = vol;
       return this;
     }
 
