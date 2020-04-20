@@ -112,7 +112,7 @@ jobs:
           if: always()
           with:
             name: acceptance
-            path: /mnt/ozone/result
+            path: /mnt/ozone/compose/result
   it-freon:
     name: it-freon
     runs-on: ubuntu-18.04
