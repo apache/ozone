@@ -112,6 +112,8 @@ jobs:
         - run: sudo chown runner -R .
         - run: cd ./hadoop-ozone/dist/target/ozone-*/ && mkdir .aws && sudo chown 1000 .aws
         - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
+          env:
+            KEEP_IMAGE: false
         - uses: actions/upload-artifact@master
           if: always()
           with:
