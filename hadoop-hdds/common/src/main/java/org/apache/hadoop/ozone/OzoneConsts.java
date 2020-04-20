@@ -324,5 +324,18 @@ public final class OzoneConsts {
   public static final String GDPR_SECRET = "secret";
   public static final String GDPR_ALGORITHM = "algorithm";
 
+  /**
+   * Block key name as illegal characters
+   *
+   * This regular expression is used to check if key name
+   * contains illegal characters when creating/renaming key.
+   *
+   * Avoid the following characters in a key name:
+   * "\", "{", "}", "^", "<", ">", "#", "|", "%", "`", "[", "]", "~", "?"
+   * and Non-printable ASCII characters (128–255 decimal characters).
+   * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
+   */
+  public static final String KEYNAME_AVOID_CHARACTERS_REGEX =
+          "^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]$";
 
 }
