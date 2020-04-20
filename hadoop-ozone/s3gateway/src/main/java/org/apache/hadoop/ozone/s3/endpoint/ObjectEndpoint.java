@@ -259,8 +259,7 @@ public class ObjectEndpoint extends EndpointBase {
           try (S3WrapperInputStream s3WrapperInputStream =
               new S3WrapperInputStream(
                   key.getInputStream())) {
-            IOUtils.copyLarge(s3WrapperInputStream, dest, startOffset,
-                copyLength);
+            s3WrapperInputStream.copyLarge(dest, startOffset, copyLength);
           }
         };
         responseBuilder = Response

@@ -18,17 +18,20 @@
 
 package org.apache.hadoop.ozone.s3.io;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * S3Wrapper Input Stream which encapsulates KeyInputStream from ozone.
  */
 public class S3WrapperInputStream extends FSInputStream {
   private final KeyInputStream inputStream;
+  private static final int DEFAULT_BUFFER_SIZE = 32 * 1024;
 
   /**
    * Constructs S3WrapperInputStream with KeyInputStream.
@@ -75,5 +78,88 @@ public class S3WrapperInputStream extends FSInputStream {
   @Override
   public boolean seekToNewSource(long targetPos) throws IOException {
     return false;
+  }
+
+  /**
+   * Copies some or all bytes from a large (over 2GB) <code>InputStream</code>
+   * to an <code>OutputStream</code>, optionally skipping input bytes.
+   * <p>
+   * Copy the method from IOUtils of commons-io to reimplement skip by seek
+   * rather than read. The reason why IOUtils of commons-io implement skip
+   * by read can be found at
+   * <a href="https://issues.apache.org/jira/browse/IO-203">IO-203</a>.
+   * </p>
+   * <p>
+   * This method buffers the input internally, so there is no need to use a
+   * <code>BufferedInputStream</code>.
+   * </p>
+   * The buffer size is given by {@link #DEFAULT_BUFFER_SIZE}.
+   *
+   * @param output the <code>OutputStream</code> to write to
+   * @param inputOffset : number of bytes to skip from input before copying
+   * -ve values are ignored
+   * @param length : number of bytes to copy. -ve means all
+   * @return the number of bytes copied
+   * @throws NullPointerException if the input or output is null
+   * @throws IOException          if an I/O error occurs
+   */
+  public long copyLarge(final OutputStream output, final long inputOffset,
+      final long length) throws IOException {
+    return copyLarge(output, inputOffset, length,
+        new byte[DEFAULT_BUFFER_SIZE]);
+  }
+
+  /**
+   * Copies some or all bytes from a large (over 2GB) <code>InputStream</code>
+   * to an <code>OutputStream</code>, optionally skipping input bytes.
+   * <p>
+   * Copy the method from IOUtils of commons-io to reimplement skip by seek
+   * rather than read. The reason why IOUtils of commons-io implement skip
+   * by read can be found at
+   * <a href="https://issues.apache.org/jira/browse/IO-203">IO-203</a>.
+   * </p>
+   * <p>
+   * This method uses the provided buffer, so there is no need to use a
+   * <code>BufferedInputStream</code>.
+   * </p>
+   *
+   * @param output the <code>OutputStream</code> to write to
+   * @param inputOffset : number of bytes to skip from input before copying
+   * -ve values are ignored
+   * @param length : number of bytes to copy. -ve means all
+   * @param buffer the buffer to use for the copy
+   * @return the number of bytes copied
+   * @throws NullPointerException if the input or output is null
+   * @throws IOException          if an I/O error occurs
+   */
+  public long copyLarge(final OutputStream output,
+      final long inputOffset, final long length, final byte[] buffer)
+      throws IOException {
+    if (inputOffset > 0) {
+      seek(inputOffset);
+    }
+    if (length == 0) {
+      return 0;
+    }
+    final int bufferLength = buffer.length;
+    int bytesToRead = bufferLength;
+    if (length > 0 && length < bufferLength) {
+      bytesToRead = (int) length;
+    }
+    int read;
+    long totalRead = 0;
+    while (bytesToRead > 0) {
+      read = inputStream.read(buffer, 0, bytesToRead);
+      if (read == IOUtils.EOF) {
+        break;
+      }
+      output.write(buffer, 0, read);
+      totalRead += read;
+      if (length > 0) { // only adjust length if not reading to the end
+        // Note the cast must work because buffer.length is an integer
+        bytesToRead = (int) Math.min(length - totalRead, bufferLength);
+      }
+    }
+    return totalRead;
   }
 }
