@@ -29,8 +29,8 @@ import java.util.Map;
 import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.security.SecurityUtil;
@@ -236,7 +236,7 @@ public class OzoneGetConf extends Configured implements Tool {
     public int doWorkInternal(OzoneGetConf tool, String[] args)
         throws IOException {
       Collection<InetSocketAddress> addresses = HddsUtils
-          .getSCMAddresses(new LegacyHadoopConfigurationSource(tool.getConf()));
+          .getSCMAddresses(OzoneConfiguration.of(tool.getConf()));
 
       for (InetSocketAddress addr : addresses) {
         tool.printOut(addr.getHostName());
@@ -252,14 +252,15 @@ public class OzoneGetConf extends Configured implements Tool {
     @Override
     public int doWorkInternal(OzoneGetConf tool, String[] args)
         throws IOException {
-      LegacyHadoopConfigurationSource configSource =
-          new LegacyHadoopConfigurationSource(tool.getConf());
+      ConfigurationSource configSource =
+          OzoneConfiguration.of(tool.getConf());
       if (OmUtils.isServiceIdsDefined(
           configSource)) {
         tool.printOut(OmUtils.getOmHAAddressesById(configSource).toString());
       } else {
         tool.printOut(OmUtils.getOmAddress(configSource).getHostName());
       }
+
       return 0;
     }
   }

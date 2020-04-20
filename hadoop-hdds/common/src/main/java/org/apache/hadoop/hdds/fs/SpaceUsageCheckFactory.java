@@ -76,9 +76,9 @@ public interface SpaceUsageCheckFactory {
     if (className != null && !className.isEmpty()) {
       try {
         aClass =
-            (Class<? extends SpaceUsageCheckFactory>)
-                SpaceUsageCheckFactory.class
-                    .getClassLoader().loadClass(className);
+            SpaceUsageCheckFactory.class
+                .getClassLoader().loadClass(className)
+                .asSubclass(SpaceUsageCheckFactory.class);
       } catch (ClassNotFoundException | RuntimeException e) {
         Logger log = LoggerFactory.getLogger(SpaceUsageCheckFactory.class);
         log.warn("Error trying to create SpaceUsageCheckFactory: '{}'",
