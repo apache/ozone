@@ -98,14 +98,14 @@ jobs:
           with:
             args: ./hadoop-ozone/dev-support/checks/build.sh
         - run: sudo pip install robotframework
-        - run: sudo chown runner -R .
-        - run: cd ./hadoop-ozone/dist/target/ozone-*/ && mkdir .aws && sudo chown 1000 .aws
-        - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
+        - run: sudo mv ./hadoop-ozone/dist/target/ozone-* /mnt/ozone && sudo chown runner -R /mnt/ozone
+        - run: cd /mnt/ozone && mkdir .aws && sudo chown 1000 .aws
+        - run: cd /mnt/ozone/compose && ./test-all.sh
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: acceptance
-            path: target/acceptance
+            path: /mnt/ozone/result
   it-freon:
     name: it-freon
     runs-on: ubuntu-18.04
