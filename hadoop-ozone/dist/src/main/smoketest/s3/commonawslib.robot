@@ -72,8 +72,6 @@ Setup dummy credentials for S3
                         Execute                    aws configure set region us-west-1
 
 Create bucket
-    ${result} =          Execute And Ignore Error           ozone sh volume create o3://${OM_SERVICE_ID}/s3v
-                         Should not contain                 ${result}          Failed
     ${postfix} =         Generate Random String  5  [NUMBERS]
     Set Suite Variable   ${BUCKET}                  bucket-${postfix}
     Execute AWSS3APICli  create-bucket --bucket ${BUCKET}
@@ -82,3 +80,5 @@ Setup s3 tests
     Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
     Run Keyword if    '${BUCKET}' == 'generated'                 Create bucket
+    ${result} =        Execute And Ignore Error                  ozone sh volume create o3://${OM_SERVICE_ID}/s3v
+                       Should not contain                        ${result}          Failed
