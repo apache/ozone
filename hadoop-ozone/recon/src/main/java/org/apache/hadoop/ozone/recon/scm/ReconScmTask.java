@@ -23,8 +23,6 @@ import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.inject.Inject;
-
 /**
  * Any background task that keeps SCM's metadata up to date.
  */
@@ -34,19 +32,20 @@ public abstract class ReconScmTask {
   private Thread taskThread;
   private ReconTaskStatusDao reconTaskStatusDao;
   private volatile boolean running;
+  private volatile boolean registered;
 
-  @Inject
-  public ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
+  protected ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
     this.reconTaskStatusDao = reconTaskStatusDao;
   }
 
-  public void register() {
+  private void register() {
     String taskName = getTaskName();
     if (!reconTaskStatusDao.existsById(taskName)) {
       ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
           taskName, 0L, 0L);
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ", taskName);
+      registered = true;
     }
   }
 
@@ -54,6 +53,9 @@ public abstract class ReconScmTask {
    * Start underlying start thread.
    */
   public synchronized void start() {
+    if (!registered) {
+      register();
+    }
     if (!isRunning()) {
       LOG.info("Starting {} Thread.", getTaskName());
       running = true;

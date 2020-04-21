@@ -152,4 +152,8 @@ public class ReconContainerManager extends SCMContainerManager {
     containerSchemaManager.upsertContainerHistory(containerID.getId(),
         datanodeHost, currentTime);
   }
+
+  public ContainerSchemaManager getContainerSchemaManager() {
+    return containerSchemaManager;
+  }
 }

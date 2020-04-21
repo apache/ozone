@@ -28,6 +28,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,10 +43,12 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -69,6 +72,9 @@ public class TestReconAsPassiveScm {
     conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
     conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
+    conf.set("ozone.recon.task.missingcontainer.interval", "15s");
+    conf.set("ozone.scm.stale.node.interval", "10s");
+    conf.set("ozone.scm.dead.node.interval", "20s");
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
@@ -196,5 +202,50 @@ public class TestReconAsPassiveScm {
     LambdaTestUtils.await(60000, 5000,
         () -> (newReconScm.getContainerManager()
             .exists(ContainerID.valueof(containerID))));
+  }
+
+  @Test
+  public void testMissingContainerDownNode() throws Exception {
+    ReconStorageContainerManagerFacade reconScm =
+        (ReconStorageContainerManagerFacade)
+            cluster.getReconServer().getReconStorageContainerManager();
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    PipelineManager reconPipelineManager = reconScm.getPipelineManager();
+    PipelineManager scmPipelineManager = scm.getPipelineManager();
+
+    LambdaTestUtils.await(60000, 5000,
+        () -> (reconPipelineManager.getPipelines().size() == 4));
+
+    ContainerManager scmContainerManager = scm.getContainerManager();
+    ReconContainerManager reconContainerManager =
+        (ReconContainerManager) reconScm.getContainerManager();
+    ContainerInfo containerInfo =
+        scmContainerManager.allocateContainer(RATIS, ONE, "test");
+    long containerID = containerInfo.getContainerID();
+    Pipeline pipeline =
+        scmPipelineManager.getPipeline(containerInfo.getPipelineID());
+    XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
+    runTestOzoneContainerViaDataNode(containerID, client);
+
+    assertEquals(scmContainerManager.getContainerIDs(),
+        reconContainerManager.getContainerIDs());
+
+    // Bring down the Datanode that had the container replica.
+    cluster.shutdownHddsDatanode(pipeline.getFirstNode());
+
+    LambdaTestUtils.await(120000, 10000, () -> {
+      List<MissingContainers> allMissingContainers =
+          reconContainerManager.getContainerSchemaManager()
+              .getAllMissingContainers();
+      return (allMissingContainers.size() == 1);
+    });
+
+    cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
+    LambdaTestUtils.await(120000, 10000, () -> {
+      List<MissingContainers> allMissingContainers =
+          reconContainerManager.getContainerSchemaManager()
+              .getAllMissingContainers();
+      return (allMissingContainers.isEmpty());
+    });
   }
 }
