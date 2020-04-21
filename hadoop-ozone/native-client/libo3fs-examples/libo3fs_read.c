@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
     tSize curSize;
     char message[110] = "Usage: o3fs_read <filename> <filesize> <buffersize>";
     strcat(message, " <host-name> <port> <bucket-name> <volume-name>\n");
-    if (argc ! = 8) {
+    if (argc != 8) {
         fprintf(stderr, message);
         exit(-1);
     }
