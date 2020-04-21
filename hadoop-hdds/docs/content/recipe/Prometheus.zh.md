@@ -22,7 +22,7 @@ linktitle: Prometheus
 
 [Prometheus](https://prometheus.io/)是在[云原生计算基金会](https://www.cncf.io/)管理下开发的一款开源监控软件。
 
-Ozone 原生支持 Prometheus，各个组件会启动一个兼容 Prometheus 的指标 endpoint，将所有可用的 hadoop 指标以 Prometheus 的格式导出发布。
+Ozone 原生支持 Prometheus，各个组件会启动一个兼容 Prometheus 的指标端点，将所有可用的 hadoop 指标以 Prometheus 的格式导出发布。
 
 ## 准备
 
