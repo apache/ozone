@@ -215,6 +215,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     auditMap.put(OzoneConsts.STORAGE_TYPE,
         (this.storageType != null) ? this.storageType.name() : null);
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
+    auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY,
+        (bekInfo != null) ? bekInfo.getKeyName() : null);
     return auditMap;
   }
 

@@ -274,6 +274,7 @@ public final class OzoneConsts {
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
   public static final String MULTIPART_UPLOAD_PART_NAME = "partName";
+  public static final String BUCKET_ENCRYPTION_KEY = "bucketEncryptionKey";
 
 
 
