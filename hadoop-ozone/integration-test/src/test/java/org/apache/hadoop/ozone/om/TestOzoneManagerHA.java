@@ -93,7 +93,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.*;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
