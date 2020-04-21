@@ -21,7 +21,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -60,7 +60,7 @@ import static org.mockito.Mockito.when;
 @RunWith(Parameterized.class)
 public class TestSCMContainerPlacementRackAware {
   private NetworkTopology cluster;
-  private Configuration conf;
+  private ConfigurationSource conf;
   private NodeManager nodeManager;
   private Integer datanodeCount;
   private List<DatanodeDetails> datanodes = new ArrayList<>();

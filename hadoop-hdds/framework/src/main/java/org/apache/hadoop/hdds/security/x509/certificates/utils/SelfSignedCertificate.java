@@ -19,13 +19,23 @@
 
 package org.apache.hadoop.hdds.security.x509.certificates.utils;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.security.KeyPair;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.util.Date;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.util.Time;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import org.apache.logging.log4j.util.Strings;
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -39,15 +49,6 @@ import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
-
-import java.io.IOException;
-import java.math.BigInteger;
-import java.security.KeyPair;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneOffset;
-import java.util.Date;
 
 /**
  * A Self Signed Certificate with CertificateServer basic constraint can be used
@@ -158,7 +159,7 @@ public final class SelfSignedCertificate {
     private SecurityConfig config;
     private boolean isCA;
 
-    public Builder setConfiguration(Configuration configuration) {
+    public Builder setConfiguration(ConfigurationSource configuration) {
       this.config = new SecurityConfig(configuration);
       return this;
     }

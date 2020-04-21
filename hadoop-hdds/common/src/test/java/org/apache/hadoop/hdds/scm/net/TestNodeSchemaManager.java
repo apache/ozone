@@ -17,19 +17,19 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.DEFAULT_NODEGROUP;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.DEFAULT_RACK;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Test the node schema loader. */
 public class TestNodeSchemaManager {
@@ -38,10 +38,10 @@ public class TestNodeSchemaManager {
   private ClassLoader classLoader =
       Thread.currentThread().getContextClassLoader();
   private NodeSchemaManager manager;
-  private Configuration conf;
+  private OzoneConfiguration conf;
 
   public TestNodeSchemaManager() {
-    conf = new Configuration();
+    conf = new OzoneConfiguration();
     String filePath = classLoader.getResource(
         "./networkTopologyTestFiles/good.xml").getPath();
     conf.set(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE, filePath);

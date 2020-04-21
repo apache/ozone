@@ -17,30 +17,29 @@
 
 package org.apache.hadoop.ozone.container.common.report;
 
-import com.google.protobuf.GeneratedMessage;
-import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .DatanodeStateMachine.DatanodeStates;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+
+import com.google.protobuf.GeneratedMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Abstract class responsible for scheduling the reports based on the
  * configured interval. All the ReportPublishers should extend this class.
  */
 public abstract class ReportPublisher<T extends GeneratedMessage>
-    implements Configurable, Runnable {
+    implements Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ReportPublisher.class);
 
-  private Configuration config;
+  private ConfigurationSource config;
   private StateContext context;
   private ScheduledExecutorService executor;
 
@@ -58,13 +57,11 @@ public abstract class ReportPublisher<T extends GeneratedMessage>
         getReportFrequency(), TimeUnit.MILLISECONDS);
   }
 
-  @Override
-  public void setConf(Configuration conf) {
+  public void setConf(ConfigurationSource conf) {
     config = conf;
   }
 
-  @Override
-  public Configuration getConf() {
+  public ConfigurationSource getConf() {
     return config;
   }
 

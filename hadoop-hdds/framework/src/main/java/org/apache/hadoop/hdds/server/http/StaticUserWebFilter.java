@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.security.Principal;
 import java.util.HashMap;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeys.DEFAULT_HADOOP_HTTP_STATIC_USER;
 import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_HTTP_STATIC_USER;
@@ -125,7 +125,7 @@ public class StaticUserWebFilter extends FilterInitializer {
   }
 
   @Override
-  public void initFilter(FilterContainer container, Configuration conf) {
+  public void initFilter(FilterContainer container, ConfigurationSource conf) {
     HashMap<String, String> options = new HashMap<String, String>();
 
     String username = getUsernameFromConf(conf);
@@ -139,7 +139,7 @@ public class StaticUserWebFilter extends FilterInitializer {
   /**
    * Retrieve the static username from the configuration.
    */
-  static String getUsernameFromConf(Configuration conf) {
+  static String getUsernameFromConf(ConfigurationSource conf) {
     String oldStyleUgi = conf.get(DEPRECATED_UGI_KEY);
     if (oldStyleUgi != null) {
       // We can't use the normal configuration deprecation mechanism here

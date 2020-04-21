@@ -21,9 +21,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -32,8 +34,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -48,10 +48,10 @@ import org.apache.commons.lang3.RandomStringUtils;
 public class TestStorageContainerManagerHelper {
 
   private final MiniOzoneCluster cluster;
-  private final Configuration conf;
+  private final OzoneConfiguration conf;
 
   public TestStorageContainerManagerHelper(MiniOzoneCluster cluster,
-      Configuration conf) throws IOException {
+      OzoneConfiguration conf) throws IOException {
     this.cluster = cluster;
     this.conf = conf;
   }

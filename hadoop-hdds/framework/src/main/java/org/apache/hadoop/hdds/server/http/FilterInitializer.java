@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 /**
  * Initialize a javax.servlet.Filter. 
@@ -29,5 +29,5 @@ public abstract class FilterInitializer {
    * @param conf Configuration for run-time parameters
    */
   public abstract void initFilter(FilterContainer container,
-      Configuration conf);
+      ConfigurationSource conf);
 }

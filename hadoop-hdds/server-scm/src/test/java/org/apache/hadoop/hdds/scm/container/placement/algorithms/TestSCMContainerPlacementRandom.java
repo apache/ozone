@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -42,7 +42,7 @@ public class TestSCMContainerPlacementRandom {
   @Test
   public void chooseDatanodes() throws SCMException {
     //given
-    Configuration conf = new OzoneConfiguration();
+    ConfigurationSource conf = new OzoneConfiguration();
 
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < 5; i++) {

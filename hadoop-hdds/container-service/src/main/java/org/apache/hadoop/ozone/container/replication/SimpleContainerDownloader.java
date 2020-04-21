@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -46,7 +46,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
   private final Path workingDirectory;
 
-  public SimpleContainerDownloader(Configuration conf) {
+  public SimpleContainerDownloader(ConfigurationSource conf) {
 
     String workDirString =
         conf.get(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR);

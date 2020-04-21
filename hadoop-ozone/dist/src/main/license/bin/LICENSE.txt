@@ -225,14 +225,6 @@ BSD
 
    org.codehaus.woodstox:stax2-api
 
-
-GPL with classpath exception
-=====================
-
-   org.openjdk.jmh:jmh-core
-   org.openjdk.jmh:jmh-generator-annprocess
-
-
 CDDL
 =====================
 
