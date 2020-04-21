@@ -72,7 +72,7 @@ Setup dummy credentials for S3
                         Execute                    aws configure set region us-west-1
 
 Create bucket
-    ${result} =          Execute And Ignore Error           ozone sh volume create /s3v
+    ${result} =          Execute And Ignore Error           ozone sh volume create o3://${OM_SERVICE_ID}/s3v
                          Should not contain                 ${result}          Failed
     ${postfix} =         Generate Random String  5  [NUMBERS]
     Set Suite Variable   ${BUCKET}                  bucket-${postfix}
