@@ -29,7 +29,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
@@ -73,7 +73,7 @@ public final class DBStoreBuilder {
   private String dbname;
   private Path dbPath;
   private List<String> tableNames;
-  private Configuration configuration;
+  private ConfigurationSource configuration;
   private CodecRegistry registry;
   private String rocksDbStat;
   private RocksDBConfiguration rocksDBConfiguration;

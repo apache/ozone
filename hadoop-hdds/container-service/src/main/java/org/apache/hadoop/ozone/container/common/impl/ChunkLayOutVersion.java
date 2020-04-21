@@ -18,20 +18,20 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Defines layout versions for the Chunks.
@@ -94,7 +94,8 @@ public enum ChunkLayOutVersion {
   /**
    * @return the latest version.
    */
-  public static ChunkLayOutVersion getConfiguredVersion(Configuration conf) {
+  public static ChunkLayOutVersion getConfiguredVersion(
+      ConfigurationSource conf) {
     try {
       return conf.getEnum(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY,
           DEFAULT_LAYOUT);

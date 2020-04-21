@@ -17,21 +17,22 @@
  */
 package org.apache.hadoop.hdds.scm.safemode;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.hadoop.conf.Configuration;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +86,7 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   private Map<String, SafeModeExitRule> exitRules = new HashMap(1);
   private Set<String> preCheckRules = new HashSet<>(1);
-  private Configuration config;
+  private ConfigurationSource config;
   private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
   private static final String DN_EXIT_RULE = "DataNodeSafeModeRule";
   private static final String HEALTHY_PIPELINE_EXIT_RULE =
@@ -101,7 +102,7 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   private final SafeModeMetrics safeModeMetrics;
 
-  public SCMSafeModeManager(Configuration conf,
+  public SCMSafeModeManager(ConfigurationSource conf,
       List<ContainerInfo> allContainers, PipelineManager pipelineManager,
       EventQueue eventQueue) {
     this.config = conf;

@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
@@ -44,7 +44,7 @@ public final class ByteStringConversion {
    * @see ByteBuffer
    */
   public static Function<ByteBuffer, ByteString> createByteBufferConversion(
-      Configuration config){
+      ConfigurationSource config){
     boolean unsafeEnabled =
         config!=null && config.getBoolean(
             OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,

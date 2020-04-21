@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -201,7 +201,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * one {@link OzoneManagerProtocolPB} proxy pointing to each OM node in the
    * cluster.
    */
-  public OzoneManagerProtocolClientSideTranslatorPB(OzoneConfiguration conf,
+  public OzoneManagerProtocolClientSideTranslatorPB(ConfigurationSource conf,
       String clientId, String omServiceId, UserGroupInformation ugi)
       throws IOException {
     this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,

@@ -24,8 +24,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -87,7 +87,7 @@ public final class HddsServerUtil {
    * @return Target {@code InetSocketAddress} for the SCM service endpoint.
    */
   public static InetSocketAddress getScmAddressForDataNodes(
-      Configuration conf) {
+      ConfigurationSource conf) {
     // We try the following settings in decreasing priority to retrieve the
     // target host.
     // - OZONE_SCM_DATANODE_ADDRESS_KEY
@@ -118,7 +118,7 @@ public final class HddsServerUtil {
    * @return Target {@code InetSocketAddress} for the SCM client endpoint.
    */
   public static InetSocketAddress getScmClientBindAddress(
-      Configuration conf) {
+      ConfigurationSource conf) {
     final String host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY)
         .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_DEFAULT);
@@ -138,7 +138,7 @@ public final class HddsServerUtil {
    * @return Target {@code InetSocketAddress} for the SCM block client endpoint.
    */
   public static InetSocketAddress getScmBlockClientBindAddress(
-      Configuration conf) {
+      ConfigurationSource conf) {
     final String host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY)
         .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT);
@@ -158,7 +158,7 @@ public final class HddsServerUtil {
    * @return Target {@code InetSocketAddress} for the SCM security service.
    */
   public static InetSocketAddress getScmSecurityInetAddress(
-      Configuration conf) {
+      ConfigurationSource conf) {
     final String host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY)
         .orElse(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_DEFAULT);
@@ -182,7 +182,7 @@ public final class HddsServerUtil {
    * @return Target {@code InetSocketAddress} for the SCM service endpoint.
    */
   public static InetSocketAddress getScmDataNodeBindAddress(
-      Configuration conf) {
+      ConfigurationSource conf) {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY);
 
@@ -203,7 +203,7 @@ public final class HddsServerUtil {
    * @return Target {@code InetSocketAddress} for the SCM service endpoint.
    */
   public static InetSocketAddress getReconDataNodeBindAddress(
-      Configuration conf) {
+      ConfigurationSource conf) {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY);
 
@@ -222,7 +222,7 @@ public final class HddsServerUtil {
    * @param conf - Configuration
    * @return long in Milliseconds.
    */
-  public static long getScmheartbeatCheckerInterval(Configuration conf) {
+  public static long getScmheartbeatCheckerInterval(ConfigurationSource conf) {
     return conf.getTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
@@ -235,7 +235,7 @@ public final class HddsServerUtil {
    * @param conf - Ozone Config
    * @return - HB interval in milli seconds.
    */
-  public static long getScmHeartbeatInterval(Configuration conf) {
+  public static long getScmHeartbeatInterval(ConfigurationSource conf) {
     return conf.getTimeDuration(HDDS_HEARTBEAT_INTERVAL,
         HDDS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
   }
@@ -247,7 +247,7 @@ public final class HddsServerUtil {
    * @param conf - Configuration.
    * @return - Long, Milliseconds to wait before flagging a node as stale.
    */
-  public static long getStaleNodeInterval(Configuration conf) {
+  public static long getStaleNodeInterval(ConfigurationSource conf) {
 
     long staleNodeIntervalMs =
         conf.getTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
@@ -284,7 +284,7 @@ public final class HddsServerUtil {
    * @param conf - Configuration.
    * @return - the interval for dead node flagging.
    */
-  public static long getDeadNodeInterval(Configuration conf) {
+  public static long getDeadNodeInterval(ConfigurationSource conf) {
     long staleNodeIntervalMs = getStaleNodeInterval(conf);
     long deadNodeIntervalMs = conf.getTimeDuration(OZONE_SCM_DEADNODE_INTERVAL,
         OZONE_SCM_DEADNODE_INTERVAL_DEFAULT,
@@ -303,7 +303,7 @@ public final class HddsServerUtil {
    * @param conf - Ozone Config
    * @return - Rpc timeout in Milliseconds.
    */
-  public static long getScmRpcTimeOutInMilliseconds(Configuration conf) {
+  public static long getScmRpcTimeOutInMilliseconds(ConfigurationSource conf) {
     return conf.getTimeDuration(OZONE_SCM_HEARTBEAT_RPC_TIMEOUT,
         OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
   }
@@ -314,7 +314,7 @@ public final class HddsServerUtil {
    * @param conf - Ozone Config
    * @return - Log warn interval.
    */
-  public static int getLogWarnInterval(Configuration conf) {
+  public static int getLogWarnInterval(ConfigurationSource conf) {
     return conf.getInt(OZONE_SCM_HEARTBEAT_LOG_WARN_INTERVAL_COUNT,
         OZONE_SCM_HEARTBEAT_LOG_WARN_DEFAULT);
   }
@@ -324,14 +324,15 @@ public final class HddsServerUtil {
    * @param conf - Conf
    * @return port number.
    */
-  public static int getContainerPort(Configuration conf) {
+  public static int getContainerPort(ConfigurationSource conf) {
     return conf.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
   }
 
-  public static String getOzoneDatanodeRatisDirectory(Configuration conf) {
+  public static String getOzoneDatanodeRatisDirectory(
+      ConfigurationSource conf) {
     String storageDir = conf.get(
-            OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
 
     if (Strings.isNullOrEmpty(storageDir)) {
       storageDir = ServerUtils.getDefaultRatisDirectory(conf);
@@ -339,15 +340,13 @@ public final class HddsServerUtil {
     return storageDir;
   }
 
-
-
   /**
    * Get the path for datanode id file.
    *
    * @param conf - Configuration
    * @return the path of datanode id as string
    */
-  public static String getDatanodeIdFilePath(Configuration conf) {
+  public static String getDatanodeIdFilePath(ConfigurationSource conf) {
     String dataNodeIDDirPath =
         conf.get(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR);
     if (dataNodeIDDirPath == null) {
@@ -404,7 +403,7 @@ public final class HddsServerUtil {
    * @throws IllegalArgumentException if configuration is not defined or invalid
    */
   public static InetSocketAddress getScmAddressForSecurityProtocol(
-      Configuration conf) {
+      ConfigurationSource conf) {
     Optional<String> host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
