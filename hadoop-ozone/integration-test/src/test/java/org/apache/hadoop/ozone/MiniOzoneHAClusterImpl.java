@@ -318,30 +318,27 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       long defaultDuration = OMConfigKeys
               .OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
               .getDuration();
-      long curLeaderElectionTimeout = conf.getTimeDuration(
-              OMConfigKeys.
+      long curLeaderElectionTimeout = conf.getTimeDuration(OMConfigKeys.
                       OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-              defaultDuration,
-              TimeUnit.MILLISECONDS);
+              defaultDuration, TimeUnit.MILLISECONDS);
       conf.setTimeDuration(OMConfigKeys.
                       OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
               defaultDuration == curLeaderElectionTimeout ?
                       RATIS_LEADER_ELECTION_TIMEOUT :
                       curLeaderElectionTimeout,
               TimeUnit.MILLISECONDS);
-      long defaultNodeFailureTimeout
-              = OMConfigKeys.
+      long defaultNodeFailureTimeout = OMConfigKeys.
               OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT.
               getDuration();
       long curNodeFailureTimeout = conf.getTimeDuration(OMConfigKeys.
                       OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
-                      defaultNodeFailureTimeout, OMConfigKeys.
+              defaultNodeFailureTimeout, OMConfigKeys.
                       OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT.
                       getUnit());
       conf.setTimeDuration(
               OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
-              curNodeFailureTimeout == defaultNodeFailureTimeout
-                      ? NODE_FAILURE_TIMEOUT : curNodeFailureTimeout,
+              curNodeFailureTimeout == defaultNodeFailureTimeout ?
+                      NODE_FAILURE_TIMEOUT : curNodeFailureTimeout,
               TimeUnit.MILLISECONDS);
     }
 

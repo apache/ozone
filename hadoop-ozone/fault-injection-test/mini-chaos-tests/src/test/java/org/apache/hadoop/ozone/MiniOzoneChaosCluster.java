@@ -383,7 +383,6 @@ public abstract class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
-
       if (numOfOMs > 1) {
         initOMRatisConf();
       }

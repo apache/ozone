@@ -89,8 +89,7 @@ public class TestOzoneFsHAURLs {
     final String path = GenericTestUtils.getTempPath(omId);
     java.nio.file.Path metaDirPath = java.nio.file.Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127." +
-            "0.0.1:0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127." + "0.0.1:0");
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
     OMStorage omStore = new OMStorage(conf);
