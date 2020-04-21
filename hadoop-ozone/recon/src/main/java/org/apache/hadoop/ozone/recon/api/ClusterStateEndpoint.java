@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -81,29 +80,25 @@ public class ClusterStateEndpoint {
         new DatanodeStorageReport(stats.getCapacity().get(),
             stats.getScmUsed().get(), stats.getRemaining().get());
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
-    try {
-      Table volumeTable = omMetadataManager.getVolumeTable();
-      if (volumeTable != null) {
-        builder.setVolumes(volumeTable.getEstimatedKeyCount());
+    if (omMetadataManager.isOmTablesInitialized()) {
+      try {
+        builder.setVolumes(
+            omMetadataManager.getVolumeTable().getEstimatedKeyCount());
+      } catch (Exception ex) {
+        LOG.error("Unable to get Volumes count in ClusterStateResponse.", ex);
       }
-    } catch (Exception ex) {
-      LOG.error("Unable to get Volumes count in ClusterStateResponse.", ex);
-    }
-    try {
-      Table bucketTable = omMetadataManager.getBucketTable();
-      if (bucketTable != null) {
-        builder.setBuckets(bucketTable.getEstimatedKeyCount());
+      try {
+        builder.setBuckets(
+            omMetadataManager.getBucketTable().getEstimatedKeyCount());
+      } catch (Exception ex) {
+        LOG.error("Unable to get Buckets count in ClusterStateResponse.", ex);
       }
-    } catch (Exception ex) {
-      LOG.error("Unable to get Buckets count in ClusterStateResponse.", ex);
-    }
-    try {
-      Table keyTable = omMetadataManager.getKeyTable();
-      if (keyTable != null) {
-        builder.setKeys(keyTable.getEstimatedKeyCount());
+      try {
+        builder.setKeys(
+            omMetadataManager.getKeyTable().getEstimatedKeyCount());
+      } catch (Exception ex) {
+        LOG.error("Unable to get Keys count in ClusterStateResponse.", ex);
       }
-    } catch (Exception ex) {
-      LOG.error("Unable to get Keys count in ClusterStateResponse.", ex);
     }
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)
