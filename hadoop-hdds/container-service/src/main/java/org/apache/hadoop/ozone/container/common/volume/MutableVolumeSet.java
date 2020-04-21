@@ -212,7 +212,8 @@ public class MutableVolumeSet implements VolumeSet {
         SHUTDOWN_HOOK_PRIORITY);
   }
 
-  public static Collection<String> getDatanodeStorageDirs(Configuration conf) {
+  public static Collection<String> getDatanodeStorageDirs(
+      ConfigurationSource conf) {
     Collection<String> rawLocations = conf.getTrimmedStringCollection(
         HDDS_DATANODE_DIR_KEY);
     if (rawLocations.isEmpty()) {
