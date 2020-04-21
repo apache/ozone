@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -58,7 +58,7 @@ public class ReconContainerManager extends SCMContainerManager {
    * @throws IOException on Failure.
    */
   public ReconContainerManager(
-      Configuration conf,
+      ConfigurationSource conf,
       Table<ContainerID, ContainerInfo> containerStore,
       BatchOperationHandler batchHandler,
       PipelineManager pipelineManager,
@@ -71,12 +71,13 @@ public class ReconContainerManager extends SCMContainerManager {
 
   /**
    * Check and add new container if not already present in Recon.
-   * @param containerID containerID to check.
+   *
+   * @param containerID     containerID to check.
    * @param datanodeDetails Datanode from where we got this container.
    * @throws IOException on Error.
    */
   public void checkAndAddNewContainer(ContainerID containerID,
-                                      DatanodeDetails datanodeDetails)
+      DatanodeDetails datanodeDetails)
       throws IOException {
     if (!exists(containerID)) {
       LOG.info("New container {} got from {}.", containerID,

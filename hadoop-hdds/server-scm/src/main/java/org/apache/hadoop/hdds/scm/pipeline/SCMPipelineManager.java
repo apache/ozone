@@ -34,8 +34,8 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -75,7 +75,7 @@ public class SCMPipelineManager implements PipelineManager {
   private final EventPublisher eventPublisher;
   private final NodeManager nodeManager;
   private final SCMPipelineMetrics metrics;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private long pipelineWaitDefaultTimeout;
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
@@ -87,7 +87,7 @@ public class SCMPipelineManager implements PipelineManager {
   // to prevent pipelines being created until sufficient nodes have registered.
   private final AtomicBoolean pipelineCreationAllowed;
 
-  public SCMPipelineManager(Configuration conf,
+  public SCMPipelineManager(ConfigurationSource conf,
       NodeManager nodeManager,
       Table<PipelineID, Pipeline> pipelineStore,
       EventPublisher eventPublisher)
@@ -100,7 +100,7 @@ public class SCMPipelineManager implements PipelineManager {
     initializePipelineState();
   }
 
-  protected SCMPipelineManager(Configuration conf,
+  protected SCMPipelineManager(ConfigurationSource conf,
       NodeManager nodeManager,
       Table<PipelineID, Pipeline> pipelineStore,
       EventPublisher eventPublisher,
@@ -219,6 +219,8 @@ public class SCMPipelineManager implements PipelineManager {
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {
+      LOG.error("Failed to create pipeline of type {} and factor {}. " +
+          "Exception: {}", type, factor, ex.getMessage());
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {

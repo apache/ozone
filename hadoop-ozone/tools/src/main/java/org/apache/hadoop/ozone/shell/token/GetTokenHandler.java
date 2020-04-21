@@ -39,7 +39,7 @@ import java.util.Objects;
     description = "get a delegation token.")
 public class GetTokenHandler extends Handler {
 
-  @CommandLine.Parameters(arity = "1..1",
+  @CommandLine.Parameters(arity = "0..1",
       description = Shell.OZONE_URI_DESCRIPTION)
   private String uri;
 
@@ -52,18 +52,21 @@ public class GetTokenHandler extends Handler {
   }
 
   @Override
+  protected boolean isApplicable() {
+    return securityEnabled();
+  }
+
+  @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
 
-    if (securityEnabled("token get")) {
-      Token<OzoneTokenIdentifier> token = client.getObjectStore()
-          .getDelegationToken(new Text(renewer.getValue()));
-      if (Objects.isNull(token)) {
-        err().println("Error: Get delegation token operation failed. " +
-            "Check OzoneManager logs for more details.");
-      } else {
-        printObjectAsJson(token.encodeToUrlString());
-      }
+    Token<OzoneTokenIdentifier> token = client.getObjectStore()
+        .getDelegationToken(new Text(renewer.getValue()));
+    if (Objects.isNull(token)) {
+      err().println("Error: Get delegation token operation failed. " +
+          "Check OzoneManager logs for more details.");
+    } else {
+      printObjectAsJson(token.encodeToUrlString());
     }
   }
 }

@@ -26,8 +26,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -116,7 +116,7 @@ public class ReconNodeManager extends SCMNodeManager {
     LOG.info("Adding new node {} to Node DB.", datanodeDetails.getUuid());
   }
 
-  protected File getNodeDBPath(Configuration conf) {
+  protected File getNodeDBPath(ConfigurationSource conf) {
     File metaDir = ReconUtils.getReconScmDbDir(conf);
     return new File(metaDir, RECON_SCM_NODE_DB);
   }

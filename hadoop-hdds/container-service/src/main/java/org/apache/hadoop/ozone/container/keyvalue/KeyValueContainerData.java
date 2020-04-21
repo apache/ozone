@@ -141,9 +141,6 @@ public class KeyValueContainerData extends ContainerData {
    * @return Path to base dir
    */
   public String getContainerPath() {
-    if (metadataPath == null) {
-      return null;
-    }
     return new File(metadataPath).getParent();
   }
 
@@ -226,7 +223,7 @@ public class KeyValueContainerData extends ContainerData {
   public ContainerDataProto getProtoBufMessage() {
     ContainerDataProto.Builder builder = ContainerDataProto.newBuilder();
     builder.setContainerID(this.getContainerID());
-    builder.setContainerPath(this.getMetadataPath());
+    builder.setContainerPath(this.getContainerPath());
     builder.setState(this.getState());
 
     for (Map.Entry<String, String> entry : getMetadata().entrySet()) {

@@ -29,7 +29,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -76,16 +76,17 @@ public class SCMContainerManager implements ContainerManager {
   /**
    * Constructs a mapping class that creates mapping between container names
    * and pipelines.
-   *
+   * <p>
    * passed to LevelDB and this memory is allocated in Native code space.
    * CacheSize is specified
    * in MB.
-   * @param conf - {@link Configuration}
+   *
+   * @param conf            - {@link ConfigurationSource}
    * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
   public SCMContainerManager(
-      final Configuration conf,
+      final ConfigurationSource conf,
       Table<ContainerID, ContainerInfo> containerStore,
       BatchOperationHandler batchHandler,
       PipelineManager pipelineManager)
@@ -364,15 +365,16 @@ public class SCMContainerManager implements ContainerManager {
     }
   }
 
-    /**
-     * Update deleteTransactionId according to deleteTransactionMap.
-     *
-     * @param deleteTransactionMap Maps the containerId to latest delete
-     *                             transaction id for the container.
-     * @throws IOException
-     */
-    public void updateDeleteTransactionId(
-        Map<Long, Long> deleteTransactionMap) throws IOException {
+  /**
+   * Update deleteTransactionId according to deleteTransactionMap.
+   *
+   * @param deleteTransactionMap Maps the containerId to latest delete
+   *                             transaction id for the container.
+   * @throws IOException
+   */
+  public void updateDeleteTransactionId(Map<Long, Long> deleteTransactionMap)
+      throws IOException {
+
     if (deleteTransactionMap == null) {
       return;
     }

@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
 import org.apache.commons.lang3.RandomStringUtils;
+
 
 /**
  * Utility class for benchmark test cases.
@@ -75,7 +76,7 @@ public final class GenesisUtil {
 
   public static MetadataStore getMetadataStore(String dbType)
       throws IOException {
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     MetadataStoreBuilder builder = MetadataStoreBuilder.newBuilder();
     builder.setConf(conf);
     builder.setCreateIfMissing(true);
@@ -135,7 +136,7 @@ public final class GenesisUtil {
     return new StorageContainerManager(conf, configurator);
   }
 
-  static void configureSCM(Configuration conf, int numHandlers) {
+  static void configureSCM(OzoneConfiguration conf, int numHandlers) {
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
         RANDOM_LOCAL_ADDRESS);
     conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
@@ -148,7 +149,7 @@ public final class GenesisUtil {
   }
 
   static void addPipelines(HddsProtos.ReplicationFactor factor,
-      int numPipelines, OzoneConfiguration conf) throws Exception {
+      int numPipelines, ConfigurationSource conf) throws Exception {
     DBStore dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
 
     Table<PipelineID, Pipeline> pipelineTable =
@@ -187,7 +188,7 @@ public final class GenesisUtil {
     return OzoneManager.createOm(conf);
   }
 
-  static void configureOM(Configuration conf, int numHandlers) {
+  static void configureOM(OzoneConfiguration conf, int numHandlers) {
     conf.set(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY,
         RANDOM_LOCAL_ADDRESS);
     conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numHandlers);

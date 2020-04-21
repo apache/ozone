@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.slf4j.Logger;
@@ -39,7 +39,7 @@ public final class ChunkManagerFactory {
   private ChunkManagerFactory() {
   }
 
-  public static ChunkManager createChunkManager(Configuration conf) {
+  public static ChunkManager createChunkManager(ConfigurationSource conf) {
     boolean sync =
         conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY,
             OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT);

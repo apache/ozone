@@ -2138,29 +2138,13 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.failover.sleep.base.millis</name>
-    <value>500</value>
+    <name>ozone.client.wait.between.retries.millis</name>
+    <value>2000</value>
     <description>
-      Expert only. The time to wait, in milliseconds, between failover
-      attempts increases exponentially as a function of the number of
-      attempts made so far, with a random factor of +/- 50%. This option
-      specifies the base value used in the failover calculation. The
-      first failover will retry immediately. The 2nd failover attempt
-      will delay at least ozone.client.failover.sleep.base.millis
-      milliseconds. And so on.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.failover.sleep.max.millis</name>
-    <value>15000</value>
-    <description>
-      Expert only. The time to wait, in milliseconds, between failover
-      attempts increases exponentially as a function of the number of
-      attempts made so far, with a random factor of +/- 50%. This option
-      specifies the maximum value to wait between failovers.
-      Specifically, the time between two failover attempts will not
-      exceed +/- 50% of ozone.client.failover.sleep.max.millis
-      milliseconds.
+      Expert only. The time to wait, in milliseconds, between retry attempts
+      to contact OM. Wait time increases linearly if same OM is retried
+      again. If retrying on multiple OMs proxies in round robin fashion, the
+      wait time is introduced after all the OM proxies have been attempted once.
     </description>
   </property>
   <property>

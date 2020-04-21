@@ -23,9 +23,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -114,7 +114,7 @@ public class TestContainerPlacement {
     return nodeManager;
   }
 
-  SCMContainerManager createContainerManager(Configuration config,
+  SCMContainerManager createContainerManager(ConfigurationSource config,
       NodeManager scmNodeManager) throws IOException {
     EventQueue eventQueue = new EventQueue();
 

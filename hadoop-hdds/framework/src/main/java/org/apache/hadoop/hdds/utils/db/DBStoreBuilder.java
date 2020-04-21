@@ -29,9 +29,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.base.Preconditions;
@@ -76,15 +76,16 @@ public final class DBStoreBuilder {
   private String dbname;
   private Path dbPath;
   private List<String> tableNames;
-  private Configuration configuration;
+  private ConfigurationSource configuration;
   private CodecRegistry registry;
   private String rocksDbStat;
   private RocksDBConfiguration rocksDBConfiguration;
 
-  private DBStoreBuilder(OzoneConfiguration configuration) {
+  private DBStoreBuilder(ConfigurationSource configuration) {
     this(configuration, configuration.getObject(RocksDBConfiguration.class));
   }
-  private DBStoreBuilder(OzoneConfiguration configuration,
+
+  private DBStoreBuilder(ConfigurationSource configuration,
       RocksDBConfiguration rocksDBConfiguration) {
     tables = new HashSet<>();
     tableNames = new LinkedList<>();
@@ -96,8 +97,7 @@ public final class DBStoreBuilder {
     this.rocksDBConfiguration = rocksDBConfiguration;
   }
 
-
-  public static DBStoreBuilder newBuilder(OzoneConfiguration configuration) {
+  public static DBStoreBuilder newBuilder(ConfigurationSource configuration) {
     return new DBStoreBuilder(configuration);
   }
 
@@ -267,7 +267,7 @@ public final class DBStoreBuilder {
   }
 
   private static DBStoreBuilder createDBStoreBuilder(
-      OzoneConfiguration configuration, DBDefinition definition) {
+      ConfigurationSource configuration, DBDefinition definition) {
 
     File metadataDir = getDirectoryFromConfig(configuration,
         definition.getLocationConfigKey(), definition.getName());
@@ -289,7 +289,7 @@ public final class DBStoreBuilder {
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
    */
-  public static DBStore createDBStore(OzoneConfiguration configuration,
+  public static DBStore createDBStore(ConfigurationSource configuration,
       DBDefinition definition)
       throws IOException {
     DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
