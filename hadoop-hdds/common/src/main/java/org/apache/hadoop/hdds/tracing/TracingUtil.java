@@ -17,7 +17,13 @@
  */
 package org.apache.hadoop.hdds.tracing;
 
+import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.util.function.Supplier;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
 import io.jaegertracing.Configuration;
 import io.jaegertracing.internal.JaegerTracer;
@@ -26,9 +32,6 @@ import io.opentracing.Span;
 import io.opentracing.SpanContext;
 import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
-
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
 /**
  * Utility class to collect all the tracing helper methods.
@@ -86,11 +89,11 @@ public final class TracingUtil {
    *
    * @return OpenTracing scope.
    */
-  public static Scope importAndCreateScope(String name, String encodedParent) {
+  public static Span importAndCreateSpan(String name, String encodedParent) {
     Tracer tracer = GlobalTracer.get();
     return tracer.buildSpan(name)
         .asChildOf(extractParent(encodedParent, tracer))
-        .startActive(true);
+        .start();
   }
 
   private static SpanContext extractParent(String parent, Tracer tracer) {
@@ -130,8 +133,57 @@ public final class TracingUtil {
   private static boolean isTracingEnabled(
       ConfigurationSource conf) {
     return conf.getBoolean(
-          ScmConfigKeys.HDDS_TRACING_ENABLED,
-          ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
+        ScmConfigKeys.HDDS_TRACING_ENABLED,
+        ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
   }
 
+  /**
+   * Execute a new function inside an activated span.
+   */
+  public static <R> R executeInNewSpan(String spanName,
+      SupplierWithIOException<R> supplier)
+      throws IOException {
+    Span span = GlobalTracer.get()
+        .buildSpan(spanName).start();
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+      return supplier.get();
+    } catch (Exception ex) {
+      span.setTag("failed", true);
+      throw ex;
+    } finally {
+      span.finish();
+    }
+  }
+
+  /**
+   * Execute a new function inside an activated span.
+   */
+  public static <R> R executeInNewSpan(String spanName,
+      Supplier<R> supplier) {
+    Span span = GlobalTracer.get()
+        .buildSpan(spanName).start();
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+      return supplier.get();
+    } catch (Exception ex) {
+      span.setTag("failed", true);
+      throw ex;
+    } finally {
+      span.finish();
+    }
+  }
+
+  /**
+   * Create an active span with auto-close at finish.
+   * <p>
+   * This is a simplified way to use span as there is no way to add any tag
+   * in case of Exceptions.
+   */
+  public static AutoCloseable createActivatedSpan(String spanName) {
+    Span span = GlobalTracer.get().buildSpan(spanName).start();
+    Scope scope = GlobalTracer.get().activateSpan(span);
+    return () -> {
+      scope.close();
+      span.finish();
+    };
+  }
 }
