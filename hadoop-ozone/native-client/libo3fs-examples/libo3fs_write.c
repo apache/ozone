@@ -24,7 +24,7 @@
 #include<string.h>
 
 int main(int argc, char **argv) {
-    ozfsFS fs;
+    o3fsFS fs;
     const char *writeFileName = argv[1];
     off_t fileTotalSize = strtoul(argv[2], NULL, 10);
     long long tmpBufferSize = strtoul(argv[3], NULL, 10);
@@ -33,21 +33,21 @@ int main(int argc, char **argv) {
     const char *bucket = argv[6];
     const char *volume = argv[7];
     tSize bufferSize;
-    ozfsFile writeFile;
+    o3fsFile writeFile;
     char* buffer;
     int i;
     off_t nrRemaining;
     tSize curSize;
     tSize written;
-    char message[110] = "Usage: ozfs_write <filename> <filesize> <buffersize>";
+    char message[110] = "Usage: o3fs_write <filename> <filesize> <buffersize>";
     strcat(message, " <host-name> <port> <bucket-name> <volume-name>\n");
     if (argc != 8) {
         fprintf(stderr, message);
         exit(-1);
     }
-    fs = ozfsConnect(host, port, bucket, volume);
+    fs = o3fsConnect(host, port, bucket, volume);
     if (!fs) {
-        fprintf(stderr, "Oops! Failed to connect to ozfs!\n");
+        fprintf(stderr, "Oops! Failed to connect to o3fs!\n");
         exit(-1);
     }
     if(fileTotalSize == ULONG_MAX && errno == ERANGE) {
@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
       exit(-3);
     }
     bufferSize = (tSize)tmpBufferSize;
-    writeFile = ozfsOpenFile(fs, writeFileName, O_WRONLY, bufferSize, 0, 0);
+    writeFile = o3fsOpenFile(fs, writeFileName, O_WRONLY, bufferSize, 0, 0);
     if (!writeFile) {
         fprintf(stderr, "Failed to open %s for writing!\n", writeFileName);
         exit(-2);
@@ -77,15 +77,15 @@ int main(int argc, char **argv) {
     for (nrRemaining = fileTotalSize; nrRemaining > 0;
      nrRemaining -= bufferSize ) {
       curSize = ( bufferSize < nrRemaining ) ? bufferSize : (tSize)nrRemaining;
-      if ((written = ozfsWrite(fs, writeFile, (void*)buffer,
+      if ((written = o3fsWrite(fs, writeFile, (void*)buffer,
        curSize)) != curSize) {
-        fprintf(stderr, "ERROR: ozfsWrite returned an error on write: %d\n",
+        fprintf(stderr, "ERROR: o3fsWrite returned an error on write: %d\n",
          written);
         exit(-3);
       }
     }
     free(buffer);
-    ozfsCloseFile(fs, writeFile);
-    ozfsDisconnect(fs);
+    o3fsCloseFile(fs, writeFile);
+    o3fsDisconnect(fs);
     return 0;
 }

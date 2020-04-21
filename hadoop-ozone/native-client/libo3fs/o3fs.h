@@ -16,29 +16,29 @@
  * limitations under the License.
  */
 
-#ifndef OZFS_DOT_H
-#define OZFS_DOT_H
+#ifndef O3FS_DOT_H
+#define O3FS_DOT_H
 
 #include "hdfs/hdfs.h"
 
 struct hdfs_internal;
-typedef struct hdfs_internal* ozfsFS;
+typedef struct hdfs_internal* o3fsFS;
 
 struct hdfsFile_internal;
-typedef struct hdfsFile_internal* ozfsFile;
+typedef struct hdfsFile_internal* o3fsFile;
 
-ozfsFS ozfsConnect(const char* nn, tPort port, const char* bucket,
+o3fsFS o3fsConnect(const char* nn, tPort port, const char* bucket,
  const char* volume);
 
-ozfsFile ozfsOpenFile(ozfsFS fs, const char *path, int flags, int bufferSize,
+o3fsFile o3fsOpenFile(o3fsFS fs, const char *path, int flags, int bufferSize,
  short replication, tSize blockSize);
 
-tSize ozfsRead(ozfsFS fs, ozfsFile f, void* buffer, tSize length);
+tSize o3fsRead(o3fsFS fs, o3fsFile f, void* buffer, tSize length);
 
-int ozfsCloseFile(ozfsFS fs, ozfsFile file);
+int o3fsCloseFile(o3fsFS fs, o3fsFile file);
 
-int ozfsDisconnect(ozfsFS fs);
+int o3fsDisconnect(o3fsFS fs);
 
-tSize ozfsWrite(ozfsFS fs, ozfsFile f, const void* buffer, tSize length);
+tSize o3fsWrite(o3fsFS fs, o3fsFile f, const void* buffer, tSize length);
 
 #endif

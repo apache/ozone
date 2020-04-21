@@ -24,7 +24,7 @@
 #include <string.h>
 #define O3FS "o3fs://"
 
-ozfsFS ozfsConnect(const char *host, tPort port,
+o3fsFS o3fsConnect(const char *host, tPort port,
  const char *bucket, const char *vol)
 {
     struct hdfsBuilder *bld = hdfsNewBuilder();
@@ -37,31 +37,30 @@ ozfsFS ozfsConnect(const char *host, tPort port,
     snprintf(string, len + 3, "%s%s.%s.%s", O3FS, bucket, vol, host);
     // After snprintf command,
     // string = o3fs://bucket4.vol4.127.0.0.1 (URI without port)
-    //printf("URI : %s\n", string);
     //port will be added to URI in hdfsBuilerConnect() function below.
     //finally URI: o3fs://bucket4.vol4.127.0.0.1:9862
     hdfsBuilderSetNameNode(bld, string);
     hdfsBuilderSetNameNodePort(bld, port);
-    return (ozfsFS)hdfsBuilderConnect(bld);
+    return (o3fsFS)hdfsBuilderConnect(bld);
 }
-ozfsFile ozfsOpenFile(ozfsFS fs, const char *path, int flags, int bufferSize,
+o3fsFile o3fsOpenFile(o3fsFS fs, const char *path, int flags, int bufferSize,
  short replication, tSize blockSize){
-    return (ozfsFile)hdfsOpenFile((hdfsFS)fs, path, flags, bufferSize,
+    return (o3fsFile)hdfsOpenFile((hdfsFS)fs, path, flags, bufferSize,
      replication, blockSize);
 }
 
-tSize ozfsRead(ozfsFS fs, ozfsFile f, void* buffer, tSize length){
+tSize o3fsRead(o3fsFS fs, o3fsFile f, void* buffer, tSize length){
     return hdfsRead((hdfsFS)fs, (hdfsFile)f, buffer, length);
 }
 
-int ozfsCloseFile(ozfsFS fs, ozfsFile file){
+int o3fsCloseFile(o3fsFS fs, o3fsFile file){
     return hdfsCloseFile((hdfsFS)fs, (hdfsFile)file);
 }
 
-int ozfsDisconnect(ozfsFS fs){
+int o3fsDisconnect(o3fsFS fs){
     return hdfsDisconnect((hdfsFS)fs);
 }
 
-tSize ozfsWrite(ozfsFS fs, ozfsFile f, const void* buffer, tSize length){
+tSize o3fsWrite(o3fsFS fs, o3fsFile f, const void* buffer, tSize length){
     return hdfsWrite((hdfsFS)fs, (hdfsFile)f, buffer, length);
 }
