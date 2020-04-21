@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -81,20 +82,26 @@ public class ClusterStateEndpoint {
             stats.getScmUsed().get(), stats.getRemaining().get());
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
     try {
-      builder.setVolumes(
-          omMetadataManager.getVolumeTable().getEstimatedKeyCount());
+      Table volumeTable = omMetadataManager.getVolumeTable();
+      if (volumeTable != null) {
+        builder.setVolumes(volumeTable.getEstimatedKeyCount());
+      }
     } catch (Exception ex) {
       LOG.error("Unable to get Volumes count in ClusterStateResponse.", ex);
     }
     try {
-      builder.setBuckets(
-          omMetadataManager.getBucketTable().getEstimatedKeyCount());
+      Table bucketTable = omMetadataManager.getBucketTable();
+      if (bucketTable != null) {
+        builder.setBuckets(bucketTable.getEstimatedKeyCount());
+      }
     } catch (Exception ex) {
       LOG.error("Unable to get Buckets count in ClusterStateResponse.", ex);
     }
     try {
-      builder.setKeys(
-          omMetadataManager.getKeyTable().getEstimatedKeyCount());
+      Table keyTable = omMetadataManager.getKeyTable();
+      if (keyTable != null) {
+        builder.setKeys(keyTable.getEstimatedKeyCount());
+      }
     } catch (Exception ex) {
       LOG.error("Unable to get Keys count in ClusterStateResponse.", ex);
     }
