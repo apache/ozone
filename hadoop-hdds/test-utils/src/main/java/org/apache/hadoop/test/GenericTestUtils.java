@@ -22,11 +22,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.util.concurrent.TimeoutException;
-
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
@@ -44,8 +43,11 @@ import org.apache.log4j.PatternLayout;
 import org.apache.log4j.WriterAppender;
 import org.junit.Assert;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.Assert.assertTrue;
+
 /**
- * Test provides some very generic helpers which might be used across the tests.
+ * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
 
@@ -56,9 +58,14 @@ public abstract class GenericTestUtils {
    * Error string used in {@link GenericTestUtils#waitFor(Supplier, int, int)}.
    */
   public static final String ERROR_MISSING_ARGUMENT =
-      "Input supplier interface should be initailized";
+      "Input supplier interface should be initialized";
   public static final String ERROR_INVALID_ARGUMENT =
       "Total wait time should be greater than check interval time";
+
+  public static final boolean WINDOWS =
+      System.getProperty("os.name").startsWith("Windows");
+
+  private static final long NANOSECONDS_PER_MILLISECOND = 1_000_000;
 
   static {
     DEFAULT_TEST_DATA_DIR =
@@ -78,8 +85,7 @@ public abstract class GenericTestUtils {
       prop = DEFAULT_TEST_DATA_DIR;
     }
     File dir = new File(prop).getAbsoluteFile();
-    dir.mkdirs();
-    assertExists(dir);
+    assertDirCreation(dir);
     return dir;
   }
 
@@ -111,7 +117,7 @@ public abstract class GenericTestUtils {
    * @return a string to use in paths
    */
   public static String getTempPath(String subpath) {
-    String prop = (Path.WINDOWS) ? DEFAULT_TEST_DATA_PATH
+    String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
         : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
 
     if (prop.isEmpty()) {
@@ -139,7 +145,15 @@ public abstract class GenericTestUtils {
    * Assert that a given file exists.
    */
   public static void assertExists(File f) {
-    Assert.assertTrue("File " + f + " should exist", f.exists());
+    assertTrue("File " + f + " should exist", f.exists());
+  }
+
+  /**
+   * Assert that a given dir can be created or it already exists.
+   */
+  public static void assertDirCreation(File f) {
+    assertTrue("Could not create dir " + f + ", nor does it exist",
+        f.mkdirs() || f.exists());
   }
 
   public static void assertExceptionContains(String expectedText, Throwable t) {
@@ -157,8 +171,21 @@ public abstract class GenericTestUtils {
       throw new AssertionError(String
           .format("%s Expected to find '%s' %s: %s", prefix, expectedText,
               "but got unexpected exception",
-              org.apache.hadoop.util.StringUtils.stringifyException(t)), t);
+              stringifyException(t)), t);
     }
+  }
+
+  /**
+   * Make a string representation of the exception.
+   * @param e The exception to stringify
+   * @return A string with exception name and call stack.
+   */
+  public static String stringifyException(Throwable e) {
+    StringWriter stm = new StringWriter();
+    PrintWriter wrt = new PrintWriter(stm);
+    e.printStackTrace(wrt);
+    wrt.close();
+    return stm.toString();
   }
 
   /**
@@ -184,10 +211,10 @@ public abstract class GenericTestUtils {
     Preconditions.checkArgument(waitForMillis >= checkEveryMillis,
         ERROR_INVALID_ARGUMENT);
 
-    long st = Time.monotonicNow();
+    long st = monotonicNow();
     boolean result = check.get();
 
-    while (!result && (Time.monotonicNow() - st < waitForMillis)) {
+    while (!result && (monotonicNow() - st < waitForMillis)) {
       Thread.sleep(checkEveryMillis);
       result = check.get();
     }
@@ -263,6 +290,10 @@ public abstract class GenericTestUtils {
     return LogManager.getLogger(logger.getName());
   }
 
+  private static long monotonicNow() {
+    return System.nanoTime() / NANOSECONDS_PER_MILLISECOND;
+  }
+
   /**
    * Capture output printed to {@link System#err}.
    * <p>
@@ -282,19 +313,19 @@ public abstract class GenericTestUtils {
    * </pre>
    */
   public static class SystemErrCapturer implements AutoCloseable {
-    final private ByteArrayOutputStream bytes;
-    final private PrintStream bytesPrintStream;
-    final private PrintStream oldErr;
+    private final ByteArrayOutputStream bytes;
+    private final PrintStream bytesPrintStream;
+    private final PrintStream oldErr;
 
-    public SystemErrCapturer() {
+    public SystemErrCapturer() throws UnsupportedEncodingException {
       bytes = new ByteArrayOutputStream();
-      bytesPrintStream = new PrintStream(bytes);
+      bytesPrintStream = new PrintStream(bytes, false, UTF_8.name());
       oldErr = System.err;
       System.setErr(new TeePrintStream(oldErr, bytesPrintStream));
     }
 
-    public String getOutput() {
-      return bytes.toString();
+    public String getOutput() throws UnsupportedEncodingException {
+      return bytes.toString(UTF_8.name());
     }
 
     @Override
@@ -312,8 +343,9 @@ public abstract class GenericTestUtils {
   public static class TeePrintStream extends PrintStream {
     private final PrintStream other;
 
-    public TeePrintStream(OutputStream main, PrintStream other) {
-      super(main);
+    public TeePrintStream(OutputStream main, PrintStream other)
+        throws UnsupportedEncodingException {
+      super(main, false, UTF_8.name());
       this.other = other;
     }
 

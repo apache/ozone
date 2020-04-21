@@ -18,18 +18,6 @@
 
 package org.apache.hadoop.ozone;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-
-import org.apache.commons.validator.routines.InetAddressValidator;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -41,6 +29,18 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+
+import org.apache.commons.validator.routines.InetAddressValidator;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ozone security Util class.
@@ -58,12 +58,12 @@ public final class OzoneSecurityUtil {
   private OzoneSecurityUtil() {
   }
 
-  public static boolean isSecurityEnabled(Configuration conf) {
+  public static boolean isSecurityEnabled(ConfigurationSource conf) {
     return conf.getBoolean(OZONE_SECURITY_ENABLED_KEY,
         OZONE_SECURITY_ENABLED_DEFAULT);
   }
 
-  public static boolean isHttpSecurityEnabled(Configuration conf) {
+  public static boolean isHttpSecurityEnabled(ConfigurationSource conf) {
     return isSecurityEnabled(conf) &&
         conf.getBoolean(OZONE_HTTP_SECURITY_ENABLED_KEY,
         OZONE_HTTP_SECURITY_ENABLED_DEFAULT);

@@ -16,7 +16,10 @@
  */
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
-import org.apache.hadoop.conf.Configuration;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -30,19 +33,15 @@ import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mockito;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import static org.mockito.Matchers.anyObject;
+import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
 
 /**
@@ -56,7 +55,7 @@ public class TestContainerPlacementFactory {
   // node storage capacity
   private final long storageCapacity = 100L;
   // configuration
-  private Configuration conf;
+  private OzoneConfiguration conf;
   // node manager
   private NodeManager nodeManager;
 

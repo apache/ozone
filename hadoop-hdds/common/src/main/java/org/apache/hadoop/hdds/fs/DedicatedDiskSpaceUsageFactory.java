@@ -17,15 +17,15 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+import java.time.Duration;
+
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
-import java.io.File;
-import java.time.Duration;
 
 /**
  * Uses DedicatedDiskSpaceUsage for all volumes.  Does not save results since
@@ -38,7 +38,8 @@ public class DedicatedDiskSpaceUsageFactory implements SpaceUsageCheckFactory {
   private Conf conf;
 
   @Override
-  public SpaceUsageCheckFactory setConfiguration(Configuration configuration) {
+  public SpaceUsageCheckFactory setConfiguration(
+      ConfigurationSource configuration) {
     conf = OzoneConfiguration.of(configuration).getObject(Conf.class);
     return this;
   }

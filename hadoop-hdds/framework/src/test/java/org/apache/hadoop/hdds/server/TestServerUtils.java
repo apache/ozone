@@ -17,21 +17,20 @@
  */
 package org.apache.hadoop.hdds.server;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.test.PathUtils;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
-import java.io.File;
-
+import org.apache.commons.io.FileUtils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 /**
  * Unit tests for {@link ServerUtils}.
@@ -49,7 +48,7 @@ public class TestServerUtils {
     final File testDir = PathUtils.getTestDir(TestServerUtils.class);
     final File dbDir = new File(testDir, "scmDbDir");
     final File metaDir = new File(testDir, "metaDir");
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dbDir.getPath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
 
@@ -72,7 +71,7 @@ public class TestServerUtils {
   public void testGetScmDbDirWithFallback() {
     final File testDir = PathUtils.getTestDir(TestServerUtils.class);
     final File metaDir = new File(testDir, "metaDir");
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
     try {
       assertFalse(metaDir.exists());
@@ -99,7 +98,7 @@ public class TestServerUtils {
   public void ozoneMetadataDirAcceptsSingleItem() {
     final File testDir = PathUtils.getTestDir(TestServerUtils.class);
     final File metaDir = new File(testDir, "metaDir");
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
 
     try {
@@ -113,7 +112,7 @@ public class TestServerUtils {
 
   @Test
   public void ozoneMetadataDirRejectsList() {
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, "/data/meta1,/data/meta2");
     thrown.expect(IllegalArgumentException.class);
 

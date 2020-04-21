@@ -18,12 +18,10 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_CONTAINER_DB;
-
 import java.io.File;
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -35,6 +33,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_CONTAINER_DB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,12 +56,12 @@ public class ReconContainerManager extends SCMContainerManager {
    * CacheSize is specified
    * in MB.
    *
-   * @param conf            - {@link Configuration}
+   * @param conf            - {@link ConfigurationSource}
    * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
   public ReconContainerManager(
-      Configuration conf, PipelineManager pipelineManager,
+      ConfigurationSource conf, PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
       ContainerSchemaManager containerSchemaManager) throws IOException {
     super(conf, pipelineManager);
@@ -70,7 +70,7 @@ public class ReconContainerManager extends SCMContainerManager {
   }
 
   @Override
-  protected File getContainerDBPath(Configuration conf) {
+  protected File getContainerDBPath(ConfigurationSource conf) {
     File metaDir = ReconUtils.getReconScmDbDir(conf);
     return new File(metaDir, RECON_SCM_CONTAINER_DB);
   }

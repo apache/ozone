@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
@@ -50,6 +51,9 @@ public abstract class Handler implements Callable<Void> {
   @ParentCommand
   private GenericParentCommand parent;
 
+  @CommandLine.Spec
+  private CommandLine.Model.CommandSpec spec;
+
   public boolean isVerbose() {
     return parent.isVerbose();
   }
@@ -58,14 +62,31 @@ public abstract class Handler implements Callable<Void> {
     return parent.createOzoneConfiguration();
   }
 
-  protected abstract OzoneAddress getAddress() throws OzoneClientException;
+  protected OzoneAddress getAddress() throws OzoneClientException {
+    return new OzoneAddress();
+  }
 
   protected abstract void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException;
 
+  /**
+   * Checks whether the current command should be executed or not.
+   * If it is skipped, an informational message should be output.
+   * Eg. some commands only work in secure clusters.
+   *
+   * @return true if the command should be executed
+   */
+  protected boolean isApplicable() {
+    return true;
+  }
+
   @Override
   public Void call() throws Exception {
     conf = createOzoneConfiguration();
+
+    if (!isApplicable()) {
+      return null;
+    }
 
     OzoneAddress address = getAddress();
     try (OzoneClient client = createClient(address)) {
@@ -83,12 +104,12 @@ public abstract class Handler implements Callable<Void> {
     return address.createClient(conf);
   }
 
-  protected boolean securityEnabled(String commandName) {
+  protected boolean securityEnabled() {
     boolean enabled = OzoneSecurityUtil.isSecurityEnabled(conf);
     if (!enabled) {
       err().printf("Error: '%s' operation works only when security is " +
           "enabled. To enable security set ozone.security.enabled to " +
-          "true.%n", commandName);
+          "true.%n", spec.qualifiedName());
     }
     return enabled;
   }

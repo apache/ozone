@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.util.function.Supplier;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
@@ -46,7 +47,7 @@ public final class TracingUtil {
    * Initialize the tracing with the given service name.
    */
   public static void initTracing(
-      String serviceName, org.apache.hadoop.conf.Configuration conf) {
+      String serviceName, ConfigurationSource conf) {
     if (!GlobalTracer.isRegistered() && isTracingEnabled(conf)) {
       Configuration config = Configuration.fromEnv(serviceName);
       JaegerTracer tracer = config.getTracerBuilder()
@@ -119,7 +120,7 @@ public final class TracingUtil {
    * calls to the delegate and also enables tracing.
    */
   public static <T> T createProxy(
-      T delegate, Class<T> itf, org.apache.hadoop.conf.Configuration conf) {
+      T delegate, Class<T> itf, ConfigurationSource conf) {
     if (!isTracingEnabled(conf)) {
       return delegate;
     }
@@ -130,7 +131,7 @@ public final class TracingUtil {
   }
 
   private static boolean isTracingEnabled(
-      org.apache.hadoop.conf.Configuration conf) {
+      ConfigurationSource conf) {
     return conf.getBoolean(
         ScmConfigKeys.HDDS_TRACING_ENABLED,
         ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);

@@ -33,8 +33,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -75,7 +75,7 @@ import org.slf4j.LoggerFactory;
 public class XceiverClientGrpc extends XceiverClientSpi {
   static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
   private final Pipeline pipeline;
-  private final Configuration config;
+  private final ConfigurationSource config;
   private Map<UUID, XceiverClientProtocolServiceStub> asyncStubs;
   private XceiverClientMetrics metrics;
   private Map<UUID, ManagedChannel> channels;
@@ -96,7 +96,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * @param config   -- Ozone Config
    * @param caCert   - SCM ca certificate.
    */
-  public XceiverClientGrpc(Pipeline pipeline, Configuration config,
+  public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
       X509Certificate caCert) {
     super();
     Preconditions.checkNotNull(pipeline);
@@ -123,7 +123,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * @param pipeline - Pipeline that defines the machines.
    * @param config   -- Ozone Config
    */
-  public XceiverClientGrpc(Pipeline pipeline, Configuration config) {
+  public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config) {
     this(pipeline, config, null);
   }
 

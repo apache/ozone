@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.security;
 
+import javax.crypto.KeyGenerator;
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -39,19 +42,19 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.crypto.KeyGenerator;
-import javax.crypto.Mac;
-import javax.crypto.SecretKey;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.conf.Configuration;
+
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.TestSSLFactory;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -88,10 +91,10 @@ public class TestOzoneTokenIdentifier {
     base.mkdirs();
   }
 
-  private Configuration createConfiguration(boolean clientCert,
+  private ConfigurationSource createConfiguration(boolean clientCert,
       boolean trustStore)
       throws Exception {
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     KeyStoreTestUtil.setupSSLConfig(KEYSTORES_DIR, sslConfsDir, conf,
         clientCert, trustStore, EXCLUDE_CIPHERS);
     sslConfsDir = KeyStoreTestUtil.getClasspathDir(TestSSLFactory.class);
