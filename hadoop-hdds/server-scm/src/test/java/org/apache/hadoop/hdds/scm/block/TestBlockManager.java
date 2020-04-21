@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreRDBImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
@@ -123,7 +122,7 @@ public class TestBlockManager {
         mockRatisProvider);
     SCMContainerManager containerManager =
         new SCMContainerManager(conf,
-            SCMDBDefinition.CONTAINERS.getTable(scmMetadataStore.getStore()),
+            scmMetadataStore.getContainerTable(),
             scmMetadataStore.getStore(),
             pipelineManager);
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,

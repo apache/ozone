@@ -83,8 +83,7 @@ public class TestSCMPipelineManager {
     nodeManager = new MockNodeManager(true, 20);
 
     store = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
-
-
+    
   }
 
   @After
