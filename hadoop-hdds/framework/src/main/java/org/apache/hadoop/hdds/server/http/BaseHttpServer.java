@@ -44,9 +44,14 @@ import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_HTTPS_NEED_AUTH_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYPASSWORD_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY;
+
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,10 +101,19 @@ public abstract class BaseHttpServer {
 
       boolean isSecurityEnabled = UserGroupInformation.isSecurityEnabled() &&
           OzoneSecurityUtil.isHttpSecurityEnabled(conf);
+      LOG.info("Hadoop Security Enabled: {} " +
+              "Ozone Security Enabled: {} " +
+              "Ozone HTTP Security Enabled: {} ",
+          UserGroupInformation.isSecurityEnabled(),
+          conf.getBoolean(OZONE_SECURITY_ENABLED_KEY,
+              OZONE_SECURITY_ENABLED_DEFAULT),
+          conf.getBoolean(OZONE_HTTP_SECURITY_ENABLED_KEY,
+              OZONE_HTTP_SECURITY_ENABLED_DEFAULT));
 
       if (isSecurityEnabled) {
-        if (conf.get(getHttpAuthType(), "simple").equals(
-            "kerberos")) {
+        String httpAuthType = conf.get(getHttpAuthType(), "simple");
+        LOG.info("HttpAuthType: {} = {}", getHttpAuthType(), httpAuthType);
+        if (httpAuthType.equals("kerberos")) {
           builder.setSecurityEnabled(true);
           builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
           builder.setUsernameConfKey(getSpnegoPrincipal());
