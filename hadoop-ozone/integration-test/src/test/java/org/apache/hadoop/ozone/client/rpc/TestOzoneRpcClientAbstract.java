@@ -160,6 +160,7 @@ public abstract class TestOzoneRpcClientAbstract {
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
+    store.createVolume(OzoneConsts.S3_VOLUME_NAME);
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();
