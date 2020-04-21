@@ -136,6 +136,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
     // filter nodes that meet the size and pipeline engagement criteria.
     // Pipeline placement doesn't take node space left into account.
+    // Sort the DNs by pipeline load.
+    // TODO check if sorting could cause performance issue: HDDS-3466.
     List<DatanodeDetails> healthyList = healthyNodes.stream()
         .map(d ->
             new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
