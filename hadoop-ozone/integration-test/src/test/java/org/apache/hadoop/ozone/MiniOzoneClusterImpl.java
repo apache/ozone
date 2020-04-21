@@ -468,7 +468,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     if (dn != null) {
       dn.stop();
       dn.join();
-      LOG.info("!!!!!! Stopped DN {}", dn.getDatanodeDetails().getUuidString());
     }
   }
 
@@ -715,7 +714,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         Files.createDirectories(workDir);
         dnConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
         dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, listOfDirs);
-        LOG.info("DFS_DATANODE_DATA_DIR_KEY = {}", listOfDirs);
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
         dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
