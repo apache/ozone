@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -54,7 +54,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);
   private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final int heavyNodeCriteria;
 
   /**
@@ -66,7 +66,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @param conf        Configuration
    */
   public PipelinePlacementPolicy(final NodeManager nodeManager,
-      final PipelineStateManager stateManager, final Configuration conf) {
+      final PipelineStateManager stateManager, final ConfigurationSource conf) {
     super(nodeManager, conf);
     this.nodeManager = nodeManager;
     this.conf = conf;

@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -54,7 +54,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
   public OneReplicaPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager,
-      SCMSafeModeManager safeModeManager, Configuration configuration) {
+      SCMSafeModeManager safeModeManager, ConfigurationSource configuration) {
     super(safeModeManager, ruleName, eventQueue);
 
     double percent =

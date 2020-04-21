@@ -17,23 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.net;
 
-import org.apache.hadoop.conf.Configuration;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.REGION_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.DATACENTER_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.NODEGROUP_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
-
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -42,6 +25,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
+
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+
+import static org.apache.hadoop.hdds.scm.net.NetConstants.DATACENTER_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODEGROUP_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.REGION_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -49,9 +44,14 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
-import org.junit.runner.RunWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Test the network topology functions. */
 @RunWith(Parameterized.class)
@@ -221,7 +221,7 @@ public class TestNetworkTopologyImpl {
   @Test
   public void testInitWithConfigFile() {
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     try {
       String filePath = classLoader.getResource(
           "./networkTopologyTestFiles/good.xml").getPath();

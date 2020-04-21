@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -71,7 +71,7 @@ public class TestReplicationManager {
 
   @Before
   public void setup() throws IOException, InterruptedException {
-    final Configuration conf = new OzoneConfiguration();
+    final ConfigurationSource conf = new OzoneConfiguration();
     final ContainerManager containerManager =
         Mockito.mock(ContainerManager.class);
     eventQueue = new EventQueue();

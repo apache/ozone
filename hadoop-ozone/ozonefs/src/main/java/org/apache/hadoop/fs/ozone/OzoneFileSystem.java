@@ -24,7 +24,7 @@ import java.net.URI;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
@@ -36,9 +36,9 @@ import org.apache.hadoop.security.token.DelegationTokenIssuer;
  * The Ozone Filesystem implementation.
  * <p>
  * This subclass is marked as private as code should not be creating it
- * directly; use {@link FileSystem#get(Configuration)} and variants to create
- * one. If cast to {@link OzoneFileSystem}, extra methods and features may be
- * accessed. Consider those private and unstable.
+ * directly; use {@link FileSystem#get(org.apache.hadoop.conf.Configuration)}
+ * and variants to create one. If cast to {@link OzoneFileSystem}, extra
+ * methods and features may be accessed. Consider those private and unstable.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -85,7 +85,7 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   }
 
   @Override
-  protected OzoneClientAdapter createAdapter(Configuration conf,
+  protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
       String bucketStr,
       String volumeStr, String omHost, int omPort,
       boolean isolatedClassloader) throws IOException {

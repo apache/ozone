@@ -16,25 +16,24 @@
  */
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.Callable;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
+
+import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.Map;
-import java.util.concurrent.Callable;
 
 /**
  * Task that returns version.
@@ -44,11 +43,11 @@ public class VersionEndpointTask implements
   public static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask
       .class);
   private final EndpointStateMachine rpcEndPoint;
-  private final Configuration configuration;
+  private final ConfigurationSource configuration;
   private final OzoneContainer ozoneContainer;
 
   public VersionEndpointTask(EndpointStateMachine rpcEndPoint,
-                             Configuration conf, OzoneContainer container) {
+      ConfigurationSource conf, OzoneContainer container) {
     this.rpcEndPoint = rpcEndPoint;
     this.configuration = conf;
     this.ozoneContainer = container;

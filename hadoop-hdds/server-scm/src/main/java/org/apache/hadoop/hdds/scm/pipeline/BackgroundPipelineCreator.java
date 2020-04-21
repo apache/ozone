@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -41,11 +41,11 @@ class BackgroundPipelineCreator {
   private final Scheduler scheduler;
   private final AtomicBoolean isPipelineCreatorRunning;
   private final PipelineManager pipelineManager;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private ScheduledFuture<?> periodicTask;
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
-      Scheduler scheduler, Configuration conf) {
+      Scheduler scheduler, ConfigurationSource conf) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
     this.scheduler = scheduler;

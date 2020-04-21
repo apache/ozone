@@ -23,20 +23,20 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
-
-import com.google.common.base.Preconditions;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+
+import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,7 +83,7 @@ public final class OzoneClientFactory {
    * @throws IOException
    */
   public static OzoneClient getRpcClient(String omHost, Integer omRpcPort,
-                                         Configuration config)
+      ConfigurationSource config)
       throws IOException {
     Preconditions.checkNotNull(omHost);
     Preconditions.checkNotNull(omRpcPort);
@@ -106,7 +106,7 @@ public final class OzoneClientFactory {
    * @throws IOException
    */
   public static OzoneClient getRpcClient(String omServiceId,
-      Configuration config) throws IOException {
+      ConfigurationSource config) throws IOException {
     Preconditions.checkNotNull(omServiceId);
     Preconditions.checkNotNull(config);
     if (OmUtils.isOmHAServiceId(config, omServiceId)) {
@@ -129,7 +129,7 @@ public final class OzoneClientFactory {
    *
    * @throws IOException
    */
-  public static OzoneClient getRpcClient(Configuration config)
+  public static OzoneClient getRpcClient(ConfigurationSource config)
       throws IOException {
     Preconditions.checkNotNull(config);
 
@@ -156,7 +156,7 @@ public final class OzoneClientFactory {
    *        Configuration to be used for OzoneClient creation
    */
   private static OzoneClient getRpcClient(ClientProtocol clientProtocol,
-                                       Configuration config) {
+                                       ConfigurationSource config) {
     OzoneClientInvocationHandler clientHandler =
         new OzoneClientInvocationHandler(clientProtocol);
     ClientProtocol proxy = (ClientProtocol) Proxy.newProxyInstance(
@@ -225,7 +225,7 @@ public final class OzoneClientFactory {
    *
    * @throws IOException
    */
-  private static ClientProtocol getClientProtocol(Configuration config)
+  private static ClientProtocol getClientProtocol(ConfigurationSource config)
       throws IOException {
     return getClientProtocol(config, null);
   }
@@ -241,7 +241,7 @@ public final class OzoneClientFactory {
    *
    * @throws IOException
    */
-  private static ClientProtocol getClientProtocol(Configuration config,
+  private static ClientProtocol getClientProtocol(ConfigurationSource config,
       String omServiceId) throws IOException {
     try {
       return new RpcClient(config, omServiceId);

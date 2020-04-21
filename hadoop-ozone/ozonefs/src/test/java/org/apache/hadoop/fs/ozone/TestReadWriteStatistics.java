@@ -18,20 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import static org.mockito.Mockito.*;
-import static org.junit.Assert.*;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CreateFlag;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.GlobalStorageStatistics;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.StorageStatistics;
-import org.junit.Before;
-import org.junit.Test;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -41,6 +27,31 @@ import java.nio.ByteBuffer;
 import java.nio.ReadOnlyBufferException;
 import java.util.Arrays;
 import java.util.EnumSet;
+
+import org.apache.hadoop.fs.CreateFlag;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.GlobalStorageStatistics;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import org.junit.Before;
+import org.junit.Test;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyShort;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests to check if bytes read and written and corresponding read and write
@@ -404,14 +415,14 @@ public class TestReadWriteStatistics {
   }
 
   private void setupFileSystemToUseFakeClientAdapter() throws IOException {
-    doReturn(fakeAdapter).when(fs).createAdapter(any(Configuration.class),
+    doReturn(fakeAdapter).when(fs).createAdapter(any(ConfigurationSource.class),
         anyString(), anyString(), anyString(), anyInt(), anyBoolean());
   }
 
   private void initializeFS() throws IOException, URISyntaxException {
     FileSystem.getGlobalStorageStatistics().reset();
     URI fsUri = new URI("o3fs://volume.bucket.localhost");
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     fs.initialize(fsUri, conf);
   }
 

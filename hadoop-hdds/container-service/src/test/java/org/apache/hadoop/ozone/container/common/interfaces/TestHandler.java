@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-import com.google.common.collect.Maps;
+import java.util.Map;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
@@ -29,10 +29,11 @@ import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.impl.TestHddsDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 
+import com.google.common.collect.Maps;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -42,8 +43,6 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.mockito.Mockito;
 
-import java.util.Map;
-
 /**
  * Tests Handler interface.
  */
@@ -51,7 +50,7 @@ public class TestHandler {
   @Rule
   public TestRule timeout = new Timeout(300000);
 
-  private Configuration conf;
+  private OzoneConfiguration conf;
   private HddsDispatcher dispatcher;
   private ContainerSet containerSet;
   private VolumeSet volumeSet;
@@ -59,7 +58,7 @@ public class TestHandler {
 
   @Before
   public void setup() throws Exception {
-    this.conf = new Configuration();
+    this.conf = new OzoneConfiguration();
     this.containerSet = Mockito.mock(ContainerSet.class);
     this.volumeSet = Mockito.mock(MutableVolumeSet.class);
     DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
