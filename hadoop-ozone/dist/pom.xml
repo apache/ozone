@@ -23,7 +23,7 @@
   </parent>
   <artifactId>hadoop-ozone-dist</artifactId>
   <name>Apache Hadoop Ozone Distribution</name>
-  <packaging>pom</packaging>
+  <packaging>jar</packaging>
   <version>0.6.0-SNAPSHOT</version>
   <properties>
     <file.encoding>UTF-8</file.encoding>
