@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -67,6 +68,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
@@ -98,6 +101,7 @@ import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
  * Ozone containers.
@@ -128,6 +132,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final RaftPeerId raftPeerId;
   // pipelines for which I am the leader
   private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
+  // Timeout used while calling submitRequest directly.
+  private long requestTimeout;
 
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -152,6 +158,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       builder.setParameters(GrpcFactory.newRaftParameters(tlsConfig));
     }
     this.server = builder.build();
+    this.requestTimeout = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT,
+        HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
@@ -494,20 +504,24 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
     RaftClientReply reply;
-    try (Scope scope = TracingUtil
-        .importAndCreateScope(
+    Span span = TracingUtil
+        .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
-            request.getTraceID())) {
+            request.getTraceID());
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
 
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,
               RaftClientRequest.writeRequestType());
       try {
-        reply = server.submitClientRequestAsync(raftClientRequest).get();
+        reply = server.submitClientRequestAsync(raftClientRequest)
+            .get(requestTimeout, TimeUnit.MILLISECONDS);
       } catch (Exception e) {
         throw new IOException(e.getMessage(), e);
       }
       processReply(reply);
+    } finally {
+      span.finish();
     }
   }
 

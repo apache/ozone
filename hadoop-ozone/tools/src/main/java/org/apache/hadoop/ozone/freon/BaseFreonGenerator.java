@@ -29,8 +29,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.codahale.metrics.ScheduledReporter;
-import com.codahale.metrics.Slf4jReporter;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -53,7 +51,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.ScheduledReporter;
+import com.codahale.metrics.Slf4jReporter;
 import io.opentracing.Scope;
+import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -170,18 +171,16 @@ public class BaseFreonGenerator {
    * @param taskId unique ID of the task
    */
   private void tryNextTask(TaskProvider provider, long taskId) {
-    Scope scope =
-        GlobalTracer.get().buildSpan(spanName)
-            .startActive(true);
-    try {
+    Span span = GlobalTracer.get().buildSpan(spanName).start();
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       provider.executeNextTask(taskId);
       successCounter.incrementAndGet();
     } catch (Exception e) {
-      scope.span().setTag("failure", true);
+      span.setTag("failure", true);
       failureCounter.incrementAndGet();
       LOG.error("Error on executing task {}", taskId, e);
     } finally {
-      scope.close();
+      span.finish();
     }
   }
 

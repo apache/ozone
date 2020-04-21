@@ -17,14 +17,18 @@
  */
 package org.apache.hadoop.ozone.s3;
 
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerRequestFilter;
+import javax.ws.rs.container.ContainerResponseContext;
+import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.container.ResourceInfo;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.ext.Provider;
+
 import io.opentracing.Scope;
 import io.opentracing.ScopeManager;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-
-import javax.ws.rs.container.*;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.ext.Provider;
 
 /**
  * Filter used to add jaeger tracing span.
@@ -35,44 +39,44 @@ public class TracingFilter implements ContainerRequestFilter,
     ContainerResponseFilter {
 
   public static final String TRACING_SCOPE = "TRACING_SCOPE";
+  public static final String TRACING_SPAN = "TRACING_SPAN";
 
   @Context
   private ResourceInfo resourceInfo;
 
-  private void closeScope(Scope scope) {
-    if (scope != null) {
-      Span span = scope.span();
-      if (span != null) {
-        span.finish();
-      }
-
-      scope.close();
-    }
-  }
-
-  private void closeActiveScope() {
-    ScopeManager manager = GlobalTracer.get().scopeManager();
-
-    if (manager != null) {
-      Scope scope = manager.active();
-      closeScope(scope);
-    }
-  }
 
   @Override
   public void filter(ContainerRequestContext requestContext) {
-    closeActiveScope();
+    finishAndCloseActiveSpan();
 
-    Scope scope = GlobalTracer.get().buildSpan(
+    Span span = GlobalTracer.get().buildSpan(
         resourceInfo.getResourceClass().getSimpleName() + "." +
-        resourceInfo.getResourceMethod().getName()).startActive(true);
+            resourceInfo.getResourceMethod().getName()).start();
+    Scope scope = GlobalTracer.get().activateSpan(span);
     requestContext.setProperty(TRACING_SCOPE, scope);
+    requestContext.setProperty(TRACING_SPAN, span);
   }
 
   @Override
   public void filter(ContainerRequestContext requestContext,
       ContainerResponseContext responseContext) {
     Scope scope = (Scope)requestContext.getProperty(TRACING_SCOPE);
-    closeScope(scope);
+    if (scope != null) {
+      scope.close();
+    }
+    Span span = (Span) requestContext.getProperty(TRACING_SPAN);
+    if (span != null) {
+      span.finish();
+    }
+
+    finishAndCloseActiveSpan();
+  }
+
+  private void finishAndCloseActiveSpan() {
+    ScopeManager scopeManager = GlobalTracer.get().scopeManager();
+    if (scopeManager != null && scopeManager.activeSpan() != null) {
+      scopeManager.activeSpan().finish();
+      scopeManager.activate(null);
+    }
   }
 }
