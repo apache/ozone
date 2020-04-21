@@ -57,6 +57,9 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.http.FilterContainer;
+import org.apache.hadoop.http.FilterInitializer;
+import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
@@ -103,6 +106,8 @@ import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilterConfigMap;
 
 /**
  * Create a Jetty embedded server to answer http requests. The primary goal is
@@ -435,6 +440,8 @@ public final class HttpServer2 implements FilterContainer {
       HttpServer2 server = new HttpServer2(this);
 
       if (this.securityEnabled) {
+        LOG.info("Initialize spnego with host: {} userKey: {} keytabKey: {}",
+            hostName, usernameConfKey, keytabConfKey);
         server.initSpnego(conf, hostName, usernameConfKey, keytabConfKey);
       }
 
@@ -564,12 +571,13 @@ public final class HttpServer2 implements FilterContainer {
 
     this.findPort = b.findPort;
     this.portRanges = b.portRanges;
-    initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs);
+    initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs,
+        b.authFilterConfigurationPrefix);
   }
 
   private void initializeWebServer(String name, String hostName,
-      ConfigurationSource conf, String[] pathSpecs)
-      throws IOException {
+      ConfigurationSource conf, String[] pathSpecs,
+      String authFilterConfigPrefix) throws IOException {
 
     Preconditions.checkNotNull(webAppContext);
 
@@ -607,7 +615,13 @@ public final class HttpServer2 implements FilterContainer {
     if (initializers != null) {
       conf.set(BIND_ADDRESS, hostName);
       for (FilterInitializer c : initializers) {
-        c.initFilter(this, conf);
+        //c.initFilter(this, conf) does not work here as it does not take config
+        // prefix key.
+        Map<String, String> filterConfig = getFilterConfigMap(
+            LegacyHadoopConfigurationSource.asHadoopConfiguration(conf),
+            authFilterConfigPrefix);
+        addFilter("authentication", AuthenticationFilter.class.getName(),
+            filterConfig);
       }
     }
 

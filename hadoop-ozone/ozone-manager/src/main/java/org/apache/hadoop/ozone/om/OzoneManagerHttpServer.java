@@ -34,9 +34,10 @@ public class OzoneManagerHttpServer extends BaseHttpServer {
   public OzoneManagerHttpServer(ConfigurationSource conf, OzoneManager om)
       throws IOException {
     super(conf, "ozoneManager");
-    addServlet("serviceList", OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT,
+    // TODO: change back to addServlet when HDDS-3453 is fixed.
+    addInternalServlet("serviceList", OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT,
         ServiceListJSONServlet.class);
-    addServlet("dbCheckpoint", OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT,
+    addInternalServlet("dbCheckpoint", OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT,
         OMDBCheckpointServlet.class);
     getWebAppContext().setAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE, om);
   }
@@ -79,5 +80,15 @@ public class OzoneManagerHttpServer extends BaseHttpServer {
 
   @Override protected String getEnabledKey() {
     return OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY;
+  }
+
+  @Override
+  protected String getHttpAuthType() {
+    return OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return OMConfigKeys.OZONE_OM_HTTP_AUTH_CONFIG_PREFIX;
   }
 }

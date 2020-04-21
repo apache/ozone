@@ -34,7 +34,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
 
@@ -93,8 +92,20 @@ public abstract class BaseHttpServer {
       conf.set("hadoop.prometheus.endpoint.enabled", "false");
 
       HttpServer2.Builder builder = newHttpServer2BuilderForOzone(
-          conf, httpAddress, httpsAddress,
-          name, getSpnegoPrincipal(), getKeytabFile());
+          conf, httpAddress, httpsAddress, name);
+
+      boolean isSecurityEnabled = UserGroupInformation.isSecurityEnabled() &&
+          OzoneSecurityUtil.isHttpSecurityEnabled(conf);
+
+      if (isSecurityEnabled) {
+        if (conf.get(getHttpAuthType(), "simple").equals(
+            "kerberos")) {
+          builder.setSecurityEnabled(true);
+          builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
+          builder.setUsernameConfKey(getSpnegoPrincipal());
+          builder.setKeytabConfKey(getKeytabFile());
+        }
+      }
 
       final boolean xFrameEnabled = conf.getBoolean(
           DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED,
@@ -144,26 +155,14 @@ public abstract class BaseHttpServer {
    */
   public static HttpServer2.Builder newHttpServer2BuilderForOzone(
       ConfigurationSource conf, final InetSocketAddress httpAddr,
-      final InetSocketAddress httpsAddr, String name, String spnegoUserNameKey,
-      String spnegoKeytabFileKey) throws IOException {
+      final InetSocketAddress httpsAddr, String name) throws IOException {
     HttpConfig.Policy policy = getHttpPolicy(conf);
-    boolean isSecurityEnabled = UserGroupInformation.isSecurityEnabled() &&
-        OzoneSecurityUtil.isHttpSecurityEnabled(conf);
 
     HttpServer2.Builder builder = new HttpServer2.Builder().setName(name)
         .setConf(conf).setACL(new AccessControlList(conf.get(
-            OZONE_ADMINISTRATORS, " ")))
-        .setSecurityEnabled(isSecurityEnabled)
-        .setUsernameConfKey(spnegoUserNameKey)
-        .setKeytabConfKey(spnegoKeytabFileKey);
+            OZONE_ADMINISTRATORS, " ")));
 
     // initialize the webserver for uploading/downloading files.
-    if (isSecurityEnabled) {
-      LOG.info("Starting web server as: "
-          + SecurityUtil.getServerPrincipal(conf.get(spnegoUserNameKey),
-          httpAddr.getHostName()));
-    }
-
     if (policy.isHttpEnabled()) {
       if (httpAddr.getPort() == 0) {
         builder.setFindPort(true);
@@ -201,6 +200,12 @@ public abstract class BaseHttpServer {
       Class<? extends HttpServlet> clazz) {
     httpServer.addServlet(servletName, pathSpec, clazz);
   }
+
+  protected void addInternalServlet(String servletName, String pathSpec,
+      Class<? extends HttpServlet> clazz) {
+    httpServer.addInternalServlet(servletName, pathSpec, clazz);
+  }
+
 
   /**
    * Returns the WebAppContext associated with this HttpServer.
@@ -314,25 +319,6 @@ public abstract class BaseHttpServer {
             sslConf.get("ssl.server.exclude.cipher.list"));
   }
 
-
-  /**
-   * Get SPNEGO keytab Key from configuration.
-   *
-   * @param conf       Configuration
-   * @param defaultKey default key to be used for config lookup
-   * @return DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY if the key is not empty
-   * else return defaultKey
-   */
-  public static String getSpnegoKeytabKey(ConfigurationSource conf,
-      String defaultKey) {
-    String value =
-        conf.get(
-            DFSConfigKeysLegacy.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY);
-    return (value == null || value.isEmpty()) ?
-        defaultKey :
-        DFSConfigKeysLegacy.DFS_WEB_AUTHENTICATION_KERBEROS_KEYTAB_KEY;
-  }
-
   /**
    * Leverages the Configuration.getPassword method to attempt to get
    * passwords from the CredentialProvider API before falling back to
@@ -418,5 +404,9 @@ public abstract class BaseHttpServer {
   protected abstract String getSpnegoPrincipal();
 
   protected abstract String getEnabledKey();
+
+  protected abstract String getHttpAuthType();
+
+  protected abstract String getHttpAuthConfigPrefix();
 
 }
