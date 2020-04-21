@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.UUID;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -255,7 +254,7 @@ public class TestKeyValueHandler {
   @Test
   public void testVolumeSetInKeyValueHandler() throws Exception{
     File path = GenericTestUtils.getRandomizedTestDir();
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, path.getAbsolutePath());
     MutableVolumeSet
         volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
@@ -312,7 +311,7 @@ public class TestKeyValueHandler {
   @Test
   public void testCloseInvalidContainer() throws IOException {
     long containerID = 1234L;
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     KeyValueContainerData kvData = new KeyValueContainerData(containerID,
         layout,
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),

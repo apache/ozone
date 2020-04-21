@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,7 +62,7 @@ public class TestSCMSafeModeManager {
 
   private static EventQueue queue;
   private SCMSafeModeManager scmSafeModeManager;
-  private static Configuration config;
+  private static OzoneConfiguration config;
   private List<ContainerInfo> containers = Collections.emptyList();
 
   @Rule

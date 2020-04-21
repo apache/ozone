@@ -17,7 +17,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.primitives.Longs;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -68,13 +68,13 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       LoggerFactory.getLogger(DeleteBlocksCommandHandler.class);
 
   private final ContainerSet containerSet;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private int invocationCount;
   private long totalTime;
   private boolean cmdExecuted;
 
   public DeleteBlocksCommandHandler(ContainerSet cset,
-      Configuration conf) {
+      ConfigurationSource conf) {
     this.containerSet = cset;
     this.conf = conf;
   }

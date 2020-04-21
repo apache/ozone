@@ -19,6 +19,7 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 # shellcheck source=/dev/null
+source "$COMPOSE_DIR/.env"
 source "$COMPOSE_DIR/../../testlib.sh"
 
 start_docker_env
@@ -35,9 +36,10 @@ source "$COMPOSE_DIR/../../testlib.sh"
 
 execute_robot_test rm ozonefs/hadoopo3fs.robot
 
-execute_robot_test rm  -v hadoop.version:3.1.2 mapreduce.robot
-
+execute_robot_test rm  -v "hadoop.version:${HADOOP_VERSION}" mapreduce.robot
 
 stop_docker_env
 
 generate_report
+
+cleanup_docker_images "${HADOOP_IMAGE}:${HADOOP_VERSION}"

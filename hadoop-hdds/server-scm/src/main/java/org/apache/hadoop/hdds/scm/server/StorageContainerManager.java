@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -91,6 +92,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RPC;
@@ -503,7 +505,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @param conf
    */
-  private void loginAsSCMUser(Configuration conf)
+  private void loginAsSCMUser(ConfigurationSource conf)
       throws IOException, AuthenticationException {
     if (LOG.isDebugEnabled()) {
       ScmConfig scmConfig = configuration.getObject(ScmConfig.class);
@@ -513,18 +515,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmConfig.getKerberosKeytab());
     }
 
-    if (SecurityUtil.getAuthenticationMethod(conf).equals(
+    Configuration hadoopConf =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+    if (SecurityUtil.getAuthenticationMethod(hadoopConf).equals(
         AuthenticationMethod.KERBEROS)) {
-      UserGroupInformation.setConfiguration(conf);
+      UserGroupInformation.setConfiguration(hadoopConf);
       InetSocketAddress socAddr = HddsServerUtil
           .getScmBlockClientBindAddress(conf);
-      SecurityUtil.login(conf,
+      SecurityUtil.login(hadoopConf,
             ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
             ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
             socAddr.getHostName());
     } else {
       throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
-          conf) + " authentication method not support. "
+          hadoopConf) + " authentication method not support. "
           + "SCM user login failed.");
     }
     LOG.info("SCM login successful.");

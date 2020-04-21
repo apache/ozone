@@ -28,7 +28,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -62,7 +61,7 @@ import org.junit.Test;
 public class TestSCMPipelineManager {
   private static MockNodeManager nodeManager;
   private static File testDir;
-  private static Configuration conf;
+  private static OzoneConfiguration conf;
 
   @Before
   public void setUp() throws Exception {

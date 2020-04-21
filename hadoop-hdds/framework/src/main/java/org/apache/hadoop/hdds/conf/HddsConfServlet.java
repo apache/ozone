@@ -17,29 +17,26 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import com.google.gson.Gson;
-import java.io.IOException;
-import java.io.Writer;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.HttpHeaders;
+import java.io.IOException;
+import java.io.Writer;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.http.HttpServer2;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.gson.Gson;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TAGS_SYSTEM_KEY;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TAGS_SYSTEM_KEY;
 
 /**
  * A servlet to print out the running configuration data.
@@ -63,8 +60,9 @@ public class HddsConfServlet extends HttpServlet {
    * Return the Configuration of the daemon hosting this servlet.
    * This is populated when the HttpServer starts.
    */
-  private Configuration getConfFromContext() {
-    Configuration conf = (Configuration) getServletContext().getAttribute(
+  private OzoneConfiguration getConfFromContext() {
+    OzoneConfiguration conf =
+        (OzoneConfiguration) getServletContext().getAttribute(
         HttpServer2.CONF_CONTEXT_ATTRIBUTE);
     assert conf != null;
     return conf;
@@ -127,11 +125,11 @@ public class HddsConfServlet extends HttpServlet {
   /**
    * Guts of the servlet - extracted for easy testing.
    */
-  static void writeResponse(Configuration conf,
+  static void writeResponse(OzoneConfiguration conf,
       Writer out, String format, String propertyName)
       throws IOException, IllegalArgumentException, BadFormatException {
     if (FORMAT_JSON.equals(format)) {
-      Configuration.dumpConfiguration(conf, propertyName, out);
+      OzoneConfiguration.dumpConfiguration(conf, propertyName, out);
     } else if (FORMAT_XML.equals(format)) {
       conf.writeXml(propertyName, out);
     } else {
@@ -155,7 +153,7 @@ public class HddsConfServlet extends HttpServlet {
       Writer out) throws IOException {
     String cmd = request.getParameter(COMMAND);
     Gson gson = new Gson();
-    Configuration config = getOzoneConfig();
+    OzoneConfiguration config = getOzoneConfig();
 
     switch (cmd) {
     case "getOzoneTags":
@@ -184,7 +182,7 @@ public class HddsConfServlet extends HttpServlet {
 
   }
 
-  private static Configuration getOzoneConfig() {
+  private static OzoneConfiguration getOzoneConfig() {
     return OZONE_CONFIG;
   }
 }

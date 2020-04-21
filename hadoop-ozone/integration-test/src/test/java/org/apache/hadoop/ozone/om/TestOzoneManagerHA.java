@@ -93,6 +93,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
@@ -108,7 +109,6 @@ import javax.management.ObjectName;
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Ignore
 public class TestOzoneManagerHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -394,7 +394,7 @@ public class TestOzoneManagerHA {
     try {
       testCreateFile(ozoneBucket, keyName, data, false, false);
     } catch (OMException ex) {
-      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+      Assert.assertEquals(DIRECTORY_NOT_FOUND, ex.getResult());
     }
 
     // create directory, now this should pass.
@@ -470,6 +470,7 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(data, new String(fileContent));
   }
 
+  @Ignore("This test failing randomly and triggering HDDS-3465.")
   @Test
   public void testMultipartUploadWithOneOmNodeDown() throws Exception {
 
@@ -672,6 +673,7 @@ public class TestOzoneManagerHA {
   /**
    * Test OMFailoverProxyProvider failover on connection exception to OM client.
    */
+  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
@@ -736,6 +738,7 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(leaderOMNodeId, newLeaderOMNodeId);
   }
 
+  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testOMRetryProxy() throws Exception {
     // Stop all the OMs.
@@ -1297,6 +1300,7 @@ public class TestOzoneManagerHA {
 
   }
 
+  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testListVolumes() throws Exception {
     String userName = UserGroupInformation.getCurrentUser().getUserName();

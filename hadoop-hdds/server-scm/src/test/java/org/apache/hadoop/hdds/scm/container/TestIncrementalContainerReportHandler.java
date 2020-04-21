@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -55,7 +55,7 @@ public class TestIncrementalContainerReportHandler {
 
   @Before
   public void setup() throws IOException {
-    final Configuration conf = new OzoneConfiguration();
+    final ConfigurationSource conf = new OzoneConfiguration();
     this.containerManager = Mockito.mock(ContainerManager.class);
     this.nodeManager = Mockito.mock(NodeManager.class);
     this.containerStateManager = new ContainerStateManager(conf);

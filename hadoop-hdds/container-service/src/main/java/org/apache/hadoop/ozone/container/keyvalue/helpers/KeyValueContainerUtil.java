@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.primitives.Longs;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -63,7 +63,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void createContainerMetaData(File containerMetaDataPath, File
-      chunksPath, File dbFile, Configuration conf) throws IOException {
+      chunksPath, File dbFile, ConfigurationSource conf) throws IOException {
     Preconditions.checkNotNull(containerMetaDataPath);
     Preconditions.checkNotNull(conf);
 
@@ -105,7 +105,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void removeContainer(KeyValueContainerData containerData,
-                                     Configuration conf)
+                                     ConfigurationSource conf)
       throws IOException {
     Preconditions.checkNotNull(containerData);
     File containerMetaDataPath = new File(containerData
@@ -132,7 +132,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
-      Configuration config) throws IOException {
+      ConfigurationSource config) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
     File metadataPath = new File(kvContainerData.getMetadataPath());
