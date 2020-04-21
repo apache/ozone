@@ -61,6 +61,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
@@ -157,10 +159,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
     String spanName = "HddsDispatcher." + msg.getCmdType().name();
     long startTime = System.nanoTime();
-    try (Scope scope = TracingUtil
-        .importAndCreateScope(spanName, msg.getTraceID())) {
+    Span span = TracingUtil
+        .importAndCreateSpan(spanName, msg.getTraceID());
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       return dispatchRequest(msg, dispatcherContext);
     } finally {
+      span.finish();
       protocolMetrics
           .increment(msg.getCmdType(), System.nanoTime() - startTime);
     }

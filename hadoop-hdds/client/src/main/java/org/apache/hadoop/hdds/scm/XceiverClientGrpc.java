@@ -35,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -57,6 +58,7 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
+import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
@@ -265,14 +267,18 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private XceiverClientReply sendCommandWithTraceIDAndRetry(
       ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
       throws IOException {
-    try (Scope scope = GlobalTracer.get()
-        .buildSpan("XceiverClientGrpc." + request.getCmdType().name())
-        .startActive(true)) {
-      ContainerCommandRequestProto finalPayload =
-          ContainerCommandRequestProto.newBuilder(request)
-              .setTraceID(TracingUtil.exportCurrentSpan()).build();
-      return sendCommandWithRetry(finalPayload, validators);
-    }
+
+    String spanName = "XceiverClientGrpc." + request.getCmdType().name();
+
+    return TracingUtil.executeInNewSpan(spanName,
+        (SupplierWithIOException<XceiverClientReply>) () -> {
+
+          ContainerCommandRequestProto finalPayload =
+              ContainerCommandRequestProto.newBuilder(request)
+                  .setTraceID(TracingUtil.exportCurrentSpan()).build();
+          return sendCommandWithRetry(finalPayload, validators);
+
+        });
   }
 
   private XceiverClientReply sendCommandWithRetry(
@@ -387,9 +393,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request)
       throws IOException, ExecutionException, InterruptedException {
-    try (Scope scope = GlobalTracer.get()
-        .buildSpan("XceiverClientGrpc." + request.getCmdType().name())
-        .startActive(true)) {
+
+    Span span = GlobalTracer.get()
+        .buildSpan("XceiverClientGrpc." + request.getCmdType().name()).start();
+
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
 
       ContainerCommandRequestProto finalPayload =
           ContainerCommandRequestProto.newBuilder(request)
@@ -405,6 +413,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         asyncReply.getResponse().get();
       }
       return asyncReply;
+
+    } finally {
+      span.finish();
     }
   }
 

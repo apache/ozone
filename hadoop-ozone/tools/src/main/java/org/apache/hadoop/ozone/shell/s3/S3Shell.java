@@ -17,10 +17,11 @@
  */
 package org.apache.hadoop.ozone.shell.s3;
 
-import io.opentracing.Scope;
-import io.opentracing.util.GlobalTracer;
+import java.util.function.Supplier;
+
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.Shell;
+
 import picocli.CommandLine.Command;
 
 /**
@@ -38,9 +39,11 @@ public class S3Shell extends Shell {
   @Override
   public void execute(String[] argv) {
     TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    try (Scope scope = GlobalTracer.get().buildSpan("main").startActive(true)) {
-      super.execute(argv);
-    }
+    TracingUtil.executeInNewSpan("s3shell",
+        (Supplier<Void>) () -> {
+          super.execute(argv);
+          return null;
+        });
   }
 
   /**
