@@ -326,4 +326,8 @@ public final class OzoneConsts {
   public static final String GDPR_ALGORITHM = "algorithm";
 
 
+  // Transaction Info
+  public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
+  public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
+
 }
