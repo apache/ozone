@@ -143,8 +143,8 @@ public class TestSCMSafeModeManager {
     ozoneConfiguration
         .setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
             3, TimeUnit.SECONDS);
-    ozoneConfiguration.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
-        false);
+    ozoneConfiguration
+        .setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
 
     scmSafeModeManager = new SCMSafeModeManager(
         ozoneConfiguration, containers, null, eventQueue);
