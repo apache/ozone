@@ -2554,4 +2554,12 @@
       Truststore password for HTTPS SSL configuration
     </description>
   </property>
+  <property>
+    <name>hdds.datanode.ratis.server.request.timeout</name>
+    <tag>OZONE, DATANODE</tag>
+    <value>2m</value>
+    <description>
+      Timeout for the request submitted directly to Ratis in datanode.
+    </description>
+  </property>
 </configuration>

@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -128,6 +129,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private final RaftPeerId raftPeerId;
   // pipelines for which I am the leader
   private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
+  // Timeout used while calling submitRequest directly.
+  private long requestTimeout;
 
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
@@ -152,6 +155,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       builder.setParameters(GrpcFactory.newRaftParameters(tlsConfig));
     }
     this.server = builder.build();
+    this.requestTimeout = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT,
+        HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
@@ -503,7 +510,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
           createRaftClientRequest(request, pipelineID,
               RaftClientRequest.writeRequestType());
       try {
-        reply = server.submitClientRequestAsync(raftClientRequest).get();
+        reply = server.submitClientRequestAsync(raftClientRequest)
+            .get(requestTimeout, TimeUnit.MILLISECONDS);
       } catch (Exception e) {
         throw new IOException(e.getMessage(), e);
       }
