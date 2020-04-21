@@ -584,6 +584,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.volume.listall.allowed</name>
+    <value>true</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Allows everyone to list all volumes when set to true. Defaults to true.
+      When set to false, non-admin users can only list the volumes they have
+      access to. Admins can always list all volumes.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.user.max.volume</name>
     <value>1024</value>
     <tag>OM, MANAGEMENT</tag>
