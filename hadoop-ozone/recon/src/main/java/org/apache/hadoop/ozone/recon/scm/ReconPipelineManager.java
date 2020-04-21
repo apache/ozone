@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,11 +31,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_PIPELINE_DB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,13 +57,7 @@ public class ReconPipelineManager extends SCMPipelineManager {
         new ReconPipelineFactory());
     initializePipelineState();
   }
-
-  @Override
-  protected File getPipelineDBPath(ConfigurationSource conf) {
-    File metaDir = ReconUtils.getReconScmDbDir(conf);
-    return new File(metaDir, RECON_SCM_PIPELINE_DB);
-  }
-
+  
   @Override
   public void triggerPipelineCreation() {
     // Don't do anything in Recon.
