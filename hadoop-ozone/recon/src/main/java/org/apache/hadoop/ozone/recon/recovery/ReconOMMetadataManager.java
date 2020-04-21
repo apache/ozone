@@ -44,7 +44,7 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
 
   /**
    * Check if OM tables are initialized.
-   * @return if OM Tables are initialized
+   * @return true if OM Tables are initialized, otherwise false.
    */
   boolean isOmTablesInitialized();
 }

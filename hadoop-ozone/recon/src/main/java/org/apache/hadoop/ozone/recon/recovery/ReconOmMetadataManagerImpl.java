@@ -124,8 +124,9 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
   /**
    * Check if OM tables are initialized.
-   * @return if OM Tables are initialized
+   * @return true if OM Tables are initialized, otherwise false.
    */
+  @Override
   public boolean isOmTablesInitialized() {
     return omTablesInitialized;
   }
