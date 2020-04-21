@@ -109,18 +109,7 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws
       IOException {
-    OzoneVolume volume;
-    try {
-      volume = getVolume(S3_VOLUME_NAME);
-    } catch (OMException ex) {
-      if (ex.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND) {
-        createVolume(S3_VOLUME_NAME);
-        volume = getVolume(S3_VOLUME_NAME);
-      } else {
-        throw ex;
-      }
-    }
-
+    OzoneVolume volume = getVolume(S3_VOLUME_NAME);
     volume.createBucket(bucketName);
   }
 
