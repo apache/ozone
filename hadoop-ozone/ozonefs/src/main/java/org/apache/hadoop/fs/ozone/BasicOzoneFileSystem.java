@@ -32,8 +32,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
@@ -46,6 +44,11 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -57,7 +60,6 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
-
 import org.apache.http.client.utils.URIBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,7 +157,15 @@ public class BasicOzoneFileSystem extends FileSystem {
       boolean isolatedClassloader =
           conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
 
-      this.adapter = createAdapter(conf, bucketStr, volumeStr, omHost, omPort,
+      ConfigurationSource source;
+      if (conf instanceof OzoneConfiguration) {
+        source = (ConfigurationSource) conf;
+      } else {
+        source = new LegacyHadoopConfigurationSource(conf);
+      }
+      this.adapter =
+          createAdapter(source, bucketStr,
+              volumeStr, omHost, omPort,
           isolatedClassloader);
 
       try {
@@ -174,7 +184,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
   }
 
-  protected OzoneClientAdapter createAdapter(Configuration conf,
+  protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
       String bucketStr,
       String volumeStr, String omHost, int omPort,
       boolean isolatedClassloader) throws IOException {

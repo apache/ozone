@@ -26,23 +26,16 @@ import static org.junit.Assert.assertTrue;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.hadoop.ozone.recon.GuiceInjectorUtilsForTestsImpl;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
-import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
-import org.jooq.impl.DSL;
-import org.jooq.impl.DefaultConfiguration;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
-import com.google.inject.Injector;
-
-import javax.sql.DataSource;
 
 /**
  * Unit Tests for ContainerDBServiceProviderImpl.
@@ -52,13 +45,27 @@ public class TestContainerDBServiceProviderImpl {
   @ClassRule
   public static TemporaryFolder tempFolder = new TemporaryFolder();
   private static ContainerDBServiceProvider containerDbServiceProvider;
-  private static Injector injector;
-  private static GuiceInjectorUtilsForTestsImpl guiceInjectorTest =
-      new GuiceInjectorUtilsForTestsImpl();
 
   private String keyPrefix1 = "V3/B1/K1";
   private String keyPrefix2 = "V3/B1/K2";
   private String keyPrefix3 = "V3/B2/K1";
+
+  @BeforeClass
+  public static void setupOnce() throws Exception {
+    ReconTestInjector reconTestInjector =
+        new ReconTestInjector.Builder(tempFolder)
+            .withReconSqlDb()
+            .withContainerDB()
+            .build();
+    containerDbServiceProvider =
+        reconTestInjector.getInstance(ContainerDBServiceProvider.class);
+  }
+
+  @Before
+  public void setUp() throws Exception {
+    // Reset containerDB before running each test
+    containerDbServiceProvider.initNewContainerDB(null);
+  }
 
   private void populateKeysInContainers(long containerId1, long containerId2)
       throws Exception {
@@ -78,33 +85,6 @@ public class TestContainerDBServiceProviderImpl {
 
     containerDbServiceProvider.storeContainerKeyMapping(containerKeyPrefix3,
         3);
-  }
-
-  private static void initializeInjector() throws Exception {
-    injector = guiceInjectorTest.getInjector(
-        null, null, tempFolder);
-  }
-
-  @BeforeClass
-  public static void setupOnce() throws Exception {
-
-    initializeInjector();
-
-    DSL.using(new DefaultConfiguration().set(
-        injector.getInstance(DataSource.class)));
-
-    containerDbServiceProvider = injector.getInstance(
-        ContainerDBServiceProvider.class);
-
-    StatsSchemaDefinition schemaDefinition = injector.getInstance(
-        StatsSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
-  }
-
-  @Before
-  public void setUp() throws Exception {
-    // Reset containerDB before running each test
-    containerDbServiceProvider.initNewContainerDB(null);
   }
 
   @Test

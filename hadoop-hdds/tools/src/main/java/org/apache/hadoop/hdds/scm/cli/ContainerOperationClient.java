@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -51,9 +53,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,9 +71,14 @@ public class ContainerOperationClient implements ScmClient {
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
+
+  public XceiverClientManager getXceiverClientManager() {
+    return xceiverClientManager;
+  }
+
   private final XceiverClientManager xceiverClientManager;
 
-  public ContainerOperationClient(Configuration conf) throws IOException {
+  public ContainerOperationClient(OzoneConfiguration conf) throws IOException {
     storageContainerLocationClient = newContainerRpcClient(conf);
     this.xceiverClientManager = newXCeiverClientManager(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
@@ -88,7 +95,7 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  private XceiverClientManager newXCeiverClientManager(Configuration conf)
+  private XceiverClientManager newXCeiverClientManager(ConfigurationSource conf)
       throws IOException {
     XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -107,14 +114,15 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   public static StorageContainerLocationProtocol newContainerRpcClient(
-      Configuration conf) throws IOException {
+      ConfigurationSource configSource) throws IOException {
 
     Class<StorageContainerLocationProtocolPB> protocol =
         StorageContainerLocationProtocolPB.class;
-
+    Configuration conf =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(configSource);
     RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
     long version = RPC.getProtocolVersion(protocol);
-    InetSocketAddress scmAddress = getScmAddressForClients(conf);
+    InetSocketAddress scmAddress = getScmAddressForClients(configSource);
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     SocketFactory socketFactory = NetUtils.getDefaultSocketFactory(conf);
     int rpcTimeOut = Client.getRpcTimeout(conf);
@@ -126,7 +134,7 @@ public class ContainerOperationClient implements ScmClient {
     StorageContainerLocationProtocolClientSideTranslatorPB client =
         new StorageContainerLocationProtocolClientSideTranslatorPB(rpcProxy);
     return TracingUtil.createProxy(
-        client, StorageContainerLocationProtocol.class, conf);
+        client, StorageContainerLocationProtocol.class, configSource);
   }
 
   @Override
@@ -234,8 +242,6 @@ public class ContainerOperationClient implements ScmClient {
           storageContainerLocationClient.allocateContainer(type, factor,
               owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
-      client = xceiverClientManager.acquireClient(pipeline);
-
       // connect to pipeline leader and allocate container on leader datanode.
       client = xceiverClientManager.acquireClient(pipeline);
       createContainer(client,

@@ -26,6 +26,8 @@
 
   <properties>
     <docker.image>apache/ozone:${project.version}</docker.image>
+    <spring.version>5.2.5.RELEASE</spring.version>
+    <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
     <module>common</module>
@@ -107,6 +109,12 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-config</artifactId>
         <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-test-utils</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>

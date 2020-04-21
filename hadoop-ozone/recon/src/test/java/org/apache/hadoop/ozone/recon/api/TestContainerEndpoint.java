@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -46,8 +51,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest;
-import org.apache.hadoop.ozone.recon.GuiceInjectorUtilsForTestsImpl;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.ContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
@@ -64,42 +68,34 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
-import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
-import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
-import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
-import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
-
-import com.google.inject.AbstractModule;
-import com.google.inject.Injector;
+import org.junit.rules.TemporaryFolder;
 
 /**
  * Test for container endpoint.
  */
-public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
+public class TestContainerEndpoint {
+
+  @Rule
+  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private ContainerDBServiceProvider containerDbServiceProvider;
   private ContainerEndpoint containerEndpoint;
-  private GuiceInjectorUtilsForTestsImpl guiceInjectorTest =
-      new GuiceInjectorUtilsForTestsImpl();
   private boolean isSetupDone = false;
   private ContainerSchemaManager containerSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private ContainerID containerID = new ContainerID(1L);
   private PipelineID pipelineID;
   private long keyCount = 5L;
-  private void initializeInjector() throws Exception {
-    reconOMMetadataManager = getTestMetadataManager(
-        initializeNewOmMetadataManager());
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        mock(OzoneManagerServiceProviderImpl.class);
 
-    Injector parentInjector = guiceInjectorTest.getInjector(
-        ozoneManagerServiceProvider, reconOMMetadataManager, temporaryFolder);
+  private void initializeInjector() throws Exception {
+    reconOMMetadataManager = getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
+        temporaryFolder.newFolder());
 
     Pipeline pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
@@ -121,44 +117,24 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
     when(mockReconSCM.getContainerManager())
         .thenReturn(mockContainerManager);
 
-    Configuration sqlConfiguration =
-        parentInjector.getInstance((Configuration.class));
-    Injector injector = parentInjector.createChildInjector(
-        new AbstractModule() {
-          @Override
-          protected void configure() {
-            try {
-              ReconTaskSchemaDefinition taskSchemaDefinition = parentInjector
-                  .getInstance(ReconTaskSchemaDefinition.class);
-              taskSchemaDefinition.initializeSchema();
-            } catch (Exception e) {
-              Assert.fail(e.getMessage());
-            }
+    ReconTestInjector reconTestInjector =
+        new ReconTestInjector.Builder(temporaryFolder)
+            .withReconSqlDb()
+            .withReconOm(reconOMMetadataManager)
+            .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
+            .withReconScm(mockReconSCM)
+            .withContainerDB()
+            .addBinding(StorageContainerServiceProvider.class,
+                mock(StorageContainerServiceProviderImpl.class))
+            .addBinding(ContainerEndpoint.class)
+            .addBinding(ContainerSchemaManager.class)
+            .build();
 
-            ReconTaskStatusDao reconTaskStatusDao =
-                new ReconTaskStatusDao(sqlConfiguration);
-            bind(ReconTaskStatusDao.class).toInstance(reconTaskStatusDao);
-
-            StorageContainerServiceProvider mockScmServiceProvider = mock(
-                StorageContainerServiceProviderImpl.class);
-            bind(StorageContainerServiceProvider.class)
-                .toInstance(mockScmServiceProvider);
-            bind(OzoneStorageContainerManager.class)
-                .toInstance(mockReconSCM);
-            bind(ContainerEndpoint.class);
-          }
-        });
-
-    containerEndpoint = injector.getInstance(ContainerEndpoint.class);
-    containerDbServiceProvider = injector.getInstance(
-        ContainerDBServiceProvider.class);
-    StatsSchemaDefinition schemaDefinition = injector.getInstance(
-        StatsSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
-    ContainerSchemaDefinition containerSchemaDefinition =
-        injector.getInstance(ContainerSchemaDefinition.class);
-    containerSchemaDefinition.initializeSchema();
-    containerSchemaManager = injector.getInstance(ContainerSchemaManager.class);
+    containerDbServiceProvider =
+        reconTestInjector.getInstance(ContainerDBServiceProvider.class);
+    containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
+    containerSchemaManager =
+        reconTestInjector.getInstance(ContainerSchemaManager.class);
   }
 
   @Before
@@ -168,7 +144,6 @@ public class TestContainerEndpoint extends AbstractOMMetadataManagerTest {
       initializeInjector();
       isSetupDone = true;
     }
-
     //Write Data to OM
     Pipeline pipeline = getRandomPipeline();
 

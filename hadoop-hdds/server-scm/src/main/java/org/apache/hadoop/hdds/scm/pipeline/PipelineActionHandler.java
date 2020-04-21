@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
@@ -44,7 +44,7 @@ public class PipelineActionHandler
       LoggerFactory.getLogger(PipelineActionHandler.class);
 
   private final PipelineManager pipelineManager;
-  private final Configuration ozoneConf;
+  private final ConfigurationSource ozoneConf;
 
   public PipelineActionHandler(PipelineManager pipelineManager,
       OzoneConfiguration conf) {

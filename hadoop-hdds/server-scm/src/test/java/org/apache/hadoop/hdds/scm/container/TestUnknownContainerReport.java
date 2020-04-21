@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
 import java.io.IOException;
 import java.util.Iterator;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -57,7 +57,7 @@ public class TestUnknownContainerReport {
 
   @Before
   public void setup() throws IOException {
-    final Configuration conf = new OzoneConfiguration();
+    final ConfigurationSource conf = new OzoneConfiguration();
     this.nodeManager = new MockNodeManager(true, 10);
     this.containerManager = Mockito.mock(ContainerManager.class);
     this.containerStateManager = new ContainerStateManager(conf);

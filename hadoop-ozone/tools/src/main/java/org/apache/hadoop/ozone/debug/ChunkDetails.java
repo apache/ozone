@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,13 +16,39 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.recon;
-
-import org.apache.hadoop.ozone.recon.types.GuiceInjectorUtilsForTests;
+package org.apache.hadoop.ozone.debug;
 
 /**
- * Implementation for GuiceInjectorUtilsForTests.
+ * Class that gives chunkDetails.
  */
-public class GuiceInjectorUtilsForTestsImpl implements
-    GuiceInjectorUtilsForTests {
+public class ChunkDetails {
+  private String chunkName;
+  private long chunkOffset;
+
+  public String getChunkName() {
+    return chunkName;
+  }
+
+  public void setChunkName(String chunkName) {
+    this.chunkName = chunkName;
+  }
+
+  @Override
+    public String toString() {
+    return "{"
+            + "chunkName='"
+            + chunkName
+            + '\''
+            + ", chunkOffset="
+            + chunkOffset
+            + '}';
+  }
+
+  public long getChunkOffset() {
+    return chunkOffset;
+  }
+
+  public void setChunkOffset(long chunkOffset) {
+    this.chunkOffset = chunkOffset;
+  }
 }

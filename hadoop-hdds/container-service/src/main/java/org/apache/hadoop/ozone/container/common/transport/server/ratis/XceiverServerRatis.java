@@ -39,10 +39,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -123,7 +122,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private long nodeFailureTimeoutMs;
   private boolean isStarted = false;
   private DatanodeDetails datanodeDetails;
-  private final OzoneConfiguration conf;
+  private final ConfigurationSource conf;
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
   private final Set<RaftGroupId> raftGids = new HashSet<>();
@@ -133,7 +132,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
-      StateContext context, GrpcTlsConfig tlsConfig, OzoneConfiguration conf)
+      StateContext context, GrpcTlsConfig tlsConfig, ConfigurationSource conf)
       throws IOException {
     this.conf = conf;
     Objects.requireNonNull(dd, "id == null");
@@ -373,7 +372,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   public static XceiverServerRatis newXceiverServerRatis(
-      DatanodeDetails datanodeDetails, OzoneConfiguration ozoneConf,
+      DatanodeDetails datanodeDetails, ConfigurationSource ozoneConf,
       ContainerDispatcher dispatcher, ContainerController containerController,
       CertificateClient caClient, StateContext context) throws IOException {
     int localPort = ozoneConf.getInt(
@@ -764,7 +763,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private static List<ThreadPoolExecutor> createChunkExecutors(
-      Configuration conf) {
+      ConfigurationSource conf) {
     // TODO create single pool with N threads if using non-incremental chunks
     final int threadCountPerDisk = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,

@@ -147,8 +147,7 @@
               <goal>copy-dependencies</goal>
             </goals>
             <configuration>
-              <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib
-              </outputDirectory>
+              <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib</outputDirectory>
               <includeScope>runtime</includeScope>
             </configuration>
           </execution>
@@ -166,11 +165,6 @@
                   <groupId>com.google.protobuf</groupId>
                   <artifactId>protobuf-java</artifactId>
                   <version>3.5.1</version>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>26.0-android</version>
                 </artifactItem>
               </artifactItems>
             </configuration>
