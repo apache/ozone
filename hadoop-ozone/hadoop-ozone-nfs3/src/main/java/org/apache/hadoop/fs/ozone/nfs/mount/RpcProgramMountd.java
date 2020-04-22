@@ -30,13 +30,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.ozone.BasicOzoneFileSystem;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.fs.ozone.nfs.conf.NfsConfigKeys;
 import org.apache.hadoop.fs.ozone.nfs.conf.NfsConfiguration;
 import org.apache.hadoop.fs.ozone.nfs.nfs3.Nfs3Utils;
-import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
 import org.apache.hadoop.mount.MountEntry;
 import org.apache.hadoop.mount.MountInterface;
 import org.apache.hadoop.mount.MountResponse;
@@ -170,7 +167,8 @@ public class RpcProgramMountd extends RpcProgram implements MountInterface {
         handle = new FileHandle(fileHandleInfo);
       } else {
         LOG.error("Can't get handle for export:" + path);
-        MountResponse.writeMNTResponse(Nfs3Status.NFS3ERR_NOENT, out, xid, null);
+        MountResponse.writeMNTResponse(Nfs3Status.NFS3ERR_NOENT, out, xid,
+            null);
         return out;
       }
     } catch (IOException e) {

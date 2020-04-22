@@ -118,5 +118,7 @@ public final class FileStatusAdapter {
     return blockLocations;
   }
 
-  public String getFileHandleInfo() { return fileHandleInfo; }
+  public String getFileHandleInfo() {
+    return fileHandleInfo;
+  }
 }

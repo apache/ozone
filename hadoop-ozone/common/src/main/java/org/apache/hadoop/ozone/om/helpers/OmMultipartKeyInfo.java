@@ -43,6 +43,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
    * Construct OmMultipartKeyInfo object which holds multipart upload
    * information for a key.
    */
+  @SuppressWarnings("parameternumber")
   public OmMultipartKeyInfo(String id, long creationTime,
       ReplicationType replicationType, ReplicationFactor replicationFactor,
       Map<Integer, PartKeyInfo> list, long objectID, long updateID,
@@ -78,7 +79,9 @@ public class OmMultipartKeyInfo extends WithObjectID {
    * Returns fileHandleInfo.
    * @return String
    */
-  public String getFileHandleInfo() { return fileHandleInfo; }
+  public String getFileHandleInfo() {
+    return fileHandleInfo;
+  }
 
   /**
    * Returns updateID.

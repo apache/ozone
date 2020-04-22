@@ -159,13 +159,17 @@ public final class OmKeyInfo extends WithObjectID {
    * Returns fileHandleInfo.
    * @return String
    */
-  public String getFileHandleInfo() { return fileHandleInfo;}
+  public String getFileHandleInfo() {
+    return fileHandleInfo;
+  }
 
   /**
    * Returns objectID.
    * @return long
    */
-  public long getObjectID() { return objectID; }
+  public long getObjectID() {
+    return objectID;
+  }
 
   /**
    * Returns updateID.
@@ -512,7 +516,7 @@ public final class OmKeyInfo extends WithObjectID {
         Objects.equals(acls, omKeyInfo.acls) &&
         objectID == omKeyInfo.objectID &&
         updateID == omKeyInfo.updateID &&
-        fileHandleInfo == omKeyInfo.fileHandleInfo;
+        fileHandleInfo.equals(omKeyInfo.fileHandleInfo);
   }
 
   @Override

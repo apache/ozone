@@ -23,7 +23,6 @@ import java.net.DatagramSocket;
 import org.apache.hadoop.fs.ozone.nfs.conf.NfsConfigKeys;
 import org.apache.hadoop.fs.ozone.nfs.conf.NfsConfiguration;
 import org.apache.hadoop.fs.ozone.nfs.mount.Mountd;
-import org.apache.hadoop.nfs.nfs3.Nfs3Base;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +34,6 @@ import com.google.common.annotations.VisibleForTesting;
  * Currently Mountd program is also started inside this class.
  * Only TCP server is supported and UDP is not supported.
  */
-//public class Nfs3 extends Nfs3Base {
 public class Nfs3 {
   private Mountd mountd;
   public static final Logger LOG = LoggerFactory.getLogger(Nfs3.class);

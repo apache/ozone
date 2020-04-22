@@ -18,35 +18,18 @@
 package org.apache.hadoop.fs.ozone.nfs.nfs3;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.file.FileSystemException;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FsConstants;
 import org.apache.hadoop.fs.viewfs.ViewFileSystem;
-import org.apache.hadoop.hdfs.DFSClient;
-import org.apache.hadoop.hdfs.DFSUtilClient;
-import org.apache.hadoop.hdfs.protocol.HdfsConstants;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.nfs.NfsFileType;
-import org.apache.hadoop.nfs.NfsTime;
-import org.apache.hadoop.nfs.nfs3.FileHandle;
-import org.apache.hadoop.nfs.nfs3.Nfs3Constant;
-import org.apache.hadoop.nfs.nfs3.Nfs3FileAttributes;
-import org.apache.hadoop.nfs.nfs3.response.WccAttr;
-import org.apache.hadoop.nfs.nfs3.response.WccData;
-import org.apache.hadoop.oncrpc.XDR;
-import org.apache.hadoop.security.IdMappingServiceProvider;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.channel.Channel;
 
 /**
- * Utility/helper methods related to NFS
+ * helper methods related to NFS3.
  */
-public class Nfs3Utils {
+public final class Nfs3Utils {
   public final static String INODEID_PATH_PREFIX = "/.reserved/.inodes/";
 
   
@@ -54,7 +37,9 @@ public class Nfs3Utils {
   public final static String READ_RPC_END =    "READ_RPC_CALL_END______";
   public final static String WRITE_RPC_START = "WRITE_RPC_CALL_START____";
   public final static String WRITE_RPC_END =   "WRITE_RPC_CALL_END______";
-  
+
+  private Nfs3Utils() {}
+
   public static URI getResolvedURI(FileSystem fs, String exportPath)
       throws IOException {
     URI fsURI = fs.getUri();
