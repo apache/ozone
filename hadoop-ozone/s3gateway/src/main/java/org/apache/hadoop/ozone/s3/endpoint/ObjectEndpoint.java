@@ -533,10 +533,16 @@ public class ObjectEndpoint extends EndpointBase {
             if (range != null) {
               RangeHeader rangeHeader =
                   RangeHeaderParserUtil.parseRangeHeader(range, 0);
-              IOUtils.copyLarge(sourceObject, ozoneOutputStream,
-                  rangeHeader.getStartOffset(),
-                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset());
 
+              long copyLength = rangeHeader.getEndOffset() -
+                  rangeHeader.getStartOffset();
+
+              try (S3WrapperInputStream s3WrapperInputStream =
+                  new S3WrapperInputStream(
+                  sourceObject.getInputStream())) {
+                s3WrapperInputStream.copyLarge(ozoneOutputStream,
+                    rangeHeader.getStartOffset(), copyLength);
+              }
             } else {
               IOUtils.copy(sourceObject, ozoneOutputStream);
             }
