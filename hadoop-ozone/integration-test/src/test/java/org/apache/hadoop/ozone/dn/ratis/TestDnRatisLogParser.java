@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
 
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -62,7 +63,7 @@ public class TestDnRatisLogParser {
   }
 
   @Test
-  public void testRatisLogParsing() {
+  public void testRatisLogParsing() throws Exception {
     cluster.stop();
     OzoneConfiguration conf = cluster.getHddsDatanodes().get(0).getConf();
     String path =
@@ -72,7 +73,7 @@ public class TestDnRatisLogParser {
     File pipelineDir = new File(path, pid.toString());
     File currentDir = new File(pipelineDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
-    Assert.assertTrue(logFile.exists());
+    GenericTestUtils.waitFor(logFile::exists, 100, 15000);
     Assert.assertTrue(logFile.isFile());
 
     DatanodeRatisLogParser datanodeRatisLogParser =
