@@ -61,6 +61,7 @@ public class BlockOutputStreamEntryPool {
   private final String requestID;
   private final int streamBufferSize;
   private final long streamBufferFlushSize;
+  private final boolean streamBufferFlushDelay;
   private final long streamBufferMaxSize;
   private final long watchTimeout;
   private final long blockSize;
@@ -75,7 +76,8 @@ public class BlockOutputStreamEntryPool {
   public BlockOutputStreamEntryPool(OzoneManagerProtocol omClient,
       int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType type,
-      int bufferSize, long bufferFlushSize, long bufferMaxSize,
+      int bufferSize, long bufferFlushSize,
+      boolean bufferFlushDelay, long bufferMaxSize,
       long size, long watchTimeout, ContainerProtos.ChecksumType checksumType,
       int bytesPerChecksum, String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
@@ -93,6 +95,7 @@ public class BlockOutputStreamEntryPool {
     this.requestID = requestId;
     this.streamBufferSize = bufferSize;
     this.streamBufferFlushSize = bufferFlushSize;
+    this.streamBufferFlushDelay = bufferFlushDelay;
     this.streamBufferMaxSize = bufferMaxSize;
     this.blockSize = size;
     this.watchTimeout = watchTimeout;
@@ -137,6 +140,7 @@ public class BlockOutputStreamEntryPool {
     requestID = null;
     streamBufferSize = 0;
     streamBufferFlushSize = 0;
+    streamBufferFlushDelay = false;
     streamBufferMaxSize = 0;
     bufferPool = new BufferPool(chunkSize, 1);
     watchTimeout = 0;
@@ -188,7 +192,9 @@ public class BlockOutputStreamEntryPool {
             .setRequestId(requestID)
             .setChunkSize(chunkSize)
             .setLength(subKeyInfo.getLength())
+            .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
+            .setStreamBufferFlushDelay(streamBufferFlushDelay)
             .setStreamBufferMaxSize(streamBufferMaxSize)
             .setWatchTimeout(watchTimeout)
             .setbufferPool(bufferPool)

@@ -136,6 +136,7 @@ public class RpcClient implements ClientProtocol {
   private final ACLType groupRights;
   private final int streamBufferSize;
   private final long streamBufferFlushSize;
+  private boolean streamBufferFlushDelay;
   private final long streamBufferMaxSize;
   private final long blockSize;
   private final ClientId clientId = ClientId.randomId();
@@ -196,6 +197,9 @@ public class RpcClient implements ClientProtocol {
         .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
             OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE_DEFAULT,
             StorageUnit.BYTES);
+    streamBufferFlushDelay = conf.getBoolean(
+        OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY,
+        OzoneConfigKeys.OOZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT);
     streamBufferMaxSize = (long) conf
         .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE,
             OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE_DEFAULT,
@@ -1198,6 +1202,7 @@ public class RpcClient implements ClientProtocol {
             .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
             .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
+            .setStreamBufferFlushDelay(streamBufferFlushDelay)
             .setStreamBufferMaxSize(streamBufferMaxSize)
             .setBlockSize(blockSize)
             .setChecksumType(checksumType)
