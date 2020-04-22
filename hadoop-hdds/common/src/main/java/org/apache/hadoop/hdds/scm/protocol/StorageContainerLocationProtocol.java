@@ -77,6 +77,18 @@ public interface StorageContainerLocationProtocol extends Closeable {
       throws IOException;
 
   /**
+   * Ask SCM the location of a batch of containers. SCM responds with a group of
+   * nodes where these containers and their replicas are located.
+   *
+   * @param containerIDs - IDs of a batch of containers.
+   * @return List of ContainerWithPipeline
+   * - the container info with the pipeline.
+   * @throws IOException
+   */
+  List<ContainerWithPipeline> getContainerWithPipelineBatch(
+      List<Long> containerIDs) throws IOException;
+
+  /**
    * Ask SCM a list of containers with a range of container names
    * and the limit of count.
    * Search container names between start name(exclusive), and
