@@ -19,15 +19,19 @@ package org.apache.hadoop.fs.ozone;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.ParseException;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.StringTokenizer;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -186,6 +190,21 @@ class OFSPath {
     return this.getBucketName().isEmpty() && !this.getVolumeName().isEmpty();
   }
 
+  private static String md5Hex(String input) {
+    try {
+      MessageDigest md = MessageDigest.getInstance("MD5");
+      byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
+      BigInteger bigInt = new BigInteger(1, digest);
+      StringBuilder sb = new StringBuilder(bigInt.toString(16));
+      while (sb.length() < 32) {
+        sb.insert(0, "0");
+      }
+      return sb.toString();
+    } catch (NoSuchAlgorithmException ex) {
+      throw new RuntimeException(ex);
+    }
+  }
+
   /**
    * Get the bucket name of temp for given username.
    * @param username Input user name String. Mustn't be null.
@@ -196,7 +215,7 @@ class OFSPath {
     Preconditions.checkNotNull(username);
     // TODO: Improve this to "slugify(username)-md5(username)" for better
     //  readability?
-    return DigestUtils.md5Hex(username);
+    return md5Hex(username);
   }
 
   /**
