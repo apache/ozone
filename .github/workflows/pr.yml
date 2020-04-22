@@ -118,87 +118,105 @@ jobs:
     needs:
         - build
     steps:
+        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
         - uses: actions/checkout@master
-        - uses: ./.github/buildenv
           with:
-             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pfreon
+            path: mnt/ozone
+        - uses: ./mnt/ozone/.github/buildenv
+          with:
+             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pfreon
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: it-freon
-            path: target/integration
+            path: mnt/ozone/target/integration
   it-filesystem:
     name: it-filesystem
     runs-on: ubuntu-18.04
     needs:
         - build
     steps:
+        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
         - uses: actions/checkout@master
-        - uses: ./.github/buildenv
           with:
-             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem
+            path: mnt/ozone
+        - uses: ./mnt/ozone/.github/buildenv
+          with:
+             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: it-filesystem
-            path: target/integration
+            path: mnt/ozone/target/integration
   it-filesystem-contract:
     name: it-filesystem-contract
     runs-on: ubuntu-18.04
     needs:
         - build
     steps:
+        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
         - uses: actions/checkout@master
-        - uses: ./.github/buildenv
           with:
-             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem-contract
+            path: mnt/ozone
+        - uses: ./mnt/ozone/.github/buildenv
+          with:
+             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem-contract
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: it-filesystem-contract
-            path: target/integration
+            path: mnt/ozone/target/integration
   it-client:
     name: it-client
     runs-on: ubuntu-18.04
     needs:
         - build
     steps:
+        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
         - uses: actions/checkout@master
-        - uses: ./.github/buildenv
           with:
-             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pclient
+            path: mnt/ozone
+        - uses: ./mnt/ozone/.github/buildenv
+          with:
+             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pclient
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: it-client
-            path: target/integration
+            path: mnt/ozone/target/integration
   it-hdds-om:
     name: it-hdds-om
     runs-on: ubuntu-18.04
     needs:
         - build
     steps:
+        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
         - uses: actions/checkout@master
-        - uses: ./.github/buildenv
           with:
-             args: ./hadoop-ozone/dev-support/checks/integration.sh -Phdds-om
+            path: mnt/ozone
+        - uses: ./mnt/ozone/.github/buildenv
+          with:
+             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Phdds-om
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: it-hdds-om
-            path: target/integration
+            path: mnt/ozone/target/integration
   it-ozone:
     name: it-ozone
     runs-on: ubuntu-18.04
     needs:
         - build
     steps:
+        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
         - uses: actions/checkout@master
-        - uses: ./.github/buildenv
           with:
-             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pozone
+            path: mnt/ozone
+        - uses: ./mnt/ozone/.github/buildenv
+          with:
+             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pozone
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: it-ozone
-            path: target/integration
+            path: mnt/ozone/target/integration
