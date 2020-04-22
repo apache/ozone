@@ -1095,7 +1095,7 @@ public class TestSCMNodeManager {
 
     // create table mapping file
     String[] hostNames = {"host1", "host2", "host3", "host4"};
-    String[] ipAddress = {"1.2.3.4", "2.3.4.5", "3.4.5.6", "4.5.6.7"};
+    String[] ipAddress = {"0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0"};
     String mapFile = this.getClass().getClassLoader()
         .getResource("nodegroup-mapping").getPath();
 
@@ -1136,7 +1136,7 @@ public class TestSCMNodeManager {
 
     // create table mapping file
     String[] hostNames = {"host1", "host2", "host3", "host4"};
-    String[] ipAddress = {"1.2.3.4", "2.3.4.5", "3.4.5.6", "4.5.6.7"};
+    String[] ipAddress = {"0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0"};
     String mapFile = this.getClass().getClassLoader()
         .getResource("rack-mapping").getPath();
 
@@ -1193,7 +1193,7 @@ public class TestSCMNodeManager {
     // create a set of hosts - note two hosts on "host1"
     String[] hostNames = {"host1", "host1", "host2", "host3", "host4"};
     String[] ipAddress =
-        {"1.2.3.4", "1.2.3.4", "2.3.4.5", "3.4.5.6", "4.5.6.7"};
+        {"0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0"};
 
     if (useHostname) {
       conf.set(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME, "true");
@@ -1215,9 +1215,9 @@ public class TestSCMNodeManager {
         Assert.assertEquals(0, nodeManager.getNodesByAddress("unknown").size());
       } else {
         Assert.assertEquals(2,
-            nodeManager.getNodesByAddress("1.2.3.4").size());
-        Assert.assertEquals(1, nodeManager.getNodesByAddress("2.3.4.5").size());
-        Assert.assertEquals(0, nodeManager.getNodesByAddress("1.9.8.7").size());
+            nodeManager.getNodesByAddress("0.0.0.0").size());
+        Assert.assertEquals(1, nodeManager.getNodesByAddress("0.0.0.0").size());
+        Assert.assertEquals(0, nodeManager.getNodesByAddress("0.0.0.0").size());
       }
     }
   }

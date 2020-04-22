@@ -137,7 +137,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
         .setUuid(DATANODE_UUID)
         .setHostName("dummyHost")
-        .setIpAddress("1.2.3.4")
+        .setIpAddress("0.0.0.0")
         .build();
     DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     when(stateMachine.getDatanodeDetails()).thenReturn(dnDetails);

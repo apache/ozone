@@ -189,7 +189,7 @@ public class TestEndpoints extends AbstractSqlDatabaseTest {
         DatanodeDetailsProto.newBuilder()
             .setHostName("host1.datanode")
             .setUuid(datanodeId)
-            .setIpAddress("1.1.1.1")
+            .setIpAddress("0.0.0.0")
             .build();
     StorageReportProto storageReportProto1 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)

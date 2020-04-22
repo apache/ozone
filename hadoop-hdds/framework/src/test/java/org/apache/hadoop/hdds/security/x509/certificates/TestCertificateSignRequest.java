@@ -142,8 +142,8 @@ public class TestCertificateSignRequest {
             .setConfiguration(conf);
 
     // Multi-home
-    builder.addIpAddress("192.168.1.1");
-    builder.addIpAddress("192.168.2.1");
+    builder.addIpAddress("0.0.0.0");
+    builder.addIpAddress("0.0.0.0");
     builder.addServiceName("OzoneMarketingCluster003");
 
     builder.addDnsName("dn1.abc.com");

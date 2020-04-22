@@ -79,90 +79,90 @@ public class TestNetworkTopologyImpl {
     Object[][] topologies = new Object[][]{
         {new NodeSchema[] {ROOT_SCHEMA, LEAF_SCHEMA},
             new Node[]{
-                createDatanode("1.1.1.1", "/"),
-                createDatanode("2.2.2.2", "/"),
-                createDatanode("3.3.3.3", "/"),
-                createDatanode("4.4.4.4", "/"),
-                createDatanode("5.5.5.5", "/"),
-                createDatanode("6.6.6.6", "/"),
-                createDatanode("7.7.7.7", "/"),
-                createDatanode("8.8.8.8", "/"),
+                createDatanode("0.0.0.0", "/"),
+                createDatanode("0.0.0.0", "/"),
+                createDatanode("0.0.0.0", "/"),
+                createDatanode("0.0.0.0", "/"),
+                createDatanode("0.0.0.0", "/"),
+                createDatanode("0.0.0.0", "/"),
+                createDatanode("0.0.0.0", "/"),
+                createDatanode("0.0.0.0", "/"),
             }},
         {new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA},
             new Node[]{
-                createDatanode("1.1.1.1", "/r1"),
-                createDatanode("2.2.2.2", "/r1"),
-                createDatanode("3.3.3.3", "/r2"),
-                createDatanode("4.4.4.4", "/r2"),
-                createDatanode("5.5.5.5", "/r2"),
-                createDatanode("6.6.6.6", "/r3"),
-                createDatanode("7.7.7.7", "/r3"),
-                createDatanode("8.8.8.8", "/r3"),
+                createDatanode("0.0.0.0", "/r1"),
+                createDatanode("0.0.0.0", "/r1"),
+                createDatanode("0.0.0.0", "/r2"),
+                createDatanode("0.0.0.0", "/r2"),
+                createDatanode("0.0.0.0", "/r2"),
+                createDatanode("0.0.0.0", "/r3"),
+                createDatanode("0.0.0.0", "/r3"),
+                createDatanode("0.0.0.0", "/r3"),
             }},
         {new NodeSchema[]
             {ROOT_SCHEMA, DATACENTER_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA},
             new Node[]{
-                createDatanode("1.1.1.1", "/d1/r1"),
-                createDatanode("2.2.2.2", "/d1/r1"),
-                createDatanode("3.3.3.3", "/d1/r2"),
-                createDatanode("4.4.4.4", "/d1/r2"),
-                createDatanode("5.5.5.5", "/d1/r2"),
-                createDatanode("6.6.6.6", "/d2/r3"),
-                createDatanode("7.7.7.7", "/d2/r3"),
-                createDatanode("8.8.8.8", "/d2/r3"),
+                createDatanode("0.0.0.0", "/d1/r1"),
+                createDatanode("0.0.0.0", "/d1/r1"),
+                createDatanode("0.0.0.0", "/d1/r2"),
+                createDatanode("0.0.0.0", "/d1/r2"),
+                createDatanode("0.0.0.0", "/d1/r2"),
+                createDatanode("0.0.0.0", "/d2/r3"),
+                createDatanode("0.0.0.0", "/d2/r3"),
+                createDatanode("0.0.0.0", "/d2/r3"),
             }},
         {new NodeSchema[] {ROOT_SCHEMA, DATACENTER_SCHEMA, RACK_SCHEMA,
             NODEGROUP_SCHEMA, LEAF_SCHEMA},
             new Node[]{
-                createDatanode("1.1.1.1", "/d1/r1/ng1"),
-                createDatanode("2.2.2.2", "/d1/r1/ng1"),
-                createDatanode("3.3.3.3", "/d1/r2/ng2"),
-                createDatanode("4.4.4.4", "/d1/r2/ng2"),
-                createDatanode("5.5.5.5", "/d1/r2/ng3"),
-                createDatanode("6.6.6.6", "/d2/r3/ng3"),
-                createDatanode("7.7.7.7", "/d2/r3/ng3"),
-                createDatanode("8.8.8.8", "/d2/r3/ng3"),
-                createDatanode("9.9.9.9", "/d3/r1/ng1"),
-                createDatanode("10.10.10.10", "/d3/r1/ng1"),
-                createDatanode("11.11.11.11", "/d3/r1/ng1"),
-                createDatanode("12.12.12.12", "/d3/r2/ng2"),
-                createDatanode("13.13.13.13", "/d3/r2/ng2"),
-                createDatanode("14.14.14.14", "/d4/r1/ng1"),
-                createDatanode("15.15.15.15", "/d4/r1/ng1"),
-                createDatanode("16.16.16.16", "/d4/r1/ng1"),
-                createDatanode("17.17.17.17", "/d4/r1/ng2"),
-                createDatanode("18.18.18.18", "/d4/r1/ng2"),
-                createDatanode("19.19.19.19", "/d4/r1/ng3"),
-                createDatanode("20.20.20.20", "/d4/r1/ng3"),
+                createDatanode("0.0.0.0", "/d1/r1/ng1"),
+                createDatanode("0.0.0.0", "/d1/r1/ng1"),
+                createDatanode("0.0.0.0", "/d1/r2/ng2"),
+                createDatanode("0.0.0.0", "/d1/r2/ng2"),
+                createDatanode("0.0.0.0", "/d1/r2/ng3"),
+                createDatanode("0.0.0.0", "/d2/r3/ng3"),
+                createDatanode("0.0.0.0", "/d2/r3/ng3"),
+                createDatanode("0.0.0.0", "/d2/r3/ng3"),
+                createDatanode("0.0.0.0", "/d3/r1/ng1"),
+                createDatanode("0.0.0.0", "/d3/r1/ng1"),
+                createDatanode("0.0.0.0", "/d3/r1/ng1"),
+                createDatanode("0.0.0.0", "/d3/r2/ng2"),
+                createDatanode("0.0.0.0", "/d3/r2/ng2"),
+                createDatanode("0.0.0.0", "/d4/r1/ng1"),
+                createDatanode("0.0.0.0", "/d4/r1/ng1"),
+                createDatanode("0.0.0.0", "/d4/r1/ng1"),
+                createDatanode("0.0.0.0", "/d4/r1/ng2"),
+                createDatanode("0.0.0.0", "/d4/r1/ng2"),
+                createDatanode("0.0.0.0", "/d4/r1/ng3"),
+                createDatanode("0.0.0.0", "/d4/r1/ng3"),
             }},
         {new NodeSchema[] {ROOT_SCHEMA, REGION_SCHEMA, DATACENTER_SCHEMA,
             RACK_SCHEMA, NODEGROUP_SCHEMA, LEAF_SCHEMA},
             new Node[]{
-                createDatanode("1.1.1.1", "/d1/rg1/r1/ng1"),
-                createDatanode("2.2.2.2", "/d1/rg1/r1/ng1"),
-                createDatanode("3.3.3.3", "/d1/rg1/r1/ng2"),
-                createDatanode("4.4.4.4", "/d1/rg1/r1/ng1"),
-                createDatanode("5.5.5.5", "/d1/rg1/r1/ng1"),
-                createDatanode("6.6.6.6", "/d1/rg1/r1/ng2"),
-                createDatanode("7.7.7.7", "/d1/rg1/r1/ng2"),
-                createDatanode("8.8.8.8", "/d1/rg1/r1/ng2"),
-                createDatanode("9.9.9.9", "/d1/rg1/r1/ng2"),
-                createDatanode("10.10.10.10", "/d1/rg1/r1/ng2"),
-                createDatanode("11.11.11.11", "/d1/rg1/r2/ng1"),
-                createDatanode("12.12.12.12", "/d1/rg1/r2/ng1"),
-                createDatanode("13.13.13.13", "/d1/rg1/r2/ng1"),
-                createDatanode("14.14.14.14", "/d1/rg1/r2/ng1"),
-                createDatanode("15.15.15.15", "/d1/rg1/r2/ng1"),
-                createDatanode("16.16.16.16", "/d1/rg1/r2/ng2"),
-                createDatanode("17.17.17.17", "/d1/rg1/r2/ng2"),
-                createDatanode("18.18.18.18", "/d1/rg1/r2/ng2"),
-                createDatanode("19.19.19.19", "/d1/rg1/r2/ng2"),
-                createDatanode("20.20.20.20", "/d1/rg1/r2/ng2"),
-                createDatanode("21.21.21.21", "/d2/rg1/r2/ng1"),
-                createDatanode("22.22.22.22", "/d2/rg1/r2/ng1"),
-                createDatanode("23.23.23.23", "/d2/rg2/r2/ng1"),
-                createDatanode("24.24.24.24", "/d2/rg2/r2/ng1"),
-                createDatanode("25.25.25.25", "/d2/rg2/r2/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r1/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng1"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng2"),
+                createDatanode("0.0.0.0", "/d1/rg1/r2/ng2"),
+                createDatanode("0.0.0.0", "/d2/rg1/r2/ng1"),
+                createDatanode("0.0.0.0", "/d2/rg1/r2/ng1"),
+                createDatanode("0.0.0.0", "/d2/rg2/r2/ng1"),
+                createDatanode("0.0.0.0", "/d2/rg2/r2/ng1"),
+                createDatanode("0.0.0.0", "/d2/rg2/r2/ng1"),
             }}
     };
     return Arrays.asList(topologies);
@@ -170,7 +170,7 @@ public class TestNetworkTopologyImpl {
 
   @Test
   public void testContains() {
-    Node nodeNotInMap = createDatanode("8.8.8.8", "/d2/r4");
+    Node nodeNotInMap = createDatanode("0.0.0.0", "/d2/r4");
     for (int i=0; i < dataNodes.length; i++) {
       assertTrue(cluster.contains(dataNodes[i]));
     }
@@ -202,9 +202,9 @@ public class TestNetworkTopologyImpl {
     NetworkTopology newCluster = new NetworkTopologyImpl(
         NodeSchemaManager.getInstance());
     Node[] invalidDataNodes = new Node[] {
-        createDatanode("1.1.1.1", "/r1"),
-        createDatanode("2.2.2.2", "/r2"),
-        createDatanode("3.3.3.3", "/d1/r2")
+        createDatanode("0.0.0.0", "/r1"),
+        createDatanode("0.0.0.0", "/r2"),
+        createDatanode("0.0.0.0", "/d1/r2")
     };
     newCluster.add(invalidDataNodes[0]);
     newCluster.add(invalidDataNodes[1]);
@@ -474,7 +474,7 @@ public class TestNetworkTopologyImpl {
       ancestorGen++;
     }
     // out scope excluded nodes, each node will be picked
-    excludedList = Arrays.asList(createDatanode("1.1.1.1.", "/city1/rack1"));
+    excludedList = Arrays.asList(createDatanode("0.0.0.0.", "/city1/rack1"));
     ancestorGen = 0;
     while(ancestorGen < cluster.getMaxLevel()) {
       frequency = pickNodes(leafNum, null, excludedList, null, ancestorGen);
@@ -713,16 +713,16 @@ public class TestNetworkTopologyImpl {
     NetworkTopology newCluster =
         new NetworkTopologyImpl(manager);
     Node[] nodeList = new Node[] {
-        createDatanode("1.1.1.1", "/r1/ng1"),
-        createDatanode("2.2.2.2", "/r1/ng1"),
-        createDatanode("3.3.3.3", "/r1/ng2"),
-        createDatanode("4.4.4.4", "/r2/ng1"),
+        createDatanode("0.0.0.0", "/r1/ng1"),
+        createDatanode("0.0.0.0", "/r1/ng1"),
+        createDatanode("0.0.0.0", "/r1/ng2"),
+        createDatanode("0.0.0.0", "/r2/ng1"),
     };
     for (Node node: nodeList) {
       newCluster.add(node);
     }
-    Node outScopeNode1 = createDatanode("5.5.5.5", "/r2/ng2");
-    Node outScopeNode2 = createDatanode("6.6.6.6", "/r2/ng2");
+    Node outScopeNode1 = createDatanode("0.0.0.0", "/r2/ng2");
+    Node outScopeNode2 = createDatanode("0.0.0.0", "/r2/ng2");
     assertEquals(Integer.MAX_VALUE,
         newCluster.getDistanceCost(nodeList[0], null));
     assertEquals(Integer.MAX_VALUE,

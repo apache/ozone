@@ -53,13 +53,13 @@ kubectl get pod
 kubectl get svc
 NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
 datanode     ClusterIP   None            <none>        <none>           27s
-kubernetes   ClusterIP   10.96.0.1       <none>        443/TCP          118m
+kubernetes   ClusterIP   0.0.0.0       <none>        443/TCP          118m
 om           ClusterIP   None            <none>        9874/TCP         27s
-om-public    NodePort    10.108.48.148   <none>        9874:32649/TCP   27s
+om-public    NodePort    0.0.0.0   <none>        9874:32649/TCP   27s
 s3g          ClusterIP   None            <none>        9878/TCP         27s
-s3g-public   NodePort    10.97.133.137   <none>        9878:31880/TCP   27s
+s3g-public   NodePort    0.0.0.0   <none>        9878:31880/TCP   27s
 scm          ClusterIP   None            <none>        9876/TCP         27s
-scm-public   NodePort    10.105.231.28   <none>        9876:32171/TCP   27s
+scm-public   NodePort    0.0.0.0   <none>        9876:32171/TCP   27s
 ```
 
 Minikube 为访问任意的 NodePort 服务提供了一个方便的命令：

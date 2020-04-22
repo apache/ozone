@@ -29,7 +29,7 @@ services:
         - ./docker-config
       networks:
          net:
-            ipv4_address: 10.5.0.4
+            ipv4_address: 0.0.0.0
    datanode_2:
       image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
@@ -43,7 +43,7 @@ services:
         - ./docker-config
       networks:
          net:
-            ipv4_address: 10.5.0.5
+            ipv4_address: 0.0.0.0
    datanode_3:
       image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
@@ -57,7 +57,7 @@ services:
         - ./docker-config
       networks:
          net:
-            ipv4_address: 10.5.0.6
+            ipv4_address: 0.0.0.0
    datanode_4:
       image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
@@ -71,7 +71,7 @@ services:
         - ./docker-config
       networks:
          net:
-            ipv4_address: 10.5.0.7
+            ipv4_address: 0.0.0.0
    datanode_5:
      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
      privileged: true #required by the profiler
@@ -85,7 +85,7 @@ services:
        - ./docker-config
      networks:
        net:
-         ipv4_address: 10.5.0.8
+         ipv4_address: 0.0.0.0
    datanode_6:
      image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
      privileged: true #required by the profiler
@@ -99,7 +99,7 @@ services:
        - ./docker-config
      networks:
        net:
-         ipv4_address: 10.5.0.9
+         ipv4_address: 0.0.0.0
    om:
       image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
@@ -114,7 +114,7 @@ services:
       command: ["/opt/hadoop/bin/ozone","om"]
       networks:
          net:
-            ipv4_address: 10.5.0.70
+            ipv4_address: 0.0.0.0
    scm:
       image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
@@ -130,10 +130,10 @@ services:
       command: ["/opt/hadoop/bin/ozone","scm"]
       networks:
          net:
-            ipv4_address: 10.5.0.71
+            ipv4_address: 0.0.0.0
 networks:
    net:
      driver: bridge
      ipam:
        config:
-         - subnet: 10.5.0.0/16
+         - subnet: 0.0.0.0/16

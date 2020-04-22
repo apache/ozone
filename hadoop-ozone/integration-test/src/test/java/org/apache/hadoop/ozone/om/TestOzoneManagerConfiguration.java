@@ -126,7 +126,7 @@ public class TestOzoneManagerConfiguration {
     String omNode2RpcAddrKey = getOMAddrKeyWithSuffix(serviceID, omNode2Id);
 
     conf.set(omNode1RpcAddrKey, "0.0.0.0");
-    conf.set(omNode2RpcAddrKey, "122.0.0.122");
+    conf.set(omNode2RpcAddrKey, "0.0.0.0");
 
     // Set omNode1 as the current node. omNode1 address does not have a port
     // number specified. So the default port should be taken.
@@ -142,7 +142,7 @@ public class TestOzoneManagerConfiguration {
     // Verify that the 2nd OMs address stored in the current OM also has the
     // default port as the port is not specified
     InetSocketAddress omNode2Addr = om.getPeerNodes().get(0).getRpcAddress();
-    Assert.assertEquals("122.0.0.122", omNode2Addr.getHostString());
+    Assert.assertEquals("0.0.0.0", omNode2Addr.getHostString());
     Assert.assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
         omNode2Addr.getPort());
 
@@ -199,9 +199,9 @@ public class TestOzoneManagerConfiguration {
     conf.set(omNodesKey, omNodesKeyValue);
 
     // Set node2 to localhost and the other two nodes to dummy addresses
-    conf.set(omNode1RpcAddrKey, "123.0.0.123:9862");
+    conf.set(omNode1RpcAddrKey, "0.0.0.0:9862");
     conf.set(omNode2RpcAddrKey, "0.0.0.0:9862");
-    conf.set(omNode3RpcAddrKey, "124.0.0.124:9862");
+    conf.set(omNode3RpcAddrKey, "0.0.0.0:9862");
 
     conf.setInt(omNode3RatisPortKey, 9898);
 
@@ -225,7 +225,7 @@ public class TestOzoneManagerConfiguration {
       switch (peer.getId().toString()) {
       case omNode1Id :
         // Ratis port is not set for node1. So it should take the default port
-        expectedPeerAddress = "123.0.0.123:" +
+        expectedPeerAddress = "0.0.0.0:" +
             OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
         break;
       case omNode2Id :
@@ -234,7 +234,7 @@ public class TestOzoneManagerConfiguration {
         break;
       case omNode3Id :
         // Ratis port is not set for node3. So it should take the default port
-        expectedPeerAddress = "124.0.0.124:9898";
+        expectedPeerAddress = "0.0.0.0:9898";
         break;
       default : Assert.fail("Unrecognized RaftPeerId");
       }
@@ -266,9 +266,9 @@ public class TestOzoneManagerConfiguration {
     conf.set(omNodesKey, omNodesKeyValue);
 
     // Set node2 to localhost and the other two nodes to dummy addresses
-    conf.set(omNode1RpcAddrKey, "123.0.0.123:9862");
-    conf.set(omNode2RpcAddrKey, "125.0.0.2:9862");
-    conf.set(omNode3RpcAddrKey, "124.0.0.124:9862");
+    conf.set(omNode1RpcAddrKey, "0.0.0.0:9862");
+    conf.set(omNode2RpcAddrKey, "0.0.0.0:9862");
+    conf.set(omNode3RpcAddrKey, "0.0.0.0:9862");
 
     try {
       startCluster();
@@ -360,17 +360,17 @@ public class TestOzoneManagerConfiguration {
     // Set the RPC addresses for all 6 OMs (3 for each service). Only one
     // node out of these must have the localhost address.
     conf.set(getOMAddrKeyWithSuffix(om1ServiceId, omNode1Id),
-        "122.0.0.123:9862");
+        "0.0.0.0:9862");
     conf.set(getOMAddrKeyWithSuffix(om1ServiceId, omNode2Id),
-        "123.0.0.124:9862");
+        "0.0.0.0:9862");
     conf.set(getOMAddrKeyWithSuffix(om1ServiceId, omNode3Id),
-        "124.0.0.125:9862");
+        "0.0.0.0:9862");
     conf.set(getOMAddrKeyWithSuffix(om2ServiceId, omNode1Id),
-        "125.0.0.126:9862");
+        "0.0.0.0:9862");
     conf.set(getOMAddrKeyWithSuffix(om2ServiceId, omNode2Id),
         "0.0.0.0:9862");
     conf.set(getOMAddrKeyWithSuffix(om2ServiceId, omNode3Id),
-        "126.0.0.127:9862");
+        "0.0.0.0:9862");
 
     startCluster();
     om = cluster.getOzoneManager();

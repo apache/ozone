@@ -1025,7 +1025,7 @@
     <description>
       The value of this property is a set of DNS | DNS:PORT | IP
       Address | IP:PORT. Written as a comma separated string. e.g. scm1,
-      scm2:8020, 7.7.7.7:7777.
+      scm2:8020, 0.0.0.0:7777.
       This property allows datanodes to discover where SCM is, so that
       datanodes can send heartbeat to SCM.
     </description>

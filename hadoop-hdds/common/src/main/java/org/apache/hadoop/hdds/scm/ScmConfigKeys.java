@@ -256,7 +256,7 @@ public final class ScmConfigKeys {
       10;
 
   // ozone.scm.names key is a set of DNS | DNS:PORT | IP Address | IP:PORT.
-  // Written as a comma separated string. e.g. scm1, scm2:8020, 7.7.7.7:7777
+  // Written as a comma separated string. e.g. scm1, scm2:8020, 0.0.0.0:7777
   //
   // If this key is not specified datanodes will not be able to find
   // SCM. The SCM membership can be dynamic, so this key should contain
