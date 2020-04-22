@@ -26,7 +26,7 @@ Ozone 原生支持 Prometheus，各个组件会启动一个兼容 Prometheus 的
 
 ## 准备
 
- 1. [安装启动]({{< ref "start/RunningViaDocker.md" >}})一个 Ozone 集群。
+ 1. [安装启动]({{< ref "start/RunningViaDocker.zh.md" >}})一个 Ozone 集群。
  2. [下载](https://prometheus.io/download/#prometheus) Prometheus 二进制包。
 
 ## 使用 Prometheus 进行监控
