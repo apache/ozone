@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import javax.management.ObjectName;
-import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,7 +37,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -46,19 +44,15 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.hdds.utils.Scheduler;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_PIPELINE_DB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,7 +71,6 @@ public class SCMPipelineManager implements PipelineManager {
   private PipelineStateManager stateManager;
   private final BackgroundPipelineCreator backgroundPipelineCreator;
   private Scheduler scheduler;
-  private MetadataStore pipelineStore;
 
   private final EventPublisher eventPublisher;
   private final NodeManager nodeManager;
@@ -87,28 +80,35 @@ public class SCMPipelineManager implements PipelineManager {
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
 
+  private Table<PipelineID, Pipeline> pipelineStore;
+
   private final AtomicBoolean isInSafeMode;
   // Used to track if the safemode pre-checks have completed. This is designed
   // to prevent pipelines being created until sufficient nodes have registered.
   private final AtomicBoolean pipelineCreationAllowed;
 
-  public SCMPipelineManager(ConfigurationSource conf, NodeManager nodeManager,
+  public SCMPipelineManager(ConfigurationSource conf,
+      NodeManager nodeManager,
+      Table<PipelineID, Pipeline> pipelineStore,
       EventPublisher eventPublisher)
       throws IOException {
-    this(conf, nodeManager, eventPublisher, null, null);
+    this(conf, nodeManager, pipelineStore, eventPublisher, null, null);
     this.stateManager = new PipelineStateManager();
     this.pipelineFactory = new PipelineFactory(nodeManager,
         stateManager, conf, eventPublisher);
+    this.pipelineStore = pipelineStore;
     initializePipelineState();
   }
 
   protected SCMPipelineManager(ConfigurationSource conf,
       NodeManager nodeManager,
-                               EventPublisher eventPublisher,
-                               PipelineStateManager pipelineStateManager,
-                               PipelineFactory pipelineFactory)
+      Table<PipelineID, Pipeline> pipelineStore,
+      EventPublisher eventPublisher,
+      PipelineStateManager pipelineStateManager,
+      PipelineFactory pipelineFactory)
       throws IOException {
     this.lock = new ReentrantReadWriteLock();
+    this.pipelineStore = pipelineStore;
     this.conf = conf;
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
@@ -116,16 +116,6 @@ public class SCMPipelineManager implements PipelineManager {
     scheduler = new Scheduler("RatisPipelineUtilsThread", false, 1);
     this.backgroundPipelineCreator =
         new BackgroundPipelineCreator(this, scheduler, conf);
-    int cacheSize = conf.getInt(ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB,
-        ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
-    final File pipelineDBPath = getPipelineDBPath(conf);
-    this.pipelineStore =
-        MetadataStoreBuilder.newBuilder()
-            .setCreateIfMissing(true)
-            .setConf(conf)
-            .setDbFile(pipelineDBPath)
-            .setCacheSize(cacheSize * OzoneConsts.MB)
-            .build();
     this.eventPublisher = eventPublisher;
     this.nodeManager = nodeManager;
     this.metrics = SCMPipelineMetrics.create();
@@ -168,18 +158,10 @@ public class SCMPipelineManager implements PipelineManager {
       LOG.info("No pipeline exists in current db");
       return;
     }
-    List<Map.Entry<byte[], byte[]>> pipelines =
-        pipelineStore.getSequentialRangeKVs(null, Integer.MAX_VALUE,
-            (MetadataKeyFilters.MetadataKeyFilter[])null);
-
-    for (Map.Entry<byte[], byte[]> entry : pipelines) {
-      HddsProtos.Pipeline.Builder pipelineBuilder = HddsProtos.Pipeline
-          .newBuilder(HddsProtos.Pipeline.PARSER.parseFrom(entry.getValue()));
-      Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.setState(
-          HddsProtos.PipelineState.PIPELINE_ALLOCATED).build());
-      // When SCM is restarted, set Creation time with current time.
-      pipeline.setCreationTimestamp(Instant.now());
-      Preconditions.checkNotNull(pipeline);
+    TableIterator<PipelineID, ? extends KeyValue<PipelineID, Pipeline>>
+        iterator = pipelineStore.iterator();
+    while (iterator.hasNext()) {
+      Pipeline pipeline = iterator.next().getValue();
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
     }
@@ -231,8 +213,7 @@ public class SCMPipelineManager implements PipelineManager {
     lock.writeLock().lock();
     try {
       Pipeline pipeline = pipelineFactory.create(type, factor);
-      pipelineStore.put(pipeline.getId().getProtobuf().toByteArray(),
-          pipeline.getProtobufMessage().toByteArray());
+      pipelineStore.put(pipeline.getId(), pipeline);
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
       recordMetricsForPipeline(pipeline);
@@ -588,11 +569,10 @@ public class SCMPipelineManager implements PipelineManager {
    * @throws IOException
    */
   protected void removePipeline(PipelineID pipelineId) throws IOException {
-    byte[] key = pipelineId.getProtobuf().toByteArray();
     lock.writeLock().lock();
     try {
       if (pipelineStore != null) {
-        pipelineStore.delete(key);
+        pipelineStore.delete(pipelineId);
         Pipeline pipeline = stateManager.removePipeline(pipelineId);
         nodeManager.removePipeline(pipeline);
         metrics.incNumPipelineDestroyed();
@@ -617,16 +597,6 @@ public class SCMPipelineManager implements PipelineManager {
       scheduler = null;
     }
 
-    lock.writeLock().lock();
-    try {
-      if (pipelineStore != null) {
-        pipelineStore.close();
-        pipelineStore = null;
-      }
-    } finally {
-      lock.writeLock().unlock();
-    }
-
     if(pmInfoBean != null) {
       MBeans.unregister(this.pmInfoBean);
       pmInfoBean = null;
@@ -638,11 +608,6 @@ public class SCMPipelineManager implements PipelineManager {
     pipelineFactory.shutdown();
   }
 
-  protected File getPipelineDBPath(ConfigurationSource configuration) {
-    File metaDir = ServerUtils.getScmDbDir(configuration);
-    return new File(metaDir, SCM_PIPELINE_DB);
-  }
-
   protected ReadWriteLock getLock() {
     return lock;
   }
@@ -652,10 +617,6 @@ public class SCMPipelineManager implements PipelineManager {
     return pipelineFactory;
   }
 
-  protected MetadataStore getPipelineStore() {
-    return pipelineStore;
-  }
-
   protected NodeManager getNodeManager() {
     return nodeManager;
   }
@@ -663,6 +624,10 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public boolean getSafeModeStatus() {
     return this.isInSafeMode.get();
+  }
+
+  public Table<PipelineID, Pipeline> getPipelineStore() {
+    return pipelineStore;
   }
 
   @Override
