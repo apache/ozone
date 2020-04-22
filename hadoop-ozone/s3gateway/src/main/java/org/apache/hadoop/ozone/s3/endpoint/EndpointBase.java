@@ -100,7 +100,7 @@ public class EndpointBase {
         throw ex;
       }
     }
-    return "/" + S3_VOLUME_NAME + "/" + bucketName;
+    return "/" + bucketName;
   }
 
   /**
