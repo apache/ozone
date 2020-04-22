@@ -284,7 +284,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
       private RetryAction getRetryAction(RetryDecision fallbackAction,
           int failovers) {
-        if (failovers <= maxFailovers) {
+        if (failovers < maxFailovers) {
           return new RetryAction(fallbackAction,
               omFailoverProxyProvider.getWaitTime());
         } else {
