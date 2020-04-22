@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -46,12 +46,12 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   private long totalTime;
 
-  private Configuration conf;
+  private ConfigurationSource conf;
 
   private ReplicationSupervisor supervisor;
 
   public ReplicateContainerCommandHandler(
-      Configuration conf,
+      ConfigurationSource conf,
       ReplicationSupervisor supervisor) {
     this.conf = conf;
     this.supervisor = supervisor;

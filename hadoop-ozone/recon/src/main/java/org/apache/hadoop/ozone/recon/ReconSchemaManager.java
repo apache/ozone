@@ -26,6 +26,7 @@ import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 
 /**
@@ -42,7 +43,8 @@ public class ReconSchemaManager {
     this.reconSchemaDefinitions.addAll(reconSchemaDefinitions);
   }
 
-  void createReconSchema() {
+  @VisibleForTesting
+  public void createReconSchema() {
     reconSchemaDefinitions.forEach(reconSchemaDefinition -> {
       try {
         reconSchemaDefinition.initializeSchema();

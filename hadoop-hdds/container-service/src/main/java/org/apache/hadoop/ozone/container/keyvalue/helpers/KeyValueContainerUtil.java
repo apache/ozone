@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.primitives.Longs;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -63,7 +63,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void createContainerMetaData(File containerMetaDataPath, File
-      chunksPath, File dbFile, Configuration conf) throws IOException {
+      chunksPath, File dbFile, ConfigurationSource conf) throws IOException {
     Preconditions.checkNotNull(containerMetaDataPath);
     Preconditions.checkNotNull(conf);
 
@@ -73,14 +73,6 @@ public final class KeyValueContainerUtil {
       throw new IOException("Unable to create directory for metadata storage." +
           " Path: " + containerMetaDataPath);
     }
-    MetadataStore store = MetadataStoreBuilder.newBuilder().setConf(conf)
-        .setCreateIfMissing(true).setDbFile(dbFile).build();
-
-    // we close since the SCM pre-creates containers.
-    // we will open and put Db handle into a cache when keys are being created
-    // in a container.
-
-    store.close();
 
     if (!chunksPath.mkdirs()) {
       LOG.error("Unable to create chunks directory Container {}",
@@ -91,6 +83,13 @@ public final class KeyValueContainerUtil {
       throw new IOException("Unable to create directory for data storage." +
           " Path: " + chunksPath);
     }
+
+    MetadataStore store = MetadataStoreBuilder.newBuilder().setConf(conf)
+        .setCreateIfMissing(true).setDbFile(dbFile).build();
+    ReferenceCountedDB db =
+        new ReferenceCountedDB(store, dbFile.getAbsolutePath());
+    //add db handler into cache
+    BlockUtils.addDB(db, dbFile.getAbsolutePath(), conf);
   }
 
   /**
@@ -106,7 +105,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void removeContainer(KeyValueContainerData containerData,
-                                     Configuration conf)
+                                     ConfigurationSource conf)
       throws IOException {
     Preconditions.checkNotNull(containerData);
     File containerMetaDataPath = new File(containerData
@@ -133,7 +132,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
-      Configuration config) throws IOException {
+      ConfigurationSource config) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
     File metadataPath = new File(kvContainerData.getMetadataPath());

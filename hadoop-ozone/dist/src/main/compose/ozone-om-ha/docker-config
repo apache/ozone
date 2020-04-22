@@ -15,7 +15,7 @@
 # limitations under the License.
 
 CORE-SITE.XML_fs.o3fs.impl=org.apache.hadoop.fs.ozone.OzoneFileSystem
-CORE-SITE.XML_fs.defaultFS=o3fs://bucket.volume.omservice
+CORE-SITE.XML_fs.defaultFS=o3fs://bucket1.volume1.omservice
 OZONE-SITE.XML_ozone.om.service.ids=omservice
 OZONE-SITE.XML_ozone.om.nodes.omservice=om1,om2,om3
 OZONE-SITE.XML_ozone.om.address.omservice.om1=om1

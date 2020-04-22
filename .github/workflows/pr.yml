@@ -97,15 +97,36 @@ jobs:
         - uses: ./.github/buildenv
           with:
             args: ./hadoop-ozone/dev-support/checks/build.sh
+        # remove image created for 'buildenv'
+        - run: docker image rm $(docker images -a -q | head -1) || true
+        # remove its big parent build image
+        - run: docker image rm apache/ozone-build || true
         - run: sudo pip install robotframework
         - run: sudo chown runner -R .
         - run: cd ./hadoop-ozone/dist/target/ozone-*/ && mkdir .aws && sudo chown 1000 .aws
         - run: ./hadoop-ozone/dev-support/checks/acceptance.sh
+          env:
+            KEEP_IMAGE: false
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: acceptance
             path: target/acceptance
+  it-freon:
+    name: it-freon
+    runs-on: ubuntu-18.04
+    needs:
+        - build
+    steps:
+        - uses: actions/checkout@master
+        - uses: ./.github/buildenv
+          with:
+             args: ./hadoop-ozone/dev-support/checks/integration.sh -Pfreon
+        - uses: actions/upload-artifact@master
+          if: always()
+          with:
+            name: it-freon
+            path: target/integration
   it-filesystem:
     name: it-filesystem
     runs-on: ubuntu-18.04

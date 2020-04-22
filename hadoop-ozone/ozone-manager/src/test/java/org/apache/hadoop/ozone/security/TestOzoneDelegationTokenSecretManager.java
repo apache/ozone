@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.S3SecretManager;
@@ -396,8 +397,15 @@ public class TestOzoneDelegationTokenSecretManager {
   private OzoneDelegationTokenSecretManager
       createSecretManager(OzoneConfiguration config, long tokenMaxLife,
       long expiry, long tokenRemoverScanTime) throws IOException {
-    return new OzoneDelegationTokenSecretManager(config, tokenMaxLife,
-        expiry, tokenRemoverScanTime, serviceRpcAdd, s3SecretManager,
-        certificateClient);
+    return new OzoneDelegationTokenSecretManager.Builder()
+        .setConf(config)
+        .setTokenMaxLifetime(tokenMaxLife)
+        .setTokenRenewInterval(expiry)
+        .setTokenRemoverScanInterval(tokenRemoverScanTime)
+        .setService(serviceRpcAdd)
+        .setS3SecretManager(s3SecretManager)
+        .setCertificateClient(certificateClient)
+        .setOmServiceId(OzoneConsts.OM_SERVICE_ID_DEFAULT)
+        .build();
   }
 }

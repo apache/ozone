@@ -27,31 +27,22 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.sql.DataSource;
-
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.Test;
 
 /**
  * Class used to test ReconInternalSchemaDefinition.
  */
-public class TestReconInternalSchemaDefinition extends AbstractSqlDatabaseTest {
+public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
 
   @Test
   public void testSchemaCreated() throws Exception {
-    ReconTaskSchemaDefinition schemaDefinition = getInjector().getInstance(
-        ReconTaskSchemaDefinition.class);
 
-    schemaDefinition.initializeSchema();
-
-    Connection connection =
-        getInjector().getInstance(DataSource.class).getConnection();
+    Connection connection = getConnection();
     // Verify table definition
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getColumns(null, null,
@@ -80,14 +71,7 @@ public class TestReconInternalSchemaDefinition extends AbstractSqlDatabaseTest {
   @Test
   public void testReconTaskStatusCRUDOperations() throws Exception {
     // Verify table exists
-    ReconTaskSchemaDefinition schemaDefinition = getInjector().getInstance(
-        ReconTaskSchemaDefinition.class);
-
-    schemaDefinition.initializeSchema();
-
-    DataSource ds = getInjector().getInstance(DataSource.class);
-    Connection connection = ds.getConnection();
-
+    Connection connection = getConnection();
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getTables(null, null,
         RECON_TASK_STATUS_TABLE_NAME, null);
@@ -97,9 +81,7 @@ public class TestReconInternalSchemaDefinition extends AbstractSqlDatabaseTest {
           resultSet.getString("TABLE_NAME"));
     }
 
-    ReconTaskStatusDao dao = new ReconTaskStatusDao(getInjector().getInstance(
-        Configuration.class));
-
+    ReconTaskStatusDao dao = getDao(ReconTaskStatusDao.class);
     long now = System.currentTimeMillis();
     ReconTaskStatus newRecord = new ReconTaskStatus();
     newRecord.setTaskName("HelloWorldTask");

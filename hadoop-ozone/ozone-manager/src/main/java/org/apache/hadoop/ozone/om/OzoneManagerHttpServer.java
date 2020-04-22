@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.hdds.server.http.BaseHttpServer;
-
 import java.io.IOException;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT;
@@ -31,7 +31,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_SERVICE_LIST_HTTP_END
  */
 public class OzoneManagerHttpServer extends BaseHttpServer {
 
-  public OzoneManagerHttpServer(Configuration conf, OzoneManager om)
+  public OzoneManagerHttpServer(ConfigurationSource conf, OzoneManager om)
       throws IOException {
     super(conf, "ozoneManager");
     addServlet("serviceList", OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT,

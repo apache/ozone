@@ -110,6 +110,8 @@ public class LogSubcommand extends BaseInsightSubCommand
       try {
         thread.join();
       } catch (InterruptedException e) {
+        // restore thread interrupted state
+        Thread.currentThread().interrupt();
         e.printStackTrace();
       }
     }

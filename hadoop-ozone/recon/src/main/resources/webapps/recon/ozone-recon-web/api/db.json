@@ -1,16 +1,16 @@
 {
   "clusterState": {
-    "totalDatanodes": 10,
-    "healthyDatanodes": 9,
-    "pipelines": 3,
+    "totalDatanodes": 24,
+    "healthyDatanodes": 24,
+    "pipelines": 32,
     "storageReport": {
-      "capacity": 1099511627778,
-      "used": 681826058240,
-      "remaining": 391915765760
+      "capacity": 32985348833280,
+      "used": 15942918602752,
+      "remaining": 12094627905536
     },
-    "containers": 54,
+    "containers": 3230,
     "volumes": 5,
-    "buckets": 100,
+    "buckets": 156,
     "keys": 253000
   },
   "datanodes": {
@@ -355,26 +355,56 @@
     "totalCount": 2,
     "containers": [
       {
-        "id": 1,
-        "keys": 3876,
-        "datanodes": [
-          "localhost1.storage.enterprise.com",
-          "localhost3.storage.enterprise.com",
-          "localhost5.storage.enterprise.com"
+        "containerID": 1,
+        "keys": 1235,
+        "replicas": [
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost1.storage.enterprise.com",
+            "firstReportTimestamp": 1578491371100,
+            "lastReportTimestamp": 1578491371528
+          },
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost3.storage.enterprise.com",
+            "firstReportTimestamp": 1578491370100,
+            "lastReportTimestamp": 1578491371328
+          },
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost5.storage.enterprise.com",
+            "firstReportTimestamp": 1578491371200,
+            "lastReportTimestamp": 1578491371528
+          }
         ],
         "missingSince": 1578491371528,
-        "pipelineId": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
+        "pipelineID": "05e3d908-ff01-4ce6-ad75-f3ec79bcc7982"
       },
       {
-        "id": 2,
-        "keys": 5943,
-        "datanodes": [
-          "localhost1.storage.enterprise.com",
-          "localhost3.storage.enterprise.com",
-          "localhost5.storage.enterprise.com"
+        "containerID": 2,
+        "keys": 1356,
+        "replicas": [
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost1.storage.enterprise.com",
+            "firstReportTimestamp": 1578491371100,
+            "lastReportTimestamp": 1578491371528
+          },
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost3.storage.enterprise.com",
+            "firstReportTimestamp": 1578491370100,
+            "lastReportTimestamp": 1578491371328
+          },
+          {
+            "containerId": 1,
+            "datanodeHost": "localhost5.storage.enterprise.com",
+            "firstReportTimestamp": 1578491371200,
+            "lastReportTimestamp": 1578491371528
+          }
         ],
         "missingSince": 1578491471528,
-        "pipelineId": "04a5d908-ff01-4ce6-ad75-f3ec73dfc8a2"
+        "pipelineID": "04a5d908-ff01-4ce6-ad75-f3ec73dfc8a2"
       }
     ]
   },

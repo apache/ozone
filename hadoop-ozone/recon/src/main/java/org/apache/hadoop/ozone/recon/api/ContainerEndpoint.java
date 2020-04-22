@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.api;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,9 +52,11 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadat
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_CONTAINER_ID_DEFAULT_VALUE;
@@ -77,11 +78,14 @@ public class ContainerEndpoint {
   private ReconOMMetadataManager omMetadataManager;
 
   private ReconContainerManager containerManager;
+  private ContainerSchemaManager containerSchemaManager;
 
   @Inject
-  public ContainerEndpoint(OzoneStorageContainerManager reconSCM) {
+  public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
+                           ContainerSchemaManager containerSchemaManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
+    this.containerSchemaManager = containerSchemaManager;
   }
 
   /**
@@ -204,6 +208,21 @@ public class ContainerEndpoint {
   }
 
   /**
+   * Return Container replica history for the container identified by the id
+   * param.
+   *
+   * @param containerID the given containerID.
+   * @return {@link Response}
+   */
+  @GET
+  @Path("/{id}/replicaHistory")
+  public Response getReplicaHistoryForContainer(
+      @PathParam("id") Long containerID) {
+    return Response.ok(
+        containerSchemaManager.getAllContainerHistory(containerID)).build();
+  }
+
+  /**
    * Return
    * {@link org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata}
    * for all missing containers.
@@ -222,9 +241,9 @@ public class ContainerEndpoint {
         long keyCount = containerInfo.getNumberOfKeys();
         UUID pipelineID = containerInfo.getPipelineID().getId();
 
-        // TODO: Find out which datanodes had replicas of this container
-        // and populate this list
-        List datanodes = Collections.emptyList();
+        List<ContainerHistory> datanodes =
+            containerSchemaManager.getLatestContainerHistory(
+                containerID, containerInfo.getReplicationFactor().getNumber());
         missingContainers.add(new MissingContainerMetadata(containerID,
             container.getMissingSince(), keyCount, pipelineID, datanodes));
       } catch (IOException ioEx) {

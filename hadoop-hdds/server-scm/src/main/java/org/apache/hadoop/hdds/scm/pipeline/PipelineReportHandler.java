@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -50,13 +50,13 @@ public class PipelineReportHandler implements
   private static final Logger LOGGER = LoggerFactory.getLogger(
       PipelineReportHandler.class);
   private final PipelineManager pipelineManager;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final SafeModeManager scmSafeModeManager;
   private final boolean pipelineAvailabilityCheck;
   private final SCMPipelineMetrics metrics;
 
   public PipelineReportHandler(SafeModeManager scmSafeModeManager,
-      PipelineManager pipelineManager, Configuration conf) {
+      PipelineManager pipelineManager, ConfigurationSource conf) {
     Preconditions.checkNotNull(pipelineManager);
     this.scmSafeModeManager = scmSafeModeManager;
     this.pipelineManager = pipelineManager;

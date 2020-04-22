@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.ServiceException;
-import io.opentracing.Scope;
+import io.opentracing.Span;
 import org.slf4j.Logger;
 
 /**
@@ -56,8 +56,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
       FunctionWithServiceException<REQUEST, RESPONSE> methodCall,
       ProtocolMessageEnum type,
       String traceId) throws ServiceException {
-    Scope scope = TracingUtil
-        .importAndCreateScope(type.toString(), traceId);
+    Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
     try {
       if (logger.isTraceEnabled()) {
         logger.trace(
@@ -87,7 +86,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
       return response;
 
     } finally {
-      scope.close();
+      span.finish();
     }
   }
 }

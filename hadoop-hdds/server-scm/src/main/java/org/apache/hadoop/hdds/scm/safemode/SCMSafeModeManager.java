@@ -17,21 +17,22 @@
  */
 package org.apache.hadoop.hdds.scm.safemode;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.hadoop.conf.Configuration;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,9 +82,11 @@ public class SCMSafeModeManager implements SafeModeManager {
       LoggerFactory.getLogger(SCMSafeModeManager.class);
   private final boolean isSafeModeEnabled;
   private AtomicBoolean inSafeMode = new AtomicBoolean(true);
+  private AtomicBoolean preCheckComplete = new AtomicBoolean(false);
 
   private Map<String, SafeModeExitRule> exitRules = new HashMap(1);
-  private Configuration config;
+  private Set<String> preCheckRules = new HashSet<>(1);
+  private ConfigurationSource config;
   private static final String CONT_EXIT_RULE = "ContainerSafeModeRule";
   private static final String DN_EXIT_RULE = "DataNodeSafeModeRule";
   private static final String HEALTHY_PIPELINE_EXIT_RULE =
@@ -92,13 +95,14 @@ public class SCMSafeModeManager implements SafeModeManager {
       "AtleastOneDatanodeReportedRule";
 
   private Set<String> validatedRules = new HashSet<>();
+  private Set<String> validatedPreCheckRules = new HashSet<>(1);
 
   private final EventQueue eventPublisher;
   private final PipelineManager pipelineManager;
 
   private final SafeModeMetrics safeModeMetrics;
 
-  public SCMSafeModeManager(Configuration conf,
+  public SCMSafeModeManager(ConfigurationSource conf,
       List<ContainerInfo> allContainers, PipelineManager pipelineManager,
       EventQueue eventQueue) {
     this.config = conf;
@@ -118,6 +122,7 @@ public class SCMSafeModeManager implements SafeModeManager {
           new DataNodeSafeModeRule(DN_EXIT_RULE, eventQueue, config, this);
       exitRules.put(CONT_EXIT_RULE, containerSafeModeRule);
       exitRules.put(DN_EXIT_RULE, dataNodeSafeModeRule);
+      preCheckRules.add(DN_EXIT_RULE);
       if (conf.getBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT)
@@ -163,7 +168,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   @VisibleForTesting
   public void emitSafeModeStatus() {
     eventPublisher.fireEvent(SCMEvents.SAFE_MODE_STATUS,
-        new SafeModeStatus(getInSafeMode()));
+        new SafeModeStatus(getInSafeMode(), getPreCheckComplete()));
   }
 
 
@@ -172,12 +177,20 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     if (exitRules.get(ruleName) != null) {
       validatedRules.add(ruleName);
+      if (preCheckRules.contains(ruleName)) {
+        validatedPreCheckRules.add(ruleName);
+      }
       LOG.info("{} rule is successfully validated", ruleName);
     } else {
       // This should never happen
       LOG.error("No Such Exit rule {}", ruleName);
     }
 
+    if (!getPreCheckComplete()) {
+      if (validatedPreCheckRules.size() == preCheckRules.size()) {
+        completePreCheck(eventQueue);
+      }
+    }
 
     if (validatedRules.size() == exitRules.size()) {
       // All rules are satisfied, we can exit safe mode.
@@ -185,6 +198,19 @@ public class SCMSafeModeManager implements SafeModeManager {
       exitSafeMode(eventQueue);
     }
 
+  }
+
+  /**
+   * When all the precheck rules have been validated, set preCheckComplete to
+   * true and then emit the safemode status so any listeners get notified of
+   * the safemode state change.
+   * @param eventQueue
+   */
+  @VisibleForTesting
+  public void completePreCheck(EventPublisher eventQueue) {
+    LOG.info("All SCM safe mode pre check rules have passed");
+    setPreCheckComplete(true);
+    emitSafeModeStatus();
   }
 
   /**
@@ -198,6 +224,9 @@ public class SCMSafeModeManager implements SafeModeManager {
   @VisibleForTesting
   public void exitSafeMode(EventPublisher eventQueue) {
     LOG.info("SCM exiting safe mode.");
+    // If safemode is exiting, then pre check must also have passed so
+    // set it to true.
+    setPreCheckComplete(true);
     setInSafeMode(false);
 
     // TODO: Remove handler registration as there is no need to listen to
@@ -213,11 +242,19 @@ public class SCMSafeModeManager implements SafeModeManager {
     return inSafeMode.get();
   }
 
+  public boolean getPreCheckComplete() {
+    return preCheckComplete.get();
+  }
+
   /**
    * Set safe mode status.
    */
   public void setInSafeMode(boolean inSafeMode) {
     this.inSafeMode.set(inSafeMode);
+  }
+
+  public void setPreCheckComplete(boolean newState) {
+    this.preCheckComplete.set(newState);
   }
 
   public static Logger getLogger() {
@@ -249,12 +286,19 @@ public class SCMSafeModeManager implements SafeModeManager {
   public static class SafeModeStatus {
 
     private boolean safeModeStatus;
-    public SafeModeStatus(boolean safeModeState) {
+    private boolean preCheckPassed;
+
+    public SafeModeStatus(boolean safeModeState, boolean preCheckPassed) {
       this.safeModeStatus = safeModeState;
+      this.preCheckPassed = preCheckPassed;
     }
 
-    public boolean getSafeModeStatus() {
+    public boolean isInSafeMode() {
       return safeModeStatus;
+    }
+
+    public boolean isPreCheckComplete() {
+      return preCheckPassed;
     }
   }
 

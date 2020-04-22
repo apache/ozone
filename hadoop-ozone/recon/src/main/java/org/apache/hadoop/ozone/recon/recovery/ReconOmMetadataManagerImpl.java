@@ -51,6 +51,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
   private OzoneConfiguration ozoneConfiguration;
   private ReconUtils reconUtils;
+  private boolean omTablesInitialized = false;
 
   @Inject
   public ReconOmMetadataManagerImpl(OzoneConfiguration configuration,
@@ -94,6 +95,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     }
     if (getStore() != null) {
       initializeOmTables();
+      omTablesInitialized = true;
     }
   }
 
@@ -120,4 +122,12 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     }
   }
 
+  /**
+   * Check if OM tables are initialized.
+   * @return true if OM Tables are initialized, otherwise false.
+   */
+  @Override
+  public boolean isOmTablesInitialized() {
+    return omTablesInitialized;
+  }
 }

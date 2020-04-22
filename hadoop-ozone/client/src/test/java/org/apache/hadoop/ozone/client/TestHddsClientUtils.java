@@ -18,23 +18,18 @@
 
 package org.apache.hadoop.ozone.client;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.conf.Configuration;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
 
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
-
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
@@ -43,6 +38,10 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
@@ -61,7 +60,7 @@ public class TestHddsClientUtils {
    */
   @Test
   public void testMissingScmClientAddress() {
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     thrown.expect(IllegalArgumentException.class);
     HddsUtils.getScmAddressForClients(conf);
   }
@@ -72,7 +71,7 @@ public class TestHddsClientUtils {
    */
   @Test
   public void testGetScmClientAddress() {
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
 
     // First try a client address with just a host name. Verify it falls
     // back to the default port.
@@ -91,7 +90,7 @@ public class TestHddsClientUtils {
 
   @Test
   public void testgetOmSocketAddress() {
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
 
     // First try a client address with just a host name. Verify it falls
     // back to the default port.
@@ -119,7 +118,7 @@ public class TestHddsClientUtils {
     // When OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY is undefined it should
     // fallback to OZONE_SCM_CLIENT_ADDRESS_KEY.
     final String scmHost = "host123";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     final InetSocketAddress address = HddsUtils.getScmAddressForBlockClients(
         conf);
@@ -136,7 +135,7 @@ public class TestHddsClientUtils {
     // Verify that the OZONE_SCM_CLIENT_ADDRESS_KEY port number is ignored,
     // if present. Instead we should use OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT.
     final String scmHost = "host123:100";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =HddsUtils.getScmAddressForBlockClients(
         conf);
@@ -149,7 +148,7 @@ public class TestHddsClientUtils {
     // When OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY and OZONE_SCM_CLIENT_ADDRESS_KEY
     // are undefined it should fallback to OZONE_SCM_NAMES.
     final String scmHost = "host456";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     final InetSocketAddress address = HddsUtils.getScmAddressForBlockClients(
         conf);
@@ -166,7 +165,7 @@ public class TestHddsClientUtils {
     // Verify that the OZONE_SCM_NAMES port number is ignored, if present.
     // Instead we should use OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT.
     final String scmHost = "host456:200";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     final InetSocketAddress address = HddsUtils.getScmAddressForBlockClients(
         conf);
@@ -179,7 +178,7 @@ public class TestHddsClientUtils {
     // When OZONE_SCM_CLIENT_ADDRESS_KEY is undefined, it should fallback
     // to OZONE_SCM_NAMES.
     final String scmHost = "host456";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     final InetSocketAddress address = HddsUtils.getScmAddressForClients(conf);
     assertEquals(scmHost, address.getHostName());
@@ -195,7 +194,7 @@ public class TestHddsClientUtils {
     // Verify that the OZONE_SCM_NAMES port number is ignored, if present.
     // Instead we should use OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT.
     final String scmHost = "host456:300";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     final InetSocketAddress address = HddsUtils.getScmAddressForClients(conf);
     assertEquals(scmHost.split(":")[0], address.getHostName());
@@ -207,7 +206,7 @@ public class TestHddsClientUtils {
     // When OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY and OZONE_SCM_CLIENT_ADDRESS_KEY
     // are undefined, fail if OZONE_SCM_NAMES has multiple SCMs.
     final String scmHost = "host123,host456";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     thrown.expect(IllegalArgumentException.class);
     HddsUtils.getScmAddressForBlockClients(conf);
@@ -218,7 +217,7 @@ public class TestHddsClientUtils {
     // When OZONE_SCM_CLIENT_ADDRESS_KEY is undefined, fail if OZONE_SCM_NAMES
     // has multiple SCMs.
     final String scmHost = "host123,host456";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     thrown.expect(IllegalArgumentException.class);
     HddsUtils.getScmAddressForClients(conf);
