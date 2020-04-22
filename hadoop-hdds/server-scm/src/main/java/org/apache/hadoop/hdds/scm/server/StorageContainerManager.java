@@ -406,13 +406,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       pipelineManager = configurator.getPipelineManager();
     } else {
       pipelineManager =
-          new SCMPipelineManager(conf, scmNodeManager, eventQueue);
+          new SCMPipelineManager(conf, scmNodeManager,
+              scmMetadataStore.getPipelineTable(),
+              eventQueue);
     }
 
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();
     } else {
-      containerManager = new SCMContainerManager(conf, pipelineManager);
+      containerManager =
+          new SCMContainerManager(conf,
+              scmMetadataStore.getContainerTable(),
+              scmMetadataStore.getBatchHandler(),
+              pipelineManager);
     }
 
     if (configurator.getScmBlockManager() != null) {

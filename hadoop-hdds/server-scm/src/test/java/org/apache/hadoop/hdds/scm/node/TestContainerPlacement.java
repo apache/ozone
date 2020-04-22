@@ -36,19 +36,24 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.PathUtils;
 
 import org.apache.commons.io.IOUtils;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
+import org.junit.After;
 import static org.junit.Assert.assertEquals;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -59,9 +64,21 @@ import org.mockito.Mockito;
  * Test for different container placement policy.
  */
 public class TestContainerPlacement {
+
   @Rule
   public ExpectedException thrown = ExpectedException.none();
+  private DBStore dbStore;
 
+  @Before
+  public void createDbStore() throws IOException {
+    dbStore =
+        DBStoreBuilder.createDBStore(getConf(), new SCMDBDefinition());
+  }
+
+  @After
+  public void destroyDBStore() throws Exception {
+    dbStore.close();
+  }
   /**
    * Returns a new copy of Configuration.
    *
@@ -100,11 +117,13 @@ public class TestContainerPlacement {
   SCMContainerManager createContainerManager(ConfigurationSource config,
       NodeManager scmNodeManager) throws IOException {
     EventQueue eventQueue = new EventQueue();
-    final int cacheSize = config.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
-        OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
+
     PipelineManager pipelineManager =
-        new SCMPipelineManager(config, scmNodeManager, eventQueue);
-    return new SCMContainerManager(config, pipelineManager);
+        new SCMPipelineManager(config, scmNodeManager,
+            PIPELINES.getTable(dbStore), eventQueue);
+    return new SCMContainerManager(config, CONTAINERS.getTable(dbStore),
+        dbStore,
+        pipelineManager);
 
   }
 
