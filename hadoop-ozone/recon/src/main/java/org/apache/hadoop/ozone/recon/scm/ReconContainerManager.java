@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import java.io.File;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -30,11 +29,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_CONTAINER_DB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,33 +55,29 @@ public class ReconContainerManager extends SCMContainerManager {
    * CacheSize is specified
    * in MB.
    *
-   * @param conf            - {@link ConfigurationSource}
-   * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
   public ReconContainerManager(
-      ConfigurationSource conf, PipelineManager pipelineManager,
+      ConfigurationSource conf,
+      Table<ContainerID, ContainerInfo> containerStore,
+      BatchOperationHandler batchHandler,
+      PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
       ContainerSchemaManager containerSchemaManager) throws IOException {
-    super(conf, pipelineManager);
+    super(conf, containerStore, batchHandler, pipelineManager);
     this.scmClient = scm;
     this.containerSchemaManager = containerSchemaManager;
   }
 
-  @Override
-  protected File getContainerDBPath(ConfigurationSource conf) {
-    File metaDir = ReconUtils.getReconScmDbDir(conf);
-    return new File(metaDir, RECON_SCM_CONTAINER_DB);
-  }
-
   /**
    * Check and add new container if not already present in Recon.
-   * @param containerID containerID to check.
+   *
+   * @param containerID     containerID to check.
    * @param datanodeDetails Datanode from where we got this container.
    * @throws IOException on Error.
    */
   public void checkAndAddNewContainer(ContainerID containerID,
-                                      DatanodeDetails datanodeDetails)
+      DatanodeDetails datanodeDetails)
       throws IOException {
     if (!exists(containerID)) {
       LOG.info("New container {} got from {}.", containerID,
@@ -143,7 +138,7 @@ public class ReconContainerManager extends SCMContainerManager {
    */
   @Override
   public void updateContainerReplica(ContainerID containerID,
-                                     ContainerReplica replica)
+      ContainerReplica replica)
       throws ContainerNotFoundException {
     super.updateContainerReplica(containerID, replica);
     // Update container_history table
