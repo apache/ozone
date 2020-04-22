@@ -118,7 +118,7 @@ public interface OzoneManagerProtocol
   void deleteVolume(String volume) throws IOException;
 
   /**
-   * Lists volume owned by a specific user.
+   * Lists volumes accessible by a specific user.
    * @param userName - user name
    * @param prefix  - Filter prefix -- Return only entries that match this.
    * @param prevKey - Previous key -- List starts from the next from the prevkey

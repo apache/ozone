@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.s3;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 
 /**
@@ -32,7 +32,7 @@ public class S3GatewayHttpServer extends BaseHttpServer {
    */
   public static final int FILTER_PRIORITY_DO_AFTER = 50;
 
-  public S3GatewayHttpServer(Configuration conf,
+  public S3GatewayHttpServer(ConfigurationSource conf,
       String name) throws IOException {
     super(conf, name);
   }

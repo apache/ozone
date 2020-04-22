@@ -85,7 +85,9 @@ public class BlockOutputStream extends OutputStream {
   private final int bytesPerChecksum;
   private int chunkIndex;
   private final AtomicLong chunkOffset = new AtomicLong();
+  private final int streamBufferSize;
   private final long streamBufferFlushSize;
+  private final boolean streamBufferFlushDelay;
   private final long streamBufferMaxSize;
   private final BufferPool bufferPool;
   // The IOException will be set by response handling thread in case there is an
@@ -131,10 +133,10 @@ public class BlockOutputStream extends OutputStream {
   @SuppressWarnings("parameternumber")
   public BlockOutputStream(BlockID blockID,
       XceiverClientManager xceiverClientManager, Pipeline pipeline,
-      long streamBufferFlushSize, long streamBufferMaxSize,
+      int streamBufferSize, long streamBufferFlushSize,
+      boolean streamBufferFlushDelay, long streamBufferMaxSize,
       BufferPool bufferPool, ChecksumType checksumType,
-      int bytesPerChecksum)
-      throws IOException {
+      int bytesPerChecksum) throws IOException {
     this.blockID = new AtomicReference<>(blockID);
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
@@ -143,8 +145,10 @@ public class BlockOutputStream extends OutputStream {
             .addMetadata(keyValue);
     this.xceiverClientManager = xceiverClientManager;
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
+    this.streamBufferSize = streamBufferSize;
     this.streamBufferFlushSize = streamBufferFlushSize;
     this.streamBufferMaxSize = streamBufferMaxSize;
+    this.streamBufferFlushDelay = streamBufferFlushDelay;
     this.bufferPool = bufferPool;
     this.bytesPerChecksum = bytesPerChecksum;
 
@@ -434,7 +438,9 @@ public class BlockOutputStream extends OutputStream {
   @Override
   public void flush() throws IOException {
     if (xceiverClientManager != null && xceiverClient != null
-        && bufferPool != null && bufferPool.getSize() > 0) {
+        && bufferPool != null && bufferPool.getSize() > 0
+        && (!streamBufferFlushDelay ||
+            writtenDataLength - totalDataFlushedLength >= streamBufferSize)) {
       try {
         handleFlush(false);
       } catch (InterruptedException | ExecutionException e) {
@@ -446,7 +452,6 @@ public class BlockOutputStream extends OutputStream {
       }
     }
   }
-
 
   private void writeChunk(ChunkBuffer buffer)
       throws IOException {

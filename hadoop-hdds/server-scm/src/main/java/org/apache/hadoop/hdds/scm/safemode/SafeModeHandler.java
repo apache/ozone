@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -51,7 +51,7 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
    * SafeModeHandler, to handle the logic once we exit safe mode.
    * @param configuration
    */
-  public SafeModeHandler(Configuration configuration) {
+  public SafeModeHandler(ConfigurationSource configuration) {
     this.waitTime = configuration.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,

@@ -33,11 +33,11 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TimeZone;
 
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -89,7 +89,8 @@ public final class HddsUtils {
    *
    * @return Target {@code InetSocketAddress} for the SCM client endpoint.
    */
-  public static InetSocketAddress getScmAddressForClients(Configuration conf) {
+  public static InetSocketAddress getScmAddressForClients(
+      ConfigurationSource conf) {
     Optional<String> host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
 
@@ -116,7 +117,7 @@ public final class HddsUtils {
    * @throws IllegalArgumentException if configuration is not defined.
    */
   public static InetSocketAddress getScmAddressForBlockClients(
-      Configuration conf) {
+      ConfigurationSource conf) {
     Optional<String> host = getHostNameFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
         ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
@@ -147,7 +148,8 @@ public final class HddsUtils {
    * @throws IllegalArgumentException if any values are not in the 'host'
    *             or host:port format.
    */
-  public static Optional<String> getHostNameFromConfigKeys(Configuration conf,
+  public static Optional<String> getHostNameFromConfigKeys(
+      ConfigurationSource conf,
       String... keys) {
     for (final String key : keys) {
       final String value = conf.getTrimmed(key);
@@ -206,7 +208,7 @@ public final class HddsUtils {
    *             or host:port format.
    */
   public static OptionalInt getPortNumberFromConfigKeys(
-      Configuration conf, String... keys) {
+      ConfigurationSource conf, String... keys) {
     for (final String key : keys) {
       final String value = conf.getTrimmed(key);
       final OptionalInt hostPort = getHostPort(value);
@@ -224,7 +226,7 @@ public final class HddsUtils {
    * @throws IllegalArgumentException If the configuration is invalid
    */
   public static Collection<InetSocketAddress> getSCMAddresses(
-      Configuration conf) {
+      ConfigurationSource conf) {
     Collection<String> names =
         conf.getTrimmedStringCollection(ScmConfigKeys.OZONE_SCM_NAMES);
     if (names.isEmpty()) {
@@ -255,7 +257,7 @@ public final class HddsUtils {
    * @throws IllegalArgumentException If the configuration is invalid
    */
   public static InetSocketAddress getReconAddresses(
-      Configuration conf) {
+      ConfigurationSource conf) {
     String name = conf.get(OZONE_RECON_ADDRESS_KEY);
     if (StringUtils.isEmpty(name)) {
       return null;
@@ -277,7 +279,8 @@ public final class HddsUtils {
    * @throws IllegalArgumentException if {@code conf} has more than one SCM
    *         address or it has none
    */
-  public static InetSocketAddress getSingleSCMAddress(Configuration conf) {
+  public static InetSocketAddress getSingleSCMAddress(
+      ConfigurationSource conf) {
     Collection<InetSocketAddress> singleton = getSCMAddresses(conf);
     Preconditions.checkArgument(singleton.size() == 1,
         MULTIPLE_SCM_NOT_YET_SUPPORTED);
@@ -295,7 +298,7 @@ public final class HddsUtils {
    * @throws UnknownHostException if the dfs.datanode.dns.interface
    *    option is used and the hostname can not be determined
    */
-  public static String getHostName(Configuration conf)
+  public static String getHostName(ConfigurationSource conf)
       throws UnknownHostException {
     String name = conf.get(DFS_DATANODE_HOST_NAME_KEY);
     if (name == null) {
@@ -498,7 +501,7 @@ public final class HddsUtils {
    * @param alias name of the credential to retreive
    * @return String credential value or null
    */
-  static String getPassword(Configuration conf, String alias) {
+  static String getPassword(ConfigurationSource conf, String alias) {
     String password = null;
     try {
       char[] passchars = conf.getPassword(alias);

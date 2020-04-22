@@ -219,57 +219,93 @@ public class SCMClientProtocolServer implements
 
   }
 
+  private ContainerWithPipeline getContainerWithPipelineCommon(
+      long containerID) throws IOException {
+    final ContainerID cid = ContainerID.valueof(containerID);
+    final ContainerInfo container = scm.getContainerManager()
+        .getContainer(cid);
+
+    if (safeModePrecheck.isInSafeMode()) {
+      if (container.isOpen()) {
+        if (!hasRequiredReplicas(container)) {
+          throw new SCMException("Open container " + containerID + " doesn't"
+              + " have enough replicas to service this operation in "
+              + "Safe mode.", ResultCodes.SAFE_MODE_EXCEPTION);
+        }
+      }
+    }
+
+    Pipeline pipeline;
+    try {
+      pipeline = container.isOpen() ? scm.getPipelineManager()
+          .getPipeline(container.getPipelineID()) : null;
+    } catch (PipelineNotFoundException ex) {
+      // The pipeline is destroyed.
+      pipeline = null;
+    }
+
+    if (pipeline == null) {
+      pipeline = scm.getPipelineManager().createPipeline(
+          HddsProtos.ReplicationType.STAND_ALONE,
+          container.getReplicationFactor(),
+          scm.getContainerManager()
+              .getContainerReplicas(cid).stream()
+              .map(ContainerReplica::getDatanodeDetails)
+              .collect(Collectors.toList()));
+    }
+
+    return new ContainerWithPipeline(container, pipeline);
+  }
+
   @Override
   public ContainerWithPipeline getContainerWithPipeline(long containerID)
       throws IOException {
-    final ContainerID cid = ContainerID.valueof(containerID);
+    getScm().checkAdminAccess(null);
+
     try {
-      final ContainerInfo container = scm.getContainerManager()
-          .getContainer(cid);
-
-      if (safeModePrecheck.isInSafeMode()) {
-        if (container.isOpen()) {
-          if (!hasRequiredReplicas(container)) {
-            throw new SCMException("Open container " + containerID + " doesn't"
-                + " have enough replicas to service this operation in "
-                + "Safe mode.", ResultCodes.SAFE_MODE_EXCEPTION);
-          }
-        }
-      }
-      getScm().checkAdminAccess(null);
-
-      Pipeline pipeline;
-      try {
-        pipeline = container.isOpen() ? scm.getPipelineManager()
-            .getPipeline(container.getPipelineID()) : null;
-      } catch (PipelineNotFoundException ex) {
-        // The pipeline is destroyed.
-        pipeline = null;
-      }
-
-      if (pipeline == null) {
-        pipeline = scm.getPipelineManager().createPipeline(
-            HddsProtos.ReplicationType.STAND_ALONE,
-            container.getReplicationFactor(),
-            scm.getContainerManager()
-                .getContainerReplicas(cid).stream()
-                .map(ContainerReplica::getDatanodeDetails)
-                .collect(Collectors.toList()));
-      }
-
+      ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_WITH_PIPELINE,
-          Collections.singletonMap("containerID", cid.toString())));
-
-      return new ContainerWithPipeline(container, pipeline);
+          Collections.singletonMap("containerID",
+          ContainerID.valueof(containerID).toString())));
+      return cp;
     } catch (IOException ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(
           SCMAction.GET_CONTAINER_WITH_PIPELINE,
-          Collections.singletonMap("containerID", cid.toString()), ex));
+          Collections.singletonMap("containerID",
+              ContainerID.valueof(containerID).toString()), ex));
       throw ex;
     }
   }
 
+  @Override
+  public List<ContainerWithPipeline> getContainerWithPipelineBatch(
+      List<Long> containerIDs) throws IOException {
+    getScm().checkAdminAccess(null);
+
+    List<ContainerWithPipeline> cpList = new ArrayList<>();
+
+    for (Long containerID : containerIDs) {
+      try {
+        ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
+        cpList.add(cp);
+      } catch (IOException ex) {
+        AUDIT.logReadFailure(buildAuditMessageForFailure(
+            SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
+            Collections.singletonMap("containerID",
+                ContainerID.valueof(containerID).toString()), ex));
+        throw ex;
+      }
+    }
+
+    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+        SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
+        Collections.singletonMap("containerIDs",
+        containerIDs.stream().map(id -> ContainerID.valueof(id).toString())
+            .collect(Collectors.joining(",")))));
+
+    return cpList;
+  }
   /**
    * Check if container reported replicas are equal or greater than required
    * replication factor.

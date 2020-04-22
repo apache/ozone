@@ -387,6 +387,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.client.stream.buffer.flush.delay</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>If set true, when call flush() and determine whether the
+      data in the current buffer is greater than ozone.client.stream.buffer.size.
+      if greater than then send buffer to the datanode.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.stream.buffer.size</name>
     <value>4MB</value>
     <tag>OZONE, CLIENT</tag>
@@ -581,6 +590,16 @@
 
       A large value for this key allows a proportionally larger amount of OM
       metadata to be cached in memory. This makes OM operations faster.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.volume.listall.allowed</name>
+    <value>true</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Allows everyone to list all volumes when set to true. Defaults to true.
+      When set to false, non-admin users can only list the volumes they have
+      access to. Admins can always list all volumes.
     </description>
   </property>
   <property>
@@ -2552,6 +2571,14 @@
     <value></value>
     <description>
       Truststore password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.ratis.server.request.timeout</name>
+    <tag>OZONE, DATANODE</tag>
+    <value>2m</value>
+    <description>
+      Timeout for the request submitted directly to Ratis in datanode.
     </description>
   </property>
 </configuration>

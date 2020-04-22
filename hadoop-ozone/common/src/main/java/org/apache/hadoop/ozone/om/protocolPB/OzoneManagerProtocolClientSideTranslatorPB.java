@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -201,7 +201,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * one {@link OzoneManagerProtocolPB} proxy pointing to each OM node in the
    * cluster.
    */
-  public OzoneManagerProtocolClientSideTranslatorPB(OzoneConfiguration conf,
+  public OzoneManagerProtocolClientSideTranslatorPB(ConfigurationSource conf,
       String clientId, String omServiceId, UserGroupInformation ugi)
       throws IOException {
     this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
@@ -284,7 +284,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
       private RetryAction getRetryAction(RetryDecision fallbackAction,
           int failovers) {
-        if (failovers <= maxFailovers) {
+        if (failovers < maxFailovers) {
           return new RetryAction(fallbackAction,
               omFailoverProxyProvider.getWaitTime());
         } else {
@@ -573,7 +573,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Lists volume owned by a specific user.
+   * Lists volumes accessible by a specific user.
    *
    * @param userName - user name
    * @param prefix - Filter prefix -- Return only entries that match this.
