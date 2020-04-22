@@ -20,9 +20,9 @@ summary: 如何在 K8s 上通过 Apache Spark 使用 Ozone ?
   limitations under the License.
 -->
 
-本页介绍如何通过以下组件在 Spark 中使用 Ozone  对象存储：
+本页介绍如何通过以下组件在 Spark 中使用 Ozone 对象存储：
 
- - OzoneFS (兼容  Hadoop 的文件系统)
+ - OzoneFS (兼容 Hadoop 的文件系统)
  - Hadoop 2.7 (包含在 Spark 发行包中)
  - Kubernetes 的 Spark 调度器
  - 本地 Spark 客户端
@@ -67,7 +67,7 @@ _注意_: 如果你使用 Minikube，需要加上 `-m` 参数来使用 Minikube 
 kubectl cp om-0:/opt/hadoop/etc/hadoop/ozone-site.xml .
 ```
 
-然后对它进行定制：
+然后创建一个包含以下内容的 core-site.xml：
 
 ```xml
 <configuration>
