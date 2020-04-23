@@ -983,14 +983,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   }
 
+  /**
+   * List Open keys in a bucket.
+   */
   @Override
-  public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName) throws  IOException{
+  public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName)
+          throws  IOException {
     List<OmKeyInfo> keys = new ArrayList<>();
-   OzoneManagerProtocolProtos.ListOpenKeysRequest.Builder reqBuilder =
+    OzoneManagerProtocolProtos.ListOpenKeysRequest.Builder reqBuilder =
             OzoneManagerProtocolProtos.ListOpenKeysRequest.newBuilder();
     reqBuilder.setVolumeName(volumeName);
     reqBuilder.setBucketName(bucketName);
-
     OzoneManagerProtocolProtos.ListOpenKeysRequest req  = reqBuilder.build();
     OMRequest omRequest = createOMRequest(Type.ListOpenKeys)
             .setListOpenKeysRequest(req)
@@ -1001,7 +1004,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             resp.getKeyInfoList().stream()
                     .map(OmKeyInfo::getFromProtobuf)
                     .collect(Collectors.toList()));
-
     return keys;
   }
 

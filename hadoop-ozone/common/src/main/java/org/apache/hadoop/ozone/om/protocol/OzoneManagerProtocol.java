@@ -555,4 +555,5 @@ public interface OzoneManagerProtocol
    */
   boolean recoverTrash(String volumeName, String bucketName, String keyName,
       String destinationBucket) throws IOException;
+
 }

@@ -796,7 +796,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName) throws IOException {
+  public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName)
+          throws IOException {
     List<OmKeyInfo> result = new ArrayList<>();
     TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
     if (Strings.isNullOrEmpty(volumeName)) {
@@ -815,7 +816,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
               ResultCodes.BUCKET_NOT_FOUND);
     }
     String seekPrefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = openKeyTable.iterator();
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = openKeyTable.iterator();
     Table.KeyValue<String, OmKeyInfo> kv;
     while (iterator.hasNext()) {
       kv = iterator.next();
@@ -842,7 +844,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     List<RepeatedOmKeyInfo> deletedKeys = new ArrayList<>();
     return deletedKeys;
   }
-
 
   /**
    * @param userName volume owner, null for listing all volumes.

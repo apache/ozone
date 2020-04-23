@@ -2238,7 +2238,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName) throws IOException {
+  public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName)
+          throws IOException {
     return keyManager.listOpenKeys(volumeName,bucketName);
   }
 

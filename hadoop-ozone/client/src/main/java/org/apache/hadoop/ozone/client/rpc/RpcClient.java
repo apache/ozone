@@ -710,7 +710,8 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public List<OzoneKey> listOpenKeys(String volumeName, String bucketName) throws IOException {
+  public List<OzoneKey> listOpenKeys(String volumeName, String bucketName)
+          throws IOException {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
     List<OmKeyInfo> keys = ozoneManagerClient.listOpenKeys(
@@ -725,7 +726,6 @@ public class RpcClient implements ClientProtocol {
             ReplicationType.valueOf(key.getType().toString()),
             key.getFactor().getNumber()))
             .collect(Collectors.toList());
-
   }
 
   @Override

@@ -301,8 +301,8 @@ public class TestOmMetadataManager {
     List<OmKeyInfo> omKeyInfoList =
             omMetadataManager.listOpenKeys(volumeName,bucketName);
     Assert.assertEquals(10,omKeyInfoList.size());
-
   }
+
   @Test
   public void testListKeys() throws Exception {
 

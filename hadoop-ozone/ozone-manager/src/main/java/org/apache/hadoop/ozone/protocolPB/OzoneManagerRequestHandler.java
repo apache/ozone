@@ -422,11 +422,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  private OzoneManagerProtocolProtos.ListOpenKeysResponse listOpenKeys(OzoneManagerProtocolProtos.ListOpenKeysRequest request)
+  private OzoneManagerProtocolProtos.ListOpenKeysResponse listOpenKeys(
+          OzoneManagerProtocolProtos.ListOpenKeysRequest request)
     throws IOException {
     OzoneManagerProtocolProtos.ListOpenKeysResponse.Builder resp =
             OzoneManagerProtocolProtos.ListOpenKeysResponse.newBuilder();
-
     List<OmKeyInfo> keys = impl.listOpenKeys(
             request.getVolumeName(),
             request.getBucketName()
@@ -434,7 +434,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (OmKeyInfo key : keys) {
       resp.addKeyInfo(key.getProtobuf());
     }
-
     return  resp.build();
   }
 

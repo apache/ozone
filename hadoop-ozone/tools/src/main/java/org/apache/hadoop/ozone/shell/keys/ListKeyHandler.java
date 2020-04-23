@@ -44,9 +44,6 @@ public class ListKeyHandler extends BucketHandler {
 
   @CommandLine.Mixin
   private ListOptions listOptions;
-  /**
-   * Executes the Client Calls.
-   */
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -64,13 +61,13 @@ public class ListKeyHandler extends BucketHandler {
     boolean isOpenKey = listOptions.isOpenkey();
 
     if (isOpenKey) {
-        List<OzoneKey> openKeysList = bucket.listOpenKeys();
-        Iterator<OzoneKey> ozoneKeyIterator = openKeysList.iterator();
-        while (ozoneKeyIterator.hasNext()) {
-            OzoneKey openKey = ozoneKeyIterator.next();
-            printObjectAsJson(openKey);
-        }
-        return;
+      List<OzoneKey> openKeysList = bucket.listOpenKeys();
+      Iterator<OzoneKey> ozoneKeyIterator = openKeysList.iterator();
+      while (ozoneKeyIterator.hasNext()) {
+        OzoneKey openKey = ozoneKeyIterator.next();
+        printObjectAsJson(openKey);
+      }
+      return;
     }
 
     int counter = 0;
