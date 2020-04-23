@@ -60,12 +60,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3InitiateMultipartUploadRequest.class);
 
-  private enum Result {
-    SUCCESS,
-    REPLAY,
-    FAILURE
-  }
-
   public S3InitiateMultipartUploadRequest(OMRequest omRequest) {
     super(omRequest);
   }

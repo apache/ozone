@@ -31,7 +31,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -42,9 +42,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.ratis.protocol.AlreadyClosedException;
 import org.apache.ratis.protocol.GroupMismatchException;
 import org.apache.ratis.protocol.NotReplicatedException;
@@ -216,56 +213,16 @@ public final class HddsClientUtils {
    * @param conf Configuration object
    * @return list cache size
    */
-  public static int getListCacheSize(Configuration conf) {
+  public static int getListCacheSize(ConfigurationSource conf) {
     return conf.getInt(OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE,
         OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE_DEFAULT);
-  }
-
-  /**
-   * @return a default instance of {@link CloseableHttpClient}.
-   */
-  public static CloseableHttpClient newHttpClient() {
-    return HddsClientUtils.newHttpClient(new Configuration());
-  }
-
-  /**
-   * Returns a {@link CloseableHttpClient} configured by given configuration.
-   * If conf is null, returns a default instance.
-   *
-   * @param conf configuration
-   * @return a {@link CloseableHttpClient} instance.
-   */
-  public static CloseableHttpClient newHttpClient(Configuration conf) {
-    long socketTimeout = OzoneConfigKeys
-        .OZONE_CLIENT_SOCKET_TIMEOUT_DEFAULT;
-    long connectionTimeout = OzoneConfigKeys
-        .OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT;
-    if (conf != null) {
-      socketTimeout = conf.getTimeDuration(
-          OzoneConfigKeys.OZONE_CLIENT_SOCKET_TIMEOUT,
-          OzoneConfigKeys.OZONE_CLIENT_SOCKET_TIMEOUT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      connectionTimeout = conf.getTimeDuration(
-          OzoneConfigKeys.OZONE_CLIENT_CONNECTION_TIMEOUT,
-          OzoneConfigKeys.OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-    }
-
-    CloseableHttpClient client = HttpClients.custom()
-        .setDefaultRequestConfig(
-            RequestConfig.custom()
-                .setSocketTimeout(Math.toIntExact(socketTimeout))
-                .setConnectTimeout(Math.toIntExact(connectionTimeout))
-                .build())
-        .build();
-    return client;
   }
 
   /**
    * Returns the maximum no of outstanding async requests to be handled by
    * Standalone and Ratis client.
    */
-  public static int getMaxOutstandingRequests(Configuration config) {
+  public static int getMaxOutstandingRequests(ConfigurationSource config) {
     return OzoneConfiguration.of(config)
         .getObject(RatisClientConfig.class)
         .getMaxOutstandingRequests();

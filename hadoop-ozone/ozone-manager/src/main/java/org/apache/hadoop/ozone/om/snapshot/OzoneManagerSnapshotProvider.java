@@ -28,8 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
@@ -75,7 +75,7 @@ public class OzoneManagerSnapshotProvider {
 
   private static final String OM_SNAPSHOT_DB = "om.snapshot.db";
 
-  public OzoneManagerSnapshotProvider(Configuration conf,
+  public OzoneManagerSnapshotProvider(ConfigurationSource conf,
       File omRatisSnapshotDir, List<OMNodeDetails> peerNodes) {
 
     LOG.info("Initializing OM Snapshot Provider");
@@ -90,7 +90,7 @@ public class OzoneManagerSnapshotProvider {
     this.httpRequestConfig = getHttpRequestConfig(conf);
   }
 
-  private RequestConfig getHttpRequestConfig(Configuration conf) {
+  private RequestConfig getHttpRequestConfig(ConfigurationSource conf) {
     TimeUnit socketTimeoutUnit =
         OZONE_OM_SNAPSHOT_PROVIDER_SOCKET_TIMEOUT_DEFAULT.getUnit();
     int socketTimeoutMS = (int) conf.getTimeDuration(

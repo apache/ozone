@@ -31,7 +31,6 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -42,7 +41,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -190,7 +188,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         long baseObjId = OMFileRequest.getObjIDFromTxId(trxnLogIndex);
         List<OzoneAcl> inheritAcls = omPathInfo.getAcls();
 
-        dirKeyInfo = createDirectoryKeyInfoWithACL(ozoneManager, keyName,
+        dirKeyInfo = createDirectoryKeyInfoWithACL(keyName,
             keyArgs, baseObjId,
             OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex);
 
@@ -286,7 +284,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
       LOG.debug("missing parent {} getting added to KeyTable", missingKey);
       // what about keyArgs for parent directories? TODO
-      OmKeyInfo parentKeyInfo = createDirectoryKeyInfoWithACL(ozoneManager,
+      OmKeyInfo parentKeyInfo = createDirectoryKeyInfoWithACL(
           missingKey, keyArgs, nextObjId, inheritAcls, trxnLogIndex);
       objectCount++;
 
@@ -345,42 +343,26 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * without initializing ACLs from the KeyArgs - used for intermediate
    * directories which get created internally/recursively during file
    * and directory create.
-   * @param ozoneManager
    * @param keyName
    * @param keyArgs
    * @param objectId
    * @param transactionIndex
    * @return the OmKeyInfo structure
-   * @throws IOException
    */
   public static OmKeyInfo createDirectoryKeyInfoWithACL(
-      OzoneManager ozoneManager, String keyName, KeyArgs keyArgs,
-      long objectId, List<OzoneAcl> inheritAcls,
-      long transactionIndex) throws IOException {
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-
-    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(
-        omMetadataManager.getBucketKey(volumeName, bucketName));
-    return dirKeyInfoBuilderNoACL(ozoneManager, omBucketInfo, volumeName,
-        bucketName, keyName, keyArgs, objectId)
-        .setAcls(inheritAcls)
-        .setUpdateID(transactionIndex)
-        .build();
+      String keyName, KeyArgs keyArgs, long objectId,
+      List<OzoneAcl> inheritAcls, long transactionIndex) {
+    return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId)
+        .setAcls(inheritAcls).setUpdateID(transactionIndex).build();
   }
 
-  private static OmKeyInfo.Builder dirKeyInfoBuilderNoACL(
-      OzoneManager ozoneManager, OmBucketInfo omBucketInfo, String volumeName,
-      String bucketName, String keyName, KeyArgs keyArgs, long objectId)
-      throws IOException {
-    Optional<FileEncryptionInfo> encryptionInfo =
-        getFileEncryptionInfo(ozoneManager, omBucketInfo);
+  private static OmKeyInfo.Builder dirKeyInfoBuilderNoACL(String keyName,
+      KeyArgs keyArgs, long objectId) {
     String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
     return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
         .setKeyName(dirName)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
@@ -389,8 +371,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setDataSize(0)
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
         .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-        .setFileEncryptionInfo(encryptionInfo.orNull())
-        .setObjectID(objectId);
+        .setObjectID(objectId)
+        .setUpdateID(objectId);
   }
 
 }

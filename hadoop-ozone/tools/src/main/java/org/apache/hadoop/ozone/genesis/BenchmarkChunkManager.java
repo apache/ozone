@@ -17,8 +17,14 @@
  */
 package org.apache.hadoop.ozone.genesis;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -32,9 +38,15 @@ import org.apache.hadoop.ozone.container.common.volume.ImmutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
+import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import org.apache.commons.io.FileUtils;
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
@@ -45,19 +57,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 
 /**
  * Benchmark for ChunkManager implementations.
@@ -99,7 +98,7 @@ public class BenchmarkChunkManager {
     private File dir;
     private ChunkBuffer buffer;
     private VolumeSet volumeSet;
-    private Configuration config;
+    private OzoneConfiguration config;
 
     private static File getTestDir() throws IOException {
       File dir = new File(DEFAULT_TEST_DATA_DIR).getAbsoluteFile();

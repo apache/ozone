@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -67,7 +67,7 @@ public class ObjectStore {
    * @param conf Configuration object.
    * @param proxy ClientProtocol proxy.
    */
-  public ObjectStore(Configuration conf, ClientProtocol proxy) {
+  public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
   }
@@ -250,7 +250,7 @@ public class ObjectStore {
       String volumePrefix, String prevVolume)
       throws IOException {
     if(Strings.isNullOrEmpty(user)) {
-      user = UserGroupInformation.getCurrentUser().getShortUserName();
+      user = UserGroupInformation.getCurrentUser().getUserName();
     }
     return new VolumeIterator(user, volumePrefix, prevVolume);
   }

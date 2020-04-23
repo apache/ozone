@@ -21,17 +21,17 @@ package org.apache.hadoop.fs.ozone;
 import java.io.IOException;
 import java.net.URI;
 
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.DtFetcher;
 import org.apache.hadoop.security.token.Token;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**

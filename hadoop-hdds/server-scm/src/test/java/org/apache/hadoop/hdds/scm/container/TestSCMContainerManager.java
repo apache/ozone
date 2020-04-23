@@ -16,24 +16,44 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
+
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
@@ -42,24 +62,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
-import java.util.UUID;
-import java.util.Iterator;
-import java.util.Optional;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Tests for Container ContainerManager.
@@ -67,7 +69,7 @@ import java.util.stream.IntStream;
 public class TestSCMContainerManager {
   private static SCMContainerManager containerManager;
   private static MockNodeManager nodeManager;
-  private static PipelineManager pipelineManager;
+  private static SCMPipelineManager pipelineManager;
   private static File testDir;
   private static XceiverClientManager xceiverClientManager;
   private static Random random;
@@ -78,9 +80,10 @@ public class TestSCMContainerManager {
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
+
   @BeforeClass
   public static void setUp() throws Exception {
-    Configuration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf();
 
     testDir = GenericTestUtils
         .getTestDir(TestSCMContainerManager.class.getSimpleName());
@@ -95,9 +98,15 @@ public class TestSCMContainerManager {
       throw new IOException("Unable to create test directory path");
     }
     nodeManager = new MockNodeManager(true, 10);
+    DBStore dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue());
-    containerManager = new SCMContainerManager(conf, pipelineManager);
+        new SCMPipelineManager(conf, nodeManager,
+            SCMDBDefinition.PIPELINES.getTable(dbStore), new EventQueue());
+    pipelineManager.allowPipelineCreation();
+    containerManager = new SCMContainerManager(conf,
+        SCMDBDefinition.CONTAINERS.getTable(dbStore),
+        dbStore,
+        pipelineManager);
     xceiverClientManager = new XceiverClientManager(conf);
     replicationFactor = SCMTestUtils.getReplicationFactor(conf);
     replicationType = SCMTestUtils.getReplicationType(conf);

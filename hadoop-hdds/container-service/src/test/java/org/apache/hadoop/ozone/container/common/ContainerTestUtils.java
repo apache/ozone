@@ -17,33 +17,33 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Random;
+import java.util.UUID;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .EndpointStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.protocolPB
-    .StorageContainerDatanodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.mockito.Mockito;
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Random;
-import java.util.UUID;
+import org.mockito.Mockito;
 
 /**
  * Helper utility to test containers.
@@ -77,7 +77,8 @@ public final class ContainerTestUtils {
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
         new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
-    return new EndpointStateMachine(address, rpcClient, conf);
+    return new EndpointStateMachine(address, rpcClient,
+        new LegacyHadoopConfigurationSource(conf));
   }
 
   public static OzoneContainer getOzoneContainer(
@@ -115,10 +116,11 @@ public final class ContainerTestUtils {
   }
 
   public static KeyValueContainer getContainer(long containerId,
+      ChunkLayOutVersion layout,
       ContainerProtos.ContainerDataProto.State state) {
     KeyValueContainerData kvData =
         new KeyValueContainerData(containerId,
-            ChunkLayOutVersion.FILE_PER_CHUNK,
+            layout,
             (long) StorageUnit.GB.toBytes(5),
             UUID.randomUUID().toString(), UUID.randomUUID().toString());
     kvData.setState(state);

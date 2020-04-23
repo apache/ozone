@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 ${ENDPOINT_URL}       http://recon:9888
@@ -60,6 +61,9 @@ Check if Recon picks up DN heartbeats
                         Should contain      ${result}       \"totalDatanodes\":3
                         Should contain      ${result}       \"healthyDatanodes\":3
                         Should contain      ${result}       \"pipelines\":4
+
+    ${result} =         Execute                             curl --negotiate -u : -v ${API_ENDPOINT_URL}/containers/1/replicaHistory
+                        Should contain      ${result}       \"containerId\":1
 
 Check if Recon Web UI is up
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user

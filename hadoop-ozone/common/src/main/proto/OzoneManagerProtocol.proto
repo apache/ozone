@@ -315,6 +315,8 @@ enum Status {
     CANNOT_CREATE_DIRECTORY_AT_ROOT = 59;
     DIRECTORY_ALREADY_EXISTS = 60;
 
+    INVALID_VOLUME_NAME = 61;
+
     // When transactions are replayed
     REPLAY = 100;
 }
@@ -707,6 +709,9 @@ message KeyArgs {
     // request type.
     optional uint64 modificationTime = 13;
     optional bool sortDatanodes = 14;
+
+    // This will be set by leader OM in HA and update the original request.
+    optional FileEncryptionInfoProto fileEncryptionInfo = 15;
 }
 
 message KeyLocation {
@@ -893,6 +898,7 @@ message OMTokenProto {
     optional string accessKeyId    = 12;
     optional string signature      = 13;
     optional string strToSign      = 14;
+    optional string omServiceId    = 15;
 }
 
 message SecretKeyProto {

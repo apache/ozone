@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -38,6 +39,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import java.util.ArrayList;
@@ -55,6 +58,7 @@ import static org.mockito.Mockito.mock;
 /**
  * This class is used to test key related operations on the container.
  */
+@RunWith(Parameterized.class)
 public class TestBlockManagerImpl {
 
   @Rule
@@ -68,6 +72,17 @@ public class TestBlockManagerImpl {
   private BlockData blockData;
   private BlockManagerImpl blockManager;
   private BlockID blockID;
+
+  private final ChunkLayOutVersion layout;
+
+  public TestBlockManagerImpl(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
 
   @Before
   public void setUp() throws Exception {
@@ -84,7 +99,7 @@ public class TestBlockManagerImpl {
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
-        ChunkLayOutVersion.FILE_PER_CHUNK,
+        layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 

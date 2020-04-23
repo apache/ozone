@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -42,6 +42,8 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
 
   private final long waitTime;
   private final AtomicBoolean isInSafeMode = new AtomicBoolean(true);
+  private final AtomicBoolean safeModePreChecksComplete
+      = new AtomicBoolean(false);
   private final List<SafeModeNotification> immediate = new ArrayList<>();
   private final List<SafeModeNotification> delayed = new ArrayList<>();
 
@@ -49,7 +51,7 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
    * SafeModeHandler, to handle the logic once we exit safe mode.
    * @param configuration
    */
-  public SafeModeHandler(Configuration configuration) {
+  public SafeModeHandler(ConfigurationSource configuration) {
     this.waitTime = configuration.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT,
@@ -98,11 +100,20 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
   @Override
   public void onMessage(SafeModeStatus safeModeStatus,
                         EventPublisher publisher) {
-    isInSafeMode.set(safeModeStatus.getSafeModeStatus());
+    isInSafeMode.set(safeModeStatus.isInSafeMode());
+    safeModePreChecksComplete.set(safeModeStatus.isPreCheckComplete());
+    // Always notify the immediate listeners
     for (SafeModeNotification s : immediate) {
       s.handleSafeModeTransition(safeModeStatus);
     }
-    if (!isInSafeMode.get()) {
+    // Only notify the delayed listeners if safemode remains on, as precheck
+    // may have completed.
+    if (safeModeStatus.isInSafeMode()) {
+      for (SafeModeNotification s : delayed) {
+        s.handleSafeModeTransition(safeModeStatus);
+      }
+    } else {
+      // If safemode is off, then notify the delayed listeners with a delay.
       final Thread safeModeExitThread = new Thread(() -> {
         try {
           Thread.sleep(waitTime);
@@ -122,5 +133,9 @@ public class SafeModeHandler implements EventHandler<SafeModeStatus> {
 
   public boolean getSafeModeStatus() {
     return isInSafeMode.get();
+  }
+
+  public boolean getPreCheckComplete() {
+    return safeModePreChecksComplete.get();
   }
 }

@@ -252,7 +252,7 @@
   </property>
   <property>
     <name>dfs.ratis.client.request.retry.interval</name>
-    <value>15000ms</value>
+    <value>1000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>Interval between successive retries for a ratis client request.
     </description>
@@ -387,6 +387,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.client.stream.buffer.flush.delay</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>If set true, when call flush() and determine whether the
+      data in the current buffer is greater than ozone.client.stream.buffer.size.
+      if greater than then send buffer to the datanode.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.stream.buffer.size</name>
     <value>4MB</value>
     <tag>OZONE, CLIENT</tag>
@@ -505,7 +514,7 @@
   </property>
   <property>
     <name>ozone.om.handler.count.key</name>
-    <value>20</value>
+    <value>100</value>
     <tag>OM, PERFORMANCE</tag>
     <description>
       The number of RPC handler threads for OM service endpoints.
@@ -581,6 +590,16 @@
 
       A large value for this key allows a proportionally larger amount of OM
       metadata to be cached in memory. This makes OM operations faster.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.volume.listall.allowed</name>
+    <value>true</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Allows everyone to list all volumes when set to true. Defaults to true.
+      When set to false, non-admin users can only list the volumes they have
+      access to. Admins can always list all volumes.
     </description>
   </property>
   <property>
@@ -918,7 +937,7 @@
   </property>
   <property>
     <name>ozone.scm.handler.count.key</name>
-    <value>10</value>
+    <value>100</value>
     <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
     <description>
       The number of RPC handler threads for each SCM service
@@ -1497,9 +1516,19 @@
   <property>
     <name>ozone.security.enabled</name>
     <value>false</value>
-    <tag> OZONE, SECURITY</tag>
+    <tag>OZONE, SECURITY</tag>
     <description>True if security is enabled for ozone. When this property is
      true, hadoop.security.authentication should be Kerberos.
+    </description>
+  </property>
+  <property>
+    <name>ozone.security.http.kerberos.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY</tag>
+    <description>True if Kerberos authentication for Ozone HTTP web consoles
+      is enabled using the SPNEGO protocol. When this property is
+      true, hadoop.security.authentication should be Kerberos and
+      ozone.security.enabled should be set to true.
     </description>
   </property>
 
@@ -1529,15 +1558,6 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Ozone client to verify checksum of the checksum blocksize data.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.client.read.timeout</name>
-    <value>30s</value>
-    <tag>OZONE, CLIENT, MANAGEMENT</tag>
-    <description>
-      Timeout for ozone grpc client during read.
     </description>
   </property>
 
@@ -2137,29 +2157,13 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.failover.sleep.base.millis</name>
-    <value>500</value>
+    <name>ozone.client.wait.between.retries.millis</name>
+    <value>2000</value>
     <description>
-      Expert only. The time to wait, in milliseconds, between failover
-      attempts increases exponentially as a function of the number of
-      attempts made so far, with a random factor of +/- 50%. This option
-      specifies the base value used in the failover calculation. The
-      first failover will retry immediately. The 2nd failover attempt
-      will delay at least ozone.client.failover.sleep.base.millis
-      milliseconds. And so on.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.failover.sleep.max.millis</name>
-    <value>15000</value>
-    <description>
-      Expert only. The time to wait, in milliseconds, between failover
-      attempts increases exponentially as a function of the number of
-      attempts made so far, with a random factor of +/- 50%. This option
-      specifies the maximum value to wait between failovers.
-      Specifically, the time between two failover attempts will not
-      exceed +/- 50% of ozone.client.failover.sleep.max.millis
-      milliseconds.
+      Expert only. The time to wait, in milliseconds, between retry attempts
+      to contact OM. Wait time increases linearly if same OM is retried
+      again. If retrying on multiple OMs proxies in round robin fashion, the
+      wait time is introduced after all the OM proxies have been attempted once.
     </description>
   </property>
   <property>
@@ -2567,6 +2571,14 @@
     <value></value>
     <description>
       Truststore password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.ratis.server.request.timeout</name>
+    <tag>OZONE, DATANODE</tag>
+    <value>2m</value>
+    <description>
+      Timeout for the request submitted directly to Ratis in datanode.
     </description>
   </property>
 </configuration>

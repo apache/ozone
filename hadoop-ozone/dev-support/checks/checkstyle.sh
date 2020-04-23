@@ -21,7 +21,18 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/checkstyle"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-mvn -B -fn checkstyle:check
+MAVEN_OPTIONS='-B -fae -Dskip.yarn -Dskip.installyarn -Dcheckstyle.failOnViolation=false'
+
+declare -i rc
+mvn ${MAVEN_OPTIONS} checkstyle:check > "${REPORT_DIR}/output.log"
+rc=$?
+if [[ ${rc} -ne 0 ]]; then
+  mvn ${MAVEN_OPTIONS} clean test-compile checkstyle:check
+  rc=$?
+  mkdir -p "$REPORT_DIR" # removed by mvn clean
+else
+  cat "${REPORT_DIR}/output.log"
+fi
 
 #Print out the exact violations with parsing XML results with sed
 find "." -name checkstyle-errors.xml -print0 \
@@ -41,3 +52,4 @@ grep -c ':' "$REPORT_FILE" > "$REPORT_DIR/failures"
 if [[ -s "${REPORT_FILE}" ]]; then
    exit 1
 fi
+exit ${rc}

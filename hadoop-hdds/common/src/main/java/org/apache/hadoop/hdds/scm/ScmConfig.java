@@ -45,6 +45,19 @@ public class ScmConfig {
   )
   private String keytab;
 
+  @Config(key = "unknown-container.action",
+      type = ConfigType.STRING,
+      defaultValue = "WARN",
+      tags = { ConfigTag.SCM, ConfigTag.MANAGEMENT },
+      description =
+          "The action taken by SCM to process unknown "
+          + "containers that reported by Datanodes. The default "
+          + "action is just logging container not found warning, "
+          + "another available action is DELETE action. "
+          + "These unknown containers will be deleted under this "
+          + "action way."
+  )
+  private String action;
 
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
@@ -55,12 +68,20 @@ public class ScmConfig {
     this.keytab = kerberosKeytab;
   }
 
+  public void setUnknownContainerAction(String unknownContainerAction) {
+    this.action = unknownContainerAction;
+  }
+
   public String getKerberosPrincipal() {
     return this.principal;
   }
 
   public String getKerberosKeytab() {
     return this.keytab;
+  }
+
+  public String getUnknownContainerAction() {
+    return this.action;
   }
 
   /**
@@ -77,4 +98,7 @@ public class ScmConfig {
     public static final String HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY =
           "hdds.scm.kerberos.keytab.file";
   }
+
+  public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION =
+      "hdds.scm.unknown-container.action";
 }

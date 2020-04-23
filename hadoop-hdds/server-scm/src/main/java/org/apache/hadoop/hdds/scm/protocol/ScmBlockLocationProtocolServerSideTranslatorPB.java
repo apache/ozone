@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
+import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
@@ -77,7 +78,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
    */
   public ScmBlockLocationProtocolServerSideTranslatorPB(
       ScmBlockLocationProtocol impl,
-      ProtocolMessageMetrics metrics) throws IOException {
+      ProtocolMessageMetrics<ProtocolMessageEnum> metrics)
+      throws IOException {
     this.impl = impl;
     dispatcher = new OzoneProtocolMessageDispatcher<>(
         "BlockLocationProtocol", metrics, LOG);

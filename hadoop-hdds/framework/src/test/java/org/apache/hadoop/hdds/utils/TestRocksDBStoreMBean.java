@@ -17,7 +17,13 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import org.apache.hadoop.conf.Configuration;
+import javax.management.MBeanServer;
+import java.io.File;
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.AbstractMetric;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -29,27 +35,20 @@ import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
-import javax.management.MBeanServer;
-import java.io.File;
-import java.io.IOException;
-import java.lang.management.ManagementFactory;
-import java.util.HashMap;
-import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Test the JMX interface for the rocksdb metastore implementation.
  */
 public class TestRocksDBStoreMBean {
   
-  private Configuration conf;
+  private OzoneConfiguration conf;
   
   @Before
   public void init() throws Exception {

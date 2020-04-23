@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -68,7 +68,7 @@ public final class SCMContainerPlacementRackAware
    *                 for closed container placement.
    */
   public SCMContainerPlacementRackAware(final NodeManager nodeManager,
-      final Configuration conf, final NetworkTopology networkTopology,
+      final ConfigurationSource conf, final NetworkTopology networkTopology,
       final boolean fallback, final SCMContainerPlacementMetrics metrics) {
     super(nodeManager, conf);
     this.networkTopology = networkTopology;

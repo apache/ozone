@@ -18,15 +18,6 @@
 
 package org.apache.hadoop.ozone;
 
-import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
@@ -35,9 +26,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -54,18 +42,27 @@ import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachin
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.hadoop.test.TestGenericTestUtils;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomUtils;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.yaml.snakeyaml.Yaml;
 
 /**
  * Test cases for mini ozone cluster.
  */
-@Ignore
 public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
@@ -192,7 +189,7 @@ public class TestMiniOzoneCluster {
 
   @Test
   public void testContainerRandomPort() throws IOException {
-    Configuration ozoneConf = SCMTestUtils.getConf();
+    OzoneConfiguration ozoneConf = SCMTestUtils.getConf();
     File testDir = PathUtils.getTestDir(TestOzoneContainer.class);
     ozoneConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
         testDir.getAbsolutePath());
@@ -325,5 +322,23 @@ public class TestMiniOzoneCluster {
       Assert.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
           endpoint.getState());
     }
+  }
+
+  /**
+   * Test that multiple datanode directories are created in MiniOzoneCluster.
+   * @throws Exception
+   */
+  @Test (timeout = 60000)
+  public void testMultipleDataDirs() throws Exception {
+    // Start a cluster with 3 DN
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .setNumDataVolumes(3)
+        .build();
+    cluster.waitForClusterToBeReady();
+
+    Assert.assertEquals(3, cluster.getHddsDatanodes().get(0)
+        .getDatanodeStateMachine().getContainer().getVolumeSet()
+        .getVolumesList().size());
   }
 }
