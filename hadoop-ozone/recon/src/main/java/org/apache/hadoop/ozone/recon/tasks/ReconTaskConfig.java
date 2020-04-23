@@ -33,7 +33,7 @@ public class ReconTaskConfig {
 
   @Config(key = "pipelinesync.interval",
       type = ConfigType.TIME, timeUnit = TimeUnit.SECONDS,
-      defaultValue = "600",
+      defaultValue = "600s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
       description = "The time interval of periodic sync of pipeline state " +
           "from SCM to Recon."
@@ -50,7 +50,7 @@ public class ReconTaskConfig {
 
   @Config(key = "missingcontainer.interval",
       type = ConfigType.TIME, timeUnit = TimeUnit.SECONDS,
-      defaultValue = "300",
+      defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
       description = "The time interval of the period check for  " +
           " containers with zero replicas in the cluster as reported by " +
