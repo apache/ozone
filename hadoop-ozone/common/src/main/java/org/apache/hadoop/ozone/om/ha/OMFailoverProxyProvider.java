@@ -318,9 +318,12 @@ public class OMFailoverProxyProvider implements
     if (!currentProxyOMNodeId.equals(newLeaderOMNodeId)) {
       if (omProxies.containsKey(newLeaderOMNodeId)) {
         currentProxyOMNodeId = newLeaderOMNodeId;
+        lastAttemptedOM = currentProxyOMNodeId;
         currentProxyIndex = omNodeIDList.indexOf(currentProxyOMNodeId);
         return true;
       }
+    } else {
+      lastAttemptedOM = currentProxyOMNodeId;
     }
     return false;
   }
