@@ -33,6 +33,9 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -136,9 +139,16 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       boolean isolatedClassloader =
           conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
 
-      // adapter should be initialized in operations.
-      this.adapter = createAdapter(
-          conf, omHostOrServiceId, omPort, isolatedClassloader);
+      ConfigurationSource source;
+      if (conf instanceof OzoneConfiguration) {
+        source = (ConfigurationSource) conf;
+      } else {
+        source = new LegacyHadoopConfigurationSource(conf);
+      }
+      this.adapter =
+          createAdapter(source,
+              omHostOrServiceId, omPort,
+              isolatedClassloader);
 
       try {
         this.userName =
@@ -155,7 +165,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  protected OzoneClientAdapter createAdapter(Configuration conf,
+  protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
       String omHost, int omPort, boolean isolatedClassloader)
       throws IOException {
 
