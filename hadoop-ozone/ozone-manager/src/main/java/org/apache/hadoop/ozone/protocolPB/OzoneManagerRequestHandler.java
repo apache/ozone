@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -159,6 +160,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListKeysResponse listKeysResponse = listKeys(
             request.getListKeysRequest());
         responseBuilder.setListKeysResponse(listKeysResponse);
+        break;
+      case ListOpenKeys:
+        OzoneManagerProtocolProtos.ListOpenKeysResponse listOpenKeysResponse = listOpenKeys(
+            request.getListOpenKeysRequest());
+        responseBuilder.setListOpenKeysResponse(listOpenKeysResponse);
         break;
       case ListTrash:
         ListTrashResponse listTrashResponse = listTrash(
@@ -414,6 +420,22 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
 
     return resp.build();
+  }
+
+  private OzoneManagerProtocolProtos.ListOpenKeysResponse listOpenKeys(OzoneManagerProtocolProtos.ListOpenKeysRequest request)
+    throws IOException {
+    OzoneManagerProtocolProtos.ListOpenKeysResponse.Builder resp =
+            OzoneManagerProtocolProtos.ListOpenKeysResponse.newBuilder();
+
+    List<OmKeyInfo> keys = impl.listOpenKeys(
+            request.getVolumeName(),
+            request.getBucketName()
+    );
+    for (OmKeyInfo key : keys) {
+      resp.addKeyInfo(key.getProtobuf());
+    }
+
+    return  resp.build();
   }
 
   private ListTrashResponse listTrash(ListTrashRequest request)

@@ -223,6 +223,7 @@ public final class OmUtils {
     case ListBuckets:
     case LookupKey:
     case ListKeys:
+    case ListOpenKeys:
     case ListTrash:
     case RecoverTrash:
     case InfoS3Bucket:

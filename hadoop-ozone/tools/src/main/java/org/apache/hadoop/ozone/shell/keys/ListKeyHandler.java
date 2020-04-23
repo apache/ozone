@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell.keys;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -43,6 +44,9 @@ public class ListKeyHandler extends BucketHandler {
 
   @CommandLine.Mixin
   private ListOptions listOptions;
+  /**
+   * Executes the Client Calls.
+   */
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -57,6 +61,17 @@ public class ListKeyHandler extends BucketHandler {
         listOptions.getPrefix(), listOptions.getStartItem());
 
     int maxKeyLimit = listOptions.getLimit();
+    boolean isOpenKey = listOptions.isOpenkey();
+
+    if (isOpenKey) {
+        List<OzoneKey> openKeysList = bucket.listOpenKeys();
+        Iterator<OzoneKey> ozoneKeyIterator = openKeysList.iterator();
+        while (ozoneKeyIterator.hasNext()) {
+            OzoneKey openKey = ozoneKeyIterator.next();
+            printObjectAsJson(openKey);
+        }
+        return;
+    }
 
     int counter = 0;
     while (maxKeyLimit > counter && keyIterator.hasNext()) {

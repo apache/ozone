@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -980,6 +981,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .collect(Collectors.toList()));
     return keys;
 
+  }
+
+  @Override
+  public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName) throws  IOException{
+    List<OmKeyInfo> keys = new ArrayList<>();
+   OzoneManagerProtocolProtos.ListOpenKeysRequest.Builder reqBuilder =
+            OzoneManagerProtocolProtos.ListOpenKeysRequest.newBuilder();
+    reqBuilder.setVolumeName(volumeName);
+    reqBuilder.setBucketName(bucketName);
+
+    OzoneManagerProtocolProtos.ListOpenKeysRequest req  = reqBuilder.build();
+    OMRequest omRequest = createOMRequest(Type.ListOpenKeys)
+            .setListOpenKeysRequest(req)
+            .build();
+    OzoneManagerProtocolProtos.ListOpenKeysResponse resp =
+            handleError(submitRequest(omRequest)).getListOpenKeysResponse();
+    keys.addAll(
+            resp.getKeyInfoList().stream()
+                    .map(OmKeyInfo::getFromProtobuf)
+                    .collect(Collectors.toList()));
+
+    return keys;
   }
 
   @Override

@@ -710,6 +710,25 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public List<OzoneKey> listOpenKeys(String volumeName, String bucketName) throws IOException {
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+    List<OmKeyInfo> keys = ozoneManagerClient.listOpenKeys(
+            volumeName, bucketName);
+    return keys.stream().map(key -> new OzoneKey(
+            key.getVolumeName(),
+            key.getBucketName(),
+            key.getKeyName(),
+            key.getDataSize(),
+            key.getCreationTime(),
+            key.getModificationTime(),
+            ReplicationType.valueOf(key.getType().toString()),
+            key.getFactor().getNumber()))
+            .collect(Collectors.toList());
+
+  }
+
+  @Override
   public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
       String startKeyName, String keyPrefix, int maxKeys) throws IOException {
 

@@ -795,6 +795,45 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return result;
   }
 
+  @Override
+  public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName) throws IOException {
+    List<OmKeyInfo> result = new ArrayList<>();
+    TreeMap<String, OmKeyInfo> cacheKeyMap = new TreeMap<>();
+    if (Strings.isNullOrEmpty(volumeName)) {
+      throw new OMException("Volume name is required.",
+              ResultCodes.VOLUME_NOT_FOUND);
+    }
+
+    if (Strings.isNullOrEmpty(bucketName)) {
+      throw new OMException("Bucket name is required.",
+              ResultCodes.BUCKET_NOT_FOUND);
+    }
+
+    String bucketNameBytes = getBucketKey(volumeName, bucketName);
+    if (getBucketTable().get(bucketNameBytes) == null) {
+      throw new OMException("Bucket " + bucketName + " not found.",
+              ResultCodes.BUCKET_NOT_FOUND);
+    }
+    String seekPrefix = getBucketKey(volumeName, bucketName + OM_KEY_PREFIX);
+    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator = openKeyTable.iterator();
+    Table.KeyValue<String, OmKeyInfo> kv;
+    while (iterator.hasNext()) {
+      kv = iterator.next();
+      if (kv.getKey().startsWith(seekPrefix)) {
+        cacheKeyMap.put(kv.getKey(), kv.getValue());
+      } else {
+        // The SeekPrefix does not match any more, we can break out of the
+        // loop.
+        break;
+      }
+    }
+    for (Map.Entry<String, OmKeyInfo>  cacheKey : cacheKeyMap.entrySet()){
+        result.add(cacheKey.getValue());
+    }
+    cacheKeyMap.clear();
+    return result;
+  }
+
   // TODO: HDDS-2419 - Complete stub below for core logic
   @Override
   public List<RepeatedOmKeyInfo> listTrash(String volumeName, String bucketName,
@@ -803,6 +842,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     List<RepeatedOmKeyInfo> deletedKeys = new ArrayList<>();
     return deletedKeys;
   }
+
 
   /**
    * @param userName volume owner, null for listing all volumes.

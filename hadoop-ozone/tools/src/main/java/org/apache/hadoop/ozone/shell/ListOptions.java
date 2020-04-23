@@ -39,6 +39,10 @@ public class ListOptions {
       description = "Prefix to filter the items")
   private String prefix;
 
+  @CommandLine.Option(names = {"--openKey", "-o"},
+          description = "List all open Keys")
+  private boolean openkey=false;
+
   public int getLimit() {
     if (limit < 1) {
       throw new IllegalArgumentException(
@@ -54,5 +58,9 @@ public class ListOptions {
 
   public String getPrefix() {
     return prefix;
+  }
+
+  public boolean isOpenkey() {
+    return openkey;
   }
 }

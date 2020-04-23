@@ -315,6 +315,9 @@ public interface ClientProtocol {
                           String keyPrefix, String prevKey, int maxListResult)
       throws IOException;
 
+  List<OzoneKey> listOpenKeys(String volumeName, String bucketName)
+          throws IOException;
+
   /**
    * List trash allows the user to list the keys that were marked as deleted,
    * but not actually deleted by Ozone Manager. This allows a user to recover

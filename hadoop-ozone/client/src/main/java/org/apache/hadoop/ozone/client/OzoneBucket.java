@@ -32,10 +32,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.WithMetadata;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
@@ -373,6 +370,9 @@ public class OzoneBucket extends WithMetadata {
     return new KeyIterator(keyPrefix, prevKey);
   }
 
+  public List<OzoneKey> listOpenKeys() throws IOException {
+    return proxy.listOpenKeys(volumeName,this.name);
+  }
   /**
    * Deletes key from the bucket.
    * @param key Name of the key to be deleted.

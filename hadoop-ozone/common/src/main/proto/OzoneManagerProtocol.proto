@@ -95,6 +95,7 @@ enum Type {
 
   ListTrash = 91;
   RecoverTrash = 92;
+  ListOpenKeys = 93;
 }
 
 message OMRequest {
@@ -167,6 +168,7 @@ message OMRequest {
 
   optional ListTrashRequest                 listTrashRequest               = 91;
   optional RecoverTrashRequest              RecoverTrashRequest            = 92;
+  optional ListOpenKeysRequest              listOpenKeysRequest            = 93;
 }
 
 message OMResponse {
@@ -239,6 +241,7 @@ message OMResponse {
 
   optional ListTrashResponse                  listTrashResponse            = 91;
   optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+  optional ListOpenKeysResponse               listOpenKeysResponse         = 93;
 }
 
 enum Status {
@@ -914,6 +917,15 @@ message ListKeysRequest {
 }
 
 message ListKeysResponse {
+    repeated KeyInfo keyInfo = 2;
+}
+
+message ListOpenKeysRequest {
+    required string volumeName = 1;
+    required string bucketName = 2;
+}
+
+message ListOpenKeysResponse {
     repeated KeyInfo keyInfo = 2;
 }
 

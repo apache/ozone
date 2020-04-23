@@ -862,6 +862,15 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
+  public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName)
+          throws IOException {
+    Preconditions.checkNotNull(volumeName);
+    Preconditions.checkNotNull(bucketName);
+
+    return metadataManager.listOpenKeys(volumeName,bucketName);
+  }
+
+  @Override
   public List<RepeatedOmKeyInfo> listTrash(String volumeName,
       String bucketName, String startKeyName, String keyPrefix,
       int maxKeys) throws IOException {

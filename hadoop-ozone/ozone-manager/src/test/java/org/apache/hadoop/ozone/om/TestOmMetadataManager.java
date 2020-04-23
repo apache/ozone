@@ -287,6 +287,23 @@ public class TestOmMetadataManager {
   }
 
   @Test
+  public void testListOpenKeys() throws Exception {
+    String volumeName = "vol";
+    String bucketName = "buck";
+    TestOMRequestUtils.addVolumeToDB(volumeName,omMetadataManager);
+    addBucketsToCache(volumeName,bucketName);
+    for (int i=0;i< 10; i++) {
+      TestOMRequestUtils.addKeyToTable(true, volumeName
+              , bucketName,"key"+ i ,
+              1000L, HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+    }
+    List<OmKeyInfo> omKeyInfoList =
+            omMetadataManager.listOpenKeys(volumeName,bucketName);
+    Assert.assertEquals(10,omKeyInfoList.size());
+
+  }
+  @Test
   public void testListKeys() throws Exception {
 
     String volumeNameA = "volumeA";
