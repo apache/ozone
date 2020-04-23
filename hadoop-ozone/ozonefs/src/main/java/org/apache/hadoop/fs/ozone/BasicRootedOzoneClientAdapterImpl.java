@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -123,7 +124,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   public BasicRootedOzoneClientAdapterImpl(String omHost, int omPort,
-      Configuration hadoopConf) throws IOException {
+      ConfigurationSource hadoopConf) throws IOException {
 
     ClassLoader contextClassLoader =
         Thread.currentThread().getContextClassLoader();
@@ -706,7 +707,8 @@ public class BasicRootedOzoneClientAdapterImpl
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
       OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+          OzoneClientFactory.getOzoneClient(OzoneConfiguration.of(conf),
+              ozoneDt);
       return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
     }
 
@@ -716,7 +718,8 @@ public class BasicRootedOzoneClientAdapterImpl
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
       OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+          OzoneClientFactory.getOzoneClient(OzoneConfiguration.of(conf),
+              ozoneDt);
       ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
     }
   }
