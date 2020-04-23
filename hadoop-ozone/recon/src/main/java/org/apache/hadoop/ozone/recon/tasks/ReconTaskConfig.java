@@ -52,8 +52,8 @@ public class ReconTaskConfig {
       type = ConfigType.TIME, timeUnit = TimeUnit.SECONDS,
       defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
-      description = "The time interval of the period check for  " +
-          " containers with zero replicas in the cluster as reported by " +
+      description = "The time interval of the periodic check for " +
+          "containers with zero replicas in the cluster as reported by " +
           "Datanodes."
   )
   private long missingContainerTaskInterval;
