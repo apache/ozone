@@ -877,7 +877,7 @@ public class KeyManagerImpl implements KeyManager {
 
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
-    Preconditions.checkArgument(maxKeys <= listTrashKeysMax,
+    Preconditions.checkArgument(maxKeys <= listTrashKeysMax, 
         "The max keys limit specified is not less than the cluster " +
           "allowed maximum limit.");
 
