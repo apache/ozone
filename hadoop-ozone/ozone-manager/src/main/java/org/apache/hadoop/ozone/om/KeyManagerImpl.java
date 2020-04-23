@@ -867,7 +867,7 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
 
-    return metadataManager.listOpenKeys(volumeName,bucketName);
+    return metadataManager.listOpenKeys(volumeName, bucketName);
   }
 
   @Override
