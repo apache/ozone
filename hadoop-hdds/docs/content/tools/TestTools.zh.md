@@ -1,6 +1,6 @@
 ---
-title: "Testing tools"
-summary: Ozone contains multiple test tools for load generation, partitioning test or acceptance tests.
+title: "测试工具"
+summary: Ozone 提供了负载生成、网络分片测试、验收测试等多种测试工具。
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -19,33 +19,33 @@ summary: Ozone contains multiple test tools for load generation, partitioning te
   limitations under the License.
 -->
 
-Testing is one of the most important part during the development of a distributed system. We have the following type of test.
+测试是开发分布式系统中最重要的部分，我们提供了以下类型的测试。
 
-This page includes our existing test tool which are part of the Ozone source base.
+本页面给出了 Ozone 自带的测试工具。
 
-Note: we have more tests (like TCP-DS, TCP-H tests via Spark or Hive) which are not included here because they use external tools only.
+注意：我们还进行了其它测试（比如通过 Spark 或 Hive 进行的 TCP-DS、TCP-H），但因为它们是外部工具，所以没有在此列出。
 
-## Unit test
+## 单元测试
 
-As every almost every java project we have the good old unit tests inside each of our projects.
+和每个 java 项目一样，我们的每个项目都包含传统的单元测试。
 
-## Integration test (JUnit)
+## 集成测试（JUnit）
 
-Traditional unit tests are supposed to test only one unit, but we also have higher level unit tests. They use `MiniOzoneCluster` which is a helper method to start real daemons (scm,om,datanodes) during the unit test.
+传统的单元测试只能测试一个单元，但我们也有更高层次的单元测试。它们使用 `MiniOzoneCluster` 辅助方法在单元测试中启动守护进程（SCM、OM、数据节点）。
 
-From maven/java point of view they are just simple unit tests (JUnit library is used) but to separate them (and solve some dependency problems) we moved all of these tests to `hadoop-ozone/integration-test`
+从 maven 或 java 的角度来看，集成测试也只是普通的单元测试而已（使用了 JUnit 库），但为了解决一些依赖问题，我们将它们单独放在了 `hadoop-ozone/integration-test` 目录下。
 
-## Smoketest
+## 冒烟测试
 
-We use docker-compose based pseudo-cluster to run different configuration of Ozone. To be sure that the different configuration can be started we implemented _acceptance_ tests with the help of https://robotframework.org/.
+我们使用基于 docker-compose 的伪集群来运行不同配置的 Ozone，为了确保这些配置可用，我们在 https://robotframework.org/ 的帮助下实现了 _验收_ 测试。
 
-The smoketests are available from the distribution (`./smoketest`) but the robot files defines only the tests: usually they start CLI and check the output.
+冒烟测试包含在发行包中（`./smoketest`），但 robot 文件只定义了运行命令行然后检查输出的测试。
 
-To run the tests in different environment (docker-compose, kubernetes) you need a definition to start the containers and execute the right tests in the right containers.
+为了在不同环境（docker-compose、kubernetes）下运行冒烟测试，你需要定义如何启动容器，然后在正确的容器中执行正确的测试。
 
-These definition of the tests are included in the `compose` directory (check `./compose/*/test.sh` or `./compose/test-all.sh`).
+这部分的测试包含在 `compose` 目录中（查看 `./compose/*/test.sh` 或者 `./compose/test-all.sh`）。
 
-For example a simple way to test the distribution package:
+例如，一种测试分发包的简单方法是：
 
 ```
 cd compose/ozone
@@ -54,9 +54,9 @@ cd compose/ozone
 
 ## Blockade
 
-[Blockade](https://github.com/worstcase/blockade) is a tool to test network failures and partitions (it's inspired by the legendary [Jepsen tests](https://jepsen.io/analyses)).
+[Blockade](https://github.com/worstcase/blockade) 是一个测试网络故障和分片的工具（灵感来自于大名鼎鼎的[Jepsen 测试](https://jepsen.io/analyses)）。
 
-Blockade tests are implemented with the help of tests and can be started from the `./blockade` directory of the distribution.
+Blockade 测试在其它测试的基础上实现，可以在分发包中的 `./blockade` 目录下进行测试。
 
 ```
 cd blocakde
@@ -64,17 +64,18 @@ pip install pytest==2.8.7,blockade
 python -m pytest -s .
 ```
 
-See the README in the blockade directory for more details.
+更多细节查看 blockade 目录下的 README。
 
 ## MiniChaosOzoneCluster
 
-This is a way to get [chaos](https://en.wikipedia.org/wiki/Chaos_engineering) in your machine. It can be started from the source code and a MiniOzoneCluster (which starts real daemons) will be started and killed randomly.
+这是一种在你的机器上获得[混沌](https://en.wikipedia.org/wiki/Chaos_engineering)的方法。它可以直接从源码启动一个 MiniOzoneCluster
+（会启动真实的守护进程），并随机杀死它。
 
 ## Freon
 
-Freon is a command line application which is included in the Ozone distribution. It's a load generator which is used in our stress tests.
+Freon 是 Ozone 发行包中包含的命令行应用，它是一个负载生成器，用于压力测试。
 
-For example:
+例如：
 
 ```
 ozone freon randomkeys --numOfVolumes=10 --numOfBuckets 10 --numOfKeys 10  --replicationType=RATIS --factor=THREE
@@ -98,13 +99,13 @@ Total Execution time: 00:00:16,898
 ***********************
 ```
 
-For more information check the [documentation page](https://hadoop.apache.org/ozone/docs/0.4.0-alpha/freon.html)
+更多细节请查看 [freon 文档页面](https://hadoop.apache.org/ozone/docs/0.4.0-alpha/freon.html)
 
 ## Genesis
 
-Genesis is a microbenchmarking tool. It's also included in the distribution (`ozone genesis`) but it doesn't require real cluster. It measures different part of the code in an isolated way (eg. the code which saves the data to the local RocksDB based key value stores)
+Genesis 是一个微型的基准测试工具，它也包含在发行包中（`ozone genesis`），但是它不需要一个真实的集群，而是采用一种隔离的方法测试不同部分的代码（比如，将数据存储到本地基于 RocksDB 的键值存储中）。
 
-Example run:
+运行示例：
 
 ```
  ozone genesis -benchmark=BenchMarkRocksDbStore
