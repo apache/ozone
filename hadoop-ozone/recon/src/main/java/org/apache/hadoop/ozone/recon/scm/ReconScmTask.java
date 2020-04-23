@@ -32,7 +32,6 @@ public abstract class ReconScmTask {
   private Thread taskThread;
   private ReconTaskStatusDao reconTaskStatusDao;
   private volatile boolean running;
-  private volatile boolean registered;
 
   protected ReconScmTask(ReconTaskStatusDao reconTaskStatusDao) {
     this.reconTaskStatusDao = reconTaskStatusDao;
@@ -45,7 +44,6 @@ public abstract class ReconScmTask {
           taskName, 0L, 0L);
       reconTaskStatusDao.insert(reconTaskStatusRecord);
       LOG.info("Registered {} task ", taskName);
-      registered = true;
     }
   }
 
@@ -53,9 +51,7 @@ public abstract class ReconScmTask {
    * Start underlying start thread.
    */
   public synchronized void start() {
-    if (!registered) {
-      register();
-    }
+    register();
     if (!isRunning()) {
       LOG.info("Starting {} Thread.", getTaskName());
       running = true;

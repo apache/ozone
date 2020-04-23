@@ -35,7 +35,8 @@ public class ReconTaskConfig {
       type = ConfigType.TIME, timeUnit = TimeUnit.SECONDS,
       defaultValue = "600",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
-      description = "Interval of the PipelineSyncTask in seconds."
+      description = "The time interval of periodic sync of pipeline state " +
+          "from SCM to Recon."
   )
   private long pipelineSyncTaskInterval;
 
@@ -51,7 +52,9 @@ public class ReconTaskConfig {
       type = ConfigType.TIME, timeUnit = TimeUnit.SECONDS,
       defaultValue = "300",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
-      description = "Interval of the Missing Container Task in seconds."
+      description = "The time interval of the period check for  " +
+          " containers with zero replicas in the cluster as reported by " +
+          "Datanodes."
   )
   private long missingContainerTaskInterval;
 

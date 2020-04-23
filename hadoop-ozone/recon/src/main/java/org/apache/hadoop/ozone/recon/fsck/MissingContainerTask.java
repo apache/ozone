@@ -47,7 +47,7 @@ public class MissingContainerTask extends ReconScmTask {
 
   private ContainerManager containerManager;
   private ContainerSchemaManager containerSchemaManager;
-  private long interval;
+  private final long interval;
 
   public MissingContainerTask(
       ContainerManager containerManager,

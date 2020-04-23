@@ -91,7 +91,7 @@ public class TestReconAsPassiveScm {
     PipelineManager scmPipelineManager = scm.getPipelineManager();
 
     LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() == 4));
+        () -> (reconPipelineManager.getPipelines().size() >= 4));
 
     // Verify if Recon has all the pipelines from SCM.
     scmPipelineManager.getPipelines().forEach(p -> {

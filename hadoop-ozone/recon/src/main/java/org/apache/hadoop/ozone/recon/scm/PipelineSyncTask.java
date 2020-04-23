@@ -40,7 +40,7 @@ public class PipelineSyncTask extends ReconScmTask {
 
   private StorageContainerServiceProvider scmClient;
   private ReconPipelineManager reconPipelineManager;
-  private long interval;
+  private final long interval;
 
   public PipelineSyncTask(ReconPipelineManager pipelineManager,
       StorageContainerServiceProvider scmClient,

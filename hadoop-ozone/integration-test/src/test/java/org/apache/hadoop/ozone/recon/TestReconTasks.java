@@ -86,7 +86,7 @@ public class TestReconTasks {
 
     // Make sure Recon's pipeline state is initialized.
     LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() == 1));
+        () -> (reconPipelineManager.getPipelines().size() >= 1));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     ReconContainerManager reconContainerManager =
