@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.loadgenerators.FilesystemLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.AgedLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.ReadOnlyLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.DataBuffer;
 import org.apache.hadoop.ozone.loadgenerators.LoadExecutors;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
@@ -47,14 +48,16 @@ public class MiniOzoneLoadGenerator {
 
   private final OzoneVolume volume;
   private final OzoneConfiguration conf;
+  private final String omServiceID;
 
   MiniOzoneLoadGenerator(OzoneVolume volume, int numClients, int numThreads,
-                         int numBuffers, OzoneConfiguration conf)
+      int numBuffers, OzoneConfiguration conf, String omServiceId)
       throws Exception {
     DataBuffer buffer = new DataBuffer(numBuffers);
     loadExecutors = new ArrayList<>();
     this.volume = volume;
     this.conf = conf;
+    this.omServiceID = omServiceId;
 
     // Random Load
     String mixBucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -62,7 +65,7 @@ public class MiniOzoneLoadGenerator {
     List<LoadBucket> ozoneBuckets = new ArrayList<>(numClients);
     for (int i = 0; i < numClients; i++) {
       ozoneBuckets.add(new LoadBucket(volume.getBucket(mixBucketName),
-          conf));
+          conf, omServiceId));
     }
     RandomLoadGenerator loadGenerator =
         new RandomLoadGenerator(buffer, ozoneBuckets);
@@ -75,6 +78,10 @@ public class MiniOzoneLoadGenerator {
     //Filesystem Load
     addLoads(numThreads,
         bucket -> new FilesystemLoadGenerator(buffer, bucket));
+
+    //Repl Load
+    addLoads(numThreads,
+        bucket -> new ReadOnlyLoadGenerator(buffer, bucket, 20));
   }
 
   private void addLoads(int numThreads,
@@ -82,7 +89,8 @@ public class MiniOzoneLoadGenerator {
       throws Exception {
     String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     volume.createBucket(bucketName);
-    LoadBucket bucket = new LoadBucket(volume.getBucket(bucketName), conf);
+    LoadBucket bucket = new LoadBucket(volume.getBucket(bucketName), conf,
+        omServiceID);
     LoadGenerator loadGenerator = function.apply(bucket);
     loadExecutors.add(new LoadExecutors(numThreads, loadGenerator));
   }

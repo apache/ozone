@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -71,7 +71,7 @@ public class TestReplicationManager {
 
   @Before
   public void setup() throws IOException, InterruptedException {
-    final Configuration conf = new OzoneConfiguration();
+    final ConfigurationSource conf = new OzoneConfiguration();
     final ContainerManager containerManager =
         Mockito.mock(ContainerManager.class);
     eventQueue = new EventQueue();
@@ -589,6 +589,36 @@ public class TestReplicationManager {
     // Wait for EventQueue to call the event handler
     Thread.sleep(100L);
     Assert.assertEquals(0, datanodeCommandHandler.getInvocation());
+  }
+
+  /**
+   * ReplicationManager should close the unhealthy OPEN container.
+   */
+  @Test
+  public void testUnhealthyOpenContainer()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = getContainer(LifeCycleState.OPEN);
+    final ContainerID id = container.containerID();
+    final Set<ContainerReplica> replicas = getReplicas(id, State.OPEN,
+        randomDatanodeDetails(),
+        randomDatanodeDetails());
+    replicas.addAll(getReplicas(id, State.UNHEALTHY, randomDatanodeDetails()));
+
+    containerStateManager.loadContainer(container);
+    for (ContainerReplica replica : replicas) {
+      containerStateManager.updateContainerReplica(id, replica);
+    }
+
+    final CloseContainerEventHandler closeContainerHandler =
+        Mockito.mock(CloseContainerEventHandler.class);
+    eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
+
+    replicationManager.processContainersNow();
+
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    Mockito.verify(closeContainerHandler, Mockito.times(1))
+        .onMessage(id, eventQueue);
   }
 
   @Test

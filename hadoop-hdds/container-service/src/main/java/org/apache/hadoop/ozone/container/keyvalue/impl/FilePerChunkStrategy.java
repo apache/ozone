@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
@@ -91,13 +92,12 @@ public class FilePerChunkStrategy implements ChunkManager {
     Preconditions.checkNotNull(dispatcherContext);
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
     try {
-
-      KeyValueContainerData containerData = (KeyValueContainerData) container
-          .getContainerData();
+      KeyValueContainer kvContainer = (KeyValueContainer) container;
+      KeyValueContainerData containerData = kvContainer.getContainerData();
       HddsVolume volume = containerData.getVolume();
       VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
-      File chunkFile = ChunkUtils.getChunkFile(containerData, info);
+      File chunkFile = getChunkFile(kvContainer, blockID, info);
 
       boolean isOverwrite = ChunkUtils.validateChunkForOverwrite(
           chunkFile, info);
@@ -198,15 +198,15 @@ public class FilePerChunkStrategy implements ChunkManager {
 
     checkLayoutVersion(container);
 
-    KeyValueContainerData containerData = (KeyValueContainerData) container
-        .getContainerData();
+    KeyValueContainer kvContainer = (KeyValueContainer) container;
+    KeyValueContainerData containerData = kvContainer.getContainerData();
 
     HddsVolume volume = containerData.getVolume();
     VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
     // In version1, we verify checksum if it is available and return data
     // of the chunk file.
-    File finalChunkFile = ChunkUtils.getChunkFile(containerData, info);
+    File finalChunkFile = getChunkFile(kvContainer, blockID, info);
 
     List<File> possibleFiles = new ArrayList<>();
     possibleFiles.add(finalChunkFile);
@@ -252,11 +252,10 @@ public class FilePerChunkStrategy implements ChunkManager {
     checkLayoutVersion(container);
 
     Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
-    KeyValueContainerData containerData = (KeyValueContainerData) container
-        .getContainerData();
+    KeyValueContainer kvContainer = (KeyValueContainer) container;
 
     // In version1, we have only chunk file.
-    File chunkFile = ChunkUtils.getChunkFile(containerData, info);
+    File chunkFile = getChunkFile(kvContainer, blockID, info);
 
     // if the chunk file does not exist, it might have already been deleted.
     // The call might be because of reapply of transactions on datanode
@@ -288,6 +287,12 @@ public class FilePerChunkStrategy implements ChunkManager {
             e, ContainerProtos.Result.INVALID_ARGUMENT);
       }
     }
+  }
+
+  private static File getChunkFile(KeyValueContainer container, BlockID blockID,
+      ChunkInfo info) throws StorageContainerException {
+    return FILE_PER_CHUNK.getChunkFile(container.getContainerData(), blockID,
+        info);
   }
 
   /**

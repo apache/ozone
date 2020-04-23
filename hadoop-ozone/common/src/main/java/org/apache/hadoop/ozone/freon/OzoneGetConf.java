@@ -25,13 +25,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+
 import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.StringUtils;
@@ -98,8 +98,6 @@ public class OzoneGetConf extends Configured implements Tool {
 
   static final String USAGE;
   static {
-    HdfsConfiguration.init();
-
     /* Initialize USAGE based on Command values */
     StringBuilder usage = new StringBuilder(DESCRIPTION);
     usage.append("\nozone getconf \n");
@@ -178,11 +176,12 @@ public class OzoneGetConf extends Configured implements Tool {
   private final PrintStream out; // Stream for printing command output
   private final PrintStream err; // Stream for printing error
 
-  protected OzoneGetConf(Configuration conf) {
+  protected OzoneGetConf(OzoneConfiguration conf) {
     this(conf, System.out, System.err);
   }
 
-  protected OzoneGetConf(Configuration conf, PrintStream out, PrintStream err) {
+  protected OzoneGetConf(OzoneConfiguration conf, PrintStream out,
+      PrintStream err) {
     super(conf);
     this.out = out;
     this.err = err;
@@ -237,7 +236,7 @@ public class OzoneGetConf extends Configured implements Tool {
     public int doWorkInternal(OzoneGetConf tool, String[] args)
         throws IOException {
       Collection<InetSocketAddress> addresses = HddsUtils
-          .getSCMAddresses(tool.getConf());
+          .getSCMAddresses(OzoneConfiguration.of(tool.getConf()));
 
       for (InetSocketAddress addr : addresses) {
         tool.printOut(addr.getHostName());
@@ -253,7 +252,15 @@ public class OzoneGetConf extends Configured implements Tool {
     @Override
     public int doWorkInternal(OzoneGetConf tool, String[] args)
         throws IOException {
-      tool.printOut(OmUtils.getOmAddress(tool.getConf()).getHostName());
+      ConfigurationSource configSource =
+          OzoneConfiguration.of(tool.getConf());
+      if (OmUtils.isServiceIdsDefined(
+          configSource)) {
+        tool.printOut(OmUtils.getOmHAAddressesById(configSource).toString());
+      } else {
+        tool.printOut(OmUtils.getOmAddress(configSource).getHostName());
+      }
+
       return 0;
     }
   }
@@ -263,7 +270,7 @@ public class OzoneGetConf extends Configured implements Tool {
       System.exit(0);
     }
 
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.addResource(new OzoneConfiguration());
     int res = ToolRunner.run(new OzoneGetConf(conf), args);
     System.exit(res);

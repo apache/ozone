@@ -24,9 +24,12 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.io.IOException;
@@ -41,6 +44,7 @@ import static org.junit.Assert.fail;
 /**
  * This class tests create/read .container files.
  */
+@RunWith(Parameterized.class)
 public class TestContainerDataYaml {
 
   private static long testContainerID = 1234;
@@ -53,6 +57,17 @@ public class TestContainerDataYaml {
   private static final String VOLUME_OWNER = "hdfs";
   private static final String CONTAINER_DB_TYPE = "RocksDB";
 
+  private final ChunkLayOutVersion layout;
+
+  public TestContainerDataYaml(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
+
   /**
    * Creates a .container file. cleanup() should be called at the end of the
    * test when container file is created.
@@ -63,7 +78,7 @@ public class TestContainerDataYaml {
     String containerPath = containerID + ".container";
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
-        containerID, FILE_PER_CHUNK, MAXSIZE,
+        containerID, layout, MAXSIZE,
         UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     keyValueContainerData.setContainerDBType(CONTAINER_DB_TYPE);
@@ -104,7 +119,7 @@ public class TestContainerDataYaml {
     assertEquals(containerFile.getParent(), kvData.getChunksPath());
     assertEquals(ContainerProtos.ContainerDataProto.State.OPEN, kvData
         .getState());
-    assertEquals(FILE_PER_CHUNK, kvData.getLayOutVersion());
+    assertEquals(layout, kvData.getLayOutVersion());
     assertEquals(0, kvData.getMetadata().size());
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertEquals(MAXSIZE, kvData.getMaxSize());
@@ -135,7 +150,7 @@ public class TestContainerDataYaml {
     assertEquals(containerFile.getParent(), kvData.getChunksPath());
     assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, kvData
         .getState());
-    assertEquals(FILE_PER_CHUNK, kvData.getLayOutVersion());
+    assertEquals(layout, kvData.getLayOutVersion());
     assertEquals(2, kvData.getMetadata().size());
     assertEquals(VOLUME_OWNER, kvData.getMetadata().get(OzoneConsts.VOLUME));
     assertEquals(OzoneConsts.OZONE,

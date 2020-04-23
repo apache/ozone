@@ -16,17 +16,13 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
-    <artifactId>hadoop-ozone</artifactId>
     <groupId>org.apache.hadoop</groupId>
-    <version>0.5.0-SNAPSHOT</version>
+    <artifactId>hadoop-ozone</artifactId>
+    <version>0.6.0-SNAPSHOT</version>
   </parent>
   <name>Apache Hadoop Ozone Recon</name>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>hadoop-ozone-recon</artifactId>
-  <properties>
-    <jooq.version>3.11.10</jooq.version>
-    <spring.version>5.1.3.RELEASE</spring.version>
-  </properties>
   <build>
     <resources>
       <resource>
@@ -194,6 +190,28 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-ozone-ozone-manager</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>com.sun.jersey</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- visible only for ContainerOperationClient -->
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-tools</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -277,9 +295,8 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
+      <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
-      <type>test-jar</type>
       <exclusions>
         <exclusion>
           <artifactId>jersey-server</artifactId>

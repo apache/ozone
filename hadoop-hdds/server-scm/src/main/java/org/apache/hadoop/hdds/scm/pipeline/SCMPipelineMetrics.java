@@ -46,6 +46,7 @@ public final class SCMPipelineMetrics implements MetricsSource {
       SCMPipelineMetrics.class.getSimpleName();
 
   private MetricsRegistry registry;
+  private static SCMPipelineMetrics instance;
 
   private @Metric MutableCounterLong numPipelineAllocated;
   private @Metric MutableCounterLong numPipelineCreated;
@@ -70,16 +71,21 @@ public final class SCMPipelineMetrics implements MetricsSource {
    *
    * @return SCMPipelineMetrics
    */
-  public static SCMPipelineMetrics create() {
+  public static synchronized SCMPipelineMetrics create() {
+    if (instance != null) {
+      return instance;
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "SCM PipelineManager Metrics",
+    instance = ms.register(SOURCE_NAME, "SCM PipelineManager Metrics",
         new SCMPipelineMetrics());
+    return instance;
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public void unRegister() {
+  public static void unRegister() {
+    instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }

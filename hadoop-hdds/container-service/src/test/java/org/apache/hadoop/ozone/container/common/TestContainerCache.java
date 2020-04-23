@@ -93,8 +93,6 @@ public class TestContainerCache {
     db3.close();
     Assert.assertEquals(0, db3.getReferenceCount());
 
-    Assert.assertTrue(cache.isFull());
-
     // add one more reference to ContainerCache and verify that it will not
     // evict the least recent entry as it has reference.
     ReferenceCountedDB db4 = cache.getDB(3, "RocksDB",

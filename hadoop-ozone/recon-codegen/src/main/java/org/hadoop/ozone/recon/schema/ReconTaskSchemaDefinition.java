@@ -23,6 +23,7 @@ import java.sql.SQLException;
 
 import javax.sql.DataSource;
 
+import com.google.inject.Singleton;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 
@@ -32,6 +33,7 @@ import com.google.inject.Inject;
  * Class used to create tables that are required for Recon's task
  * management.
  */
+@Singleton
 public class ReconTaskSchemaDefinition implements ReconSchemaDefinition {
 
   public static final String RECON_TASK_STATUS_TABLE_NAME =

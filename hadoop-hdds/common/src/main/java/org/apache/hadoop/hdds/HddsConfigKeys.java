@@ -251,4 +251,10 @@ public final class HddsConfigKeys {
   public static final String
       HDDS_DATANODE_HTTP_KERBEROS_KEYTAB_FILE_KEY =
       "hdds.datanode.http.kerberos.keytab";
+
+  public static final String HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT =
+      "hdds.datanode.ratis.server.request.timeout";
+  public static final String
+      HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT = "2m";
+
 }

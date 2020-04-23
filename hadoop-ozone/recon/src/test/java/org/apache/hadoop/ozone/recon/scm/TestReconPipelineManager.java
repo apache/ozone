@@ -18,15 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest.getRandomPipeline;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,11 +36,23 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineFactory.ReconPipelineProvider;
+
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import org.junit.After;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import static org.mockito.Mockito.mock;
 
 /**
  * Class to test Recon Pipeline Manager.
@@ -61,6 +64,7 @@ public class TestReconPipelineManager {
 
   private OzoneConfiguration conf;
   private SCMStorageConfig scmStorageConfig;
+  private DBStore store;
 
   @Before
   public void setup() throws IOException {
@@ -69,6 +73,12 @@ public class TestReconPipelineManager {
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
     scmStorageConfig = new ReconStorageConfig(conf);
+    store = DBStoreBuilder.createDBStore(conf, new ReconDBDefinition());
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    store.close();
   }
 
   @Test
@@ -103,7 +113,8 @@ public class TestReconPipelineManager {
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
 
     try (ReconPipelineManager reconPipelineManager =
-        new ReconPipelineManager(conf, nodeManager, eventQueue)) {
+        new ReconPipelineManager(conf, nodeManager,
+            ReconDBDefinition.PIPELINES.getTable(store), eventQueue)) {
       reconPipelineManager.addPipeline(validPipeline);
       reconPipelineManager.addPipeline(invalidPipeline);
 
@@ -138,7 +149,8 @@ public class TestReconPipelineManager {
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
 
     ReconPipelineManager reconPipelineManager =
-        new ReconPipelineManager(conf, nodeManager, eventQueue);
+        new ReconPipelineManager(conf, nodeManager,
+            ReconDBDefinition.PIPELINES.getTable(store), eventQueue);
     assertFalse(reconPipelineManager.containsPipeline(pipeline.getId()));
     reconPipelineManager.addPipeline(pipeline);
     assertTrue(reconPipelineManager.containsPipeline(pipeline.getId()));
@@ -150,7 +162,8 @@ public class TestReconPipelineManager {
     NodeManager nodeManagerMock = mock(NodeManager.class);
 
     ReconPipelineManager reconPipelineManager = new ReconPipelineManager(
-        conf, nodeManagerMock, new EventQueue());
+        conf, nodeManagerMock, ReconDBDefinition.PIPELINES.getTable(store),
+        new EventQueue());
     PipelineFactory pipelineFactory = reconPipelineManager.getPipelineFactory();
     assertTrue(pipelineFactory instanceof ReconPipelineFactory);
     ReconPipelineFactory reconPipelineFactory =

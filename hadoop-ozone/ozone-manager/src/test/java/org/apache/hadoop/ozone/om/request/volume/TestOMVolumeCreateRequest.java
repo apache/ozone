@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.om.request.volume;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -49,6 +51,9 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     String adminName = UUID.randomUUID().toString();
     String ownerName = UUID.randomUUID().toString();
     doPreExecute(volumeName, adminName, ownerName);
+    // Verify exception thrown on invalid volume name
+    LambdaTestUtils.intercept(OMException.class, "Invalid volume name: v1",
+        () -> doPreExecute("v1", adminName, ownerName));
   }
 
   @Test

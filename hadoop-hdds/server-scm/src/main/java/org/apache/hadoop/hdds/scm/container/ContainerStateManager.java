@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
-    .FAILED_TO_CHANGE_CONTAINER_STATE;
-
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
@@ -29,8 +26,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -43,15 +40,15 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.ozone.common.statemachine
-    .InvalidStateTransitionException;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicLongMap;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_CHANGE_CONTAINER_STATE;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A container state manager keeps track of container states and returns
@@ -118,6 +115,7 @@ public class ContainerStateManager {
       HddsProtos.LifeCycleEvent> stateMachine;
 
   private final long containerSize;
+  private final boolean autoCreateRatisOne;
   private final ConcurrentHashMap<ContainerState, ContainerID> lastUsedMap;
   private final ContainerStateMap containers;
   private final AtomicLong containerCount;
@@ -131,7 +129,7 @@ public class ContainerStateManager {
    * TODO : Add Container Tags so we know which containers are owned by SCM.
    */
   @SuppressWarnings("unchecked")
-  public ContainerStateManager(final Configuration configuration) {
+  public ContainerStateManager(final ConfigurationSource configuration) {
 
     // Initialize the container state machine.
     final Set<HddsProtos.LifeCycleState> finalStates = new HashSet();
@@ -149,6 +147,9 @@ public class ContainerStateManager {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
+    this.autoCreateRatisOne = configuration.getBoolean(
+            ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
     this.lastUsedMap = new ConcurrentHashMap<>();
     this.containerCount = new AtomicLong(0);
@@ -247,23 +248,33 @@ public class ContainerStateManager {
       final HddsProtos.ReplicationType type,
       final HddsProtos.ReplicationFactor replicationFactor, final String owner)
       throws IOException {
-
+    final List<Pipeline> pipelines = pipelineManager
+        .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
     Pipeline pipeline;
-    try {
-      // TODO: #CLUTIL remove creation logic when all replication types and
-      // factors are handled by pipeline creator job.
-      pipeline = pipelineManager.createPipeline(type, replicationFactor);
-      pipelineManager.waitPipelineReady(pipeline.getId(), 0);
-    } catch (IOException e) {
-      final List<Pipeline> pipelines = pipelineManager
-          .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
-      if (pipelines.isEmpty()) {
-        throw new IOException("Could not allocate container. Cannot get any" +
-            " matching pipeline for Type:" + type +
-            ", Factor:" + replicationFactor + ", State:PipelineState.OPEN");
-      }
+
+    boolean bgCreateOne = (type == ReplicationType.RATIS) && replicationFactor
+        == ReplicationFactor.ONE && autoCreateRatisOne;
+    boolean bgCreateThree = (type == ReplicationType.RATIS) && replicationFactor
+        == ReplicationFactor.THREE;
+
+    if (!pipelines.isEmpty() && (bgCreateOne || bgCreateThree)) {
+      // let background create Ratis pipelines.
       pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
+    } else {
+      try {
+        pipeline = pipelineManager.createPipeline(type, replicationFactor);
+        pipelineManager.waitPipelineReady(pipeline.getId(), 0);
+      } catch (IOException e) {
+
+        if (pipelines.isEmpty()) {
+          throw new IOException("Could not allocate container. Cannot get any" +
+              " matching pipeline for Type:" + type +
+              ", Factor:" + replicationFactor + ", State:PipelineState.OPEN");
+        }
+        pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
+      }
     }
+
     synchronized (pipeline) {
       return allocateContainer(pipelineManager, owner, pipeline);
     }
@@ -294,7 +305,7 @@ public class ContainerStateManager {
         .setPipelineID(pipeline.getId())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
-        .setStateEnterTime(Time.monotonicNow())
+        .setStateEnterTime(Time.now())
         .setOwner(owner)
         .setContainerID(containerID)
         .setDeleteTransactionId(0)

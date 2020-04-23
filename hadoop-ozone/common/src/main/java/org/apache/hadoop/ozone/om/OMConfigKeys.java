@@ -37,7 +37,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_HANDLER_COUNT_KEY =
       "ozone.om.handler.count.key";
-  public static final int OZONE_OM_HANDLER_COUNT_DEFAULT = 20;
+  public static final int OZONE_OM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_OM_INTERNAL_SERVICE_ID =
       "ozone.om.internal.service.id";
@@ -76,6 +76,9 @@ public final class OMConfigKeys {
       "ozone.om.db.cache.size.mb";
   public static final int OZONE_OM_DB_CACHE_SIZE_DEFAULT = 128;
 
+  public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
+      "ozone.om.volume.listall.allowed";
+  public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
   public static final String OZONE_OM_USER_MAX_VOLUME =
       "ozone.om.user.max.volume";
   public static final int OZONE_OM_USER_MAX_VOLUME_DEFAULT = 1024;

@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+import java.net.InetSocketAddress;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -26,6 +29,12 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.test.PathUtils;
 
 import org.apache.commons.io.FileUtils;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import org.junit.Rule;
 import org.junit.Test;
@@ -33,17 +42,6 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.net.InetSocketAddress;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.junit.Assert.assertEquals;
 
 /**
  * Unit tests for {@link HddsServerUtil}.
@@ -65,7 +63,7 @@ public class TestHddsServerUtils {
   @SuppressWarnings("StringSplitter")
   public void testGetDatanodeAddressWithPort() {
     final String scmHost = "host123:100";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_DATANODE_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
         HddsServerUtil.getScmAddressForDataNodes(conf);
@@ -79,7 +77,7 @@ public class TestHddsServerUtils {
   @Test
   public void testGetDatanodeAddressWithoutPort() {
     final String scmHost = "host123";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_DATANODE_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
         HddsServerUtil.getScmAddressForDataNodes(conf);
@@ -94,7 +92,7 @@ public class TestHddsServerUtils {
   @Test
   public void testDatanodeAddressFallbackToClientNoPort() {
     final String scmHost = "host123";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
         HddsServerUtil.getScmAddressForDataNodes(conf);
@@ -111,7 +109,7 @@ public class TestHddsServerUtils {
   @SuppressWarnings("StringSplitter")
   public void testDatanodeAddressFallbackToClientWithPort() {
     final String scmHost = "host123:100";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scmHost);
     final InetSocketAddress address =
         HddsServerUtil.getScmAddressForDataNodes(conf);
@@ -126,7 +124,7 @@ public class TestHddsServerUtils {
   @Test
   public void testDatanodeAddressFallbackToScmNamesNoPort() {
     final String scmHost = "host123";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     final InetSocketAddress address =
         HddsServerUtil.getScmAddressForDataNodes(conf);
@@ -143,7 +141,7 @@ public class TestHddsServerUtils {
   @SuppressWarnings("StringSplitter")
   public void testDatanodeAddressFallbackToScmNamesWithPort() {
     final String scmHost = "host123:100";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     final InetSocketAddress address =
         HddsServerUtil.getScmAddressForDataNodes(conf);
@@ -158,7 +156,7 @@ public class TestHddsServerUtils {
   @Test
   public void testClientFailsWithMultipleScmNames() {
     final String scmHost = "host123,host456";
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_NAMES, scmHost);
     thrown.expect(IllegalArgumentException.class);
     HddsServerUtil.getScmAddressForDataNodes(conf);
@@ -172,7 +170,7 @@ public class TestHddsServerUtils {
     final File testDir = PathUtils.getTestDir(TestHddsServerUtils.class);
     final File dbDir = new File(testDir, "scmDbDir");
     final File metaDir = new File(testDir, "metaDir");   // should be ignored.
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dbDir.getPath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
 
@@ -192,7 +190,7 @@ public class TestHddsServerUtils {
   public void testGetScmDbDirWithFallback() {
     final File testDir = PathUtils.getTestDir(TestHddsServerUtils.class);
     final File metaDir = new File(testDir, "metaDir");
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
     try {
       assertEquals(metaDir, ServerUtils.getScmDbDir(conf));
@@ -210,7 +208,7 @@ public class TestHddsServerUtils {
 
   @Test
   public void testGetStaleNodeInterval() {
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
 
     // Reset OZONE_SCM_STALENODE_INTERVAL to 300s that
     // larger than max limit value.

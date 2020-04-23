@@ -51,6 +51,19 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
   }
 
   /**
+   * When the S3MultipartUploadCompleteRequest is a replay but the
+   * openKey should be deleted from the OpenKey table.
+   * Note that this response will result in openKey deletion and
+   * multipartInfo deletion only. Key will not be added to Key table.
+   */
+  public S3MultipartUploadCompleteResponse(
+      @Nonnull OMResponse omResponse,
+      @Nonnull String multipartKey) {
+    super(omResponse);
+    this.multipartKey = multipartKey;
+  }
+
+  /**
    * For when the request is not successful or it is a replay transaction.
    * For a successful request, the other constructor should be used.
    */
@@ -63,30 +76,31 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-        omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName(), omKeyInfo.getKeyName()), omKeyInfo);
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
         multipartKey);
     omMetadataManager.getMultipartInfoTable().deleteWithBatch(batchOperation,
         multipartKey);
 
-    // Add unused parts to deleted key table.
-    String keyName =
-        omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
+    if (omKeyInfo != null) {
+      String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
+          omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
+      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
+          ozoneKey, omKeyInfo);
 
-    RepeatedOmKeyInfo repeatedOmKeyInfo =
-        omMetadataManager.getDeletedTable().get(keyName);
+      if (!partsUnusedList.isEmpty()) {
+        // Add unused parts to deleted key table.
+        RepeatedOmKeyInfo repeatedOmKeyInfo =
+            omMetadataManager.getDeletedTable()
+                .get(ozoneKey);
+        if (repeatedOmKeyInfo == null) {
+          repeatedOmKeyInfo = new RepeatedOmKeyInfo(partsUnusedList);
+        } else {
+          repeatedOmKeyInfo.addOmKeyInfo(omKeyInfo);
+        }
 
-    if (repeatedOmKeyInfo == null) {
-      repeatedOmKeyInfo =
-          new RepeatedOmKeyInfo(partsUnusedList);
-    } else {
-      repeatedOmKeyInfo.addOmKeyInfo(omKeyInfo);
+        omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+            ozoneKey, repeatedOmKeyInfo);
+      }
     }
-
-    omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-        keyName, repeatedOmKeyInfo);
   }
 }

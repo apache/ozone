@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -115,7 +116,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyList;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -1114,12 +1115,27 @@ public class TestKeyManagerImpl {
 
       StorageContainerLocationProtocol sclProtocolMock = mock(
           StorageContainerLocationProtocol.class);
-      ContainerWithPipeline containerWithPipelineMock =
-          mock(ContainerWithPipeline.class);
-      when(containerWithPipelineMock.getPipeline())
-          .thenReturn(getRandomPipeline());
-      when(sclProtocolMock.getContainerWithPipeline(anyLong()))
-          .thenReturn(containerWithPipelineMock);
+
+      List<Long> containerIDs = new ArrayList<>();
+      containerIDs.add(100L);
+      containerIDs.add(200L);
+
+      List<ContainerWithPipeline> cps = new ArrayList<>();
+      for (Long containerID : containerIDs) {
+        ContainerWithPipeline containerWithPipelineMock =
+            mock(ContainerWithPipeline.class);
+        when(containerWithPipelineMock.getPipeline())
+            .thenReturn(getRandomPipeline());
+
+        ContainerInfo ci = mock(ContainerInfo.class);
+        when(ci.getContainerID()).thenReturn(containerID);
+        when(containerWithPipelineMock.getContainerInfo()).thenReturn(ci);
+
+        cps.add(containerWithPipelineMock);
+      }
+
+      when(sclProtocolMock.getContainerWithPipelineBatch(containerIDs))
+          .thenReturn(cps);
 
       ScmClient scmClientMock = mock(ScmClient.class);
       when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
@@ -1158,9 +1174,8 @@ public class TestKeyManagerImpl {
 
       keyManagerImpl.refreshPipeline(omKeyInfo);
 
-      verify(sclProtocolMock, times(2)).getContainerWithPipeline(anyLong());
-      verify(sclProtocolMock, times(1)).getContainerWithPipeline(100L);
-      verify(sclProtocolMock, times(1)).getContainerWithPipeline(200L);
+      verify(sclProtocolMock, times(1))
+          .getContainerWithPipelineBatch(containerIDs);
     } finally {
       cluster.shutdown();
     }
@@ -1178,7 +1193,7 @@ public class TestKeyManagerImpl {
       StorageContainerLocationProtocol sclProtocolMock = mock(
           StorageContainerLocationProtocol.class);
       doThrow(new IOException(errorMessage)).when(sclProtocolMock)
-          .getContainerWithPipeline(anyLong());
+          .getContainerWithPipelineBatch(anyList());
 
       ScmClient scmClientMock = mock(ScmClient.class);
       when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
