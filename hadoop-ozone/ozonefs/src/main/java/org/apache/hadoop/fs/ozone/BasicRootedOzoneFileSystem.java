@@ -686,6 +686,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     LOG.trace("getFileStatus() path:{}", f);
     Path qualifiedPath = f.makeQualified(uri, workingDir);
     String key = pathToKey(qualifiedPath);
+    // Handle DistCp /NONE path
+    if (key.equals("NONE")) {
+      throw new FileNotFoundException("File not found. path /NONE.");
+    }
     FileStatus fileStatus = null;
     try {
       fileStatus = convertFileStatus(
