@@ -37,9 +37,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.
  * Test OMFailoverProxyProvider failover behaviour.
  */
 public class TestOMFailoverProxyProvider {
-  private final static String omServiceId = "om-service-test1";
-  private final static String nodeIdBaseStr = "omNode-";
-  private final static String dummyNodeAddr = "0.0.0.0:8080";
+  private final static String OM_SERVICE_ID = "om-service-test1";
+  private final static String NODE_ID_BASE_STR = "omNode-";
+  private final static String DUMMY_NODE_ADDR = "0.0.0.0:8080";
 
   /**
    * 1. Create FailoverProvider with 3 OMs.
@@ -49,38 +49,37 @@ public class TestOMFailoverProxyProvider {
    */
   @Test
   public void testWaitTimeWithSameNodeFailover() throws IOException {
-    String nodeId1 = nodeIdBaseStr + 1;
-    String nodeId2 = nodeIdBaseStr + 2;
-    String nodeId3 = nodeIdBaseStr + 3;
+    String nodeId1 = NODE_ID_BASE_STR + 1;
+    String nodeId2 = NODE_ID_BASE_STR + 2;
+    String nodeId3 = NODE_ID_BASE_STR + 3;
     OzoneConfiguration config = new OzoneConfiguration();
-    //config.set(OZONE_OM_NODE_ID_KEY, nodeId);
-    config.set(OmUtils.addKeySuffixes(OZONE_OM_NODES_KEY, omServiceId),
+    config.set(OmUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         String.join(",", nodeId1, nodeId2, nodeId3));
-    config.set(OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, omServiceId,
-        nodeId1), dummyNodeAddr);
-    config.set(OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, omServiceId,
-        nodeId2), dummyNodeAddr);
-    config.set(OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, omServiceId,
-        nodeId3), dummyNodeAddr);
+    config.set(OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
+        nodeId1), DUMMY_NODE_ADDR);
+    config.set(OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
+        nodeId2), DUMMY_NODE_ADDR);
+    config.set(OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
+        nodeId3), DUMMY_NODE_ADDR);
     long waitBetweenRetries = config.getLong(
         OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
     OMFailoverProxyProvider provider = new OMFailoverProxyProvider(config,
-        UserGroupInformation.getCurrentUser(), omServiceId);
+        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID);
     provider.performFailoverToNextProxy(); // Failover attempt 1
     Assert.assertEquals(0, provider.getWaitTime());
     provider.performFailoverToNextProxy(); // Failover attempt 2
     Assert.assertEquals(0, provider.getWaitTime());
-    // Failover attempt 3 to same OM, waitTime should increase after this
+    // Failover attempt 3 to same OM, waitTime should increase
     provider.performFailoverIfRequired(provider.getCurrentProxyOMNodeId());
     Assert.assertEquals(waitBetweenRetries, provider.getWaitTime());
-    // Failover attempt 4 to same OM, waitTime should further increase after this
+    // Failover attempt 4 to same OM, waitTime should further increase
     provider.performFailoverIfRequired(provider.getCurrentProxyOMNodeId());
     Assert.assertEquals(waitBetweenRetries * 2, provider.getWaitTime());
-    // Failover attempt 5 to same OM, waitTime should further increase after this
+    // Failover attempt 5 to same OM, waitTime should further increase
     provider.performFailoverIfRequired(provider.getCurrentProxyOMNodeId());
     Assert.assertEquals(waitBetweenRetries * 3, provider.getWaitTime());
-    // Failover attempt 6 to same OM, waitTime should further increase after this
+    // Failover attempt 6 to same OM, waitTime should further increase
     provider.performFailoverIfRequired(provider.getCurrentProxyOMNodeId());
     Assert.assertEquals(waitBetweenRetries * 4, provider.getWaitTime());
 
