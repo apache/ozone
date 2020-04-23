@@ -17,18 +17,13 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -38,8 +33,14 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.security.UserGroupInformation;
+
+import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
@@ -55,7 +56,7 @@ public class TestOzoneFileSystemWithMocks {
 
   @Test
   public void testFSUriWithHostPortOverrides() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     mockClientFactory(conf, 5899);
     mockUser();
 
@@ -71,7 +72,7 @@ public class TestOzoneFileSystemWithMocks {
 
   @Test
   public void testFSUriWithHostPortUnspecified() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     final int omPort = OmUtils.getOmRpcPort(conf);
     mockClientFactory(conf, omPort);
     mockUser();
@@ -90,7 +91,7 @@ public class TestOzoneFileSystemWithMocks {
 
   @Test
   public void testFSUriHostVersionDefault() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     mockClientFactory(conf);
     mockUser();
 
@@ -106,7 +107,7 @@ public class TestOzoneFileSystemWithMocks {
   @Test
   public void testReplicationDefaultValue()
       throws IOException, URISyntaxException {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     int defaultValue = conf.getInt(OzoneConfigKeys.OZONE_REPLICATION, 3);
     mockClientFactory(conf);
     mockUser();
@@ -120,7 +121,7 @@ public class TestOzoneFileSystemWithMocks {
   @Test
   public void testReplicationCustomValue()
       throws IOException, URISyntaxException {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     short configured = 1;
     conf.setInt(OzoneConfigKeys.OZONE_REPLICATION, configured);
     mockClientFactory(conf);
@@ -144,20 +145,20 @@ public class TestOzoneFileSystemWithMocks {
     return ozoneClient;
   }
 
-  private void mockClientFactory(Configuration conf, int omPort)
+  private void mockClientFactory(ConfigurationSource conf, int omPort)
       throws IOException {
     OzoneClient ozoneClient = mockClient();
 
     PowerMockito.mockStatic(OzoneClientFactory.class);
     PowerMockito.when(OzoneClientFactory.getRpcClient(eq("local.host"),
-        eq(omPort), eq(conf))).thenReturn(ozoneClient);
+        eq(omPort), any())).thenReturn(ozoneClient);
   }
 
-  private void mockClientFactory(Configuration conf) throws IOException {
+  private void mockClientFactory(ConfigurationSource conf) throws IOException {
     OzoneClient ozoneClient = mockClient();
 
     PowerMockito.mockStatic(OzoneClientFactory.class);
-    PowerMockito.when(OzoneClientFactory.getRpcClient(eq(conf)))
+    PowerMockito.when(OzoneClientFactory.getRpcClient(any()))
         .thenReturn(ozoneClient);
   }
 

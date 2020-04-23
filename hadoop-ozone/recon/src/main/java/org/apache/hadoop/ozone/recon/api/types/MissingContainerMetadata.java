@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.recon.api.types;
 
+import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
+
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
@@ -41,17 +43,17 @@ public class MissingContainerMetadata {
   @XmlElement(name = "pipelineID")
   private UUID pipelineID;
 
-  @XmlElement(name = "datanodes")
-  private List<String> datanodes;
+  @XmlElement(name = "replicas")
+  private List<ContainerHistory> replicas;
 
   public MissingContainerMetadata(long containerID, long missingSince,
                                   long keys, UUID pipelineID,
-                                  List<String> datanodes) {
+                                  List<ContainerHistory> replicas) {
     this.containerID = containerID;
     this.missingSince = missingSince;
     this.keys = keys;
     this.pipelineID = pipelineID;
-    this.datanodes = datanodes;
+    this.replicas = replicas;
   }
 
   public long getContainerID() {
@@ -62,8 +64,8 @@ public class MissingContainerMetadata {
     return keys;
   }
 
-  public List<String> getDatanodes() {
-    return datanodes;
+  public List<ContainerHistory> getReplicas() {
+    return replicas;
   }
 
   public long getMissingSince() {

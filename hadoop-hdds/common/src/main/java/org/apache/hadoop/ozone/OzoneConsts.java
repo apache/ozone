@@ -115,14 +115,9 @@ public final class OzoneConsts {
    */
   public static final String CONTAINER_DB_SUFFIX = "container.db";
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
-  public static final String SCM_CONTAINER_DB = "scm-" + CONTAINER_DB_SUFFIX;
-  public static final String SCM_PIPELINE_DB = "scm-" + PIPELINE_DB_SUFFIX;
   public static final String DN_CONTAINER_DB = "-dn-"+ CONTAINER_DB_SUFFIX;
-  public static final String DELETED_BLOCK_DB = "deletedBlock.db";
   public static final String OM_DB_NAME = "om.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
-  public static final String OZONE_MANAGER_TOKEN_DB_NAME = "om-token.db";
-  public static final String SCM_DB_NAME = "scm.db";
 
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
@@ -240,7 +235,6 @@ public final class OzoneConsts {
   public static final String KEY = "key";
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
-  public static final String QUOTA = "quota";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
   public static final String OBJECT_ID = "objectID";
   public static final String UPDATE_ID = "updateID";
@@ -276,6 +270,7 @@ public final class OzoneConsts {
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
   public static final String MULTIPART_UPLOAD_PART_NAME = "partName";
+  public static final String BUCKET_ENCRYPTION_KEY = "bucketEncryptionKey";
 
 
 

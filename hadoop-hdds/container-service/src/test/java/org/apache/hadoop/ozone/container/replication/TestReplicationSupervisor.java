@@ -29,6 +29,7 @@ import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
@@ -36,6 +37,8 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import javax.annotation.Nonnull;
 
@@ -45,6 +48,7 @@ import static java.util.Collections.emptyList;
 /**
  * Test the replication supervisor.
  */
+@RunWith(Parameterized.class)
 public class TestReplicationSupervisor {
 
   private final ContainerReplicator noopReplicator = task -> {};
@@ -57,6 +61,17 @@ public class TestReplicationSupervisor {
       task -> replicatorRef.get().replicate(task);
 
   private ContainerSet set;
+
+  private final ChunkLayOutVersion layout;
+
+  public TestReplicationSupervisor(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
 
   @Before
   public void setUp() throws Exception {
@@ -159,8 +174,7 @@ public class TestReplicationSupervisor {
   }
 
   private ReplicationSupervisor supervisorWithSuccessfulReplicator() {
-    return supervisorWith(supervisor -> new FakeReplicator(supervisor, set),
-        newDirectExecutorService());
+    return supervisorWith(FakeReplicator::new, newDirectExecutorService());
   }
 
   private ReplicationSupervisor supervisorWith(
@@ -175,33 +189,31 @@ public class TestReplicationSupervisor {
   /**
    * A fake replicator that simulates successful download of containers.
    */
-  private static class FakeReplicator implements ContainerReplicator {
+  private class FakeReplicator implements ContainerReplicator {
 
     private final OzoneConfiguration conf = new OzoneConfiguration();
     private final ReplicationSupervisor supervisor;
-    private final ContainerSet containerSet;
 
-    FakeReplicator(ReplicationSupervisor supervisor, ContainerSet set) {
+    FakeReplicator(ReplicationSupervisor supervisor) {
       this.supervisor = supervisor;
-      this.containerSet = set;
     }
 
     @Override
     public void replicate(ReplicationTask task) {
-      Assert.assertNull(containerSet.getContainer(task.getContainerId()));
+      Assert.assertNull(set.getContainer(task.getContainerId()));
 
       // assumes same-thread execution
       Assert.assertEquals(1, supervisor.getInFlightReplications());
 
       KeyValueContainerData kvcd =
           new KeyValueContainerData(task.getContainerId(),
-              ChunkLayOutVersion.FILE_PER_CHUNK, 100L,
+              layout, 100L,
               UUID.randomUUID().toString(), UUID.randomUUID().toString());
       KeyValueContainer kvc =
           new KeyValueContainer(kvcd, conf);
 
       try {
-        containerSet.addContainer(kvc);
+        set.addContainer(kvc);
         task.setStatus(ReplicationTask.Status.DONE);
       } catch (Exception e) {
         Assert.fail("Unexpected error: " + e.getMessage());

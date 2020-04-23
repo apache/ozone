@@ -39,7 +39,7 @@ public class ReconPipelineFactory extends PipelineFactory {
     setProviders(new DefaultedMap(reconMockPipelineProvider));
   }
 
-  static class ReconPipelineProvider implements PipelineProvider {
+  static class ReconPipelineProvider extends PipelineProvider {
 
     @Override
     public Pipeline create(HddsProtos.ReplicationFactor factor){
@@ -63,7 +63,7 @@ public class ReconPipelineFactory extends PipelineFactory {
 
     @Override
     public void shutdown() {
-
+      // Do nothing
     }
   }
 }

@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
@@ -111,11 +112,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       builderConsumer.accept(builder);
       ScmContainerLocationRequest wrapper = builder.build();
 
-      response = rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+      response = submitRpcRequest(wrapper);
     } catch (ServiceException ex) {
       throw ProtobufHelper.getRemoteException(ex);
     }
     return response;
+  }
+
+  private ScmContainerLocationResponse submitRpcRequest(
+      ScmContainerLocationRequest wrapper) throws ServiceException {
+    return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
   }
 
   /**
@@ -187,6 +193,40 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         response.getGetContainerWithPipelineResponse()
             .getContainerWithPipeline());
 
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  public List<ContainerWithPipeline> getContainerWithPipelineBatch(
+      List<Long> containerIDs) throws IOException {
+    for (Long containerID: containerIDs) {
+      Preconditions.checkState(containerID >= 0,
+          "Container ID cannot be negative");
+    }
+
+    GetContainerWithPipelineBatchRequestProto request =
+        GetContainerWithPipelineBatchRequestProto.newBuilder()
+            .setTraceID(TracingUtil.exportCurrentSpan())
+            .addAllContainerIDs(containerIDs)
+            .build();
+
+    ScmContainerLocationResponse response =
+        submitRequest(Type.GetContainerWithPipelineBatch,
+            (builder) -> builder
+                .setGetContainerWithPipelineBatchRequest(request));
+
+    List<HddsProtos.ContainerWithPipeline> protoCps = response
+        .getGetContainerWithPipelineBatchResponse()
+        .getContainerWithPipelinesList();
+
+    List<ContainerWithPipeline> cps = new ArrayList<>();
+
+    for (HddsProtos.ContainerWithPipeline cp : protoCps) {
+      cps.add(ContainerWithPipeline.fromProtobuf(cp));
+    }
+
+    return cps;
   }
 
   /**

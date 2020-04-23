@@ -56,9 +56,6 @@ public class KeyValueContainerData extends ContainerData {
   // Path to Container metadata Level DB/RocksDB Store and .container file.
   private String metadataPath;
 
-  // Path to Physical file system where chunks are stored.
-  private String chunksPath;
-
   //Type of DB used to store key to chunks mapping
   private String containerDBType;
 
@@ -144,9 +141,6 @@ public class KeyValueContainerData extends ContainerData {
    * @return Path to base dir
    */
   public String getContainerPath() {
-    if (metadataPath == null) {
-      return null;
-    }
     return new File(metadataPath).getParent();
   }
 
@@ -162,22 +156,6 @@ public class KeyValueContainerData extends ContainerData {
    */
   public void updateBlockCommitSequenceId(long id) {
     this.blockCommitSequenceId = id;
-  }
-
-  /**
-   * Get chunks path.
-   * @return - Path where chunks are stored
-   */
-  public String getChunksPath() {
-    return chunksPath;
-  }
-
-  /**
-   * Set chunks Path.
-   * @param chunkPath - File path.
-   */
-  public void setChunksPath(String chunkPath) {
-    this.chunksPath = chunkPath;
   }
 
   /**
@@ -245,7 +223,7 @@ public class KeyValueContainerData extends ContainerData {
   public ContainerDataProto getProtoBufMessage() {
     ContainerDataProto.Builder builder = ContainerDataProto.newBuilder();
     builder.setContainerID(this.getContainerID());
-    builder.setContainerPath(this.getMetadataPath());
+    builder.setContainerPath(this.getContainerPath());
     builder.setState(this.getState());
 
     for (Map.Entry<String, String> entry : getMetadata().entrySet()) {

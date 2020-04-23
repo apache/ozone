@@ -1541,6 +1541,21 @@ function hadoop_translate_cygwin_path
   fi
 }
 
+## @description  Adds default GC parameters
+## @description  Only for server components and only if no other -XX parameters
+## @description  are set
+## @audience     private
+## @stability    evolving
+## @replaceable  yes
+function hadoop_add_default_gc_opts
+{
+  if [[ "${HADOOP_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
+    if [[ ! "$HADOOP_OPTS" =~ "-XX" ]] ; then
+       hadoop_error "No '-XX:...' jvm parameters are used. Adding safer GC settings to the HADOOP_OPTS"
+       HADOOP_OPTS="${HADOOP_OPTS} -XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
+    fi
+  fi
+}
 ## @description  Adds the HADOOP_CLIENT_OPTS variable to
 ## @description  HADOOP_OPTS if HADOOP_SUBCMD_SUPPORTDAEMONIZATION is false
 ## @audience     public
@@ -2729,4 +2744,52 @@ function hadoop_generic_java_subcmd_handler
   else
     hadoop_java_exec "${HADOOP_SUBCMD}" "${HADOOP_CLASSNAME}" "${HADOOP_SUBCMD_ARGS[@]}"
   fi
+}
+
+
+## @description Add all the required jar files to the classpath
+## @audience private
+## @stability evolving
+## @replaceable yes
+function hadoop_assembly_classpath() {
+  #
+  # Setting up classpath based on the generate classpath descriptors
+  #
+  ARTIFACT_NAME="$1"
+  if [ ! "$ARTIFACT_NAME" ]; then
+    echo "ERROR: Ozone components require to set OZONE_RUN_ARTIFACT_NAME to set the classpath"
+    exit 255
+  fi
+  export HDDS_LIB_JARS_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib"
+  CLASSPATH_FILE="${HADOOP_HDFS_HOME}/share/ozone/classpath/${ARTIFACT_NAME}.classpath"
+  if [ ! "$CLASSPATH_FILE" ]; then
+    echo "ERROR: Classpath file descriptor $CLASSPATH_FILE is missing"
+    exit 255
+  fi
+  # shellcheck disable=SC1090,SC2086
+  source $CLASSPATH_FILE
+  OIFS=$IFS
+  IFS=':'
+
+  # shellcheck disable=SC2154
+  for jar in $classpath; do
+    hadoop_add_classpath "$jar"
+  done
+  hadoop_add_classpath "${HADOOP_HDFS_HOME}/share/ozone/web"
+
+  #We need to add the artifact manually as it's not part the generated classpath desciptor
+  ARTIFACT_LIB_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib"
+  MAIN_ARTIFACT=$(find "$ARTIFACT_LIB_DIR" -name "${OZONE_RUN_ARTIFACT_NAME}-*.jar")
+  if [ ! "$MAIN_ARTIFACT" ]; then
+    echo "ERROR: Component jar file $MAIN_ARTIFACT is missing from ${HADOOP_HDFS_HOME}/share/ozone/lib"
+  fi
+  hadoop_add_classpath "${MAIN_ARTIFACT}"
+
+  #Add optional jars to the classpath
+  OPTIONAL_CLASSPATH_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib/${ARTIFACT_NAME}"
+  if [[ -d "$OPTIONAL_CLASSPATH_DIR" ]]; then
+    hadoop_add_classpath "$OPTIONAL_CLASSPATH_DIR/*"
+  fi
+
+  IFS=$OIFS
 }

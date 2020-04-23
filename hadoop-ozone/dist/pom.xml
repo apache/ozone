@@ -19,16 +19,16 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-ozone</artifactId>
-    <version>0.5.0-SNAPSHOT</version>
+    <version>0.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone-dist</artifactId>
   <name>Apache Hadoop Ozone Distribution</name>
-  <packaging>pom</packaging>
-  <version>0.5.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <version>0.6.0-SNAPSHOT</version>
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20191107-1</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20200403-1</docker.ozone-runner.version>
   </properties>
 
   <build>
@@ -147,8 +147,7 @@
               <goal>copy-dependencies</goal>
             </goals>
             <configuration>
-              <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib
-              </outputDirectory>
+              <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib</outputDirectory>
               <includeScope>runtime</includeScope>
             </configuration>
           </execution>
@@ -166,11 +165,6 @@
                   <groupId>com.google.protobuf</groupId>
                   <artifactId>protobuf-java</artifactId>
                   <version>3.5.1</version>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>26.0-android</version>
                 </artifactItem>
               </artifactItems>
             </configuration>

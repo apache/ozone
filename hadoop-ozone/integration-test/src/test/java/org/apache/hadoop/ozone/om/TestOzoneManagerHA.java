@@ -90,9 +90,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT;
+    .OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys
     .OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
@@ -108,7 +109,6 @@ import javax.management.ObjectName;
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Ignore
 public class TestOzoneManagerHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -282,6 +282,7 @@ public class TestOzoneManagerHA {
   /**
    * Test client request fails when 2 OMs are down.
    */
+  @Ignore("This test is failing randomly. It will be enabled after fixing it.")
   @Test
   public void testTwoOMNodesDown() throws Exception {
     cluster.stopOzoneManager(1);
@@ -394,7 +395,7 @@ public class TestOzoneManagerHA {
     try {
       testCreateFile(ozoneBucket, keyName, data, false, false);
     } catch (OMException ex) {
-      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+      Assert.assertEquals(DIRECTORY_NOT_FOUND, ex.getResult());
     }
 
     // create directory, now this should pass.
@@ -470,6 +471,7 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(data, new String(fileContent));
   }
 
+  @Ignore("This test failing randomly and triggering HDDS-3465.")
   @Test
   public void testMultipartUploadWithOneOmNodeDown() throws Exception {
 
@@ -672,6 +674,7 @@ public class TestOzoneManagerHA {
   /**
    * Test OMFailoverProxyProvider failover on connection exception to OM client.
    */
+  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
@@ -684,11 +687,11 @@ public class TestOzoneManagerHA {
     // On stopping the current OM Proxy, the next connection attempt should
     // failover to a another OM proxy.
     cluster.stopOzoneManager(firstProxyNodeId);
-    Thread.sleep(OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT * 4);
+    Thread.sleep(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT * 4);
 
     // Next request to the proxy provider should result in a failover
     createVolumeTest(true);
-    Thread.sleep(OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT);
+    Thread.sleep(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
 
     // Get the new OM Proxy NodeId
     String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -753,19 +756,10 @@ public class TestOzoneManagerHA {
       // the RpcClient should give up.
       fail("TestOMRetryProxy should fail when there are no OMs running");
     } catch (ConnectException e) {
-      // Each retry attempt tries IPC_CLIENT_CONNECT_MAX_RETRIES times.
-      // So there should be at least
-      // OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS * IPC_CLIENT_CONNECT_MAX_RETRIES
-      // "Retrying connect to server" messages.
-      // Also, the first call will result in EOFException.
-      // That will result in another IPC_CLIENT_CONNECT_MAX_RETRIES attempts.
-      Assert.assertEquals(
-          (OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS + 1) *
-              IPC_CLIENT_CONNECT_MAX_RETRIES,
-          appender.countLinesWithMessage("Retrying connect to server:"));
-
       Assert.assertEquals(1,
           appender.countLinesWithMessage("Failed to connect to OMs:"));
+      Assert.assertEquals(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS,
+          appender.countLinesWithMessage("Trying to failover"));
       Assert.assertEquals(1,
           appender.countLinesWithMessage("Attempted " +
               OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS + " failovers."));
@@ -1297,6 +1291,7 @@ public class TestOzoneManagerHA {
 
   }
 
+  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testListVolumes() throws Exception {
     String userName = UserGroupInformation.getCurrentUser().getUserName();

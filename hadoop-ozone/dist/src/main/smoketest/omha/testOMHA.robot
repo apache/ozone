@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             SSHLibrary
 Library             Collections
 Resource            ../commonlib.robot
+Test Timeout        8 minutes
 
 *** Variables ***
 ${SECURITY_ENABLED}                 false
@@ -32,6 +33,7 @@ ${VOLUME}                           volume1
 ${BUCKET}                           bucket1
 ${TEST_FILE}                        NOTICE.txt
 ${WRITE_FILE_COUNT}                 0
+${TEMPDIR}                          /tmp
 
 ** Keywords ***
 Open Connection And Log In
@@ -67,12 +69,13 @@ Create volume and bucket
 Write Test File
     ${writeFileCount} =     Evaluate                ${WRITE_FILE_COUNT}+1
                             Set Global Variable     ${WRITE_FILE_COUNT}     ${writeFileCount}
-    ${fileName} =           Catenate                SEPARATOR=              ${WRITE_FILE_COUNT}       .txt
-                            Copy File               ${TEST_FILE}            ${fileName}
-                            Execute                 ozone fs -copyFromLocal ${fileName} o3fs://${BUCKET}.${VOLUME}.${OM_SERVICE_ID}/
+    ${fileName} =           Set Variable            omha-${WRITE_FILE_COUNT}.txt
+    ${testFilePath} =       Set Variable            ${TEMPDIR}/${fileName}
+                            Copy File               ${TEST_FILE}            ${testFilePath}
+                            Execute                 ozone fs -copyFromLocal ${testFilePath} o3fs://${BUCKET}.${VOLUME}.${OM_SERVICE_ID}/
     ${result} =             Execute                 ozone sh key list o3://${OM_SERVICE_ID}/${VOLUME}/${BUCKET} | jq -r '.name'
                             Should contain          ${result}               ${fileName}
-                            Remove File             ${fileName}
+                            Remove File             ${testFilePath}
 
 Put Key
     [arguments]             ${FILE}                 ${KEY}
@@ -132,6 +135,23 @@ Stop Leader OM and Verify Failover
     # Restart stopped OM
     Start OM                ${leaderOM}
 
+Test Multiple Failovers
+    FOR     ${INDEX}    IN RANGE    5
+            # Find Leader OM and stop it
+            ${leaderOM} =               Get OM Leader Node
+            ${stopOMResult} =           Stop OM                 ${leaderOM}
+
+            # Verify that new Leader OM is elected
+            ${newLeaderOM} =            Get OM Leader Node
+            Should Not be Equal         ${leaderOM}             ${newLeaderOM}      OMs did not failover
+
+            # Verify write succeeds after failover
+            Write Test File
+
+            # Restart OM
+            Start OM                    ${leaderOM}
+    END
+
 Restart OM and Verify Ratis Logs
     Set Test Variable       ${OM_HOST}              om2
     Set Test Variable       ${keyBase}              testOMRestart_
@@ -161,22 +181,5 @@ Restart OM and Verify Ratis Logs
 
     # Verify that the logs match with the Leader OMs logs
     List Should Contain Sub List    ${logsAfter}        ${logsLeader}
-
-Test Multiple Failovers
-    FOR     ${INDEX}    IN RANGE    5
-            # Find Leader OM and stop it
-            ${leaderOM} =               Get OM Leader Node
-            ${stopOMResult} =           Stop OM                 ${leaderOM}
-
-            # Verify that new Leader OM is elected
-            ${newLeaderOM} =            Get OM Leader Node
-            Should Not be Equal         ${leaderOM}             ${newLeaderOM}      OMs did not failover
-
-            # Verify write succeeds after failover
-            Write Test File
-
-            # Restart OM
-            Start OM                    ${leaderOM}
-    END
 
 

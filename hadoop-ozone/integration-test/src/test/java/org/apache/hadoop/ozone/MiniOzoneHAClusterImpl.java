@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -29,16 +33,17 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.BindException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
@@ -48,7 +53,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
  * with OM HA suitable for running tests.  The cluster consists of a set of
  * OzoneManagers, StorageContainerManager and multiple DataNodes.
  */
-public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
+public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MiniOzoneHAClusterImpl.class);
@@ -61,20 +66,20 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private List<OzoneManager> activeOMs;
   private List<OzoneManager> inactiveOMs;
 
-  private static final Random RANDOM = new Random();
-  private static final int RATIS_LEADER_ELECTION_TIMEOUT = 1000; // 1 seconds
+  private int waitForOMToBeReadyTimeout = 120000; // 2 min
 
+  private static final Random RANDOM = new Random();
+  private static final int RATIS_LEADER_ELECTION_TIMEOUT = 1000; // 1 second
   public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   /**
-   * Creates a new MiniOzoneCluster with OM HA.
+   * Creates a new MiniOzoneCluster.
    *
    * @throws IOException if there is an I/O error
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private MiniOzoneHAClusterImpl(
       OzoneConfiguration conf,
-      Map<String, OzoneManager> omMap,
       List<OzoneManager> activeOMList,
       List<OzoneManager> inactiveOMList,
       StorageContainerManager scm,
@@ -82,11 +87,40 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       String omServiceId,
       ReconServer reconServer) {
     super(conf, scm, hddsDatanodes, reconServer);
-    this.ozoneManagerMap = omMap;
-    this.ozoneManagers = new ArrayList<>(omMap.values());
+
+    this.ozoneManagerMap = Maps.newHashMap();
+    if (activeOMList != null) {
+      for (OzoneManager om : activeOMList) {
+        this.ozoneManagerMap.put(om.getOMNodeId(), om);
+      }
+    }
+    if (inactiveOMList != null) {
+      for (OzoneManager om : inactiveOMList) {
+        this.ozoneManagerMap.put(om.getOMNodeId(), om);
+      }
+    }
+    this.ozoneManagers = new ArrayList<>(ozoneManagerMap.values());
     this.activeOMs = activeOMList;
     this.inactiveOMs = inactiveOMList;
     this.omServiceId = omServiceId;
+
+    // If the serviceID is null, then this should be a non-HA cluster.
+    if (omServiceId == null) {
+      Preconditions.checkArgument(ozoneManagers.size() <= 1);
+    }
+  }
+
+  /**
+   * Creates a new MiniOzoneCluster with all OMs active.
+   * This is used by MiniOzoneChaosCluster.
+   */
+  protected MiniOzoneHAClusterImpl(
+      OzoneConfiguration conf,
+      List<OzoneManager> omList,
+      StorageContainerManager scm,
+      List<HddsDatanodeService> hddsDatanodes,
+      String omServiceId) {
+    this(conf, omList, null, scm, hddsDatanodes, omServiceId, null);
   }
 
   @Override
@@ -105,7 +139,13 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   @Override
   public OzoneClient getRpcClient() throws IOException {
-    return OzoneClientFactory.getRpcClient(getServiceId(), getConf());
+    if (omServiceId == null) {
+      // Non-HA cluster.
+      return OzoneClientFactory.getRpcClient(getConf());
+    } else {
+      // HA cluster
+      return OzoneClientFactory.getRpcClient(omServiceId, getConf());
+    }
   }
 
   public boolean isOMActive(String omNodeId) {
@@ -118,6 +158,10 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   public OzoneManager getOzoneManager(String omNodeId) {
     return this.ozoneManagerMap.get(omNodeId);
+  }
+
+  public List<OzoneManager> getOzoneManagersList() {
+    return ozoneManagers;
   }
 
   /**
@@ -162,6 +206,30 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
   }
 
+  void shutdownOzoneManager(int omNodeIndex) {
+    OzoneManager ozoneManager = ozoneManagers.get(omNodeIndex);
+    LOG.info("Shutting down OzoneManager " + ozoneManager.getOMNodeId());
+
+    ozoneManager.stop();
+  }
+
+  void restartOzoneManager(int omNodeIndex, boolean waitForOM)
+      throws IOException, TimeoutException, InterruptedException {
+    OzoneManager ozoneManager = ozoneManagers.get(omNodeIndex);
+    restartOzoneManager(ozoneManager, waitForOM);
+  }
+
+  void restartOzoneManager(OzoneManager ozoneManager, boolean waitForOM)
+      throws IOException, TimeoutException, InterruptedException {
+    LOG.info("Restarting OzoneManager " + ozoneManager.getOMNodeId());
+    ozoneManager.restart();
+
+    if (waitForOM) {
+      GenericTestUtils.waitFor(ozoneManager::isRunning,
+          1000, waitForOMToBeReadyTimeout);
+    }
+  }
+
   @Override
   public void stop() {
     for (OzoneManager ozoneManager : ozoneManagers) {
@@ -176,6 +244,7 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   public void stopOzoneManager(int index) {
     ozoneManagers.get(index).stop();
+    ozoneManagers.get(index).join();
   }
 
   public void stopOzoneManager(String omNodeId) {
@@ -211,15 +280,16 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       if (numOfActiveOMs == ACTIVE_OMS_NOT_SET) {
         numOfActiveOMs = numOfOMs;
       }
+
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
+      initOMRatisConf();
       StorageContainerManager scm;
-      Map<String, OzoneManager> omMap;
       ReconServer reconServer = null;
       try {
         scm = createSCM();
         scm.start();
-        omMap = createOMService();
+        createOMService();
         if (includeRecon) {
           configureRecon();
           reconServer = new ReconServer();
@@ -229,44 +299,56 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(scm,
-          reconServer);
-      MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(
-          conf, omMap, activeOMs, inactiveOMs, scm, hddsDatanodes,
-          omServiceId, reconServer);
+      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
+          scm, reconServer);
+
+      MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
+          activeOMs, inactiveOMs, scm, hddsDatanodes, omServiceId, reconServer);
+
       if (startDataNodes) {
         cluster.startHddsDatanodes();
       }
       return cluster;
     }
 
-    /**
-     * Initialize OM configurations.
-     * @throws IOException
-     */
-    @Override
-    protected void initializeConfiguration() throws IOException {
-      super.initializeConfiguration();
+    protected void initOMRatisConf() {
       conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
       conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
+      // If test change the following config values we will respect,
+      // otherwise we will set lower timeout values.
+      long defaultDuration =
+          OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
+              .getDuration();
+      long curLeaderElectionTimeout = conf.getTimeDuration(
+          OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+              defaultDuration, TimeUnit.MILLISECONDS);
       conf.setTimeDuration(
           OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-          RATIS_LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+          defaultDuration == curLeaderElectionTimeout ?
+              RATIS_LEADER_ELECTION_TIMEOUT : curLeaderElectionTimeout,
+          TimeUnit.MILLISECONDS);
+      long defaultNodeFailureTimeout =
+          OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT.
+              getDuration();
+      long curNodeFailureTimeout = conf.getTimeDuration(
+          OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
+          defaultNodeFailureTimeout,
+          OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT.
+              getUnit());
       conf.setTimeDuration(
           OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
-          NODE_FAILURE_TIMEOUT, TimeUnit.MILLISECONDS);
+          curNodeFailureTimeout == defaultNodeFailureTimeout ?
+              NODE_FAILURE_TIMEOUT : curNodeFailureTimeout,
+          TimeUnit.MILLISECONDS);
     }
 
     /**
      * Start OM service with multiple OMs.
-     * @return list of OzoneManagers
-     * @throws IOException
-     * @throws AuthenticationException
      */
-    private Map<String, OzoneManager> createOMService() throws IOException,
+    protected List<OzoneManager> createOMService() throws IOException,
         AuthenticationException {
 
-      Map<String, OzoneManager> omMap = new HashMap<>();
+      List<OzoneManager> omList = Lists.newArrayList();
 
       int retryCount = 0;
       int basePort = 10000;
@@ -293,8 +375,10 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             initializeOmStorage(omStore);
 
             OzoneManager om = OzoneManager.createOm(config);
-            om.setCertClient(certClient);
-            omMap.put(nodeId, om);
+            if (certClient != null) {
+              om.setCertClient(certClient);
+            }
+            omList.add(om);
 
             if (i <= numOfActiveOMs) {
               om.start();
@@ -311,24 +395,23 @@ public final class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           // Set default OM address to point to the first OM. Clients would
           // try connecting to this address by default
           conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
-              NetUtils.getHostPortString(omMap.get(nodeIdBaseStr + 1)
-                  .getOmRpcServerAddr()));
+              NetUtils.getHostPortString(omList.get(0).getOmRpcServerAddr()));
 
           break;
         } catch (BindException e) {
-          for (OzoneManager om : omMap.values()) {
+          for (OzoneManager om : omList) {
             om.stop();
             om.join();
             LOG.info("Stopping OzoneManager server at {}",
                 om.getOmRpcServerAddr());
           }
-          omMap.clear();
+          omList.clear();
           ++retryCount;
           LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
                   retryCount);
         }
       }
-      return omMap;
+      return omList;
     }
 
     /**

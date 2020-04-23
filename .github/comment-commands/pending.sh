@@ -29,3 +29,10 @@ curl -s -o /dev/null \
   --header "authorization: Bearer $GITHUB_TOKEN" \
   --header 'content-type: application/json' \
   "$URL"
+
+curl -s -o /dev/null \
+  -X POST \
+  --data '{"labels": [ "pending" ]}' \
+  --header "authorization: Bearer $GITHUB_TOKEN" \
+  "$(jq -r '.issue.url' "$GITHUB_EVENT_PATH")/labels"
+

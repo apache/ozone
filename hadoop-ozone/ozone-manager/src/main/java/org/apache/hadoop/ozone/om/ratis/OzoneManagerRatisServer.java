@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -35,30 +34,30 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import com.google.common.base.Strings;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.ServiceException;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.ServiceException;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.netty.NettyConfigKeys;
-import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
+import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
@@ -245,7 +244,7 @@ public final class OzoneManagerRatisServer {
    * @param raftPeers peer nodes in the raft ring
    * @throws IOException
    */
-  private OzoneManagerRatisServer(Configuration conf,
+  private OzoneManagerRatisServer(ConfigurationSource conf,
       OzoneManager om,
       String raftGroupIdStr, RaftPeerId localRaftPeerId,
       InetSocketAddress addr, List<RaftPeer> raftPeers)
@@ -295,7 +294,7 @@ public final class OzoneManagerRatisServer {
    * Creates an instance of OzoneManagerRatisServer.
    */
   public static OzoneManagerRatisServer newOMRatisServer(
-      Configuration ozoneConf, OzoneManager omProtocol,
+      ConfigurationSource ozoneConf, OzoneManager omProtocol,
       OMNodeDetails omNodeDetails, List<OMNodeDetails> peerNodes)
       throws IOException {
 
@@ -370,7 +369,7 @@ public final class OzoneManagerRatisServer {
 
   //TODO simplify it to make it shorter
   @SuppressWarnings("methodlength")
-  private RaftProperties newRaftProperties(Configuration conf) {
+  private RaftProperties newRaftProperties(ConfigurationSource conf) {
     final RaftProperties properties = new RaftProperties();
 
     // Set RPC type
@@ -389,7 +388,7 @@ public final class OzoneManagerRatisServer {
 
     // Set Ratis storage directory
     String storageDir = OzoneManagerRatisServer.getOMRatisDirectory(conf);
-    RaftServerConfigKeys.setStorageDirs(properties,
+    RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(storageDir)));
 
     // Set RAFT segment size
@@ -473,7 +472,7 @@ public final class OzoneManagerRatisServer {
         serverMaxTimeout);
 
     // Set the number of maximum cached segments
-    RaftServerConfigKeys.Log.setMaxCachedSegmentNum(properties, 2);
+    RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
     // TODO: set max write buffer size
 
@@ -657,7 +656,7 @@ public final class OzoneManagerRatisServer {
   /**
    * Get the local directory where ratis logs will be stored.
    */
-  public static String getOMRatisDirectory(Configuration conf) {
+  public static String getOMRatisDirectory(ConfigurationSource conf) {
     String storageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
 
     if (Strings.isNullOrEmpty(storageDir)) {
@@ -666,7 +665,7 @@ public final class OzoneManagerRatisServer {
     return storageDir;
   }
 
-  public static String getOMRatisSnapshotDirectory(Configuration conf) {
+  public static String getOMRatisSnapshotDirectory(ConfigurationSource conf) {
     String snapshotDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
 
     if (Strings.isNullOrEmpty(snapshotDir)) {

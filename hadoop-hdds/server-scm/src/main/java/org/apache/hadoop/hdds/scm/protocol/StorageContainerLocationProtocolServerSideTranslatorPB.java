@@ -38,6 +38,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeRequestProto;
@@ -68,6 +70,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
+import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
@@ -104,7 +107,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
    */
   public StorageContainerLocationProtocolServerSideTranslatorPB(
       StorageContainerLocationProtocol impl,
-      ProtocolMessageMetrics protocolMetrics) throws IOException {
+      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics)
+      throws IOException {
     this.impl = impl;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("ScmContainerLocation",
@@ -143,6 +147,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetContainerWithPipelineResponse(getContainerWithPipeline(
                 request.getGetContainerWithPipelineRequest()))
+            .build();
+      case GetContainerWithPipelineBatch:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetContainerWithPipelineBatchResponse(
+                getContainerWithPipelineBatch(
+                    request.getGetContainerWithPipelineBatchRequest()))
             .build();
       case ListContainer:
         return ScmContainerLocationResponse.newBuilder()
@@ -285,6 +297,19 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return GetContainerWithPipelineResponseProto.newBuilder()
         .setContainerWithPipeline(container.getProtobuf())
         .build();
+  }
+
+  public GetContainerWithPipelineBatchResponseProto
+      getContainerWithPipelineBatch(
+      GetContainerWithPipelineBatchRequestProto request) throws IOException {
+    List<ContainerWithPipeline> containers = impl
+        .getContainerWithPipelineBatch(request.getContainerIDsList());
+    GetContainerWithPipelineBatchResponseProto.Builder builder =
+        GetContainerWithPipelineBatchResponseProto.newBuilder();
+    for (ContainerWithPipeline container : containers) {
+      builder.addContainerWithPipelines(container.getProtobuf());
+    }
+    return builder.build();
   }
 
   public SCMListContainerResponseProto listContainer(

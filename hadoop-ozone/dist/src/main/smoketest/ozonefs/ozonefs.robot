@@ -17,6 +17,7 @@
 Documentation       Ozonefs test covering both o3fs and ofs
 Library             OperatingSystem
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 ${OfsBucket1}          om:9862/fstest/bucket1
@@ -40,6 +41,10 @@ Create volume and bucket for Ozone file System test
 
 
 Check volume from o3fs
+    ${result} =         Execute               ozone sh volume list
+                        Should contain    ${result}         fstest
+                        Should contain    ${result}         fstest2
+                        Should Match Regexp  ${result}      "admin" : "(hadoop|testuser\/scm@EXAMPLE\.COM)"
     ${result} =         Execute               ozone fs -ls o3fs://${O3fsBucket1}
 
 Test ozone shell with ofs

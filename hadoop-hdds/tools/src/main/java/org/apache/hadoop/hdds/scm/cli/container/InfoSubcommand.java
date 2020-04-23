@@ -22,8 +22,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
@@ -57,26 +55,14 @@ public class InfoSubcommand implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      ContainerWithPipeline container = scmClient.
+      final ContainerWithPipeline container = scmClient.
           getContainerWithPipeline(containerID);
       Preconditions.checkNotNull(container, "Container cannot be null");
 
-      ContainerDataProto containerData = scmClient.readContainer(container
-          .getContainerInfo().getContainerID(), container.getPipeline());
-
       // Print container report info.
       LOG.info("Container id: {}", containerID);
-      String openStatus =
-          containerData.getState() == ContainerDataProto.State.OPEN ? "OPEN" :
-              "CLOSED";
-      LOG.info("Container State: {}", openStatus);
-      LOG.info("Container Path: {}", containerData.getContainerPath());
-
-      // Output meta data.
-      String metadataStr = containerData.getMetadataList().stream().map(
-          p -> p.getKey() + ":" + p.getValue())
-          .collect(Collectors.joining(", "));
-      LOG.info("Container Metadata: {}", metadataStr);
+      LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+      LOG.info("Container State: {}", container.getContainerInfo().getState());
 
       // Print pipeline of an existing container.
       String machinesStr = container.getPipeline().getNodes().stream().map(

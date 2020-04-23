@@ -18,15 +18,16 @@
  */
 package org.apache.hadoop.hdds.security.x509.keys;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A class to generate Key Pair for use with Certificates.
@@ -41,7 +42,7 @@ public class HDDSKeyGenerator {
    *
    * @param configuration - config
    */
-  public HDDSKeyGenerator(Configuration configuration) {
+  public HDDSKeyGenerator(ConfigurationSource configuration) {
     this.securityConfig = new SecurityConfig(configuration);
   }
 
