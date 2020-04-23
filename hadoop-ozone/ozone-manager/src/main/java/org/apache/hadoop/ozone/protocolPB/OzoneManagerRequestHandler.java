@@ -162,7 +162,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setListKeysResponse(listKeysResponse);
         break;
       case ListOpenKeys:
-        OzoneManagerProtocolProtos.ListOpenKeysResponse listOpenKeysResponse = listOpenKeys(
+        OzoneManagerProtocolProtos.ListOpenKeysResponse
+                listOpenKeysResponse = listOpenKeys(
             request.getListOpenKeysRequest());
         responseBuilder.setListOpenKeysResponse(listOpenKeysResponse);
         break;
@@ -424,7 +425,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   private OzoneManagerProtocolProtos.ListOpenKeysResponse listOpenKeys(
           OzoneManagerProtocolProtos.ListOpenKeysRequest request)
-    throws IOException {
+      throws IOException {
     OzoneManagerProtocolProtos.ListOpenKeysResponse.Builder resp =
             OzoneManagerProtocolProtos.ListOpenKeysResponse.newBuilder();
     List<OmKeyInfo> keys = impl.listOpenKeys(

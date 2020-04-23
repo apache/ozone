@@ -2240,7 +2240,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName)
           throws IOException {
-    return keyManager.listOpenKeys(volumeName,bucketName);
+    return keyManager.listOpenKeys(volumeName, bucketName);
   }
 
   @Override
@@ -2296,7 +2296,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void setBucketProperty(OmBucketArgs args)
       throws IOException {
-    if(isAclEnabled) {
+    if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
           args.getVolumeName(), args.getBucketName(), null);
     }

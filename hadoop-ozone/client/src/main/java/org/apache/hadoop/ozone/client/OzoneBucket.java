@@ -374,7 +374,7 @@ public class OzoneBucket extends WithMetadata {
   }
 
   public List<OzoneKey> listOpenKeys() throws IOException {
-    return proxy.listOpenKeys(volumeName,this.name);
+    return proxy.listOpenKeys(volumeName, this.name);
   }
   /**
    * Deletes key from the bucket.

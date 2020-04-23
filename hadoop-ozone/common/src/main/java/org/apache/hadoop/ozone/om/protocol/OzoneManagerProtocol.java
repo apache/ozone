@@ -279,7 +279,8 @@ public interface OzoneManagerProtocol
       String bucketName, String startKeyName, String keyPrefix, int maxKeys)
       throws IOException;
 
-  List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName) throws  IOException;
+  List<OmKeyInfo> listOpenKeys(String volumeName, String bucketName)
+          throws  IOException;
   /**
    * Returns list of Ozone services with its configuration details.
    *

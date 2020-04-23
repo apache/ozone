@@ -829,8 +829,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         break;
       }
     }
-    for (Map.Entry<String, OmKeyInfo>  cacheKey : cacheKeyMap.entrySet()){
-        result.add(cacheKey.getValue());
+    for (Map.Entry<String, OmKeyInfo>  cacheKey : cacheKeyMap.entrySet()) {
+      result.add(cacheKey.getValue());
     }
     cacheKeyMap.clear();
     return result;
