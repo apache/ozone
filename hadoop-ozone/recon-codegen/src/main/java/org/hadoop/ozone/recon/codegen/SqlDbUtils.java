@@ -18,12 +18,17 @@
 
 package org.hadoop.ozone.recon.codegen;
 
+import static org.jooq.impl.DSL.count;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.function.BiPredicate;
 
+import org.jooq.exception.DataAccessException;
+import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,4 +79,19 @@ public final class SqlDbUtils {
       }
     };
   }
+
+  /**
+   * Helper function to check if table exists through JOOQ.
+   */
+  public static final BiPredicate<Connection, String> TABLE_EXISTS_CHECK =
+      (conn, tableName) -> {
+        try {
+          DSL.using(conn).select(count()).from(tableName).execute();
+        } catch (DataAccessException ex) {
+          LOG.info(ex.getMessage());
+          return false;
+        }
+        LOG.info("{} table already exists, skipping creation.", tableName);
+        return true;
+      };
 }

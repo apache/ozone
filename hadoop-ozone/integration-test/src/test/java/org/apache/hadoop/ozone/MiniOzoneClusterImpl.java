@@ -804,8 +804,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           .getAbsolutePath());
       conf.set(OZONE_RECON_SCM_DB_DIR,
           tempNewFolder.getAbsolutePath());
-      conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:" +
-          tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
+      conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:derby:" +
+          tempNewFolder.getAbsolutePath() + "/ozone_recon_derby.db");
 
       conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:0");
       conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
