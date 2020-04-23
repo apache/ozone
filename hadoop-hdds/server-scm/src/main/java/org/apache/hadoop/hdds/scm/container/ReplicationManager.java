@@ -252,9 +252,14 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
       final LifeCycleState state = container.getState();
 
       /*
-       * We don't take any action if the container is in OPEN state.
+       * We don't take any action if the container is in OPEN state and
+       * the container is healthy. If the container is not healthy, i.e.
+       * the replicas are not in OPEN state, send CLOSE_CONTAINER command.
        */
       if (state == LifeCycleState.OPEN) {
+        if (!isContainerHealthy(container, replicas)) {
+          eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
+        }
         return;
       }
 
