@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.fs.ozone.contract;
+package org.apache.hadoop.fs.ozone.contract.rooted;
 
 import java.io.IOException;
 
@@ -30,20 +30,20 @@ import org.junit.BeforeClass;
 /**
  * Test dir operations on Ozone.
  */
-public class ITestOzoneContractMkdir extends AbstractContractMkdirTest {
+public class ITestRootedOzoneContractMkdir extends AbstractContractMkdirTest {
 
   @BeforeClass
   public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+    RootedOzoneContract.createCluster();
   }
 
   @AfterClass
   public static void teardownCluster() throws IOException {
-    OzoneContract.destroyCluster();
+    RootedOzoneContract.destroyCluster();
   }
 
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
-    return new OzoneContract(conf);
+    return new RootedOzoneContract(conf);
   }
 }

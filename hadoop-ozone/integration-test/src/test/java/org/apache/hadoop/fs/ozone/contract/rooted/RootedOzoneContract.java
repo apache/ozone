@@ -16,7 +16,7 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.fs.ozone.contract;
+package org.apache.hadoop.fs.ozone.contract.rooted;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -41,12 +41,12 @@ import org.junit.Assert;
 /**
  * The contract of Ozone: only enabled if the test bucket is provided.
  */
-class OzoneContract extends AbstractFSContract {
+class RootedOzoneContract extends AbstractFSContract {
 
   private static MiniOzoneCluster cluster;
   private static final String CONTRACT_XML = "contract/ozone.xml";
 
-  OzoneContract(Configuration conf) {
+  RootedOzoneContract(Configuration conf) {
     super(conf);
     //insert the base features
     addConfResource(CONTRACT_XML);

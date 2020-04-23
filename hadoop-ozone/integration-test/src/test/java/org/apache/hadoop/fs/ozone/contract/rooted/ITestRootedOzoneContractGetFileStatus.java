@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.ozone.contract;
+package org.apache.hadoop.fs.ozone.contract.rooted;
 
 import java.io.IOException;
 
@@ -32,25 +32,25 @@ import org.slf4j.LoggerFactory;
 /**
  * Ozone contract tests covering getFileStatus.
  */
-public class ITestOzoneContractGetFileStatus
+public class ITestRootedOzoneContractGetFileStatus
     extends AbstractContractGetFileStatusTest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ITestOzoneContractGetFileStatus.class);
+      LoggerFactory.getLogger(ITestRootedOzoneContractGetFileStatus.class);
 
   @BeforeClass
   public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+    RootedOzoneContract.createCluster();
   }
 
   @AfterClass
   public static void teardownCluster() throws IOException {
-    OzoneContract.destroyCluster();
+    RootedOzoneContract.destroyCluster();
   }
 
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
-    return new OzoneContract(conf);
+    return new RootedOzoneContract(conf);
   }
 
   @Override

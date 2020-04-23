@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.fs.ozone.contract;
+package org.apache.hadoop.fs.ozone.contract.rooted;
 
 import java.io.IOException;
 
@@ -32,20 +32,20 @@ import org.junit.BeforeClass;
  * Uses the block output stream, buffered to disk. This is the
  * recommended output mechanism for DistCP due to its scalability.
  */
-public class ITestOzoneContractDistCp extends AbstractContractDistCpTest {
+public class ITestRootedOzoneContractDistCp extends AbstractContractDistCpTest {
 
   @BeforeClass
   public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+    RootedOzoneContract.createCluster();
   }
 
   @AfterClass
   public static void teardownCluster() throws IOException {
-    OzoneContract.destroyCluster();
+    RootedOzoneContract.destroyCluster();
   }
 
   @Override
-  protected OzoneContract createContract(Configuration conf) {
-    return new OzoneContract(conf);
+  protected RootedOzoneContract createContract(Configuration conf) {
+    return new RootedOzoneContract(conf);
   }
 }
