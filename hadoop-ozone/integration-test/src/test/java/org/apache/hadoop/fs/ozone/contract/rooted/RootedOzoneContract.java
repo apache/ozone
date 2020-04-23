@@ -32,14 +32,12 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 import org.junit.Assert;
 
 /**
- * The contract of Ozone: only enabled if the test bucket is provided.
+ * The contract of Rooted Ozone FileSystem (OFS).
  */
 class RootedOzoneContract extends AbstractFSContract {
 
@@ -54,13 +52,12 @@ class RootedOzoneContract extends AbstractFSContract {
 
   @Override
   public String getScheme() {
-    return OzoneConsts.OZONE_URI_SCHEME;
+    return OzoneConsts.OZONE_OFS_URI_SCHEME;
   }
 
   @Override
   public Path getTestPath() {
-    Path path = new Path("/test");
-    return path;
+    return new Path("/testvol1/testbucket1");
   }
 
   public static void createCluster() throws IOException {
@@ -103,17 +100,22 @@ class RootedOzoneContract extends AbstractFSContract {
     //assumes cluster is not null
     Assert.assertNotNull("cluster not created", cluster);
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
-
-    String uri = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
+    String uri = String.format("%s://localhost:%s/",
+        OzoneConsts.OZONE_OFS_URI_SCHEME,
+        cluster.getOzoneManager().getRpcPort());
     getConf().set("fs.defaultFS", uri);
+
+    // Note: FileSystem#loadFileSystems doesn't load OFS class because
+    //  META-INF points to org.apache.hadoop.fs.ozone.OzoneFileSystem
+    getConf().set("fs.ofs.impl",
+        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY);
     copyClusterConfigs(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
     return FileSystem.get(getConf());
   }
 
-  public static void destroyCluster() throws IOException {
+  public static void destroyCluster() {
     if (cluster != null) {
       cluster.shutdown();
       cluster = null;
