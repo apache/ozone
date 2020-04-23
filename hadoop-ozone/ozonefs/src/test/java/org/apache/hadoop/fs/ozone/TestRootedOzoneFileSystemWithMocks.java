@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
@@ -49,7 +48,7 @@ public class TestRootedOzoneFileSystemWithMocks {
 
   @Test
   public void testFSUriWithHostPortOverrides() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     OzoneClient ozoneClient = mock(OzoneClient.class);
     ObjectStore objectStore = mock(ObjectStore.class);
 
@@ -80,7 +79,7 @@ public class TestRootedOzoneFileSystemWithMocks {
 
   @Test
   public void testFSUriWithHostPortUnspecified() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     final int omPort = OmUtils.getOmRpcPort(conf);
 
     OzoneClient ozoneClient = mock(OzoneClient.class);
