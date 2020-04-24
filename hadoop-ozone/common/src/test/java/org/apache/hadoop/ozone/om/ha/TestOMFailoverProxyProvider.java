@@ -43,11 +43,11 @@ public class TestOMFailoverProxyProvider {
   private final static String DUMMY_NODE_ADDR = "0.0.0.0:8080";
   private OMFailoverProxyProvider provider;
   private long waitBetweenRetries;
+  private int numNodes = 3;
 
   @Before
   public void init() throws Exception {
     OzoneConfiguration config = new OzoneConfiguration();
-    long numNodes = 3;
     waitBetweenRetries = config.getLong(
         OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
@@ -69,27 +69,14 @@ public class TestOMFailoverProxyProvider {
    */
   @Test
   public void testWaitTimeWithNextNode() {
-    failoverToNextNode(2, 0);
+    failoverToNextNode(numNodes - 1, 0);
     // After 3 attempts done, wait time should be waitBetweenRetries.
     failoverToNextNode(1, waitBetweenRetries);
     // From 4th Attempt waitTime should reset to 0.
-    failoverToNextNode(2, 0);
+    failoverToNextNode(numNodes - 1, 0);
     // After 2nd round of 3attempts done, wait time should be
     // waitBetweenRetries.
     failoverToNextNode(1, waitBetweenRetries);
-  }
-
-  /**
-   * 1. Try failover to same node: wiatTime should increment
-   * attempts*waitBetweenRetries.
-   * 2. Try failover to next node: waitTime should be 0.
-   */
-  @Test
-  public void testWaitTimeWithSameNodeFailover() {
-    // Failover attempt 1 to same OM, waitTime should increase.
-    failoverToSameNode(4);
-    // 2 same node failovers, waitTime should be 0.
-    failoverToNextNode(2, 0);
   }
 
   /**
@@ -121,13 +108,13 @@ public class TestOMFailoverProxyProvider {
   @Test
   public void testWaitTimeResetWhenAllNodeFailoverAndSameNode() {
     // Next node failover wait time should be 0.
-    failoverToNextNode(2, 0);
+    failoverToNextNode(numNodes - 1, 0);
     // Once all numNodes failover done, waitTime should be waitBetweenRetries
     failoverToNextNode(1, waitBetweenRetries);
-    // 1 failover attempt to same OM, waitTime should increase.
-    failoverToSameNode(2);
+    // 4 failover attempts to same OM, waitTime should increase.
+    failoverToSameNode(4);
     // Next node failover should reset wait time.
-    failoverToNextNode(2, 0);
+    failoverToNextNode(numNodes - 1, 0);
     failoverToNextNode(1, waitBetweenRetries);
   }
 
