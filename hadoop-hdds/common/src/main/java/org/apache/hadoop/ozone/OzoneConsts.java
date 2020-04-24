@@ -338,7 +338,7 @@ public final class OzoneConsts {
    * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
    */
   public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
-          Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]$");
+          Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]+$");
 
   public static final String FS_FILE_COPYING_TEMP_SUFFIX= "._COPYING_";
 }
