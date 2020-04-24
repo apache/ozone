@@ -88,8 +88,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     // Verify key name
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-            .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-                    OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
     if(checkKeyNameEnabled){
       OmUtils.validateKeyName(keyArgs.getKeyName());
     }
