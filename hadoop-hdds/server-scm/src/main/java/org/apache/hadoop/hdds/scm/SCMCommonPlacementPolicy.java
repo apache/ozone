@@ -17,20 +17,21 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+
+import com.google.common.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This policy implements a set of invariants which are common
@@ -43,15 +44,16 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       LoggerFactory.getLogger(SCMCommonPlacementPolicy.class);
   private final NodeManager nodeManager;
   private final Random rand;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
 
   /**
    * Constructor.
    *
    * @param nodeManager NodeManager
-   * @param conf Configuration class.
+   * @param conf        Configuration class.
    */
-  public SCMCommonPlacementPolicy(NodeManager nodeManager, Configuration conf) {
+  public SCMCommonPlacementPolicy(NodeManager nodeManager,
+      ConfigurationSource conf) {
     this.nodeManager = nodeManager;
     this.rand = new Random();
     this.conf = conf;
@@ -80,7 +82,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    *
    * @return Configuration
    */
-  public Configuration getConf() {
+  public ConfigurationSource getConf() {
     return conf;
   }
 
@@ -95,11 +97,10 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * 3. if a set of containers are requested, we either meet the required
    * number of nodes or we fail that request.
    *
-   *
    * @param excludedNodes - datanodes with existing replicas
-   * @param favoredNodes - list of nodes preferred.
+   * @param favoredNodes  - list of nodes preferred.
    * @param nodesRequired - number of datanodes required.
-   * @param sizeRequired - size required for the container or block.
+   * @param sizeRequired  - size required for the container or block.
    * @return list of datanodes chosen.
    * @throws SCMException SCM exception.
    */
@@ -162,7 +163,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    * expected number of nodes.
    *
    * @param nodesRequired - Nodes Required
-   * @param healthyNodes - List of Nodes in the result set.
+   * @param healthyNodes  - List of Nodes in the result set.
    * @return List of Datanodes that can be used for placement.
    * @throws SCMException SCMException
    */

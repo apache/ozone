@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.container.common.helpers;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -86,7 +86,7 @@ public class ContainerMetrics {
     }
   }
 
-  public static ContainerMetrics create(Configuration conf) {
+  public static ContainerMetrics create(ConfigurationSource conf) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     // Percentile measurement is off by default, by watching no intervals
     int[] intervals =

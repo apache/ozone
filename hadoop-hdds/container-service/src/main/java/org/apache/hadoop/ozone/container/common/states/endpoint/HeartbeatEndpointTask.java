@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.GeneratedMessage;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -78,7 +78,7 @@ public class HeartbeatEndpointTask
   static final Logger LOG =
       LoggerFactory.getLogger(HeartbeatEndpointTask.class);
   private final EndpointStateMachine rpcEndpoint;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private DatanodeDetailsProto datanodeDetailsProto;
   private StateContext context;
   private int maxContainerActionsPerHB;
@@ -90,7 +90,7 @@ public class HeartbeatEndpointTask
    * @param conf Config.
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
-      Configuration conf, StateContext context) {
+      ConfigurationSource conf, StateContext context) {
     this.rpcEndpoint = rpcEndpoint;
     this.conf = conf;
     this.context = context;
@@ -344,7 +344,7 @@ public class HeartbeatEndpointTask
    */
   public static class Builder {
     private EndpointStateMachine endPointStateMachine;
-    private Configuration conf;
+    private ConfigurationSource conf;
     private DatanodeDetails datanodeDetails;
     private StateContext context;
 
@@ -371,7 +371,7 @@ public class HeartbeatEndpointTask
      * @param config - config
      * @return Builder
      */
-    public Builder setConfig(Configuration config) {
+    public Builder setConfig(ConfigurationSource config) {
       this.conf = config;
       return this;
     }

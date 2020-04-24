@@ -17,26 +17,26 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.junit.Rule;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.Assert;
-import org.junit.rules.TemporaryFolder;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.fs.Path;
+
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
 /**
  * Test class for OzoneConfiguration.
  */
 public class TestOzoneConfiguration {
 
-  private Configuration conf;
+  private OzoneConfiguration conf;
 
   @Rule
   public TemporaryFolder tempConfigs = new TemporaryFolder();

@@ -153,7 +153,6 @@ public class AbstractReconSqlDBTest {
     return injector.getInstance(type);
   }
 
-
   /**
    * Local Derby datasource provider.
    */

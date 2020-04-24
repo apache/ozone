@@ -28,7 +28,6 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
@@ -90,7 +89,7 @@ public class TestMetadataStore {
     testDir = GenericTestUtils.getTestDir(getClass().getSimpleName()
         + "-" + storeImpl.toLowerCase());
 
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
 
     store = MetadataStoreBuilder.newBuilder()
@@ -110,7 +109,7 @@ public class TestMetadataStore {
 
   @Test
   public void testIterator() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
     File dbDir = GenericTestUtils.getRandomizedTestDir();
     MetadataStore dbStore = MetadataStoreBuilder.newBuilder()
@@ -166,7 +165,7 @@ public class TestMetadataStore {
   @Test
   public void testMetaStoreConfigDifferentFromType() throws IOException {
 
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
     String dbType;
     GenericTestUtils.setLogLevel(MetadataStoreBuilder.LOG, Level.DEBUG);
@@ -193,7 +192,7 @@ public class TestMetadataStore {
   @Test
   public void testdbTypeNotSet() throws IOException {
 
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
     GenericTestUtils.setLogLevel(MetadataStoreBuilder.LOG, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
@@ -460,7 +459,7 @@ public class TestMetadataStore {
   @Test
   public void testDestroyDB() throws IOException {
     // create a new DB to test db destroy
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
 
     File dbDir = GenericTestUtils.getTestDir(getClass().getSimpleName()
@@ -485,7 +484,7 @@ public class TestMetadataStore {
 
   @Test
   public void testBatchWrite() throws IOException {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
 
     File dbDir = GenericTestUtils.getTestDir(getClass().getSimpleName()

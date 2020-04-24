@@ -17,6 +17,17 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletRequestWrapper;
+import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -37,29 +48,15 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.servlet.Filter;
-import javax.servlet.FilterChain;
-import javax.servlet.FilterConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
-import javax.servlet.http.HttpServletResponse;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
-import com.sun.jersey.spi.container.servlet.ServletContainer;
 import org.apache.hadoop.HadoopIllegalArgumentException;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.conf.ConfServlet;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
@@ -72,6 +69,11 @@ import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import com.sun.jersey.spi.container.servlet.ServletContainer;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.Connector;
@@ -192,8 +194,8 @@ public final class HttpServer2 implements FilterContainer {
   public static class Builder {
     private ArrayList<URI> endpoints = Lists.newArrayList();
     private String name;
-    private Configuration conf;
-    private Configuration sslConf;
+    private ConfigurationSource conf;
+    private ConfigurationSource sslConf;
     private String[] pathSpecs;
     private AccessControlList adminsAcl;
     private boolean securityEnabled = false;
@@ -291,7 +293,7 @@ public final class HttpServer2 implements FilterContainer {
       return this;
     }
 
-    public Builder setConf(Configuration configuration) {
+    public Builder setConf(ConfigurationSource configuration) {
       this.conf = configuration;
       return this;
     }
@@ -300,7 +302,7 @@ public final class HttpServer2 implements FilterContainer {
      * Specify the SSL configuration to load. This API provides an alternative
      * to keyStore/keyPassword/trustStore.
      */
-    public Builder setSSLConf(Configuration sslCnf) {
+    public Builder setSSLConf(ConfigurationSource sslCnf) {
       this.sslConf = sslCnf;
       return this;
     }
@@ -368,14 +370,15 @@ public final class HttpServer2 implements FilterContainer {
     }
 
     /**
-     * A wrapper of {@link Configuration#getPassword(String)}. It returns
+     * A wrapper of {@link ConfigurationSource#getPassword(String)}. It returns
      * <code>String</code> instead of <code>char[]</code>.
      *
      * @param conf the configuration
      * @param name the property name
      * @return the password string or null
      */
-    private static String getPasswordString(Configuration conf, String name)
+    private static String getPasswordString(ConfigurationSource conf,
+        String name)
         throws IOException {
       char[] passchars = conf.getPassword(name);
       if (passchars == null) {
@@ -426,7 +429,7 @@ public final class HttpServer2 implements FilterContainer {
       }
 
       if (this.conf == null) {
-        conf = new Configuration();
+        conf = new OzoneConfiguration();
       }
 
       HttpServer2 server = new HttpServer2(this);
@@ -565,7 +568,7 @@ public final class HttpServer2 implements FilterContainer {
   }
 
   private void initializeWebServer(String name, String hostName,
-      Configuration conf, String[] pathSpecs)
+      ConfigurationSource conf, String[] pathSpecs)
       throws IOException {
 
     Preconditions.checkNotNull(webAppContext);
@@ -602,7 +605,6 @@ public final class HttpServer2 implements FilterContainer {
     addGlobalFilter("safety", QuotingInputFilter.class.getName(), xFrameParams);
     final FilterInitializer[] initializers = getFilterInitializers(conf);
     if (initializers != null) {
-      conf = new Configuration(conf);
       conf.set(BIND_ADDRESS, hostName);
       for (FilterInitializer c : initializers) {
         c.initFilter(this, conf);
@@ -654,18 +656,20 @@ public final class HttpServer2 implements FilterContainer {
   private static SignerSecretProvider constructSecretProvider(final Builder b,
       ServletContext ctx)
       throws Exception {
-    final Configuration conf = b.conf;
+    final ConfigurationSource conf = b.conf;
     Properties config = getFilterProperties(conf,
         b.authFilterConfigurationPrefix);
     return AuthenticationFilter.constructSecretProvider(
         ctx, config, b.disallowFallbackToRandomSignerSecretProvider);
   }
 
-  private static Properties getFilterProperties(Configuration conf, String
+  private static Properties getFilterProperties(ConfigurationSource conf, String
       prefix) {
     Properties prop = new Properties();
     Map<String, String> filterConfig = AuthenticationFilterInitializer
-        .getFilterConfigMap(conf, prefix);
+        .getFilterConfigMap(
+            LegacyHadoopConfigurationSource.asHadoopConfiguration(conf),
+            prefix);
     prop.putAll(filterConfig);
     return prop;
   }
@@ -678,7 +682,8 @@ public final class HttpServer2 implements FilterContainer {
   /**
    * Get an array of FilterConfiguration specified in the conf.
    */
-  private static FilterInitializer[] getFilterInitializers(Configuration conf) {
+  private static FilterInitializer[] getFilterInitializers(
+      ConfigurationSource conf) {
     if (conf == null) {
       return null;
     }
@@ -691,8 +696,12 @@ public final class HttpServer2 implements FilterContainer {
 
     FilterInitializer[] initializers = new FilterInitializer[classes.length];
     for (int i = 0; i < classes.length; i++) {
-      initializers[i] = (FilterInitializer) ReflectionUtils.newInstance(
-          classes[i], conf);
+      try {
+        initializers[i] = (FilterInitializer) classes[i].newInstance();
+      } catch (Exception e) {
+        LOG.error("Can't initialize the filter initializer {}",
+            classes[i].getCanonicalName(), e);
+      }
     }
     return initializers;
   }
@@ -703,7 +712,7 @@ public final class HttpServer2 implements FilterContainer {
    * @throws IOException
    */
   protected void addDefaultApps(ContextHandlerCollection parent,
-      final String appDir, Configuration conf) throws IOException {
+      final String appDir, ConfigurationSource conf) throws IOException {
     // set up the context for "/logs/" if "hadoop.log.dir" property is defined
     // and it's enabled.
     String logDir = System.getProperty("hadoop.log.dir");
@@ -750,7 +759,7 @@ public final class HttpServer2 implements FilterContainer {
   }
 
   private void setContextAttributes(ServletContextHandler context,
-      Configuration conf) {
+      ConfigurationSource conf) {
     context.getServletContext().setAttribute(CONF_CONTEXT_ATTRIBUTE, conf);
     context.getServletContext().setAttribute(ADMINS_ACL, adminsAcl);
   }
@@ -1110,7 +1119,7 @@ public final class HttpServer2 implements FilterContainer {
     pool.setMaxThreads(max);
   }
 
-  private void initSpnego(Configuration conf, String hostName,
+  private void initSpnego(ConfigurationSource conf, String hostName,
       String usernameConfKey, String keytabConfKey) throws IOException {
     Map<String, String> params = new HashMap<>();
     String principalInConf = conf.get(usernameConfKey);
@@ -1380,8 +1389,9 @@ public final class HttpServer2 implements FilterContainer {
   public static boolean isInstrumentationAccessAllowed(
       ServletContext servletContext, HttpServletRequest request,
       HttpServletResponse response) throws IOException {
-    Configuration conf =
-        (Configuration) servletContext.getAttribute(CONF_CONTEXT_ATTRIBUTE);
+    ConfigurationSource conf =
+        (ConfigurationSource) servletContext
+            .getAttribute(CONF_CONTEXT_ATTRIBUTE);
 
     boolean access = true;
     boolean adminAccess = conf.getBoolean(
@@ -1405,8 +1415,9 @@ public final class HttpServer2 implements FilterContainer {
   public static boolean hasAdministratorAccess(
       ServletContext servletContext, HttpServletRequest request,
       HttpServletResponse response) throws IOException {
-    Configuration conf =
-        (Configuration) servletContext.getAttribute(CONF_CONTEXT_ATTRIBUTE);
+    ConfigurationSource conf =
+        (ConfigurationSource) servletContext
+            .getAttribute(CONF_CONTEXT_ATTRIBUTE);
     // If there is no authorization, anybody has administrator access.
     if (!conf.getBoolean(
         CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false)) {
@@ -1679,17 +1690,14 @@ public final class HttpServer2 implements FilterContainer {
     }
   }
 
-  private Map<String, String> setHeaders(Configuration conf) {
+  private Map<String, String> setHeaders(ConfigurationSource conf) {
     Map<String, String> xFrameParams = new HashMap<>();
-    Map<String, String> headerConfigMap =
-        conf.getValByRegex(HTTP_HEADER_REGEX);
 
     xFrameParams.putAll(getDefaultHeaders());
     if (this.xFrameOptionIsEnabled) {
       xFrameParams.put(HTTP_HEADER_PREFIX + X_FRAME_OPTIONS,
           this.xFrameOption.toString());
     }
-    xFrameParams.putAll(headerConfigMap);
     return xFrameParams;
   }
 

@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
@@ -80,7 +80,7 @@ public class KeyDeletingService extends BackgroundService {
   KeyDeletingService(OzoneManager ozoneManager,
       ScmBlockLocationProtocol scmClient,
       KeyManager manager, long serviceInterval,
-      long serviceTimeout, Configuration conf) {
+      long serviceTimeout, ConfigurationSource conf) {
     super("KeyDeletingService", serviceInterval, TimeUnit.MILLISECONDS,
         KEY_DELETING_CORE_POOL_SIZE, serviceTimeout);
     this.ozoneManager = ozoneManager;

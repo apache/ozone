@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.UUID;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -114,7 +114,7 @@ public class OMStorage extends Storage {
    * @param conf - Config
    * @return File path, after creating all the required Directories.
    */
-  public static File getOmDbDir(Configuration conf) {
+  public static File getOmDbDir(ConfigurationSource conf) {
     return ServerUtils.getDBPath(conf, OMConfigKeys.OZONE_OM_DB_DIRS);
   }
 }

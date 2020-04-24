@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -201,7 +201,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * one {@link OzoneManagerProtocolPB} proxy pointing to each OM node in the
    * cluster.
    */
-  public OzoneManagerProtocolClientSideTranslatorPB(OzoneConfiguration conf,
+  public OzoneManagerProtocolClientSideTranslatorPB(ConfigurationSource conf,
       String clientId, String omServiceId, UserGroupInformation ugi)
       throws IOException {
     this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
@@ -241,6 +241,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
               getNotLeaderException(exception);
           if (notLeaderException != null &&
               notLeaderException.getSuggestedLeaderNodeId() != null) {
+            FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
+                notLeaderException.getMessage());
+
             // TODO: NotLeaderException should include the host
             //  address of the suggested leader along with the nodeID.
             //  Failing over just based on nodeID is not very robust.
@@ -258,6 +261,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           // does not perform any failover.
           // So Just retry with same OM node.
           if (leaderNotReadyException != null) {
+            FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
+                leaderNotReadyException.getMessage());
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
         }
@@ -266,13 +271,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         // NotLeaderException fail over manually to the next OM Node proxy.
         // OMFailoverProxyProvider#performFailover() is a dummy call and
         // does not perform any failover.
+        String exceptionMsg;
+        if (exception.getCause() != null) {
+          exceptionMsg = exception.getCause().getMessage();
+        } else {
+          exceptionMsg = exception.getMessage();
+        }
+        FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}", exceptionMsg);
         omFailoverProxyProvider.performFailoverToNextProxy();
         return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
       }
 
       private RetryAction getRetryAction(RetryDecision fallbackAction,
           int failovers) {
-        if (failovers <= maxFailovers) {
+        if (failovers < maxFailovers) {
           return new RetryAction(fallbackAction,
               omFailoverProxyProvider.getWaitTime());
         } else {
@@ -561,7 +573,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Lists volume owned by a specific user.
+   * Lists volumes accessible by a specific user.
    *
    * @param userName - user name
    * @param prefix - Filter prefix -- Return only entries that match this.

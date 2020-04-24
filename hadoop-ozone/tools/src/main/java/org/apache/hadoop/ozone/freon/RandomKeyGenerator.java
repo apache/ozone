@@ -22,6 +22,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,21 +32,19 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.opentracing.Scope;
-import io.opentracing.util.GlobalTracer;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -66,6 +65,8 @@ import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.slf4j.Logger;
@@ -73,8 +74,6 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.security.MessageDigest;
 
 /**
  * Data generator tool to generate as much keys as possible.
@@ -623,8 +622,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
     String volumeName = "vol-" + volumeNumber + "-"
         + RandomStringUtils.randomNumeric(5);
     LOG.trace("Creating volume: {}", volumeName);
-    try (Scope ignored = GlobalTracer.get().buildSpan("createVolume")
-        .startActive(true)) {
+    try (AutoCloseable scope = TracingUtil
+        .createActivatedSpan("createVolume")) {
       long start = System.nanoTime();
       objectStore.createVolume(volumeName);
       long volumeCreationDuration = System.nanoTime() - start;
@@ -655,8 +654,9 @@ public final class RandomKeyGenerator implements Callable<Void> {
         RandomStringUtils.randomNumeric(5);
     LOG.trace("Creating bucket: {} in volume: {}",
         bucketName, volume.getName());
-    try (Scope ignored = GlobalTracer.get().buildSpan("createBucket")
-        .startActive(true)) {
+    try (AutoCloseable scope = TracingUtil
+        .createActivatedSpan("createBucket")) {
+
       long start = System.nanoTime();
       volume.createBucket(bucketName);
       long bucketCreationDuration = System.nanoTime() - start;
@@ -691,8 +691,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     LOG.trace("Adding key: {} in bucket: {} of volume: {}",
         keyName, bucketName, volumeName);
     try {
-      try (Scope scope = GlobalTracer.get().buildSpan("createKey")
-          .startActive(true)) {
+      try (AutoCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
         long keyCreateStart = System.nanoTime();
         try (OzoneOutputStream os = bucket.createKey(keyName, keySize, type,
             factor, new HashMap<>())) {
@@ -701,8 +700,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
               .update(keyCreationDuration);
           keyCreationTime.getAndAdd(keyCreationDuration);
 
-          try (Scope writeScope = GlobalTracer.get().buildSpan("writeKeyData")
-              .startActive(true)) {
+          try (AutoCloseable writeScope = TracingUtil
+              .createActivatedSpan("writeKeyData")) {
             long keyWriteStart = System.nanoTime();
             for (long nrRemaining = keySize;
                  nrRemaining > 0; nrRemaining -= bufferSize) {

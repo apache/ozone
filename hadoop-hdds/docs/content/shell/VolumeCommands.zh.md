@@ -80,13 +80,14 @@ ozone sh volume info /hive
 
 ### 列举
 
-`volume list` 命令用来列举一个用户拥有的所有卷。
+`volume list` 命令用来列举一个用户可以访问的所有卷。
 
 {{< highlight bash >}}
 ozone sh volume list --user hadoop
 {{< /highlight >}}
 
-上述命令会打印出 hadoop 用户拥有的所有卷。
+若 ACL 已启用，上述命令会打印出 hadoop 用户有 LIST 权限的所有卷。
+若 ACL 被禁用，上述命令会打印出 hadoop 用户拥有的所有卷。
 
 ### 更新
 

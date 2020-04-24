@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import io.opentracing.Scope;
+import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 
 /**
@@ -64,9 +65,10 @@ public class TraceAllMethod<T> implements InvocationHandler {
         method.getName());
     }
 
-    try (Scope scope = GlobalTracer.get().buildSpan(
+    Span span = GlobalTracer.get().buildSpan(
         name + "." + method.getName())
-        .startActive(true)) {
+        .start();
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       try {
         return delegateMethod.invoke(delegate, args);
       } catch (Exception ex) {
@@ -75,6 +77,8 @@ public class TraceAllMethod<T> implements InvocationHandler {
         } else {
           throw ex;
         }
+      } finally {
+        span.finish();
       }
     }
   }

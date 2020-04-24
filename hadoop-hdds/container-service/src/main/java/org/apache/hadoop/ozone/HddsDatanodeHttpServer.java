@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 
 /**
@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.server.http.BaseHttpServer;
  */
 public class HddsDatanodeHttpServer extends BaseHttpServer {
 
-  public HddsDatanodeHttpServer(Configuration conf) throws IOException {
+  public HddsDatanodeHttpServer(OzoneConfiguration conf) throws IOException {
     super(conf, "hddsDatanode");
   }
 

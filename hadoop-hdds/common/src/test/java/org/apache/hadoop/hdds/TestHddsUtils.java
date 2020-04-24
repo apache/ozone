@@ -25,18 +25,17 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
 
 import static org.apache.hadoop.hdds.HddsUtils.getSCMAddresses;
 import static org.hamcrest.core.Is.is;
+import org.junit.Assert;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import org.junit.Test;
 
 /**
  * Testing HddsUtils.
@@ -76,7 +75,7 @@ public class TestHddsUtils {
 
   @Test
   public void testGetSCMAddresses() {
-    final Configuration conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
     Collection<InetSocketAddress> addresses;
     InetSocketAddress addr;
     Iterator<InetSocketAddress> it;

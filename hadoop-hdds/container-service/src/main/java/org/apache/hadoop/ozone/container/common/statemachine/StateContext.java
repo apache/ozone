@@ -16,45 +16,16 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import com.google.common.base.Preconditions;
-import com.google.protobuf.GeneratedMessage;
-
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineAction;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerAction;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
-import org.apache.hadoop.ozone.container.common.states.DatanodeState;
-import org.apache.hadoop.ozone.container.common.states.datanode
-    .InitDatanodeState;
-import org.apache.hadoop.ozone.container.common.states.datanode
-    .RunningDatanodeState;
-import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
-import org.apache.hadoop.ozone.protocol.commands
-    .DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-
-import static java.lang.Math.min;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
-import java.util.ArrayList;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +34,26 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.ozone.container.common.states.DatanodeState;
+import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
+import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+
+import com.google.common.base.Preconditions;
+import com.google.protobuf.GeneratedMessage;
+import static java.lang.Math.min;
+import org.apache.commons.collections.CollectionUtils;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Current Context of State Machine.
@@ -75,7 +66,7 @@ public class StateContext {
   private final Lock lock;
   private final DatanodeStateMachine parent;
   private final AtomicLong stateExecutionCount;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final Set<InetSocketAddress> endpoints;
   private final Map<InetSocketAddress, List<GeneratedMessage>> reports;
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
@@ -98,8 +89,9 @@ public class StateContext {
    * @param state  - State
    * @param parent Parent State Machine
    */
-  public StateContext(Configuration conf, DatanodeStateMachine.DatanodeStates
-      state, DatanodeStateMachine parent) {
+  public StateContext(ConfigurationSource conf,
+      DatanodeStateMachine.DatanodeStates
+          state, DatanodeStateMachine parent) {
     this.conf = conf;
     this.state = state;
     this.parent = parent;

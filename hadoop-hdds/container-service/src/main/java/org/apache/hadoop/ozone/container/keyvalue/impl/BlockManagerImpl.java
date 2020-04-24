@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -57,7 +57,7 @@ public class BlockManagerImpl implements BlockManager {
   private static byte[] blockCommitSequenceIdKey =
           DFSUtil.string2Bytes(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
 
-  private Configuration config;
+  private ConfigurationSource config;
 
   private static final String DB_NULL_ERR_MSG = "DB cannot be null here";
   private static final String NO_SUCH_BLOCK_ERR_MSG =
@@ -68,7 +68,7 @@ public class BlockManagerImpl implements BlockManager {
    *
    * @param conf - Ozone configuration
    */
-  public BlockManagerImpl(Configuration conf) {
+  public BlockManagerImpl(ConfigurationSource conf) {
     Preconditions.checkNotNull(conf, "Config cannot be null");
     this.config = conf;
   }
