@@ -207,13 +207,10 @@ public final class HddsClientUtils {
     if (keyName == null) {
       throw new IllegalArgumentException("Key name is null");
     }
-    for (int index = 0; index < keyName.length(); index++) {
-      char currChar = keyName.charAt(index);
-      if (!(Character.toString(currChar)
-              .matches(OzoneConsts.KEYNAME_AVOID_CHARACTERS_REGEX))){
-        throw new IllegalArgumentException("Key name has an " +
-                "unsupported character : " + currChar);
-      }
+    if(!OzoneConsts.KEYNAME_CHECK_ILLGEAL_CHARACTERS_REGEX
+            .matcher(keyName).matches()){
+      throw new IllegalArgumentException("key name contains " +
+              "illegal characters.");
     }
   }
 

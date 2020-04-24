@@ -23,6 +23,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
+import java.util.regex.Pattern;
+
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 
 /**
@@ -335,8 +337,8 @@ public final class OzoneConsts {
    * and Non-printable ASCII characters (128–255 decimal characters).
    * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
    */
-  public static final String KEYNAME_AVOID_CHARACTERS_REGEX =
-          "^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]$";
+  public static final Pattern KEYNAME_CHECK_ILLGEAL_CHARACTERS_REGEX =
+          Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]$");
 
   public static final String FS_FILE_COPYING_TEMP_SUFFIX= "._COPYING_";
 }
