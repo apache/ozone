@@ -31,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
@@ -94,8 +95,13 @@ public class OMFileCreateRequest extends OMKeyRequest {
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
 
     // Verify key name
-    OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
-                    OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+            .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                    OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if(checkKeyNameEnabled){
+      OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
+              OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
+    }
 
     if (keyArgs.getKeyName().length() == 0) {
       // Check if this is the root of the filesystem.

@@ -337,7 +337,7 @@ public final class OzoneConsts {
    * and Non-printable ASCII characters (128–255 decimal characters).
    * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
    */
-  public static final Pattern KEYNAME_CHECK_ILLGEAL_CHARACTERS_REGEX =
+  public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
           Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]$");
 
   public static final String FS_FILE_COPYING_TEMP_SUFFIX= "._COPYING_";

@@ -207,7 +207,7 @@ public final class HddsClientUtils {
     if (keyName == null) {
       throw new IllegalArgumentException("Key name is null");
     }
-    if(!OzoneConsts.KEYNAME_CHECK_ILLGEAL_CHARACTERS_REGEX
+    if(!OzoneConsts.KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX
             .matcher(keyName).matches()){
       throw new IllegalArgumentException("key name contains " +
               "illegal characters.");
