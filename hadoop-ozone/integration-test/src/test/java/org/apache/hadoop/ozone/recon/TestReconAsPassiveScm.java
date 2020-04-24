@@ -81,7 +81,7 @@ public class TestReconAsPassiveScm {
     }
   }
 
-  @Test(timeout = 120000)
+  @Test
   public void testDatanodeRegistrationAndReports() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -91,7 +91,7 @@ public class TestReconAsPassiveScm {
     PipelineManager scmPipelineManager = scm.getPipelineManager();
 
     LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() == 4));
+        () -> (reconPipelineManager.getPipelines().size() >= 4));
 
     // Verify if Recon has all the pipelines from SCM.
     scmPipelineManager.getPipelines().forEach(p -> {
@@ -139,7 +139,7 @@ public class TestReconAsPassiveScm {
         1000, 20000);
   }
 
-  @Test(timeout = 120000)
+  @Test
   public void testReconRestart() throws Exception {
     final OzoneStorageContainerManager reconScm =
             cluster.getReconServer().getReconStorageContainerManager();
@@ -193,7 +193,7 @@ public class TestReconAsPassiveScm {
     assertFalse(
         reconPipelineManager.containsPipeline(pipelineToClose.get().getId()));
 
-    LambdaTestUtils.await(60000, 5000,
+    LambdaTestUtils.await(90000, 5000,
         () -> (newReconScm.getContainerManager()
             .exists(ContainerID.valueof(containerID))));
   }

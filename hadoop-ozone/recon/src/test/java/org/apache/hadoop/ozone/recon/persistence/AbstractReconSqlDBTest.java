@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule.RECON_DAO_LIST;
-import static org.junit.Assert.assertNotNull;
-
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
@@ -40,7 +37,6 @@ import org.jooq.impl.DefaultConfiguration;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
-import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import com.google.inject.AbstractModule;
@@ -144,21 +140,6 @@ public class AbstractReconSqlDBTest {
    */
   protected <T> T getSchemaDefinition(Class<T> type) {
     return injector.getInstance(type);
-  }
-
-  /**
-   * Make sure schema was created correctly.
-   * @throws SQLException
-   */
-  @Test
-  public void testSchemaSetup() throws SQLException {
-    assertNotNull(injector);
-    assertNotNull(getConfiguration());
-    assertNotNull(dslContext);
-    assertNotNull(getConnection());
-    RECON_DAO_LIST.forEach(dao -> {
-      assertNotNull(getDao(dao));
-    });
   }
 
   /**
