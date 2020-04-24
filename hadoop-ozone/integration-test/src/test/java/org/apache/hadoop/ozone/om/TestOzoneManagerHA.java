@@ -282,6 +282,7 @@ public class TestOzoneManagerHA {
   /**
    * Test client request fails when 2 OMs are down.
    */
+  @Ignore("This test is failing randomly. It will be enabled after fixing it.")
   @Test
   public void testTwoOMNodesDown() throws Exception {
     cluster.stopOzoneManager(1);
@@ -738,7 +739,6 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(leaderOMNodeId, newLeaderOMNodeId);
   }
 
-  @Ignore("This test randomly failing. Let's enable once its fixed.")
   @Test
   public void testOMRetryProxy() throws Exception {
     // Stop all the OMs.
@@ -756,19 +756,10 @@ public class TestOzoneManagerHA {
       // the RpcClient should give up.
       fail("TestOMRetryProxy should fail when there are no OMs running");
     } catch (ConnectException e) {
-      // Each retry attempt tries IPC_CLIENT_CONNECT_MAX_RETRIES times.
-      // So there should be at least
-      // OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS * IPC_CLIENT_CONNECT_MAX_RETRIES
-      // "Retrying connect to server" messages.
-      // Also, the first call will result in EOFException.
-      // That will result in another IPC_CLIENT_CONNECT_MAX_RETRIES attempts.
-      Assert.assertEquals(
-          (OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS + 1) *
-              IPC_CLIENT_CONNECT_MAX_RETRIES,
-          appender.countLinesWithMessage("Retrying connect to server:"));
-
       Assert.assertEquals(1,
           appender.countLinesWithMessage("Failed to connect to OMs:"));
+      Assert.assertEquals(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS,
+          appender.countLinesWithMessage("Trying to failover"));
       Assert.assertEquals(1,
           appender.countLinesWithMessage("Attempted " +
               OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS + " failovers."));

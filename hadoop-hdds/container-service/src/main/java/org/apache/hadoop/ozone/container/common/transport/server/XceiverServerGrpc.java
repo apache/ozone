@@ -43,6 +43,8 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 
 import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.thirdparty.io.grpc.BindableService;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerBuilder;
@@ -170,16 +172,19 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   @Override
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
-    try (Scope scope = TracingUtil
-        .importAndCreateScope(
+    Span span = TracingUtil
+        .importAndCreateSpan(
             "XceiverServerGrpc." + request.getCmdType().name(),
-            request.getTraceID())) {
+            request.getTraceID());
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       ContainerProtos.ContainerCommandResponseProto response =
           storageContainer.dispatch(request, null);
       if (response.getResult() != ContainerProtos.Result.SUCCESS) {
         throw new StorageContainerException(response.getMessage(),
             response.getResult());
       }
+    } finally {
+      span.finish();
     }
   }
 

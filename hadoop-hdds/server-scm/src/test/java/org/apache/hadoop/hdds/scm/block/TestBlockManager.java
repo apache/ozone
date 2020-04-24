@@ -39,6 +39,8 @@ import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreRDBImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
@@ -65,7 +67,6 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 
-
 /**
  * Tests for SCM Block Manager.
  */
@@ -87,6 +88,7 @@ public class TestBlockManager {
 
   @Rule
   public TemporaryFolder folder= new TemporaryFolder();
+  private SCMMetadataStore scmMetadataStore;
 
   @Before
   public void setUp() throws Exception {
@@ -104,16 +106,25 @@ public class TestBlockManager {
     // Override the default Node Manager in SCM with this Mock Node Manager.
     nodeManager = new MockNodeManager(true, 10);
     eventQueue = new EventQueue();
+
+    scmMetadataStore = new SCMMetadataStoreRDBImpl(conf);
+    scmMetadataStore.start(conf);
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, eventQueue);
+        new SCMPipelineManager(conf, nodeManager,
+            scmMetadataStore.getPipelineTable(),
+            eventQueue);
     pipelineManager.allowPipelineCreation();
+
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     SCMContainerManager containerManager =
-        new SCMContainerManager(conf, pipelineManager);
+        new SCMContainerManager(conf,
+            scmMetadataStore.getContainerTable(),
+            scmMetadataStore.getStore(),
+            pipelineManager);
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         containerManager.getContainers(), pipelineManager, eventQueue) {
       @Override
@@ -126,6 +137,7 @@ public class TestBlockManager {
     configurator.setPipelineManager(pipelineManager);
     configurator.setContainerManager(containerManager);
     configurator.setScmSafeModeManager(safeModeManager);
+    configurator.setMetadataStore(scmMetadataStore);
     scm = TestUtils.getScm(conf, configurator);
 
     // Initialize these fields so that the tests can pass.
@@ -145,10 +157,11 @@ public class TestBlockManager {
   }
 
   @After
-  public void cleanup() {
+  public void cleanup() throws Exception {
     scm.stop();
     scm.join();
     eventQueue.close();
+    scmMetadataStore.stop();
   }
 
   @Test

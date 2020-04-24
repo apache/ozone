@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.genesis;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,15 +31,17 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -48,9 +49,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_PIPELINE_DB;
+
 
 /**
  * Utility class for benchmark test cases.
@@ -150,16 +149,11 @@ public final class GenesisUtil {
   }
 
   static void addPipelines(HddsProtos.ReplicationFactor factor,
-      int numPipelines, ConfigurationSource conf) throws IOException {
-    final File metaDir = ServerUtils.getScmDbDir(conf);
-    final File pipelineDBPath = new File(metaDir, SCM_PIPELINE_DB);
-    int cacheSize = conf.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
-        OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
-    MetadataStore pipelineStore =
-        MetadataStoreBuilder.newBuilder().setCreateIfMissing(true)
-            .setConf(conf).setDbFile(pipelineDBPath)
-            .setCacheSize(cacheSize * OzoneConsts.MB).build();
+      int numPipelines, ConfigurationSource conf) throws Exception {
+    DBStore dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
 
+    Table<PipelineID, Pipeline> pipelineTable =
+        SCMDBDefinition.PIPELINES.getTable(dbStore);
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < factor.getNumber(); i++) {
       nodes
@@ -174,11 +168,11 @@ public final class GenesisUtil {
               .setFactor(factor)
               .setNodes(nodes)
               .build();
-      pipelineStore.put(pipeline.getId().getProtobuf().toByteArray(),
-          pipeline.getProtobufMessage().toByteArray());
+      pipelineTable.put(pipeline.getId(),
+          pipeline);
     }
 
-    pipelineStore.close();
+    dbStore.close();
   }
 
   static OzoneManager getOm(OzoneConfiguration conf)

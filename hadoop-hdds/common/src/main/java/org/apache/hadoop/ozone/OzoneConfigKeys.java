@@ -149,6 +149,17 @@ public final class OzoneConfigKeys {
   public static final TimeDuration OZONE_CLIENT_RETRY_INTERVAL_DEFAULT =
       TimeDuration.valueOf(0, TimeUnit.MILLISECONDS);
 
+  /**
+   * If this value is true, when the client calls the flush() method,
+   * it checks whether the data in the buffer is greater than
+   * OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT. If greater than,
+   * send the data in the buffer to the datanode.
+   * */
+  public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY =
+      "ozone.client.stream.buffer.flush.delay";
+  public static final boolean OOZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT =
+      false;
+
   // This defines the overall connection limit for the connection pool used in
   // RestClient.
   public static final String OZONE_REST_CLIENT_HTTP_CONNECTION_MAX =

@@ -85,13 +85,15 @@ The above command will print out the information about hive volume.
 
 ### List
 
-The `volume list` command will list the volumes owned by a user.
+The `volume list` command will list the volumes accessible by a user.
 
 {{< highlight bash >}}
 ozone sh volume list --user hadoop
 {{< /highlight >}}
 
-The above command will print out all the volumes owned by the user hadoop.
+When ACL is enabled, the above command will print out volumes that the user
+hadoop has LIST permission to. When ACL is disabled, the above command will
+print out all the volumes owned by the user hadoop.
 
 ### Update
 

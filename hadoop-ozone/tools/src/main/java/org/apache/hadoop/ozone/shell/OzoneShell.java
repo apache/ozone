@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.shell;
 
+import java.util.function.Supplier;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.shell.bucket.BucketCommands;
@@ -24,8 +26,6 @@ import org.apache.hadoop.ozone.shell.keys.KeyCommands;
 import org.apache.hadoop.ozone.shell.token.TokenCommands;
 import org.apache.hadoop.ozone.shell.volume.VolumeCommands;
 
-import io.opentracing.Scope;
-import io.opentracing.util.GlobalTracer;
 import picocli.CommandLine.Command;
 
 /**
@@ -56,9 +56,11 @@ public class OzoneShell extends Shell {
   @Override
   public void execute(String[] argv) {
     TracingUtil.initTracing("shell", createOzoneConfiguration());
-    try (Scope scope = GlobalTracer.get().buildSpan("main").startActive(true)) {
-      super.execute(argv);
-    }
+    TracingUtil.executeInNewSpan("main",
+        (Supplier<Void>) () -> {
+          super.execute(argv);
+          return null;
+        });
   }
 
 }
