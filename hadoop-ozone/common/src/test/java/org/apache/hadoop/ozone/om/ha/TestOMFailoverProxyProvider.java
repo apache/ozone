@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.ha;
 
+import java.util.Collection;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.Before;
@@ -44,10 +45,11 @@ public class TestOMFailoverProxyProvider {
   private OMFailoverProxyProvider provider;
   private long waitBetweenRetries;
   private int numNodes = 3;
+  private OzoneConfiguration config;
 
   @Before
   public void init() throws Exception {
-    OzoneConfiguration config = new OzoneConfiguration();
+    config = new OzoneConfiguration();
     waitBetweenRetries = config.getLong(
         OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
@@ -90,7 +92,7 @@ public class TestOMFailoverProxyProvider {
   }
 
   /**
-   * Tests wait time should reset in thr following case:
+   * Tests wait time should reset in the following case:
    * 1. Do a couple same node failover attempts.
    * 2. Next node failover should reset wait time to 0.
    */
@@ -100,6 +102,22 @@ public class TestOMFailoverProxyProvider {
     failoverToSameNode(2);
     // Failover to next node, should reset waitTime to 0.
     failoverToNextNode(1, 0);
+  }
+
+  /**
+   * Tests wait time should be 0 in the following case:
+   * 1. Do failover to suggest new node.
+   * 2. WaitTime should be 0.
+   */
+  @Test
+  public void testWaitTimeWithSuggestedNewNode() {
+    Collection<String> allNodeIds = config.getTrimmedStringCollection(OmUtils.
+        addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID));
+    allNodeIds.remove(provider.getCurrentProxyOMNodeId());
+    Assert.assertTrue("This test needs at least 2 OMs",
+        allNodeIds.size() > 0);
+    provider.performFailoverIfRequired(allNodeIds.iterator().next());
+    Assert.assertEquals(0, provider.getWaitTime());
   }
 
   /**
