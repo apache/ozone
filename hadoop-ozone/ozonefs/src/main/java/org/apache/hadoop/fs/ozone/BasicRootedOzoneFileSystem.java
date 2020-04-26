@@ -695,7 +695,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       fileStatus = convertFileStatus(
           adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
     } catch (OMException ex) {
-      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND)) {
+      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
+          ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
+          ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
         throw new FileNotFoundException("File not found. path:" + f);
       }
     }
