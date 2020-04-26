@@ -151,7 +151,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   }
 
   @Test
-  public void testReadWriteWithChaosCluster() {
+  public void testReadWriteWithChaosCluster() throws Exception {
     cluster.startChaos(5, 10, TimeUnit.SECONDS);
     loadGenerator.startIO(120, TimeUnit.SECONDS);
   }

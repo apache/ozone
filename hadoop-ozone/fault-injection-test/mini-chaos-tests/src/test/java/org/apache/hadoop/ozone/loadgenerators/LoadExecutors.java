@@ -72,7 +72,7 @@ public class LoadExecutors {
   }
 
 
-  public void startLoad(long time) {
+  public void startLoad(long time) throws Exception {
     LOG.info("Starting {} threads for {} genrators", numThreads,
         generators.size());
     for (LoadGenerator gen : generators) {
@@ -81,6 +81,7 @@ public class LoadExecutors {
         gen.initialize();
       } catch (Throwable t) {
         LOG.error("Failed to initialize loadgen:{}", gen, t);
+        throw t;
       }
     }
 

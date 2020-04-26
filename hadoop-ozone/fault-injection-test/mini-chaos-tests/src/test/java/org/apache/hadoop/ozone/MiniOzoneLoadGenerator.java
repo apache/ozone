@@ -76,7 +76,7 @@ public class MiniOzoneLoadGenerator {
     loadGenerators.add(loadGenerator);
   }
 
-  void startIO(long time, TimeUnit timeUnit) {
+  void startIO(long time, TimeUnit timeUnit) throws Exception {
     LOG.info("Starting MiniOzoneLoadGenerator for time {}:{}", time, timeUnit);
     long runTime = timeUnit.toMillis(time);
     // start and wait for executors to finish
