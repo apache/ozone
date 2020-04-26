@@ -48,4 +48,29 @@ public class ITestRootedOzoneContractRootDir extends
     return new RootedOzoneContract(conf);
   }
 
+  @Override
+  public void testRmEmptyRootDirNonRecursive() {
+    // OFS doesn't support deleting volumes via rm
+  }
+
+  @Override
+  public void testRmRootRecursive() {
+    // OFS doesn't support deleting volumes via rm
+  }
+
+  @Override
+  public void testListEmptyRootDirectory() {
+    // OFS doesn't support deleting volumes via rm
+  }
+
+  @Override
+  public void testMkDirDepth1() {
+    // OFS doesn't support deleting volumes via rm
+  }
+
+  @Override
+  public void testRmNonEmptyRootDirNonRecursive() {
+    // OFS doesn't support creating files directly under root
+  }
+
 }

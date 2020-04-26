@@ -57,7 +57,7 @@ class RootedOzoneContract extends AbstractFSContract {
 
   @Override
   public Path getTestPath() {
-    return new Path("/testvol1/testbucket1");
+    return new Path("/testvol1/testbucket1/test");
   }
 
   public static void createCluster() throws IOException {
