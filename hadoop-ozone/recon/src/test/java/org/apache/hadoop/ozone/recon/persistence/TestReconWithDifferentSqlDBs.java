@@ -135,12 +135,12 @@ public class TestReconWithDifferentSqlDBs extends AbstractReconSqlDBTest {
         }
 
         @Override
-        public Integer getMaxConnectionAge() {
+        public long getMaxConnectionAge() {
           return 120;
         }
 
         @Override
-        public Integer getMaxIdleConnectionAge() {
+        public long getMaxIdleConnectionAge() {
           return 120;
         }
 
@@ -150,7 +150,7 @@ public class TestReconWithDifferentSqlDBs extends AbstractReconSqlDBTest {
         }
 
         @Override
-        public Integer getIdleConnectionTestPeriod() {
+        public long getIdleConnectionTestPeriod() {
           return 30;
         }
       };

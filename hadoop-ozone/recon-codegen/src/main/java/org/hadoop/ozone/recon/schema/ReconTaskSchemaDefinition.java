@@ -51,7 +51,7 @@ public class ReconTaskSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     if (!TABLE_EXISTS_CHECK.test(conn, RECON_TASK_STATUS_TABLE_NAME)) {
-      createReconTaskStatus(conn);
+      createReconTaskStatusTable(conn);
     }
   }
 
@@ -59,7 +59,7 @@ public class ReconTaskSchemaDefinition implements ReconSchemaDefinition {
    * Create the Recon Task Status table.
    * @param conn connection
    */
-  private void createReconTaskStatus(Connection conn) {
+  private void createReconTaskStatusTable(Connection conn) {
     DSL.using(conn).createTableIfNotExists(RECON_TASK_STATUS_TABLE_NAME)
         .column("task_name", SQLDataType.VARCHAR(1024))
         .column("last_updated_timestamp", SQLDataType.BIGINT)

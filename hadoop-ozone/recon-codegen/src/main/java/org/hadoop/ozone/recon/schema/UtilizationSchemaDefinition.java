@@ -60,7 +60,7 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     if (!TABLE_EXISTS_CHECK.test(conn, FILE_COUNT_BY_SIZE_TABLE_NAME)) {
-      createFileSizeCount(conn);
+      createFileSizeCountTable(conn);
     }
     if (!TABLE_EXISTS_CHECK.test(conn, CLUSTER_GROWTH_DAILY_TABLE_NAME)) {
       createClusterGrowthTable(conn);
@@ -82,7 +82,7 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
         .execute();
   }
 
-  private void createFileSizeCount(Connection conn) {
+  private void createFileSizeCountTable(Connection conn) {
     DSL.using(conn).createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
         .column("file_size", SQLDataType.BIGINT)
         .column("count", SQLDataType.BIGINT)

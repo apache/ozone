@@ -37,6 +37,7 @@ import org.jooq.meta.jaxb.Database;
 import org.jooq.meta.jaxb.Generate;
 import org.jooq.meta.jaxb.Generator;
 import org.jooq.meta.jaxb.Jdbc;
+import org.jooq.meta.jaxb.Logging;
 import org.jooq.meta.jaxb.Strategy;
 import org.jooq.meta.jaxb.Target;
 import org.slf4j.Logger;
@@ -89,14 +90,14 @@ public class JooqCodeGenerator {
         new Configuration()
             .withJdbc(new Jdbc()
                 .withDriver(DERBY_DRIVER_CLASS)
-                .withUrl(JDBC_URL)
-                .withSchema(RECON_SCHEMA_NAME))
+                .withUrl(JDBC_URL))
             .withGenerator(new Generator()
                 .withDatabase(new Database()
                     .withName("org.jooq.meta.derby.DerbyDatabase")
                     .withOutputSchemaToDefault(true)
                     .withIncludeTables(true)
-                    .withIncludePrimaryKeys(true))
+                    .withIncludePrimaryKeys(true)
+                    .withInputSchema(RECON_SCHEMA_NAME))
                 .withGenerate(new Generate()
                     .withDaos(true)
                     .withEmptyCatalogs(true))
@@ -105,7 +106,8 @@ public class JooqCodeGenerator {
                 .withTarget(new Target()
                     .withPackageName("org.hadoop.ozone.recon.schema")
                     .withClean(true)
-                    .withDirectory(outputDir)));
+                    .withDirectory(outputDir)))
+                .withLogging(Logging.WARN);
     GenerationTool.generate(configuration);
   }
 

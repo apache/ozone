@@ -88,7 +88,7 @@ public final class SqlDbUtils {
         try {
           DSL.using(conn).select(count()).from(tableName).execute();
         } catch (DataAccessException ex) {
-          LOG.info(ex.getMessage());
+          LOG.debug(ex.getMessage());
           return false;
         }
         LOG.info("{} table already exists, skipping creation.", tableName);
