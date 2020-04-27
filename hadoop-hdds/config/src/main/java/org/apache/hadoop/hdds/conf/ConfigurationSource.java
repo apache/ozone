@@ -35,6 +35,8 @@ public interface ConfigurationSource {
 
   Collection<String> getConfigKeys();
 
+  char[] getPassword(String key) throws IOException;
+
   @Deprecated
     //TODO: user read only configs and don't use it to store actual port
     // numbers.
@@ -106,10 +108,6 @@ public interface ConfigurationSource {
     }
 
     return valueString.trim().split("\\s*[,\n]\\s*");
-  }
-
-  default char[] getPassword(String key) throws IOException {
-    return get(key).toCharArray();
   }
 
   default Map<String, String> getPropsWithPrefix(String confPrefix) {
