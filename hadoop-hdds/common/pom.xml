@@ -28,11 +28,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Hadoop HDDS Common</name>
   <packaging>jar</packaging>
 
-  <properties>
-    <log4j2.version>2.11.0</log4j2.version>
-    <disruptor.version>3.4.2</disruptor.version>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -41,7 +36,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
-      <version>3.9.6</version>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
@@ -79,7 +73,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>javax.annotation</groupId>
       <artifactId>javax.annotation-api</artifactId>
-      <version>1.2</version>
     </dependency>
 
     <dependency>
@@ -116,7 +109,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>com.google.errorprone</groupId>
       <artifactId>error_prone_annotations</artifactId>
-      <version>2.2.0</version>
       <optional>true</optional>
     </dependency>
 
@@ -149,18 +141,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-pool2</artifactId>
-      <version>2.6.0</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk15on</artifactId>
       <version>${bouncycastle.version}</version>
     </dependency>
-    <!-- https://mvnrepository.com/artifact/commons-validator/commons-validator -->
     <dependency>
       <groupId>commons-validator</groupId>
       <artifactId>commons-validator</artifactId>
-      <version>1.6</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
@@ -170,17 +159,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.jaegertracing</groupId>
       <artifactId>jaeger-client</artifactId>
-      <version>${jaeger.version}</version>
     </dependency>
     <dependency>
       <groupId>io.opentracing</groupId>
       <artifactId>opentracing-util</artifactId>
-      <version>0.33.0</version>
     </dependency>
     <dependency>
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
-      <version>1.16</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
