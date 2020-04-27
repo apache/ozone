@@ -21,7 +21,14 @@ Library             String
 Resource            commonlib.robot
 Test Timeout        1 minutes
 
+*** Keywords ***
+CSI Socket check
+   Execute                          find -name /tmp/csi.sock
+
 *** Test Cases ***
+Check if CSI server is started
+   Wait Until Keyword Succeeds      3min       1sec      CSI Socket check
+
 Test CSI identitiy service
    ${result} =             Execute                        csc -e unix:///tmp/csi.sock identity plugin-info
                            Should Contain                 ${result}             org.apache.hadoop.ozone
