@@ -262,5 +262,16 @@ public class OzoneConfiguration extends Configuration
     }
     return configMap;
   }
-  
+
+  @Override
+  public char[] getPassword(String key) {
+    String value = get(key);
+    if (value == null) {
+      throw new NullPointerException(
+          "Password entry is missing for key " + key
+              + ".Note: generic ConfigurationSource interface doesn't support"
+              + " Hadoop CredentialProvider implementations");
+    }
+    return value.toCharArray();
+  }
 }
