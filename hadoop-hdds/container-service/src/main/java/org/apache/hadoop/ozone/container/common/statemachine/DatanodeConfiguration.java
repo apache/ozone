@@ -16,12 +16,12 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import javax.annotation.PostConstruct;
-
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
-import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.PostConstruct;
+
+import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
