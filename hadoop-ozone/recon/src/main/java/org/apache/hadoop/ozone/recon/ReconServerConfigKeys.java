@@ -96,10 +96,6 @@ public final class ReconServerConfigKeys {
   public static final String RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM =
       "recon.om.snapshot.task.flush.param";
 
-  // Persistence properties
-  public static final String OZONE_RECON_SQL_DB_JDBC_URL =
-      "ozone.recon.sql.db.jdbc.url";
-
   public static final String OZONE_RECON_TASK_THREAD_COUNT_KEY =
       "ozone.recon.task.thread.count";
   public static final int OZONE_RECON_TASK_THREAD_COUNT_DEFAULT = 5;
