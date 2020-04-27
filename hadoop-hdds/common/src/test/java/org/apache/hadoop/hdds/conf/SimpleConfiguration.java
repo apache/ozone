@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import javax.annotation.PostConstruct;
 import java.util.concurrent.TimeUnit;
 
 /**

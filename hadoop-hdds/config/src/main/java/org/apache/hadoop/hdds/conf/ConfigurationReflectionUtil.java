@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import javax.annotation.PostConstruct;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
