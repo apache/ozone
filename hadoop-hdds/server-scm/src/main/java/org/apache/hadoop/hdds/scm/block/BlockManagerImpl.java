@@ -42,9 +42,10 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.StringUtils;
@@ -353,11 +354,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     return this.blockDeletingService;
   }
 
-  @Override
-  public void handleSafeModeTransition(
-      SCMSafeModeManager.SafeModeStatus status) {
-    this.safeModePrecheck.setInSafeMode(status.isInSafeMode());
-  }
   /**
    * Returns status of scm safe mode determined by SAFE_MODE_STATUS event.
    * */
@@ -370,6 +366,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * */
   public static Logger getLogger() {
     return LOG;
+  }
+
+  @Override
+  public void onMessage(SafeModeStatus status,
+      EventPublisher publisher) {
+    this.safeModePrecheck.setInSafeMode(status.isInSafeMode());
   }
 
   /**
