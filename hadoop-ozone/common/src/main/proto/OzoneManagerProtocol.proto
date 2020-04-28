@@ -423,7 +423,7 @@ message SetVolumePropertyRequest {
 }
 
 message SetVolumePropertyResponse {
-
+    optional bool response = 1;
 }
 
 /**
