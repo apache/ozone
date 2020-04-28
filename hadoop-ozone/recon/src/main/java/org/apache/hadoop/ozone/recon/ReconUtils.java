@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import static java.net.HttpURLConnection.HTTP_CREATED;
-import static java.net.HttpURLConnection.HTTP_OK;
-import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
-import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -31,24 +25,25 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.zip.GZIPOutputStream;
+
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.io.IOUtils;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.io.IOUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-
-import org.apache.http.util.EntityUtils;
+import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +60,7 @@ public class ReconUtils {
   private static final Logger LOG = LoggerFactory.getLogger(
       ReconUtils.class);
 
-  public static File getReconScmDbDir(Configuration conf) {
+  public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
   }
 
@@ -77,7 +72,7 @@ public class ReconUtils {
    * @param dirConfigKey key to check
    * @return Return File based on configured or fallback value.
    */
-  public File getReconDbDir(Configuration conf, String dirConfigKey) {
+  public File getReconDbDir(ConfigurationSource conf, String dirConfigKey) {
 
     File metadataDir = getDirectoryFromConfig(conf, dirConfigKey,
         "Recon");
@@ -224,25 +219,14 @@ public class ReconUtils {
    * @return Inputstream to the response of the HTTP call.
    * @throws IOException While reading the response.
    */
-  public InputStream makeHttpCall(CloseableHttpClient httpClient, String url)
+  public InputStream makeHttpCall(URLConnectionFactory connectionFactory,
+                                  String url)
       throws IOException {
 
-    HttpGet httpGet = new HttpGet(url);
-    HttpResponse response = httpClient.execute(httpGet);
-    int errorCode = response.getStatusLine().getStatusCode();
-    HttpEntity entity = response.getEntity();
-
-    if ((errorCode == HTTP_OK) || (errorCode == HTTP_CREATED)) {
-      return entity.getContent();
-    }
-
-    if (entity != null) {
-      throw new IOException("Unexpected exception when trying to reach Ozone " +
-          "Manager, " + EntityUtils.toString(entity));
-    } else {
-      throw new IOException("Unexpected null in http payload," +
-          " while processing request");
-    }
+    URLConnection urlConnection =
+          connectionFactory.openConnection(new URL(url));
+    urlConnection.connect();
+    return urlConnection.getInputStream();
   }
 
   /**

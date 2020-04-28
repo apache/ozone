@@ -18,17 +18,23 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.MiniOzoneChaosCluster.FailureService;
+import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.ReadOnlyLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.FilesystemLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.AgedLoadGenerator;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.TimeUnit;
 
@@ -38,7 +44,9 @@ import java.util.concurrent.TimeUnit;
 @Ignore
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
-public class TestMiniChaosOzoneCluster implements Runnable {
+public class TestMiniChaosOzoneCluster extends GenericCli {
+  static final Logger LOG =
+      LoggerFactory.getLogger(TestMiniChaosOzoneCluster.class);
 
   @Option(names = {"-d", "--numDatanodes"},
       description = "num of datanodes")
@@ -65,9 +73,9 @@ public class TestMiniChaosOzoneCluster implements Runnable {
       description = "total run time")
   private static int numMinutes = 1440; // 1 day by default
 
-  @Option(names = {"-n", "--numClients"},
-      description = "no of clients writing to OM")
-  private static int numClients = 3;
+  @Option(names = {"-v", "--numDataVolume"},
+      description = "number of datanode volumes to create")
+  private static int numDataVolumes = 3;
 
   @Option(names = {"-i", "--failureInterval"},
       description = "time between failure events in seconds")
@@ -90,6 +98,7 @@ public class TestMiniChaosOzoneCluster implements Runnable {
         .setNumOzoneManagers(numOzoneManagers)
         .setFailureService(failureService)
         .setOMServiceID(omServiceID)
+        .setNumDataVolumes(numDataVolumes)
         .build();
     cluster.waitForClusterToBeReady();
 
@@ -98,9 +107,17 @@ public class TestMiniChaosOzoneCluster implements Runnable {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 
-    loadGenerator =
-        new MiniOzoneLoadGenerator(volume, numClients, numThreads,
-            numBuffers, configuration, omServiceID);
+    loadGenerator = new MiniOzoneLoadGenerator.Builder()
+        .setVolume(volume)
+        .setConf(configuration)
+        .setNumBuffers(numBuffers)
+        .setNumThreads(numThreads)
+        .setOMServiceId(omServiceID)
+        .addLoadGenerator(RandomLoadGenerator.class)
+        .addLoadGenerator(AgedLoadGenerator.class)
+        .addLoadGenerator(FilesystemLoadGenerator.class)
+        .addLoadGenerator(ReadOnlyLoadGenerator.class)
+        .build();
   }
 
   /**
@@ -117,23 +134,24 @@ public class TestMiniChaosOzoneCluster implements Runnable {
     }
   }
 
-  public void run() {
+  @Override
+  public Void call() throws Exception {
     try {
       init();
       cluster.startChaos(failureInterval, failureInterval, TimeUnit.SECONDS);
       loadGenerator.startIO(numMinutes, TimeUnit.MINUTES);
-    } catch (Exception e) {
     } finally {
       shutdown();
     }
+    return null;
   }
 
   public static void main(String... args) {
-    CommandLine.run(new TestMiniChaosOzoneCluster(), System.err, args);
+    new TestMiniChaosOzoneCluster().run(args);
   }
 
   @Test
-  public void testReadWriteWithChaosCluster() {
+  public void testReadWriteWithChaosCluster() throws Exception {
     cluster.startChaos(5, 10, TimeUnit.SECONDS);
     loadGenerator.startIO(120, TimeUnit.SECONDS);
   }

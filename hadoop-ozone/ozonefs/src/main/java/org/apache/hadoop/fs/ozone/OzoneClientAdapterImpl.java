@@ -18,7 +18,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
-import org.apache.hadoop.conf.Configuration;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
@@ -44,7 +45,7 @@ public class OzoneClientAdapterImpl extends BasicOzoneClientAdapterImpl {
   }
 
   public OzoneClientAdapterImpl(String omHost, int omPort,
-      Configuration hadoopConf, String volumeStr, String bucketStr,
+      ConfigurationSource hadoopConf, String volumeStr, String bucketStr,
       OzoneFSStorageStatistics storageStatistics)
       throws IOException {
     super(omHost, omPort, hadoopConf, volumeStr, bucketStr);

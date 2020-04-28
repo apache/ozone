@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -151,6 +151,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
+import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -159,7 +160,7 @@ import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAILOVER_AND_RETRY;
+import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
@@ -200,7 +201,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * one {@link OzoneManagerProtocolPB} proxy pointing to each OM node in the
    * cluster.
    */
-  public OzoneManagerProtocolClientSideTranslatorPB(OzoneConfiguration conf,
+  public OzoneManagerProtocolClientSideTranslatorPB(ConfigurationSource conf,
       String clientId, String omServiceId, UserGroupInformation ugi)
       throws IOException {
     this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
@@ -209,15 +210,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
-    int sleepBase = conf.getInt(
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT);
-    int sleepMax = conf.getInt(
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_DEFAULT);
 
-    this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers,
-        sleepBase, sleepMax);
+    this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers);
     this.clientID = clientId;
   }
 
@@ -227,8 +221,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * exception or if the current proxy is not the leader OM.
    */
   private OzoneManagerProtocolPB createRetryProxy(
-      OMFailoverProxyProvider failoverProxyProvider,
-      int maxFailovers, int delayMillis, int maxDelayBase) {
+      OMFailoverProxyProvider failoverProxyProvider, int maxFailovers) {
 
     // Client attempts contacting each OM ipc.client.connect.max.retries
     // (default = 10) times before failing over to the next OM, if
@@ -248,6 +241,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
               getNotLeaderException(exception);
           if (notLeaderException != null &&
               notLeaderException.getSuggestedLeaderNodeId() != null) {
+            FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
+                notLeaderException.getMessage());
+
             // TODO: NotLeaderException should include the host
             //  address of the suggested leader along with the nodeID.
             //  Failing over just based on nodeID is not very robust.
@@ -255,7 +251,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             // OMFailoverProxyProvider#performFailover() is a dummy call and
             // does not perform any failover. Failover manually to the next OM.
             omFailoverProxyProvider.performFailoverToNextProxy();
-            return getRetryAction(FAILOVER_AND_RETRY, failovers);
+            return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
 
           OMLeaderNotReadyException leaderNotReadyException =
@@ -265,7 +261,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           // does not perform any failover.
           // So Just retry with same OM node.
           if (leaderNotReadyException != null) {
-            return getRetryAction(FAILOVER_AND_RETRY, failovers);
+            FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
+                leaderNotReadyException.getMessage());
+            // HDDS-3465. OM index will not change, but LastOmID will be
+            // updated to currentOMId, so that wiatTime calculation will
+            // know lastOmID and currentID are same and need to increment
+            // wait time in between.
+            omFailoverProxyProvider.performFailoverIfRequired(
+                omFailoverProxyProvider.getCurrentProxyOMNodeId());
+            return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
         }
 
@@ -273,14 +277,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         // NotLeaderException fail over manually to the next OM Node proxy.
         // OMFailoverProxyProvider#performFailover() is a dummy call and
         // does not perform any failover.
+        String exceptionMsg;
+        if (exception.getCause() != null) {
+          exceptionMsg = exception.getCause().getMessage();
+        } else {
+          exceptionMsg = exception.getMessage();
+        }
+        FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}", exceptionMsg);
         omFailoverProxyProvider.performFailoverToNextProxy();
-        return getRetryAction(FAILOVER_AND_RETRY, failovers);
+        return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
       }
 
-      private RetryAction getRetryAction(RetryAction fallbackAction,
+      private RetryAction getRetryAction(RetryDecision fallbackAction,
           int failovers) {
-        if (failovers <= maxFailovers) {
-          return fallbackAction;
+        if (failovers < maxFailovers) {
+          return new RetryAction(fallbackAction,
+              omFailoverProxyProvider.getWaitTime());
         } else {
           FAILOVER_PROXY_PROVIDER_LOG.error("Failed to connect to OMs: {}. " +
               "Attempted {} failovers.",
@@ -296,13 +308,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Unwrap exception to check if it is a {@link AccessControlException}.
+   * Unwrap exception to check if it is some kind of access control problem
+   * ({@link AccessControlException} or {@link SecretManager.InvalidToken}).
    */
   private boolean isAccessControlException(Exception ex) {
     if (ex instanceof ServiceException) {
       Throwable t = ex.getCause();
+      if (t instanceof RemoteException) {
+        t = ((RemoteException) t).unwrapRemoteException();
+      }
       while (t != null) {
-        if (t instanceof AccessControlException) {
+        if (t instanceof AccessControlException ||
+            t instanceof SecretManager.InvalidToken) {
           return true;
         }
         t = t.getCause();
@@ -562,7 +579,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Lists volume owned by a specific user.
+   * Lists volumes accessible by a specific user.
    *
    * @param userName - user name
    * @param prefix - Filter prefix -- Return only entries that match this.

@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.genesis;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -27,7 +25,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -47,7 +44,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Scope;
@@ -77,7 +76,7 @@ public class BenchMarkOzoneManager {
 
   @Setup(Level.Trial)
   public static void initialize()
-      throws IOException, AuthenticationException, InterruptedException {
+      throws Exception {
     try {
       lock.lock();
       if (scm == null) {
@@ -104,7 +103,7 @@ public class BenchMarkOzoneManager {
           pipelineManager.openPipeline(pipeline.getId());
         }
         scm.getEventQueue().fireEvent(SCMEvents.SAFE_MODE_STATUS,
-            new SCMSafeModeManager.SafeModeStatus(false));
+            new SCMSafeModeManager.SafeModeStatus(false, false));
         Thread.sleep(1000);
 
         // prepare OM

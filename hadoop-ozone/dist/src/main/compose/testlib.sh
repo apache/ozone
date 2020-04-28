@@ -192,6 +192,13 @@ stop_docker_env(){
   fi
 }
 
+## @description  Removes the given docker images if configured not to keep them (via KEEP_IMAGE=false)
+cleanup_docker_images() {
+  if [[ "${KEEP_IMAGE:-true}" == false ]]; then
+    docker image rm "$@"
+  fi
+}
+
 ## @description  Generate robot framework reports based on the saved results.
 generate_report(){
 

@@ -23,7 +23,7 @@ It doesn't mean that this PR is not important or ignored: feel free to reopen th
 
 It only means that attention of committers is not required. We prefer to keep the review queue clean. This ensures PRs in need of review are more visible, which results in faster feedback for all PRs.
 
-If you need ANY help to finish this PR, please [contact the community](https://github.com/apache/hadoop-ozone#contact) on the mailing list or the slack channel.
+If you need ANY help to finish this PR, please [contact the community](https://github.com/apache/hadoop-ozone#contact) on the mailing list or the slack channel."
 
 set +x #GITHUB_TOKEN
 curl -s -o /dev/null \

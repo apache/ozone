@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.segmentparser.OMRatisLogParser;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -83,7 +84,7 @@ public class TestOMRatisLogParser {
   }
 
   @Test
-  public void testRatisLogParsing() {
+  public void testRatisLogParsing() throws Exception {
     OzoneConfiguration ozoneConfiguration =
         cluster.getOMLeader().getConfiguration();
 
@@ -94,22 +95,24 @@ public class TestOMRatisLogParser {
     Assert.assertTrue(omMetaDir.isDirectory());
 
     String[] ratisDirs = omMetaDir.list();
-    File groupDir = null;
-
+    Assert.assertNotNull(ratisDirs);
     Assert.assertEquals(2, ratisDirs.length);
 
+    File groupDir = null;
     for (int i=0; i< ratisDirs.length; i++) {
       if (ratisDirs[i].equals("snapshot")) {
         continue;
       }
-      groupDir = new File(omMetaDir, omMetaDir.list()[1]);
+      groupDir = new File(omMetaDir, ratisDirs[i]);
     }
 
     Assert.assertNotNull(groupDir);
+    Assert.assertFalse(groupDir.toString(),
+        groupDir.getName().contains("snapshot"));
     Assert.assertTrue(groupDir.isDirectory());
     File currentDir = new File(groupDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
-    Assert.assertTrue(logFile.exists());
+    GenericTestUtils.waitFor(logFile::exists, 100, 15000);
     Assert.assertTrue(logFile.isFile());
 
     OMRatisLogParser omRatisLogParser = new OMRatisLogParser();

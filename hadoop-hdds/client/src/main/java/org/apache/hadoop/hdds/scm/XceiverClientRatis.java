@@ -34,20 +34,24 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
@@ -61,12 +65,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-
-import io.opentracing.Scope;
-import io.opentracing.util.GlobalTracer;
-
 /**
  * An abstract implementation of {@link XceiverClientSpi} using Ratis.
  * The underlying RPC mechanism can be chosen via the constructor.
@@ -77,13 +75,13 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      Configuration ozoneConf) {
+      ConfigurationSource ozoneConf) {
     return newXceiverClientRatis(pipeline, ozoneConf, null);
   }
 
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      Configuration ozoneConf, X509Certificate caCert) {
+      ConfigurationSource ozoneConf, X509Certificate caCert) {
     final String rpcType = ozoneConf
         .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
@@ -100,7 +98,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   private final AtomicReference<RaftClient> client = new AtomicReference<>();
   private final RetryPolicy retryPolicy;
   private final GrpcTlsConfig tlsConfig;
-  private final Configuration ozoneConfiguration;
+  private final ConfigurationSource ozoneConfiguration;
 
   // Map to track commit index at every server
   private final ConcurrentHashMap<UUID, Long> commitInfoMap;
@@ -112,7 +110,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
    */
   private XceiverClientRatis(Pipeline pipeline, RpcType rpcType,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
-      Configuration configuration) {
+      ConfigurationSource configuration) {
     super();
     this.pipeline = pipeline;
     this.rpcType = rpcType;
@@ -209,24 +207,27 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   private CompletableFuture<RaftClientReply> sendRequestAsync(
       ContainerCommandRequestProto request) {
-    try (Scope scope = GlobalTracer.get()
-        .buildSpan("XceiverClientRatis." + request.getCmdType().name())
-        .startActive(true)) {
-      final ContainerCommandRequestMessage message
-          = ContainerCommandRequestMessage.toMessage(
+    return TracingUtil.executeInNewSpan(
+        "XceiverClientRatis." + request.getCmdType().name(),
+        (Supplier<CompletableFuture<RaftClientReply>>) () -> {
+          final ContainerCommandRequestMessage message
+              = ContainerCommandRequestMessage.toMessage(
               request, TracingUtil.exportCurrentSpan());
-      if (HddsUtils.isReadOnly(request)) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("sendCommandAsync ReadOnly {}", message);
+          if (HddsUtils.isReadOnly(request)) {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("sendCommandAsync ReadOnly {}", message);
+            }
+            return getClient().sendReadOnlyAsync(message);
+          } else {
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("sendCommandAsync {}", message);
+            }
+            return getClient().sendAsync(message);
+          }
+
         }
-        return getClient().sendReadOnlyAsync(message);
-      } else {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("sendCommandAsync {}", message);
-        }
-        return getClient().sendAsync(message);
-      }
-    }
+
+    );
   }
 
   // gets the minimum log index replicated to all servers

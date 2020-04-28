@@ -32,6 +32,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQ
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_MAX_IDLE_CONNECTION_TEST_STMT;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -60,14 +62,18 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.ratis.protocol.ClientId;
+import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.jooq.Configuration;
+import org.jooq.DAO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
@@ -101,6 +107,7 @@ public class ReconControllerModule extends AbstractModule {
         getProvider(DataSourceConfiguration.class)));
 
     install(new ReconOmTaskBindingModule());
+    install(new ReconDaoBindingModule());
 
     bind(ReconTaskController.class)
         .to(ReconTaskControllerImpl.class).in(Singleton.class);
@@ -110,26 +117,6 @@ public class ReconControllerModule extends AbstractModule {
         .to(ReconStorageContainerManagerFacade.class).in(Singleton.class);
   }
 
-  @Provides
-  ReconTaskStatusDao getReconTaskTableDao(final Configuration sqlConfig) {
-    return new ReconTaskStatusDao(sqlConfig);
-  }
-
-  @Provides
-  MissingContainersDao getMissingContainersDao(final Configuration sqlConfig) {
-    return new MissingContainersDao(sqlConfig);
-  }
-
-  @Provides
-  ContainerHistoryDao getContainerHistoryDao(final Configuration sqlConfig) {
-    return new ContainerHistoryDao(sqlConfig);
-  }
-
-  @Provides
-  FileCountBySizeDao getFileCountBySizeDao(final Configuration sqlConfig) {
-    return new FileCountBySizeDao(sqlConfig);
-  }
-
   static class ReconOmTaskBindingModule extends AbstractModule {
     @Override
     protected void configure() {
@@ -137,6 +124,32 @@ public class ReconControllerModule extends AbstractModule {
           Multibinder.newSetBinder(binder(), ReconOmTask.class);
       taskBinder.addBinding().to(ContainerKeyMapperTask.class);
       taskBinder.addBinding().to(FileSizeCountTask.class);
+    }
+  }
+
+  /**
+   * Class that has all the DAO bindings in Recon.
+   */
+  public static class ReconDaoBindingModule extends AbstractModule {
+    public static final List<Class<? extends DAO>> RECON_DAO_LIST =
+        ImmutableList.of(
+            FileCountBySizeDao.class,
+            ReconTaskStatusDao.class,
+            MissingContainersDao.class,
+            GlobalStatsDao.class,
+            ClusterGrowthDailyDao.class,
+            ContainerHistoryDao.class);
+
+    @Override
+    protected void configure() {
+      RECON_DAO_LIST.forEach(aClass -> {
+        try {
+          bind(aClass).toConstructor(
+              (Constructor) aClass.getConstructor(Configuration.class));
+        } catch (NoSuchMethodException e) {
+          LOG.error("Error creating DAO {} ", aClass.getSimpleName(), e);
+        }
+      });
     }
   }
 
