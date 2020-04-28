@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.MetricsAsserts;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -157,7 +156,6 @@ public class TestOmMetrics {
   }
 
   @Test
-  @Ignore("Test failing because of table cache. Revisit later.")
   public void testBucketOps() throws IOException {
     BucketManager bucketManager =
         (BucketManager) HddsWhiteboxTestUtils.getInternalState(
@@ -170,10 +168,11 @@ public class TestOmMetrics {
     S3BucketManager mockS3Bm = Mockito.spy(s3BucketManager);
 
     Mockito.doNothing().when(mockS3Bm).createS3Bucket("random", "random");
+    Mockito.doNothing().when(mockS3Bm).createS3Bucket("random1", "random1");
+    Mockito.doNothing().when(mockS3Bm).createS3Bucket("random2", "random2");
     Mockito.doNothing().when(mockS3Bm).deleteS3Bucket("random");
     Mockito.doReturn(true).when(mockS3Bm).createOzoneVolumeIfNeeded(null);
 
-    Mockito.doNothing().when(mockBm).createBucket(null);
     Mockito.doNothing().when(mockBm).createBucket(null);
     Mockito.doNothing().when(mockBm).deleteBucket(null, null);
     Mockito.doReturn(null).when(mockBm).getBucketInfo(null, null);
@@ -182,6 +181,9 @@ public class TestOmMetrics {
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
+    HddsWhiteboxTestUtils.setInternalState(
+            ozoneManager, "s3BucketManager", mockS3Bm);
+
     doBucketOps();
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
