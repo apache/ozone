@@ -95,12 +95,14 @@ public class OMKeyRenameResponse extends OMClientResponse {
             omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
             newKeyInfo);
         // At this point we can also update the KeyIdTable.
-        omMetadataManager.getKeyIdTable().putWithBatch(batchOperation,
-            omMetadataManager.getOzoneKeyIdTableKey(
-                newKeyInfo.getFileHandleInfo()), toKeyName);
-        omMetadataManager.getKeyIdTable().deleteWithBatch(batchOperation,
-            omMetadataManager.getOzoneKeyIdTableKey(
-                newKeyInfo.getFileHandleInfo()));
+        if (newKeyInfo.getFileHandleInfo() != null) {
+          omMetadataManager.getKeyIdTable().putWithBatch(batchOperation,
+              omMetadataManager.getOzoneKeyIdTableKey(
+                  newKeyInfo.getFileHandleInfo()), toKeyName);
+          omMetadataManager.getKeyIdTable().deleteWithBatch(batchOperation,
+              omMetadataManager.getOzoneKeyIdTableKey(
+                  newKeyInfo.getFileHandleInfo()));
+        }
       }
     }
   }

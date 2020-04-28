@@ -164,6 +164,14 @@ public final class OmKeyInfo extends WithObjectID {
   }
 
   /**
+   * Returns fileHandleInfo.
+   * @return String
+   */
+  public void setFileHandleInfo(String fileHandleInfo) {
+    this.fileHandleInfo = fileHandleInfo;
+  }
+
+  /**
    * Returns objectID.
    * @return long
    */
@@ -410,7 +418,10 @@ public final class OmKeyInfo extends WithObjectID {
     }
 
     public Builder setFileHandleInfo(String fh) {
-      this.fileHandleInfo = fh;
+      System.out.println("Prashant debug " + fh);
+      if (fh != null) {
+        this.fileHandleInfo = fh;
+      }
       return this;
     }
 
@@ -446,8 +457,10 @@ public final class OmKeyInfo extends WithObjectID {
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
         .setObjectID(objectID)
-        .setUpdateID(updateID)
-        .setFileHandleInfo(fileHandleInfo);
+        .setUpdateID(updateID);
+    if (fileHandleInfo != null) {
+      kb.setFileHandleInfo(fileHandleInfo);
+    }
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
@@ -516,7 +529,8 @@ public final class OmKeyInfo extends WithObjectID {
         Objects.equals(acls, omKeyInfo.acls) &&
         objectID == omKeyInfo.objectID &&
         updateID == omKeyInfo.updateID &&
-        fileHandleInfo.equals(omKeyInfo.fileHandleInfo);
+        (fileHandleInfo != null ?
+            fileHandleInfo.equals(omKeyInfo.fileHandleInfo) : true);
   }
 
   @Override

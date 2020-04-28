@@ -224,8 +224,10 @@ public class OmMultipartKeyInfo extends WithObjectID {
         .setType(replicationType)
         .setFactor(replicationFactor)
         .setObjectID(objectID)
-        .setUpdateID(updateID)
-        .setFileHandleInfo(fileHandleInfo);
+        .setUpdateID(updateID);
+    if (fileHandleInfo != null) {
+        builder.setFileHandleInfo(fileHandleInfo);
+    }
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
   }

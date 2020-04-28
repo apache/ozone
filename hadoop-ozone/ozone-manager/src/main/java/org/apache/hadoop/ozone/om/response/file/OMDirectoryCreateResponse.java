@@ -81,12 +81,14 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
       omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
           dirKeyInfo);
       // We can also persist the fileHandle to KeyIdTable.
-      omMetadataManager.getKeyIdTable().putWithBatch(batchOperation,
-          omMetadataManager.getOzoneKeyIdTableKey(
-              dirKeyInfo.getFileHandleInfo()),
-          omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
-              dirKeyInfo.getBucketName(),
-              dirKeyInfo.getKeyName()));
+      if (dirKeyInfo.getFileHandleInfo() != null) {
+        omMetadataManager.getKeyIdTable().putWithBatch(batchOperation,
+            omMetadataManager.getOzoneKeyIdTableKey(
+                dirKeyInfo.getFileHandleInfo()),
+            omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
+                dirKeyInfo.getBucketName(),
+                dirKeyInfo.getKeyName()));
+      }
     } else {
       // When directory already exists, we don't add it to cache. And it is
       // not an error, in this case dirKeyInfo will be null.

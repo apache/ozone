@@ -67,9 +67,11 @@ public class OMKeyDeleteResponse extends OMClientResponse {
           omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
       omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
           ozoneKey);
-      omMetadataManager.getKeyIdTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getOzoneKeyIdTableKey(
-              omKeyInfo.getFileHandleInfo()));
+      if (omKeyInfo.getFileHandleInfo() != null) {
+        omMetadataManager.getKeyIdTable().deleteWithBatch(batchOperation,
+            omMetadataManager.getOzoneKeyIdTableKey(
+                omKeyInfo.getFileHandleInfo()));
+      }
 
       // If Key is not empty add this to delete table.
       if (!isKeyEmpty(omKeyInfo)) {
