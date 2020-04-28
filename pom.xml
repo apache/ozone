@@ -78,7 +78,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>0.6.0-490b689-SNAPSHOT</ratis.version>
+    <ratis.version>0.6.0-cac3336-SNAPSHOT</ratis.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
     <distMgmtSnapshotsUrl>https://repository.apache.org/content/repositories/snapshots</distMgmtSnapshotsUrl>
@@ -166,9 +166,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
-    <datanode.protobuf-compile.version>3.10.0</datanode.protobuf-compile.version>
-    <datanode.grpc-compile.version>1.24.0</datanode.grpc-compile.version>
+    <protobuf-compile.version>3.11.0</protobuf-compile.version>
+    <grpc-compile.version>1.28.1</grpc-compile.version>
     <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
+
+    <netty.version>4.1.48.Final</netty.version>
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
@@ -906,7 +908,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
-        <version>4.1.47.Final</version>
+        <version>${netty.version}</version>
       </dependency>
 
       <dependency>
