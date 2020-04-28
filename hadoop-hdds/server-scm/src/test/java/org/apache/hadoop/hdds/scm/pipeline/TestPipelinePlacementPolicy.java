@@ -418,7 +418,7 @@ public class TestPipelinePlacementPolicy {
   @Test
   public void testValidatePlacementPolicySingleRackInCluster() {
     cluster = initTopology();
-    nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
+    nodeManager = new MockNodeManager(cluster, new ArrayList<>(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);

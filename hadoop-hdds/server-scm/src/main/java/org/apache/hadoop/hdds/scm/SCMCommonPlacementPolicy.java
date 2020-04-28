@@ -258,7 +258,6 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     if (replicas < requiredRacks) {
       requiredRacks = replicas;
     }
-
     return new ContainerPlacementStatusDefault(
         (int)currentRackCount, requiredRacks, numRacks);
   }

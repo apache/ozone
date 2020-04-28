@@ -393,7 +393,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
 
   @Override
   protected NetworkTopology getNetworkTopology() {
-    LOG.info("Called the one");
     return nodeManager.getClusterNetworkTopologyMap();
   }
 
