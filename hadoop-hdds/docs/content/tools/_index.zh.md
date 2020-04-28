@@ -45,8 +45,7 @@ Ozone 有一系列管理 Ozone 的命令行工具。
 
 管理命令：
 
-   * **admin** -  Collects admin and developer related commands related to the 
-   ozone components.
+   * **admin** - 供管理员和开发者使用的 Ozone 各组件管理命令。
    * **classpath** - 打印包含 Hadoop jar 包和其它必要库的 CLASSPATH。
    * **dtutil**    - 进行和代理 token 有关的操作。
    * **envvars** - 列出 Hadoop 的环境变量。
