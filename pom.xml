@@ -118,9 +118,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <java.security.egd>file:///dev/urandom</java.security.egd>
 
-    <!-- avro version -->
-    <avro.version>1.7.7</avro.version>
-
     <bouncycastle.version>1.60</bouncycastle.version>
 
     <!-- jersey version -->
@@ -1129,11 +1126,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>org.apache.avro</groupId>
-        <artifactId>avro</artifactId>
-        <version>${avro.version}</version>
-      </dependency>
-      <dependency>
         <groupId>net.sf.kosmosfs</groupId>
         <artifactId>kfs</artifactId>
         <version>0.3</version>
@@ -1502,11 +1494,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-source-plugin</artifactId>
           <version>${maven-source-plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.avro</groupId>
-          <artifactId>avro-maven-plugin</artifactId>
-          <version>${avro.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
