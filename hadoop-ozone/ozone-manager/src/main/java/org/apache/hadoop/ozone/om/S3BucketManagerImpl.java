@@ -29,6 +29,8 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_ADMINISTRATOR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_ADMINISTRATOR_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 
 import org.apache.logging.log4j.util.Strings;
@@ -50,7 +52,6 @@ public class S3BucketManagerImpl implements S3BucketManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(S3BucketManagerImpl.class);
 
-  private static final String S3_ADMIN_NAME = "OzoneS3Manager";
   private final OzoneConfiguration configuration;
   private final OMMetadataManager omMetadataManager;
   private final VolumeManager volumeManager;
@@ -160,10 +161,12 @@ public class S3BucketManagerImpl implements S3BucketManager {
     // this call is invoked while holding the s3Bucket lock.
     boolean newVolumeCreate = true;
     String ozoneVolumeName = formatOzoneVolumeName(userName);
+    String s3gAdminName = configuration.get(
+        OZONE_S3G_ADMINISTRATOR, OZONE_S3G_ADMINISTRATOR_DEFAULT);
     try {
       OmVolumeArgs.Builder builder =
           OmVolumeArgs.newBuilder()
-              .setAdminName(S3_ADMIN_NAME)
+              .setAdminName(s3gAdminName)
               .setOwnerName(userName)
               .setVolume(ozoneVolumeName)
               .setQuotaInBytes(OzoneConsts.MAX_QUOTA_IN_BYTES);
@@ -194,8 +197,10 @@ public class S3BucketManagerImpl implements S3BucketManager {
    * */
   private List<OzoneAcl> getDefaultAcls(String userName) {
     UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    String s3gAdminName = configuration.get(
+            OZONE_S3G_ADMINISTRATOR, OZONE_S3G_ADMINISTRATOR_DEFAULT);
     return OzoneAcl.parseAcls("user:" + (ugi == null ? userName :
-        ugi.getUserName()) + ":a,user:" + S3_ADMIN_NAME + ":a");
+        ugi.getUserName()) + ":a,user:" + s3gAdminName + ":a");
   }
 
   private void createOzoneBucket(String volumeName, String bucketName)

@@ -629,6 +629,13 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.s3g.administrator</name>
+    <value>OzoneS3Manager</value>
+    <tag>OZONE, OM, S3GATEWAY</tag>
+    <description>Ozone s3g administrator user. This user has all permissions of
+      bucket or volume created by s3g.</description>
+  </property>
+  <property>
     <name>ozone.metadata.dirs</name>
     <value/>
     <tag>OZONE, OM, SCM, CONTAINER, STORAGE, REQUIRED</tag>

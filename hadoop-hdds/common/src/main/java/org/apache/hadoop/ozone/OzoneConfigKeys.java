@@ -123,6 +123,11 @@ public final class OzoneConfigKeys {
    * */
   public static final String OZONE_ADMINISTRATORS_WILDCARD = "*";
 
+  public static final String OZONE_S3G_ADMINISTRATOR =
+      "ozone.om.s3g.administrator";
+  public static final String OZONE_S3G_ADMINISTRATOR_DEFAULT =
+      "OzoneS3Manager";
+
   public static final String OZONE_CLIENT_STREAM_BUFFER_SIZE =
       "ozone.client.stream.buffer.size";
 

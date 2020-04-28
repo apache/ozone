@@ -65,6 +65,8 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_ADMINISTRATOR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3G_ADMINISTRATOR_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_VOLUME_PREFIX;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_BUCKET_LOCK;
@@ -75,8 +77,6 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
  * Handles S3 Bucket create request.
  */
 public class S3BucketCreateRequest extends OMVolumeRequest {
-
-  private static final String S3_ADMIN_NAME = "OzoneS3Manager";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3CreateBucketRequest.class);
@@ -113,6 +113,8 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
         .getCreateS3BucketRequest();
     String userName = s3CreateBucketRequest.getUserName();
     String s3BucketName = s3CreateBucketRequest.getS3Bucketname();
+    String s3gAdminName = ozoneManager.getConfiguration().get(
+        OZONE_S3G_ADMINISTRATOR, OZONE_S3G_ADMINISTRATOR_DEFAULT);
 
     OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
         OzoneManagerProtocolProtos.Type.CreateS3Bucket).setStatus(
@@ -182,7 +184,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
           // request irrespective of whether it is a replay or not.
           OmVolumeArgs omVolumeArgs = createOmVolumeArgs(volumeName, userName,
               s3CreateBucketRequest.getS3CreateVolumeInfo().getCreationTime(),
-              trxnLogIndex);
+              trxnLogIndex, s3gAdminName);
           UserVolumeInfo volumeList = omMetadataManager.getUserTable().get(
               omMetadataManager.getUserKey(userName));
           volumeList = addVolumeToOwnerList(volumeList, volumeName, userName,
@@ -205,7 +207,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
       // check if ozone bucket exists, if not create ozone bucket
       OmBucketInfo omBucketInfo = createBucket(ozoneManager, volumeName,
           s3BucketName, userName, s3CreateBucketRequest.getS3CreateVolumeInfo()
-              .getCreationTime(), trxnLogIndex);
+              .getCreationTime(), trxnLogIndex, s3gAdminName);
 
       // Now finally add it to s3 table cache.
       omMetadataManager.getS3Table().addCacheEntry(
@@ -254,7 +256,8 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
 
   private OmBucketInfo createBucket(OzoneManager ozoneManager,
       String volumeName, String s3BucketName, String userName,
-      long creationTime, long transactionLogIndex) throws IOException {
+      long creationTime, long transactionLogIndex, String s3gAdminName)
+      throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     // check if ozone bucket exists, if it does not exist create ozone
     // bucket
@@ -268,7 +271,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
           s3BucketName);
       if (!omMetadataManager.getBucketTable().isExist(bucketKey)) {
         omBucketInfo = createOmBucketInfo(volumeName, s3BucketName, userName,
-            creationTime, transactionLogIndex);
+            creationTime, transactionLogIndex, s3gAdminName);
         // Add to bucket table cache.
         omMetadataManager.getBucketTable().addCacheEntry(
             new CacheKey<>(bucketKey),
@@ -333,10 +336,11 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
    * @return {@link OmVolumeArgs}
    */
   private OmVolumeArgs createOmVolumeArgs(String volumeName, String userName,
-      long creationTime, long transactionLogIndex) throws IOException {
+      long creationTime, long transactionLogIndex, String s3gAdminName)
+      throws IOException {
     long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
     OmVolumeArgs.Builder builder = OmVolumeArgs.newBuilder()
-        .setAdminName(S3_ADMIN_NAME).setVolume(volumeName)
+        .setAdminName(s3gAdminName).setVolume(volumeName)
         .setQuotaInBytes(OzoneConsts.MAX_QUOTA_IN_BYTES)
         .setOwnerName(userName)
         .setCreationTime(creationTime)
@@ -344,7 +348,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
         .setUpdateID(transactionLogIndex);
 
     // Set default acls.
-    for (OzoneAcl acl : getDefaultAcls(userName)) {
+    for (OzoneAcl acl : getDefaultAcls(userName, s3gAdminName)) {
       builder.addOzoneAcls(OzoneAcl.toProtobuf(acl));
     }
 
@@ -361,7 +365,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
    */
   private OmBucketInfo createOmBucketInfo(String volumeName,
       String s3BucketName, String userName, long creationTime,
-      long transactionLogIndex) {
+      long transactionLogIndex, String s3gAdminName) {
     //TODO: Now S3Bucket API takes only bucketName as param. In future if we
     // support some configurable options we need to fix this.
     OmBucketInfo.Builder builder = OmBucketInfo.newBuilder()
@@ -374,7 +378,7 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
         .setUpdateID(transactionLogIndex);
 
     // Set default acls.
-    builder.setAcls(getDefaultAcls(userName));
+    builder.setAcls(getDefaultAcls(userName, s3gAdminName));
 
     return builder.build();
   }
@@ -396,10 +400,10 @@ public class S3BucketCreateRequest extends OMVolumeRequest {
   /**
    * Get default acls.
    * */
-  private List<OzoneAcl> getDefaultAcls(String userName) {
+  private List<OzoneAcl> getDefaultAcls(String userName, String s3gAdminName) {
     UserGroupInformation ugi = createUGI();
     return OzoneAcl.parseAcls("user:" + (ugi == null ? userName :
-        ugi.getUserName()) + ":a,user:" + S3_ADMIN_NAME + ":a");
+        ugi.getUserName()) + ":a,user:" + s3gAdminName + ":a");
   }
 }
 

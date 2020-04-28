@@ -71,6 +71,8 @@ public class TestS3BucketRequest {
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
+    when(ozoneManager.getConfiguration()).thenReturn(
+        new OzoneConfiguration());
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
   }
 
