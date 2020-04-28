@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
@@ -379,7 +380,8 @@ public class ReplicationManager
    */
   private boolean isContainerHealthy(final ContainerInfo container,
                                      final Set<ContainerReplica> replicas) {
-    return container.getReplicationFactor().getNumber() == replicas.size() &&
+    return !isContainerUnderReplicated(container, replicas) &&
+        !isContainerOverReplicated(container, replicas) &&
         replicas.stream().allMatch(
             r -> compareState(container.getState(), r.getState()));
   }
@@ -393,8 +395,11 @@ public class ReplicationManager
    */
   private boolean isContainerUnderReplicated(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
+    boolean misReplicated = !getPlacementStatus(
+        replicas, container.getReplicationFactor().getNumber())
+        .isPolicySatisfied();
     return container.getReplicationFactor().getNumber() >
-        getReplicaCount(container.containerID(), replicas);
+        getReplicaCount(container.containerID(), replicas) || misReplicated;
   }
 
   /**
@@ -501,6 +506,11 @@ public class ReplicationManager
           .stream()
           .map(action -> action.datanode)
           .collect(Collectors.toList());
+      final List<DatanodeDetails> replicationInFlight = inflightReplication
+          .getOrDefault(id, Collections.emptyList())
+          .stream()
+          .map(action -> action.datanode)
+          .collect(Collectors.toList());
       final List<DatanodeDetails> source = replicas.stream()
           .filter(r ->
               r.getState() == State.QUASI_CLOSED ||
@@ -512,25 +522,61 @@ public class ReplicationManager
       if (source.size() > 0) {
         final int replicationFactor = container
             .getReplicationFactor().getNumber();
-        final int delta = replicationFactor - getReplicaCount(id, replicas);
+        // Want to check if the container is mis-replicated after considering
+        // inflight add and delete.
+        // Create a new list from source (healthy replicas minus pending delete)
+        List<DatanodeDetails> targetReplicas = new ArrayList<>();
+        targetReplicas.addAll(source);
+        // Then add any pending additions
+        targetReplicas.addAll(replicationInFlight);
+
+        int delta = replicationFactor - getReplicaCount(id, replicas);
+        final int additionalRacks
+            = containerPlacement.validateContainerPlacement(
+                targetReplicas, replicationFactor).additionalReplicaRequired();
+        final int replicasNeeded
+            = delta < additionalRacks ? additionalRacks : delta;
+
         final List<DatanodeDetails> excludeList = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
+        excludeList.addAll(replicationInFlight);
         List<InflightAction> actionList = inflightReplication.get(id);
         if (actionList != null) {
           actionList.stream().map(r -> r.datanode)
               .forEach(excludeList::add);
         }
         final List<DatanodeDetails> selectedDatanodes = containerPlacement
-            .chooseDatanodes(excludeList, null, delta,
+            .chooseDatanodes(excludeList, null, replicasNeeded,
                 container.getUsedBytes());
-
-        LOG.info("Container {} is under replicated. Expected replica count" +
-                " is {}, but found {}.", id, replicationFactor,
-            replicationFactor - delta);
-
-        for (DatanodeDetails datanode : selectedDatanodes) {
-          sendReplicateCommand(container, datanode, source);
+        if (delta > 0) {
+          LOG.info("Container {} is under replicated. Expected replica count" +
+                  " is {}, but found {}.", id, replicationFactor,
+              replicationFactor - delta);
+        }
+        int newAdditionalRacks = additionalRacks;
+        if (additionalRacks > 0) {
+          LOG.info("Container {} is mis-replicated. Is should be on {} " +
+              "additional racks", id, additionalRacks);
+          // Check if the new target nodes (original plus newly selected nodes)
+          // makes the placement policy valid.
+          targetReplicas.addAll(selectedDatanodes);
+          newAdditionalRacks = containerPlacement.validateContainerPlacement(
+              targetReplicas, replicationFactor).additionalReplicaRequired();
+        }
+        if (delta > 0 || newAdditionalRacks < additionalRacks) {
+          // Only create new replicas if we are missing a replicas or
+          // the number of pending racks has improved. No point in creating
+          // new replicas for mis-replicated containers unless it improves
+          // things
+          for (DatanodeDetails datanode : selectedDatanodes) {
+            sendReplicateCommand(container, datanode, source);
+          }
+        } else {
+          LOG.warn("Container required {} additional racks and {} additional " +
+              "replicas. After selecting new nodes, {} racks are still " +
+              "required. No new replicas will be scheduled.",
+              additionalRacks, Integer.max(delta, 0), newAdditionalRacks);
         }
       } else {
         LOG.warn("Cannot replicate container {}, no healthy replica found.",
@@ -591,6 +637,21 @@ public class ReplicationManager
             eligibleReplicas.get(i).getDatanodeDetails(), true);
       }
     }
+  }
+
+  /**
+   * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
+   * and then check if the list meets the container placement policy.
+   * @param replicas List of containerReplica
+   * @param replicationFactor Expected Replication Factor of the containe
+   * @return ContainerPlacementStatus indicating if the policy is met or not
+   */
+  private ContainerPlacementStatus getPlacementStatus(
+      Set<ContainerReplica> replicas, int replicationFactor) {
+    List<DatanodeDetails> replicaDns = replicas.stream()
+        .map(c -> c.getDatanodeDetails()).collect(Collectors.toList());
+    return containerPlacement.validateContainerPlacement(
+        replicaDns, replicationFactor);
   }
 
   /**
