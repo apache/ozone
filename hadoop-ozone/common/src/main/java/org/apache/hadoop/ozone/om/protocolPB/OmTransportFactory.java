@@ -24,6 +24,9 @@ import java.util.ServiceLoader;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.security.UserGroupInformation;
 
+/**
+ * Factory pattern to create object for RPC communication with OM.
+ */
 public interface OmTransportFactory {
 
   OmTransport createOmTransport(ConfigurationSource source,

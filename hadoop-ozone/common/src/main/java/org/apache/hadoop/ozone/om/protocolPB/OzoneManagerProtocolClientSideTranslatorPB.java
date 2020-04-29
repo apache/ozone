@@ -206,9 +206,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   private OMResponse submitRequest(OMRequest omRequest)
       throws IOException {
-      OMRequest payload = OMRequest.newBuilder(omRequest)
-          .setTraceID(TracingUtil.exportCurrentSpan())
-          .build();
+    OMRequest payload = OMRequest.newBuilder(omRequest)
+        .setTraceID(TracingUtil.exportCurrentSpan())
+        .build();
 
     return transport.submitRequest(payload);
   }

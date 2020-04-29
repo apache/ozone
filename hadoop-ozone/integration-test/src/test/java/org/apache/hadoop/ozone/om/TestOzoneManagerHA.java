@@ -476,7 +476,6 @@ public class TestOzoneManagerHA {
     // After initiate multipartupload, shutdown leader OM.
     // Stop leader OM, to see when the OM leader changes
     // multipart upload is happening successfully or not.
-    ;
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = cluster.getOMLeader().getOMNodeId();
@@ -516,9 +515,8 @@ public class TestOzoneManagerHA {
         getFailoverProxyProvider();
     long numTimesTriedToSameNode = omFailoverProxyProvider.getWaitTime()
         / waitBetweenRetries;
-    omFailoverProxyProvider.performFailoverIfRequired
-        (omFailoverProxyProvider.
-            getCurrentProxyOMNodeId());
+    omFailoverProxyProvider.performFailoverIfRequired(
+        omFailoverProxyProvider.getCurrentProxyOMNodeId());
     Assert.assertEquals((numTimesTriedToSameNode + 1) * waitBetweenRetries,
         omFailoverProxyProvider.getWaitTime());
   }

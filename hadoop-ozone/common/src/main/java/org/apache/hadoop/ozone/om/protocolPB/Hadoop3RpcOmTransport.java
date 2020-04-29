@@ -49,6 +49,9 @@ import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Full-featured Hadoop RPC + HA implementation.
+ */
 public class Hadoop3RpcOmTransport implements OmTransport {
 
   /**
