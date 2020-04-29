@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.io.retry.RetryProxy;
@@ -91,6 +92,11 @@ public class Hadoop32RpcOmTransport implements OmTransport {
       }
       throw new IOException("Could not determine or connect to OM Leader.");
     }
+  }
+
+  @Override
+  public Text getDelegationTokenService() {
+    return omFailoverProxyProvider.getCurrentProxyDelegationToken();
   }
 
   /**
