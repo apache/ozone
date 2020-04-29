@@ -22,6 +22,8 @@ OZONE-SITE.XML_ozone.om.address.omservice.om1=om1
 OZONE-SITE.XML_ozone.om.address.omservice.om2=om2
 OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
+OZONE-SITE.XML_ozone.om.ratis.log.purge.gap=50
+OZONE-SITE.XML_ozone.om.ratis.snapshot.auto.trigger.threshold=50
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
@@ -30,7 +32,7 @@ OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.handler.type=distributed
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_ozone.replication=1
-OZONE-SITE.XML_ozone.client.failover.max.attempts=6
+OZONE-SITE.XML_ozone.client.failover.max.attempts=30
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
@@ -44,6 +46,8 @@ LOG4J.PROPERTIES_log4j.logger.org.apache.hadoop.util.NativeCodeLoader=ERROR
 LOG4J.PROPERTIES_log4j.logger.org.apache.ratis.conf.ConfUtils=WARN
 LOG4J.PROPERTIES_log4j.logger.org.apache.hadoop.security.ShellBasedUnixGroupsMapping=ERROR
 LOG4J.PROPERTIES_log4j.logger.org.apache.ratis.grpc.client.GrpcClientProtocolClient=WARN
+LOG4J.PROPERTIES_log4j.logger.org.apache.ratis.grpc.server.GrpcLogAppender=WARN
+LOG4J.PROPERTIES_log4j.logger.org.apache.ratis.server.impl.FollowerInfo=WARN
 
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
