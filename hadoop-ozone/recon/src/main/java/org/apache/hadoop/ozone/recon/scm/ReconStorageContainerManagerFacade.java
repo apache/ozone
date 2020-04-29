@@ -53,7 +53,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.recon.fsck.MissingContainerTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
@@ -154,15 +154,17 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
 
+    ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     reconScmTasks.add(new PipelineSyncTask(
-        this,
+        pipelineManager,
         scmServiceProvider,
-        reconTaskStatusDao));
-    reconScmTasks.add(new MissingContainerTask(
-        this,
         reconTaskStatusDao,
-        containerSchemaManager));
-    reconScmTasks.forEach(ReconScmTask::register);
+        reconTaskConfig));
+    reconScmTasks.add(new MissingContainerTask(
+        containerManager,
+        reconTaskStatusDao,
+        containerSchemaManager,
+        reconTaskConfig));
   }
 
   /**

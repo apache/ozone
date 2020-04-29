@@ -24,7 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 
 /**
  * Random load generator which writes, read and deletes keys from
@@ -34,26 +33,24 @@ public class RandomLoadGenerator extends LoadGenerator {
   private static final Logger LOG =
       LoggerFactory.getLogger(RandomLoadGenerator.class);
 
-  private final List<LoadBucket> ozoneBuckets;
+  private final LoadBucket ozoneBucket;
   private final DataBuffer dataBuffer;
 
-  public RandomLoadGenerator(DataBuffer dataBuffer, List<LoadBucket> buckets) {
-    this.ozoneBuckets = buckets;
+  public RandomLoadGenerator(DataBuffer dataBuffer, LoadBucket bucket) {
+    this.ozoneBucket = bucket;
     this.dataBuffer = dataBuffer;
   }
 
   @Override
   public void generateLoad() throws Exception {
-    LoadBucket bucket =
-        ozoneBuckets.get((int) (Math.random() * ozoneBuckets.size()));
     int index = RandomUtils.nextInt();
     ByteBuffer buffer = dataBuffer.getBuffer(index);
     String keyName = getKeyName(index);
-    bucket.writeKey(buffer, keyName);
+    ozoneBucket.writeKey(buffer, keyName);
 
-    bucket.readKey(buffer, keyName);
+    ozoneBucket.readKey(buffer, keyName);
 
-    bucket.deleteKey(keyName);
+    ozoneBucket.deleteKey(keyName);
   }
 
   public void initialize() {

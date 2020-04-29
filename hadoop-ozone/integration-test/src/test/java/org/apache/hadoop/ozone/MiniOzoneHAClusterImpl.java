@@ -249,6 +249,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   public void stopOzoneManager(String omNodeId) {
     ozoneManagerMap.get(omNodeId).stop();
+    ozoneManagerMap.get(omNodeId).join();
   }
 
   /**

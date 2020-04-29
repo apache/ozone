@@ -123,7 +123,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void initialize(RaftServer server, RaftGroupId id,
       RaftStorage raftStorage) throws IOException {
-    lifeCycle.startAndTransition(() -> {
+    getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
       this.raftGroupId = id;
       storage.init(raftStorage);
@@ -304,8 +304,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public void pause() {
-    lifeCycle.transition(LifeCycle.State.PAUSING);
-    lifeCycle.transition(LifeCycle.State.PAUSED);
+    getLifeCycle().transition(LifeCycle.State.PAUSING);
+    getLifeCycle().transition(LifeCycle.State.PAUSED);
     ozoneManagerDoubleBuffer.stop();
   }
 
@@ -316,7 +316,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
-    lifeCycle.startAndTransition(() -> {
+    getLifeCycle().startAndTransition(() -> {
       this.ozoneManagerDoubleBuffer =
           new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
               this::updateLastAppliedIndex);

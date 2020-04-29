@@ -707,17 +707,17 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
         String listOfDirs = String.join(",", dataDirs);
         Path ratisDir = Paths.get(datanodeBaseDir, "data", "ratis");
-        Path wrokDir = Paths.get(datanodeBaseDir, "data", "replication",
+        Path workDir = Paths.get(datanodeBaseDir, "data", "replication",
             "work");
         Files.createDirectories(metaDir);
         Files.createDirectories(ratisDir);
-        Files.createDirectories(wrokDir);
+        Files.createDirectories(workDir);
         dnConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
         dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, listOfDirs);
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
         dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
-            wrokDir.toString());
+            workDir.toString());
         if (reconServer != null) {
           OzoneStorageContainerManager reconScm =
               reconServer.getReconStorageContainerManager();

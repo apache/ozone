@@ -78,7 +78,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>0.6.0-490b689-SNAPSHOT</ratis.version>
+    <ratis.version>0.6.0-cac3336-SNAPSHOT</ratis.version>
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
     <distMgmtSnapshotsUrl>https://repository.apache.org/content/repositories/snapshots</distMgmtSnapshotsUrl>
@@ -118,16 +118,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <java.security.egd>file:///dev/urandom</java.security.egd>
 
-    <!-- avro version -->
-    <avro.version>1.7.7</avro.version>
-
     <bouncycastle.version>1.60</bouncycastle.version>
 
     <!-- jersey version -->
     <jersey.version>1.19</jersey.version>
 
     <!-- jackson versions -->
-    <jackson.version>1.9.13</jackson.version>
     <jackson2.version>2.10.3</jackson2.version>
 
     <!-- jaegertracing veresion -->
@@ -170,9 +166,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
-    <datanode.protobuf-compile.version>3.10.0</datanode.protobuf-compile.version>
-    <datanode.grpc-compile.version>1.24.0</datanode.grpc-compile.version>
+    <protobuf-compile.version>3.11.0</protobuf-compile.version>
+    <grpc-compile.version>1.28.1</grpc-compile.version>
     <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
+
+    <netty.version>4.1.48.Final</netty.version>
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
@@ -910,7 +908,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
-        <version>4.1.47.Final</version>
+        <version>${netty.version}</version>
       </dependency>
 
       <dependency>
@@ -1078,26 +1076,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>5.0.3</version>
       </dependency>
       <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-mapper-asl</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-core-asl</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-jaxrs</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.codehaus.jackson</groupId>
-        <artifactId>jackson-xc</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
         <version>${jackson2.version}</version>
@@ -1148,11 +1126,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>javax.servlet-api</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.avro</groupId>
-        <artifactId>avro</artifactId>
-        <version>${avro.version}</version>
       </dependency>
       <dependency>
         <groupId>net.sf.kosmosfs</groupId>
@@ -1523,11 +1496,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-source-plugin</artifactId>
           <version>${maven-source-plugin.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.avro</groupId>
-          <artifactId>avro-maven-plugin</artifactId>
-          <version>${avro.version}</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

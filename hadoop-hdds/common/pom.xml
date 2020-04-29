@@ -29,10 +29,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>jar</packaging>
 
   <properties>
-    <hdds.version>0.6.0-SNAPSHOT</hdds.version>
     <log4j2.version>2.11.0</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
-    <declared.hdds.version>${hdds.version}</declared.hdds.version>
   </properties>
 
   <dependencies>
@@ -225,7 +223,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <extensions>true</extensions>
         <configuration>
           <protocArtifact>
-            com.google.protobuf:protoc:${datanode.protobuf-compile.version}:exe:${os.detected.classifier}
+            com.google.protobuf:protoc:${protobuf-compile.version}:exe:${os.detected.classifier}
           </protocArtifact>
           <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
           <includes>
@@ -246,7 +244,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <configuration>
                 <pluginId>grpc-java</pluginId>
                 <pluginArtifact>
-                  io.grpc:protoc-gen-grpc-java:${datanode.grpc-compile.version}:exe:${os.detected.classifier}
+                  io.grpc:protoc-gen-grpc-java:${grpc-compile.version}:exe:${os.detected.classifier}
                 </pluginArtifact>
               </configuration>
           </execution>
