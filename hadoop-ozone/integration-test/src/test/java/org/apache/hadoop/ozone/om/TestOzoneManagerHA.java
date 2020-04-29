@@ -471,7 +471,6 @@ public class TestOzoneManagerHA {
     Assert.assertEquals(data, new String(fileContent));
   }
 
-  @Ignore("This test failing randomly and triggering HDDS-3465.")
   @Test
   public void testMultipartUploadWithOneOmNodeDown() throws Exception {
 
@@ -501,6 +500,38 @@ public class TestOzoneManagerHA {
         omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     Assert.assertTrue(leaderOMNodeId != newLeaderOMNodeId);
+  }
+
+  /**
+   * 1. Stop one of the OM
+   * 2. make a call to OM, this will make failover attempts to find new node.
+   * a) if LE finishes but leader not ready, it retries to same node
+   * b) if LE not done, it will failover to new node and check
+   * 3. Try failover to same OM explicitly.
+   * Now #3 should wait additional waitBetweenRetries time.
+   * LE: Leader Election.
+   */
+  @Test
+  public void testIncrementalWaitTimeWithSameNodeFailover() throws Exception {
+    long waitBetweenRetries = conf.getLong(
+        OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
+    OMFailoverProxyProvider omFailoverProxyProvider =
+        objectStore.getClientProxy().getOMProxyProvider();
+
+    // The OMFailoverProxyProvider will point to the current leader OM node.
+    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+
+    cluster.stopOzoneManager(leaderOMNodeId);
+    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+    createKeyTest(true); // failover should happen to new node
+
+    long numTimesTriedToSameNode = omFailoverProxyProvider.getWaitTime()
+        / waitBetweenRetries;
+    omFailoverProxyProvider.performFailoverIfRequired(omFailoverProxyProvider.
+        getCurrentProxyOMNodeId());
+    Assert.assertEquals((numTimesTriedToSameNode + 1) * waitBetweenRetries,
+        omFailoverProxyProvider.getWaitTime());
   }
 
 

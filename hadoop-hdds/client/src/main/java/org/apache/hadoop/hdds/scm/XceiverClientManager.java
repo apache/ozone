@@ -294,6 +294,15 @@ public class XceiverClientManager implements Closeable {
   }
 
   /**
+   * Reset xceiver client metric.
+   */
+  public static synchronized void resetXceiverClientMetrics() {
+    if (metrics != null) {
+      metrics.reset();
+    }
+  }
+
+  /**
    * Configuration for HDDS client.
    */
   @ConfigGroup(prefix = "scm.container.client")

@@ -591,6 +591,36 @@ public class TestReplicationManager {
     Assert.assertEquals(0, datanodeCommandHandler.getInvocation());
   }
 
+  /**
+   * ReplicationManager should close the unhealthy OPEN container.
+   */
+  @Test
+  public void testUnhealthyOpenContainer()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = getContainer(LifeCycleState.OPEN);
+    final ContainerID id = container.containerID();
+    final Set<ContainerReplica> replicas = getReplicas(id, State.OPEN,
+        randomDatanodeDetails(),
+        randomDatanodeDetails());
+    replicas.addAll(getReplicas(id, State.UNHEALTHY, randomDatanodeDetails()));
+
+    containerStateManager.loadContainer(container);
+    for (ContainerReplica replica : replicas) {
+      containerStateManager.updateContainerReplica(id, replica);
+    }
+
+    final CloseContainerEventHandler closeContainerHandler =
+        Mockito.mock(CloseContainerEventHandler.class);
+    eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
+
+    replicationManager.processContainersNow();
+
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    Mockito.verify(closeContainerHandler, Mockito.times(1))
+        .onMessage(id, eventQueue);
+  }
+
   @Test
   public void testGeneratedConfig() {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
