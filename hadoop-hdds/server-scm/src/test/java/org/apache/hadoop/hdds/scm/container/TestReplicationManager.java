@@ -707,6 +707,56 @@ public class TestReplicationManager {
         .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand));
   }
 
+  @Test
+  public void overReplicatedButRemovingMakesMisReplicated()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    // In this test, the excess replica should not be removed.
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    final ContainerID id = container.containerID();
+    final UUID originNodeId = UUID.randomUUID();
+    final ContainerReplica replicaOne = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaTwo = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaThree = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaFour = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaFive = getReplicas(
+        id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
+
+    containerStateManager.loadContainer(container);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaThree);
+    containerStateManager.updateContainerReplica(id, replicaFour);
+    containerStateManager.updateContainerReplica(id, replicaFive);
+
+    // Ensure a mis-replicated status is returned for any containers in this
+    // test where there are exactly 3 replicas checked.
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.argThat(new ListOfNElements(3)),
+        Mockito.anyInt()
+    )).thenAnswer(
+        invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
+
+    int currentDeleteCommandCount = datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+
+    replicationManager.processContainersNow();
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    // The unhealthy replica should be removed, but not the other replica
+    // as each time we test with 3 replicas, Mockitor ensures it returns
+    // mis-replicated
+    Assert.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+
+    Assert.assertTrue(datanodeCommandHandler.received(
+        SCMCommandProto.Type.deleteContainerCommand,
+        replicaFive.getDatanodeDetails()));
+  }
+
   @After
   public void teardown() throws IOException {
     containerStateManager.close();

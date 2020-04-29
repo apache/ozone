@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.container;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -602,7 +603,7 @@ public class ReplicationManager
     final ContainerID id = container.containerID();
     final int replicationFactor = container.getReplicationFactor().getNumber();
     // Dont consider inflight replication while calculating excess here.
-    final int excess = replicas.size() - replicationFactor -
+    int excess = replicas.size() - replicationFactor -
         inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
 
     if (excess > 0) {
@@ -628,13 +629,52 @@ public class ReplicationManager
           .filter(r -> !compareState(container.getState(), r.getState()))
           .collect(Collectors.toList());
 
-      //Move the unhealthy replicas to the front of eligible replicas to delete
-      eligibleReplicas.removeAll(unhealthyReplicas);
-      eligibleReplicas.addAll(0, unhealthyReplicas);
-
-      for (int i = 0; i < excess; i++) {
-        sendDeleteCommand(container,
-            eligibleReplicas.get(i).getDatanodeDetails(), true);
+      // If there are unhealthy replicas, then we should remove them even if it
+      // makes the container violate the placement policy, as excess unhealthy
+      // containers are not really useful. It will be corrected later as a
+      // mis-replicated container will be seen as under-replicated.
+      for (ContainerReplica r : unhealthyReplicas) {
+        if (excess > 0) {
+          sendDeleteCommand(container, r.getDatanodeDetails(), true);
+          excess -= 1;
+        }
+        break;
+      }
+      // After removing all unhealthy replicas, if the container is still over
+      // replicated then we need to check if it is already mis-replicated.
+      // If it is, we do no harm by removing excess replicas. However, if it is
+      // not mis-replicated, then we can only remove replicas if they don't
+      // make the container become mis-replicated.
+      if (excess > 0) {
+        eligibleReplicas.removeAll(unhealthyReplicas);
+        Set<ContainerReplica> replicaSet = new HashSet<>(eligibleReplicas);
+        boolean misReplicated =
+            getPlacementStatus(replicaSet, replicationFactor)
+                .isPolicySatisfied();
+        for (ContainerReplica r : eligibleReplicas) {
+          if (excess <= 0) {
+            break;
+          }
+          // First remove the replica we are working on from the set, and then
+          // check if the set is now mis-replicated.
+          replicaSet.remove(r);
+          boolean nowMisRep = getPlacementStatus(replicaSet, replicationFactor)
+              .isPolicySatisfied();
+          if (misReplicated || !nowMisRep) {
+            // Remove the replica if the container was already mis-replicated
+            // OR if losing this replica does not make it become mis-replicated
+            sendDeleteCommand(container, r.getDatanodeDetails(), true);
+            excess -= 1;
+            continue;
+          }
+          // If we decided not to remove this replica, put it back into the set
+          replicaSet.add(r);
+        }
+        if (excess > 0) {
+          LOG.info("The container {} is over replicated with {} excess " +
+              "replica. The excess replicas cannot be removed without " +
+              "violating the placement policy", container, excess);
+        }
       }
     }
   }
