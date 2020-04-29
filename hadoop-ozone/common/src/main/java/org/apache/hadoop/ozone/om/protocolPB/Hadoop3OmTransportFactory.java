@@ -19,17 +19,17 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
 
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
- * Transport responsible to send messages to OM.
+ * Factory to crate the default Hadoop 3 + HA transport.
  */
-public interface OmTransport {
+public class Hadoop3OmTransportFactory implements OmTransportFactory {
+  @Override
+  public OmTransport createOmTransport(ConfigurationSource source,
+      UserGroupInformation ugi, String omServiceId) throws IOException {
 
-  OMResponse submitRequest(OMRequest payload) throws IOException;
-
-  Text getDelegationTokenService();
-
+    return new Hadoop3RpcOmTransport(source, ugi, omServiceId);
+  }
 }

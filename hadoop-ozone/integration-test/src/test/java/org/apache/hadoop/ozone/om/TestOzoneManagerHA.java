@@ -62,7 +62,7 @@ import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.protocolPB.Hadoop32RpcOmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.Hadoop3RpcOmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -698,8 +698,8 @@ public class TestOzoneManagerHA {
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
         (OzoneManagerProtocolClientSideTranslatorPB) clientProxy
             .getOzoneManagerClient();
-    Hadoop32RpcOmTransport transport =
-        (Hadoop32RpcOmTransport) ozoneManagerClient.getTransport();
+    Hadoop3RpcOmTransport transport =
+        (Hadoop3RpcOmTransport) ozoneManagerClient.getTransport();
     return transport.getOmFailoverProxyProvider();
   }
 
