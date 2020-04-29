@@ -38,8 +38,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -107,6 +105,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -1694,7 +1694,7 @@ public class KeyManagerImpl implements KeyManager {
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
         validateBucket(volumeName, bucketName);
-        return new OzoneFileStatus(OZONE_URI_DELIMITER);
+        return new OzoneFileStatus();
       }
 
       // Check if the key is a file.
@@ -1758,8 +1758,7 @@ public class KeyManagerImpl implements KeyManager {
       Path keyPath = Paths.get(keyName);
       OzoneFileStatus status =
           verifyNoFilesInPath(volumeName, bucketName, keyPath, false);
-      if (status != null && OzoneFSUtils.pathToKey(status.getPath())
-          .equals(keyName)) {
+      if (status != null && status.getKeyInfo().getKeyName().equals(keyName)) {
         // if directory already exists
         return;
       }
@@ -2030,12 +2029,17 @@ public class KeyManagerImpl implements KeyManager {
                 // if entry is a directory
                 if (!deletedKeySet.contains(entryInDb)) {
                   if (!entryKeyName.equals(immediateChild)) {
+                    OmKeyInfo fakeDirEntry = new OmKeyInfo.Builder()
+                        .setVolumeName(omKeyInfo.getVolumeName())
+                        .setBucketName(omKeyInfo.getBucketName())
+                        .setKeyName(immediateChild)
+                        .build();
                     cacheKeyMap.put(entryInDb,
-                        new OzoneFileStatus(immediateChild));
+                        new OzoneFileStatus(fakeDirEntry, scmBlockSize, true));
                   } else {
                     // If entryKeyName matches dir name, we have the info
                     cacheKeyMap.put(entryInDb,
-                        new OzoneFileStatus(omKeyInfo, 0, true));
+                        new OzoneFileStatus(omKeyInfo, scmBlockSize, true));
                   }
                   countEntries++;
                 }
