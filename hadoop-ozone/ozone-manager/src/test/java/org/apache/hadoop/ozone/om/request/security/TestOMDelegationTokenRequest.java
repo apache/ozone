@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -44,7 +45,7 @@ public class TestOMDelegationTokenRequest {
   protected OzoneManager ozoneManager;
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
-  protected OzoneConfiguration conf;
+  protected ConfigurationSource conf;
 
   // Just setting OzoneManagerDoubleBuffer which does nothing.
   protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
@@ -57,8 +58,9 @@ public class TestOMDelegationTokenRequest {
     ozoneManager = Mockito.mock(OzoneManager.class);
 
     conf = new OzoneConfiguration();
-    conf.set(OZONE_OM_DB_DIRS, folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(conf);
+    ((OzoneConfiguration) conf)
+        .set(OZONE_OM_DB_DIRS, folder.newFolder().getAbsolutePath());
+    omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
   }
 

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.security;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -35,16 +36,16 @@ public class TestOMDelegationTokenResponse {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
-  protected OzoneConfiguration conf;
+  protected ConfigurationSource conf;
   protected OMMetadataManager omMetadataManager;
   protected BatchOperation batchOperation;
 
   @Before
   public void setup() throws IOException {
     conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
+    ((OzoneConfiguration) conf).set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(conf);
+    omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 }
