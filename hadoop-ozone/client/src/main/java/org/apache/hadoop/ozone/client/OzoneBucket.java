@@ -159,7 +159,7 @@ public class OzoneBucket extends WithMetadata {
   }
 
   @SuppressWarnings("parameternumber")
-  public OzoneBucket(Configuration conf, ClientProtocol proxy,
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, long modificationTime,
       Map<String, String> metadata, String encryptionKeyName) {
@@ -200,7 +200,7 @@ public class OzoneBucket extends WithMetadata {
    * @param modificationTime modification time of the bucket.
    */
   @SuppressWarnings("parameternumber")
-  public OzoneBucket(Configuration conf, ClientProtocol proxy,
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, long modificationTime,
       Map<String, String> metadata) {

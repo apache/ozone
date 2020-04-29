@@ -128,8 +128,8 @@ public class OzoneVolume extends WithMetadata {
   }
 
   @SuppressWarnings("parameternumber")
-  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy, String name,
-      String admin, String owner, long quotaInBytes,
+  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
+      String name, String admin, String owner, long quotaInBytes,
       long creationTime, List<OzoneAcl> acls) {
     this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls,
         new HashMap<>());
@@ -142,9 +142,9 @@ public class OzoneVolume extends WithMetadata {
   }
 
   @SuppressWarnings("parameternumber")
-  public OzoneVolume(ConfigurationSourceq conf, ClientProtocol proxy, String name,
-      String admin, String owner, long quotaInBytes, long creationTime,
-      long modificationTime, List<OzoneAcl> acls) {
+  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
+      String name, String admin, String owner, long quotaInBytes,
+      long creationTime, long modificationTime, List<OzoneAcl> acls) {
     this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
