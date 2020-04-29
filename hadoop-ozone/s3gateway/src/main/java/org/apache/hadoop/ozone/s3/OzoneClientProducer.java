@@ -107,7 +107,7 @@ public class OzoneClientProducer {
           throw S3_AUTHINFO_CREATION_ERROR;
         }
 
-      } else if (isAclEnable) {
+      } else {
         String awsAccessId = v4RequestParser.getAwsAccessId();
         if (awsAccessId != null) {
           UserGroupInformation remoteUser =
