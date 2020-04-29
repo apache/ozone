@@ -16,6 +16,9 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import javax.management.MBeanInfo;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.net.ConnectException;
@@ -32,24 +35,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
-import org.apache.log4j.Logger;
-
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,53 +43,62 @@ import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.protocolPB.Hadoop32RpcOmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.VolumeArgs;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
-    .IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
-    .IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY;
-
-import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl
-    .NODE_FAILURE_TIMEOUT;
+import org.apache.commons.lang3.RandomStringUtils;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import org.apache.log4j.Logger;
 import static org.apache.ratis.server.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
+import org.jetbrains.annotations.NotNull;
+import org.junit.After;
+import org.junit.Assert;
 import static org.junit.Assert.fail;
-
-import javax.management.MBeanInfo;
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
+import org.junit.Before;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario.
@@ -482,12 +476,10 @@ public class TestOzoneManagerHA {
     // After initiate multipartupload, shutdown leader OM.
     // Stop leader OM, to see when the OM leader changes
     // multipart upload is happening successfully or not.
-
-    OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+    ;
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
-    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+    String leaderOMNodeId = cluster.getOMLeader().getOMNodeId();
 
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.
@@ -496,15 +488,13 @@ public class TestOzoneManagerHA {
 
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
-    String newLeaderOMNodeId =
-        omFailoverProxyProvider.getCurrentProxyOMNodeId();
-
-    Assert.assertTrue(leaderOMNodeId != newLeaderOMNodeId);
+    Assert.assertTrue(leaderOMNodeId != cluster.getOMLeader().getOMNodeId());
   }
 
   /**
    * 1. Stop one of the OM
-   * 2. make a call to OM, this will make failover attempts to find new node.
+   * 2. make a call to OM, this will make failover attempts to find new
+   * node.
    * a) if LE finishes but leader not ready, it retries to same node
    * b) if LE not done, it will failover to new node and check
    * 3. Try failover to same OM explicitly.
@@ -512,28 +502,26 @@ public class TestOzoneManagerHA {
    * LE: Leader Election.
    */
   @Test
-  public void testIncrementalWaitTimeWithSameNodeFailover() throws Exception {
+  public void testIncrementalWaitTimeWithSameNodeFailover() throws
+      Exception {
     long waitBetweenRetries = conf.getLong(
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
-    OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
 
-    // The OMFailoverProxyProvider will point to the current leader OM node.
-    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
-
-    cluster.stopOzoneManager(leaderOMNodeId);
+    cluster.stopOzoneManager(cluster.getOMLeader().getOMNodeId());
     Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
     createKeyTest(true); // failover should happen to new node
 
+    OMFailoverProxyProvider omFailoverProxyProvider =
+        getFailoverProxyProvider();
     long numTimesTriedToSameNode = omFailoverProxyProvider.getWaitTime()
         / waitBetweenRetries;
-    omFailoverProxyProvider.performFailoverIfRequired(omFailoverProxyProvider.
-        getCurrentProxyOMNodeId());
+    omFailoverProxyProvider.performFailoverIfRequired
+        (omFailoverProxyProvider.
+            getCurrentProxyOMNodeId());
     Assert.assertEquals((numTimesTriedToSameNode + 1) * waitBetweenRetries,
         omFailoverProxyProvider.getWaitTime());
   }
-
 
   private String initiateMultipartUpload(OzoneBucket ozoneBucket,
       String keyName) throws Exception {
@@ -678,9 +666,9 @@ public class TestOzoneManagerHA {
    */
   @Test
   public void testOMProxyProviderInitialization() throws Exception {
-    OzoneClient rpcClient = cluster.getRpcClient();
     OMFailoverProxyProvider omFailoverProxyProvider =
-        rpcClient.getObjectStore().getClientProxy().getOMProxyProvider();
+        getFailoverProxyProvider();
+
     List<OMProxyInfo> omProxies =
         omFailoverProxyProvider.getOMProxyInfos();
 
@@ -702,6 +690,19 @@ public class TestOzoneManagerHA {
     }
   }
 
+  @NotNull
+  private OMFailoverProxyProvider getFailoverProxyProvider()
+      throws IOException {
+    RpcClient clientProxy =
+        (RpcClient) cluster.getRpcClient().getObjectStore().getClientProxy();
+    OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
+        (OzoneManagerProtocolClientSideTranslatorPB) clientProxy
+            .getOzoneManagerClient();
+    Hadoop32RpcOmTransport transport =
+        (Hadoop32RpcOmTransport) ozoneManagerClient.getTransport();
+    return transport.getOmFailoverProxyProvider();
+  }
+
   /**
    * Test OMFailoverProxyProvider failover on connection exception to OM client.
    */
@@ -710,7 +711,8 @@ public class TestOzoneManagerHA {
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
     OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+        getFailoverProxyProvider();
+
     String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     createVolumeTest(true);
@@ -740,7 +742,7 @@ public class TestOzoneManagerHA {
   @Test
   public void testOMProxyProviderFailoverToCurrentLeader() throws Exception {
     OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+        getFailoverProxyProvider();
 
     // Run couple of createVolume tests to discover the current Leader OM
     createVolumeTest(true);
@@ -803,7 +805,8 @@ public class TestOzoneManagerHA {
     objectStore.createVolume(volumeName);
 
     OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+        getFailoverProxyProvider();
+
     String currentLeaderNodeId = omFailoverProxyProvider
         .getCurrentProxyOMNodeId();
 
@@ -815,8 +818,7 @@ public class TestOzoneManagerHA {
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
       final ObjectStore store = OzoneClientFactory.getRpcClient(
           omServiceId, conf).getObjectStore();
-      final OMFailoverProxyProvider proxyProvider =
-          store.getClientProxy().getOMProxyProvider();
+      final OMFailoverProxyProvider proxyProvider = getFailoverProxyProvider();
 
       // Failover to the OM node that the objectStore points to
       omFailoverProxyProvider.performFailoverIfRequired(
@@ -1133,9 +1135,7 @@ public class TestOzoneManagerHA {
     retVolumeinfo.createBucket(bucketName);
     OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
-    String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
-        .getCurrentProxyOMNodeId();
-    OzoneManager ozoneManager = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManager ozoneManager = cluster.getOMLeader();
 
     // Send commands to ratis to increase the log index so that ratis
     // triggers a snapshot on the state machine.
@@ -1203,9 +1203,7 @@ public class TestOzoneManagerHA {
   @Test
   public void testOMRestart() throws Exception {
     // Get the leader OM
-    String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
-        .getCurrentProxyOMNodeId();
-    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManager leaderOM = cluster.getOMLeader();
 
     // Get follower OMs
     OzoneManager followerOM1 = cluster.getOzoneManager(
@@ -1386,12 +1384,8 @@ public class TestOzoneManagerHA {
    * @throws Exception
    */
   private void stopLeaderOM() {
-    //Stop the leader OM.
-    OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
 
-    // The OMFailoverProxyProvider will point to the current leader OM node.
-    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+    String leaderOMNodeId = cluster.getOMLeader().getOMNodeId();
 
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.

@@ -18,9 +18,14 @@
 
 package org.apache.hadoop.ozone;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import java.io.IOException;
+import java.net.BindException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -34,19 +39,13 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.net.BindException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 
 /**
  * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
@@ -155,6 +154,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public OzoneManager getOzoneManager(int index) {
     return this.ozoneManagers.get(index);
   }
+
 
   public OzoneManager getOzoneManager(String omNodeId) {
     return this.ozoneManagerMap.get(omNodeId);
