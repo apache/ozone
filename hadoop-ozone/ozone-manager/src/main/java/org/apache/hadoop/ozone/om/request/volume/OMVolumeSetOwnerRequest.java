@@ -84,7 +84,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
-
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
     Preconditions.checkNotNull(setVolumePropertyRequest);
@@ -149,7 +148,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
             transactionLogIndex, setVolumePropertyRequest);
         return new OMVolumeSetOwnerResponse(createReplayOMResponse(omResponse));
       }
-
       oldOwner = omVolumeArgs.getOwnerName();
 
       // Return OK immediately if newOwner is the same as oldOwner.
@@ -203,7 +201,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
           SetVolumePropertyResponse.newBuilder().setResponse(true).build());
       omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build(),
           oldOwner, oldOwnerVolumeList, newOwnerVolumeList, omVolumeArgs);
-
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMVolumeSetOwnerResponse(
