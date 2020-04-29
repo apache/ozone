@@ -2365,7 +2365,7 @@
   </property>
   <property>
     <name>hdds.tracing.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, HDDS</tag>
     <description>
       If enabled, tracing information is sent to tracing server.

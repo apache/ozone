@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -156,7 +155,6 @@ public class TestOmMetrics {
   }
 
   @Test
-  @Ignore("Test failing because of table cache. Revisit later.")
   public void testBucketOps() throws IOException {
     BucketManager bucketManager =
         (BucketManager) HddsWhiteboxTestUtils.getInternalState(
@@ -171,6 +169,7 @@ public class TestOmMetrics {
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
+
     doBucketOps();
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
@@ -202,11 +201,11 @@ public class TestOmMetrics {
     doBucketOps();
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumBucketOps", 18L, omMetrics);
-    assertCounter("NumBucketCreates", 8L, omMetrics);
+    assertCounter("NumBucketOps", 14L, omMetrics);
+    assertCounter("NumBucketCreates", 5L, omMetrics);
     assertCounter("NumBucketUpdates", 2L, omMetrics);
     assertCounter("NumBucketInfos", 2L, omMetrics);
-    assertCounter("NumBucketDeletes", 4L, omMetrics);
+    assertCounter("NumBucketDeletes", 3L, omMetrics);
     assertCounter("NumBucketLists", 2L, omMetrics);
 
     assertCounter("NumBucketCreateFails", 1L, omMetrics);
@@ -215,10 +214,10 @@ public class TestOmMetrics {
     assertCounter("NumBucketDeleteFails", 1L, omMetrics);
     assertCounter("NumBucketListFails", 1L, omMetrics);
 
-    assertCounter("NumBuckets", 4L, omMetrics);
+    assertCounter("NumBuckets", 2L, omMetrics);
 
     cluster.restartOzoneManager();
-    assertCounter("NumBuckets", 4L, omMetrics);
+    assertCounter("NumBuckets", 2L, omMetrics);
   }
 
   @Test
