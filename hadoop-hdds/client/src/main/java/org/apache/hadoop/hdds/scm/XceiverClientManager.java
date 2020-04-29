@@ -169,7 +169,8 @@ public class XceiverClientManager implements Closeable {
       throws IOException {
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkArgument(pipeline.getNodes() != null);
-    Preconditions.checkArgument(!pipeline.getNodes().isEmpty(), NO_DATANODE_FOUND);
+    Preconditions.checkArgument(!pipeline.getNodes().isEmpty(),
+        NO_DATANODE_FOUND);
 
     synchronized (clientCache) {
       XceiverClientSpi info = getClient(pipeline, read);
