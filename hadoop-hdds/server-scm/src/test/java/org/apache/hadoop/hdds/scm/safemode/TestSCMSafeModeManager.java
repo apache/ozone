@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -40,6 +41,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -144,6 +146,59 @@ public class TestSCMSafeModeManager {
 
   }
 
+  @Test
+  public void testDelayedEventNotification() throws Exception {
+
+    List<SafeModeStatus> delayedSafeModeEvents = new ArrayList<>();
+    List<SafeModeStatus> safeModeEvents = new ArrayList<>();
+
+    //given
+    EventQueue eventQueue = new EventQueue();
+    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS,
+        (safeModeStatus, publisher) -> safeModeEvents.add(safeModeStatus));
+    eventQueue.addHandler(SCMEvents.DELAYED_SAFE_MODE_STATUS,
+        (safeModeStatus, publisher) -> delayedSafeModeEvents
+            .add(safeModeStatus));
+
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration
+        .setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
+            3, TimeUnit.SECONDS);
+    ozoneConfiguration
+        .setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+
+    scmSafeModeManager = new SCMSafeModeManager(
+        ozoneConfiguration, containers, null, eventQueue);
+
+    //when
+    scmSafeModeManager.setInSafeMode(true);
+    scmSafeModeManager.setPreCheckComplete(true);
+
+    scmSafeModeManager.emitSafeModeStatus();
+    eventQueue.processAll(1000L);
+
+    //then
+    Assert.assertEquals(1, delayedSafeModeEvents.size());
+    Assert.assertEquals(1, safeModeEvents.size());
+
+    //when
+    scmSafeModeManager.setInSafeMode(false);
+    scmSafeModeManager.setPreCheckComplete(true);
+
+    scmSafeModeManager.emitSafeModeStatus();
+    eventQueue.processAll(1000L);
+
+    //then
+    Assert.assertEquals(2, safeModeEvents.size());
+    //delayed messages are not yet sent (unless JVM is paused for 3 seconds)
+    Assert.assertEquals(1, delayedSafeModeEvents.size());
+
+    //event will be triggered after 3 seconds (see previous config)
+    GenericTestUtils.waitFor(() -> delayedSafeModeEvents.size() == 2,
+        300,
+        6000);
+
+  }
   @Test
   public void testSafeModeExitRule() throws Exception {
     containers = new ArrayList<>();

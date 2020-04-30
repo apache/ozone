@@ -61,10 +61,6 @@ enum Type {
   CommitKey = 36;
   AllocateBlock = 37;
 
-  CreateS3Bucket = 41;
-  DeleteS3Bucket = 42;
-  InfoS3Bucket = 43;
-  ListS3Buckets = 44;
   InitiateMultiPartUpload = 45;
   CommitMultiPartUpload = 46;
   CompleteMultiPartUpload = 47;
@@ -130,10 +126,6 @@ message OMRequest {
   optional CommitKeyRequest                 commitKeyRequest               = 36;
   optional AllocateBlockRequest             allocateBlockRequest           = 37;
 
-  optional S3CreateBucketRequest            createS3BucketRequest          = 41;
-  optional S3DeleteBucketRequest            deleteS3BucketRequest          = 42;
-  optional S3BucketInfoRequest              infoS3BucketRequest            = 43;
-  optional S3ListBucketsRequest             listS3BucketsRequest           = 44;
   optional MultipartInfoInitiateRequest     initiateMultiPartUploadRequest = 45;
   optional MultipartCommitUploadPartRequest commitMultiPartUploadRequest   = 46;
   optional MultipartUploadCompleteRequest   completeMultiPartUploadRequest = 47;
@@ -205,10 +197,6 @@ message OMResponse {
   optional CommitKeyResponse                 commitKeyResponse             = 36;
   optional AllocateBlockResponse             allocateBlockResponse         = 37;
 
-  optional S3CreateBucketResponse            createS3BucketResponse        = 41;
-  optional S3DeleteBucketResponse            deleteS3BucketResponse        = 42;
-  optional S3BucketInfoResponse              infoS3BucketResponse          = 43;
-  optional S3ListBucketsResponse             listS3BucketsResponse         = 44;
   optional MultipartInfoInitiateResponse   initiateMultiPartUploadResponse = 45;
   optional MultipartCommitUploadPartResponse commitMultiPartUploadResponse = 46;
   optional MultipartUploadCompleteResponse completeMultiPartUploadResponse = 47;
@@ -263,8 +251,6 @@ enum Status {
     METADATA_ERROR = 19;
     OM_NOT_INITIALIZED = 20;
     SCM_VERSION_MISMATCH_ERROR = 21;
-    S3_BUCKET_NOT_FOUND = 22;
-    S3_BUCKET_ALREADY_EXISTS = 23;
 
     INITIATE_MULTIPART_UPLOAD_ERROR = 24;
     MULTIPART_UPLOAD_PARTFILE_ERROR = 25;
@@ -297,8 +283,6 @@ enum Status {
     PERMISSION_DENIED = 48;
     TIMEOUT = 49;
     PREFIX_NOT_FOUND=50;
-
-    S3_BUCKET_INVALID_LENGTH = 51; // s3 bucket invalid length.
 
     RATIS_ERROR = 52;
 
@@ -985,53 +969,6 @@ message ServiceInfo {
     required string hostname = 2;
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
-}
-
-message S3CreateBucketRequest {
-    required string userName = 1;
-    required string s3bucketname = 2;
-    // This will be set during OM HA by one of the OM node. In future if more
-    // data fields are required to create volume/bucket we can add them to
-    // this. This is the reason for creating a new message type for this.
-    // S3CreateBucket means create volume from userName and create bucket
-    // with s3BucketName.
-    optional S3CreateVolumeInfo s3CreateVolumeInfo = 3;
-}
-
-message S3CreateVolumeInfo {
-    // Creation time set in preExecute on one of the OM node.
-    required uint64 creationTime = 1;
-}
-
-message S3CreateBucketResponse {
-
-}
-
-message S3DeleteBucketRequest {
-    required string s3bucketName = 1;
-}
-
-message S3DeleteBucketResponse {
-
-}
-
-message S3BucketInfoRequest {
-    required string s3bucketName = 1;
-}
-message S3BucketInfoResponse {
-
-    optional string ozoneMapping = 2;
-}
-
-message S3ListBucketsRequest {
-    required string userName = 1;
-    optional string startKey = 2;
-    optional string prefix = 3;
-    optional int32 count = 4;
-}
-
-message S3ListBucketsResponse {
-   repeated BucketInfo bucketInfo = 2;
 }
 
 message MultipartInfoInitiateRequest {

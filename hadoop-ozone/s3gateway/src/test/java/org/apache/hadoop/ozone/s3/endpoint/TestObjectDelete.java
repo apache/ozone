@@ -38,12 +38,10 @@ public class TestObjectDelete {
   public void delete() throws IOException, OS3Exception {
     //GIVEN
     OzoneClient client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket("bilbo", "b1");
-
-    String volumeName = client.getObjectStore().getOzoneVolumeName("b1");
+    client.getObjectStore().createS3Bucket("b1");
 
     OzoneBucket bucket =
-        client.getObjectStore().getVolume(volumeName).getBucket("b1");
+        client.getObjectStore().getS3Bucket("b1");
 
     bucket.createKey("key1", 0).close();
 
