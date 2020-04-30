@@ -145,7 +145,7 @@ This is the same implementation but doesn't include the features/dependencies wh
 
 The following table summarize which jar files and implementation should be used:
 
-Hadoop version | Required jar            | OzoneFileSystem implementation | AbstractFileSystem implementation
+Hadoop version | Required jar            | FileSystem implementation | AbstractFileSystem implementation
 ---------------|-------------------------|-------------------------------------------------|-------------------------------------
 3.2            | filesystem-lib-current  | org.apache.hadoop.fs.ozone.OzoneFileSystem      | org.apache.hadoop.fs.ozone.OzFs
 3.1            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.OzoneFileSystem      | org.apache.hadoop.fs.ozone.OzFs
