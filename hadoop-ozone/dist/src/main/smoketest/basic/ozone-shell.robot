@@ -121,7 +121,7 @@ Test key handling
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
     ${result} =     Execute             ozone debug chunkinfo ${protocol}${server}/${volume}/bb1/key1 | jq -r '.[]'
-                    Should contain      ${result}       chunks
+                    Should contain      ${result}       files
     ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="key1") | .name'
                     Should Be Equal     ${result}       key1
                     Execute             ozone sh key rename ${protocol}${server}/${volume}/bb1 key1 key2

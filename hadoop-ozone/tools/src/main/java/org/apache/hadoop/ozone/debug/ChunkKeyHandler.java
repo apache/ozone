@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -102,6 +103,8 @@ public class ChunkKeyHandler  extends KeyHandler {
             .getLatestVersionLocations().getBlocksLatestVersionOnly();
     // querying  the keyLocations.The OM is queried to get containerID and
     // localID pertaining to a given key
+    ChunkLayOutVersion chunkLayOutVersion = ChunkLayOutVersion
+            .getConfiguredVersion(getConf());
     for (OmKeyLocationInfo keyLocation:locationInfos) {
       ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
       ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
@@ -128,9 +131,15 @@ public class ChunkKeyHandler  extends KeyHandler {
         chunkDetails.setChunkName(chunkInfo.getChunkName());
         chunkDetails.setChunkOffset(chunkInfo.getOffset());
         chunkDetailsList.add(chunkDetails);
-        chunkPaths.add(getChunkLocationPath(containerData.getContainerPath())
-              + File.separator
-              + chunkInfo.getChunkName());
+        if (chunkLayOutVersion == ChunkLayOutVersion.FILE_PER_CHUNK) {
+          chunkPaths.add(getChunkLocationPath(containerData.getContainerPath())
+                  + File.separator
+                  + chunkInfo.getChunkName());
+        } else {
+          chunkPaths.add(getChunkLocationPath(containerData.getContainerPath())
+                  + File.separator
+                  + keyLocation.getLocalID() + ".block");
+        }
       }
       containerChunkInfoVerbose
               .setContainerPath(containerData.getContainerPath());
@@ -138,7 +147,7 @@ public class ChunkKeyHandler  extends KeyHandler {
               .setDataNodeList(keyLocation.getPipeline().getNodes());
       containerChunkInfoVerbose.setPipeline(keyLocation.getPipeline());
       containerChunkInfoVerbose.setChunkInfos(chunkDetailsList);
-      containerChunkInfo.setChunks(chunkPaths);
+      containerChunkInfo.setFiles(chunkPaths);
       List<ChunkDataNodeDetails> chunkDataNodeDetails = new
               ArrayList<ChunkDataNodeDetails>();
       for (DatanodeDetails datanodeDetails:keyLocation
@@ -153,11 +162,11 @@ public class ChunkKeyHandler  extends KeyHandler {
       Gson gson = new GsonBuilder().create();
       if (isVerbose()) {
         element = gson.toJsonTree(containerChunkInfoVerbose);
-        jsonObj.add("container Id :" + containerId + ""
+        jsonObj.add("container Id :" + containerId + " "
                 + "blockId :" + keyLocation.getLocalID() + "", element);
       } else {
         element = gson.toJsonTree(containerChunkInfo);
-        jsonObj.add("container Id :" + containerId + ""
+        jsonObj.add("container Id :" + containerId + " "
                 + "blockId :" + keyLocation.getLocalID() + "", element);
       }
     }
