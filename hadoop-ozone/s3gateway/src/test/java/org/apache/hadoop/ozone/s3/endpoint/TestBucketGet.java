@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -187,7 +187,7 @@ public class TestBucketGet {
             "", null, null, null, null, null).getEntity();
 
     Assert.assertTrue(getBucketResponse.isTruncated());
-    Assert.assertTrue(getBucketResponse.getContents().size() == 2);
+    Assert.assertEquals(2, getBucketResponse.getContents().size());
 
     // 2nd time
     String continueToken = getBucketResponse.getNextToken();
@@ -195,7 +195,7 @@ public class TestBucketGet {
         (ListObjectResponse) getBucket.list("b1", null, null, null, maxKeys,
             "", null, continueToken, null, null, null).getEntity();
     Assert.assertTrue(getBucketResponse.isTruncated());
-    Assert.assertTrue(getBucketResponse.getContents().size() == 2);
+    Assert.assertEquals(2, getBucketResponse.getContents().size());
 
 
     continueToken = getBucketResponse.getNextToken();
@@ -206,7 +206,7 @@ public class TestBucketGet {
             "", null, continueToken, null, null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
-    Assert.assertTrue(getBucketResponse.getContents().size() == 1);
+    Assert.assertEquals(1, getBucketResponse.getContents().size());
 
   }
 
@@ -257,11 +257,11 @@ public class TestBucketGet {
 
   }
 
-  @Test
   /**
    * This test is with prefix and delimiter and verify continuation-token
    * behavior.
    */
+  @Test
   public void listWithContinuationToken1() throws OS3Exception, IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
@@ -281,7 +281,7 @@ public class TestBucketGet {
             "dir", null, null, null, null, null).getEntity();
 
     Assert.assertTrue(getBucketResponse.isTruncated());
-    Assert.assertTrue(getBucketResponse.getCommonPrefixes().size() == 2);
+    Assert.assertEquals(2, getBucketResponse.getCommonPrefixes().size());
 
     // 2nd time
     String continueToken = getBucketResponse.getNextToken();
@@ -289,7 +289,7 @@ public class TestBucketGet {
         (ListObjectResponse) getBucket.list("b1", "/", null, null, maxKeys,
             "dir", null, continueToken, null, null, null).getEntity();
     Assert.assertTrue(getBucketResponse.isTruncated());
-    Assert.assertTrue(getBucketResponse.getCommonPrefixes().size() == 2);
+    Assert.assertEquals(2, getBucketResponse.getCommonPrefixes().size());
 
     //3rd time
     continueToken = getBucketResponse.getNextToken();
@@ -298,12 +298,12 @@ public class TestBucketGet {
             "dir", null, continueToken, null, null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
-    Assert.assertTrue(getBucketResponse.getCommonPrefixes().size() == 1);
+    Assert.assertEquals(1, getBucketResponse.getCommonPrefixes().size());
 
   }
 
   @Test
-  public void listWithContinuationTokenFail() throws OS3Exception, IOException {
+  public void listWithContinuationTokenFail() throws IOException {
 
     BucketEndpoint getBucket = new BucketEndpoint();
 
@@ -341,7 +341,7 @@ public class TestBucketGet {
             null, null, null, null, null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
-    Assert.assertTrue(getBucketResponse.getContents().size() == 5);
+    Assert.assertEquals(5, getBucketResponse.getContents().size());
 
     //As our list output is sorted, after seeking to startAfter, we shall
     // have 4 keys.
@@ -352,14 +352,14 @@ public class TestBucketGet {
             1000, null, null, null, startAfter, null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
-    Assert.assertTrue(getBucketResponse.getContents().size() == 4);
+    Assert.assertEquals(4, getBucketResponse.getContents().size());
 
     getBucketResponse =
         (ListObjectResponse) getBucket.list("b1", null, null, null,
             1000, null, null, null, "random", null, null).getEntity();
 
     Assert.assertFalse(getBucketResponse.isTruncated());
-    Assert.assertTrue(getBucketResponse.getContents().size() == 0);
+    Assert.assertEquals(0, getBucketResponse.getContents().size());
 
 
   }
@@ -367,11 +367,8 @@ public class TestBucketGet {
   private OzoneClient createClientWithKeys(String... keys) throws IOException {
     OzoneClient client = new OzoneClientStub();
 
-    client.getObjectStore().createS3Bucket("bilbo", "b1");
-    String volume = client.getObjectStore().getOzoneVolumeName("b1");
-    client.getObjectStore().getVolume(volume).createBucket("b1");
-    OzoneBucket bucket =
-        client.getObjectStore().getVolume(volume).getBucket("b1");
+    client.getObjectStore().createS3Bucket("b1");
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
     for (String key : keys) {
       bucket.createKey(key, 0).close();
     }
