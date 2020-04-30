@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.security;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
+import com.google.common.base.Optional;
 import java.util.UUID;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
@@ -61,7 +61,6 @@ public class TestOMGetDelegationTokenRequest extends
   public void setupGetDelegationToken() {
     secretManager = Mockito.mock(OzoneDelegationTokenSecretManager.class);
     when(ozoneManager.getDelegationTokenMgr()).thenReturn(secretManager);
-    secretManager = ozoneManager.getDelegationTokenMgr();
 
     setupToken();
     setupRequest();
@@ -98,6 +97,7 @@ public class TestOMGetDelegationTokenRequest extends
     tester = new Text("tester");
     identifier = new OzoneTokenIdentifier(tester, tester, tester);
     identifier.setOmCertSerialId("certID");
+    identifier.setOmServiceId("");
 
     byte[] password = RandomStringUtils
         .randomAlphabetic(10)
@@ -176,7 +176,8 @@ public class TestOMGetDelegationTokenRequest extends
         .thenReturn(renewTime);
 
     OMClientResponse clientResponse = setValidateAndUpdateCache();
-    Optional<Long> responseRenewTime = Optional.ofNullable(
+
+    Optional<Long> responseRenewTime = Optional.fromNullable(
         omMetadataManager.getDelegationTokenTable().get(identifier));
     Assert.assertEquals(Optional.of(renewTime), responseRenewTime);
 
@@ -194,9 +195,9 @@ public class TestOMGetDelegationTokenRequest extends
         .getGetDelegationTokenResponse().hasResponse();
     Assert.assertFalse(hasResponse);
 
-    Optional<Long> responseRenewTime = Optional.ofNullable(
+    Optional<Long> responseRenewTime = Optional.fromNullable(
         omMetadataManager.getDelegationTokenTable().get(identifier));
-    Assert.assertEquals(Optional.empty(), responseRenewTime);
+    Assert.assertEquals(Optional.absent(), responseRenewTime);
 
     Assert.assertEquals(Status.OK, clientResponse.getOMResponse().getStatus());
   }
