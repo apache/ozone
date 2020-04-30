@@ -45,7 +45,7 @@ import com.google.inject.Singleton;
 public class JooqPersistenceModule extends AbstractModule {
 
   private Provider<DataSourceConfiguration> configurationProvider;
-  public static final SQLDialect DEFAULT_DIALECT = SQLDialect.SQLITE;
+  public static final SQLDialect DEFAULT_DIALECT = SQLDialect.DERBY;
 
   public JooqPersistenceModule(
       Provider<DataSourceConfiguration> configurationProvider) {

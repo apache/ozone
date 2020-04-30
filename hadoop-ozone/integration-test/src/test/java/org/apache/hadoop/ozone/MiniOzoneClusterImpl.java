@@ -29,7 +29,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_DB_JDBC_URL;
+import static org.hadoop.ozone.recon.codegen.ReconSqlDbConfig.ConfigKeys.OZONE_RECON_SQL_DB_JDBC_URL;
 
 import java.io.File;
 import java.io.IOException;
@@ -804,8 +804,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           .getAbsolutePath());
       conf.set(OZONE_RECON_SCM_DB_DIR,
           tempNewFolder.getAbsolutePath());
-      conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:" +
-          tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
+      conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:derby:" +
+          tempNewFolder.getAbsolutePath() + "/ozone_recon_derby.db");
 
       conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:0");
       conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");
