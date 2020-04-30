@@ -36,8 +36,7 @@
     <module>tools</module>
     <module>integration-test</module>
     <module>ozonefs</module>
-    <module>ozonefs-hadoop2</module>
-    <module>ozonefs-hadoop3</module>
+    <module>ozonefs-common</module>
     <module>datanode</module>
     <module>s3gateway</module>
     <module>dist</module>
@@ -99,7 +98,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
+        <artifactId>hadoop-ozone-filesystem-common</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
