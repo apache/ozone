@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.recon.persistence;
 
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.DERBY_DRIVER_CLASS;
+
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
@@ -56,10 +58,22 @@ public class AbstractReconSqlDBTest {
 
   private Injector injector;
   private DSLContext dslContext;
+  private Provider<DataSourceConfiguration> configurationProvider;
 
   public AbstractReconSqlDBTest() {
     try {
       temporaryFolder.create();
+      configurationProvider =
+          new DerbyDataSourceConfigurationProvider(temporaryFolder.newFolder());
+    } catch (IOException e) {
+      Assert.fail();
+    }
+  }
+
+  protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
+    try {
+      temporaryFolder.create();
+      configurationProvider = provider;
     } catch (IOException e) {
       Assert.fail();
     }
@@ -76,12 +90,9 @@ public class AbstractReconSqlDBTest {
   /**
    * Get set of Guice modules needed to setup a Recon SQL DB.
    * @return List of modules.
-   * @throws IOException on Error.
    */
-  public List<Module> getReconSqlDBModules() throws IOException {
+  public List<Module> getReconSqlDBModules() {
     List<Module> modules = new ArrayList<>();
-    DataSourceConfigurationProvider configurationProvider =
-        new DataSourceConfigurationProvider(temporaryFolder.newFolder());
     modules.add(new JooqPersistenceModule(configurationProvider));
     modules.add(new AbstractModule() {
       @Override
@@ -143,14 +154,14 @@ public class AbstractReconSqlDBTest {
   }
 
   /**
-   * Local Sqlite datasource provider.
+   * Local Derby datasource provider.
    */
-  public static class DataSourceConfigurationProvider implements
+  public static class DerbyDataSourceConfigurationProvider implements
       Provider<DataSourceConfiguration> {
 
     private final File tempDir;
 
-    public DataSourceConfigurationProvider(File tempDir) {
+    public DerbyDataSourceConfigurationProvider(File tempDir) {
       this.tempDir = tempDir;
     }
 
@@ -159,13 +170,13 @@ public class AbstractReconSqlDBTest {
       return new DataSourceConfiguration() {
         @Override
         public String getDriverClass() {
-          return "org.sqlite.JDBC";
+          return DERBY_DRIVER_CLASS;
         }
 
         @Override
         public String getJdbcUrl() {
-          return "jdbc:sqlite:" + tempDir.getAbsolutePath() +
-              File.separator + "sqlite_recon.db";
+          return "jdbc:derby:" + tempDir.getAbsolutePath() +
+              File.separator + "derby_recon.db";
         }
 
         @Override
@@ -190,7 +201,7 @@ public class AbstractReconSqlDBTest {
 
         @Override
         public String getSqlDialect() {
-          return SQLDialect.SQLITE.toString();
+          return SQLDialect.DERBY.toString();
         }
 
         @Override
@@ -199,12 +210,12 @@ public class AbstractReconSqlDBTest {
         }
 
         @Override
-        public Integer getMaxConnectionAge() {
+        public long getMaxConnectionAge() {
           return 120;
         }
 
         @Override
-        public Integer getMaxIdleConnectionAge() {
+        public long getMaxIdleConnectionAge() {
           return 120;
         }
 
@@ -214,7 +225,7 @@ public class AbstractReconSqlDBTest {
         }
 
         @Override
-        public Integer getIdleConnectionTestPeriod() {
+        public long getIdleConnectionTestPeriod() {
           return 30;
         }
       };
