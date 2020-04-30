@@ -17,12 +17,17 @@
  */
 package org.apache.hadoop.ozone.om.ha;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.StringJoiner;
+
+import org.apache.hadoop.io.Text;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.Before;
-
-import java.util.StringJoiner;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ozone.OmUtils;
@@ -157,4 +162,34 @@ public class TestOMFailoverProxyProvider {
           provider.getWaitTime());
     }
   }
+
+  /**
+   * Tests canonical delegation token service name in is consistently ordered.
+   */
+  @Test
+  public void testCanonicalTokenServiceName() throws IOException {
+    OzoneConfiguration ozoneConf = new OzoneConfiguration();
+    ArrayList<String> nodeAddrs = new ArrayList<>(
+        Arrays.asList("4.3.2.1:9862", "2.1.0.5:9862", "3.2.1.0:9862"));
+    Assert.assertEquals(numNodes, nodeAddrs.size());
+
+    StringJoiner allNodeIds = new StringJoiner(",");
+    for (int i = 1; i <= numNodes; i++) {
+      String nodeId = NODE_ID_BASE_STR + i;
+      ozoneConf.set(OmUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
+          nodeId), nodeAddrs.get(i-1));
+      allNodeIds.add(nodeId);
+    }
+    ozoneConf.set(OmUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
+        allNodeIds.toString());
+    OMFailoverProxyProvider prov = new OMFailoverProxyProvider(ozoneConf,
+        UserGroupInformation.getCurrentUser(), OM_SERVICE_ID);
+
+    Text dtService = prov.getCurrentProxyDelegationToken();
+
+    Collections.sort(nodeAddrs);
+    String expectedDtService = String.join(",", nodeAddrs);
+    Assert.assertEquals(expectedDtService, dtService.toString());
+  }
+
 }
