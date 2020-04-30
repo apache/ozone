@@ -151,5 +151,6 @@ Hadoop version | Required jar            | FileSystem implementation | AbstractF
 3.1            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.OzoneFileSystem      | org.apache.hadoop.fs.ozone.OzFs
 2.9            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem | org.apache.hadoop.fs.ozone.BasicOzFs
 2.7            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem | org.apache.hadoop.fs.ozone.BasicOzFs
- With this method the hadoop-ozone-filesystem-lib-legacy.jar can be used from
+
+With this method the hadoop-ozone-filesystem-lib-legacy.jar can be used from
  any older hadoop version (eg. hadoop 2.7 or spark+hadoop 2.7)
