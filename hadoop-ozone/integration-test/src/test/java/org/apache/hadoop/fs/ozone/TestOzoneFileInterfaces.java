@@ -407,7 +407,7 @@ public class TestOzoneFileInterfaces {
     // In this case, the dir key exists.
     assertEquals(0, omStatus.getKeyInfo().getDataSize());
     assertTrue(omStatus.getKeyInfo().getModificationTime() <= currentTime);
-    assertEquals(new Path(omStatus.getPathName()).getName(),
+    assertEquals(new Path(omStatus.getPath()).getName(),
         o3fs.pathToKey(path));
   }
 

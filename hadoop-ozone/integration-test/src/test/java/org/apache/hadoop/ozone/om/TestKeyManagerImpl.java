@@ -1278,8 +1278,10 @@ public class TestKeyManagerImpl {
       Set<String> fileSet, boolean recursive) {
 
     for (OzoneFileStatus fileStatus : fileStatuses) {
-      String keyName = fileStatus.getKeyInfo().getKeyName();
-      String parent = Paths.get(keyName).getParent().toString();
+      String normalizedKeyName = fileStatus.getTrimmedName();
+      String parent =
+          Paths.get(fileStatus.getKeyInfo().getKeyName()).getParent()
+              .toString();
       if (!recursive) {
         // if recursive is false, verify all the statuses have the input
         // directory as parent
@@ -1287,9 +1289,13 @@ public class TestKeyManagerImpl {
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {
-        Assert.assertTrue(directorySet.contains(keyName));
+        Assert
+            .assertTrue(directorySet + " doesn't contain " + normalizedKeyName,
+                directorySet.contains(normalizedKeyName));
       } else {
-        Assert.assertTrue(fileSet.contains(keyName));
+        Assert
+            .assertTrue(fileSet + " doesn't contain " + normalizedKeyName,
+                fileSet.contains(normalizedKeyName));
       }
     }
 
