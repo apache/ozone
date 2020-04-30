@@ -1176,10 +1176,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmMetadataStore.getStore().flush();
     }
 
-    if (containerManager != null) {
-      containerManager.flushDB();
-    }
-
     scmRatisSnapshotInfo.saveRatisSnapshotToDisk(snapshotIndex);
 
     return snapshotIndex;
