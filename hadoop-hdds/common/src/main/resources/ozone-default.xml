@@ -197,10 +197,12 @@
   </property>
   <property>
     <name>dfs.container.ratis.num.write.chunk.threads</name>
-    <value>60</value>
+    <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum number of threads in the thread pool that Ratis
-      will use for writing chunks (60 by default).
+    <description>Maximum number of threads in the thread pool that Datanode
+      will use for writing replicated chunks.
+      This is a per configured locations!
+      (10 thread per disk by default).
     </description>
   </property>
   <property>
@@ -387,10 +389,20 @@
     </description>
   </property>
   <property>
+    <name>ozone.client.stream.buffer.flush.delay</name>
+    <value>false</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>If set true, when call flush() and determine whether the
+      data in the current buffer is greater than ozone.client.stream.buffer.size.
+      if greater than then send buffer to the datanode.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.stream.buffer.size</name>
     <value>4MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>The size of chunks the client will send to the server.</description>
+    <description>The size of chunks the client will send to the server.
+    </description>
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.size</name>
@@ -581,6 +593,16 @@
 
       A large value for this key allows a proportionally larger amount of OM
       metadata to be cached in memory. This makes OM operations faster.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.volume.listall.allowed</name>
+    <value>true</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Allows everyone to list all volumes when set to true. Defaults to true.
+      When set to false, non-admin users can only list the volumes they have
+      access to. Admins can always list all volumes.
     </description>
   </property>
   <property>
@@ -2377,7 +2399,7 @@
   </property>
   <property>
     <name>hdds.tracing.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, HDDS</tag>
     <description>
       If enabled, tracing information is sent to tracing server.

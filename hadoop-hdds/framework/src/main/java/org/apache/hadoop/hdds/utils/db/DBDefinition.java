@@ -16,8 +16,31 @@
  * limitations under the License.
  *
  */
+package org.apache.hadoop.hdds.utils.db;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Package contains test classes for s3 bucket responses.
+ * Simple interface to provide information to create a DBStore..
  */
-package org.apache.hadoop.ozone.om.response.s3.bucket;
+public interface DBDefinition {
+
+  Logger LOG = LoggerFactory.getLogger(DBDefinition.class);
+
+  /**
+   * Logical name of the DB.
+   */
+  String getName();
+
+  /**
+   * Configuration key defines the location of the DB.
+   */
+  String getLocationConfigKey();
+
+  /**
+   * Create a new DB store instance based on the configuration.
+   */
+  DBColumnFamilyDefinition[] getColumnFamilies();
+
+}

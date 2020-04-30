@@ -15,6 +15,7 @@
 # limitations under the License.
 
 CORE-SITE.XML_fs.o3fs.impl=org.apache.hadoop.fs.ozone.OzoneFileSystem
+OZONE-SITE.XML_ozone.om.volume.listall.allowed=false
 
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
@@ -37,7 +38,7 @@ OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true
 OZONE-SITE.XML_ozone.acl.authorizer.class=org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
-OZONE-SITE.XML_ozone.administrators="testuser/scm@EXAMPLE.COM"
+OZONE-SITE.XML_ozone.administrators="testuser/scm@EXAMPLE.COM,testuser/s3g@EXAMPLE.COM"
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019

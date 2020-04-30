@@ -129,12 +129,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveA
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3BucketInfoRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3BucketInfoResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3CreateBucketRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3DeleteBucketRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3ListBucketsRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
@@ -263,6 +257,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           if (leaderNotReadyException != null) {
             FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
                 leaderNotReadyException.getMessage());
+            // HDDS-3465. OM index will not change, but LastOmID will be
+            // updated to currentOMId, so that wiatTime calculation will
+            // know lastOmID and currentID are same and need to increment
+            // wait time in between.
+            omFailoverProxyProvider.performFailoverIfRequired(
+                omFailoverProxyProvider.getCurrentProxyOMNodeId());
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
         }
@@ -284,7 +284,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
       private RetryAction getRetryAction(RetryDecision fallbackAction,
           int failovers) {
-        if (failovers <= maxFailovers) {
+        if (failovers < maxFailovers) {
           return new RetryAction(fallbackAction,
               omFailoverProxyProvider.getWaitTime());
         } else {
@@ -573,7 +573,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Lists volume owned by a specific user.
+   * Lists volumes accessible by a specific user.
    *
    * @param userName - user name
    * @param prefix - Filter prefix -- Return only entries that match this.
@@ -991,83 +991,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .map(OmKeyInfo::getFromProtobuf)
             .collect(Collectors.toList()));
     return keys;
-
-  }
-
-  @Override
-  public void createS3Bucket(String userName, String s3BucketName)
-      throws IOException {
-    S3CreateBucketRequest req = S3CreateBucketRequest.newBuilder()
-        .setUserName(userName)
-        .setS3Bucketname(s3BucketName)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.CreateS3Bucket)
-        .setCreateS3BucketRequest(req)
-        .build();
-
-    handleError(submitRequest(omRequest));
-
-  }
-
-  @Override
-  public void deleteS3Bucket(String s3BucketName) throws IOException {
-    S3DeleteBucketRequest request  = S3DeleteBucketRequest.newBuilder()
-        .setS3BucketName(s3BucketName)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.DeleteS3Bucket)
-        .setDeleteS3BucketRequest(request)
-        .build();
-
-    handleError(submitRequest(omRequest));
-
-  }
-
-  @Override
-  public String getOzoneBucketMapping(String s3BucketName)
-      throws IOException {
-    S3BucketInfoRequest request  = S3BucketInfoRequest.newBuilder()
-        .setS3BucketName(s3BucketName)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.InfoS3Bucket)
-        .setInfoS3BucketRequest(request)
-        .build();
-
-    S3BucketInfoResponse resp = handleError(submitRequest(omRequest))
-        .getInfoS3BucketResponse();
-    return resp.getOzoneMapping();
-  }
-
-  @Override
-  public List<OmBucketInfo> listS3Buckets(String userName, String startKey,
-                                          String prefix, int count)
-      throws IOException {
-    List<OmBucketInfo> buckets = new ArrayList<>();
-    S3ListBucketsRequest.Builder reqBuilder = S3ListBucketsRequest.newBuilder();
-    reqBuilder.setUserName(userName);
-    reqBuilder.setCount(count);
-    if (startKey != null) {
-      reqBuilder.setStartKey(startKey);
-    }
-    if (prefix != null) {
-      reqBuilder.setPrefix(prefix);
-    }
-    S3ListBucketsRequest request = reqBuilder.build();
-
-    OMRequest omRequest = createOMRequest(Type.ListS3Buckets)
-        .setListS3BucketsRequest(request)
-        .build();
-
-    S3ListBucketsResponse resp = handleError(submitRequest(omRequest))
-        .getListS3BucketsResponse();
-
-    buckets.addAll(
-        resp.getBucketInfoList().stream()
-            .map(OmBucketInfo::getFromProtobuf)
-            .collect(Collectors.toList()));
-    return buckets;
 
   }
 

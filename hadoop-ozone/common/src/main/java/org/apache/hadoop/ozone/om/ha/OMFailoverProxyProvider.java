@@ -317,10 +317,13 @@ public class OMFailoverProxyProvider implements
   synchronized boolean updateLeaderOMNodeId(String newLeaderOMNodeId) {
     if (!currentProxyOMNodeId.equals(newLeaderOMNodeId)) {
       if (omProxies.containsKey(newLeaderOMNodeId)) {
+        lastAttemptedOM = currentProxyOMNodeId;
         currentProxyOMNodeId = newLeaderOMNodeId;
         currentProxyIndex = omNodeIDList.indexOf(currentProxyOMNodeId);
         return true;
       }
+    } else {
+      lastAttemptedOM = currentProxyOMNodeId;
     }
     return false;
   }

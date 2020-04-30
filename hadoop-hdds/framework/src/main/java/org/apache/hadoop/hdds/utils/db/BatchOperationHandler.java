@@ -16,9 +16,29 @@
  * limitations under the License.
  *
  */
+package org.apache.hadoop.hdds.utils.db;
+
+import java.io.IOException;
 
 /**
- * Package contains classes related to s3 bucket responses.
+ * Create and commit batch operation for one DB.
  */
-package org.apache.hadoop.ozone.om.response.s3.bucket;
+public interface BatchOperationHandler {
 
+  /**
+   * Initialize an atomic batch operation which can hold multiple PUT/DELETE
+   * operations and committed later in one step.
+   *
+   * @return BatchOperation holder which can be used to add or commit batch
+   * operations.
+   */
+  BatchOperation initBatchOperation();
+
+  /**
+   * Commit the batch operations.
+   *
+   * @param operation which contains all the required batch operation.
+   * @throws IOException on Failure.
+   */
+  void commitBatchOperation(BatchOperation operation) throws IOException;
+}

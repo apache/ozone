@@ -44,9 +44,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -58,6 +61,7 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+
 
 /**
  * Tests for Container ContainerManager.
@@ -76,6 +80,7 @@ public class TestSCMContainerManager {
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
+
   @BeforeClass
   public static void setUp() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf();
@@ -93,10 +98,15 @@ public class TestSCMContainerManager {
       throw new IOException("Unable to create test directory path");
     }
     nodeManager = new MockNodeManager(true, 10);
+    DBStore dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, new EventQueue());
+        new SCMPipelineManager(conf, nodeManager,
+            SCMDBDefinition.PIPELINES.getTable(dbStore), new EventQueue());
     pipelineManager.allowPipelineCreation();
-    containerManager = new SCMContainerManager(conf, pipelineManager);
+    containerManager = new SCMContainerManager(conf,
+        SCMDBDefinition.CONTAINERS.getTable(dbStore),
+        dbStore,
+        pipelineManager);
     xceiverClientManager = new XceiverClientManager(conf);
     replicationFactor = SCMTestUtils.getReplicationFactor(conf);
     replicationType = SCMTestUtils.getReplicationType(conf);

@@ -16,8 +16,30 @@
  * limitations under the License.
  *
  */
+package org.apache.hadoop.hdds.scm.metadata;
+
+import java.io.IOException;
+
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.Codec;
 
 /**
- * Package contains test classes for s3 bucket requests.
+ * Codec to serialize / deserialize PipelineID.
  */
-package org.apache.hadoop.ozone.om.request.s3.bucket;
+public class PipelineIDCodec implements Codec<PipelineID> {
+
+  @Override
+  public byte[] toPersistedFormat(PipelineID object) throws IOException {
+    return object.getProtobuf().toByteArray();
+  }
+
+  @Override
+  public PipelineID fromPersistedFormat(byte[] rawData) throws IOException {
+    return null;
+  }
+
+  @Override
+  public PipelineID copyObject(PipelineID object) {
+    throw new UnsupportedOperationException();
+  }
+}

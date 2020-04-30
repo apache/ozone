@@ -16,8 +16,23 @@
  * limitations under the License.
  *
  */
+package org.apache.hadoop.ozone.recon.scm;
+
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 
 /**
- * Package contains classes related to s3 bucket requests.
+ * SCM db file for ozone.
  */
-package org.apache.hadoop.ozone.om.request.s3.bucket;
+public class ReconDBDefinition extends SCMDBDefinition {
+
+  @Override
+  public String getName() {
+    return "recon-scm.db";
+  }
+
+  @Override
+  public String getLocationConfigKey() {
+    return ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+  }
+}

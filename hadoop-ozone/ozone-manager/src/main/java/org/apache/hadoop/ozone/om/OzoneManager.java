@@ -170,7 +170,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -202,14 +201,14 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
 
 import org.apache.ratis.metrics.MetricRegistries;
@@ -254,7 +253,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
-  private S3BucketManager s3BucketManager;
 
   private final OMMetrics metrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
@@ -295,6 +293,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static String keyProviderUriKeyName =
       CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 
+  private boolean allowListAllVolumes;
   // Adding parameters needed for VolumeRequests here, so that during request
   // execution, we can get from ozoneManager.
   private long maxUserVolumeCount;
@@ -341,6 +340,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     loginOMUserIfSecurityEnabled(conf);
 
+    this.allowListAllVolumes = conf.getBoolean(OZONE_OM_VOLUME_LISTALL_ALLOWED,
+        OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT);
     this.maxUserVolumeCount = conf.getInt(OZONE_OM_USER_MAX_VOLUME,
         OZONE_OM_USER_MAX_VOLUME_DEFAULT);
     Preconditions.checkArgument(this.maxUserVolumeCount > 0,
@@ -421,11 +422,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     instantiateServices();
-
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo(
         omStorage.getCurrentDir());
     initializeRatisServer();
-
     if (isRatisEnabled) {
       // Create Ratis storage dir
       String omRatisDirectory =
@@ -446,7 +445,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     metrics = OMMetrics.create();
-
     omClientProtocolMetrics = ProtocolMessageMetrics
         .create("OmClientProtocol", "Ozone Manager RPC endpoint",
             OzoneManagerProtocolProtos.Type.values());
@@ -489,8 +487,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
         isRatisEnabled);
-    s3BucketManager = new S3BucketManagerImpl(configuration, metadataManager,
-        volumeManager, bucketManager);
     if (secConfig.isSecurityEnabled()) {
       s3SecretManager = new S3SecretManagerImpl(configuration, metadataManager);
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
@@ -1595,7 +1591,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param vol     - name of volume
    * @param bucket  - bucket name
    * @param key     - key
-   * @throws OMException
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied.
    */
   private void checkAcls(ResourceType resType, StoreType store,
       ACLType acl, String vol, String bucket, String key)
@@ -1603,26 +1599,53 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     checkAcls(resType, store, acl, vol, bucket, key,
         ProtobufRpcEngine.Server.getRemoteUser(),
         ProtobufRpcEngine.Server.getRemoteIp(),
-        ProtobufRpcEngine.Server.getRemoteIp().getHostName());
+        ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
+        true);
   }
 
   /**
+   * A variant of checkAcls that doesn't throw exception if permission denied.
+   * @return true if permission granted, false if permission denied.
+   */
+  private boolean hasAcls(ResourceType resType, StoreType store,
+      ACLType acl, String vol, String bucket, String key) {
+    try {
+      return checkAcls(resType, store, acl, vol, bucket, key,
+          ProtobufRpcEngine.Server.getRemoteUser(),
+          ProtobufRpcEngine.Server.getRemoteIp(),
+          ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
+          false);
+    } catch (OMException ex) {
+      // Should not trigger exception here at all
+      return false;
+    }
+  }
+
+
+  /**
    * CheckAcls for the ozone object.
-   * @param resType
-   * @param storeType
-   * @param aclType
-   * @param vol
-   * @param bucket
-   * @param key
-   * @param ugi
-   * @param remoteAddress
-   * @param hostName
-   * @throws OMException
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied.
    */
   @SuppressWarnings("parameternumber")
   public void checkAcls(ResourceType resType, StoreType storeType,
       ACLType aclType, String vol, String bucket, String key,
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName)
+      throws OMException {
+    checkAcls(resType, storeType, aclType, vol, bucket, key,
+        ugi, remoteAddress, hostName, true);
+  }
+
+  /**
+   * CheckAcls for the ozone object.
+   * @return true if permission granted, false if permission denied.
+   * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied
+   *                     and throwOnPermissionDenied set to true.
+   */
+  @SuppressWarnings("parameternumber")
+  private boolean checkAcls(ResourceType resType, StoreType storeType,
+      ACLType aclType, String vol, String bucket, String key,
+      UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
+      boolean throwIfPermissionDenied)
       throws OMException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(resType)
@@ -1638,11 +1661,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setAclRights(aclType)
         .build();
     if (!accessAuthorizer.checkAccess(obj, context)) {
-      LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
-          ugi.getUserName(), aclType, resType, vol, bucket, key);
-      throw new OMException("User " + ugi.getUserName() + " doesn't " +
-          "have " + aclType + " permission to access " + resType,
-          ResultCodes.PERMISSION_DENIED);
+      if (throwIfPermissionDenied) {
+        LOG.warn("User {} doesn't have {} permission to access {} /{}/{}/{}",
+            ugi.getUserName(), aclType, resType, vol, bucket, key);
+        throw new OMException("User " + ugi.getUserName() + " doesn't have " +
+            aclType + " permission to access " + resType,
+            ResultCodes.PERMISSION_DENIED);
+      }
+      return false;
+    } else {
+      return true;
     }
   }
 
@@ -1725,7 +1753,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public boolean checkVolumeAccess(String volume, OzoneAclInfo userAcl)
       throws IOException {
-    if(isAclEnabled) {
+    if (isAclEnabled) {
       checkAcls(ResourceType.VOLUME, StoreType.OZONE,
           ACLType.READ, volume, null, null);
     }
@@ -1810,7 +1838,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Lists volume owned by a specific user.
+   * Lists volumes accessible by a specific user.
    *
    * @param userName - user name
    * @param prefix - Filter prefix -- Return only entries that match this.
@@ -1823,13 +1851,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<OmVolumeArgs> listVolumeByUser(String userName, String prefix,
       String prevKey, int maxKeys) throws IOException {
-    if(isAclEnabled) {
-      UserGroupInformation remoteUserUgi = ProtobufRpcEngine.Server.
-          getRemoteUser();
+    UserGroupInformation remoteUserUgi =
+        ProtobufRpcEngine.Server.getRemoteUser();
+    if (isAclEnabled) {
       if (remoteUserUgi == null) {
         LOG.error("Rpc user UGI is null. Authorization failed.");
-        throw new OMException("Rpc user UGI is null. Authorization " +
-            "failed.", ResultCodes.PERMISSION_DENIED);
+        throw new OMException("Rpc user UGI is null. Authorization failed.",
+            ResultCodes.PERMISSION_DENIED);
       }
     }
     boolean auditSuccess = true;
@@ -1840,7 +1868,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USERNAME, userName);
     try {
       metrics.incNumVolumeLists();
-      return volumeManager.listVolumes(userName, prefix, prevKey, maxKeys);
+      if (isAclEnabled) {
+        // List all volumes first
+        List<OmVolumeArgs> listAllVolumes = volumeManager.listVolumes(
+            null, prefix, prevKey, maxKeys);
+        List<OmVolumeArgs> result = new ArrayList<>();
+        // Filter all volumes by LIST ACL
+        for (OmVolumeArgs volumeArgs : listAllVolumes) {
+          if (hasAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
+              volumeArgs.getVolume(), null, null)) {
+            result.add(volumeArgs);
+          }
+        }
+        return result;
+      } else {
+        // When ACL is not enabled, fallback to filter by owner
+        return volumeManager.listVolumes(userName, prefix, prevKey, maxKeys);
+      }
     } catch (Exception ex) {
       metrics.incNumVolumeListFails();
       auditSuccess = false;
@@ -1876,7 +1920,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USERNAME, null);
     try {
       metrics.incNumVolumeLists();
-      checkAdmin();
+      if (!allowListAllVolumes) {
+        // Only admin can list all volumes when disallowed in config
+        checkAdmin();
+      }
       return volumeManager.listVolumes(null, prefix, prevKey, maxKeys);
     } catch (Exception ex) {
       metrics.incNumVolumeListFails();
@@ -2518,70 +2565,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * {@inheritDoc}
    */
-  public void createS3Bucket(String userName, String s3BucketName)
-      throws IOException {
-
-    boolean acquiredS3Lock = false;
-    boolean acquiredVolumeLock = false;
-    try {
-      metrics.incNumBucketCreates();
-      acquiredS3Lock = metadataManager.getLock().acquireLock(S3_BUCKET_LOCK,
-          s3BucketName);
-      try {
-        acquiredVolumeLock = metadataManager.getLock().acquireLock(VOLUME_LOCK,
-            s3BucketManager.formatOzoneVolumeName(userName));
-        boolean newVolumeCreate = s3BucketManager.createOzoneVolumeIfNeeded(
-            userName);
-        if (newVolumeCreate) {
-          metrics.incNumVolumeCreates();
-          metrics.incNumVolumes();
-        }
-      } catch (IOException ex) {
-        // We need to increment volume creates also because this is first
-        // time we are trying to create a volume, it failed. As we increment
-        // ops and create when we try to do that operation.
-        metrics.incNumVolumeCreates();
-        metrics.incNumVolumeCreateFails();
-        throw ex;
-      }
-      s3BucketManager.createS3Bucket(userName, s3BucketName);
-      metrics.incNumBuckets();
-    } catch (IOException ex) {
-      metrics.incNumBucketCreateFails();
-      throw ex;
-    } finally {
-      if (acquiredVolumeLock) {
-        metadataManager.getLock().releaseLock(VOLUME_LOCK,
-            s3BucketManager.formatOzoneVolumeName(userName));
-      }
-      if (acquiredS3Lock) {
-        metadataManager.getLock().releaseLock(S3_BUCKET_LOCK, s3BucketName);
-      }
-    }
-  }
-
-  @Override
-  /**
-   * {@inheritDoc}
-   */
-  public void deleteS3Bucket(String s3BucketName) throws IOException {
-    try {
-      if(isAclEnabled) {
-        checkAcls(ResourceType.BUCKET, StoreType.S3, ACLType.DELETE, 
-            getS3VolumeName(), s3BucketName, null);
-      }
-      metrics.incNumBucketDeletes();
-      s3BucketManager.deleteS3Bucket(s3BucketName);
-      metrics.decNumBuckets();
-    } catch (IOException ex) {
-      metrics.incNumBucketDeleteFails();
-    }
-  }
-
-  @Override
-  /**
-   * {@inheritDoc}
-   */
   public S3SecretValue getS3Secret(String kerberosID) throws IOException{
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
 
@@ -2594,59 +2577,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return s3SecretManager.getS3Secret(kerberosID);
   }
 
-  @Override
-  /**
-   * {@inheritDoc}
-   */
-  public String getOzoneBucketMapping(String s3BucketName)
-      throws IOException {
-    if(isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.S3, ACLType.READ,
-          getS3VolumeName(), s3BucketName, null);
-    }
-    return s3BucketManager.getOzoneBucketMapping(s3BucketName);
-  }
-
-  /**
-   * Helper function to return volume name for S3 users.
-   * */
-  private String getS3VolumeName() {
-    return s3BucketManager.formatOzoneVolumeName(DigestUtils.md5Hex(
-        ProtobufRpcEngine.Server.getRemoteUser().getUserName().toLowerCase()));
-  }
-
-  @Override
-  public List<OmBucketInfo> listS3Buckets(String userName, String startKey,
-                                          String prefix, int maxNumOfBuckets)
-      throws IOException {
-    if(isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.S3, ACLType.LIST,
-          s3BucketManager.getOzoneVolumeNameForUser(userName), null, null);
-    }
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(userName);
-    auditMap.put(OzoneConsts.START_KEY, startKey);
-    auditMap.put(OzoneConsts.PREFIX, prefix);
-    auditMap.put(OzoneConsts.MAX_NUM_OF_BUCKETS,
-        String.valueOf(maxNumOfBuckets));
-    try {
-      metrics.incNumListS3Buckets();
-      String volumeName = s3BucketManager.getOzoneVolumeNameForUser(userName);
-      return bucketManager.listBuckets(volumeName, startKey, prefix,
-          maxNumOfBuckets);
-    } catch (IOException ex) {
-      metrics.incNumListS3BucketsFails();
-      auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_S3BUCKETS,
-          auditMap, ex));
-      throw ex;
-    } finally {
-      if(auditSuccess){
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
-                .LIST_S3BUCKETS, auditMap));
-      }
-    }
-  }
   @Override
   public OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs) throws
       IOException {

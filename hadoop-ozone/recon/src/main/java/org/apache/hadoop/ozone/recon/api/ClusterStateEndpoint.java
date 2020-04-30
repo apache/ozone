@@ -80,23 +80,25 @@ public class ClusterStateEndpoint {
         new DatanodeStorageReport(stats.getCapacity().get(),
             stats.getScmUsed().get(), stats.getRemaining().get());
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
-    try {
-      builder.setVolumes(
-          omMetadataManager.getVolumeTable().getEstimatedKeyCount());
-    } catch (Exception ex) {
-      LOG.error("Unable to get Volumes count in ClusterStateResponse.", ex);
-    }
-    try {
-      builder.setBuckets(
-          omMetadataManager.getBucketTable().getEstimatedKeyCount());
-    } catch (Exception ex) {
-      LOG.error("Unable to get Buckets count in ClusterStateResponse.", ex);
-    }
-    try {
-      builder.setKeys(
-          omMetadataManager.getKeyTable().getEstimatedKeyCount());
-    } catch (Exception ex) {
-      LOG.error("Unable to get Keys count in ClusterStateResponse.", ex);
+    if (omMetadataManager.isOmTablesInitialized()) {
+      try {
+        builder.setVolumes(
+            omMetadataManager.getVolumeTable().getEstimatedKeyCount());
+      } catch (Exception ex) {
+        LOG.error("Unable to get Volumes count in ClusterStateResponse.", ex);
+      }
+      try {
+        builder.setBuckets(
+            omMetadataManager.getBucketTable().getEstimatedKeyCount());
+      } catch (Exception ex) {
+        LOG.error("Unable to get Buckets count in ClusterStateResponse.", ex);
+      }
+      try {
+        builder.setKeys(
+            omMetadataManager.getKeyTable().getEstimatedKeyCount());
+      } catch (Exception ex) {
+        LOG.error("Unable to get Keys count in ClusterStateResponse.", ex);
+      }
     }
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)
