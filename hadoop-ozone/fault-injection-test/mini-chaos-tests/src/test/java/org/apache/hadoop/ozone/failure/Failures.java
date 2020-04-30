@@ -45,6 +45,9 @@ public abstract class Failures {
                                        StorageContainerManager scm,
                                        List<HddsDatanodeService> hddsDatanodes);
 
+  /**
+   * Ozone Manager failures.
+   */
   public abstract static class OzoneFailures extends Failures {
     @Override
     public void validateFailure(List<OzoneManager> ozoneManagers,
@@ -58,6 +61,9 @@ public abstract class Failures {
     }
   }
 
+  /**
+   * Restart Ozone Manager to induce failure.
+   */
   public static class OzoneManagerRestartFailure extends OzoneFailures {
     public void fail(MiniOzoneChaosCluster cluster) {
       boolean failureMode = FailureManager.isFastRestart();
@@ -74,6 +80,9 @@ public abstract class Failures {
     }
   }
 
+  /**
+   * Start/Stop Ozone Manager to induce failure.
+   */
   public static class OzoneManagerStartStopFailure extends OzoneFailures {
     public void fail(MiniOzoneChaosCluster cluster) {
       // Get the number of OzoneManager to fail in the cluster.
@@ -94,6 +103,9 @@ public abstract class Failures {
     }
   }
 
+  /**
+   * Datanode failures.
+   */
   public abstract static class DatanodeFailures extends Failures {
     @Override
     public void validateFailure(List<OzoneManager> ozoneManagers,
@@ -103,6 +115,9 @@ public abstract class Failures {
     }
   }
 
+  /**
+   * Restart Datanodes to induce failure.
+   */
   public static class DatanodeRestartFailure extends DatanodeFailures {
     public void fail(MiniOzoneChaosCluster cluster) {
       boolean failureMode = FailureManager.isFastRestart();
@@ -117,6 +132,9 @@ public abstract class Failures {
     }
   }
 
+  /**
+   * Start/Stop Datanodes to induce failure.
+   */
   public static class DatanodeStartStopFailure extends DatanodeFailures {
     public void fail(MiniOzoneChaosCluster cluster) {
       // Get the number of datanodes to fail in the cluster.

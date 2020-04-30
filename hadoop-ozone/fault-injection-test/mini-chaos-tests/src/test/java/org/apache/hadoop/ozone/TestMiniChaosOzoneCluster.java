@@ -97,20 +97,20 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
         new MiniOzoneChaosCluster.Builder(configuration);
 
     switch (service) {
-      case DATANODE:
-        omServiceID = null;
-        builder
-            .addFailures(Failures.DatanodeRestartFailure.class)
-            .addFailures(Failures.DatanodeStartStopFailure.class);
-        break;
-      case OZONE_MANAGER:
-        omServiceID = OM_SERVICE_ID;
-        builder
-            .addFailures(Failures.OzoneManagerStartStopFailure.class)
-            .addFailures(Failures.OzoneManagerRestartFailure.class);
-        break;
-      default:
-        throw new IllegalArgumentException();
+    case DATANODE:
+      omServiceID = null;
+      builder
+          .addFailures(Failures.DatanodeRestartFailure.class)
+          .addFailures(Failures.DatanodeStartStopFailure.class);
+      break;
+    case OZONE_MANAGER:
+      omServiceID = OM_SERVICE_ID;
+      builder
+          .addFailures(Failures.OzoneManagerStartStopFailure.class)
+          .addFailures(Failures.OzoneManagerRestartFailure.class);
+      break;
+    default:
+      throw new IllegalArgumentException();
     }
 
     builder

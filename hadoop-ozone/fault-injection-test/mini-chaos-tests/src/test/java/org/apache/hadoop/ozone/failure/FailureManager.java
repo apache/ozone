@@ -76,7 +76,8 @@ public class FailureManager {
   }
 
   public void start(long initialDelay, long period, TimeUnit timeUnit) {
-    LOG.info("starting failure manager {} {} {}", initialDelay, period, timeUnit);
+    LOG.info("starting failure manager {} {} {}", initialDelay,
+        period, timeUnit);
     scheduledFuture = executorService.scheduleAtFixedRate(this::fail,
         initialDelay, period, timeUnit);
   }
