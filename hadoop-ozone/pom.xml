@@ -36,6 +36,8 @@
     <module>tools</module>
     <module>integration-test</module>
     <module>ozonefs</module>
+    <module>ozonefs-hadoop2</module>
+    <module>ozonefs-hadoop3</module>
     <module>datanode</module>
     <module>s3gateway</module>
     <module>dist</module>
@@ -97,12 +99,17 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-filesystem-lib-current</artifactId>
+        <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-filesystem-lib-legacy</artifactId>
+        <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
@@ -384,8 +391,8 @@
         </property>
       </activation>
       <modules>
-        <module>ozonefs-lib-current</module>
-        <module>ozonefs-lib-legacy</module>
+        <module>ozonefs-hadoop2</module>
+        <module>ozonefs-hadoop3</module>
       </modules>
     </profile>
     <profile>
