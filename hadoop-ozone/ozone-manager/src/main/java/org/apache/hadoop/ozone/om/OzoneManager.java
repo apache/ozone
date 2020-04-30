@@ -212,7 +212,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
 
 import org.apache.ratis.metrics.MetricRegistries;
-import org.apache.ratis.metrics.MetricsReporting;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
@@ -468,12 +467,38 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void registerRatisMetricReporters() {
     // All the Ratis metrics (registered from now) will be published via JMX
     // and via the prometheus exporter (used by the /prom servlet
-    MetricRegistries.global()
-        .addReporterRegistration(MetricsReporting.jmxReporter());
+
+    // enableJmxReporter will unregister metric from JMX automatically
+    // when remove metric
+    MetricRegistries.global().enableJmxReporter();
+
+    // addReporterRegistration need to pass the lambda to unregister metric
+    // so that metric can unregister when remove metric
     MetricRegistries.global().addReporterRegistration(
         registry -> CollectorRegistry.defaultRegistry.register(
             new RatisDropwizardExports(
-                registry.getDropWizardMetricRegistry())));
+                registry.getDropWizardMetricRegistry())),
+        registry -> {
+          try {
+            CollectorRegistry.defaultRegistry.unregister(
+                new RatisDropwizardExports(
+                    registry.getDropWizardMetricRegistry()));
+          } catch (NullPointerException e) {
+            // TODO
+            // This should only happen in test.
+            // Because 3 datanodes and om in mini-cluster share one
+            // MetricRegistries.global(). When datanode1 start,
+            // it call addReporterRegistration(register1, unregister1)
+            // to add register1 and unregister1 lambda, the registry
+            // in datanode1 apply register1. Then datanode2 start, it call
+            // addReporterRegistration(register2, unregister2).
+            // When shutdown cluster, registry in datanode1 apply unregister1
+            // and unregister2. So registry only apply register1 but apply
+            // unregister1 and unregister2, when apply unregister2
+            // NullPointerException threw in prometheus
+            LOG.warn("This should only happen in test", e);
+          }
+        });
   }
 
   /**

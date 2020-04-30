@@ -65,7 +65,6 @@ import static org.apache.hadoop.hdds.security.x509.certificates.utils.Certificat
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import org.apache.ratis.metrics.MetricRegistries;
-import org.apache.ratis.metrics.MetricsReporting;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -183,12 +182,38 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
     //All the Ratis metrics (registered from now) will be published via JMX and
     //via the prometheus exporter (used by the /prom servlet
-    MetricRegistries.global()
-        .addReporterRegistration(MetricsReporting.jmxReporter());
+
+    // enableJmxReporter will unregister metric from JMX automatically
+    // when remove metric
+    MetricRegistries.global().enableJmxReporter();
+
+    // addReporterRegistration need to pass the lambda to unregister metric
+    // so that metric can unregister when remove metric
     MetricRegistries.global().addReporterRegistration(
         registry -> CollectorRegistry.defaultRegistry.register(
             new RatisDropwizardExports(
-                registry.getDropWizardMetricRegistry())));
+                registry.getDropWizardMetricRegistry())),
+        registry -> {
+          try {
+            CollectorRegistry.defaultRegistry.unregister(
+                new RatisDropwizardExports(
+                    registry.getDropWizardMetricRegistry()));
+          } catch (NullPointerException e) {
+            // TODO
+            // This should only happen in test.
+            // Because 3 datanodes and om in mini-cluster share one
+            // MetricRegistries.global(). When datanode1 start,
+            // it call addReporterRegistration(register1, unregister1)
+            // to add register1 and unregister1 lambda, the registry
+            // in datanode1 apply register1. Then datanode2 start, it call
+            // addReporterRegistration(register2, unregister2).
+            // When shutdown cluster, registry in datanode1 apply unregister1
+            // and unregister2. So registry only apply register1 but apply
+            // unregister1 and unregister2, when apply unregister2
+            // NullPointerException threw in prometheus
+            LOG.warn("This should only happen in test", e);
+          }
+        });
 
     OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");

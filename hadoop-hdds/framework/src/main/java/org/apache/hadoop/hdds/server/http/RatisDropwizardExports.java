@@ -25,6 +25,7 @@ import io.prometheus.client.dropwizard.samplebuilder.DefaultSampleBuilder;
  * Collect Dropwizard metrics, but rename ratis specific metrics.
  */
 public class RatisDropwizardExports extends DropwizardExports {
+  private final MetricRegistry registry;
 
   /**
    * Creates a new DropwizardExports with a {@link DefaultSampleBuilder}.
@@ -33,6 +34,19 @@ public class RatisDropwizardExports extends DropwizardExports {
    */
   public RatisDropwizardExports(MetricRegistry registry) {
     super(registry, new RatisNameRewriteSampleBuilder());
+    this.registry = registry;
   }
 
+  @Override
+  public boolean equals(Object other) {
+    return this == other
+        || (other instanceof RatisDropwizardExports
+            && ((RatisDropwizardExports) other).registry
+                .equals(this.registry));
+  }
+
+  @Override
+  public int hashCode() {
+    return registry.hashCode();
+  }
 }
