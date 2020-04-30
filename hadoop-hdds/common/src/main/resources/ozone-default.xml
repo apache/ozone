@@ -197,10 +197,12 @@
   </property>
   <property>
     <name>dfs.container.ratis.num.write.chunk.threads</name>
-    <value>60</value>
+    <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum number of threads in the thread pool that Ratis
-      will use for writing chunks (60 by default).
+    <description>Maximum number of threads in the thread pool that Datanode
+      will use for writing replicated chunks.
+      This is a per configured locations!
+      (10 thread per disk by default).
     </description>
   </property>
   <property>
@@ -399,7 +401,8 @@
     <name>ozone.client.stream.buffer.size</name>
     <value>4MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>The size of chunks the client will send to the server.</description>
+    <description>The size of chunks the client will send to the server.
+    </description>
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.size</name>
