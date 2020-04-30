@@ -26,12 +26,10 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -52,7 +50,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Full-featured Hadoop RPC + HA implementation.
  */
-public class Hadoop3RpcOmTransport implements OmTransport {
+public class Hadoop3OmTransport implements OmTransport {
 
   /**
    * RpcController is not used and hence is set to null.
@@ -66,7 +64,7 @@ public class Hadoop3RpcOmTransport implements OmTransport {
 
   private final OzoneManagerProtocolPB rpcProxy;
 
-  public Hadoop3RpcOmTransport(ConfigurationSource conf,
+  public Hadoop3OmTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
 
     long omVersion = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
@@ -74,12 +72,6 @@ public class Hadoop3RpcOmTransport implements OmTransport {
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
-
-    OzoneManagerProtocolPB proxy =
-        RPC.getProxy(OzoneManagerProtocolPB.class, omVersion, omAddress,
-            ugi, OzoneConfiguration.of(conf),
-            NetUtils.getDefaultSocketFactory(OzoneConfiguration.of(conf)),
-            Client.getRpcTimeout(OzoneConfiguration.of(conf)));
 
     this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
         omServiceId);

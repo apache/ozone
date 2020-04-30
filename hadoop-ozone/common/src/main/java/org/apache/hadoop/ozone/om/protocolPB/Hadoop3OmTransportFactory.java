@@ -30,6 +30,6 @@ public class Hadoop3OmTransportFactory implements OmTransportFactory {
   public OmTransport createOmTransport(ConfigurationSource source,
       UserGroupInformation ugi, String omServiceId) throws IOException {
 
-    return new Hadoop3RpcOmTransport(source, ugi, omServiceId);
+    return new Hadoop3OmTransport(source, ugi, omServiceId);
   }
 }
