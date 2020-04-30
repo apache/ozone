@@ -146,7 +146,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
             "Volume '" + volume + "' owner is already '" + newOwner + "'.")
           .setSuccess(false);
         omResponse.setSetVolumePropertyResponse(
-            SetVolumePropertyResponse.newBuilder().build());
+            SetVolumePropertyResponse.newBuilder()
+                .setResponse(false).build());
         omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build());
         // Note: addResponseToDoubleBuffer would be executed in finally block.
         return omClientResponse;
@@ -182,7 +183,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
           new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
 
       omResponse.setSetVolumePropertyResponse(
-          SetVolumePropertyResponse.newBuilder().build());
+          SetVolumePropertyResponse.newBuilder()
+              .setResponse(true).build());
       omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build(),
           oldOwner, oldOwnerVolumeList, newOwnerVolumeList, omVolumeArgs);
 
