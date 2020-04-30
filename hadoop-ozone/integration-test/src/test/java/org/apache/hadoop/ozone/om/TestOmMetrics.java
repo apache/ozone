@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.MetricsAsserts;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -162,17 +161,6 @@ public class TestOmMetrics {
             ozoneManager, "bucketManager");
     BucketManager mockBm = Mockito.spy(bucketManager);
 
-    S3BucketManager s3BucketManager =
-        (S3BucketManager) HddsWhiteboxTestUtils.getInternalState(
-            ozoneManager, "s3BucketManager");
-    S3BucketManager mockS3Bm = Mockito.spy(s3BucketManager);
-
-    Mockito.doNothing().when(mockS3Bm).createS3Bucket("random", "random");
-    Mockito.doNothing().when(mockS3Bm).createS3Bucket("random1", "random1");
-    Mockito.doNothing().when(mockS3Bm).createS3Bucket("random2", "random2");
-    Mockito.doNothing().when(mockS3Bm).deleteS3Bucket("random");
-    Mockito.doReturn(true).when(mockS3Bm).createOzoneVolumeIfNeeded(null);
-
     Mockito.doNothing().when(mockBm).createBucket(null);
     Mockito.doNothing().when(mockBm).deleteBucket(null, null);
     Mockito.doReturn(null).when(mockBm).getBucketInfo(null, null);
@@ -181,8 +169,6 @@ public class TestOmMetrics {
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
-    HddsWhiteboxTestUtils.setInternalState(
-            ozoneManager, "s3BucketManager", mockS3Bm);
 
     doBucketOps();
 
@@ -200,28 +186,8 @@ public class TestOmMetrics {
     ozoneManager.createBucket(null);
     ozoneManager.deleteBucket(null, null);
 
-    //Taking already existing value, as the same metrics is used over all the
-    // test cases.
-    long numVolumesOps = MetricsAsserts.getLongCounter("NumVolumeOps",
-        omMetrics);
-    long numVolumes = MetricsAsserts.getLongCounter("NumVolumes",
-        omMetrics);
-    long numVolumeCreates = MetricsAsserts.getLongCounter("NumVolumeCreates",
-        omMetrics);
-
-    ozoneManager.createS3Bucket("random", "random");
-    ozoneManager.createS3Bucket("random1", "random1");
-    ozoneManager.createS3Bucket("random2", "random2");
-    ozoneManager.deleteS3Bucket("random");
-
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumBuckets", 4L, omMetrics);
-
-    assertCounter("NumVolumeOps", numVolumesOps + 3, omMetrics);
-    assertCounter("NumVolumeCreates", numVolumeCreates + 3, omMetrics);
-    assertCounter("NumVolumes", numVolumes + 3, omMetrics);
-
-
+    assertCounter("NumBuckets", 2L, omMetrics);
 
     // inject exception to test for Failure Metrics
     Mockito.doThrow(exception).when(mockBm).createBucket(null);
@@ -235,11 +201,11 @@ public class TestOmMetrics {
     doBucketOps();
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumBucketOps", 18L, omMetrics);
-    assertCounter("NumBucketCreates", 8L, omMetrics);
+    assertCounter("NumBucketOps", 14L, omMetrics);
+    assertCounter("NumBucketCreates", 5L, omMetrics);
     assertCounter("NumBucketUpdates", 2L, omMetrics);
     assertCounter("NumBucketInfos", 2L, omMetrics);
-    assertCounter("NumBucketDeletes", 4L, omMetrics);
+    assertCounter("NumBucketDeletes", 3L, omMetrics);
     assertCounter("NumBucketLists", 2L, omMetrics);
 
     assertCounter("NumBucketCreateFails", 1L, omMetrics);
@@ -248,10 +214,10 @@ public class TestOmMetrics {
     assertCounter("NumBucketDeleteFails", 1L, omMetrics);
     assertCounter("NumBucketListFails", 1L, omMetrics);
 
-    assertCounter("NumBuckets", 4L, omMetrics);
+    assertCounter("NumBuckets", 2L, omMetrics);
 
     cluster.restartOzoneManager();
-    assertCounter("NumBuckets", 4L, omMetrics);
+    assertCounter("NumBuckets", 2L, omMetrics);
   }
 
   @Test

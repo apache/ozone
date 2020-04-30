@@ -47,7 +47,7 @@ import picocli.CommandLine.Command;
     mixinStandardHelpOptions = true)
 public class CsiServer extends GenericCli implements Callable<Void> {
 
-  private final static Logger LOG = LoggerFactory.getLogger(CsiServer.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CsiServer.class);
 
   @Override
   public Void call() throws Exception {
@@ -73,7 +73,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
             .bossEventLoopGroup(group)
             .addService(new IdentitiyService())
             .addService(new ControllerService(rpcClient,
-                csiConfig.getDefaultVolumeSize(), csiConfig.getVolumeOwner()))
+                csiConfig.getDefaultVolumeSize()))
             .addService(new NodeService(csiConfig))
             .build();
 
@@ -112,8 +112,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
     @Config(key = "s3g.address",
         defaultValue = "http://localhost:9878",
         description =
-            "The defaul t size of the created volumes (if not specified in the"
-                + " requests).",
+            "The address of S3 Gateway endpoint.",
         tags = ConfigTag.STORAGE)
     private String s3gAddress;
 

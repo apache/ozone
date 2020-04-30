@@ -170,7 +170,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -210,8 +209,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
 
 import org.apache.ratis.metrics.MetricRegistries;
@@ -256,7 +253,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManagerImpl prefixManager;
-  private S3BucketManager s3BucketManager;
 
   private final OMMetrics metrics;
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
@@ -491,8 +487,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
         isRatisEnabled);
-    s3BucketManager = new S3BucketManagerImpl(configuration, metadataManager,
-        volumeManager, bucketManager);
     if (secConfig.isSecurityEnabled()) {
       s3SecretManager = new S3SecretManagerImpl(configuration, metadataManager);
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
@@ -2571,70 +2565,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * {@inheritDoc}
    */
-  public void createS3Bucket(String userName, String s3BucketName)
-      throws IOException {
-
-    boolean acquiredS3Lock = false;
-    boolean acquiredVolumeLock = false;
-    try {
-      metrics.incNumBucketCreates();
-      acquiredS3Lock = metadataManager.getLock().acquireLock(S3_BUCKET_LOCK,
-          s3BucketName);
-      try {
-        acquiredVolumeLock = metadataManager.getLock().acquireLock(VOLUME_LOCK,
-            s3BucketManager.formatOzoneVolumeName(userName));
-        boolean newVolumeCreate = s3BucketManager.createOzoneVolumeIfNeeded(
-            userName);
-        if (newVolumeCreate) {
-          metrics.incNumVolumeCreates();
-          metrics.incNumVolumes();
-        }
-      } catch (IOException ex) {
-        // We need to increment volume creates also because this is first
-        // time we are trying to create a volume, it failed. As we increment
-        // ops and create when we try to do that operation.
-        metrics.incNumVolumeCreates();
-        metrics.incNumVolumeCreateFails();
-        throw ex;
-      }
-      s3BucketManager.createS3Bucket(userName, s3BucketName);
-      metrics.incNumBuckets();
-    } catch (IOException ex) {
-      metrics.incNumBucketCreateFails();
-      throw ex;
-    } finally {
-      if (acquiredVolumeLock) {
-        metadataManager.getLock().releaseLock(VOLUME_LOCK,
-            s3BucketManager.formatOzoneVolumeName(userName));
-      }
-      if (acquiredS3Lock) {
-        metadataManager.getLock().releaseLock(S3_BUCKET_LOCK, s3BucketName);
-      }
-    }
-  }
-
-  @Override
-  /**
-   * {@inheritDoc}
-   */
-  public void deleteS3Bucket(String s3BucketName) throws IOException {
-    try {
-      if(isAclEnabled) {
-        checkAcls(ResourceType.BUCKET, StoreType.S3, ACLType.DELETE, 
-            getS3VolumeName(), s3BucketName, null);
-      }
-      metrics.incNumBucketDeletes();
-      s3BucketManager.deleteS3Bucket(s3BucketName);
-      metrics.decNumBuckets();
-    } catch (IOException ex) {
-      metrics.incNumBucketDeleteFails();
-    }
-  }
-
-  @Override
-  /**
-   * {@inheritDoc}
-   */
   public S3SecretValue getS3Secret(String kerberosID) throws IOException{
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
 
@@ -2647,59 +2577,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return s3SecretManager.getS3Secret(kerberosID);
   }
 
-  @Override
-  /**
-   * {@inheritDoc}
-   */
-  public String getOzoneBucketMapping(String s3BucketName)
-      throws IOException {
-    if(isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.S3, ACLType.READ,
-          getS3VolumeName(), s3BucketName, null);
-    }
-    return s3BucketManager.getOzoneBucketMapping(s3BucketName);
-  }
-
-  /**
-   * Helper function to return volume name for S3 users.
-   * */
-  private String getS3VolumeName() {
-    return s3BucketManager.formatOzoneVolumeName(DigestUtils.md5Hex(
-        ProtobufRpcEngine.Server.getRemoteUser().getUserName().toLowerCase()));
-  }
-
-  @Override
-  public List<OmBucketInfo> listS3Buckets(String userName, String startKey,
-                                          String prefix, int maxNumOfBuckets)
-      throws IOException {
-    if(isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.S3, ACLType.LIST,
-          s3BucketManager.getOzoneVolumeNameForUser(userName), null, null);
-    }
-    boolean auditSuccess = true;
-    Map<String, String> auditMap = buildAuditMap(userName);
-    auditMap.put(OzoneConsts.START_KEY, startKey);
-    auditMap.put(OzoneConsts.PREFIX, prefix);
-    auditMap.put(OzoneConsts.MAX_NUM_OF_BUCKETS,
-        String.valueOf(maxNumOfBuckets));
-    try {
-      metrics.incNumListS3Buckets();
-      String volumeName = s3BucketManager.getOzoneVolumeNameForUser(userName);
-      return bucketManager.listBuckets(volumeName, startKey, prefix,
-          maxNumOfBuckets);
-    } catch (IOException ex) {
-      metrics.incNumListS3BucketsFails();
-      auditSuccess = false;
-      AUDIT.logReadFailure(buildAuditMessageForFailure(OMAction.LIST_S3BUCKETS,
-          auditMap, ex));
-      throw ex;
-    } finally {
-      if(auditSuccess){
-        AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction
-                .LIST_S3BUCKETS, auditMap));
-      }
-    }
-  }
   @Override
   public OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs) throws
       IOException {

@@ -121,6 +121,7 @@ public final class OzoneConsts {
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
+  public static final String S3_VOLUME_NAME = "s3v";
 
   /**
    * Supports Bucket Versioning.
