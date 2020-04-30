@@ -88,7 +88,7 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void initialize(RaftServer server, RaftGroupId id,
                          RaftStorage raftStorage) throws IOException {
-    lifeCycle.startAndTransition(() -> {
+    getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
       this.raftGroupId = id;
       storage.init(raftStorage);
@@ -134,8 +134,8 @@ public class SCMStateMachine extends BaseStateMachine {
    */
   @Override
   public void pause() {
-    lifeCycle.transition(LifeCycle.State.PAUSING);
-    lifeCycle.transition(LifeCycle.State.PAUSED);
+    getLifeCycle().transition(LifeCycle.State.PAUSING);
+    getLifeCycle().transition(LifeCycle.State.PAUSED);
   }
 
   /**
@@ -144,7 +144,7 @@ public class SCMStateMachine extends BaseStateMachine {
    */
   public void unpause(long newLastAppliedSnaphsotIndex,
                       long newLastAppliedSnapShotTermIndex) {
-    lifeCycle.startAndTransition(() -> {
+    getLifeCycle().startAndTransition(() -> {
       this.setLastAppliedTermIndex(TermIndex.newTermIndex(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
     });

@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds.scm.server.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -30,7 +30,8 @@ import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.netty.NettyConfigKeys;
-import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
+import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
@@ -87,7 +88,7 @@ public final class SCMRatisServer {
   private long roleCheckInitialDelayMs = 1000; // 1 second default
   private long roleCheckIntervalMs;
   private ReentrantReadWriteLock roleCheckLock = new ReentrantReadWriteLock();
-  private Optional<RaftProtos.RaftPeerRole> cachedPeerRole = Optional.empty();
+  private Optional<RaftPeerRole> cachedPeerRole = Optional.empty();
   private Optional<RaftPeerId> cachedLeaderPeerId = Optional.empty();
 
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
@@ -99,7 +100,7 @@ public final class SCMRatisServer {
    * Creates a SCM Ratis Server.
    * @throws IOException
    */
-  private SCMRatisServer(Configuration conf,
+  private SCMRatisServer(ConfigurationSource conf,
                          StorageContainerManager scm,
                          String raftGroupIdStr, RaftPeerId localRaftPeerId,
                          InetSocketAddress addr, List<RaftPeer> raftPeers)
@@ -137,7 +138,7 @@ public final class SCMRatisServer {
       public void run() {
         // Run this check only on the leader OM
         if (cachedPeerRole.isPresent() &&
-            cachedPeerRole.get() == RaftProtos.RaftPeerRole.LEADER) {
+            cachedPeerRole.get() == RaftPeerRole.LEADER) {
           updateServerRole();
         }
       }
@@ -148,7 +149,7 @@ public final class SCMRatisServer {
    * Create a SCM Ratis Server instance.
    */
   public static SCMRatisServer newSCMRatisServer(
-      Configuration conf, StorageContainerManager scm,
+      ConfigurationSource conf, StorageContainerManager scm,
       SCMNodeDetails scmNodeDetails, List<SCMNodeDetails> peers)
       throws IOException {
     String scmServiceId = scmNodeDetails.getSCMServiceId();
@@ -186,7 +187,7 @@ public final class SCMRatisServer {
     return new SCMStateMachine(this);
   }
 
-  private RaftProperties newRaftProperties(Configuration conf) {
+  private RaftProperties newRaftProperties(ConfigurationSource conf) {
     final RaftProperties properties = new RaftProperties();
     // Set RPC type
     final String rpcType = conf.get(
@@ -202,20 +203,20 @@ public final class SCMRatisServer {
     }
     // Set Ratis storage directory
     String storageDir = SCMRatisServer.getSCMRatisDirectory(conf);
-    RaftServerConfigKeys.setStorageDirs(properties,
+    RaftServerConfigKeys.setStorageDir(properties,
         Collections.singletonList(new File(storageDir)));
     // Set RAFT segment size
     final int raftSegmentSize = (int) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_RATIS_SEGMENT_SIZE_KEY,
         ScmConfigKeys.OZONE_SCM_RATIS_SEGMENT_SIZE_DEFAULT,
-        StorageUnit.BYTES);
+        org.apache.hadoop.hdds.conf.StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
     // Set RAFT segment pre-allocated size
     final int raftSegmentPreallocatedSize = (int) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
         ScmConfigKeys.OZONE_SCM_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
-        StorageUnit.BYTES);
+        org.apache.hadoop.hdds.conf.StorageUnit.BYTES);
     int logAppenderQueueNumElements = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS,
         ScmConfigKeys.OZONE_SCM_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT);
@@ -280,7 +281,7 @@ public final class SCMRatisServer {
     RaftServerConfigKeys.Rpc.setTimeoutMax(properties,
         serverMaxTimeout);
     // Set the number of maximum cached segments
-    RaftServerConfigKeys.Log.setMaxCachedSegmentNum(properties, 2);
+    RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
     // TODO: set max write buffer size
     // Set the ratis leader election timeout
     TimeUnit leaderElectionMinTimeoutUnit =
@@ -355,7 +356,7 @@ public final class SCMRatisServer {
     this.roleCheckLock.readLock().lock();
     try {
       if (cachedPeerRole.isPresent() &&
-          cachedPeerRole.get() == RaftProtos.RaftPeerRole.LEADER) {
+          cachedPeerRole.get() ==RaftPeerRole.LEADER) {
         return true;
       }
       return false;
@@ -393,7 +394,7 @@ public final class SCMRatisServer {
   /**
    * Get the local directory where ratis logs will be stored.
    */
-  public static String getSCMRatisDirectory(Configuration conf) {
+  public static String getSCMRatisDirectory(ConfigurationSource conf) {
     String storageDir = conf.get(ScmConfigKeys.OZONE_SCM_RATIS_STORAGE_DIR);
 
     if (Strings.isNullOrEmpty(storageDir)) {
@@ -427,17 +428,17 @@ public final class SCMRatisServer {
   public void updateServerRole() {
     try {
       GroupInfoReply groupInfo = getGroupInfo();
-      RaftProtos.RoleInfoProto roleInfoProto = groupInfo.getRoleInfoProto();
-      RaftProtos.RaftPeerRole thisNodeRole = roleInfoProto.getRole();
+      RoleInfoProto roleInfoProto = groupInfo.getRoleInfoProto();
+      RaftPeerRole thisNodeRole = roleInfoProto.getRole();
 
-      if (thisNodeRole.equals(RaftProtos.RaftPeerRole.LEADER)) {
+      if (thisNodeRole.equals(RaftPeerRole.LEADER)) {
         setServerRole(thisNodeRole, raftPeerId);
 
-      } else if (thisNodeRole.equals(RaftProtos.RaftPeerRole.FOLLOWER)) {
+      } else if (thisNodeRole.equals(RaftPeerRole.FOLLOWER)) {
         ByteString leaderNodeId = roleInfoProto.getFollowerInfo()
             .getLeaderInfo().getId().getId();
         // There may be a chance, here we get leaderNodeId as null. For
-        // example, in 3 node OM Ratis, if 2 SCM nodes are down, there will
+        // example, in 3 node OM Ratis, if 2 OM nodes are down, there will
         // be no leader.
         RaftPeerId leaderPeerId = null;
         if (leaderNodeId != null && !leaderNodeId.isEmpty()) {
@@ -452,8 +453,7 @@ public final class SCMRatisServer {
       }
     } catch (IOException e) {
       LOG.error("Failed to retrieve RaftPeerRole. Setting cached role to " +
-          "{} and resetting leader info.",
-          RaftProtos.RaftPeerRole.UNRECOGNIZED, e);
+          "{} and resetting leader info.", RaftPeerRole.UNRECOGNIZED, e);
       setServerRole(null, null);
     }
   }
@@ -469,7 +469,7 @@ public final class SCMRatisServer {
     return groupInfo;
   }
 
-  private void setServerRole(RaftProtos.RaftPeerRole currentRole,
+  private void setServerRole(RaftPeerRole currentRole,
                              RaftPeerId leaderPeerId) {
     this.roleCheckLock.writeLock().lock();
     try {
