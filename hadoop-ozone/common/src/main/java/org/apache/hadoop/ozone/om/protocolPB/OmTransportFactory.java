@@ -51,7 +51,7 @@ public interface OmTransportFactory {
       return OmTransportFactory.class.getClassLoader()
           .loadClass(
               "org.apache.hadoop.ozone.om.protocolPB"
-                  + ".Hadoop32OmTransportFactory")
+                  + ".Hadoop3OmTransportFactory")
           .asSubclass(OmTransportFactory.class)
           .newInstance();
     } catch (Exception ex) {
