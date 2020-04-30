@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.util.Objects;
+
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto.Builder;
 
@@ -58,21 +60,25 @@ public class OzoneFileStatus {
     return blockSize;
   }
 
-  @Override
-  public boolean equals(Object o) {
-    return super.equals(o);
+  public String getTrimmedName() {
+    String keyName = keyInfo.getKeyName();
+    if (keyName.endsWith(OZONE_URI_DELIMITER)) {
+      return keyName.substring(0, keyName.length() - 1);
+    } else {
+      return keyName;
+    }
   }
 
-  @Override
-  public int hashCode() {
-    return super.hashCode();
-  }
-
-  public String getPathName() {
+  public String getPath() {
     if (keyInfo == null) {
       return OZONE_URI_DELIMITER;
     } else {
-      return OZONE_URI_DELIMITER + keyInfo.getKeyName();
+      String path = OZONE_URI_DELIMITER + keyInfo.getKeyName();
+      if (path.endsWith(OZONE_URI_DELIMITER)) {
+        return path.substring(0, path.length() - 1);
+      } else {
+        return path;
+      }
     }
   }
 
@@ -104,5 +110,24 @@ public class OzoneFileStatus {
         OmKeyInfo.getFromProtobuf(status.getKeyInfo()),
         status.getBlockSize(),
         status.getIsDirectory());
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof OzoneFileStatus)) {
+      return false;
+    }
+    OzoneFileStatus that = (OzoneFileStatus) o;
+    return isDirectory == that.isDirectory &&
+        blockSize == that.blockSize &&
+        getTrimmedName().equals(that.getTrimmedName());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getTrimmedName());
   }
 }

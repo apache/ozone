@@ -1758,7 +1758,8 @@ public class KeyManagerImpl implements KeyManager {
       Path keyPath = Paths.get(keyName);
       OzoneFileStatus status =
           verifyNoFilesInPath(volumeName, bucketName, keyPath, false);
-      if (status != null && status.getKeyInfo().getKeyName().equals(keyName)) {
+      if (status != null && status.getTrimmedName()
+          .equals(keyName)) {
         // if directory already exists
         return;
       }
@@ -2039,7 +2040,7 @@ public class KeyManagerImpl implements KeyManager {
                   } else {
                     // If entryKeyName matches dir name, we have the info
                     cacheKeyMap.put(entryInDb,
-                        new OzoneFileStatus(omKeyInfo, scmBlockSize, true));
+                        new OzoneFileStatus(omKeyInfo, 0, true));
                   }
                   countEntries++;
                 }
