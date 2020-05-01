@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,10 +50,14 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
 
   /**
    * Return for replication factor 1 containers where the placement policy
-   * is always met, rather than creating a new object each time.
+   * is always met, or not met (zero replicas available) rather than creating a
+   * new object each time. There are only used when there is no network topology
+   * or the replication factor is 1 or the required racks is 1.
    */
   private ContainerPlacementStatus validPlacement
       = new ContainerPlacementStatusDefault(1, 1, 1);
+  private ContainerPlacementStatus invalidPlacement
+      = new ContainerPlacementStatusDefault(0, 1, 1);
 
   /**
    * Constructor.
@@ -249,8 +252,12 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     NetworkTopology topology = getNetworkTopology();
     int requiredRacks = getRequiredRackCount();
     if (topology == null || replicas == 1 || requiredRacks == 1) {
-      // placement is always satisfied if there is at least one DN.
-      return validPlacement;
+      if (dns.size() > 0) {
+        // placement is always satisfied if there is at least one DN.
+        return validPlacement;
+      } else {
+        return invalidPlacement;
+      }
     }
     // We have a network topology so calculate if it is satisfied or not.
     int numRacks = 1;
