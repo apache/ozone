@@ -187,9 +187,10 @@ public class OzoneVolume extends WithMetadata {
    * @param owner new owner
    * @throws IOException
    */
-  public void setOwner(String owner) throws IOException {
-    proxy.setVolumeOwner(name, owner);
+  public boolean setOwner(String owner) throws IOException {
+    boolean result = proxy.setVolumeOwner(name, owner);
     this.owner = owner;
+    return result;
   }
 
   /**

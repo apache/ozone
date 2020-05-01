@@ -88,9 +88,11 @@ public interface ClientProtocol {
    * Sets the owner of volume.
    * @param volumeName Name of the Volume
    * @param owner to be set for the Volume
+   * @return true if operation succeeded, false if specified user is
+   *         already the owner.
    * @throws IOException
    */
-  void setVolumeOwner(String volumeName, String owner) throws IOException;
+  boolean setVolumeOwner(String volumeName, String owner) throws IOException;
 
   /**
    * Set Volume Quota.
