@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +48,13 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   private final NodeManager nodeManager;
   private final Random rand;
   private final ConfigurationSource conf;
+
+  /**
+   * Return for replication factor 1 containers where the placement policy
+   * is always met, rather than creating a new object each time.
+   */
+  private ContainerPlacementStatus validPlacement
+      = new ContainerPlacementStatusDefault(1, 1, 1);
 
   /**
    * Constructor.
@@ -203,7 +211,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
 
   /**
    * Default implementation for basic placement policies that do not have a
-   * placement policy. If the policy has not network toplogy this method should
+   * placement policy. If the policy has not network topology this method should
    * return null.
    * @return The networkTopology for the policy or null if none is configured.
    */
@@ -242,14 +250,14 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
     int requiredRacks = getRequiredRackCount();
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       // placement is always satisfied if there is at least one DN.
-      return new ContainerPlacementStatusDefault(dns.size(), 1, 1);
+      return validPlacement;
     }
     // We have a network topology so calculate if it is satisfied or not.
     int numRacks = 1;
     final int maxLevel = topology.getMaxLevel();
     // The leaf nodes are all at max level, so the number of nodes at
     // leafLevel - 1 is the rack count
-    numRacks = topology.getNumOfNodes(maxLevel- 1);
+    numRacks = topology.getNumOfNodes(maxLevel - 1);
     final long currentRackCount = dns.stream()
         .map(d -> topology.getAncestor(d, 1))
         .distinct()

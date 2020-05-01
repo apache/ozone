@@ -526,8 +526,7 @@ public class ReplicationManager
         // Want to check if the container is mis-replicated after considering
         // inflight add and delete.
         // Create a new list from source (healthy replicas minus pending delete)
-        List<DatanodeDetails> targetReplicas = new ArrayList<>();
-        targetReplicas.addAll(source);
+        List<DatanodeDetails> targetReplicas = new ArrayList<>(source);
         // Then add any pending additions
         targetReplicas.addAll(replicationInFlight);
 
