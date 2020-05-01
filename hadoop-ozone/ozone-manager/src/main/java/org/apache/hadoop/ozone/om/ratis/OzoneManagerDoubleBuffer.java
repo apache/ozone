@@ -267,6 +267,9 @@ public class OzoneManagerDoubleBuffer {
   /**
    * Stop OM DoubleBuffer flush thread.
    */
+  // Ignore the sonar false positive on the InterruptedException issue
+  // as this a normal flow of a shutdown.
+  @SuppressWarnings("squid:S2142")
   public void stop() {
     if (isRunning.compareAndSet(true, false)) {
       LOG.info("Stopping OMDoubleBuffer flush thread");
@@ -276,7 +279,6 @@ public class OzoneManagerDoubleBuffer {
         daemon.join();
       } catch (InterruptedException e) {
         LOG.error("Interrupted while waiting for daemon to exit.", e);
-        Thread.currentThread().interrupt();
       }
 
       // stop metrics.
