@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -86,7 +85,7 @@ public class TestSCMPipelineMetrics {
       cluster.getStorageContainerManager()
           .getPipelineManager()
           .finalizeAndDestroyPipeline(
-              pipeline.get(),false);
+              pipeline.get(), false);
     } catch (IOException e) {
       e.printStackTrace();
       Assert.fail();
