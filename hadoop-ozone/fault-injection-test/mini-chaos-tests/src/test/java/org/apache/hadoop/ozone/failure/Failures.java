@@ -121,7 +121,7 @@ public abstract class Failures {
   public static class DatanodeRestartFailure extends DatanodeFailures {
     public void fail(MiniOzoneChaosCluster cluster) {
       boolean failureMode = FailureManager.isFastRestart();
-      List<DatanodeDetails> dns = cluster.nodeToFail();
+      List<DatanodeDetails> dns = cluster.dnToFail();
       dns.parallelStream().forEach(dn -> {
         try {
           cluster.restartHddsDatanode(dn, failureMode);
@@ -139,7 +139,7 @@ public abstract class Failures {
     public void fail(MiniOzoneChaosCluster cluster) {
       // Get the number of datanodes to fail in the cluster.
       boolean shouldStop = FailureManager.shouldStop();
-      List<DatanodeDetails> dns = cluster.nodeToFail();
+      List<DatanodeDetails> dns = cluster.dnToFail();
       dns.parallelStream().forEach(dn -> {
         try {
           if (shouldStop) {

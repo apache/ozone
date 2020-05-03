@@ -301,7 +301,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     int numOms = getOzoneManagersList().size();
     List<OzoneManager> oms = new ArrayList<>(numNodesToFail);
     for (int i = 0; i < numNodesToFail; i++) {
-      int failedNodeIndex = FailureManager.getRandomIndex(numOms);
+      int failedNodeIndex = FailureManager.getBoundedRandomIndex(numOms);
       oms.add(getOzoneManager(failedNodeIndex));
     }
     return oms;
@@ -326,14 +326,25 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     return RandomUtils.nextBoolean();
   }
 
-  public List<DatanodeDetails> nodeToFail() {
-    int numNodesToFail = FailureManager.getNumberOfNodesToFail();
-    int numDatanodes = getHddsDatanodes().size();
+  public List<DatanodeDetails> dnToFail() {
+    int numNodesToFail = FailureManager.getNumberOfDnToFail();
+    int numDns = getHddsDatanodes().size();
     List<DatanodeDetails> dns = new ArrayList<>(numNodesToFail);
     for (int i = 0; i < numNodesToFail; i++) {
-      int failedNodeIndex = FailureManager.getRandomIndex(numDatanodes);
+      int failedNodeIndex = FailureManager.getBoundedRandomIndex(numDns);
       dns.add(getHddsDatanodes().get(failedNodeIndex).getDatanodeDetails());
     }
     return dns;
+  }
+  
+  @Override
+  public void restartHddsDatanode(DatanodeDetails dn, boolean waitForDatanode)
+      throws InterruptedException, TimeoutException, IOException {
+    super.restartHddsDatanode(dn, waitForDatanode);
+  }
+
+  @Override
+  public void shutdownHddsDatanode(int i) {
+    super.shutdownHddsDatanode(i);
   }
 }
