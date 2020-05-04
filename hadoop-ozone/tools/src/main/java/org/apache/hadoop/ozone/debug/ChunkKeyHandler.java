@@ -135,15 +135,15 @@ public class ChunkKeyHandler  extends KeyHandler {
         switch (chunkLayOutVersion) {
           case FILE_PER_CHUNK:
             chunkPaths.add(getChunkLocationPath(containerData
-                    .getContainerPath())
-                    + File.separator
-                    + chunkInfo.getChunkName());
+                      .getContainerPath())
+                      + File.separator
+                      + chunkInfo.getChunkName());
             break;
           case FILE_PER_BLOCK:
             chunkPaths.add(getChunkLocationPath(containerData
-                    .getContainerPath())
-                    + File.separator
-                    + keyLocation.getLocalID() + ".block");
+                      .getContainerPath())
+                      + File.separator
+                      + keyLocation.getLocalID() + ".block");
             break;
           default:
             throw new StorageContainerException("chunk strategy does not exist",
