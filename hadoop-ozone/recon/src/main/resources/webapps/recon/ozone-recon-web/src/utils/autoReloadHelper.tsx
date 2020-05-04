@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,15 +16,40 @@
  * limitations under the License.
  */
 
-.overview-content {
-  margin: 0 5px 20px;
-  .icon-small {
-    font-size: 16px;
+import {AUTO_RELOAD_INTERVAL_DEFAULT} from "../constants/autoReload.constants";
+
+class AutoReloadHelper {
+
+  loadData: () => void;
+  interval: number = 0;
+
+  constructor(loadData: () => void) {
+    this.loadData = loadData;
   }
-  .meta {
-    font-size: 12px;
-  }
-  .padded-text {
-    padding-left: 5px;
-  }
+
+  initPolling = () => {
+    this.loadData();
+    this.interval = window.setTimeout(this.initPolling, AUTO_RELOAD_INTERVAL_DEFAULT);
+  };
+
+  startPolling = () => {
+    this.stopPolling();
+    this.interval = window.setTimeout(this.initPolling, AUTO_RELOAD_INTERVAL_DEFAULT);
+  };
+
+  stopPolling = () => {
+    if (this.interval > 0) {
+      clearTimeout(this.interval);
+    }
+  };
+
+  handleAutoReloadToggle = (checked: boolean) => {
+    if (checked) {
+      this.startPolling();
+    } else {
+      this.stopPolling();
+    }
+  };
 }
+
+export {AutoReloadHelper};

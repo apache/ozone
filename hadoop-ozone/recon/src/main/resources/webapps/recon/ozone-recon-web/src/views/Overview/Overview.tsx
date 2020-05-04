@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -24,6 +24,10 @@ import prettyBytes from 'pretty-bytes';
 import './Overview.less';
 import {StorageReport} from "types/datanode.types";
 import {MissingContainersResponse} from "../MissingContainers/MissingContainers";
+import moment from 'moment';
+import AutoReloadPanel from "components/AutoReloadPanel/AutoReloadPanel";
+import {showDataFetchError} from "utils/common";
+import {AutoReloadHelper} from "utils/autoReloadHelper";
 
 interface ClusterStateResponse {
   totalDatanodes: number;
@@ -46,9 +50,13 @@ interface OverviewState {
   buckets: number;
   keys: number;
   missingContainersCount: number;
+  lastUpdated: number;
 }
 
 export class Overview extends React.Component<any, OverviewState> {
+
+  interval: number = 0;
+  autoReload: AutoReloadHelper;
 
   constructor(props: any) {
     super(props);
@@ -65,17 +73,19 @@ export class Overview extends React.Component<any, OverviewState> {
       volumes: 0,
       buckets: 0,
       keys: 0,
-      missingContainersCount: 0
-    }
+      missingContainersCount: 0,
+      lastUpdated: 0
+    };
+    this.autoReload = new AutoReloadHelper(this._loadData);
   }
 
-  componentDidMount(): void {
+  _loadData = () => {
     this.setState({
       loading: true
     });
     axios.all([
-        axios.get('/api/v1/clusterState'),
-        axios.get('/api/v1/containers/missing')
+      axios.get('/api/v1/clusterState'),
+      axios.get('/api/v1/containers/missing')
     ]).then(axios.spread((clusterStateResponse, missingContainersResponse) => {
       const clusterState: ClusterStateResponse = clusterStateResponse.data;
       const missingContainers: MissingContainersResponse = missingContainersResponse.data;
@@ -89,14 +99,29 @@ export class Overview extends React.Component<any, OverviewState> {
         volumes: clusterState.volumes,
         buckets: clusterState.buckets,
         keys: clusterState.keys,
-        missingContainersCount
+        missingContainersCount,
+        lastUpdated: +moment()
       });
-    }));
+    })).catch(error => {
+      this.setState({
+        loading: false
+      });
+      showDataFetchError(error.toString());
+    });
+  };
+
+  componentDidMount(): void {
+    this._loadData();
+    this.autoReload.startPolling();
+  }
+
+  componentWillUnmount(): void {
+    this.autoReload.stopPolling();
   }
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets,
-      keys, missingContainersCount} = this.state;
+      keys, missingContainersCount, lastUpdated} = this.state;
     const datanodesElement = <span>
       <Icon type="check-circle" theme="filled" className="icon-success icon-small"/> {datanodes} <span className="ant-card-meta-description meta">HEALTHY</span>
     </span>;
@@ -113,6 +138,10 @@ export class Overview extends React.Component<any, OverviewState> {
     const clusterCapacity = `${prettyBytes(storageReport.capacity - storageReport.remaining)}/${prettyBytes(storageReport.capacity)}`;
     return (
         <div className="overview-content">
+          <div className="page-header">
+            Overview
+            <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} onReload={this._loadData} togglePolling={this.autoReload.handleAutoReloadToggle}/>
+          </div>
           <Row gutter={[25, 25]}>
             <Col xs={24} sm={18} md={12} lg={12} xl={6}>
               <OverviewCard loading={loading} title={"Datanodes"} data={datanodesElement} icon={"cluster"} hoverable={true}

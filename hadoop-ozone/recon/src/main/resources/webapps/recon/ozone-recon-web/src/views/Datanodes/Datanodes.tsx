@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -25,6 +25,9 @@ import {ReplicationIcon} from 'utils/themeIcons';
 import StorageBar from "components/StorageBar/StorageBar";
 import {DatanodeStatus, StorageReport} from "types/datanode.types";
 import './Datanodes.less';
+import {AutoReloadHelper} from 'utils/autoReloadHelper';
+import AutoReloadPanel from 'components/AutoReloadPanel/AutoReloadPanel';
+import {showDataFetchError} from 'utils/common';
 
 interface DatanodeResponse {
   hostname: string;
@@ -61,6 +64,7 @@ interface DatanodesState {
   loading: boolean;
   dataSource: Datanode[];
   totalCount: number;
+  lastUpdated: number;
 }
 
 const renderDatanodeStatus = (status: DatanodeStatus) => {
@@ -134,17 +138,20 @@ const COLUMNS = [
 
 export class Datanodes extends React.Component<any, DatanodesState> {
 
+  autoReload: AutoReloadHelper;
+
   constructor(props: any) {
     super(props);
     this.state = {
       loading: false,
       dataSource: [],
-      totalCount: 0
-    }
+      totalCount: 0,
+      lastUpdated: 0
+    };
+    this.autoReload = new AutoReloadHelper(this._loadData);
   }
 
-  componentDidMount(): void {
-    // Fetch datanodes on component mount
+  _loadData = () => {
     this.setState({
       loading: true
     });
@@ -167,9 +174,25 @@ export class Datanodes extends React.Component<any, DatanodesState> {
       this.setState({
         loading: false,
         dataSource,
-        totalCount
+        totalCount,
+        lastUpdated: +moment()
       });
+    }).catch(error => {
+      this.setState({
+        loading: false
+      });
+      showDataFetchError(error.toString());
     });
+  };
+
+  componentDidMount(): void {
+    // Fetch datanodes on component mount
+    this._loadData();
+    this.autoReload.startPolling();
+  }
+
+  componentWillUnmount(): void {
+    this.autoReload.stopPolling();
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
@@ -178,7 +201,7 @@ export class Datanodes extends React.Component<any, DatanodesState> {
   };
 
   render () {
-    const {dataSource, loading, totalCount} = this.state;
+    const {dataSource, loading, totalCount, lastUpdated} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} datanodes`,
       showSizeChanger: true,
@@ -188,6 +211,7 @@ export class Datanodes extends React.Component<any, DatanodesState> {
         <div className="datanodes-container">
           <div className="page-header">
             Datanodes ({totalCount})
+            <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} onReload={this._loadData} togglePolling={this.autoReload.handleAutoReloadToggle}/>
           </div>
           <div className="content-div">
             <Table dataSource={dataSource} columns={COLUMNS} loading={loading} pagination={paginationConfig} rowKey="hostname"/>
