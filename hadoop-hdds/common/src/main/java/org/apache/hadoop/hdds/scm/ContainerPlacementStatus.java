@@ -31,6 +31,14 @@ public interface ContainerPlacementStatus {
   boolean isPolicySatisfied();
 
   /**
+   * Returns an String describing why a container does not meet the placement
+   * policy.
+   * @return String indicating the reason the policy is not satisfied or null if
+   *         the policy is satisfied.
+   */
+  String misReplicatedReason();
+
+  /**
    * If the container do not meet the placement policy, return an integer
    * indicating how many additional replicas are required. Otherwise return
    * zero.

@@ -42,6 +42,15 @@ public class ContainerPlacementStatusDefault
   }
 
   @Override
+  public String misReplicatedReason() {
+    if (isPolicySatisfied()) {
+      return null;
+    }
+    return "The container is mis-replicated as it is on " + currentRacks +
+        " racks but should be on " + requiredRacks + " racks.";
+  }
+
+  @Override
   public int additionalReplicaRequired() {
     if (isPolicySatisfied()) {
       return 0;

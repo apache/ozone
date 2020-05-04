@@ -531,11 +531,12 @@ public class ReplicationManager
         targetReplicas.addAll(replicationInFlight);
 
         int delta = replicationFactor - getReplicaCount(id, replicas);
-        final int additionalRacks
-            = containerPlacement.validateContainerPlacement(
-                targetReplicas, replicationFactor).additionalReplicaRequired();
+        final ContainerPlacementStatus placementStatus =
+            containerPlacement.validateContainerPlacement(
+                targetReplicas, replicationFactor);
+        final int misRepDelta = placementStatus.additionalReplicaRequired();
         final int replicasNeeded
-            = delta < additionalRacks ? additionalRacks : delta;
+            = delta < misRepDelta ? misRepDelta : delta;
 
         final List<DatanodeDetails> excludeList = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
@@ -554,29 +555,28 @@ public class ReplicationManager
                   " is {}, but found {}.", id, replicationFactor,
               replicationFactor - delta);
         }
-        int newAdditionalRacks = additionalRacks;
-        if (additionalRacks > 0) {
-          LOG.info("Container {} is mis-replicated. Is should be on {} " +
-              "additional racks", id, additionalRacks);
+        int newMisRepDelta = misRepDelta;
+        if (misRepDelta > 0) {
+          LOG.info("Container: {}. {}",
+              id, placementStatus.misReplicatedReason());
           // Check if the new target nodes (original plus newly selected nodes)
           // makes the placement policy valid.
           targetReplicas.addAll(selectedDatanodes);
-          newAdditionalRacks = containerPlacement.validateContainerPlacement(
+          newMisRepDelta = containerPlacement.validateContainerPlacement(
               targetReplicas, replicationFactor).additionalReplicaRequired();
         }
-        if (delta > 0 || newAdditionalRacks < additionalRacks) {
+        if (delta > 0 || newMisRepDelta < misRepDelta) {
           // Only create new replicas if we are missing a replicas or
-          // the number of pending racks has improved. No point in creating
-          // new replicas for mis-replicated containers unless it improves
-          // things
+          // the number of pending mis-replication has improved. No point in
+          // creating new replicas for mis-replicated containers unless it
+          // improves things.
           for (DatanodeDetails datanode : selectedDatanodes) {
             sendReplicateCommand(container, datanode, source);
           }
         } else {
-          LOG.warn("Container required {} additional racks and {} additional " +
-              "replicas. After selecting new nodes, {} racks are still " +
-              "required. No new replicas will be scheduled.",
-              additionalRacks, Integer.max(delta, 0), newAdditionalRacks);
+          LOG.warn("Container {} is mis-replicated, requiring {} additional " +
+              "replicas. After selecting new nodes, mis-replication has not " +
+              "improved. No additional will be scheduled", id, misRepDelta);
         }
       } else {
         LOG.warn("Cannot replicate container {}, no healthy replica found.",
