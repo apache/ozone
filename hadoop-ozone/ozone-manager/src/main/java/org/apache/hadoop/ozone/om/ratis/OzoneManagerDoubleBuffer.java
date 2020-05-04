@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -143,14 +145,18 @@ public class OzoneManagerDoubleBuffer {
               try {
                 lastTraceId.set(entry.getResponse().getOMResponse()
                     .getTraceID());
-                try (Scope s1 = TracingUtil.importAndCreateScope(
+                Span s1 = TracingUtil.importAndCreateSpan(
                     "DB-addToWriteBatch-" + entry.getResponse()
                         .getOMResponse().getCmdType().toString(),
-                    lastTraceId.get())){
-                  s1.span().setTag("cmd", entry.getResponse().getOMResponse()
-                      .getCmdType().toString());
+                    lastTraceId.get());
+                s1.setTag("cmd", entry.getResponse().getOMResponse()
+                    .getCmdType().toString());
+
+                try (Scope scope = GlobalTracer.get().activateSpan(s1)) {
                   entry.getResponse().checkAndUpdateDB(omMetadataManager,
                       batchOperation);
+                } finally {
+                  s1.finish();
                 }
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
@@ -160,10 +166,13 @@ public class OzoneManagerDoubleBuffer {
             });
 
             long startTime = Time.monotonicNowNanos();
-            try (Scope s2 = TracingUtil.importAndCreateScope(
-                "DB-commitWriteBatch", lastTraceId.get())) {
-              s2.span().setTag("BatchSize", readyBuffer.size());
+            Span s2 = TracingUtil.importAndCreateSpan(
+                "DB-commitWriteBatch", lastTraceId.get());
+            s2.setTag("BatchSize", readyBuffer.size());
+            try (Scope scope = GlobalTracer.get().activateSpan(s2)) {
               omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            } finally {
+              s2.finish();
             }
             ozoneManagerDoubleBufferMetrics.updateFlushTime(
                 Time.monotonicNowNanos() - startTime);
