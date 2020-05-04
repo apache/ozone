@@ -523,7 +523,7 @@ public final class TestSecureOzoneCluster {
       // Get Om client, this time authentication should happen via Token
       testUser.doAs((PrivilegedExceptionAction<Void>) () -> {
         omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-            OmTransportFactory.create(conf, ugi, null),
+            OmTransportFactory.create(conf, testUser, null),
             RandomStringUtils.randomAscii(5));
         return null;
       });
@@ -569,7 +569,7 @@ public final class TestSecureOzoneCluster {
       // Get Om client, this time authentication using Token will fail as
       // token is not in cache anymore.
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          OmTransportFactory.create(conf, ugi, null),
+          OmTransportFactory.create(conf, testUser, null),
           RandomStringUtils.randomAscii(5));
       ex = LambdaTestUtils.intercept(OMException.class,
           "Cancel delegation token failed",
