@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -30,7 +29,6 @@ import org.apache.hadoop.ipc.ProtobufHelper;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
@@ -67,8 +65,6 @@ public class Hadoop3OmTransport implements OmTransport {
   public Hadoop3OmTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
 
-    long omVersion = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
-    InetSocketAddress omAddress = OmUtils.getOmAddressForClients(conf);
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
