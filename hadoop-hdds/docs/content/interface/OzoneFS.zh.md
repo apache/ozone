@@ -130,11 +130,11 @@ Ozone 文件系统的 jar 包有两种类型，它们都包含了所有的依赖
 
 下表总结了各个版本 Hadoop 应当使用的 jar 包和文件系统实现：
 
-Hadoop 版本 | 需要的 jar            | OzoneFileSystem 实现
----------------|-------------------------|----------------------------------------------------
-3.2            | filesystem-lib-current  | org.apache.hadoop.fs.ozone.OzoneFileSystem
-3.1            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.OzoneFileSystem
-2.9            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem
-2.7            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem
+Hadoop 版本 | 需要的 jar            | FileSystem 实现  | AbstractFileSystem 实现
+---------------|-------------------------|-------------------------------------------------|---------------------------
+3.2            | filesystem-lib-current  | org.apache.hadoop.fs.ozone.OzoneFileSystem      | org.apache.hadoop.fs.ozone.OzFs
+3.1            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.OzoneFileSystem      | org.apache.hadoop.fs.ozone.OzFs
+2.9            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem | org.apache.hadoop.fs.ozone.BasicOzFs
+2.7            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem | org.apache.hadoop.fs.ozone.BasicOzFs
 
 由此可知，低版本的 Hadoop 可以使用 hadoop-ozone-filesystem-lib-legacy.jar（比如 hadoop 2.7 或者 spark+hadoop 2.7）。

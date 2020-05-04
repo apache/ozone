@@ -24,11 +24,10 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -52,25 +51,22 @@ import static org.mockito.Mockito.when;
  */
 public class TestObjectPut {
   public static final String CONTENT = "0123456789";
-  private String userName = OzoneConsts.OZONE;
   private String bucketName = "b1";
   private String keyName = "key1";
   private String destBucket = "b2";
   private String destkey = "key2";
   private String nonexist = "nonexist";
-  private OzoneClientStub clientStub;
-  private ObjectStore objectStoreStub;
+  private OzoneClient clientStub;
   private ObjectEndpoint objectEndpoint;
 
   @Before
   public void setup() throws IOException {
     //Create client stub and object store stub.
     clientStub = new OzoneClientStub();
-    objectStoreStub = clientStub.getObjectStore();
 
     // Create bucket
-    objectStoreStub.createS3Bucket(userName, bucketName);
-    objectStoreStub.createS3Bucket("ozone1", destBucket);
+    clientStub.getObjectStore().createS3Bucket(bucketName);
+    clientStub.getObjectStore().createS3Bucket(destBucket);
 
     // Create PutObject and setClient to OzoneClientStub
     objectEndpoint = new ObjectEndpoint();
@@ -90,13 +86,11 @@ public class TestObjectPut {
 
 
     //THEN
-    String volumeName = clientStub.getObjectStore()
-        .getOzoneVolumeName(bucketName);
     OzoneInputStream ozoneInputStream =
-        clientStub.getObjectStore().getVolume(volumeName).getBucket(bucketName)
+        clientStub.getObjectStore().getS3Bucket(bucketName)
             .readKey(keyName);
     String keyContent =
-        IOUtils.toString(ozoneInputStream, Charset.forName("UTF-8"));
+        IOUtils.toString(ozoneInputStream, StandardCharsets.UTF_8);
 
     Assert.assertEquals(200, response.getStatus());
     Assert.assertEquals(CONTENT, keyContent);
@@ -122,13 +116,11 @@ public class TestObjectPut {
         new ByteArrayInputStream(chunkedContent.getBytes()));
 
     //THEN
-    String volumeName = clientStub.getObjectStore()
-        .getOzoneVolumeName(bucketName);
     OzoneInputStream ozoneInputStream =
-        clientStub.getObjectStore().getVolume(volumeName).getBucket(bucketName)
+        clientStub.getObjectStore().getS3Bucket(bucketName)
             .readKey(keyName);
     String keyContent =
-        IOUtils.toString(ozoneInputStream, Charset.forName("UTF-8"));
+        IOUtils.toString(ozoneInputStream, StandardCharsets.UTF_8);
 
     Assert.assertEquals(200, response.getStatus());
     Assert.assertEquals("1234567890abcde", keyContent);
@@ -145,14 +137,12 @@ public class TestObjectPut {
     Response response = objectEndpoint.put(bucketName, keyName,
         CONTENT.length(), 1, null, body);
 
-    String volumeName = clientStub.getObjectStore().getOzoneVolumeName(
-        bucketName);
+    OzoneInputStream ozoneInputStream = clientStub.getObjectStore()
+        .getS3Bucket(bucketName)
+        .readKey(keyName);
 
-    OzoneInputStream ozoneInputStream = clientStub.getObjectStore().getVolume(
-        volumeName).getBucket(bucketName).readKey(keyName);
-
-    String keyContent = IOUtils.toString(ozoneInputStream, Charset.forName(
-        "UTF-8"));
+    String keyContent = IOUtils.toString(ozoneInputStream,
+        StandardCharsets.UTF_8);
 
     Assert.assertEquals(200, response.getStatus());
     Assert.assertEquals(CONTENT, keyContent);
@@ -166,11 +156,10 @@ public class TestObjectPut {
         null, body);
 
     // Check destination key and response
-    volumeName = clientStub.getObjectStore().getOzoneVolumeName(destBucket);
-    ozoneInputStream = clientStub.getObjectStore().getVolume(volumeName)
-        .getBucket(destBucket).readKey(destkey);
+    ozoneInputStream = clientStub.getObjectStore().getS3Bucket(destBucket)
+        .readKey(destkey);
 
-    keyContent = IOUtils.toString(ozoneInputStream, Charset.forName("UTF-8"));
+    keyContent = IOUtils.toString(ozoneInputStream, StandardCharsets.UTF_8);
 
     Assert.assertEquals(200, response.getStatus());
     Assert.assertEquals(CONTENT, keyContent);
@@ -258,11 +247,8 @@ public class TestObjectPut {
     Response response = objectEndpoint.put(bucketName, keyName, CONTENT
             .length(), 1, null, body);
 
-    String volumeName = clientStub.getObjectStore()
-        .getOzoneVolumeName(bucketName);
-
     OzoneKeyDetails key =
-        clientStub.getObjectStore().getVolume(volumeName).getBucket(bucketName)
+        clientStub.getObjectStore().getS3Bucket(bucketName)
             .getKey(keyName);
 
     //default type is set

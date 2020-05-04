@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
  * Ozone volume with in-memory state for testing.
@@ -43,7 +44,7 @@ public class OzoneVolumeStub extends OzoneVolume {
   }
 
   @Override
-  public void createBucket(String bucketName) throws IOException {
+  public void createBucket(String bucketName) {
     createBucket(bucketName, new BucketArgs.Builder()
         .setStorageType(StorageType.DEFAULT)
         .setVersioning(false)
@@ -51,8 +52,7 @@ public class OzoneVolumeStub extends OzoneVolume {
   }
 
   @Override
-  public void createBucket(String bucketName, BucketArgs bucketArgs)
-      throws IOException {
+  public void createBucket(String bucketName, BucketArgs bucketArgs) {
     buckets.put(bucketName, new OzoneBucketStub(
         getName(),
         bucketName,
@@ -67,7 +67,7 @@ public class OzoneVolumeStub extends OzoneVolume {
     if (buckets.containsKey(bucketName)) {
       return buckets.get(bucketName);
     } else {
-      throw new IOException("BUCKET_NOT_FOUND");
+      throw new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND);
     }
 
   }
@@ -103,7 +103,7 @@ public class OzoneVolumeStub extends OzoneVolume {
     if (buckets.containsKey(bucketName)) {
       buckets.remove(bucketName);
     } else {
-      throw new IOException("BUCKET_NOT_FOUND");
+      throw new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND);
     }
   }
 }
