@@ -26,12 +26,12 @@ Test Timeout        2 minute
 Create Volume,Bucket and put key
    Execute             ozone sh volume create o3://om/vol1 --quota 100TB
    Execute             ozone sh bucket create o3://om/vol1/bucket1
-   Execute             ozone sh key put o3://om/vol1/bucket1/key1 /opt/hadoop/NOTICE.txt
+   Execute             ozone sh key put o3://om/vol1/bucket1/debugKey /opt/hadoop/NOTICE.txt
 
 Test ozone debug
-    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/key1 | jq -r '.[]'
+    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.[]'
                     Should contain      ${result}       files
-    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/key1 | jq -r '.[].files[0]'
+    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.[].files[0]'
     ${result3} =    Execute             echo "exists"
     ${result2} =    Execute             test -f ${result} && echo "exists"
                     Should Be Equal     ${result2}       ${result3}
