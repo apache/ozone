@@ -533,8 +533,10 @@ public final class TestSecureOzoneCluster {
           "Auth successful for " + username + " (auth:TOKEN)"));
       OzoneTestUtils.expectOmException(VOLUME_NOT_FOUND,
           () -> omClient.deleteVolume("vol1"));
-      assertTrue(logs.getOutput().contains("Auth successful for "
-          + username + " (auth:TOKEN)"));
+      assertTrue(
+          "Log file doesn't contain successful auth for user " + username,
+          logs.getOutput().contains("Auth successful for "
+              + username + " (auth:TOKEN)"));
 
       // Case 4: Test failure of token renewal.
       // Call to renewDelegationToken will fail but it will confirm that
