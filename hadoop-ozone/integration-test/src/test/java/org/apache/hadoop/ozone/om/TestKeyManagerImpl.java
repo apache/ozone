@@ -36,7 +36,7 @@ import java.util.UUID;
 import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;

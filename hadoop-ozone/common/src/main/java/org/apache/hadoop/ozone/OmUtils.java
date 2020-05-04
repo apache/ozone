@@ -230,8 +230,6 @@ public final class OmUtils {
     case ListKeys:
     case ListTrash:
     case RecoverTrash:
-    case InfoS3Bucket:
-    case ListS3Buckets:
     case ServiceList:
     case ListMultiPartUploadParts:
     case GetFileStatus:
@@ -252,8 +250,6 @@ public final class OmUtils {
     case DeleteKey:
     case CommitKey:
     case AllocateBlock:
-    case CreateS3Bucket:
-    case DeleteS3Bucket:
     case InitiateMultiPartUpload:
     case CommitMultiPartUpload:
     case CompleteMultiPartUpload:

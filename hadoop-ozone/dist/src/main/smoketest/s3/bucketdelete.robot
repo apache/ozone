@@ -28,12 +28,10 @@ ${BUCKET}             generated
 
 *** Test Cases ***
 
-Create new bucket
-    Create bucket
+Delete existing bucket
+# Bucket already is created in Test Setup.
+                   Execute AWSS3APICli                delete-bucket --bucket ${BUCKET}
 
-Create bucket which already exists
-    Create bucket with name     ${BUCKET}
-
-Create bucket with invalid bucket name
-    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket_1   255
-                        Should contain              ${result}         InvalidBucketName
+Delete non-existent bucket
+    ${result} =    Execute AWSS3APICli and checkrc    delete-bucket --bucket nosuchbucket    255
+                   Should contain                     ${result}                              NoSuchBucket

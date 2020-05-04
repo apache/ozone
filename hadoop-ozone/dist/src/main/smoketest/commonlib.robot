@@ -21,6 +21,7 @@ Library             BuiltIn
 *** Variables ***
 ${SECURITY_ENABLED}                 %{SECURITY_ENABLED}
 ${OM_HA_PARAM}                      %{OM_HA_PARAM}
+${OM_SERVICE_ID}                    %{OM_SERVICE_ID}
 
 *** Keywords ***
 Execute
