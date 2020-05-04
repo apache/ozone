@@ -133,21 +133,21 @@ public class ChunkKeyHandler  extends KeyHandler {
         chunkDetails.setChunkOffset(chunkInfo.getOffset());
         chunkDetailsList.add(chunkDetails);
         switch (chunkLayOutVersion) {
-          case FILE_PER_CHUNK:
-            chunkPaths.add(getChunkLocationPath(containerData
-                      .getContainerPath())
-                      + File.separator
-                      + chunkInfo.getChunkName());
-            break;
-          case FILE_PER_BLOCK:
-            chunkPaths.add(getChunkLocationPath(containerData
-                      .getContainerPath())
-                      + File.separator
-                      + keyLocation.getLocalID() + ".block");
-            break;
-          default:
-            throw new StorageContainerException("chunk strategy does not exist",
-                    ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
+        case FILE_PER_CHUNK:
+          chunkPaths.add(getChunkLocationPath(containerData
+                  .getContainerPath())
+                  + File.separator
+                  + chunkInfo.getChunkName());
+          break;
+        case FILE_PER_BLOCK:
+          chunkPaths.add(getChunkLocationPath(containerData
+                  .getContainerPath())
+                  + File.separator
+                  + keyLocation.getLocalID() + ".block");
+          break;
+        default:
+          throw new StorageContainerException("chunk strategy does not exist",
+                  ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
         }
       }
       containerChunkInfoVerbose
