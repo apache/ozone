@@ -155,6 +155,12 @@ public class Hadoop3OmTransport implements OmTransport {
           if (leaderNotReadyException != null) {
             FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
                 leaderNotReadyException.getMessage());
+            // HDDS-3465. OM index will not change, but LastOmID will be
+            // updated to currentOMId, so that wiatTime calculation will
+            // know lastOmID and currentID are same and need to increment
+            // wait time in between.
+            omFailoverProxyProvider.performFailoverIfRequired(
+                omFailoverProxyProvider.getCurrentProxyOMNodeId());
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
         }
@@ -192,6 +198,7 @@ public class Hadoop3OmTransport implements OmTransport {
         OzoneManagerProtocolPB.class, failoverProxyProvider, retryPolicy);
     return proxy;
   }
+
 
   /**
    * Check if exception is OMLeaderNotReadyException.
