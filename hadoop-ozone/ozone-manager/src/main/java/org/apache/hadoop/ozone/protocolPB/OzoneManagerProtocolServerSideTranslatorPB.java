@@ -80,7 +80,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         // For OM NON-HA code, there is no need to save transaction index.
         // As we wait until the double buffer flushes DB to disk.
         .setOzoneManagerRatisSnapShot((i) -> {})
-        .enableRatis(true)
+        .enableRatis(isRatisEnabled)
         .enableTracing(TracingUtil.isTracingEnabled(
             ozoneManager.getConfiguration()))
         .build();

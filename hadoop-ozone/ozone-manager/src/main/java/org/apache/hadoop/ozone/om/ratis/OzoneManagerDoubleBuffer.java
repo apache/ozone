@@ -54,7 +54,7 @@ import org.apache.ratis.util.ExitUtils;
  * methods.
  *
  */
-public class OzoneManagerDoubleBuffer {
+public final class OzoneManagerDoubleBuffer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerDoubleBuffer.class);
@@ -91,20 +91,23 @@ public class OzoneManagerDoubleBuffer {
   private final boolean isRatisEnabled;
   private final boolean isTracingEnabled;
 
+  /**
+   *  Builder for creating OzoneManagerDoubleBuffer.
+   */
   public static class Builder {
-    private OMMetadataManager omMetadataManager;
-    private OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot;
+    private OMMetadataManager mm;
+    private OzoneManagerRatisSnapshot rs;
     private boolean isRatisEnabled = false;
     private boolean isTracingEnabled = false;
 
-    public Builder setOmMetadataManager(OMMetadataManager omMetadataManager) {
-      this.omMetadataManager = omMetadataManager;
+    public Builder setOmMetadataManager(OMMetadataManager omm) {
+      this.mm = omm;
       return this;
     }
 
     public Builder setOzoneManagerRatisSnapShot(
-        OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot) {
-      this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
+        OzoneManagerRatisSnapshot omrs) {
+      this.rs = omrs;
       return this;
     }
 
@@ -119,8 +122,8 @@ public class OzoneManagerDoubleBuffer {
     }
 
     public OzoneManagerDoubleBuffer build() {
-      return new OzoneManagerDoubleBuffer(omMetadataManager,
-          ozoneManagerRatisSnapShot, isRatisEnabled, isTracingEnabled);
+      return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
+          isTracingEnabled);
     }
   }
 
@@ -172,13 +175,13 @@ public class OzoneManagerDoubleBuffer {
   /**
    * flush write batch with trace span if tracing is enabled.
    */
-  private Void flushBatchWithTrace(String ParentName, int batchSize,
+  private Void flushBatchWithTrace(String parentName, int batchSize,
       SupplierWithIOException<Void> supplier) throws IOException {
     if (!isTracingEnabled) {
       return supplier.get();
     }
     String spanName = "DB-commitWriteBatch-Size-" + batchSize;
-    return TracingUtil.executeAsChildSpan(spanName, ParentName, supplier);
+    return TracingUtil.executeAsChildSpan(spanName, parentName, supplier);
   }
 
   /**
@@ -217,7 +220,7 @@ public class OzoneManagerDoubleBuffer {
                   omMetadataManager.getStore().commitBatchOperation(
                       batchOperation);
                   return null;
-            });
+                });
             ozoneManagerDoubleBufferMetrics.updateFlushTime(
                 Time.monotonicNowNanos() - startTime);
           }
