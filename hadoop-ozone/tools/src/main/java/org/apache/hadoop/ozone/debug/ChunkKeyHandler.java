@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -132,23 +131,8 @@ public class ChunkKeyHandler  extends KeyHandler {
         chunkDetails.setChunkName(chunkInfo.getChunkName());
         chunkDetails.setChunkOffset(chunkInfo.getOffset());
         chunkDetailsList.add(chunkDetails);
-        switch (chunkLayOutVersion) {
-        case FILE_PER_CHUNK:
-          chunkPaths.add(getChunkLocationPath(containerData
-                  .getContainerPath())
-                  + File.separator
-                  + chunkInfo.getChunkName());
-          break;
-        case FILE_PER_BLOCK:
-          chunkPaths.add(getChunkLocationPath(containerData
-                  .getContainerPath())
-                  + File.separator
-                  + keyLocation.getLocalID() + ".block");
-          break;
-        default:
-          throw new StorageContainerException("chunk strategy does not exist",
-                  ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
-        }
+        chunkPaths.add(ChunkFileUtility.getChunkFilePath(chunkInfo,
+                keyLocation,containerData,chunkLayOutVersion));
       }
       containerChunkInfoVerbose
               .setContainerPath(containerData.getContainerPath());
