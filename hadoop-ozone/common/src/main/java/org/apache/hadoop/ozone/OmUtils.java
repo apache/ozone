@@ -515,7 +515,7 @@ public final class OmUtils {
     try {
       HddsClientUtils.verifyKeyName(keyName);
     } catch (IllegalArgumentException e) {
-      throw new OMException("Invalid key name: " + keyName,
+      throw new OMException(e.getMessage(),
               OMException.ResultCodes.INVALID_KEY_NAME);
     }
   }
