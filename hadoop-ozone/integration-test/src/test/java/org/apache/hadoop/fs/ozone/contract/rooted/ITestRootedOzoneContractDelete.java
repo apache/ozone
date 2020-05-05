@@ -38,7 +38,7 @@ public class ITestRootedOzoneContractDelete extends AbstractContractDeleteTest {
   }
 
   @AfterClass
-  public static void teardownCluster() throws IOException {
+  public static void teardownCluster() {
     RootedOzoneContract.destroyCluster();
   }
 

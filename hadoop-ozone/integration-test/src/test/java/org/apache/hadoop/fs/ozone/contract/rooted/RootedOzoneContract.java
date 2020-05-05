@@ -46,7 +46,7 @@ class RootedOzoneContract extends AbstractFSContract {
 
   RootedOzoneContract(Configuration conf) {
     super(conf);
-    //insert the base features
+    // insert the base features
     addConfResource(CONTRACT_XML);
   }
 

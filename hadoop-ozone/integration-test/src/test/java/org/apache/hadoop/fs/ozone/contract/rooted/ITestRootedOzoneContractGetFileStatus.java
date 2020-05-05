@@ -26,8 +26,6 @@ import org.apache.hadoop.fs.contract.AbstractFSContract;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Ozone contract tests covering getFileStatus.
@@ -35,28 +33,19 @@ import org.slf4j.LoggerFactory;
 public class ITestRootedOzoneContractGetFileStatus
     extends AbstractContractGetFileStatusTest {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ITestRootedOzoneContractGetFileStatus.class);
-
   @BeforeClass
   public static void createCluster() throws IOException {
     RootedOzoneContract.createCluster();
   }
 
   @AfterClass
-  public static void teardownCluster() throws IOException {
+  public static void teardownCluster() {
     RootedOzoneContract.destroyCluster();
   }
 
   @Override
   protected AbstractFSContract createContract(Configuration conf) {
     return new RootedOzoneContract(conf);
-  }
-
-  @Override
-  public void teardown() throws Exception {
-    LOG.info("FS details {}", getFileSystem());
-    super.teardown();
   }
 
   @Override
