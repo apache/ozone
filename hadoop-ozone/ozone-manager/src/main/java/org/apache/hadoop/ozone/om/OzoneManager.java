@@ -2319,15 +2319,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  // TODO: HDDS-2424. recover-trash command server side handling.
-  @Override
-  public boolean recoverTrash(String volumeName, String bucketName,
-      String keyName, String destinationBucket) throws IOException {
-
-    boolean recoverOperation = true;
-    return recoverOperation;
-  }
-
   /**
    * Sets bucket property from args.
    *

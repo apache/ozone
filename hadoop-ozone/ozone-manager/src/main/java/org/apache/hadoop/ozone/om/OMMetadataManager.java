@@ -203,6 +203,18 @@ public interface OMMetadataManager {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
+   * Recover trash allows the user to recover the keys
+   * that were marked as deleted, but not actually deleted by Ozone Manager.
+   * @param volumeName - The volume name.
+   * @param bucketName - The bucket name.
+   * @param keyName - The key user want to recover.
+   * @param destinationBucket - The bucket user want to recover to.
+   * @return The result of recovering operation is success or not.
+   */
+  boolean recoverTrash(String volumeName, String bucketName,
+      String keyName, String destinationBucket) throws IOException;
+
+  /**
    * Returns a list of volumes owned by a given user; if user is null, returns
    * all volumes.
    *
