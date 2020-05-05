@@ -213,16 +213,6 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
       List<DatanodeDetails> healthyNodes);
 
   /**
-   * Default implementation for basic placement policies that do not have a
-   * placement policy. If the policy has not network topology this method should
-   * return null.
-   * @return The networkTopology for the policy or null if none is configured.
-   */
-  protected NetworkTopology getNetworkTopology() {
-    return null;
-  }
-
-  /**
    * Default implementation to return the number of racks containers should span
    * to meet the placement policy. For simple policies that are not rack aware
    * we return 1, from this default implementation.
@@ -249,7 +239,7 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   @Override
   public ContainerPlacementStatus validateContainerPlacement(
       List<DatanodeDetails> dns, int replicas) {
-    NetworkTopology topology = getNetworkTopology();
+    NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     int requiredRacks = getRequiredRackCount();
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {

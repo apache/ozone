@@ -39,9 +39,12 @@ public interface ContainerPlacementStatus {
   String misReplicatedReason();
 
   /**
-   * If the container do not meet the placement policy, return an integer
-   * indicating how many additional replicas are required. Otherwise return
-   * zero.
+   * If the container does not meet the placement policy, return an integer
+   * indicating how many additional replicas are required so the container
+   * meets the placement policy. Otherwise return zero.
+   * Note the count returned are the number of replicas needed to meet the
+   * placement policy. The container may need additional replicas if it is
+   * under replicated.
    * @return The number of additional replicas required, or zero.
    */
   int additionalReplicaRequired();

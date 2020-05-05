@@ -349,11 +349,6 @@ public final class SCMContainerPlacementRackAware
   }
 
   @Override
-  protected NetworkTopology getNetworkTopology() {
-    return networkTopology;
-  }
-
-  @Override
   protected int getRequiredRackCount() {
     return REQUIRED_RACKS;
   }

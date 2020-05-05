@@ -390,12 +390,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     return (topology.getNumOfNodes(topology.getMaxLevel() - 1) == 1);
   }
 
-
-  @Override
-  protected NetworkTopology getNetworkTopology() {
-    return nodeManager.getClusterNetworkTopologyMap();
-  }
-
   @Override
   protected int getRequiredRackCount() {
     return REQUIRED_RACKS;
