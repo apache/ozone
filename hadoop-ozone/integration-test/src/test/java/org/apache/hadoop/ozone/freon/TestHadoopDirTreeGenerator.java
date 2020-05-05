@@ -100,9 +100,13 @@ public class TestHadoopDirTreeGenerator {
 
     verifyDataTree(conf, store, "vol1", "bucket1",
             1, 1, 1);
-    verifyDataTree(conf, store, "vol2", "bucket2",
+    verifyDataTree(conf, store, "vol2", "bucket1",
+            1, 5, 1);
+    verifyDataTree(conf, store, "vol3", "bucket1",
+            2, 5, 3);
+    verifyDataTree(conf, store, "vol4", "bucket1",
             3, 2, 4);
-    verifyDataTree(conf, store, "vol3", "bucket3",
+    verifyDataTree(conf, store, "vol5", "bucket1",
             5, 4, 1);
 
     shutdown(cluster);
@@ -117,11 +121,11 @@ public class TestHadoopDirTreeGenerator {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     String rootPath = "o3fs://" + bucketName + "." + volumeName;
+    String confPath = new File(path, "conf").getAbsolutePath();
     new Freon().execute(
-            new String[]{"-conf", new File(path, "conf")
-                    .getAbsolutePath(), "dtsg", "-d", depth + "", "-c",
-                    fileCount + "", "-s", span + "", "-n", "1", "-r",
-                    rootPath});
+        new String[]{"-conf", confPath, "dtsg", "-d", depth + "", "-c",
+            fileCount + "", "-s", span + "", "-n", "1", "-r",
+                rootPath});
     // verify the directory structure
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
             conf);

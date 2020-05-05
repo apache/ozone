@@ -99,7 +99,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
   /*
       Nested directories will be created like this,
-      suppose you pass depth=3, span=3 and number of tests=2
+      suppose you pass depth=3, span=3 and number of tests=1
 
       Directory Structure:-
                             |-- Dir111
@@ -122,21 +122,22 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
                             |
                             |-- Dir133
 
-     In each directory 'n' number of files with file size 's' will be created.
+     In each directory 'c' number of files with file size in KBs 'g' will be
+     created.
    */
   private void createDir(long counter) throws Exception {
     if (depth <= 0) {
       LOG.info("Invalid depth value, at least one depth should be passed!");
       return;
     }
-    String dirString = "/";
-    String root = RandomStringUtils.
-            randomAlphanumeric(length);
-    String dir = rootPath.concat("/").concat(root);
-    makeDir(dir);
-    // create files..
-    createFiles(dir);
-    createSubDirRecursively(dir, 1, 1);
+    if (span <= 0) {
+      LOG.info("Invalid span value, at least one span should be passed!");
+      return;
+    }
+    String dir = makeDirWithGivenNumberOfFiles(rootPath);
+    if (depth > 1) {
+      createSubDirRecursively(dir, 1, 1);
+    }
     System.out.println("Successfully created directories & files. Total Dir " +
             "Count=" + totalDirsCnt);
   }
@@ -145,17 +146,12 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
                                        int spanIndex)
           throws Exception {
     if (depthIndex < depth) {
-      String depthSubDir = RandomStringUtils.
-              randomAlphanumeric(length);
-      depthSubDir =
-              parent.toString().concat("/").concat(depthSubDir);
-      makeDir(depthSubDir);
+      String depthSubDir = makeDirWithGivenNumberOfFiles(parent);
+      ++depthIndex;
+
       if (LOG.isDebugEnabled()) {
         LOG.debug("SubDir:{}, depthIndex:{} +", depthSubDir, depthIndex);
       }
-      ++depthIndex;
-      // create files..
-      createFiles(depthSubDir);
       // only non-leaf nodes will be iterated recursively..
       if (depthIndex < depth) {
         createSubDirRecursively(depthSubDir, depthIndex, spanIndex);
@@ -163,19 +159,13 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
     }
 
     while(spanIndex < span) {
-      String levelSubDir = RandomStringUtils.
-              randomAlphanumeric(length);
-      levelSubDir =
-              parent.toString().concat("/").concat(levelSubDir);
-      makeDir(levelSubDir);
+      String levelSubDir = makeDirWithGivenNumberOfFiles(parent);
       ++spanIndex;
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("SpanSubDir:{}, depthIndex:{}, spanIndex:{} +", levelSubDir,
                 depthIndex, spanIndex);
       }
-      // create files..
-      createFiles(levelSubDir);
       // only non-leaf nodes will be iterated recursively..
       if (depthIndex < depth) {
         createSubDirRecursively(levelSubDir, depthIndex, 1);
@@ -183,9 +173,14 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
     }
   }
 
-  private void makeDir(String levelSubDir) throws IOException {
-    fileSystem.mkdirs(new Path(levelSubDir));
+  private String makeDirWithGivenNumberOfFiles(String parent) throws IOException {
+    String dir = RandomStringUtils.randomAlphanumeric(length);
+    dir = parent.toString().concat("/").concat(dir);
+    fileSystem.mkdirs(new Path(dir));
     totalDirsCnt++;
+    // Add given number of files into the created directory.
+    createFiles(dir);
+    return dir;
   }
 
   private void createFiles(String dir) throws IOException {
