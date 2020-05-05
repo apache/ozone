@@ -226,7 +226,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
         .setObjectID(objectID)
         .setUpdateID(updateID);
     if (fileHandleInfo != null) {
-        builder.setFileHandleInfo(fileHandleInfo);
+      builder.setFileHandleInfo(fileHandleInfo);
     }
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();

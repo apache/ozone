@@ -52,8 +52,6 @@ public final class OmKeyInfo extends WithObjectID {
   private HddsProtos.ReplicationType type;
   private HddsProtos.ReplicationFactor factor;
   private FileEncryptionInfo encInfo;
-  private long objectID;
-  private long updateID;
   private String fileHandleInfo;
 
   /**
