@@ -58,7 +58,7 @@ public class UpdateVolumeHandler extends VolumeHandler {
     if (ownerName != null && !ownerName.isEmpty()) {
       boolean result = volume.setOwner(ownerName);
       if (LOG.isDebugEnabled() && !result) {
-        out().format("Volume '%s' owner is already '%s'. Unchanged.\n",
+        out().format("Volume '%s' owner is already '%s'. Unchanged.%n",
             volumeName, ownerName);
       }
     }
