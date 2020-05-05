@@ -107,6 +107,8 @@ public class TestSCMContainerPlacementRackAware {
 
     // create mock node manager
     nodeManager = Mockito.mock(NodeManager.class);
+    when(nodeManager.getClusterNetworkTopologyMap())
+        .thenReturn(cluster);
     when(nodeManager.getNodes(NodeState.HEALTHY))
         .thenReturn(new ArrayList<>(datanodes));
     when(nodeManager.getNodeStat(anyObject()))
