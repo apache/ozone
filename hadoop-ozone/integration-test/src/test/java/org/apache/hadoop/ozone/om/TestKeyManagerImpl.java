@@ -92,7 +92,7 @@ import org.apache.hadoop.util.Time;
 import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;

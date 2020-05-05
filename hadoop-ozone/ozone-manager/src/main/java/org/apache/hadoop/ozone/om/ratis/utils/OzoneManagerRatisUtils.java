@@ -40,8 +40,6 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
-import org.apache.hadoop.ozone.om.request.s3.bucket.S3BucketCreateRequest;
-import org.apache.hadoop.ozone.om.request.s3.bucket.S3BucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequest;
@@ -122,10 +120,6 @@ public final class OzoneManagerRatisUtils {
       return new OMFileCreateRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
-    case CreateS3Bucket:
-      return new S3BucketCreateRequest(omRequest);
-    case DeleteS3Bucket:
-      return new S3BucketDeleteRequest(omRequest);
     case InitiateMultiPartUpload:
       return new S3InitiateMultipartUploadRequest(omRequest);
     case CommitMultiPartUpload:

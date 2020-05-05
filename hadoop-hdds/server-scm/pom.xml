@@ -93,10 +93,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.hamcrest</groupId>
       <artifactId>hamcrest-core</artifactId>
-      <version>1.3</version>
-      <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
@@ -115,13 +112,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-all</artifactId>
+      <version>${mockito1-hadoop.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.hamcrest</groupId>
       <artifactId>hamcrest-all</artifactId>
-      <version>1.3</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>

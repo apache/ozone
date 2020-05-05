@@ -58,12 +58,12 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
 
     List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("timestamp", Types.VARCHAR));
+    expectedPairs.add(new ImmutablePair<>("timestamp", Types.TIMESTAMP));
     expectedPairs.add(new ImmutablePair<>("datanode_id", Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("datanode_host", Types.VARCHAR));
     expectedPairs.add(new ImmutablePair<>("rack_id", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("available_size", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("used_size", Types.INTEGER));
+    expectedPairs.add(new ImmutablePair<>("available_size", Types.BIGINT));
+    expectedPairs.add(new ImmutablePair<>("used_size", Types.BIGINT));
     expectedPairs.add(new ImmutablePair<>("container_count", Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("block_count", Types.INTEGER));
 
@@ -82,9 +82,9 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
 
     List<Pair<String, Integer>> expectedPairsFileCount = new ArrayList<>();
     expectedPairsFileCount.add(
-        new ImmutablePair<>("file_size", Types.INTEGER));
+        new ImmutablePair<>("file_size", Types.BIGINT));
     expectedPairsFileCount.add(
-        new ImmutablePair<>("count", Types.INTEGER));
+        new ImmutablePair<>("count", Types.BIGINT));
 
     List<Pair<String, Integer>> actualPairsFileCount = new ArrayList<>();
     while(resultSetFileCount.next()) {

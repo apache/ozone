@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -49,10 +50,8 @@ public class TestListParts {
   @BeforeClass
   public static void setUp() throws Exception {
 
-    OzoneClientStub client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket(OzoneConsts.OZONE,
-        OzoneConsts.S3_BUCKET);
-
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
@@ -68,7 +67,7 @@ public class TestListParts {
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
     uploadID = multipartUploadInitiateResponse.getUploadID();
 
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
 
     String content = "Multipart Upload";
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());
@@ -97,7 +96,7 @@ public class TestListParts {
         (ListPartsResponse) response.getEntity();
 
     Assert.assertFalse(listPartsResponse.getTruncated());
-    Assert.assertTrue(listPartsResponse.getPartList().size() == 3);
+    assertEquals(3, listPartsResponse.getPartList().size());
 
   }
 
@@ -109,7 +108,7 @@ public class TestListParts {
         (ListPartsResponse) response.getEntity();
 
     Assert.assertTrue(listPartsResponse.getTruncated());
-    Assert.assertTrue(listPartsResponse.getPartList().size() == 2);
+    assertEquals(2, listPartsResponse.getPartList().size());
 
     // Continue
     response = REST.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, 2,
@@ -117,7 +116,7 @@ public class TestListParts {
     listPartsResponse = (ListPartsResponse) response.getEntity();
 
     Assert.assertFalse(listPartsResponse.getTruncated());
-    Assert.assertTrue(listPartsResponse.getPartList().size() == 1);
+    assertEquals(1, listPartsResponse.getPartList().size());
 
   }
 
