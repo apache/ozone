@@ -173,7 +173,8 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
     }
   }
 
-  private String makeDirWithGivenNumberOfFiles(String parent) throws IOException {
+  private String makeDirWithGivenNumberOfFiles(String parent)
+          throws IOException {
     String dir = RandomStringUtils.randomAlphanumeric(length);
     dir = parent.toString().concat("/").concat(dir);
     fileSystem.mkdirs(new Path(dir));

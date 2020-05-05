@@ -98,23 +98,23 @@ public class TestHadoopDirTreeGenerator {
     out.getFD().sync();
     out.close();
 
-    verifyDataTree(conf, store, "vol1", "bucket1",
+    verifyDirTree(conf, store, "vol1", "bucket1",
             1, 1, 1);
-    verifyDataTree(conf, store, "vol2", "bucket1",
+    verifyDirTree(conf, store, "vol2", "bucket1",
             1, 5, 1);
-    verifyDataTree(conf, store, "vol3", "bucket1",
+    verifyDirTree(conf, store, "vol3", "bucket1",
             2, 5, 3);
-    verifyDataTree(conf, store, "vol4", "bucket1",
+    verifyDirTree(conf, store, "vol4", "bucket1",
             3, 2, 4);
-    verifyDataTree(conf, store, "vol5", "bucket1",
+    verifyDirTree(conf, store, "vol5", "bucket1",
             5, 4, 1);
 
     shutdown(cluster);
   }
 
-  private void verifyDataTree(OzoneConfiguration conf, ObjectStore store,
-                              String volumeName, String bucketName,
-                              int depth, int span, int fileCount)
+  private void verifyDirTree(OzoneConfiguration conf, ObjectStore store,
+                             String volumeName, String bucketName,
+                             int depth, int span, int fileCount)
           throws IOException {
 
     store.createVolume(volumeName);
@@ -124,8 +124,7 @@ public class TestHadoopDirTreeGenerator {
     String confPath = new File(path, "conf").getAbsolutePath();
     new Freon().execute(
         new String[]{"-conf", confPath, "dtsg", "-d", depth + "", "-c",
-            fileCount + "", "-s", span + "", "-n", "1", "-r",
-                rootPath});
+            fileCount + "", "-s", span + "", "-n", "1", "-r", rootPath});
     // verify the directory structure
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
             conf);
