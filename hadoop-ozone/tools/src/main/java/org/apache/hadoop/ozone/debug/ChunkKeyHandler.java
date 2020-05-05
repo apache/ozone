@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -131,8 +132,10 @@ public class ChunkKeyHandler  extends KeyHandler {
         chunkDetails.setChunkName(chunkInfo.getChunkName());
         chunkDetails.setChunkOffset(chunkInfo.getOffset());
         chunkDetailsList.add(chunkDetails);
-        chunkPaths.add(ChunkFileUtility.getChunkFilePath(chunkInfo,
-                keyLocation, containerData, chunkLayOutVersion));
+        chunkPaths.add(chunkLayOutVersion.getChunkFile(new File(
+                getChunkLocationPath(containerData.getContainerPath())),
+                keyLocation.getBlockID(),
+                ChunkInfo.getFromProtoBuf(chunkInfo)).toString());
       }
       containerChunkInfoVerbose
               .setContainerPath(containerData.getContainerPath());
