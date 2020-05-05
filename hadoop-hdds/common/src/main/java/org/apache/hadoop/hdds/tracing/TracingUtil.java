@@ -165,7 +165,10 @@ public final class TracingUtil {
     }
   }
 
-  public static <R> R executeInSpan(Span span,
+  /**
+   * Execute a new function a given span.
+   */
+  private static <R> R executeInSpan(Span span,
       SupplierWithIOException<R> supplier) throws IOException {
     try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       return supplier.get();
@@ -176,6 +179,16 @@ public final class TracingUtil {
       span.finish();
     }
   }
+
+  /**
+   * Execute a new function as a child span of the parent.
+   */
+  public static <R> R executeAsChildSpan(String spanName, String parentName,
+      SupplierWithIOException<R> supplier) throws IOException {
+    Span span = TracingUtil.importAndCreateSpan(spanName, parentName);
+    return executeInSpan(span, supplier);
+  }
+
 
   /**
    * Create an active span with auto-close at finish.

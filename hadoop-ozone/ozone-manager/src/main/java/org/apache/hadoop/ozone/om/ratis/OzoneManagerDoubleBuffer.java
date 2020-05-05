@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.opentracing.Span;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -166,10 +165,8 @@ public class OzoneManagerDoubleBuffer {
     }
     String spanName = "DB-addToWriteBatch" + "-" +
         omResponse.getCmdType().toString();
-    Span span = TracingUtil.importAndCreateSpan(spanName,
-        omResponse.getTraceID());
-    span.setTag("cmd", omResponse.getCmdType().toString());
-    return TracingUtil.executeInSpan(span, supplier);
+    return TracingUtil.executeAsChildSpan(spanName, omResponse.getTraceID(),
+        supplier);
   }
 
   /**
@@ -180,11 +177,8 @@ public class OzoneManagerDoubleBuffer {
     if (!isTracingEnabled) {
       return supplier.get();
     }
-    String spanName = "DB-commitWriteBatch";
-    Span span = TracingUtil.importAndCreateSpan(spanName,
-        ParentName);
-    span.setTag("BatchSize", batchSize);
-    return TracingUtil.executeInSpan(span, supplier);
+    String spanName = "DB-commitWriteBatch-Size-" + batchSize;
+    return TracingUtil.executeAsChildSpan(spanName, ParentName, supplier);
   }
 
   /**
