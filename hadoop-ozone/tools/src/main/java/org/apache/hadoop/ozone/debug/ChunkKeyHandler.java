@@ -132,7 +132,7 @@ public class ChunkKeyHandler  extends KeyHandler {
         chunkDetails.setChunkOffset(chunkInfo.getOffset());
         chunkDetailsList.add(chunkDetails);
         chunkPaths.add(ChunkFileUtility.getChunkFilePath(chunkInfo,
-                keyLocation,containerData,chunkLayOutVersion));
+                keyLocation, containerData, chunkLayOutVersion));
       }
       containerChunkInfoVerbose
               .setContainerPath(containerData.getContainerPath());
