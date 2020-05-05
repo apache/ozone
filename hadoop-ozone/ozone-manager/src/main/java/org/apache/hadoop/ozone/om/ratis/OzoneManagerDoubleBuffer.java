@@ -29,10 +29,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
-import io.opentracing.Scope;
 import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,20 +90,49 @@ public class OzoneManagerDoubleBuffer {
   private final OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot;
 
   private final boolean isRatisEnabled;
+  private final boolean isTracingEnabled;
 
-  public OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
-      OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot) {
-    this(omMetadataManager, ozoneManagerRatisSnapShot, true);
+  public static class Builder {
+    private OMMetadataManager omMetadataManager;
+    private OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot;
+    private boolean isRatisEnabled = false;
+    private boolean isTracingEnabled = false;
+
+    public Builder setOmMetadataManager(OMMetadataManager omMetadataManager) {
+      this.omMetadataManager = omMetadataManager;
+      return this;
+    }
+
+    public Builder setOzoneManagerRatisSnapShot(
+        OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot) {
+      this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
+      return this;
+    }
+
+    public Builder enableRatis(boolean enableRatis) {
+      this.isRatisEnabled = enableRatis;
+      return this;
+    }
+
+    public Builder enableTracing(boolean enableTracing) {
+      this.isTracingEnabled = enableTracing;
+      return this;
+    }
+
+    public OzoneManagerDoubleBuffer build() {
+      return new OzoneManagerDoubleBuffer(omMetadataManager,
+          ozoneManagerRatisSnapShot, isRatisEnabled, isTracingEnabled);
+    }
   }
 
-  public OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
+  private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
-      boolean isRatisEnabled) {
+      boolean isRatisEnabled, boolean isTracingEnabled) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
 
     this.isRatisEnabled = isRatisEnabled;
-
+    this.isTracingEnabled = isTracingEnabled;
     if (!isRatisEnabled) {
       this.currentFutureQueue = new ConcurrentLinkedQueue<>();
       this.readyFutureQueue = new ConcurrentLinkedQueue<>();
@@ -125,8 +154,38 @@ public class OzoneManagerDoubleBuffer {
 
   }
 
+  // TODO: pass the trace id further down and trace all methods of DBStore.
 
+  /**
+   * add to write batch with trace span if tracing is enabled.
+   */
+  private Void addToBatchWithTrace(OMResponse omResponse,
+      SupplierWithIOException<Void> supplier) throws IOException {
+    if (!isTracingEnabled) {
+      return supplier.get();
+    }
+    String spanName = "DB-addToWriteBatch" + "-" +
+        omResponse.getCmdType().toString();
+    Span span = TracingUtil.importAndCreateSpan(spanName,
+        omResponse.getTraceID());
+    span.setTag("cmd", omResponse.getCmdType().toString());
+    return TracingUtil.executeInSpan(span, supplier);
+  }
 
+  /**
+   * flush write batch with trace span if tracing is enabled.
+   */
+  private Void flushBatchWithTrace(String ParentName, int batchSize,
+      SupplierWithIOException<Void> supplier) throws IOException {
+    if (!isTracingEnabled) {
+      return supplier.get();
+    }
+    String spanName = "DB-commitWriteBatch";
+    Span span = TracingUtil.importAndCreateSpan(spanName,
+        ParentName);
+    span.setTag("BatchSize", batchSize);
+    return TracingUtil.executeInSpan(span, supplier);
+  }
 
   /**
    * Runs in a background thread and batches the transaction in currentBuffer
@@ -143,21 +202,14 @@ public class OzoneManagerDoubleBuffer {
             AtomicReference<String> lastTraceId = new AtomicReference<>();
             readyBuffer.iterator().forEachRemaining((entry) -> {
               try {
-                lastTraceId.set(entry.getResponse().getOMResponse()
-                    .getTraceID());
-                Span s1 = TracingUtil.importAndCreateSpan(
-                    "DB-addToWriteBatch-" + entry.getResponse()
-                        .getOMResponse().getCmdType().toString(),
-                    lastTraceId.get());
-                s1.setTag("cmd", entry.getResponse().getOMResponse()
-                    .getCmdType().toString());
-
-                try (Scope scope = GlobalTracer.get().activateSpan(s1)) {
-                  entry.getResponse().checkAndUpdateDB(omMetadataManager,
-                      batchOperation);
-                } finally {
-                  s1.finish();
-                }
+                OMResponse omResponse = entry.getResponse().getOMResponse();
+                lastTraceId.set(omResponse.getTraceID());
+                addToBatchWithTrace(omResponse,
+                    (SupplierWithIOException<Void>) () -> {
+                      entry.getResponse().checkAndUpdateDB(omMetadataManager,
+                          batchOperation);
+                      return null;
+                    });
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
@@ -166,14 +218,12 @@ public class OzoneManagerDoubleBuffer {
             });
 
             long startTime = Time.monotonicNowNanos();
-            Span s2 = TracingUtil.importAndCreateSpan(
-                "DB-commitWriteBatch", lastTraceId.get());
-            s2.setTag("BatchSize", readyBuffer.size());
-            try (Scope scope = GlobalTracer.get().activateSpan(s2)) {
-              omMetadataManager.getStore().commitBatchOperation(batchOperation);
-            } finally {
-              s2.finish();
-            }
+            flushBatchWithTrace(lastTraceId.get(), readyBuffer.size(),
+                (SupplierWithIOException<Void>) () -> {
+                  omMetadataManager.getStore().commitBatchOperation(
+                      batchOperation);
+                  return null;
+            });
             ozoneManagerDoubleBufferMetrics.updateFlushTime(
                 Time.monotonicNowNanos() - startTime);
           }

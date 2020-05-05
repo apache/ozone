@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -104,9 +105,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     updateLastAppliedIndexWithSnaphsotIndex();
 
-    this.ozoneManagerDoubleBuffer =
-        new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
-            this::updateLastAppliedIndex);
+    this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(ozoneManager.getMetadataManager())
+        .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+        .enableRatis(true)
+        .enableTracing(TracingUtil.isTracingEnabled(
+            ozoneManager.getConfiguration()))
+        .build();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
@@ -318,8 +323,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       long newLastAppliedSnapShotTermIndex) {
     getLifeCycle().startAndTransition(() -> {
       this.ozoneManagerDoubleBuffer =
-          new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
-              this::updateLastAppliedIndex);
+          new OzoneManagerDoubleBuffer.Builder()
+              .setOmMetadataManager(ozoneManager.getMetadataManager())
+              .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+              .enableRatis(true)
+              .enableTracing(TracingUtil.isTracingEnabled(
+                  ozoneManager.getConfiguration()))
+              .build();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
       this.setLastAppliedTermIndex(TermIndex.newTermIndex(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));

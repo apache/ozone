@@ -130,7 +130,7 @@ public final class TracingUtil {
         new TraceAllMethod<>(delegate, itf.getSimpleName())));
   }
 
-  private static boolean isTracingEnabled(
+  public static boolean isTracingEnabled(
       ConfigurationSource conf) {
     return conf.getBoolean(
         ScmConfigKeys.HDDS_TRACING_ENABLED,
@@ -145,6 +145,16 @@ public final class TracingUtil {
       throws IOException {
     Span span = GlobalTracer.get()
         .buildSpan(spanName).start();
+    return executeInSpan(span, supplier);
+  }
+
+  /**
+   * Execute a new function inside an activated span.
+   */
+  public static <R> R executeInNewSpan(String spanName,
+      Supplier<R> supplier) {
+    Span span = GlobalTracer.get()
+        .buildSpan(spanName).start();
     try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       return supplier.get();
     } catch (Exception ex) {
@@ -155,13 +165,8 @@ public final class TracingUtil {
     }
   }
 
-  /**
-   * Execute a new function inside an activated span.
-   */
-  public static <R> R executeInNewSpan(String spanName,
-      Supplier<R> supplier) {
-    Span span = GlobalTracer.get()
-        .buildSpan(spanName).start();
+  public static <R> R executeInSpan(Span span,
+      SupplierWithIOException<R> supplier) throws IOException {
     try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       return supplier.get();
     } catch (Exception ex) {

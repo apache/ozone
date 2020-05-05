@@ -22,6 +22,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -73,12 +74,16 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       boolean enableRatis) {
     this.ozoneManager = impl;
     this.isRatisEnabled = enableRatis;
-    this.ozoneManagerDoubleBuffer =
-        new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(), (i) -> {
-          // Do nothing.
-          // For OM NON-HA code, there is no need to save transaction index.
-          // As we wait until the double buffer flushes DB to disk.
-        }, isRatisEnabled);
+    this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(ozoneManager.getMetadataManager())
+        // Do nothing.
+        // For OM NON-HA code, there is no need to save transaction index.
+        // As we wait until the double buffer flushes DB to disk.
+        .setOzoneManagerRatisSnapShot((i) -> {})
+        .enableRatis(true)
+        .enableTracing(TracingUtil.isTracingEnabled(
+            ozoneManager.getConfiguration()))
+        .build();
     handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
