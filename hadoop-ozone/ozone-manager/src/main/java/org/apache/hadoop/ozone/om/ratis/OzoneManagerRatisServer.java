@@ -37,6 +37,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -267,7 +268,7 @@ public final class OzoneManagerRatisServer {
     LOG.info("Instantiating OM Ratis server with GroupID: {} and " +
         "Raft Peers: {}", raftGroupIdStr, raftPeersStr.toString().substring(2));
 
-    this.omStateMachine = getStateMachine();
+    this.omStateMachine = getStateMachine(conf);
 
     this.server = RaftServer.newBuilder()
         .setServerId(this.raftPeerId)
@@ -336,8 +337,9 @@ public final class OzoneManagerRatisServer {
   /**
    * Initializes and returns OzoneManager StateMachine.
    */
-  private OzoneManagerStateMachine getStateMachine() {
-    return new OzoneManagerStateMachine(this);
+  private OzoneManagerStateMachine getStateMachine(ConfigurationSource conf) {
+    return new OzoneManagerStateMachine(this,
+        TracingUtil.isTracingEnabled(conf));
   }
 
   @VisibleForTesting

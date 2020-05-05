@@ -33,7 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -86,6 +85,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final OMRatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
+  private final boolean isTracingEnabled;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are recived through applyTransaction.
@@ -98,8 +98,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       new ConcurrentSkipListMap<>();
 
 
-  public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer) {
+  public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
+      boolean isTracingEnabled) {
     this.omRatisServer = ratisServer;
+    this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = omRatisServer.getOzoneManager();
 
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
@@ -109,8 +111,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
         .enableRatis(true)
-        .enableTracing(TracingUtil.isTracingEnabled(
-            ozoneManager.getConfiguration()))
+        .enableTracing(isTracingEnabled)
         .build();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
@@ -327,8 +328,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
               .setOmMetadataManager(ozoneManager.getMetadataManager())
               .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
               .enableRatis(true)
-              .enableTracing(TracingUtil.isTracingEnabled(
-                  ozoneManager.getConfiguration()))
+              .enableTracing(isTracingEnabled)
               .build();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
       this.setLastAppliedTermIndex(TermIndex.newTermIndex(
