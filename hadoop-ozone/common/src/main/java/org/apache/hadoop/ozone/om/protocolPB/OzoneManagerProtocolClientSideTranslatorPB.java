@@ -1639,15 +1639,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         "The destination bucket name cannot be null or empty. " +
         "Please enter a valid destination bucket name.");
 
-    RecoverTrashRequest recoverRequest = RecoverTrashRequest.newBuilder()
+    RecoverTrashRequest.Builder req = RecoverTrashRequest.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setDestinationBucket(destinationBucket)
-        .build();
+        .setDestinationBucket(destinationBucket);
 
     OMRequest omRequest = createOMRequest(Type.RecoverTrash)
-        .setRecoverTrashRequest(recoverRequest)
+        .setRecoverTrashRequest(req)
         .build();
 
     RecoverTrashResponse recoverResponse =

@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
+import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
@@ -140,6 +141,8 @@ public final class OzoneManagerRatisUtils {
       return new OMRenewDelegationTokenRequest(omRequest);
     case GetS3Secret:
       return new S3GetSecretRequest(omRequest);
+    case RecoverTrash:
+      return new OMTrashRecoverRequest(omRequest);
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);
