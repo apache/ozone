@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -117,6 +118,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
+    store.createVolume(OzoneConsts.S3_VOLUME_NAME);
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();

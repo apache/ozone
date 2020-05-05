@@ -66,12 +66,12 @@ public interface DataSourceConfiguration {
   /**
    * Sets the maximum connection age (in seconds).
    */
-  Integer getMaxConnectionAge();
+  long getMaxConnectionAge();
 
   /**
    * Sets the maximum idle connection age (in seconds).
    */
-  Integer getMaxIdleConnectionAge();
+  long getMaxIdleConnectionAge();
 
   /**
    * Statement specific to database, usually SELECT 1.
@@ -81,5 +81,5 @@ public interface DataSourceConfiguration {
   /**
    * How often to test idle connections for being active (in seconds).
    */
-  Integer getIdleConnectionTestPeriod();
+  long getIdleConnectionTestPeriod();
 }

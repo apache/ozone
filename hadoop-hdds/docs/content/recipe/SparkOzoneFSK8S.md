@@ -112,25 +112,16 @@ For remote kubernetes cluster you may need to push it:
 docker push myrepo/spark-ozone
 ```
 
-## Create a bucket and identify the ozonefs path
+## Create a bucket
 
 Download any text file and put it to the `/tmp/alice.txt` first.
 
 ```bash
 kubectl port-forward s3g-0 9878:9878
+ozone sh volume create /s3v
 aws s3api --endpoint http://localhost:9878 create-bucket --bucket=test
 aws s3api --endpoint http://localhost:9878 put-object --bucket test --key alice.txt --body /tmp/alice.txt
-kubectl exec -it scm-0 ozone s3 path test
 ```
-
-The output of the last command is something like this:
-
-```
-Volume name for S3Bucket is : s3asdlkjqiskjdsks
-Ozone FileSystem Uri is : o3fs://test.s3asdlkjqiskjdsks
-```
-
-Write down the ozone filesystem uri as it should be used with the spark-submit command.
 
 ## Create service account to use
 
@@ -146,8 +137,6 @@ Execute the following spark-submit command, but change at least the following va
  * the kubernetes namespace (_yournamespace_ in this example)
  * serviceAccountName (you can use the _spark_ value if you followed the previous steps)
  * container.image (in this example this is _myrepo/spark-ozone_. This is pushed to the registry in the previous steps)
- * location of the input file (o3fs://...), use the string which is identified earlier with the \
- `ozone s3 path <bucketname>` command
 
 ```bash
 bin/spark-submit \
@@ -162,7 +151,7 @@ bin/spark-submit \
     --conf spark.kubernetes.container.image.pullPolicy=Always \
     --jars /opt/hadoop-ozone-filesystem-lib-legacy.jar \
     local:///opt/spark/examples/jars/spark-examples_2.11-2.4.0.jar \
-    o3fs://bucket.volume/alice.txt
+    o3fs://test.s3v/alice.txt
 ```
 
 Check the available `spark-word-count-...` pods with `kubectl get pod`

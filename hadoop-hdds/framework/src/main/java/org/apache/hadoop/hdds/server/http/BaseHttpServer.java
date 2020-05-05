@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.HddsConfServlet;
+import org.apache.hadoop.hdds.conf.HddsPrometheusConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
@@ -120,7 +122,23 @@ public abstract class BaseHttpServer {
         prometheusMetricsSink = new PrometheusMetricsSink();
         httpServer.getWebAppContext().getServletContext()
             .setAttribute(PROMETHEUS_SINK, prometheusMetricsSink);
-        httpServer.addServlet("prometheus", "/prom", PrometheusServlet.class);
+        HddsPrometheusConfig prometheusConfig =
+            OzoneConfiguration.of(conf).getObject(HddsPrometheusConfig.class);
+        String token = prometheusConfig.getPrometheusEndpointToken();
+        if (StringUtils.isNotEmpty(token)) {
+          httpServer.getWebAppContext().getServletContext()
+              .setAttribute(PrometheusServlet.SECURITY_TOKEN, token);
+          // Adding as internal servlet since we want to have token based
+          // auth and hence SPNEGO should be disabled if security is enabled.
+          httpServer.addInternalServlet("prometheus", "/prom",
+              PrometheusServlet.class);
+        } else {
+          // If token is not configured, keeping as regular servlet and not
+          // internal servlet since we do not want to expose /prom endpoint
+          // without authentication in a secure cluster.
+          httpServer.addServlet("prometheus", "/prom",
+              PrometheusServlet.class);
+        }
       }
 
       if (profilerSupport) {

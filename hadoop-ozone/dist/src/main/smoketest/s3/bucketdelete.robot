@@ -14,14 +14,24 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoketest Ozone CSI service
+Documentation       S3 gateway test with aws cli
 Library             OperatingSystem
-Library             BuiltIn
 Library             String
-Resource            commonlib.robot
-Test Timeout        1 minutes
+Resource            ../commonlib.robot
+Resource            commonawslib.robot
+Test Timeout        5 minutes
+Suite Setup         Setup s3 tests
+
+*** Variables ***
+${ENDPOINT_URL}       http://s3g:9878
+${BUCKET}             generated
 
 *** Test Cases ***
-Test CSI identitiy service
-   ${result} =             Execute                        csc -e unix:///tmp/csi.sock identity plugin-info
-                           Should Contain                 ${result}             org.apache.hadoop.ozone
+
+Delete existing bucket
+# Bucket already is created in Test Setup.
+                   Execute AWSS3APICli                delete-bucket --bucket ${BUCKET}
+
+Delete non-existent bucket
+    ${result} =    Execute AWSS3APICli and checkrc    delete-bucket --bucket nosuchbucket    255
+                   Should contain                     ${result}                              NoSuchBucket

@@ -371,8 +371,8 @@ public class TestSCMPipelineManager {
             pipelineManager.getStateManager(), conf);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    pipelineManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    pipelineManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(true, true), null);
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE);
@@ -495,8 +495,8 @@ public class TestSCMPipelineManager {
             HddsProtos.ReplicationFactor.ONE);
 
     // Simulate safemode check exiting.
-    pipelineManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    pipelineManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(true, true), null);
     GenericTestUtils.waitFor(new Supplier<Boolean>() {
       @Override
       public Boolean get() {
@@ -528,14 +528,14 @@ public class TestSCMPipelineManager {
     assertEquals(true, pipelineManager.getSafeModeStatus());
     assertEquals(false, pipelineManager.isPipelineCreationAllowed());
     // First pass pre-check as true, but safemode still on
-    pipelineManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    pipelineManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(true, true), null);
     assertEquals(true, pipelineManager.getSafeModeStatus());
     assertEquals(true, pipelineManager.isPipelineCreationAllowed());
 
     // Then also turn safemode off
-    pipelineManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(false, true));
+    pipelineManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(false, true), null);
     assertEquals(false, pipelineManager.getSafeModeStatus());
     assertEquals(true, pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();
