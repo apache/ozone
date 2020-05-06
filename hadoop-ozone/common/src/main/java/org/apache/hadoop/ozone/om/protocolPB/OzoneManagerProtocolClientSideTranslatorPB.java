@@ -178,7 +178,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public void close() throws IOException {
-
+    //transport is not reusable
+    transport.close();
   }
 
   /**

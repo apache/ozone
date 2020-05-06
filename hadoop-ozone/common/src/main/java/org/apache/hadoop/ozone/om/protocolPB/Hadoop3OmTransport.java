@@ -261,4 +261,9 @@ public class Hadoop3OmTransport implements OmTransport {
   public OMFailoverProxyProvider getOmFailoverProxyProvider() {
     return omFailoverProxyProvider;
   }
+
+  @Override
+  public void close() throws IOException {
+    omFailoverProxyProvider.close();
+  }
 }

@@ -32,4 +32,5 @@ public interface OmTransport {
 
   Text getDelegationTokenService();
 
+  void close() throws IOException;
 }
