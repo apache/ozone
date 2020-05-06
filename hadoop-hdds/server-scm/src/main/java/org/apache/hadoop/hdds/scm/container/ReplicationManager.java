@@ -571,7 +571,8 @@ public class ReplicationManager
         } else {
           LOG.warn("Container {} is mis-replicated, requiring {} additional " +
               "replicas. After selecting new nodes, mis-replication has not " +
-              "improved. No additional will be scheduled", id, misRepDelta);
+              "improved. No additional replicas will be scheduled",
+              id, misRepDelta);
         }
       } else {
         LOG.warn("Cannot replicate container {}, no healthy replica found.",

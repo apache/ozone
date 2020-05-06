@@ -24,8 +24,11 @@ package org.apache.hadoop.hdds.scm;
 public interface ContainerPlacementStatus {
 
   /**
-   * Returns a boolean indicating if the container replica meet the desired
-   * replication policy.
+   * Returns a boolean indicating if the container replicas meet the desired
+   * placement policy. That is, they are placed on a sufficient number of
+   * racks, or node groups etc. This does not check if the container is over
+   * or under replicated, as it is possible for a container to have enough
+   * replicas and still not meet the placement rules.
    * @return True if the containers meet the policy. False otherwise.
    */
   boolean isPolicySatisfied();
@@ -44,7 +47,9 @@ public interface ContainerPlacementStatus {
    * meets the placement policy. Otherwise return zero.
    * Note the count returned are the number of replicas needed to meet the
    * placement policy. The container may need additional replicas if it is
-   * under replicated.
+   * under replicated. The container could also have sufficient replicas but
+   * require more to make it meet the policy, as the existing replicas are not
+   * placed correctly.
    * @return The number of additional replicas required, or zero.
    */
   int additionalReplicaRequired();
