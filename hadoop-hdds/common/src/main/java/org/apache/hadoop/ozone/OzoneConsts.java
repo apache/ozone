@@ -89,6 +89,8 @@ public final class OzoneConsts {
   public static final String OZONE_RPC_SCHEME = "o3";
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
+  public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
+
 
   public static final String CONTAINER_EXTENSION = ".container";
   public static final String CONTAINER_META = ".meta";

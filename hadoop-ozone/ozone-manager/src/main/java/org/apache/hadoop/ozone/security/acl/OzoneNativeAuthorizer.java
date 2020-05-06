@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.security.acl;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
@@ -26,8 +27,10 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collection;
 import java.util.Objects;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
 /**
@@ -44,17 +47,19 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   private BucketManager bucketManager;
   private KeyManager keyManager;
   private PrefixManager prefixManager;
+  private Collection<String> ozAdmins;
 
   public OzoneNativeAuthorizer() {
   }
 
   public OzoneNativeAuthorizer(VolumeManager volumeManager,
       BucketManager bucketManager, KeyManager keyManager,
-      PrefixManager prefixManager) {
+      PrefixManager prefixManager, Collection<String> ozoneAdmins) {
     this.volumeManager = volumeManager;
     this.bucketManager = bucketManager;
     this.keyManager = keyManager;
     this.prefixManager = prefixManager;
+    this.ozAdmins = ozoneAdmins;
   }
 
   /**
@@ -80,6 +85,9 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
           "configured to work with OzoneObjInfo type only.", INVALID_REQUEST);
     }
 
+    boolean isListAllVolume = ((context.getAclRights() == ACLType.LIST) &&
+        objInfo.getVolumeName().equals(OzoneConsts.OZONE_ROOT));
+
     // For CREATE and DELETE acl requests, the parents need to be checked
     // for WRITE acl. If Key create request is received, then we need to
     // check if user has WRITE acl set on Bucket and Volume. In all other cases
@@ -98,6 +106,9 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     switch (objInfo.getResourceType()) {
     case VOLUME:
       LOG.trace("Checking access for volume: {}", objInfo);
+      if (isACLTypeCreate || isListAllVolume) {
+        return checkAdmin(context.getClientUgi().getUserName());
+      }
       return volumeManager.checkAccess(objInfo, context);
     case BUCKET:
       LOG.trace("Checking access for bucket: {}", objInfo);
@@ -146,5 +157,26 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
 
   public void setPrefixManager(PrefixManager prefixManager) {
     this.prefixManager = prefixManager;
+  }
+
+  public void setOzoneAdmins(Collection<String> ozoneAdmins) {
+    this.ozAdmins = ozoneAdmins;
+  }
+
+  public Collection<String> getOzoneAdmins() {
+    return this.ozAdmins;
+  }
+
+  private boolean checkAdmin(String caller) {
+    if (getOzoneAdmins() == null) {
+      return false;
+    }
+
+    if (!getOzoneAdmins().contains(OZONE_ADMINISTRATORS_WILDCARD)
+        && !getOzoneAdmins().contains(caller)){
+      return false;
+    }
+
+    return true;
   }
 }

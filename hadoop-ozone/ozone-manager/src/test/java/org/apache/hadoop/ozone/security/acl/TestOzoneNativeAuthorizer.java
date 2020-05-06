@@ -160,7 +160,8 @@ public class TestOzoneNativeAuthorizer {
         metadataManager, ozConfig, "om1", null);
 
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
-        keyManager, prefixManager);
+        keyManager, prefixManager,
+        Collections.singletonList(OZONE_ADMINISTRATORS_WILDCARD));
     //keySession.
     ugi = UserGroupInformation.getCurrentUser();
   }
