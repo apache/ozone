@@ -447,18 +447,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  private Iterator<? extends OzoneBucket> listBucket(String volumeName)
-      throws IOException {
-    OzoneVolume volume = adapterImpl.getObjectStore().getVolume(volumeName);
-    return volume.listBuckets("");
-  }
-
-  private void deleteBucket(String volumeName, String bucketName)
-      throws IOException {
-    OzoneVolume volume = adapterImpl.getObjectStore().getVolume(volumeName);
-    volume.deleteBucket(bucketName);
-  }
-
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
     incrementCounter(Statistic.INVOCATION_DELETE);
@@ -484,30 +472,33 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return false;
       }
 
+      // Handling root and volume deletion
       OFSPath ofsPath = new OFSPath(key);
-      // rm -r /
-      if (ofsPath.getVolumeName().isEmpty()) {
+
+      if (ofsPath.isRoot()) {
         Iterator<? extends OzoneVolume> it =
             adapterImpl.getObjectStore().listVolumes("");
         while (it.hasNext()) {
           OzoneVolume volume = it.next();
-          String next = addTrailingSlashIfNeeded(
+          String nextVolume = addTrailingSlashIfNeeded(
               f.toString()) + volume.getName();
-          delete(new Path(next), true);
+          delete(new Path(nextVolume), true);
         }
         return true;
       }
-      // rm -r /volume
-      if (ofsPath.getBucketName().isEmpty()) {
+
+      if (ofsPath.isVolume()) {
         String volumeName = ofsPath.getVolumeName();
         if (recursive) {
-          // Get list of buckets
-          Iterator<? extends OzoneBucket> it = listBucket(volumeName);
+          // Delete all buckets first
+          OzoneVolume volume =
+              adapterImpl.getObjectStore().getVolume(volumeName);
+          Iterator<? extends OzoneBucket> it = volume.listBuckets("");
           while (it.hasNext()) {
             OzoneBucket bucket = it.next();
-            String next = addTrailingSlashIfNeeded(
+            String nextBucket = addTrailingSlashIfNeeded(
                 f.toString()) + bucket.getName();
-            delete(new Path(next), true);
+            delete(new Path(nextBucket), true);
           }
         }
         adapterImpl.getObjectStore().deleteVolume(volumeName);
@@ -517,8 +508,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       result = innerDelete(f, recursive);
 
       // Delete bucket
-      if (ofsPath.getKeyName().isEmpty()) {
-        deleteBucket(ofsPath.getVolumeName(), ofsPath.getBucketName());
+      if (ofsPath.isBucket()) {
+        OzoneVolume volume =
+            adapterImpl.getObjectStore().getVolume(ofsPath.getVolumeName());
+        volume.deleteBucket(ofsPath.getBucketName());
         return result;
       }
     } else {
