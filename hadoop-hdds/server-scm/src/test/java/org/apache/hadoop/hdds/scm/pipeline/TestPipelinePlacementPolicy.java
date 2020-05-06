@@ -389,7 +389,7 @@ public class TestPipelinePlacementPolicy {
     ContainerPlacementStatus status =
         placementPolicy.validateContainerPlacement(dns, 3);
     assertTrue(status.isPolicySatisfied());
-    assertEquals(0, status.additionalReplicaRequired());
+    assertEquals(0, status.misReplicationCount());
 
 
     List<DatanodeDetails> subSet = new ArrayList<>();
@@ -398,7 +398,7 @@ public class TestPipelinePlacementPolicy {
     subSet.add(dns.get(2));
     status = placementPolicy.validateContainerPlacement(subSet, 3);
     assertTrue(status.isPolicySatisfied());
-    assertEquals(0, status.additionalReplicaRequired());
+    assertEquals(0, status.misReplicationCount());
 
     // Cut it down to two nodes, one racks
     subSet = new ArrayList<>();
@@ -406,7 +406,7 @@ public class TestPipelinePlacementPolicy {
     subSet.add(dns.get(1));
     status = placementPolicy.validateContainerPlacement(subSet, 3);
     assertFalse(status.isPolicySatisfied());
-    assertEquals(1, status.additionalReplicaRequired());
+    assertEquals(1, status.misReplicationCount());
 
     // One node, but only one replica
     subSet = new ArrayList<>();
@@ -436,7 +436,7 @@ public class TestPipelinePlacementPolicy {
     ContainerPlacementStatus status =
         placementPolicy.validateContainerPlacement(dns, 3);
     assertTrue(status.isPolicySatisfied());
-    assertEquals(0, status.additionalReplicaRequired());
+    assertEquals(0, status.misReplicationCount());
   }
 
   private boolean checkDuplicateNodesUUID(List<DatanodeDetails> nodes) {

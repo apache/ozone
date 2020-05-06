@@ -534,7 +534,7 @@ public class ReplicationManager
         final ContainerPlacementStatus placementStatus =
             containerPlacement.validateContainerPlacement(
                 targetReplicas, replicationFactor);
-        final int misRepDelta = placementStatus.additionalReplicaRequired();
+        final int misRepDelta = placementStatus.misReplicationCount();
         final int replicasNeeded
             = delta < misRepDelta ? misRepDelta : delta;
 
@@ -558,7 +558,7 @@ public class ReplicationManager
           // makes the placement policy valid.
           targetReplicas.addAll(selectedDatanodes);
           newMisRepDelta = containerPlacement.validateContainerPlacement(
-              targetReplicas, replicationFactor).additionalReplicaRequired();
+              targetReplicas, replicationFactor).misReplicationCount();
         }
         if (delta > 0 || newMisRepDelta < misRepDelta) {
           // Only create new replicas if we are missing a replicas or

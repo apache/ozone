@@ -52,6 +52,6 @@ public interface ContainerPlacementStatus {
    * placed correctly.
    * @return The number of additional replicas required, or zero.
    */
-  int additionalReplicaRequired();
+  int misReplicationCount();
 
 }

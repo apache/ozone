@@ -51,7 +51,7 @@ public class ContainerPlacementStatusDefault
   }
 
   @Override
-  public int additionalReplicaRequired() {
+  public int misReplicationCount() {
     if (isPolicySatisfied()) {
       return 0;
     }

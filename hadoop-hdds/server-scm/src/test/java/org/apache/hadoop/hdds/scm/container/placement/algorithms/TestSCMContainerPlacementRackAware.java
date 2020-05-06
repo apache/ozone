@@ -393,7 +393,7 @@ public class TestSCMContainerPlacementRackAware {
     dns.add(datanodes.get(2));
     ContainerPlacementStatus stat = policy.validateContainerPlacement(dns, 3);
     assertFalse(stat.isPolicySatisfied());
-    assertEquals(1, stat.additionalReplicaRequired());
+    assertEquals(1, stat.misReplicationCount());
 
     // Pick a new list which spans 2 racks
     dns = new ArrayList<>();
@@ -402,21 +402,21 @@ public class TestSCMContainerPlacementRackAware {
     dns.add(datanodes.get(5)); // This is on second rack
     stat = policy.validateContainerPlacement(dns, 3);
     assertTrue(stat.isPolicySatisfied());
-    assertEquals(0, stat.additionalReplicaRequired());
+    assertEquals(0, stat.misReplicationCount());
 
     // Pick single DN, expecting 3 replica. Policy is not met.
     dns = new ArrayList<>();
     dns.add(datanodes.get(0));
     stat = policy.validateContainerPlacement(dns, 3);
     assertFalse(stat.isPolicySatisfied());
-    assertEquals(1, stat.additionalReplicaRequired());
+    assertEquals(1, stat.misReplicationCount());
 
     // Pick single DN, expecting 1 replica. Policy is met.
     dns = new ArrayList<>();
     dns.add(datanodes.get(0));
     stat = policy.validateContainerPlacement(dns, 1);
     assertTrue(stat.isPolicySatisfied());
-    assertEquals(0, stat.additionalReplicaRequired());
+    assertEquals(0, stat.misReplicationCount());
   }
 
   @Test
@@ -431,20 +431,20 @@ public class TestSCMContainerPlacementRackAware {
     dns.add(datanodes.get(2));
     ContainerPlacementStatus stat = policy.validateContainerPlacement(dns, 3);
     assertTrue(stat.isPolicySatisfied());
-    assertEquals(0, stat.additionalReplicaRequired());
+    assertEquals(0, stat.misReplicationCount());
 
     // Single DN - policy met as cluster only has one rack.
     dns = new ArrayList<>();
     dns.add(datanodes.get(0));
     stat = policy.validateContainerPlacement(dns, 3);
     assertTrue(stat.isPolicySatisfied());
-    assertEquals(0, stat.additionalReplicaRequired());
+    assertEquals(0, stat.misReplicationCount());
 
     // Single DN - only 1 replica expected
     dns = new ArrayList<>();
     dns.add(datanodes.get(0));
     stat = policy.validateContainerPlacement(dns, 1);
     assertTrue(stat.isPolicySatisfied());
-    assertEquals(0, stat.additionalReplicaRequired());
+    assertEquals(0, stat.misReplicationCount());
   }
 }

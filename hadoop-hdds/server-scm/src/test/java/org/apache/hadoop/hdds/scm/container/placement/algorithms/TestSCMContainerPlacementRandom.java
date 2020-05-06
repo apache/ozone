@@ -109,14 +109,14 @@ public class TestSCMContainerPlacementRandom {
     ContainerPlacementStatus status =
         scmContainerPlacementRandom.validateContainerPlacement(datanodes, 3);
     assertTrue(status.isPolicySatisfied());
-    assertEquals(0, status.additionalReplicaRequired());
+    assertEquals(0, status.misReplicationCount());
 
     status = scmContainerPlacementRandom.validateContainerPlacement(
         new ArrayList<DatanodeDetails>(), 3);
     assertFalse(status.isPolicySatisfied());
 
     // Only expect 1 more replica to give us one rack on this policy.
-    assertEquals(1, status.additionalReplicaRequired(), 3);
+    assertEquals(1, status.misReplicationCount(), 3);
 
     datanodes = new ArrayList<DatanodeDetails>();
     datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -125,6 +125,6 @@ public class TestSCMContainerPlacementRandom {
     assertTrue(status.isPolicySatisfied());
 
     // Only expect 1 more replica to give us one rack on this policy.
-    assertEquals(0, status.additionalReplicaRequired(), 3);
+    assertEquals(0, status.misReplicationCount(), 3);
   }
 }
