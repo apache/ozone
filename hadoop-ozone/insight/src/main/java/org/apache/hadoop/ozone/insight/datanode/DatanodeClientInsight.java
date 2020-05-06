@@ -24,10 +24,14 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.insight.BaseInsightPoint;
+import org.apache.hadoop.ozone.insight.Component.Type;
 import org.apache.hadoop.ozone.insight.InsightPoint;
 import org.apache.hadoop.ozone.insight.LoggerSource;
+import org.apache.hadoop.ozone.insight.MetricGroupDisplay;
 
 import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.getPipelineIdFromFilters;
 import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.withDatanodesFromPipeline;
@@ -35,11 +39,13 @@ import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.wit
 /**
  * Insight definition for datanode/pipline metrics.
  */
-public class RatisInsight extends BaseInsightPoint implements InsightPoint {
+public class DatanodeClientInsight extends BaseInsightPoint
+    implements InsightPoint {
 
   private OzoneConfiguration conf;
 
-  public RatisInsight(OzoneConfiguration conf) {
+  public DatanodeClientInsight(
+      OzoneConfiguration conf) {
     this.conf = conf;
   }
 
@@ -55,7 +61,7 @@ public class RatisInsight extends BaseInsightPoint implements InsightPoint {
           dn -> {
             result
                 .add(new LoggerSource(dn,
-                    "org.apache.ratis.server.impl",
+                    HddsDispatcher.class.getCanonicalName(),
                     defaultLevel(verbose)));
             return null;
           });
@@ -66,12 +72,17 @@ public class RatisInsight extends BaseInsightPoint implements InsightPoint {
   }
 
   @Override
-  public String getDescription() {
-    return "More information about one ratis datanode ring.";
+  public List<MetricGroupDisplay> getMetrics() {
+    List<MetricGroupDisplay> metrics = new ArrayList<>();
+
+    addProtocolMessageMetrics(metrics, "hdds_dispatcher",
+        Type.SCM, ScmBlockLocationProtocolProtos.Type.values());
+
+    return metrics;
   }
 
   @Override
-  public boolean filterLog(Map<String, String> filters, String logLine) {
-    return true;
+  public String getDescription() {
+    return "Datanode client protocol";
   }
 }

@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.function.FunctionWithServiceException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.ServiceException;
 import io.opentracing.Span;
 import org.slf4j.Logger;
@@ -34,17 +33,17 @@ import org.slf4j.Logger;
  * It logs the message type/content on DEBUG/TRACING log for insight and create
  * a new span based on the tracing information.
  */
-public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
+public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
 
   private String serviceName;
 
-  private final ProtocolMessageMetrics<ProtocolMessageEnum>
+  private final ProtocolMessageMetrics<TYPE>
       protocolMessageMetrics;
 
   private Logger logger;
 
   public OzoneProtocolMessageDispatcher(String serviceName,
-      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics,
+      ProtocolMessageMetrics<TYPE> protocolMessageMetrics,
       Logger logger) {
     this.serviceName = serviceName;
     this.protocolMessageMetrics = protocolMessageMetrics;
@@ -54,7 +53,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
   public RESPONSE processRequest(
       REQUEST request,
       FunctionWithServiceException<REQUEST, RESPONSE> methodCall,
-      ProtocolMessageEnum type,
+      TYPE type,
       String traceId) throws ServiceException {
     Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
     try {
