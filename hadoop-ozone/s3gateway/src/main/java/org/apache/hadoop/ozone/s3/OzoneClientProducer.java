@@ -34,8 +34,6 @@ import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.apache.hadoop.ozone.s3.SignatureProcessor.UTF_8;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
@@ -78,8 +76,9 @@ public class OzoneClientProducer {
 
   private OzoneClient getClient(OzoneConfiguration config) throws IOException {
     try {
-      Boolean isAclEnable = config.getBoolean(
-          OZONE_ACL_ENABLED, OZONE_ACL_ENABLED_DEFAULT);
+      String awsAccessId = v4RequestParser.getAwsAccessId();
+      UserGroupInformation remoteUser =
+          UserGroupInformation.createRemoteUser(awsAccessId);
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
         LOG.debug("Creating s3 auth info for client.");
         try {
@@ -88,8 +87,8 @@ public class OzoneClientProducer {
           identifier.setTokenType(S3AUTHINFO);
           identifier.setStrToSign(v4RequestParser.getStringToSign());
           identifier.setSignature(v4RequestParser.getSignature());
-          identifier.setAwsAccessId(v4RequestParser.getAwsAccessId());
-          identifier.setOwner(new Text(v4RequestParser.getAwsAccessId()));
+          identifier.setAwsAccessId(awsAccessId);
+          identifier.setOwner(new Text(awsAccessId));
           if (LOG.isTraceEnabled()) {
             LOG.trace("Adding token for service:{}", omService);
           }
@@ -97,24 +96,14 @@ public class OzoneClientProducer {
               identifier.getSignature().getBytes(UTF_8),
               identifier.getKind(),
               omService);
-          UserGroupInformation remoteUser =
-              UserGroupInformation.createRemoteUser(
-                  v4RequestParser.getAwsAccessId());
           remoteUser.addToken(token);
-          UserGroupInformation.setLoginUser(remoteUser);
         } catch (OS3Exception | URISyntaxException ex) {
           LOG.error("S3 auth info creation failed.");
           throw S3_AUTHINFO_CREATION_ERROR;
         }
 
-      } else {
-        String awsAccessId = v4RequestParser.getAwsAccessId();
-        if (awsAccessId != null) {
-          UserGroupInformation remoteUser =
-              UserGroupInformation.createRemoteUser(awsAccessId);
-          UserGroupInformation.setLoginUser(remoteUser);
-        }
       }
+      UserGroupInformation.setLoginUser(remoteUser);
     } catch (Exception e) {
       LOG.error("Error: ", e);
     }
