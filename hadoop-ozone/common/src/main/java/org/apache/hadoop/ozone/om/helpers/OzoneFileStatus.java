@@ -67,7 +67,10 @@ public class OzoneFileStatus extends FileStatus {
 
   public OzoneFileStatusProto getProtobuf() throws IOException {
     OzoneFileStatusProto.Builder builder = OzoneFileStatusProto.newBuilder()
-        .setStatus(convert(this)).setFileHandleInfo(fileHandleInfo);
+        .setStatus(convert(this));
+    if (fileHandleInfo != null) {
+      builder.setFileHandleInfo(fileHandleInfo);
+    }
     if (keyInfo != null) {
       builder.setKeyInfo(keyInfo.getProtobuf());
     }
