@@ -424,10 +424,15 @@ public final class OzoneConfigKeys {
   public static final int OZONE_FREON_HTTPS_BIND_PORT_DEFAULT = 9885;
   public static final String
       OZONE_FREON_HTTP_KERBEROS_PRINCIPAL_KEY =
-      "ozone.freon.http.kerberos.principal";
+      "ozone.freon.http.auth.kerberos.principal";
   public static final String
       OZONE_FREON_HTTP_KERBEROS_KEYTAB_FILE_KEY =
-      "ozone.freon.http.kerberos.keytab";
+      "ozone.freon.http.auth.kerberos.keytab";
+  public static final String OZONE_FREON_HTTP_AUTH_TYPE =
+      "ozone.freon.http.auth.type";
+  public static final String OZONE_FREON_HTTP_AUTH_CONFIG_PREFIX =
+      "ozone.freon.http.auth.";
+
 
   public static final String OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY =
       "ozone.network.topology.aware.read";
