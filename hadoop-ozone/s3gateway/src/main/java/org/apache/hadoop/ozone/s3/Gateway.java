@@ -54,7 +54,7 @@ public class Gateway extends GenericCli {
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
     ozoneConfiguration.set("hadoop.http.authentication.type", "simple");
     if (SecurityUtil.getAuthenticationMethod(ozoneConfiguration).equals(
-      UserGroupInformation.AuthenticationMethod.KERBEROS)){
+        UserGroupInformation.AuthenticationMethod.KERBEROS)) {
       UserGroupInformation.setConfiguration(ozoneConfiguration);
     }
 
