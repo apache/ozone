@@ -50,7 +50,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       LoggerFactory.getLogger(HadoopDirTreeGenerator.class);
 
   @Option(names = {"-r", "--rpath"},
-      description = "Hadoop FS directory system path",
+      description = "Hadoop FS root path",
       defaultValue = "o3fs://bucket2.vol2")
   private String rootPath;
 
@@ -195,13 +195,13 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
       FSDataOutputStream out =
               fileSystem.create(new Path(fileName), true);
-      int fSizeInKBs = fileSize * 1024;
-      if (fSizeInKBs > 0) {
+      int fSizeInBytes = fileSize * 1024;
+      if (fSizeInBytes > 0) {
         int bufferLen = 1024;
         int seed = 0;
         byte[] toWrite = new byte[bufferLen];
         Random rb = new Random(seed);
-        long bytesToWrite = fileSize;
+        long bytesToWrite = fSizeInBytes;
         while (bytesToWrite > 0) {
           rb.nextBytes(toWrite);
           int bytesToWriteNext = (bufferLen < bytesToWrite) ? bufferLen

@@ -88,33 +88,37 @@ public class TestHadoopDirTreeGenerator {
   @Test
   public void testNestedDirTreeGeneration() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    MiniOzoneCluster cluster = startCluster(conf);
-    ObjectStore store =
-            OzoneClientFactory.getRpcClient(conf).getObjectStore();
-    OzoneManager om = cluster.getOzoneManager();
-    FileOutputStream out = FileUtils.openOutputStream(new File(path,
-            "conf"));
-    cluster.getConf().writeXml(out);
-    out.getFD().sync();
-    out.close();
+    MiniOzoneCluster cluster = null;
+    try {
+      cluster = startCluster(conf);
+      ObjectStore store =
+              OzoneClientFactory.getRpcClient(conf).getObjectStore();
+      OzoneManager om = cluster.getOzoneManager();
+      FileOutputStream out = FileUtils.openOutputStream(new File(path,
+              "conf"));
+      cluster.getConf().writeXml(out);
+      out.getFD().sync();
+      out.close();
 
-    verifyDirTree(conf, store, "vol1", "bucket1",
-            1, 1, 1);
-    verifyDirTree(conf, store, "vol2", "bucket1",
-            1, 5, 1);
-    verifyDirTree(conf, store, "vol3", "bucket1",
-            2, 5, 3);
-    verifyDirTree(conf, store, "vol4", "bucket1",
-            3, 2, 4);
-    verifyDirTree(conf, store, "vol5", "bucket1",
-            5, 4, 1);
-
-    shutdown(cluster);
+      verifyDirTree(conf, store, "vol1", "bucket1",
+              1, 1, 1, 0);
+      verifyDirTree(conf, store, "vol2", "bucket1",
+              1, 5, 1, 5);
+      verifyDirTree(conf, store, "vol3", "bucket1",
+              2, 5, 3, 1);
+      verifyDirTree(conf, store, "vol4", "bucket1",
+              3, 2, 4, 2);
+      verifyDirTree(conf, store, "vol5", "bucket1",
+              5, 4, 1, 0);
+    } finally {
+      shutdown(cluster);
+    }
   }
 
   private void verifyDirTree(OzoneConfiguration conf, ObjectStore store,
                              String volumeName, String bucketName,
-                             int depth, int span, int fileCount)
+                             int depth, int span, int fileCount,
+                             int perFileSizeInKBs)
           throws IOException {
 
     store.createVolume(volumeName);
@@ -124,7 +128,8 @@ public class TestHadoopDirTreeGenerator {
     String confPath = new File(path, "conf").getAbsolutePath();
     new Freon().execute(
         new String[]{"-conf", confPath, "dtsg", "-d", depth + "", "-c",
-            fileCount + "", "-s", span + "", "-n", "1", "-r", rootPath});
+            fileCount + "", "-s", span + "", "-n", "1", "-r", rootPath,
+                     "-g", perFileSizeInKBs + ""});
     // verify the directory structure
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
             conf);
@@ -136,17 +141,17 @@ public class TestHadoopDirTreeGenerator {
       // as it has only one dir at root.
       verifyActualSpan(1, fileStatuses);
       int actualDepth = traverseToLeaf(fileSystem, fileStatus.getPath(),
-              1, depth, span, fileCount);
+              1, depth, span, fileCount, perFileSizeInKBs);
       Assert.assertEquals("Mismatch depth in a path",
               depth, actualDepth);
     }
   }
 
-  private int traverseToLeaf(FileSystem fileSystem, Path dirPath, int depth,
+  private int traverseToLeaf(FileSystem fs, Path dirPath, int depth,
                              int expectedDepth, int expectedSpanCnt,
-                             int expectedFileCnt)
+                             int expectedFileCnt, int perFileSizeInKBs)
           throws IOException {
-    FileStatus[] fileStatuses = fileSystem.listStatus(dirPath);
+    FileStatus[] fileStatuses = fs.listStatus(dirPath);
     // check the num of peer directories except root and leaf as both
     // has less dirs.
     if (depth < expectedDepth - 1) {
@@ -156,9 +161,11 @@ public class TestHadoopDirTreeGenerator {
     for (FileStatus fileStatus : fileStatuses) {
       if (fileStatus.isDirectory()) {
         ++depth;
-        return traverseToLeaf(fileSystem, fileStatus.getPath(),
-                depth, expectedDepth, expectedSpanCnt, expectedFileCnt);
+        return traverseToLeaf(fs, fileStatus.getPath(), depth, expectedDepth,
+                expectedSpanCnt, expectedFileCnt, perFileSizeInKBs);
       } else {
+        Assert.assertEquals("Mismatches file len",
+                perFileSizeInKBs * 1024, fileStatus.getLen());
         actualNumFiles++;
       }
     }
