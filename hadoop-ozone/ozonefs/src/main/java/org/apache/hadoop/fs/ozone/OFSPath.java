@@ -190,6 +190,17 @@ class OFSPath {
     return this.getBucketName().isEmpty() && !this.getVolumeName().isEmpty();
   }
 
+  /**
+   * If key name is empty but volume and bucket names are not, the given path
+   * it bucket.
+   * e.g. /volume1/bucket2
+   */
+  public boolean isBucket() {
+    return this.getKeyName().isEmpty() &&
+        !this.getBucketName().isEmpty() &&
+        !this.getVolumeName().isEmpty();
+  }
+
   private static String md5Hex(String input) {
     try {
       MessageDigest md = MessageDigest.getInstance("MD5");
