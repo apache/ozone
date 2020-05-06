@@ -694,7 +694,7 @@ public class TestOzoneManagerHA {
   private OMFailoverProxyProvider getFailoverProxyProvider()
       throws IOException {
     RpcClient clientProxy =
-        (RpcClient) cluster.getRpcClient().getObjectStore().getClientProxy();
+        (RpcClient) objectStore.getClientProxy();
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
         (OzoneManagerProtocolClientSideTranslatorPB) clientProxy
             .getOzoneManagerClient();
