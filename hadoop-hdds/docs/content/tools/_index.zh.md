@@ -45,12 +45,12 @@ Ozone 有一系列管理 Ozone 的命令行工具。
 
 管理命令：
 
-   * **admin** - 供管理员和开发者使用的 Ozone 各组件管理命令。
+   * **admin** - 供管理员和开发者使用的 Ozone 管理员命令。
    * **classpath** - 打印包含 Hadoop jar 包和其它必要库的 CLASSPATH。
-   * **dtutil**    - 进行和代理 token 有关的操作。
+   * **dtutil**    - 进行和 token 有关的操作。
    * **envvars** - 列出 Hadoop 的环境变量。
    * **getconf** -  从 Ozone 配置中读取特定配置值。
-   * **jmxget**  - 从 NameNode 或 DataNode 中获取 JMX 导出的值。
+   * **jmxget**  - 从 Ozone 服务中获取 JMX 导出的值。
    * **scmcli** -  SCM 的命令行接口，仅供开发者使用。
    Container Manager.
    * **genconf** -  生成 Ozone 所需的最小配置，并输出到 ozone-site.xml 中。
