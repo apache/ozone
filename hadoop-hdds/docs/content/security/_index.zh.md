@@ -23,7 +23,7 @@ weight: 5
     -->
 
 {{<jumbotron title="安全化 Ozone">}}
-          Ozone 是一个企业级的安全存储系统，提供了很多可选的安全特性，以下页面讨论了如何利用 Ozone 的安全特性。
+          Ozone 是一个企业级的安全存储系统，提供了很多可配置的安全特性，以下页面讨论了如何利用安全性配置来使 Ozone 安全化。
 {{</jumbotron>}}
 
 <div class="alert alert-warning" role="alert">
