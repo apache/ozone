@@ -480,6 +480,29 @@ public final class TestSecureOzoneCluster {
 
     // Setup secure OM for start
     setupOm(conf);
+
+    //These are two very important lines: ProtobufRpcEngine uses ClientCache
+    //which caches clients until no more references. Cache key is the
+    //SocketFactory which means that we use one Client instance for
+    //all the Hadoop RPC.
+    //
+    //Hadoop Client caches connections with a connection pool. Even if you
+    //close the client here, if you have ANY Hadoop RPC clients which uses the
+    //same Client, connections can be reused.
+    //
+    //Here we closed all the OTHER Hadoop RPC clients to have only the clients
+    //from this unit test.
+    //
+    //With this approach all the following client.close() calls trigger a
+    //Client.close (if there is no other open Hadoop RPC client) which triggers
+    //connection close for all the available connection.
+    //
+    //The following test tests the authorization of the new client calls, it
+    //requires a real connection close and connection open as the authorization
+    //is part the initial handhsake of Hadoop RPC.
+    om.getScmClient().getBlockClient().close();
+    om.getScmClient().getContainerClient().close();
+
     long omVersion =
         RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
     try {
@@ -551,6 +574,7 @@ public final class TestSecureOzoneCluster {
           "Auth successful for " + username + " (auth:TOKEN)"));
       omLogs.clearOutput();
       //testUser.setAuthenticationMethod(AuthMethod.KERBEROS);
+      omClient.close();
       UserGroupInformation.setLoginUser(ugi);
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
