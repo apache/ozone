@@ -73,6 +73,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   private BucketEncryptionKeyInfo bekInfo;
 
   /**
+   * Bucket is trash enabled or not.
+   */
+  private boolean trashEnabled;
+
+  /**
    * Private constructor, constructed via builder.
    * @param volumeName - Volume name.
    * @param bucketName - Bucket name.
@@ -82,6 +87,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param creationTime - Bucket creation time.
    * @param metadata - metadata.
    * @param bekInfo - bucket encryption key info.
+   * @param trashEnabled - bucket is trash enabled or not.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private OmBucketInfo(String volumeName,
@@ -93,7 +99,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
                        long objectID,
                        long updateID,
                        Map<String, String> metadata,
-                       BucketEncryptionKeyInfo bekInfo) {
+                       BucketEncryptionKeyInfo bekInfo,
+                       boolean trashEnabled) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.acls = acls;
@@ -104,6 +111,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.updateID = updateID;
     this.metadata = metadata;
     this.bekInfo = bekInfo;
+    this.trashEnabled = trashEnabled;
   }
 
   /**
@@ -193,6 +201,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   }
 
   /**
+   * Returns bucket is trash enabled or not.
+   * @return boolean
+   */
+  public boolean getTrashEnabled() {
+    return trashEnabled;
+  }
+
+  /**
    * Returns new builder class that builds a OmBucketInfo.
    *
    * @return Builder
@@ -217,6 +233,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
     auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY,
         (bekInfo != null) ? bekInfo.getKeyName() : null);
+    auditMap.put(OzoneConsts.IS_TRASH_ENABLED,
+        String.valueOf(this.trashEnabled));
     return auditMap;
   }
 
@@ -234,7 +252,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setUpdateID(updateID)
         .setBucketEncryptionKey(bekInfo != null ?
             new BucketEncryptionKeyInfo(bekInfo.getVersion(),
-                bekInfo.getSuite(), bekInfo.getKeyName()) : null);
+                bekInfo.getSuite(), bekInfo.getKeyName()) : null)
+        .setTrashEnabled(trashEnabled);
 
     acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
         acl.getName(), (BitSet) acl.getAclBitSet().clone(),
@@ -261,6 +280,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private long updateID;
     private Map<String, String> metadata;
     private BucketEncryptionKeyInfo bekInfo;
+    private boolean trashEnabled;
 
     public Builder() {
       //Default values
@@ -268,6 +288,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       this.isVersionEnabled = false;
       this.storageType = StorageType.DISK;
       this.metadata = new HashMap<>();
+      this.trashEnabled = false;
     }
 
     public Builder setVolumeName(String volume) {
@@ -337,6 +358,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setTrashEnabled(boolean trashEnabledSetting) {
+      this.trashEnabled = trashEnabledSetting;
+      return this;
+    }
+
     /**
      * Constructs the OmBucketInfo.
      * @return instance of OmBucketInfo.
@@ -349,7 +375,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(storageType);
 
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
-          storageType, creationTime, objectID, updateID, metadata, bekInfo);
+          storageType, creationTime, objectID, updateID, metadata, bekInfo,
+          trashEnabled);
     }
   }
 
@@ -366,7 +393,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setCreationTime(creationTime)
         .setObjectID(objectID)
         .setUpdateID(updateID)
-        .addAllMetadata(KeyValueUtil.toProtobuf(metadata));
+        .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+        .setTrashEnabled(trashEnabled);
     if (bekInfo != null && bekInfo.getKeyName() != null) {
       bib.setBeinfo(OMPBHelper.convert(bekInfo));
     }
@@ -386,7 +414,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
             OzoneAcl::fromProtobuf).collect(Collectors.toList()))
         .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
         .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
-        .setCreationTime(bucketInfo.getCreationTime());
+        .setCreationTime(bucketInfo.getCreationTime())
+        .setTrashEnabled(bucketInfo.getTrashEnabled());
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());
     }
@@ -411,6 +440,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", isVersionEnabled='" + isVersionEnabled + '\'' +
         ", storageType='" + storageType + '\'' +
         ", creationTime='" + creationTime + '\'' +
+        ", trashEnabled='" + trashEnabled+ '\'' +
         '}';
   }
 
@@ -432,7 +462,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         objectID == that.objectID &&
         updateID == that.updateID &&
         Objects.equals(metadata, that.metadata) &&
-        Objects.equals(bekInfo, that.bekInfo);
+        Objects.equals(bekInfo, that.bekInfo) &&
+        Objects.equals(trashEnabled, that.trashEnabled);
   }
 
   @Override

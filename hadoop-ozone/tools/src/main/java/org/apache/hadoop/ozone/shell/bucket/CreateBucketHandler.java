@@ -46,6 +46,12 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
+  @Option(names = {"--enableTrash", "-t"},
+      description = "if true, indicates bucket with trash-enabled, " +
+          "false/unspecified indicates otherwise",
+      defaultValue = "false")
+  private boolean isTrashEnabled;
+
   /**
    * Executes create bucket.
    */
@@ -60,6 +66,15 @@ public class CreateBucketHandler extends BucketHandler {
     if (isGdprEnforced != null) {
       bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(isGdprEnforced));
     }
+
+    if ((isGdprEnforced != null) &&
+        (isGdprEnforced) &&
+        (isTrashEnabled)) {
+      isTrashEnabled = false;
+      System.out.println("GDPR enabled buckets cannot have trash-enabled. " +
+          "Set trash-disabled.");
+    }
+    bb.setTrashEnabled(isTrashEnabled);
 
     if (bekName != null) {
       if (!bekName.isEmpty()) {

@@ -478,6 +478,7 @@ message BucketInfo {
     optional BucketEncryptionInfoProto beinfo = 8;
     optional uint64 objectID = 9;
     optional uint64 updateID = 10;
+    required bool trashEnabled = 11 [default = false];
 }
 
 enum StorageTypeProto {

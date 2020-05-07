@@ -101,6 +101,11 @@ public class OzoneBucket extends WithMetadata {
    */
   private String encryptionKeyName;
 
+  /**
+   * Bucket is trash enabled or not.
+   */
+  private boolean trashEnabled;
+
   private OzoneObj ozoneObj;
 
 
@@ -144,6 +149,17 @@ public class OzoneBucket extends WithMetadata {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
     this.encryptionKeyName = encryptionKeyName;
+    this.trashEnabled = false;
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, Map<String, String> metadata,
+      String encryptionKeyName, boolean trashEnabled) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, metadata, encryptionKeyName);
+    this.trashEnabled = trashEnabled;
   }
 
   /**
@@ -166,6 +182,28 @@ public class OzoneBucket extends WithMetadata {
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
+    this.trashEnabled = false;
+  }
+
+  /**
+   * Constructs OzoneBucket instance.
+   * @param conf Configuration object.
+   * @param proxy ClientProtocol proxy.
+   * @param volumeName Name of the volume the bucket belongs to.
+   * @param bucketName Name of the bucket.
+   * @param storageType StorageType of the bucket.
+   * @param versioning versioning status of the bucket.
+   * @param creationTime creation time of the bucket.
+   * @param trashEnabled trash is enabled with the bucket.
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, Map<String, String> metadata,
+      boolean trashEnabled) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, metadata);
+    this.trashEnabled = trashEnabled;
   }
 
   @VisibleForTesting
@@ -187,8 +225,19 @@ public class OzoneBucket extends WithMetadata {
         .setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
+    this.trashEnabled = false;
   }
 
+  @VisibleForTesting
+  @SuppressWarnings("parameternumber")
+  OzoneBucket(String volumeName, String name,
+      ReplicationFactor defaultReplication,
+      ReplicationType defaultReplicationType, StorageType storageType,
+      Boolean versioning, long creationTime, boolean trashEnabled) {
+    this(volumeName, name, defaultReplication, defaultReplicationType,
+        storageType, versioning, creationTime);
+    this.trashEnabled = trashEnabled;
+  }
 
   /**
    * Returns Volume Name.
@@ -251,6 +300,13 @@ public class OzoneBucket extends WithMetadata {
    */
   public String getEncryptionKeyName() {
     return encryptionKeyName;
+  }
+
+  /**
+   * Return bucket is trash enabled or not.
+   */
+  public boolean getTrashEnabled() {
+    return trashEnabled;
   }
 
   /**

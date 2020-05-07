@@ -56,21 +56,28 @@ public final class BucketArgs {
   private String bucketEncryptionKey;
 
   /**
+   * Bucket is trash enabled or not.
+   */
+  private boolean trashEnabled;
+
+  /**
    * Private constructor, constructed via builder.
    * @param versioning Bucket version flag.
    * @param storageType Storage type to be used.
    * @param acls list of ACLs.
    * @param metadata map of bucket metadata
    * @param bucketEncryptionKey bucket encryption key name
+   * @param trashEnabled bucket is trash enabled or not.
    */
   private BucketArgs(Boolean versioning, StorageType storageType,
                      List<OzoneAcl> acls, Map<String, String> metadata,
-                     String bucketEncryptionKey) {
+                     String bucketEncryptionKey, boolean trashEnabled) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
     this.metadata = metadata;
     this.bucketEncryptionKey = bucketEncryptionKey;
+    this.trashEnabled = trashEnabled;
   }
 
   /**
@@ -115,6 +122,14 @@ public final class BucketArgs {
   }
 
   /**
+   * Returns the bucket is trash enabled or not.
+   * @return boolean
+   */
+  public boolean getTrashEnabled() {
+    return trashEnabled;
+  }
+
+  /**
    * Returns new builder class that builds a OmBucketInfo.
    *
    * @return Builder
@@ -132,6 +147,7 @@ public final class BucketArgs {
     private List<OzoneAcl> acls;
     private Map<String, String> metadata;
     private String bucketEncryptionKey;
+    private boolean trashEnabled;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -161,13 +177,19 @@ public final class BucketArgs {
       this.bucketEncryptionKey = bek;
       return this;
     }
+
+    public BucketArgs.Builder setTrashEnabled(boolean trashEnabledSetting) {
+      this.trashEnabled = trashEnabledSetting;
+      return this;
+    }
+
     /**
      * Constructs the BucketArgs.
      * @return instance of BucketArgs.
      */
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
-          bucketEncryptionKey);
+          bucketEncryptionKey, trashEnabled);
     }
   }
 }
