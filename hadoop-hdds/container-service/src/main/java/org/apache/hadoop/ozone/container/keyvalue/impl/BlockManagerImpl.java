@@ -246,8 +246,9 @@ public class BlockManagerImpl implements BlockManager {
       // Update DB to delete block and set block count and bytes used.
       BatchOperation batch = new BatchOperation();
       batch.delete(blockKey);
-      batch.put(DB_CONTAINER_BYTES_USED_KEY,
-          Longs.toByteArray(container.getContainerData().getBytesUsed()));
+      // Update DB to delete block and set block count.
+      // No need to set bytes used here, as bytes used is taken care during
+      // delete chunk.
       batch.put(DB_BLOCK_COUNT_KEY,
           Longs.toByteArray(container.getContainerData().getKeyCount() - 1));
       db.getStore().writeBatch(batch);
