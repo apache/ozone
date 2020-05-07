@@ -51,12 +51,14 @@ import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT;
@@ -276,6 +278,14 @@ public class OzoneManagerServiceProviderImpl
     return omLeaderUrl;
   }
 
+  private boolean isOmSpengoEnabled() {
+    if (configuration.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
+        .equals("kerberos")) {
+      return true;
+    }
+    return false;
+  }
+
   /**
    * Method to obtain current OM DB Snapshot.
    * @return DBCheckpoint instance.
@@ -288,7 +298,7 @@ public class OzoneManagerServiceProviderImpl
         ".tar.gz");
     try {
       try (InputStream inputStream = reconUtils.makeHttpCall(connectionFactory,
-          getOzoneManagerSnapshotUrl())) {
+          getOzoneManagerSnapshotUrl(), isOmSpengoEnabled())) {
         FileUtils.copyInputStreamToFile(inputStream, targetFile);
       }
 
@@ -301,7 +311,7 @@ public class OzoneManagerServiceProviderImpl
       // Currently, OM DB type is not configurable. Hence, defaulting to
       // RocksDB.
       return new RocksDBCheckpoint(untarredDbDir);
-    } catch (IOException e) {
+    } catch (IOException | AuthenticationException e) {
       LOG.error("Unable to obtain Ozone Manager DB Snapshot. ", e);
     }
     return null;

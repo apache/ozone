@@ -151,7 +151,7 @@ public class TestReconUtils {
     when(connectionFactoryMock.openConnection(any(URL.class)))
         .thenReturn(urlConnectionMock);
     try (InputStream inputStream = new ReconUtils()
-        .makeHttpCall(connectionFactoryMock, url)) {
+        .makeHttpCall(connectionFactoryMock, url, false)) {
       contents = IOUtils.toString(inputStream, Charset.defaultCharset());
     }
 

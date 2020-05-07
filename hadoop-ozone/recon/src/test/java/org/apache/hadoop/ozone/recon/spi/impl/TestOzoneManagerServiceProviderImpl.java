@@ -112,7 +112,7 @@ public class TestOzoneManagerServiceProviderImpl {
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
     InputStream inputStream = new FileInputStream(tarFile);
     ReconUtils reconUtilsMock = getMockReconUtils();
-    when(reconUtilsMock.makeHttpCall(any(), anyString()))
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), false))
         .thenReturn(inputStream);
 
     ReconTaskController reconTaskController = getMockTaskController();
@@ -163,7 +163,7 @@ public class TestOzoneManagerServiceProviderImpl {
     File tarFile = createTarFile(checkpointDir.toPath());
     InputStream fileInputStream = new FileInputStream(tarFile);
     ReconUtils reconUtilsMock = getMockReconUtils();
-    when(reconUtilsMock.makeHttpCall(any(), anyString()))
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), false))
         .thenReturn(fileInputStream);
 
     ReconOMMetadataManager reconOMMetadataManager =
