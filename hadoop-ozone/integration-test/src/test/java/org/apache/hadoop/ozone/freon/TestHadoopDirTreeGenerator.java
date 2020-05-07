@@ -45,12 +45,10 @@ import java.net.URI;
 public class TestHadoopDirTreeGenerator {
 
   private String path;
+  private OzoneConfiguration conf = null;
+  private MiniOzoneCluster cluster = null;
+  private ObjectStore store = null;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
   @Before
   public void setup() {
     path = GenericTestUtils
@@ -64,61 +62,55 @@ public class TestHadoopDirTreeGenerator {
   /**
    * Shutdown MiniDFSCluster.
    */
-  private void shutdown(MiniOzoneCluster cluster) throws IOException {
+  private void shutdown() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
       FileUtils.deleteDirectory(new File(path));
     }
   }
 
-  private MiniOzoneCluster startCluster(OzoneConfiguration conf)
-          throws Exception {
-    if (conf == null) {
-      conf = new OzoneConfiguration();
-    }
-    MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(5)
-            .build();
+  /**
+   * Create a MiniDFSCluster for testing.
+   *
+   * @throws IOException
+   */
+  private void startCluster() throws Exception {
+    conf = new OzoneConfiguration();
 
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
-    return cluster;
+
+    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
   }
 
   @Test
   public void testNestedDirTreeGeneration() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    MiniOzoneCluster cluster = null;
     try {
-      cluster = startCluster(conf);
-      ObjectStore store =
-              OzoneClientFactory.getRpcClient(conf).getObjectStore();
-      OzoneManager om = cluster.getOzoneManager();
+      startCluster();
       FileOutputStream out = FileUtils.openOutputStream(new File(path,
               "conf"));
       cluster.getConf().writeXml(out);
       out.getFD().sync();
       out.close();
 
-      verifyDirTree(conf, store, "vol1", "bucket1",
-              1, 1, 1, 0);
-      verifyDirTree(conf, store, "vol2", "bucket1",
-              1, 5, 1, 5);
-      verifyDirTree(conf, store, "vol3", "bucket1",
-              2, 5, 3, 1);
-      verifyDirTree(conf, store, "vol4", "bucket1",
-              3, 2, 4, 2);
-      verifyDirTree(conf, store, "vol5", "bucket1",
-              5, 4, 1, 0);
+      verifyDirTree("vol1", "bucket1", 1,
+              1, 1, 0);
+      verifyDirTree("vol2", "bucket1", 1,
+              5, 1, 5);
+      verifyDirTree("vol3", "bucket1", 2,
+              5, 3, 1);
+      verifyDirTree("vol4", "bucket1", 3,
+              2, 4, 2);
+      verifyDirTree("vol5", "bucket1", 5,
+              4, 1, 0);
     } finally {
-      shutdown(cluster);
+      shutdown();
     }
   }
 
-  private void verifyDirTree(OzoneConfiguration conf, ObjectStore store,
-                             String volumeName, String bucketName,
-                             int depth, int span, int fileCount,
-                             int perFileSizeInKBs)
+  private void verifyDirTree(String volumeName, String bucketName, int depth,
+                             int span, int fileCount, int perFileSizeInKBs)
           throws IOException {
 
     store.createVolume(volumeName);
