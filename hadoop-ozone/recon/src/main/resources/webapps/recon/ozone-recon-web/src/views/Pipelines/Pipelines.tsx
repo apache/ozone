@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,9 +23,12 @@ import './Pipelines.less';
 import {PaginationConfig} from "antd/lib/pagination";
 import prettyMilliseconds from "pretty-ms";
 import moment from 'moment';
-import {ReplicationIcon} from "../../utils/themeIcons";
-const {TabPane} = Tabs;
+import {ReplicationIcon} from "utils/themeIcons";
+import {AutoReloadHelper} from "utils/autoReloadHelper";
+import AutoReloadPanel from "components/AutoReloadPanel/AutoReloadPanel";
+import {showDataFetchError} from "utils/common";
 
+const {TabPane} = Tabs;
 export type PipelineStatus = "active" | "inactive";
 
 interface PipelineResponse {
@@ -53,6 +56,7 @@ interface PipelinesState {
   inactiveLoading: boolean;
   inactiveDataSource: PipelineResponse[];
   inactiveTotalCount: number;
+  lastUpdated: number;
 }
 
 const COLUMNS = [
@@ -128,6 +132,8 @@ const COLUMNS = [
 
 export class Pipelines extends React.Component<any, PipelinesState> {
 
+  autoReload: AutoReloadHelper;
+
   constructor(props: any) {
     super(props);
     this.state = {
@@ -136,12 +142,13 @@ export class Pipelines extends React.Component<any, PipelinesState> {
       activeTotalCount: 0,
       inactiveLoading: false,
       inactiveDataSource: [],
-      inactiveTotalCount: 0
-    }
+      inactiveTotalCount: 0,
+      lastUpdated: 0
+    };
+    this.autoReload = new AutoReloadHelper(this._loadData);
   }
 
-  componentDidMount(): void {
-    // Fetch pipelines on component mount
+  _loadData = () => {
     this.setState({
       activeLoading: true
     });
@@ -152,9 +159,25 @@ export class Pipelines extends React.Component<any, PipelinesState> {
       this.setState({
         activeLoading: false,
         activeDataSource: pipelines,
-        activeTotalCount: totalCount
+        activeTotalCount: totalCount,
+        lastUpdated: +moment()
       });
+    }).catch(error => {
+      this.setState({
+        activeLoading: false
+      });
+      showDataFetchError(error.toString());
     });
+  };
+
+  componentDidMount(): void {
+    // Fetch pipelines on component mount
+    this._loadData();
+    this.autoReload.startPolling()
+  }
+
+  componentWillUnmount(): void {
+    this.autoReload.stopPolling();
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
@@ -170,7 +193,7 @@ export class Pipelines extends React.Component<any, PipelinesState> {
   };
 
   render () {
-    const {activeDataSource, activeLoading, activeTotalCount} = this.state;
+    const {activeDataSource, activeLoading, activeTotalCount, lastUpdated} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} pipelines`,
       showSizeChanger: true,
@@ -180,6 +203,7 @@ export class Pipelines extends React.Component<any, PipelinesState> {
         <div className="pipelines-container">
           <div className="page-header">
             Pipelines ({activeTotalCount})
+            <AutoReloadPanel isLoading={activeLoading} lastUpdated={lastUpdated} onReload={this._loadData} togglePolling={this.autoReload.handleAutoReloadToggle}/>
           </div>
           <div className="content-div">
             <Tabs defaultActiveKey="1" onChange={this.onTabChange}>
