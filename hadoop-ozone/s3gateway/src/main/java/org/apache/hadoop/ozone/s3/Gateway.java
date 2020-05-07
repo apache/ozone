@@ -53,11 +53,7 @@ public class Gateway extends GenericCli {
     TracingUtil.initTracing("S3gateway", ozoneConfiguration);
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
     ozoneConfiguration.set("hadoop.http.authentication.type", "simple");
-    if (SecurityUtil.getAuthenticationMethod(ozoneConfiguration).equals(
-        UserGroupInformation.AuthenticationMethod.KERBEROS)) {
-      UserGroupInformation.setConfiguration(ozoneConfiguration);
-    }
-
+    UserGroupInformation.setConfiguration(ozoneConfiguration);
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
     start();
     return null;
