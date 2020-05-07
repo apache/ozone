@@ -71,8 +71,11 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };
-    doubleBuffer = new OzoneManagerDoubleBuffer(omMetadataManager,
-        ozoneManagerRatisSnapshot);
+    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(omMetadataManager)
+        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .enableRatis(true)
+        .build();
   }
 
   @After

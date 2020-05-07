@@ -25,9 +25,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +54,7 @@ import org.apache.ratis.util.ExitUtils;
  * methods.
  *
  */
-public class OzoneManagerDoubleBuffer {
+public final class OzoneManagerDoubleBuffer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerDoubleBuffer.class);
@@ -85,20 +89,52 @@ public class OzoneManagerDoubleBuffer {
   private final OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot;
 
   private final boolean isRatisEnabled;
+  private final boolean isTracingEnabled;
 
-  public OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
-      OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot) {
-    this(omMetadataManager, ozoneManagerRatisSnapShot, true);
+  /**
+   *  Builder for creating OzoneManagerDoubleBuffer.
+   */
+  public static class Builder {
+    private OMMetadataManager mm;
+    private OzoneManagerRatisSnapshot rs;
+    private boolean isRatisEnabled = false;
+    private boolean isTracingEnabled = false;
+
+    public Builder setOmMetadataManager(OMMetadataManager omm) {
+      this.mm = omm;
+      return this;
+    }
+
+    public Builder setOzoneManagerRatisSnapShot(
+        OzoneManagerRatisSnapshot omrs) {
+      this.rs = omrs;
+      return this;
+    }
+
+    public Builder enableRatis(boolean enableRatis) {
+      this.isRatisEnabled = enableRatis;
+      return this;
+    }
+
+    public Builder enableTracing(boolean enableTracing) {
+      this.isTracingEnabled = enableTracing;
+      return this;
+    }
+
+    public OzoneManagerDoubleBuffer build() {
+      return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
+          isTracingEnabled);
+    }
   }
 
-  public OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
+  private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
-      boolean isRatisEnabled) {
+      boolean isRatisEnabled, boolean isTracingEnabled) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
 
     this.isRatisEnabled = isRatisEnabled;
-
+    this.isTracingEnabled = isTracingEnabled;
     if (!isRatisEnabled) {
       this.currentFutureQueue = new ConcurrentLinkedQueue<>();
       this.readyFutureQueue = new ConcurrentLinkedQueue<>();
@@ -120,8 +156,33 @@ public class OzoneManagerDoubleBuffer {
 
   }
 
+  // TODO: pass the trace id further down and trace all methods of DBStore.
 
+  /**
+   * add to write batch with trace span if tracing is enabled.
+   */
+  private Void addToBatchWithTrace(OMResponse omResponse,
+      SupplierWithIOException<Void> supplier) throws IOException {
+    if (!isTracingEnabled) {
+      return supplier.get();
+    }
+    String spanName = "DB-addToWriteBatch" + "-" +
+        omResponse.getCmdType().toString();
+    return TracingUtil.executeAsChildSpan(spanName, omResponse.getTraceID(),
+        supplier);
+  }
 
+  /**
+   * flush write batch with trace span if tracing is enabled.
+   */
+  private Void flushBatchWithTrace(String parentName, int batchSize,
+      SupplierWithIOException<Void> supplier) throws IOException {
+    if (!isTracingEnabled) {
+      return supplier.get();
+    }
+    String spanName = "DB-commitWriteBatch-Size-" + batchSize;
+    return TracingUtil.executeAsChildSpan(spanName, parentName, supplier);
+  }
 
   /**
    * Runs in a background thread and batches the transaction in currentBuffer
@@ -135,10 +196,17 @@ public class OzoneManagerDoubleBuffer {
           try(BatchOperation batchOperation = omMetadataManager.getStore()
               .initBatchOperation()) {
 
+            AtomicReference<String> lastTraceId = new AtomicReference<>();
             readyBuffer.iterator().forEachRemaining((entry) -> {
               try {
-                entry.getResponse().checkAndUpdateDB(omMetadataManager,
-                    batchOperation);
+                OMResponse omResponse = entry.getResponse().getOMResponse();
+                lastTraceId.set(omResponse.getTraceID());
+                addToBatchWithTrace(omResponse,
+                    (SupplierWithIOException<Void>) () -> {
+                      entry.getResponse().checkAndUpdateDB(omMetadataManager,
+                          batchOperation);
+                      return null;
+                    });
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
@@ -147,7 +215,12 @@ public class OzoneManagerDoubleBuffer {
             });
 
             long startTime = Time.monotonicNowNanos();
-            omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            flushBatchWithTrace(lastTraceId.get(), readyBuffer.size(),
+                (SupplierWithIOException<Void>) () -> {
+                  omMetadataManager.getStore().commitBatchOperation(
+                      batchOperation);
+                  return null;
+                });
             ozoneManagerDoubleBufferMetrics.updateFlushTime(
                 Time.monotonicNowNanos() - startTime);
           }
@@ -172,10 +245,6 @@ public class OzoneManagerDoubleBuffer {
                     "iteration{}", flushIterations.get(),
                 flushedTransactionsSize);
           }
-
-          long lastRatisTransactionIndex =
-              readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
-                  .max(Long::compareTo).get();
 
           List<Long> flushedEpochs =
               readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
@@ -369,4 +438,3 @@ public class OzoneManagerDoubleBuffer {
   }
 
 }
-

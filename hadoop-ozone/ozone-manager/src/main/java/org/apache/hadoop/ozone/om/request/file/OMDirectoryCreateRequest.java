@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -130,11 +131,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setCreateDirectoryResponse(CreateDirectoryResponse.newBuilder());
-
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
+    omResponse.setCreateDirectoryResponse(CreateDirectoryResponse.newBuilder());
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumCreateDirectory();
 
