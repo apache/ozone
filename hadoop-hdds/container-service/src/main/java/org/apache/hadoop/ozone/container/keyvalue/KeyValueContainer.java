@@ -492,7 +492,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       containerData.setState(originalContainerData.getState());
       containerData
           .setContainerDBType(originalContainerData.getContainerDBType());
-      containerData.setBytesUsed(originalContainerData.getBytesUsed());
 
       //rewriting the yaml file with new checksum calculation.
       update(originalContainerData.getMetadata(), true);
