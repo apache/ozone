@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
@@ -238,6 +239,12 @@ public class TestOzoneContainer {
       db.getStore().put(Longs.toByteArray(blockID.getLocalID()),
           blockData.getProtoBufMessage().toByteArray());
     }
+
+    // Set Block count and used bytes.
+    db.getStore().put(OzoneConsts.DB_BLOCK_COUNT_KEY,
+        Longs.toByteArray(blocks));
+    db.getStore().put(OzoneConsts.DB_CONTAINER_BYTES_USED_KEY,
+        Longs.toByteArray(usedBytes));
 
     // remaining available capacity of the container
     return (freeBytes - usedBytes);
