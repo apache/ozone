@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
@@ -116,9 +117,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LOG.debug("Received OMRequest: {}, ", request);
     }
     Type cmdType = request.getCmdType();
-    OMResponse.Builder responseBuilder = OMResponse.newBuilder()
-        .setCmdType(cmdType)
-        .setStatus(Status.OK);
+    OMResponse.Builder responseBuilder = OmResponseUtil.getOMResponseBuilder(
+        request);
     try {
       switch (cmdType) {
       case CheckVolumeAccess:
