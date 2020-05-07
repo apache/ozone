@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,15 +16,5 @@
  * limitations under the License.
  */
 
-.overview-content {
-  margin: 0 5px 20px;
-  .icon-small {
-    font-size: 16px;
-  }
-  .meta {
-    font-size: 12px;
-  }
-  .padded-text {
-    padding-left: 5px;
-  }
-}
+// default global auto reload interval: 60 seconds
+export const AUTO_RELOAD_INTERVAL_DEFAULT = 60 * 1000;
