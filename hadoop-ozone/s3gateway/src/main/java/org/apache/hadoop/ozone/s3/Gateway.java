@@ -51,7 +51,6 @@ public class Gateway extends GenericCli {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     TracingUtil.initTracing("S3gateway", ozoneConfiguration);
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
-    ozoneConfiguration.set("hadoop.http.authentication.type", "simple");
     UserGroupInformation.setConfiguration(ozoneConfiguration);
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
     start();
