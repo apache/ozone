@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,10 +16,14 @@
  * limitations under the License.
  */
 
-.datanodes-container {
-  .content-div {
-    .pipeline-container {
-      margin-bottom: 5px;
-    }
-  }
-}
+import React from 'react';
+
+export const NotFound: React.FC = () => {
+  return (
+    <div>
+      <div className='page-header'>
+        404 Page Not Found :(
+      </div>
+    </div>
+  );
+};

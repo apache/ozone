@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,30 +19,25 @@
 import React from 'react';
 
 import {Layout} from 'antd';
-import './App.less';
-import NavBar from './components/NavBar/NavBar';
-import Breadcrumbs from './components/Breadcrumbs/Breadcrumbs';
+import './app.less';
+import NavBar from './components/navBar/navBar';
+import Breadcrumbs from './components/breadcrumbs/breadcrumbs';
 import {HashRouter as Router, Switch, Route, Redirect} from 'react-router-dom';
 import {routes} from './routes';
 import {MakeRouteWithSubRoutes} from './makeRouteWithSubRoutes';
+import classNames from 'classnames';
 
-const classNames = require('classnames');
 const {
   Header, Content, Footer
 } = Layout;
 
-interface Props {
-}
-
-interface State {
+interface IAppState {
   collapsed: boolean;
 }
 
-class App extends React.Component<Props, State> {
-
-  constructor(props: Props) {
+class App extends React.Component<Record<string, object>, IAppState> {
+  constructor(props = {}) {
     super(props);
-
     this.state = {collapsed: false};
   }
 
@@ -55,32 +50,31 @@ class App extends React.Component<Props, State> {
     const layoutClass = classNames('content-layout', {'sidebar-collapsed': collapsed});
 
     return (
-        <Router>
-          <Layout style={{minHeight: '100vh'}}>
-            <NavBar collapsed={collapsed} onCollapse={this.onCollapse}/>
-            <Layout className={layoutClass}>
-              <Header>
-                <div style={{margin: '16px 0'}}>
-                  <Breadcrumbs/>
-                </div>
-              </Header>
-              <Content style={{margin: '0 16px 0', overflow: 'initial'}}>
-                <Switch>
-                  <Route exact path="/">
-                    <Redirect to="/Overview"/>
-                  </Route>
-                  {
-                    routes.map(
-                        (route, index) => <MakeRouteWithSubRoutes key={index} {...route} />
-                    )
-                  }
-                </Switch>
-              </Content>
-              <Footer style={{textAlign: 'center'}}>
-              </Footer>
-            </Layout>
+      <Router>
+        <Layout style={{minHeight: '100vh'}}>
+          <NavBar collapsed={collapsed} onCollapse={this.onCollapse}/>
+          <Layout className={layoutClass}>
+            <Header>
+              <div style={{margin: '16px 0'}}>
+                <Breadcrumbs/>
+              </div>
+            </Header>
+            <Content style={{margin: '0 16px 0', overflow: 'initial'}}>
+              <Switch>
+                <Route exact path='/'>
+                  <Redirect to='/Overview'/>
+                </Route>
+                {
+                  routes.map(
+                    (route, index) => <MakeRouteWithSubRoutes key={index} {...route}/>
+                  )
+                }
+              </Switch>
+            </Content>
+            <Footer style={{textAlign: 'center'}}/>
           </Layout>
-        </Router>
+        </Layout>
+      </Router>
     );
   }
 }
