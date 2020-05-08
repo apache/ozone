@@ -225,7 +225,6 @@ public class ReconUtils {
   public InputStream makeHttpCall(URLConnectionFactory connectionFactory,
                                   String url, boolean isSpnego)
       throws IOException, AuthenticationException {
-
     URLConnection urlConnection =
           connectionFactory.openConnection(new URL(url), isSpnego);
     urlConnection.connect();
