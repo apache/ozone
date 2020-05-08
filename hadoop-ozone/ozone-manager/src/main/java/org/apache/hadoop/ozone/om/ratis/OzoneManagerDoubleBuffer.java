@@ -278,7 +278,7 @@ public class OzoneManagerDoubleBuffer {
         // Wait for daemon thread to exit
         daemon.join();
       } catch (InterruptedException e) {
-        LOG.error("Interrupted while waiting for daemon to exit.", e);
+        LOG.debug("Interrupted while waiting for daemon to exit.", e);
       }
 
       // stop metrics.
