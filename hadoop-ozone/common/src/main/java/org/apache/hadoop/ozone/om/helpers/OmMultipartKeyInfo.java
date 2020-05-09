@@ -35,8 +35,6 @@ public class OmMultipartKeyInfo extends WithObjectID {
   private final ReplicationType replicationType;
   private final ReplicationFactor replicationFactor;
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
-  private long objectID;
-  private long updateID;
   private String fileHandleInfo;
 
   /**
@@ -59,38 +57,12 @@ public class OmMultipartKeyInfo extends WithObjectID {
   }
 
   /**
-   * Sets the update ID. For each modification of this object, we will set
-   * this to a value greater than the current value.
-   * @param updateID  long
-   */
-  public void setUpdateID(long updateID) {
-    this.updateID = updateID;
-  }
-
-  /**
-   * Returns objectID.
-   * @return long
-   */
-  public long getObjectID() {
-    return objectID;
-  }
-
-  /**
    * Returns fileHandleInfo.
    * @return String
    */
   public String getFileHandleInfo() {
     return fileHandleInfo;
   }
-
-  /**
-   * Returns updateID.
-   * @return long
-   */
-  public long getUpdateID() {
-    return updateID;
-  }
-
 
   /**
    * Returns the uploadID for this multi part upload of a key.

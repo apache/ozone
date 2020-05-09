@@ -142,18 +142,6 @@ public final class OmKeyInfo extends WithObjectID {
   }
 
   /**
-   * Sets the update ID. For each modification of this object, we will set
-   * this to a value greater than the current value.
-   * @param updateId  long
-   */
-  public void setUpdateID(long updateId) {
-    Preconditions.checkArgument(updateId > this.updateID,
-        "Trying to set updateID to a value ({}) which is less than the " +
-            "current value ({}) for ()", updateId, this.updateID, this);
-    this.updateID = updateId;
-  }
-
-  /**
    * Returns fileHandleInfo.
    * @return String
    */
@@ -167,22 +155,6 @@ public final class OmKeyInfo extends WithObjectID {
    */
   public void setFileHandleInfo(String fileHandleInfo) {
     this.fileHandleInfo = fileHandleInfo;
-  }
-
-  /**
-   * Returns objectID.
-   * @return long
-   */
-  public long getObjectID() {
-    return objectID;
-  }
-
-  /**
-   * Returns updateID.
-   * @return long
-   */
-  public long getUpdateID() {
-    return updateID;
   }
 
   /**
@@ -416,7 +388,6 @@ public final class OmKeyInfo extends WithObjectID {
     }
 
     public Builder setFileHandleInfo(String fh) {
-      System.out.println("Prashant debug " + fh);
       if (fh != null) {
         this.fileHandleInfo = fh;
       }
