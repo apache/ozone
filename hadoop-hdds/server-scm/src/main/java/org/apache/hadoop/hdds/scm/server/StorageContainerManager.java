@@ -269,6 +269,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       loginAsSCMUser(conf);
     }
 
+    // Initialize SCM Ratis Server
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
       this.scmRatisSnapshotInfo = new SCMRatisSnapshotInfo(
           scmStorageConfig.getCurrentDir());
@@ -1141,9 +1142,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (scmRatisServer == null) {
       SCMNodeDetails scmNodeDetails = SCMNodeDetails
           .initStandAlone(configuration);
-      //TODO enable Ratis ring
-      scmRatisServer = SCMRatisServer.newSCMRatisServer(configuration, this,
-          scmNodeDetails, Collections.EMPTY_LIST);
+      //TODO enable Ratis group
+      scmRatisServer = SCMRatisServer.newSCMRatisServer(configuration
+              .getObject(SCMRatisServer.SCMRatisServerConfiguration.class),
+          this, scmNodeDetails, Collections.EMPTY_LIST,
+          SCMRatisServer.getSCMRatisDirectory(configuration));
       if (scmRatisServer != null) {
         LOG.info("SCM Ratis server initialized at port {}",
             scmRatisServer.getServerPort());

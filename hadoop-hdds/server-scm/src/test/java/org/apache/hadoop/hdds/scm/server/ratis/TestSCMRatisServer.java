@@ -117,8 +117,10 @@ public class TestSCMRatisServer {
     // Starts a single node Ratis server
     scmRatisServer.stop();
     SCMRatisServer newScmRatisServer = SCMRatisServer
-        .newSCMRatisServer(newConf, scm, nodeDetails,
-            Collections.emptyList());
+        .newSCMRatisServer(newConf.getObject(SCMRatisServer
+                .SCMRatisServerConfiguration.class), scm, nodeDetails,
+            Collections.emptyList(),
+            SCMRatisServer.getSCMRatisDirectory(newConf));
     newScmRatisServer.start();
 
     UUID uuid = UUID.nameUUIDFromBytes(customScmServiceId.getBytes());
