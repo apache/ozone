@@ -106,6 +106,11 @@ public class OzoneBucket extends WithMetadata {
    */
   private boolean trashEnabled;
 
+  /**
+   * recover-window of bucket for deleted key (trash).
+   */
+  private long recoverWindow;
+
   private OzoneObj ozoneObj;
 
 
@@ -150,16 +155,18 @@ public class OzoneBucket extends WithMetadata {
     this.metadata = metadata;
     this.encryptionKeyName = encryptionKeyName;
     this.trashEnabled = false;
+    this.recoverWindow = 0;
   }
 
   @SuppressWarnings("parameternumber")
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, Map<String, String> metadata,
-      String encryptionKeyName, boolean trashEnabled) {
+      String encryptionKeyName, boolean trashEnabled, long recoverWindow) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
         creationTime, metadata, encryptionKeyName);
     this.trashEnabled = trashEnabled;
+    this.recoverWindow = recoverWindow;
   }
 
   /**
@@ -183,6 +190,7 @@ public class OzoneBucket extends WithMetadata {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
     this.trashEnabled = false;
+    this.recoverWindow = 0;
   }
 
   /**
@@ -194,16 +202,18 @@ public class OzoneBucket extends WithMetadata {
    * @param storageType StorageType of the bucket.
    * @param versioning versioning status of the bucket.
    * @param creationTime creation time of the bucket.
-   * @param trashEnabled trash is enabled with the bucket.
+   * @param trashEnabled trash is enabled or not with the bucket.
+   * @param recoverWindow recover-window of the bucket.
    */
   @SuppressWarnings("parameternumber")
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, Map<String, String> metadata,
-      boolean trashEnabled) {
+      boolean trashEnabled, long recoverWindow) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
         creationTime, metadata);
     this.trashEnabled = trashEnabled;
+    this.recoverWindow = recoverWindow;
   }
 
   @VisibleForTesting
@@ -226,6 +236,7 @@ public class OzoneBucket extends WithMetadata {
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
     this.trashEnabled = false;
+    this.recoverWindow = 0;
   }
 
   @VisibleForTesting
@@ -233,10 +244,12 @@ public class OzoneBucket extends WithMetadata {
   OzoneBucket(String volumeName, String name,
       ReplicationFactor defaultReplication,
       ReplicationType defaultReplicationType, StorageType storageType,
-      Boolean versioning, long creationTime, boolean trashEnabled) {
+      Boolean versioning, long creationTime, boolean trashEnabled,
+      long recoverWindow) {
     this(volumeName, name, defaultReplication, defaultReplicationType,
         storageType, versioning, creationTime);
     this.trashEnabled = trashEnabled;
+    this.recoverWindow = recoverWindow;
   }
 
   /**
@@ -307,6 +320,13 @@ public class OzoneBucket extends WithMetadata {
    */
   public boolean getTrashEnabled() {
     return trashEnabled;
+  }
+
+  /**
+   * Return length of recover-window in seconds.
+   */
+  public long getRecoverWindow() {
+    return recoverWindow;
   }
 
   /**

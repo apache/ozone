@@ -479,6 +479,7 @@ message BucketInfo {
     optional uint64 objectID = 9;
     optional uint64 updateID = 10;
     required bool trashEnabled = 11 [default = false];
+    optional uint64 recoverWindow = 12;
 }
 
 enum StorageTypeProto {

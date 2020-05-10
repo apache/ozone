@@ -113,6 +113,11 @@ public final class OzoneConsts {
   public static final long GB = MB * 1024L;
   public static final long TB = GB * 1024L;
 
+  // Used by Ozone Recover-Window.
+  public static final long MIN = 60L;
+  public static final long HR = MIN * 60L;
+  public static final long DAY = HR * 24L;
+
   /**
    * level DB names used by SCM and data nodes.
    */
@@ -280,6 +285,7 @@ public final class OzoneConsts {
   public static final String RESOURCE_TYPE = "resourceType";
   public static final String IS_VERSION_ENABLED = "isVersionEnabled";
   public static final String IS_TRASH_ENABLED = "isTrashEnabled";
+  public static final String RECOVER_WINDOW = "recoverWindow";
   public static final String CREATION_TIME = "creationTime";
   public static final String DATA_SIZE = "dataSize";
   public static final String REPLICATION_TYPE = "replicationType";

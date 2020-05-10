@@ -61,6 +61,11 @@ public final class BucketArgs {
   private boolean trashEnabled;
 
   /**
+   * recover-window of the bucket for deleted key (trash).
+   */
+  private String recoverWindow;
+
+  /**
    * Private constructor, constructed via builder.
    * @param versioning Bucket version flag.
    * @param storageType Storage type to be used.
@@ -68,16 +73,19 @@ public final class BucketArgs {
    * @param metadata map of bucket metadata
    * @param bucketEncryptionKey bucket encryption key name
    * @param trashEnabled bucket is trash enabled or not.
+   * @param recoverWindow recover-window of the bucket for deleted key (trash).
    */
   private BucketArgs(Boolean versioning, StorageType storageType,
                      List<OzoneAcl> acls, Map<String, String> metadata,
-                     String bucketEncryptionKey, boolean trashEnabled) {
+                     String bucketEncryptionKey, boolean trashEnabled,
+                     String recoverWindow) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
     this.metadata = metadata;
     this.bucketEncryptionKey = bucketEncryptionKey;
     this.trashEnabled = trashEnabled;
+    this.recoverWindow = recoverWindow;
   }
 
   /**
@@ -130,6 +138,14 @@ public final class BucketArgs {
   }
 
   /**
+   * Return the recover-window of the bucket.
+   * @return String
+   */
+  public String getRecoverWindow() {
+    return recoverWindow;
+  }
+
+  /**
    * Returns new builder class that builds a OmBucketInfo.
    *
    * @return Builder
@@ -148,6 +164,7 @@ public final class BucketArgs {
     private Map<String, String> metadata;
     private String bucketEncryptionKey;
     private boolean trashEnabled;
+    private String recoverWindow;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -183,13 +200,18 @@ public final class BucketArgs {
       return this;
     }
 
+    public BucketArgs.Builder setRecoverWindow(String recoverWindowSetting) {
+      this.recoverWindow = recoverWindowSetting;
+      return this;
+    }
+
     /**
      * Constructs the BucketArgs.
      * @return instance of BucketArgs.
      */
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
-          bucketEncryptionKey, trashEnabled);
+          bucketEncryptionKey, trashEnabled, recoverWindow);
     }
   }
 }

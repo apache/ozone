@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.OzoneRecoverWindow;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -78,6 +79,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   private boolean trashEnabled;
 
   /**
+   * recover-window of the bucket for deleted key (trash).
+   */
+  private long recoverWindow;
+
+  /**
    * Private constructor, constructed via builder.
    * @param volumeName - Volume name.
    * @param bucketName - Bucket name.
@@ -100,7 +106,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
                        long updateID,
                        Map<String, String> metadata,
                        BucketEncryptionKeyInfo bekInfo,
-                       boolean trashEnabled) {
+                       boolean trashEnabled,
+                       long recoverWindow) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.acls = acls;
@@ -112,6 +119,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.metadata = metadata;
     this.bekInfo = bekInfo;
     this.trashEnabled = trashEnabled;
+    this.recoverWindow = recoverWindow;
   }
 
   /**
@@ -209,6 +217,13 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   }
 
   /**
+   * Returns length of recover-window in seconds.
+   */
+  public long getRecoverWindow() {
+    return recoverWindow;
+  }
+
+  /**
    * Returns new builder class that builds a OmBucketInfo.
    *
    * @return Builder
@@ -235,6 +250,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         (bekInfo != null) ? bekInfo.getKeyName() : null);
     auditMap.put(OzoneConsts.IS_TRASH_ENABLED,
         String.valueOf(this.trashEnabled));
+    auditMap.put(OzoneConsts.RECOVER_WINDOW,
+        String.valueOf(this.recoverWindow));
     return auditMap;
   }
 
@@ -253,7 +270,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setBucketEncryptionKey(bekInfo != null ?
             new BucketEncryptionKeyInfo(bekInfo.getVersion(),
                 bekInfo.getSuite(), bekInfo.getKeyName()) : null)
-        .setTrashEnabled(trashEnabled);
+        .setTrashEnabled(trashEnabled)
+        .setRecoverWindow(recoverWindow);
 
     acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
         acl.getName(), (BitSet) acl.getAclBitSet().clone(),
@@ -281,6 +299,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private Map<String, String> metadata;
     private BucketEncryptionKeyInfo bekInfo;
     private boolean trashEnabled;
+    private long recoverWindow;
 
     public Builder() {
       //Default values
@@ -363,6 +382,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setRecoverWindow(long windowLength) {
+      this.recoverWindow = windowLength;
+      return this;
+    }
+
     /**
      * Constructs the OmBucketInfo.
      * @return instance of OmBucketInfo.
@@ -376,7 +400,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
           storageType, creationTime, objectID, updateID, metadata, bekInfo,
-          trashEnabled);
+          trashEnabled, recoverWindow);
     }
   }
 
@@ -394,7 +418,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
-        .setTrashEnabled(trashEnabled);
+        .setTrashEnabled(trashEnabled)
+        .setRecoverWindow(recoverWindow);
     if (bekInfo != null && bekInfo.getKeyName() != null) {
       bib.setBeinfo(OMPBHelper.convert(bekInfo));
     }
@@ -415,7 +440,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
         .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
         .setCreationTime(bucketInfo.getCreationTime())
-        .setTrashEnabled(bucketInfo.getTrashEnabled());
+        .setTrashEnabled(bucketInfo.getTrashEnabled())
+        .setRecoverWindow(bucketInfo.getRecoverWindow());
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());
     }
@@ -434,6 +460,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
   @Override
   public String getObjectInfo() {
+    String windowFormatted = OzoneRecoverWindow
+        .formatWindow(OzoneRecoverWindow.getOzoneRecoverWindow(recoverWindow));
+
     return "OMBucketInfo{" +
         "volume='" + volumeName + '\'' +
         ", bucket='" + bucketName + '\'' +
@@ -441,6 +470,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", storageType='" + storageType + '\'' +
         ", creationTime='" + creationTime + '\'' +
         ", trashEnabled='" + trashEnabled+ '\'' +
+        ", recoverWindow='" + windowFormatted + '\'' +
         '}';
   }
 
@@ -463,7 +493,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         updateID == that.updateID &&
         Objects.equals(metadata, that.metadata) &&
         Objects.equals(bekInfo, that.bekInfo) &&
-        Objects.equals(trashEnabled, that.trashEnabled);
+        Objects.equals(trashEnabled, that.trashEnabled) &&
+        recoverWindow == that.recoverWindow;
   }
 
   @Override

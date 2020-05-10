@@ -52,6 +52,17 @@ public class CreateBucketHandler extends BucketHandler {
       defaultValue = "false")
   private boolean isTrashEnabled;
 
+  @Option(names = {"--recoverWindow", "-r"},
+      description =
+          "if trash-enabled," +
+              " set indicates recover window of key in this bucket" +
+              " (eg. 5MIN, 1HR, 1DAY), " +
+          "unspecified indicates" +
+              " default recover window (5MIN).\n" +
+          "if trash-disabled, indicates ignoring.",
+      defaultValue = "5MIN")
+  private String recoverWindow;
+
   /**
    * Executes create bucket.
    */
@@ -67,14 +78,20 @@ public class CreateBucketHandler extends BucketHandler {
       bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(isGdprEnforced));
     }
 
-    if ((isGdprEnforced != null) &&
-        (isGdprEnforced) &&
-        (isTrashEnabled)) {
+    if (isGdprEnforced != null &&
+        isGdprEnforced &&
+        isTrashEnabled) {
       isTrashEnabled = false;
-      System.out.println("GDPR enabled buckets cannot have trash-enabled. " +
+      System.out.println("GDPR enabled buckets cannot have trash-enabled.\n" +
           "Set trash-disabled.");
     }
     bb.setTrashEnabled(isTrashEnabled);
+
+    if (isTrashEnabled) {
+      bb.setRecoverWindow(recoverWindow);
+    } else {
+      bb.setRecoverWindow("0MIN");
+    }
 
     if (bekName != null) {
       if (!bekName.isEmpty()) {
