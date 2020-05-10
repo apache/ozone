@@ -839,8 +839,6 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
-  @Ignore
-  // TODO: Enable this after we implement NodeReportEvent handler.
   public void testScmStatsFromNodeReport()
       throws IOException, InterruptedException, AuthenticationException {
     OzoneConfiguration conf = getConf();
@@ -852,6 +850,8 @@ public class TestSCMNodeManager {
     final long remaining = capacity - used;
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      NodeReportHandler nodeReportHandler = new NodeReportHandler(nodeManager);
+      EventPublisher publisher = Mockito.mock(EventPublisher.class);
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails datanodeDetails = TestUtils
             .createRandomDatanodeAndRegister(nodeManager);
@@ -860,6 +860,10 @@ public class TestSCMNodeManager {
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
+        NodeReportProto nodeReportProto = TestUtils.createNodeReport(report);
+        nodeReportHandler.onMessage(
+                new NodeReportFromDatanode(datanodeDetails, nodeReportProto),
+                publisher);
         nodeManager.processHeartbeat(datanodeDetails);
       }
       //TODO: wait for heartbeat to be processed
