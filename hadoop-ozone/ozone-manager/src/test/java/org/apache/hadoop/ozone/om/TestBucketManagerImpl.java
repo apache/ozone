@@ -86,7 +86,7 @@ public class TestBucketManagerImpl {
     OmMetadataManagerImpl metaMgr =
         new OmMetadataManagerImpl(conf);
     try {
-      BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+      BucketManager bucketManager = new BucketManagerImpl(metaMgr, conf);
       OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
           .setVolumeName("sampleVol")
           .setBucketName("bucketOne")
@@ -104,6 +104,7 @@ public class TestBucketManagerImpl {
   @Test
   public void testCreateBucket() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     KeyProviderCryptoExtension kmsProvider = Mockito.mock(
         KeyProviderCryptoExtension.class);
@@ -116,7 +117,7 @@ public class TestBucketManagerImpl {
     Mockito.when(mockMetadata.getCipher()).thenReturn(testCipherName);
 
     BucketManager bucketManager = new BucketManagerImpl(metaMgr,
-        kmsProvider);
+        kmsProvider, conf);
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol")
         .setBucketName("bucketOne")
@@ -138,8 +139,9 @@ public class TestBucketManagerImpl {
   @Test
   public void testCreateEncryptedBucket() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
-    BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+    BucketManager bucketManager = new BucketManagerImpl(metaMgr, conf);
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol")
         .setBucketName("bucketOne")
@@ -154,9 +156,10 @@ public class TestBucketManagerImpl {
   public void testCreateAlreadyExistingBucket() throws Exception {
     thrown.expectMessage("Bucket already exist");
     OmMetadataManagerImpl metaMgr = createSampleVol();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     try {
-      BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+      BucketManager bucketManager = new BucketManagerImpl(metaMgr, conf);
       OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
           .setVolumeName("sampleVol")
           .setBucketName("bucketOne")
@@ -176,10 +179,10 @@ public class TestBucketManagerImpl {
   public void testGetBucketInfoForInvalidBucket() throws Exception {
     thrown.expectMessage("Bucket not found");
     OmMetadataManagerImpl metaMgr = createSampleVol();
+    OzoneConfiguration conf = new OzoneConfiguration();
+
     try {
-
-
-      BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+      BucketManager bucketManager = new BucketManagerImpl(metaMgr, conf);
       bucketManager.getBucketInfo("sampleVol", "bucketOne");
     } catch (OMException omEx) {
       Assert.assertEquals(ResultCodes.BUCKET_NOT_FOUND,
@@ -193,8 +196,9 @@ public class TestBucketManagerImpl {
   @Test
   public void testGetBucketInfo() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
-    BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+    BucketManager bucketManager = new BucketManagerImpl(metaMgr, conf);
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol")
         .setBucketName("bucketOne")
@@ -220,8 +224,9 @@ public class TestBucketManagerImpl {
   @Test
   public void testSetBucketPropertyChangeStorageType() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
-    BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+    BucketManager bucketManager = new BucketManagerImpl(metaMgr, conf);
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol")
         .setBucketName("bucketOne")
@@ -248,8 +253,9 @@ public class TestBucketManagerImpl {
   @Test
   public void testSetBucketPropertyChangeVersioning() throws Exception {
     OmMetadataManagerImpl metaMgr = createSampleVol();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
-    BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+    BucketManager bucketManager = new BucketManagerImpl(metaMgr, conf);
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol")
         .setBucketName("bucketOne")
@@ -275,7 +281,9 @@ public class TestBucketManagerImpl {
   public void testDeleteBucket() throws Exception {
     thrown.expectMessage("Bucket not found");
     OmMetadataManagerImpl metaMgr = createSampleVol();
-    BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    BucketManager bucketManager = new BucketManagerImpl(metaMgr, conf);
     for (int i = 0; i < 5; i++) {
       OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
           .setVolumeName("sampleVol")
@@ -309,7 +317,9 @@ public class TestBucketManagerImpl {
   public void testDeleteNonEmptyBucket() throws Exception {
     thrown.expectMessage("Bucket is not empty");
     OmMetadataManagerImpl metaMgr = createSampleVol();
-    BucketManager bucketManager = new BucketManagerImpl(metaMgr);
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    BucketManager bucketManager = new BucketManagerImpl(metaMgr, conf);
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName("sampleVol")
         .setBucketName("bucketOne")

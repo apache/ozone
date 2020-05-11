@@ -76,7 +76,7 @@ public class BenchMarkOMKeyAllocation {
     OmMetadataManagerImpl omMetadataManager =
         new OmMetadataManagerImpl(configuration);
     volumeManager = new VolumeManagerImpl(omMetadataManager, configuration);
-    bucketManager = new BucketManagerImpl(omMetadataManager);
+    bucketManager = new BucketManagerImpl(omMetadataManager, configuration);
 
     volumeManager.createVolume(new OmVolumeArgs.Builder().setVolume(volumeName)
         .setAdminName(UserGroupInformation.getLoginUser().getUserName())

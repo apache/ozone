@@ -23,6 +23,7 @@ import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -122,6 +123,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
@@ -163,6 +165,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private final KeyProviderCryptoExtension kmsProvider;
   private final PrefixManager prefixManager;
+  private OzoneConfiguration conf;
 
 
   @VisibleForTesting
@@ -206,6 +209,7 @@ public class KeyManagerImpl implements KeyManager {
     this.prefixManager = prefixManager;
     this.secretManager = secretManager;
     this.kmsProvider = kmsProvider;
+    this.conf = conf;
 
   }
 
@@ -1589,6 +1593,11 @@ public class KeyManagerImpl implements KeyManager {
     Objects.requireNonNull(ozObject);
     Objects.requireNonNull(context);
     Objects.requireNonNull(context.getClientUgi());
+    Collection<String> ozAdmins =
+        conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    if(ozAdmins.contains(context.getClientUgi().getUserName())) {
+      return true;
+    }
 
     String volume = ozObject.getVolumeName();
     String bucket = ozObject.getBucketName();

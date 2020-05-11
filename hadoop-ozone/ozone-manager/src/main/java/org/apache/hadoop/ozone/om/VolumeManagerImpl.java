@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -35,6 +36,8 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import com.google.common.base.Preconditions;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -54,6 +57,7 @@ public class VolumeManagerImpl implements VolumeManager {
   private final OMMetadataManager metadataManager;
   private final int maxUserVolumeCount;
   private final boolean aclEnabled;
+  private OzoneConfiguration conf;
 
 
   /**
@@ -68,6 +72,7 @@ public class VolumeManagerImpl implements VolumeManager {
         OZONE_OM_USER_MAX_VOLUME_DEFAULT);
     aclEnabled = conf.getBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED,
         OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT);
+    this.conf = conf;
   }
 
   // Helpers to add and delete volume from user list
@@ -657,7 +662,11 @@ public class VolumeManagerImpl implements VolumeManager {
       throws OMException {
     Objects.requireNonNull(ozObject);
     Objects.requireNonNull(context);
-
+    Collection<String> ozAdmins =
+        conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    if(ozAdmins.contains(context.getClientUgi().getUserName())) {
+      return true;
+    }
     String volume = ozObject.getVolumeName();
     metadataManager.getLock().acquireLock(VOLUME_LOCK, volume);
     try {

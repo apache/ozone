@@ -18,14 +18,17 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+
 
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -44,6 +47,7 @@ import org.iq80.leveldb.DBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -61,25 +65,29 @@ public class BucketManagerImpl implements BucketManager {
    */
   private final OMMetadataManager metadataManager;
   private final KeyProviderCryptoExtension kmsProvider;
+  private OzoneConfiguration conf;
 
   /**
    * Constructs BucketManager.
    *
    * @param metadataManager
    */
-  public BucketManagerImpl(OMMetadataManager metadataManager) {
-    this(metadataManager, null, false);
+  public BucketManagerImpl(OMMetadataManager metadataManager,
+      OzoneConfiguration conf) {
+    this(metadataManager, null, false, conf);
   }
 
   public BucketManagerImpl(OMMetadataManager metadataManager,
-                           KeyProviderCryptoExtension kmsProvider) {
-    this(metadataManager, kmsProvider, false);
+      KeyProviderCryptoExtension kmsProvider, OzoneConfiguration conf) {
+    this(metadataManager, kmsProvider, false, conf);
   }
 
   public BucketManagerImpl(OMMetadataManager metadataManager,
-      KeyProviderCryptoExtension kmsProvider, boolean isRatisEnabled) {
+      KeyProviderCryptoExtension kmsProvider, boolean isRatisEnabled,
+      OzoneConfiguration conf) {
     this.metadataManager = metadataManager;
     this.kmsProvider = kmsProvider;
+    this.conf = conf;
   }
 
   KeyProviderCryptoExtension getKMSProvider() {
@@ -555,6 +563,11 @@ public class BucketManagerImpl implements BucketManager {
       throws OMException {
     Objects.requireNonNull(ozObject);
     Objects.requireNonNull(context);
+    Collection<String> ozAdmins =
+        conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    if(ozAdmins.contains(context.getClientUgi().getUserName())) {
+      return true;
+    }
 
     String volume = ozObject.getVolumeName();
     String bucket = ozObject.getBucketName();

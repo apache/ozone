@@ -486,7 +486,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager = new OmMetadataManagerImpl(configuration);
     volumeManager = new VolumeManagerImpl(metadataManager, configuration);
     bucketManager = new BucketManagerImpl(metadataManager, getKmsProvider(),
-        isRatisEnabled);
+        isRatisEnabled, configuration);
     if (secConfig.isSecurityEnabled()) {
       s3SecretManager = new S3SecretManagerImpl(configuration, metadataManager);
       delegationTokenMgr = createDelegationTokenSecretManager(configuration);
@@ -1631,8 +1631,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       ACLType aclType, String vol, String bucket, String key,
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName)
       throws OMException {
-    checkAcls(resType, storeType, aclType, vol, bucket, key,
-        ugi, remoteAddress, hostName, true);
+    if(!ozAdmins.contains(ugi.getUserName())) {
+      checkAcls(resType, storeType, aclType, vol, bucket, key,
+              ugi, remoteAddress, hostName, true);
+    }
   }
 
   /**

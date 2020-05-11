@@ -153,7 +153,7 @@ public class TestOzoneNativeAuthorizer {
 
     metadataManager = new OmMetadataManagerImpl(ozConfig);
     volumeManager = new VolumeManagerImpl(metadataManager, ozConfig);
-    bucketManager = new BucketManagerImpl(metadataManager);
+    bucketManager = new BucketManagerImpl(metadataManager, ozConfig);
     prefixManager = new PrefixManagerImpl(metadataManager, false);
 
     keyManager = new KeyManagerImpl(mock(ScmBlockLocationProtocol.class),
