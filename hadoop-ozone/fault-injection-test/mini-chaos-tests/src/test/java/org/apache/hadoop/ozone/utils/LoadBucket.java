@@ -159,8 +159,12 @@ public class LoadBucket {
     }
   }
 
+  /**
+   * Create and Read Directories.
+   */
   public class DirectoryOp extends Op {
-    boolean readDir;
+    private final boolean readDir;
+
     DirectoryOp(String keyName, boolean readDir) {
       super(true, keyName);
       this.readDir = readDir;

@@ -22,7 +22,7 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.ozone.utils.LoadBucket;
 
 /**
- * A simple directory based load generator
+ * A simple directory based load generator.
  */
 public class RandomDirLoadGenerator extends LoadGenerator {
   private final LoadBucket fsBucket;
