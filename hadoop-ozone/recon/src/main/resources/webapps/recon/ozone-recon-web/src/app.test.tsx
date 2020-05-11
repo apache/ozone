@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,6 +16,12 @@
  * limitations under the License.
  */
 
-.pl-5 {
-  padding-left: 5px;
-}
+import React from 'react';
+import ReactDOM from 'react-dom';
+import App from './app';
+
+it('renders without crashing', () => {
+  const div = document.createElement('div');
+  ReactDOM.render(<App/>, div);
+  ReactDOM.unmountComponentAtNode(div);
+});

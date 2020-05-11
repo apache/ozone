@@ -19,19 +19,20 @@
 import React from 'react';
 import axios from 'axios';
 import {Table, Tabs} from 'antd';
-import './Pipelines.less';
-import {PaginationConfig} from "antd/lib/pagination";
-import prettyMilliseconds from "pretty-ms";
+import './pipelines.less';
+import {PaginationConfig} from 'antd/lib/pagination';
+import prettyMilliseconds from 'pretty-ms';
 import moment from 'moment';
-import {ReplicationIcon} from "utils/themeIcons";
-import {AutoReloadHelper} from "utils/autoReloadHelper";
-import AutoReloadPanel from "components/AutoReloadPanel/AutoReloadPanel";
-import {showDataFetchError} from "utils/common";
+import {ReplicationIcon} from 'utils/themeIcons';
+import {AutoReloadHelper} from 'utils/autoReloadHelper';
+import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
+import {showDataFetchError} from 'utils/common';
+import {IAxiosResponse} from 'types/axios.types';
 
 const {TabPane} = Tabs;
-export type PipelineStatus = "active" | "inactive";
+export type PipelineStatus = 'active' | 'inactive';
 
-interface PipelineResponse {
+interface IPipelineResponse {
   pipelineId: string;
   status: PipelineStatus;
   replicationType: string;
@@ -44,18 +45,15 @@ interface PipelineResponse {
   containers: number;
 }
 
-interface PipelinesResponse  {
+interface IPipelinesResponse {
   totalCount: number;
-  pipelines: PipelineResponse[];
+  pipelines: IPipelineResponse[];
 }
 
-interface PipelinesState {
+interface IPipelinesState {
   activeLoading: boolean;
-  activeDataSource: PipelineResponse[];
+  activeDataSource: IPipelineResponse[];
   activeTotalCount: number;
-  inactiveLoading: boolean;
-  inactiveDataSource: PipelineResponse[];
-  inactiveTotalCount: number;
   lastUpdated: number;
 }
 
@@ -64,36 +62,36 @@ const COLUMNS = [
     title: 'Pipeline ID',
     dataIndex: 'pipelineId',
     key: 'pipelineId',
-    sorter: (a: PipelineResponse, b: PipelineResponse) => a.pipelineId.localeCompare(b.pipelineId)
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId)
   },
   {
     title: 'Replication Type & Factor',
     dataIndex: 'replicationType',
     key: 'replicationType',
-    render: (replicationType: string, record: PipelineResponse) => {
+    render: (replicationType: string, record: IPipelineResponse) => {
       const replicationFactor = record.replicationFactor;
       return (
-          <span>
-            <ReplicationIcon replicationFactor={replicationFactor} replicationType={replicationType}/>
-            {replicationType} ({replicationFactor})
-          </span>
-      )
+        <span>
+          <ReplicationIcon replicationFactor={replicationFactor} replicationType={replicationType}/>
+          {replicationType} ({replicationFactor})
+        </span>
+      );
     },
-    sorter: (a: PipelineResponse, b: PipelineResponse) =>
-        (a.replicationType + a.replicationFactor).localeCompare(b.replicationType + b.replicationFactor),
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) =>
+      (a.replicationType + a.replicationFactor.toString()).localeCompare(b.replicationType + b.replicationFactor.toString()),
     defaultSortOrder: 'descend' as const
   },
   {
     title: 'Status',
     dataIndex: 'status',
     key: 'status',
-    sorter: (a: PipelineResponse, b: PipelineResponse) => a.status.localeCompare(b.status)
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.status.localeCompare(b.status)
   },
   {
     title: 'Containers',
     dataIndex: 'containers',
     key: 'containers',
-    sorter: (a: PipelineResponse, b: PipelineResponse) => a.containers - b.containers
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.containers - b.containers
   },
   {
     title: 'Datanodes',
@@ -105,44 +103,40 @@ const COLUMNS = [
     title: 'Leader',
     dataIndex: 'leaderNode',
     key: 'leaderNode',
-    sorter: (a: PipelineResponse, b: PipelineResponse) => a.leaderNode.localeCompare(b.leaderNode)
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderNode.localeCompare(b.leaderNode)
   },
   {
     title: 'Last Leader Election',
     dataIndex: 'lastLeaderElection',
     key: 'lastLeaderElection',
     render: (lastLeaderElection: number) => lastLeaderElection > 0 ?
-        moment(lastLeaderElection).format('lll') : 'NA',
-    sorter: (a: PipelineResponse, b: PipelineResponse) => a.lastLeaderElection - b.lastLeaderElection
+      moment(lastLeaderElection).format('lll') : 'NA',
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.lastLeaderElection - b.lastLeaderElection
   },
   {
     title: 'Lifetime',
     dataIndex: 'duration',
     key: 'duration',
     render: (duration: number) => prettyMilliseconds(duration, {compact: true}),
-    sorter: (a: PipelineResponse, b: PipelineResponse) => a.duration - b.duration
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.duration - b.duration
   },
   {
     title: 'No. of Elections',
     dataIndex: 'leaderElections',
     key: 'leaderElections',
-    sorter: (a: PipelineResponse, b: PipelineResponse) => a.leaderElections - b.leaderElections
+    sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderElections - b.leaderElections
   }
 ];
 
-export class Pipelines extends React.Component<any, PipelinesState> {
-
+export class Pipelines extends React.Component<Record<string, object>, IPipelinesState> {
   autoReload: AutoReloadHelper;
 
-  constructor(props: any) {
+  constructor(props = {}) {
     super(props);
     this.state = {
       activeLoading: false,
       activeDataSource: [],
       activeTotalCount: 0,
-      inactiveLoading: false,
-      inactiveDataSource: [],
-      inactiveTotalCount: 0,
       lastUpdated: 0
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
@@ -152,15 +146,15 @@ export class Pipelines extends React.Component<any, PipelinesState> {
     this.setState({
       activeLoading: true
     });
-    axios.get('/api/v1/pipelines').then(response => {
-      const pipelinesResponse: PipelinesResponse = response.data;
+    axios.get('/api/v1/pipelines').then((response: IAxiosResponse<IPipelinesResponse>) => {
+      const pipelinesResponse: IPipelinesResponse = response.data;
       const totalCount = pipelinesResponse.totalCount;
-      const pipelines: PipelineResponse[] = pipelinesResponse.pipelines;
+      const pipelines: IPipelineResponse[] = pipelinesResponse.pipelines;
       this.setState({
         activeLoading: false,
         activeDataSource: pipelines,
         activeTotalCount: totalCount,
-        lastUpdated: +moment()
+        lastUpdated: Number(moment())
       });
     }).catch(error => {
       this.setState({
@@ -173,7 +167,7 @@ export class Pipelines extends React.Component<any, PipelinesState> {
   componentDidMount(): void {
     // Fetch pipelines on component mount
     this._loadData();
-    this.autoReload.startPolling()
+    this.autoReload.startPolling();
   }
 
   componentWillUnmount(): void {
@@ -181,18 +175,17 @@ export class Pipelines extends React.Component<any, PipelinesState> {
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
-    // TODO: Implement this method once server side pagination is enabled
     console.log(current, pageSize);
   };
 
   onTabChange = (activeKey: string) => {
     // Fetch inactive pipelines if tab is switched to "Inactive"
-    if (activeKey === "2") {
-      // TODO: Trigger an ajax request to fetch inactive pipelines
+    if (activeKey === '2') {
+      // Fetch inactive pipelines in the future
     }
   };
 
-  render () {
+  render() {
     const {activeDataSource, activeLoading, activeTotalCount, lastUpdated} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} pipelines`,
@@ -200,22 +193,20 @@ export class Pipelines extends React.Component<any, PipelinesState> {
       onShowSizeChange: this.onShowSizeChange
     };
     return (
-        <div className="pipelines-container">
-          <div className="page-header">
-            Pipelines ({activeTotalCount})
-            <AutoReloadPanel isLoading={activeLoading} lastUpdated={lastUpdated} onReload={this._loadData} togglePolling={this.autoReload.handleAutoReloadToggle}/>
-          </div>
-          <div className="content-div">
-            <Tabs defaultActiveKey="1" onChange={this.onTabChange}>
-              <TabPane key="1" tab="Active">
-                <Table dataSource={activeDataSource} columns={COLUMNS} loading={activeLoading} pagination={paginationConfig} rowKey="pipelineId"/>
-              </TabPane>
-              <TabPane key="2" tab="Inactive">
-
-              </TabPane>
-            </Tabs>
-          </div>
+      <div className='pipelines-container'>
+        <div className='page-header'>
+          Pipelines ({activeTotalCount})
+          <AutoReloadPanel isLoading={activeLoading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
+        <div className='content-div'>
+          <Tabs defaultActiveKey='1' onChange={this.onTabChange}>
+            <TabPane key='1' tab='Active'>
+              <Table dataSource={activeDataSource} columns={COLUMNS} loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'/>
+            </TabPane>
+            <TabPane key='2' tab='Inactive'/>
+          </Tabs>
+        </div>
+      </div>
     );
   }
 }

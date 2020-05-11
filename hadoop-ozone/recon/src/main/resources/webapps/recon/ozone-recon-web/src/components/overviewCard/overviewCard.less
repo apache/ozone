@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,39 +16,18 @@
  * limitations under the License.
  */
 
-@sidebar-collapsed-width: 50px;
-
-.logo {
-  color: #FFF;
-  font-size: 20px;
-  font-weight: 500;
-  padding: 10px;
-  background-color: #002040;
-  .logo-text {
-    margin-left: 10px;
-  }
-}
-
-.ant-layout-sider-collapsed .logo-text {
-  display: none;
-}
-
-.ant-menu {
-  &.ant-menu-inline-collapsed {
-    width: @sidebar-collapsed-width;
-    .ant-menu-item {
-      padding-left: 17px !important;
+.overview-card {
+  .ant-card-meta-detail {
+    .ant-card-meta-title {
+      margin-bottom: 0;
+      font-size: 24px;
     }
   }
-  &.ant-menu-inline {
-    .ant-menu-item {
-      &.ant-menu-item-selected {
-        background-color: #0a2542;
-        &::after {
-          border-right: 5px solid #1DA57A;
-        }
-      }
-    }
+  .storage-bar {
+    margin-top: -25px;
   }
 }
 
+.card-error {
+  border-color: #f5222d;
+}

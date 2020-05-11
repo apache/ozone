@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,15 +20,15 @@ import React from 'react';
 import {Icon, Progress} from 'antd';
 import {withRouter} from 'react-router-dom';
 import {RouteComponentProps} from 'react-router';
-import {FilledIcon} from "utils/themeIcons";
-import Tooltip from "antd/lib/tooltip";
-import {getCapacityPercent} from "utils/common";
-import filesize from "filesize";
-import './StorageBar.less';
+import {FilledIcon} from 'utils/themeIcons';
+import Tooltip from 'antd/lib/tooltip';
+import {getCapacityPercent} from 'utils/common';
+import filesize from 'filesize';
+import './storageBar.less';
 
 const size = filesize.partial({standard: 'iec', round: 1});
 
-interface StorageBarProps extends RouteComponentProps<any> {
+interface IStorageBarProps extends RouteComponentProps<object> {
   total: number;
   used: number;
   remaining: number;
@@ -42,28 +42,33 @@ const defaultProps = {
   showMeta: true
 };
 
-class StorageBar extends React.Component<StorageBarProps> {
+class StorageBar extends React.Component<IStorageBarProps> {
   static defaultProps = defaultProps;
 
   render() {
-    let {total, used, remaining, showMeta} = this.props;
+    const {total, used, remaining, showMeta} = this.props;
     const nonOzoneUsed = total - remaining - used;
     const totalUsed = total - remaining;
-    const tooltip = <div>
-      <div><Icon component={FilledIcon} className="ozone-used-bg"/> Ozone Used ({size(used)})</div>
-      <div><Icon component={FilledIcon} className="non-ozone-used-bg"/> Non Ozone Used ({size(nonOzoneUsed)})</div>
-      <div><Icon component={FilledIcon} className="remaining-bg"/> Remaining ({size(remaining)})</div>
-    </div>;
+    const tooltip = (
+      <div>
+        <div><Icon component={FilledIcon} className='ozone-used-bg'/> Ozone Used ({size(used)})</div>
+        <div><Icon component={FilledIcon} className='non-ozone-used-bg'/> Non Ozone Used ({size(nonOzoneUsed)})</div>
+        <div><Icon component={FilledIcon} className='remaining-bg'/> Remaining ({size(remaining)})</div>
+      </div>
+    );
     const metaElement = showMeta ? <div>{size(used)} + {size(nonOzoneUsed)} / {size(total)}</div> : null;
-    return <div className={"storage-cell-container"}>
-      <Tooltip title={tooltip} placement="bottomLeft">
-        {metaElement}
-        <Progress strokeLinecap="square"
-                  percent={getCapacityPercent(totalUsed, total)}
-                  successPercent={getCapacityPercent(used, total)}
-                  className="capacity-bar" strokeWidth={3}/>
-      </Tooltip>
-    </div>
+    return (
+      <div className='storage-cell-container'>
+        <Tooltip title={tooltip} placement='bottomLeft'>
+          {metaElement}
+          <Progress
+            strokeLinecap='square'
+            percent={getCapacityPercent(totalUsed, total)}
+            successPercent={getCapacityPercent(used, total)}
+            className='capacity-bar' strokeWidth={3}/>
+        </Tooltip>
+      </div>
+    );
   }
 }
 
