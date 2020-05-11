@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,37 +20,31 @@ import React from 'react';
 import {Breadcrumb, Icon} from 'antd';
 import {withRouter, Link} from 'react-router-dom';
 import {RouteComponentProps} from 'react-router';
-import {breadcrumbNameMap} from '../../constants/breadcrumbs.constants';
-
-interface Props extends RouteComponentProps<any> {
-  collapsed: boolean;
-  onCollapse: (arg: boolean) => void;
-}
+import {breadcrumbNameMap} from 'constants/breadcrumbs.constants';
 
 class Breadcrumbs extends React.Component<RouteComponentProps> {
-
   render() {
     const {location} = this.props;
     const pathSnippets = location.pathname.split('/').filter(i => i);
     const extraBreadcrumbItems = pathSnippets.map((_, index) => {
       const url = `/${pathSnippets.slice(0, index + 1).join('/')}`;
       return (
-          <Breadcrumb.Item key={url}>
-            <Link to={url}>
-              {breadcrumbNameMap[url]}
-            </Link>
-          </Breadcrumb.Item>
+        <Breadcrumb.Item key={url}>
+          <Link to={url}>
+            {breadcrumbNameMap[url]}
+          </Link>
+        </Breadcrumb.Item>
       );
     });
     const breadcrumbItems = [(
-        <Breadcrumb.Item key="home">
-          <Link to="/"><Icon type="home"/></Link>
-        </Breadcrumb.Item>
+      <Breadcrumb.Item key='home'>
+        <Link to='/'><Icon type='home'/></Link>
+      </Breadcrumb.Item>
     )].concat(extraBreadcrumbItems);
     return (
-        <Breadcrumb>
-          {breadcrumbItems}
-        </Breadcrumb>
+      <Breadcrumb>
+        {breadcrumbItems}
+      </Breadcrumb>
     );
   }
 }

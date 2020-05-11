@@ -22,58 +22,58 @@ import {Table, Icon} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
-import StorageBar from "components/StorageBar/StorageBar";
-import {DatanodeStatus, StorageReport} from "types/datanode.types";
-import './Datanodes.less';
+import StorageBar from 'components/storageBar/storageBar';
+import {DatanodeStatus, IStorageReport} from 'types/datanode.types';
+import './datanodes.less';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
-import AutoReloadPanel from 'components/AutoReloadPanel/AutoReloadPanel';
+import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {showDataFetchError} from 'utils/common';
 
-interface DatanodeResponse {
+interface IDatanodeResponse {
   hostname: string;
   state: DatanodeStatus;
   lastHeartbeat: number;
-  storageReport: StorageReport;
-  pipelines: Pipeline[];
+  storageReport: IStorageReport;
+  pipelines: IPipeline[];
   containers: number;
 }
 
-interface DatanodesResponse  {
+interface IDatanodesResponse {
   totalCount: number;
-  datanodes: DatanodeResponse[];
+  datanodes: IDatanodeResponse[];
 }
 
-interface Datanode {
+interface IDatanode {
   hostname: string;
   state: DatanodeStatus;
   lastHeartbeat: number;
   storageUsed: number;
   storageTotal: number;
   storageRemaining: number;
-  pipelines: Pipeline[];
+  pipelines: IPipeline[];
   containers: number;
 }
 
-interface Pipeline {
+interface IPipeline {
   pipelineID: string;
   replicationType: string;
   replicationFactor: number;
 }
 
-interface DatanodesState {
+interface IDatanodesState {
   loading: boolean;
-  dataSource: Datanode[];
+  dataSource: IDatanode[];
   totalCount: number;
   lastUpdated: number;
 }
 
 const renderDatanodeStatus = (status: DatanodeStatus) => {
   const statusIconMap = {
-    HEALTHY: <Icon type="check-circle" theme="filled" twoToneColor="#1da57a" className="icon-success"/>,
-    STALE: <Icon type="hourglass" theme="filled" className="icon-warning"/>,
-    DEAD: <Icon type="close-circle" theme="filled" className="icon-failure"/>,
-    DECOMMISSIONING: <Icon type="warning" theme="filled" className="icon-warning"/>,
-    DECOMMISSIONED: <Icon type="exclamation-circle" theme="filled" className="icon-failure"/>
+    HEALTHY: <Icon type='check-circle' theme='filled' twoToneColor='#1da57a' className='icon-success'/>,
+    STALE: <Icon type='hourglass' theme='filled' className='icon-warning'/>,
+    DEAD: <Icon type='close-circle' theme='filled' className='icon-failure'/>,
+    DECOMMISSIONING: <Icon type='warning' theme='filled' className='icon-warning'/>,
+    DECOMMISSIONED: <Icon type='exclamation-circle' theme='filled' className='icon-failure'/>
   };
   const icon = status in statusIconMap ? statusIconMap[status] : '';
   return <span>{icon} {status}</span>;
@@ -85,29 +85,30 @@ const COLUMNS = [
     dataIndex: 'state',
     key: 'state',
     render: (text: DatanodeStatus) => renderDatanodeStatus(text),
-    sorter: (a: Datanode, b: Datanode) => a.state.localeCompare(b.state)
+    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
   },
   {
     title: 'Hostname',
     dataIndex: 'hostname',
     key: 'hostname',
-    sorter: (a: Datanode, b: Datanode) => a.hostname.localeCompare(b.hostname),
+    sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname),
     defaultSortOrder: 'ascend' as const
   },
   {
     title: 'Storage Capacity',
     dataIndex: 'storageUsed',
     key: 'storageUsed',
-    sorter: (a: Datanode, b: Datanode) => a.storageRemaining - b.storageRemaining,
-    render: (text: string, record: Datanode) =>
-        <StorageBar total={record.storageTotal} used={record.storageUsed}
-                    remaining={record.storageRemaining}/>
-  },
+    sorter: (a: IDatanode, b: IDatanode) => a.storageRemaining - b.storageRemaining,
+    render: (text: string, record: IDatanode) => (
+      <StorageBar
+        total={record.storageTotal} used={record.storageUsed}
+        remaining={record.storageRemaining}/>
+    )},
   {
     title: 'Last Heartbeat',
     dataIndex: 'lastHeartbeat',
     key: 'lastHeartbeat',
-    sorter: (a: Datanode, b: Datanode) => a.lastHeartbeat - b.lastHeartbeat,
+    sorter: (a: IDatanode, b: IDatanode) => a.lastHeartbeat - b.lastHeartbeat,
     render: (heartbeat: number) => {
       return heartbeat > 0 ? moment(heartbeat).format('lll') : 'NA';
     }
@@ -116,31 +117,33 @@ const COLUMNS = [
     title: 'Pipeline ID(s)',
     dataIndex: 'pipelines',
     key: 'pipelines',
-    render: (pipelines: Pipeline[]) => {
-      return (<div>
-        {
-          pipelines.map((pipeline, index) =>
-              <div key={index} className="pipeline-container">
+    render: (pipelines: IPipeline[]) => {
+      return (
+        <div>
+          {
+            pipelines.map((pipeline, index) => (
+              <div key={index} className='pipeline-container'>
                 <ReplicationIcon replicationFactor={pipeline.replicationFactor} replicationType={pipeline.replicationType}/>
                 {pipeline.pipelineID}
-              </div>)
-        }
-      </div>);
+              </div>
+            ))
+          }
+        </div>
+      );
     }
   },
   {
     title: 'Containers',
     dataIndex: 'containers',
     key: 'containers',
-    sorter: (a: Datanode, b: Datanode) => a.containers - b.containers
+    sorter: (a: IDatanode, b: IDatanode) => a.containers - b.containers
   }
 ];
 
-export class Datanodes extends React.Component<any, DatanodesState> {
-
+export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
   autoReload: AutoReloadHelper;
 
-  constructor(props: any) {
+  constructor(props = {}) {
     super(props);
     this.state = {
       loading: false,
@@ -156,10 +159,10 @@ export class Datanodes extends React.Component<any, DatanodesState> {
       loading: true
     });
     axios.get('/api/v1/datanodes').then(response => {
-      const datanodesResponse: DatanodesResponse = response.data;
+      const datanodesResponse: IDatanodesResponse = response.data;
       const totalCount = datanodesResponse.totalCount;
-      const datanodes: DatanodeResponse[] = datanodesResponse.datanodes;
-      const dataSource: Datanode[] = datanodes.map(datanode => {
+      const datanodes: IDatanodeResponse[] = datanodesResponse.datanodes;
+      const dataSource: IDatanode[] = datanodes.map(datanode => {
         return {
           hostname: datanode.hostname,
           state: datanode.state,
@@ -169,13 +172,13 @@ export class Datanodes extends React.Component<any, DatanodesState> {
           storageRemaining: datanode.storageReport.remaining,
           pipelines: datanode.pipelines,
           containers: datanode.containers
-        }
+        };
       });
       this.setState({
         loading: false,
         dataSource,
         totalCount,
-        lastUpdated: +moment()
+        lastUpdated: Number(moment())
       });
     }).catch(error => {
       this.setState({
@@ -196,11 +199,10 @@ export class Datanodes extends React.Component<any, DatanodesState> {
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
-    // TODO: Implement this method once server side pagination is enabled
     console.log(current, pageSize);
   };
 
-  render () {
+  render() {
     const {dataSource, loading, totalCount, lastUpdated} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} datanodes`,
@@ -208,15 +210,15 @@ export class Datanodes extends React.Component<any, DatanodesState> {
       onShowSizeChange: this.onShowSizeChange
     };
     return (
-        <div className="datanodes-container">
-          <div className="page-header">
-            Datanodes ({totalCount})
-            <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} onReload={this._loadData} togglePolling={this.autoReload.handleAutoReloadToggle}/>
-          </div>
-          <div className="content-div">
-            <Table dataSource={dataSource} columns={COLUMNS} loading={loading} pagination={paginationConfig} rowKey="hostname"/>
-          </div>
+      <div className='datanodes-container'>
+        <div className='page-header'>
+          Datanodes ({totalCount})
+          <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
         </div>
+        <div className='content-div'>
+          <Table dataSource={dataSource} columns={COLUMNS} loading={loading} pagination={paginationConfig} rowKey='hostname'/>
+        </div>
+      </div>
     );
   }
 }

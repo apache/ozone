@@ -19,20 +19,19 @@
 import React from 'react';
 
 import {Tooltip, Button, Switch} from 'antd';
-import './AutoReloadPanel.less';
+import './autoReloadPanel.less';
 import {withRouter} from 'react-router-dom';
 import {RouteComponentProps} from 'react-router';
-import moment from "moment";
+import moment from 'moment';
 
-interface AutoReloadPanelProps extends RouteComponentProps<any> {
+interface IAutoReloadPanelProps extends RouteComponentProps<object> {
   onReload: () => void;
   lastUpdated: number;
   isLoading: boolean;
   togglePolling: (isEnabled: boolean) => void;
 }
 
-class AutoReloadPanel extends React.Component<AutoReloadPanelProps> {
-
+class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
   autoReloadToggleHandler = (checked: boolean, _event: Event) => {
     const {togglePolling} = this.props;
     togglePolling(checked);
@@ -41,14 +40,20 @@ class AutoReloadPanel extends React.Component<AutoReloadPanelProps> {
   render() {
     const {onReload, lastUpdated, isLoading} = this.props;
     const lastUpdatedText = lastUpdated === 0 ? 'NA' :
-        <Tooltip placement="bottom" title={moment(lastUpdated).format('lll')}>{moment(lastUpdated).format('LT')}</Tooltip>
+      (
+        <Tooltip
+          placement='bottom' title={moment(lastUpdated).format('lll')}
+        >
+          {moment(lastUpdated).format('LT')}
+        </Tooltip>
+      );
     return (
-        <div className="auto-reload-panel">
-          Auto Reload
-          &nbsp;<Switch size="small" defaultChecked onChange={this.autoReloadToggleHandler} className="toggle-switch"/>
-          &nbsp; | Last updated at {lastUpdatedText}
-          &nbsp;<Button shape="circle" icon="reload" size="small" loading={isLoading} onClick={onReload}/>
-        </div>
+      <div className='auto-reload-panel'>
+        Auto Reload
+        &nbsp;<Switch defaultChecked size='small' className='toggle-switch' onChange={this.autoReloadToggleHandler}/>
+        &nbsp; | Last updated at {lastUpdatedText}
+        &nbsp;<Button shape='circle' icon='reload' size='small' loading={isLoading} onClick={onReload}/>
+      </div>
     );
   }
 }

@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 
-import {AUTO_RELOAD_INTERVAL_DEFAULT} from "../constants/autoReload.constants";
+import {AUTO_RELOAD_INTERVAL_DEFAULT} from '../constants/autoReload.constants';
 
 class AutoReloadHelper {
-
   loadData: () => void;
-  interval: number = 0;
+  interval = 0;
 
   constructor(loadData: () => void) {
     this.loadData = loadData;
