@@ -29,8 +29,10 @@ import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * A util class for {@link HddsVolume}.
@@ -143,11 +145,16 @@ public final class HddsVolumeUtil {
     String lvStr = getProperty(props, OzoneConsts.LAYOUTVERSION, versionFile);
 
     int lv = Integer.parseInt(lvStr);
-    if(DataNodeLayoutVersion.getLatestVersion().getVersion() != lv) {
+    boolean validVersion = Stream.of(DataNodeLayoutVersion.getAllVersions())
+        .anyMatch(dataNodeLayoutVersion -> (
+            dataNodeLayoutVersion.getVersion() == lv));
+    if (!validVersion) {
+      int[] supportedVs =
+          Stream.of(DataNodeLayoutVersion.getAllVersions())
+              .mapToInt(DataNodeLayoutVersion::getVersion).toArray();
       throw new InconsistentStorageStateException("Invalid layOutVersion. " +
-          "Version file has layOutVersion as " + lv + " and latest Datanode " +
-          "layOutVersion is " +
-          DataNodeLayoutVersion.getLatestVersion().getVersion());
+          "Version file has layOutVersion as " + lv + " which is unsupported" +
+          ". Supported versions are " + Arrays.toString(supportedVs));
     }
     return lv;
   }

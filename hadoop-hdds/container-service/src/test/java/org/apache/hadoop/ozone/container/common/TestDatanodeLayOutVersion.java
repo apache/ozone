@@ -32,7 +32,7 @@ public class TestDatanodeLayOutVersion {
         .getVersion());
     Assert.assertEquals("HDDS Datanode LayOut Version 1", DataNodeLayoutVersion
         .getLatestVersion().getDescription());
-    Assert.assertEquals(DataNodeLayoutVersion.getAllVersions().length,
+    Assert.assertEquals(1,
         DataNodeLayoutVersion.getAllVersions().length);
   }
 }

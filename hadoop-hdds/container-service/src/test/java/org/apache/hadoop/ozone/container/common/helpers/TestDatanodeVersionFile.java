@@ -21,6 +21,7 @@ import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.Before;
 import org.junit.Rule;
@@ -85,6 +86,22 @@ public class TestDatanodeVersionFile {
         properties, versionFile));
     assertEquals(lv, HddsVolumeUtil.getLayOutVersion(
         properties, versionFile));
+  }
+
+  @Test
+  public void testInvalidLayoutVersion() throws Exception {
+    File invalidVersionFile = folder.newFile("InvalidVersion");
+    cTime = Time.now();
+    lv = DataNodeLayoutVersion.getLatestVersion().getVersion();
+    dnVersionFile = new DatanodeVersionFile(
+        storageID, clusterID, datanodeUUID, cTime, lv + 1);
+    dnVersionFile.createVersionFile(invalidVersionFile);
+    Properties invProperties = dnVersionFile.readFrom(invalidVersionFile);
+    LambdaTestUtils.intercept(InconsistentStorageStateException.class,
+        "Version file has layOutVersion as 2 which is unsupported" +
+        ". Supported versions are [1]",
+        () -> HddsVolumeUtil.getLayOutVersion(invProperties,
+            invalidVersionFile));
   }
 
   @Test
