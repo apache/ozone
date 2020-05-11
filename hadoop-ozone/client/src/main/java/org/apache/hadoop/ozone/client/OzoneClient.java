@@ -74,6 +74,7 @@ public class OzoneClient implements Closeable {
 
   private final ClientProtocol proxy;
   private final ObjectStore objectStore;
+  private  ConfigurationSource conf;
 
   /**
    * Creates a new OzoneClient object, generally constructed
@@ -84,6 +85,7 @@ public class OzoneClient implements Closeable {
   public OzoneClient(ConfigurationSource conf, ClientProtocol proxy) {
     this.proxy = proxy;
     this.objectStore = new ObjectStore(conf, this.proxy);
+    this.conf = conf;
   }
 
   @VisibleForTesting
@@ -97,6 +99,14 @@ public class OzoneClient implements Closeable {
    */
   public ObjectStore getObjectStore() {
     return objectStore;
+  }
+
+  /**
+   * Returns the configuration of client.
+   * @return ConfigurationSource
+   */
+  public ConfigurationSource getConfiguration() {
+    return conf;
   }
 
   /**
