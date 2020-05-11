@@ -29,12 +29,12 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class NestedDirLoadGenerator extends LoadGenerator {
   private final LoadBucket fsBucket;
-  private final int maxDirWidth;
+  private final int maxDirDepth;
   private final Map<Integer, String> pathMap;
 
   public NestedDirLoadGenerator(DataBuffer dataBuffer, LoadBucket fsBucket) {
     this.fsBucket = fsBucket;
-    this.maxDirWidth = 20;
+    this.maxDirDepth = 20;
     this.pathMap = new ConcurrentHashMap<>();
   }
 
@@ -45,7 +45,7 @@ public class NestedDirLoadGenerator extends LoadGenerator {
 
   @Override
   public void generateLoad() throws Exception {
-    int index = RandomUtils.nextInt(0, maxDirWidth);
+    int index = RandomUtils.nextInt(0, maxDirDepth);
     String str = this.pathMap.compute(index, this::createNewPath);
     fsBucket.createDirectory(str);
     fsBucket.readDirectory(str);
