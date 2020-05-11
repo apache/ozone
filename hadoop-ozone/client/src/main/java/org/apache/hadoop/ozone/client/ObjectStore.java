@@ -26,6 +26,7 @@ import java.util.NoSuchElementException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -74,6 +75,9 @@ public class ObjectStore {
 
   @VisibleForTesting
   protected ObjectStore() {
+    // For the unit test
+    OzoneConfiguration conf = new OzoneConfiguration();
+    this.s3VolumeName = HddsClientUtils.getS3VolumeName(conf);
     proxy = null;
   }
 

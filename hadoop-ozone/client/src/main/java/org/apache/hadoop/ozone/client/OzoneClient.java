@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 
 import java.io.Closeable;
@@ -92,6 +93,8 @@ public class OzoneClient implements Closeable {
   protected OzoneClient(ObjectStore objectStore) {
     this.objectStore = objectStore;
     this.proxy = null;
+    // For the unit test
+    this.conf = new OzoneConfiguration();
   }
   /**
    * Returns the object store associated with the Ozone Cluster.
