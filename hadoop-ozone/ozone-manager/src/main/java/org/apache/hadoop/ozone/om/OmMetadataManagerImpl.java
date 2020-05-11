@@ -42,27 +42,10 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmMultipartKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmPrefixInfoCodec;
-import org.apache.hadoop.ozone.om.codec.OmVolumeArgsCodec;
-import org.apache.hadoop.ozone.om.codec.RepeatedOmKeyInfoCodec;
-import org.apache.hadoop.ozone.om.codec.S3SecretValueCodec;
-import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
-import org.apache.hadoop.ozone.om.codec.UserVolumeInfoCodec;
+import org.apache.hadoop.ozone.om.codec.*;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
-import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.protocol.proto
     .OzoneManagerProtocolProtos.UserVolumeInfo;
@@ -118,6 +101,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  multipartInfoTable| /volumeName/bucketName/keyName/uploadId ->...   |
    * |----------------------------------------------------------------------|
+   * |  directoryTable    | parentId/directoryName -> DirectoryInfo         |
+   * |----------------------------------------------------------------------|
    */
 
   public static final String USER_TABLE = "userTable";
@@ -131,6 +116,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String S3_SECRET_TABLE = "s3SecretTable";
   public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
   public static final String PREFIX_TABLE = "prefixTable";
+  public static final String DIRECTORY_TABLE = "directoryTable";
 
   private DBStore store;
 
@@ -148,6 +134,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table s3SecretTable;
   private Table dTokenTable;
   private Table prefixTable;
+  private Table dirTable;
   private boolean isRatisEnabled;
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
@@ -218,6 +205,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
+  public Table<String, OmDirectoryInfo> getDirectoryTable() {
+    return dirTable;
+  }
+
+  @Override
   public Table<String, OmMultipartKeyInfo> getMultipartInfoTable() {
     return multipartInfoTable;
   }
@@ -282,6 +274,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(DELEGATION_TOKEN_TABLE)
         .addTable(S3_SECRET_TABLE)
         .addTable(PREFIX_TABLE)
+        .addTable(DIRECTORY_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec())
         .addCodec(RepeatedOmKeyInfo.class, new RepeatedOmKeyInfoCodec())
@@ -290,7 +283,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(UserVolumeInfo.class, new UserVolumeInfoCodec())
         .addCodec(OmMultipartKeyInfo.class, new OmMultipartKeyInfoCodec())
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
-        .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec());
+        .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
+        .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec());
   }
 
   /**
@@ -346,6 +340,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     prefixTable = this.store.getTable(PREFIX_TABLE, String.class,
         OmPrefixInfo.class);
     checkTableStatus(prefixTable, PREFIX_TABLE);
+
+    dirTable = this.store.getTable(DIRECTORY_TABLE, OmDirectoryInfo.class,
+        OmPrefixInfo.class);
+    checkTableStatus(dirTable, DIRECTORY_TABLE);
   }
 
   /**

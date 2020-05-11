@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.file;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -41,6 +42,8 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
   private OmKeyInfo dirKeyInfo;
   private List<OmKeyInfo> parentKeyInfos;
+  private List<OmDirectoryInfo> parentDirInfos;
+  private OmDirectoryInfo dirInfo;
 
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
       @Nullable OmKeyInfo dirKeyInfo,
@@ -63,6 +66,11 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
+    addToKeyTable(omMetadataManager, batchOperation);
+    addToDirectoryTable(omMetadataManager, batchOperation);
+  }
+
+  private void addToKeyTable(OMMetadataManager omMetadataManager, BatchOperation batchOperation) throws IOException {
     if (dirKeyInfo != null) {
       if (parentKeyInfos != null) {
         for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
@@ -86,6 +94,36 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
       // not an error, in this case dirKeyInfo will be null.
       LOG.debug("Response Status is OK, dirKeyInfo is null in " +
           "OMDirectoryCreateResponse");
+    }
+  }
+
+
+  private void addToDirectoryTable(OMMetadataManager omMetadataManager,
+                           BatchOperation batchOperation) throws IOException {
+    if (dirInfo != null) {
+      if (parentDirInfos != null) {
+        for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
+          String parentKey = omMetadataManager
+                  .getOzoneDirKey(parentDirInfo.getVolumeName(),
+                          parentDirInfo.getBucketName(),
+                          parentDirInfo.getName());
+          LOG.debug("putWithBatch parent : dir {} info : {}", parentKey,
+                  parentDirInfo);
+          omMetadataManager.getDirectoryTable()
+                  .putWithBatch(batchOperation, parentKey, parentDirInfo);
+        }
+      }
+
+      String dirKey = omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
+              dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
+      omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
+              dirKeyInfo);
+
+    } else {
+      // When directory already exists, we don't add it to cache. And it is
+      // not an error, in this case dirKeyInfo will be null.
+      LOG.debug("Response Status is OK, dirKeyInfo is null in " +
+              "OMDirectoryCreateResponse");
     }
   }
 }

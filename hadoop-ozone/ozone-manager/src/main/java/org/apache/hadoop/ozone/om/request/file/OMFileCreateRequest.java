@@ -29,6 +29,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
@@ -41,9 +42,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -287,6 +285,23 @@ public class OMFileCreateRequest extends OMKeyRequest {
       OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
           bucketName, Optional.absent(), Optional.of(missingParentInfos),
           trxnLogIndex);
+
+      // Add Directory Table entry
+      // TODO: dummy parent Id. Need to get the parent id from the dirTable
+      OmDirectoryInfo dirInfo = OmDirectoryInfo.createDirectoryInfo(omKeyInfo
+              , omKeyInfo.getObjectID());
+      List<OmDirectoryInfo> missingDirs =
+              new ArrayList<>(missingParentInfos.size());
+      for (OmKeyInfo parentInfo : missingParentInfos) {
+        // TODO: dummy parent Id. Need to get the parent id from the dirTable
+        long parentObjectID = parentInfo.getObjectID();
+        missingDirs.add(OmDirectoryInfo.createDirectoryInfo(parentInfo,
+                parentObjectID));
+      }
+      OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
+              volumeName,
+              bucketName, Optional.of(dirInfo),
+              Optional.of(missingDirs), trxnLogIndex);
 
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()

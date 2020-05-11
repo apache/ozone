@@ -31,10 +31,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -198,6 +195,23 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             bucketName, Optional.of(dirKeyInfo),
             Optional.of(missingParentInfos), trxnLogIndex);
 
+        // Add Directory Table entry
+        OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(keyName,
+                keyArgs, baseObjId, trxnLogIndex,
+                OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+        List<OmDirectoryInfo> missingDirs =
+                new ArrayList<>(missingParentInfos.size());
+        for (OmKeyInfo parentInfo : missingParentInfos) {
+          // TODO: dummy parent Id. Need to get the parent id from the dirTable
+          long parentObjectID = parentInfo.getObjectID();
+          missingDirs.add(OmDirectoryInfo.createDirectoryInfo(parentInfo,
+                  parentObjectID));
+        }
+        OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
+                volumeName,
+                bucketName, Optional.of(dirInfo),
+                Optional.of(missingDirs), trxnLogIndex);
+
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             dirKeyInfo, missingParentInfos);
         result = Result.SUCCESS;
@@ -293,6 +307,16 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
               bucketName, parentKeyInfo.getKeyName())),
           new CacheValue<>(Optional.of(parentKeyInfo),
               trxnLogIndex));
+
+      // add entry to directory table
+      OmDirectoryInfo directoryInfo = createDirectoryInfoWithACL(missingKey,
+              keyArgs, nextObjId, trxnLogIndex, inheritAcls);
+      omMetadataManager.getDirectoryTable().addCacheEntry(
+              new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
+                      bucketName, directoryInfo.getName())),
+              new CacheValue<>(Optional.of(directoryInfo),
+                      trxnLogIndex));
+
     }
 
     return missingParentInfos;
@@ -374,4 +398,32 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setUpdateID(objectId);
   }
 
+  /**
+   * fill in a DirectoryInfo for a new directory entry in OM database.
+   * without initializing ACLs from the KeyArgs - used for intermediate
+   * directories which get created internally/recursively during file
+   * and directory create.
+   * @param keyName
+   * @param keyArgs
+   * @param objectId
+   * @param parentObjectId
+   * @param  inheritAcls
+   * @return the OmDirectoryInfo structure
+   */
+  public static OmDirectoryInfo createDirectoryInfoWithACL(
+          String keyName, KeyArgs keyArgs, long objectId, long parentObjectId,
+          List<OzoneAcl> inheritAcls) {
+    String dirName = OzoneFSUtils.getDirName(keyName);
+
+    return OmDirectoryInfo.newBuilder()
+            .setName(dirName)
+            .setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName())
+            .setCreationTime(keyArgs.getModificationTime())
+            .setModificationTime(keyArgs.getModificationTime())
+            .setObjectID(objectId)
+            .setUpdateID(objectId)
+            .setParentObjectID(parentObjectId)
+            .setAcls(inheritAcls).build();
+  }
 }

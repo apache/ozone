@@ -35,12 +35,12 @@ import java.util.stream.Collectors;
  * can be extended for other OzFS optimizations in future.
  */
 // TODO: support Auditable interface
-public final class OmPrefixInfo extends WithObjectID {
+public class OmPrefixInfo extends WithObjectID {
 
   private String name;
   private List<OzoneAcl> acls;
 
-  public OmPrefixInfo(String name, List<OzoneAcl> acls,
+  protected OmPrefixInfo(String name, List<OzoneAcl> acls,
       Map<String, String> metadata, long objectId, long updateId) {
     this.name = name;
     this.acls = acls;

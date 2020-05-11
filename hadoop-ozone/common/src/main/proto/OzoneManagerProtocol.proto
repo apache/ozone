@@ -558,6 +558,20 @@ message PrefixInfo {
     optional uint64 updateID = 5;
 }
 
+message DirectoryInfo {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    required string name = 3;
+    required uint64 creationTime = 4;
+    required uint64 modificationTime = 5;
+    optional uint64 latestVersion = 6;
+    repeated hadoop.hdds.KeyValue metadata = 7;
+    repeated OzoneAclInfo acls = 8;
+    optional uint64 objectID = 9;
+    optional uint64 updateID = 10;
+    optional uint64 parentID = 11;
+}
+
 message OzoneObj {
   enum ObjectType {
     VOLUME = 1;

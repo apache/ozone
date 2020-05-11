@@ -75,6 +75,24 @@ public final class OzoneFSUtils {
     return descendant;
   }
 
+  /**
+   * The function returns file name from the given absolute path. For
+   * example, the given key path '/a/b/c/d/e/file1' then it returns file name
+   * 'file1'.
+   */
+  public static String getDirName(String keyName) {
+    if (keyName.endsWith("/")) {
+      keyName = keyName.substring(0, keyName.lastIndexOf("/"));
+    }
+    int keyNameIndx = keyName.lastIndexOf("/");
+    if (keyNameIndx > 0) {
+      return keyName.substring(keyNameIndx + 1);
+    } else if (!keyName.contains("/")) {
+      return keyName;
+    }
+    return "";
+  }
+
   public static String addTrailingSlashIfNeeded(String key) {
     if (!key.endsWith(OZONE_URI_DELIMITER)) {
       return key + OZONE_URI_DELIMITER;

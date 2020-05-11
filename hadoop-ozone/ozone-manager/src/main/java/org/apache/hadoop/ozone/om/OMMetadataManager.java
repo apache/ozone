@@ -22,13 +22,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserVolumeInfo;
@@ -313,6 +307,12 @@ public interface OMMetadataManager {
    * @return Table.
    */
   Table<String, OmPrefixInfo> getPrefixTable();
+
+  /**
+   * Gets the DirectoryTable.
+   * @return Table.
+   */
+  Table<String, OmDirectoryInfo> getDirectoryTable();
 
   /**
    * Returns the DB key name of a multipart upload key in OM metadata store.

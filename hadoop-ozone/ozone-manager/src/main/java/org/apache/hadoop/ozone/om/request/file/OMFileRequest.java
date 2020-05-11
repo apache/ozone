@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -252,6 +253,26 @@ public final class OMFileRequest {
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
                   keyInfo.get().getKeyName())),
           new CacheValue<>(keyInfo, index));
+    }
+  }
+
+  public static void addDirectoryTableCacheEntries(
+          OMMetadataManager omMetadataManager, String volumeName,
+          String bucketName, Optional<OmDirectoryInfo> dirInfo,
+          Optional<List<OmDirectoryInfo>> parentInfoList,
+          long index) {
+    for (OmDirectoryInfo parentInfo : parentInfoList.get()) {
+      omMetadataManager.getDirectoryTable().addCacheEntry(
+              new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
+                      parentInfo.getName())),
+              new CacheValue<>(Optional.of(parentInfo), index));
+    }
+
+    if (dirInfo.isPresent()) {
+      omMetadataManager.getDirectoryTable().addCacheEntry(
+              new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
+                      dirInfo.get().getName())),
+              new CacheValue<>(dirInfo, index));
     }
   }
 }
