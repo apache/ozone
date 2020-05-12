@@ -27,6 +27,9 @@ import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.ReadOnlyLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.FilesystemLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.AgedLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.AgedDirLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.RandomDirLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.NestedDirLoadGenerator;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Ignore;
@@ -117,6 +120,9 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
         .addLoadGenerator(AgedLoadGenerator.class)
         .addLoadGenerator(FilesystemLoadGenerator.class)
         .addLoadGenerator(ReadOnlyLoadGenerator.class)
+        .addLoadGenerator(RandomDirLoadGenerator.class)
+        .addLoadGenerator(AgedDirLoadGenerator.class)
+        .addLoadGenerator(NestedDirLoadGenerator.class)
         .build();
   }
 
