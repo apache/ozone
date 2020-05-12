@@ -462,6 +462,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
 
+    if (status == null) {
+      return false;
+    }
+
     String key = pathToKey(f);
     boolean result;
 
