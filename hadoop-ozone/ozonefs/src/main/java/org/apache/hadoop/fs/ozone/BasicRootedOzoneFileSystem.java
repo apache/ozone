@@ -62,6 +62,8 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
 
 /**
  * The minimal Ozone Filesystem implementation.
@@ -472,9 +474,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return false;
       }
 
-      // Handling root and volume deletion
       OFSPath ofsPath = new OFSPath(key);
 
+      // Handle rm root
       if (ofsPath.isRoot()) {
         Iterator<? extends OzoneVolume> it =
             adapterImpl.getObjectStore().listVolumes("");
@@ -487,6 +489,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return true;
       }
 
+      // Handle delete volume
       if (ofsPath.isVolume()) {
         String volumeName = ofsPath.getVolumeName();
         if (recursive) {
@@ -501,19 +504,38 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
             delete(new Path(nextBucket), true);
           }
         }
-        adapterImpl.getObjectStore().deleteVolume(volumeName);
-        return true;
+        try {
+          adapterImpl.getObjectStore().deleteVolume(volumeName);
+          return true;
+        } catch (OMException ex) {
+          // volume is not empty
+          if (ex.getResult() == VOLUME_NOT_EMPTY) {
+            throw new PathIsNotEmptyDirectoryException(f.toString());
+          } else {
+            throw ex;
+          }
+        }
       }
 
       result = innerDelete(f, recursive);
 
-      // Delete bucket
+      // Handle delete bucket
       if (ofsPath.isBucket()) {
         OzoneVolume volume =
             adapterImpl.getObjectStore().getVolume(ofsPath.getVolumeName());
-        volume.deleteBucket(ofsPath.getBucketName());
-        return result;
+        try {
+          volume.deleteBucket(ofsPath.getBucketName());
+          return result;
+        } catch (OMException ex) {
+          // bucket is not empty
+          if (ex.getResult() == BUCKET_NOT_EMPTY) {
+            throw new PathIsNotEmptyDirectoryException(f.toString());
+          } else {
+            throw ex;
+          }
+        }
       }
+
     } else {
       LOG.debug("delete: Path is a file: {}", f);
       result = adapter.deleteObject(key);
