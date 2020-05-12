@@ -61,6 +61,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_EN
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
@@ -116,8 +120,17 @@ public class OzoneManagerServiceProviderImpl
       ReconUtils reconUtils,
       OzoneManagerProtocol ozoneManagerClient) {
 
+    int connectionTimeout = (int) configuration.getTimeDuration(
+        RECON_OM_CONNECTION_TIMEOUT,
+        RECON_OM_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+    int connectionRequestTimeout = (int)configuration.getTimeDuration(
+        RECON_OM_CONNECTION_REQUEST_TIMEOUT,
+        RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+
     connectionFactory =
-        URLConnectionFactory.newDefaultURLConnectionFactory(configuration);
+        URLConnectionFactory.newDefaultURLConnectionFactory(connectionTimeout,
+            connectionRequestTimeout, configuration);
+
     String ozoneManagerHttpAddress = configuration.get(OMConfigKeys
         .OZONE_OM_HTTP_ADDRESS_KEY);
 
@@ -218,6 +231,9 @@ public class OzoneManagerServiceProviderImpl
     omMetadataManager.stop();
     scheduler.shutdownNow();
     metrics.unRegister();
+    // TODO: update pom to hadoop-3.2.1
+    // HDFS-14037 is not available from hadoop-3.2.0
+    // connectionFactory.destroy();
   }
 
   /**
