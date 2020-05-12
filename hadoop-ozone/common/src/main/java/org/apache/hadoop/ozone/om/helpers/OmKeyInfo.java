@@ -408,6 +408,9 @@ public final class OmKeyInfo extends WithObjectID {
   }
 
   public static OmKeyInfo getFromProtobuf(KeyInfo keyInfo) {
+    if (keyInfo == null) {
+      return null;
+    }
     Builder builder = new Builder()
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
