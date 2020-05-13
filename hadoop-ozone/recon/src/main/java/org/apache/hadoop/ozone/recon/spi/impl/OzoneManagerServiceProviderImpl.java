@@ -231,9 +231,7 @@ public class OzoneManagerServiceProviderImpl
     omMetadataManager.stop();
     scheduler.shutdownNow();
     metrics.unRegister();
-    // TODO: update pom to hadoop-3.2.1
-    // HDFS-14037 is not available from hadoop-3.2.0
-    // connectionFactory.destroy();
+    connectionFactory.destroy();
   }
 
   /**

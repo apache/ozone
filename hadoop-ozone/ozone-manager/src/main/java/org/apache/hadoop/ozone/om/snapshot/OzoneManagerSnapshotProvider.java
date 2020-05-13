@@ -165,4 +165,10 @@ public class OzoneManagerSnapshotProvider {
     omCheckpoint.setRatisSnapshotTerm(snapshotTerm[0]);
     return omCheckpoint;
   }
+
+  public void stop() {
+    if (connectionFactory != null) {
+      connectionFactory.destroy();
+    }
+  }
 }
