@@ -257,7 +257,7 @@ public class TestKeyInputStream {
 
     // Seek operation should not result in any readChunk operation.
     Assert.assertEquals(readChunkCount, metrics
-        .getContainerOpsMetrics(ContainerProtos.Type.ReadChunk));
+        .getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
 
     byte[] readData = new byte[chunkSize];
     keyInputStream.read(readData, 0, chunkSize);
