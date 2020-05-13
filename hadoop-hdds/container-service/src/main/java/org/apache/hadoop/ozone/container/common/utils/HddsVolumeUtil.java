@@ -137,7 +137,7 @@ public final class HddsVolumeUtil {
   }
 
   /**
-   * Returns layOutVersion if it is valid. Throws an exception otherwise.
+   * Returns layoutVersion if it is valid. Throws an exception otherwise.
    */
   @VisibleForTesting
   public static int getLayOutVersion(Properties props, File versionFile) throws
@@ -152,8 +152,8 @@ public final class HddsVolumeUtil {
       int[] supportedVs =
           Stream.of(DataNodeLayoutVersion.getAllVersions())
               .mapToInt(DataNodeLayoutVersion::getVersion).toArray();
-      throw new InconsistentStorageStateException("Invalid layOutVersion. " +
-          "Version file has layOutVersion as " + lv + " which is unsupported" +
+      throw new InconsistentStorageStateException("Invalid layoutVersion. " +
+          "Version file has layoutVersion as " + lv + " which is unsupported" +
           ". Supported versions are " + Arrays.toString(supportedVs));
     }
     return lv;
