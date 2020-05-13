@@ -696,6 +696,11 @@ public class TestOzoneManagerHA {
       throws IOException {
     RpcClient clientProxy =
         (RpcClient) objectStore.getClientProxy();
+    return getFailoverProxyProvider(clientProxy);
+  }
+
+  private OMFailoverProxyProvider getFailoverProxyProvider(
+      RpcClient clientProxy) {
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
         (OzoneManagerProtocolClientSideTranslatorPB) clientProxy
             .getOzoneManagerClient();
@@ -819,7 +824,8 @@ public class TestOzoneManagerHA {
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
       final ObjectStore store = OzoneClientFactory.getRpcClient(
           omServiceId, conf).getObjectStore();
-      final OMFailoverProxyProvider proxyProvider = getFailoverProxyProvider();
+      final OMFailoverProxyProvider proxyProvider =
+          getFailoverProxyProvider((RpcClient) store.getClientProxy());
 
       // Failover to the OM node that the objectStore points to
       omFailoverProxyProvider.performFailoverIfRequired(
