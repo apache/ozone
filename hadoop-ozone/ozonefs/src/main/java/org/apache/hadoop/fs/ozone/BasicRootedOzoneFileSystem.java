@@ -482,15 +482,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
       // Handle rm root
       if (ofsPath.isRoot()) {
-        Iterator<? extends OzoneVolume> it =
-            adapterImpl.getObjectStore().listVolumes("");
-        while (it.hasNext()) {
-          OzoneVolume volume = it.next();
-          String nextVolume = addTrailingSlashIfNeeded(
-              f.toString()) + volume.getName();
-          delete(new Path(nextVolume), true);
-        }
-        return true;
+        // Intentionally drop support for rm root
+        // because it is too dangerous and doesn't provide much value
+        LOG.warn("delete: OFS does not support rm root. "
+            + "To wipe the cluster, please re-init OM instead.");
+        return false;
       }
 
       // Handle delete volume
