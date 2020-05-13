@@ -98,7 +98,7 @@ public class TestDatanodeVersionFile {
     dnVersionFile.createVersionFile(invalidVersionFile);
     Properties invProperties = dnVersionFile.readFrom(invalidVersionFile);
     LambdaTestUtils.intercept(InconsistentStorageStateException.class,
-        "Version file has layOutVersion as 2 which is unsupported" +
+        "Version file has layoutVersion as 2 which is unsupported" +
         ". Supported versions are [1]",
         () -> HddsVolumeUtil.getLayOutVersion(invProperties,
             invalidVersionFile));
