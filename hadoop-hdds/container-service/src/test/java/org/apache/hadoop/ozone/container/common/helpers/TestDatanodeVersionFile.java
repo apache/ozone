@@ -145,7 +145,7 @@ public class TestDatanodeVersionFile {
       HddsVolumeUtil.getLayOutVersion(props, versionFile);
       fail("Test failure in testVerifyLayOut");
     } catch (InconsistentStorageStateException ex) {
-      GenericTestUtils.assertExceptionContains("Invalid layOutVersion.", ex);
+      GenericTestUtils.assertExceptionContains("Invalid layoutVersion.", ex);
     }
   }
 }
