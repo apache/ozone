@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -39,6 +40,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -103,6 +105,13 @@ public class TestReplicationManager {
           return IntStream.range(0, count)
               .mapToObj(i -> randomDatanodeDetails())
               .collect(Collectors.toList());
+        });
+
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.anyListOf(DatanodeDetails.class),
+        Mockito.anyInt()
+        )).thenAnswer(invocation ->  {
+          return new ContainerPlacementStatusDefault(2, 2, 3);
         });
 
     replicationManager = new ReplicationManager(
@@ -635,6 +644,119 @@ public class TestReplicationManager {
 
   }
 
+  @Test
+  public void additionalReplicaScheduledWhenMisReplicated()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    final ContainerID id = container.containerID();
+    final UUID originNodeId = UUID.randomUUID();
+    final ContainerReplica replicaOne = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaTwo = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaThree = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+
+    containerStateManager.loadContainer(container);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaThree);
+
+    // Ensure a mis-replicated status is returned for any containers in this
+    // test where there are 3 replicas. When there are 2 or 4 replicas
+    // the status returned will be healthy.
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.argThat(new ListOfNElements(3)),
+        Mockito.anyInt()
+    )).thenAnswer(invocation ->  {
+      return new ContainerPlacementStatusDefault(1, 2, 3);
+    });
+
+    int currentReplicateCommandCount = datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
+
+    replicationManager.processContainersNow();
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    // At this stage, due to the mocked calls to validteContainerPlacement
+    // the mis-replicated racks will not have improved, so expect to see nothing
+    // scheduled.
+    Assert.assertEquals(currentReplicateCommandCount + 1, datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand));
+
+    // Now make it so that all containers seem mis-replicated no matter how
+    // many replicas. This will test replicas are not scheduled if the new
+    // replica does not fix the mis-replication.
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.anyList(),
+        Mockito.anyInt()
+    )).thenAnswer(invocation ->  {
+      return new ContainerPlacementStatusDefault(1, 2, 3);
+    });
+
+    currentReplicateCommandCount = datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand);
+
+    replicationManager.processContainersNow();
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    // At this stage, due to the mocked calls to validteContainerPlacement
+    // the mis-replicated racks will not have improved, so expect to see nothing
+    // scheduled.
+    Assert.assertEquals(currentReplicateCommandCount, datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand));
+  }
+
+  @Test
+  public void overReplicatedButRemovingMakesMisReplicated()
+      throws SCMException, ContainerNotFoundException, InterruptedException {
+    // In this test, the excess replica should not be removed.
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    final ContainerID id = container.containerID();
+    final UUID originNodeId = UUID.randomUUID();
+    final ContainerReplica replicaOne = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaTwo = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaThree = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaFour = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaFive = getReplicas(
+        id, State.UNHEALTHY, 1000L, originNodeId, randomDatanodeDetails());
+
+    containerStateManager.loadContainer(container);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaThree);
+    containerStateManager.updateContainerReplica(id, replicaFour);
+    containerStateManager.updateContainerReplica(id, replicaFive);
+
+    // Ensure a mis-replicated status is returned for any containers in this
+    // test where there are exactly 3 replicas checked.
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.argThat(new ListOfNElements(3)),
+        Mockito.anyInt()
+    )).thenAnswer(
+        invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
+
+    int currentDeleteCommandCount = datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+
+    replicationManager.processContainersNow();
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    // The unhealthy replica should be removed, but not the other replica
+    // as each time we test with 3 replicas, Mockitor ensures it returns
+    // mis-replicated
+    Assert.assertEquals(currentDeleteCommandCount + 1, datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+
+    Assert.assertTrue(datanodeCommandHandler.received(
+        SCMCommandProto.Type.deleteContainerCommand,
+        replicaFive.getDatanodeDetails()));
+  }
+
   @After
   public void teardown() throws IOException {
     containerStateManager.close();
@@ -685,6 +807,20 @@ public class TestReplicationManager {
       return commands.stream().anyMatch(dc ->
           dc.getCommand().getType().equals(type) &&
               dc.getDatanodeId().equals(datanode.getUuid()));
+    }
+  }
+
+  class ListOfNElements extends ArgumentMatcher<List> {
+
+    private int expected;
+
+    ListOfNElements(int expected) {
+      this.expected = expected;
+    }
+
+    @Override
+    public boolean matches(Object argument) {
+      return ((List)argument).size() == expected;
     }
   }
 
