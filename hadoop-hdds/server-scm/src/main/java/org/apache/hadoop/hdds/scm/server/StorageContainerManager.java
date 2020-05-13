@@ -220,7 +220,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @param conf configuration
    */
-  public StorageContainerManager(OzoneConfiguration conf)
+  private StorageContainerManager(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
     // default empty configurator means default managers will be used.
     this(conf, new SCMConfigurator());
@@ -236,7 +236,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param conf - Configuration
    * @param configurator - configurator
    */
-  public StorageContainerManager(OzoneConfiguration conf,
+  private StorageContainerManager(OzoneConfiguration conf,
                                  SCMConfigurator configurator)
       throws IOException, AuthenticationException  {
     super(HddsVersionInfo.HDDS_VERSION_INFO);
@@ -269,15 +269,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       loginAsSCMUser(conf);
     }
 
-    // Initialize SCM Ratis Server
-    if (SCMHAUtils.isSCMHAEnabled(conf)) {
-      this.scmRatisSnapshotInfo = new SCMRatisSnapshotInfo(
-          scmStorageConfig.getCurrentDir());
-      this.scmRatisSnapshotDir = SCMHAUtils.createSCMRatisDir(conf);
-      initializeRatisServer();
-    } else {
-      scmRatisServer = null;
-    }
+    this.scmRatisSnapshotInfo = new SCMRatisSnapshotInfo(
+        scmStorageConfig.getCurrentDir());
+    this.scmRatisSnapshotDir = SCMHAUtils.createSCMRatisDir(conf);
 
     // Creates the SCM DBs or opens them if it exists.
     // A valid pointer to the store is required by all the other services below.
@@ -386,6 +380,42 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmSafeModeManager.emitSafeModeStatus();
     registerMXBean();
     registerMetricsSource(this);
+  }
+
+  /**
+   * Create an SCM instance based on the supplied configuration.
+   *
+   * @param conf        HDDS configuration
+   * @return SCM instance
+   * @throws IOException, AuthenticationException
+   */
+  public static StorageContainerManager createSCM(
+      OzoneConfiguration conf, SCMConfigurator configurator)
+      throws IOException, AuthenticationException {
+    StorageContainerManager scm = new StorageContainerManager(
+          conf, configurator);
+    if (SCMHAUtils.isSCMHAEnabled(conf) && scm.getScmRatisServer() == null) {
+      SCMRatisServer scmRatisServer = initializeRatisServer(conf, scm);
+      scm.setScmRatisServer(scmRatisServer);
+    }
+    return scm;
+  }
+
+  /**
+   * Create an SCM instance based on the supplied configuration.
+   *
+   * @param conf        HDDS configuration
+   * @return SCM instance
+   * @throws IOException, AuthenticationException
+   */
+  public static StorageContainerManager createSCM(OzoneConfiguration conf)
+      throws IOException, AuthenticationException {
+    StorageContainerManager scm = new StorageContainerManager(conf);
+    if (SCMHAUtils.isSCMHAEnabled(conf) && scm.getScmRatisServer() == null) {
+      SCMRatisServer scmRatisServer = initializeRatisServer(conf, scm);
+      scm.setScmRatisServer(scmRatisServer);
+    }
+    return scm;
   }
 
   /**
@@ -632,18 +662,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     DFSUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;
-  }
-
-  /**
-   * Create an SCM instance based on the supplied configuration.
-   *
-   * @param conf        HDDS configuration
-   * @return SCM instance
-   * @throws IOException, AuthenticationException
-   */
-  public static StorageContainerManager createSCM(OzoneConfiguration conf)
-      throws IOException, AuthenticationException {
-    return new StorageContainerManager(conf);
   }
 
   /**
@@ -1138,25 +1156,29 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return this.clusterMap;
   }
 
-  private void initializeRatisServer() throws IOException {
-    if (scmRatisServer == null) {
-      SCMNodeDetails scmNodeDetails = SCMNodeDetails
-          .initStandAlone(configuration);
-      //TODO enable Ratis group
-      scmRatisServer = SCMRatisServer.newSCMRatisServer(configuration
-              .getObject(SCMRatisServer.SCMRatisServerConfiguration.class),
-          this, scmNodeDetails, Collections.EMPTY_LIST,
-          SCMRatisServer.getSCMRatisDirectory(configuration));
-      if (scmRatisServer != null) {
-        LOG.info("SCM Ratis server initialized at port {}",
-            scmRatisServer.getServerPort());
-      }
+  private static SCMRatisServer initializeRatisServer(
+      OzoneConfiguration conf, StorageContainerManager scm) throws IOException {
+    SCMNodeDetails scmNodeDetails = SCMNodeDetails
+        .initStandAlone(conf);
+    //TODO enable Ratis group
+    SCMRatisServer scmRatisServer = SCMRatisServer.newSCMRatisServer(
+        conf.getObject(SCMRatisServer.SCMRatisServerConfiguration.class),
+        scm, scmNodeDetails, Collections.EMPTY_LIST,
+        SCMRatisServer.getSCMRatisDirectory(conf));
+    if (scmRatisServer != null) {
+      LOG.info("SCM Ratis server initialized at port {}",
+          scmRatisServer.getServerPort());
     }
+    return scmRatisServer;
   }
 
   @VisibleForTesting
   public SCMRatisServer getScmRatisServer() {
     return scmRatisServer;
+  }
+
+  public void setScmRatisServer(SCMRatisServer scmRatisServer) {
+    this.scmRatisServer = scmRatisServer;
   }
 
   @VisibleForTesting
