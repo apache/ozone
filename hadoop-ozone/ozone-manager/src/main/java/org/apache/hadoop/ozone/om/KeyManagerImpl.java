@@ -1701,7 +1701,7 @@ public class KeyManagerImpl implements KeyManager {
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
         validateBucket(volumeName, bucketName);
-        return new OzoneFileStatus(OZONE_URI_DELIMITER);
+        return new OzoneFileStatus();
       }
 
       // Check if the key is a file.
@@ -1765,7 +1765,7 @@ public class KeyManagerImpl implements KeyManager {
       Path keyPath = Paths.get(keyName);
       OzoneFileStatus status =
           verifyNoFilesInPath(volumeName, bucketName, keyPath, false);
-      if (status != null && OzoneFSUtils.pathToKey(status.getPath())
+      if (status != null && status.getTrimmedName()
           .equals(keyName)) {
         // if directory already exists
         return;
@@ -2037,8 +2037,13 @@ public class KeyManagerImpl implements KeyManager {
                 // if entry is a directory
                 if (!deletedKeySet.contains(entryInDb)) {
                   if (!entryKeyName.equals(immediateChild)) {
+                    OmKeyInfo fakeDirEntry = new OmKeyInfo.Builder()
+                        .setVolumeName(omKeyInfo.getVolumeName())
+                        .setBucketName(omKeyInfo.getBucketName())
+                        .setKeyName(immediateChild)
+                        .build();
                     cacheKeyMap.put(entryInDb,
-                        new OzoneFileStatus(immediateChild));
+                        new OzoneFileStatus(fakeDirEntry, scmBlockSize, true));
                   } else {
                     // If entryKeyName matches dir name, we have the info
                     cacheKeyMap.put(entryInDb,
