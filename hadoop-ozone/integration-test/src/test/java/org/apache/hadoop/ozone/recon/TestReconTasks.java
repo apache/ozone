@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
+import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -114,7 +114,7 @@ public class TestReconTasks {
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
     LambdaTestUtils.await(120000, 10000, () -> {
-      List<MissingContainers> allMissingContainers =
+      List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
               .getAllMissingContainers();
       return (allMissingContainers.size() == 1);
@@ -123,7 +123,7 @@ public class TestReconTasks {
     // Restart the Datanode to make sure we remove the missing container.
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     LambdaTestUtils.await(120000, 10000, () -> {
-      List<MissingContainers> allMissingContainers =
+      List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
               .getAllMissingContainers();
       return (allMissingContainers.isEmpty());
