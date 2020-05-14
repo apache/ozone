@@ -490,10 +490,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           OzoneVolume volume =
               adapterImpl.getObjectStore().getVolume(volumeName);
           Iterator<? extends OzoneBucket> it = volume.listBuckets("");
+          String prefixVolumePathStr = addTrailingSlashIfNeeded(f.toString());
           while (it.hasNext()) {
             OzoneBucket bucket = it.next();
-            String nextBucket = addTrailingSlashIfNeeded(
-                f.toString()) + bucket.getName();
+            String nextBucket = prefixVolumePathStr + bucket.getName();
             delete(new Path(nextBucket), true);
           }
         }
