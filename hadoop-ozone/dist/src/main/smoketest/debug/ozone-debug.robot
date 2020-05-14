@@ -32,6 +32,4 @@ Test ozone debug
     ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.[]'
                     Should contain      ${result}       files
     ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.[].files[0]'
-    ${result3} =    Execute             echo "exists"
-    ${result2} =    Execute             test -f ${result} && echo "exists"
-                    Should Be Equal     ${result2}       ${result3}
+                    File Should Exist             ${result}
