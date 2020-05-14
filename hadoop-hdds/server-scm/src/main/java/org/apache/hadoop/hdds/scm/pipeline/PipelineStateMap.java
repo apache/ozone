@@ -211,7 +211,7 @@ class PipelineStateMap {
 
     if (state == PipelineState.OPEN) {
       List<Pipeline> pipeline =
-        query2OpenPipelines.get(new PipelineQuery(type, factor));
+          query2OpenPipelines.get(new PipelineQuery(type, factor));
       if (pipeline == null) {
         return Collections.EMPTY_LIST;
       }
