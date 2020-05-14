@@ -18,28 +18,17 @@
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
+export SECURITY_ENABLED=true
+export OM_SERVICE_ID="id1"
+
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
-
-export SECURITY_ENABLED=true
 
 start_docker_env
 
 execute_robot_test scm kinit.robot
 
-execute_robot_test scm basic
-
-execute_robot_test scm security
-
-execute_robot_test scm ozonefs/ozonefs.robot
-
-execute_robot_test s3g s3
-
-execute_robot_test scm admincli
-
-execute_robot_test scm recon
-
-execute_robot_test scm spnego
+execute_robot_test scm freon
 
 stop_docker_env
 
