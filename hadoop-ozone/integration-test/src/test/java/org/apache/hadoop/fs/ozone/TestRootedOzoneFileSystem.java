@@ -800,9 +800,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Test
-  public void testDeleteVolumeAndBucket() throws IOException {
-    // Case 1: Delete empty volume
-
+  public void testDeleteEmptyVolume() throws IOException {
     // Create volume
     String volumeStr1 = getRandomNonExistVolumeName();
     Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
@@ -815,9 +813,10 @@ public class TestRootedOzoneFileSystem {
     // Verify the volume is deleted
     Assert.assertFalse(volumeStr1 + " should have been deleted!",
         volumeExist(volumeStr1));
+  }
 
-    // Case 2: Delete volume and bucket
-
+  @Test
+  public void testDeleteVolumeAndBucket() throws IOException {
     // Create volume and bucket
     String volumeStr2 = getRandomNonExistVolumeName();
     Path volumePath2 = new Path(OZONE_URI_DELIMITER + volumeStr2);
@@ -836,9 +835,10 @@ public class TestRootedOzoneFileSystem {
     Assert.assertTrue(fs.delete(volumePath2, false));
     // Verify the volume is deleted
     Assert.assertFalse(volumeExist(volumeStr2));
+  }
 
-    // Case 3: Delete volume, bucket and key
-
+  @Test
+  public void testDeleteVolumeBucketAndKey() throws IOException {
     // Create test volume, bucket and key
     String volumeStr3 = getRandomNonExistVolumeName();
     Path volumePath3 = new Path(OZONE_URI_DELIMITER + volumeStr3);
@@ -857,14 +857,20 @@ public class TestRootedOzoneFileSystem {
     // Verify the volume is deleted
     Assert.assertFalse(volumeExist(volumeStr3));
 
-    // Case 4: Recursively delete volume
-
+    // Test recursively delete volume
     // Create test volume, bucket and key
     fs.mkdirs(dirPath3);
     // Delete volume recursively
     Assert.assertTrue(fs.delete(volumePath3, true));
     // Verify the volume is deleted
     Assert.assertFalse(volumeExist(volumeStr3));
+  }
+
+  @Test
+  public void testFailToDeleteRoot() throws IOException {
+    // rm root should always fail for OFS
+    Assert.assertFalse(fs.delete(new Path("/"), false));
+    Assert.assertFalse(fs.delete(new Path("/"), true));
   }
 
 }
