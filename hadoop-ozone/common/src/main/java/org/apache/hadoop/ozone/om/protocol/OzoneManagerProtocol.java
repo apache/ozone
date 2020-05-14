@@ -79,9 +79,11 @@ public interface OzoneManagerProtocol
    * Changes the owner of a volume.
    * @param volume  - Name of the volume.
    * @param owner - Name of the owner.
+   * @return true if operation succeeded, false if specified user is
+   *         already the owner.
    * @throws IOException
    */
-  void setOwner(String volume, String owner) throws IOException;
+  boolean setOwner(String volume, String owner) throws IOException;
 
   /**
    * Changes the Quota on a volume.

@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -457,14 +458,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Changes the owner of a volume.
-   *
-   * @param volume - Name of the volume.
-   * @param owner - Name of the owner.
-   * @throws IOException
+   * {@inheritDoc}
    */
   @Override
-  public void setOwner(String volume, String owner) throws IOException {
+  public boolean setOwner(String volume, String owner) throws IOException {
     SetVolumePropertyRequest.Builder req =
         SetVolumePropertyRequest.newBuilder();
     req.setVolumeName(volume).setOwnerName(owner);
@@ -474,7 +471,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
+    OzoneManagerProtocolProtos.SetVolumePropertyResponse response =
+        handleError(omResponse).getSetVolumePropertyResponse();
+
+    return response.getResponse();
   }
 
   /**

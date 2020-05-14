@@ -1687,14 +1687,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Changes the owner of a volume.
-   *
-   * @param volume - Name of the volume.
-   * @param owner - Name of the owner.
-   * @throws IOException
+   * {@inheritDoc}
    */
   @Override
-  public void setOwner(String volume, String owner) throws IOException {
+  public boolean setOwner(String volume, String owner) throws IOException {
     if(isAclEnabled) {
       checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.WRITE_ACL, volume,
           null, null);
@@ -1706,6 +1702,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       volumeManager.setOwner(volume, owner);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.SET_OWNER,
           auditMap));
+      return true;
     } catch (Exception ex) {
       metrics.incNumVolumeUpdateFails();
       AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.SET_OWNER,
