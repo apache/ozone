@@ -33,3 +33,4 @@ Test ozone debug
                     Should contain      ${result}       files
     ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.[].files[0]'
                     File Should Exist   ${result}
+
