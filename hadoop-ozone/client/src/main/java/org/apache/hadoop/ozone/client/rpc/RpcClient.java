@@ -314,11 +314,11 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void setVolumeOwner(String volumeName, String owner)
+  public boolean setVolumeOwner(String volumeName, String owner)
       throws IOException {
     verifyVolumeName(volumeName);
     Preconditions.checkNotNull(owner);
-    ozoneManagerClient.setOwner(volumeName, owner);
+    return ozoneManagerClient.setOwner(volumeName, owner);
   }
 
   @Override
