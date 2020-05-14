@@ -210,13 +210,9 @@ class PipelineStateMap {
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");
 
     if (state == PipelineState.OPEN) {
-      List<Pipeline> pipeline =
-          query2OpenPipelines.get(new PipelineQuery(type, factor));
-      if (pipeline == null) {
-        return Collections.EMPTY_LIST;
-      }
       return Collections.unmodifiableList(
-          query2OpenPipelines.get(new PipelineQuery(type, factor)));
+          query2OpenPipelines.getOrDefault(new PipelineQuery(type, factor)),
+          Collections.EMPTY_LIST);
     }
     return pipelineMap.values().stream().filter(
         pipeline -> pipeline.getType() == type
