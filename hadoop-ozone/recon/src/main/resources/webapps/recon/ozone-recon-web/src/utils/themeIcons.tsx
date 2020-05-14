@@ -35,17 +35,21 @@ export class FilledIcon extends React.Component {
 
 interface IRatisIconProps {
   replicationFactor: number;
+  isLeader: boolean;
 }
 
 interface IReplicationIconProps {
   replicationFactor: number;
   replicationType: string;
+  leaderNode: string;
+  isLeader: boolean;
 }
 
 export class RatisIcon extends React.PureComponent<IRatisIconProps> {
   render() {
-    const {replicationFactor} = this.props;
-    const textClass = replicationFactor >= 3 ? 'icon-text-three-dots' : 'icon-text-one-dot';
+    const {replicationFactor, isLeader} = this.props;
+    const threeFactorClass = isLeader ? 'icon-text-three-dots-leader' : 'icon-text-three-dots';
+    const textClass = replicationFactor >= 3 ? threeFactorClass : 'icon-text-one-dot';
     return (
       <div className='ratis-icon'>
         <div className={textClass}>R</div>
@@ -66,11 +70,11 @@ export class StandaloneIcon extends React.PureComponent {
 
 export class ReplicationIcon extends React.PureComponent<IReplicationIconProps> {
   render() {
-    const {replicationType, replicationFactor} = this.props;
+    const {replicationType, replicationFactor, isLeader, leaderNode} = this.props;
     // Assign icons only for RATIS and STAND_ALONE types
     let icon = null;
     if (replicationType === 'RATIS') {
-      icon = <RatisIcon replicationFactor={replicationFactor}/>;
+      icon = <RatisIcon replicationFactor={replicationFactor} isLeader={isLeader}/>;
     } else if (replicationType === 'STAND_ALONE') {
       icon = <StandaloneIcon/>;
     }
@@ -81,10 +85,11 @@ export class ReplicationIcon extends React.PureComponent<IReplicationIconProps> 
         <div>
           <div>Replication Type: {replicationType}</div>
           <div>Replication Factor: {replicationFactor}</div>
+          <div>Leader Node: {leaderNode}</div>
         </div>
       );
       icon = (
-        <Tooltip title={tooltip} placement='right'>
+        <Tooltip title={tooltip} placement='right' className='pointer'>
           <div className='replication-icon'>{icon}</div>
         </Tooltip>
       );

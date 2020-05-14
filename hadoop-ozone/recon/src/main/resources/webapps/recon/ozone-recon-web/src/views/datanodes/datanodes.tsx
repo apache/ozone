@@ -18,7 +18,7 @@
 
 import React from 'react';
 import axios from 'axios';
-import {Table, Icon} from 'antd';
+import {Table, Icon, Tooltip} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
@@ -36,6 +36,7 @@ interface IDatanodeResponse {
   storageReport: IStorageReport;
   pipelines: IPipeline[];
   containers: number;
+  leaderCount: number;
 }
 
 interface IDatanodesResponse {
@@ -52,12 +53,14 @@ interface IDatanode {
   storageRemaining: number;
   pipelines: IPipeline[];
   containers: number;
+  leaderCount: number;
 }
 
 interface IPipeline {
   pipelineID: string;
   replicationType: string;
   replicationFactor: number;
+  leaderNode: string;
 }
 
 interface IDatanodesState {
@@ -117,13 +120,16 @@ const COLUMNS = [
     title: 'Pipeline ID(s)',
     dataIndex: 'pipelines',
     key: 'pipelines',
-    render: (pipelines: IPipeline[]) => {
+    render: (pipelines: IPipeline[], record: IDatanode) => {
       return (
         <div>
           {
             pipelines.map((pipeline, index) => (
               <div key={index} className='pipeline-container'>
-                <ReplicationIcon replicationFactor={pipeline.replicationFactor} replicationType={pipeline.replicationType}/>
+                <ReplicationIcon replicationFactor={pipeline.replicationFactor}
+                                 replicationType={pipeline.replicationType}
+                                 leaderNode={pipeline.leaderNode}
+                                 isLeader={pipeline.leaderNode === record.hostname}/>
                 {pipeline.pipelineID}
               </div>
             ))
@@ -131,6 +137,17 @@ const COLUMNS = [
         </div>
       );
     }
+  },
+  {
+    title: <span>
+      Leader Count&nbsp;
+      <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
+        <Icon type='info-circle'/>
+      </Tooltip>
+    </span>,
+    dataIndex: 'leaderCount',
+    key: 'leaderCount',
+    sorter: (a: IDatanode, b: IDatanode) => a.leaderCount - b.leaderCount
   },
   {
     title: 'Containers',
@@ -171,7 +188,8 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           storageTotal: datanode.storageReport.capacity,
           storageRemaining: datanode.storageReport.remaining,
           pipelines: datanode.pipelines,
-          containers: datanode.containers
+          containers: datanode.containers,
+          leaderCount: datanode.leaderCount
         };
       });
       this.setState({
