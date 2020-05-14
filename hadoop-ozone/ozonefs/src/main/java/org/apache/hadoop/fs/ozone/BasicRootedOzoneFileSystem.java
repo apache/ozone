@@ -471,13 +471,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     if (status.isDirectory()) {
       LOG.debug("delete: Path is a directory: {}", f);
-      key = addTrailingSlashIfNeeded(key);
-
-      if (key.equals("/")) {
-        LOG.warn("Cannot delete root directory.");
-        return false;
-      }
-
       OFSPath ofsPath = new OFSPath(key);
 
       // Handle rm root
