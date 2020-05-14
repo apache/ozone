@@ -18,20 +18,18 @@ Documentation       Test ozone Debug CLI
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Test Timeout        2 minute
-
+Suite Setup         Write key
 *** Variables ***
 
+*** Keywords ***
+Write key
+    Execute             ozone sh volume create o3://om/vol1 --quota 100TB
+    Execute             ozone sh bucket create o3://om/vol1/bucket1
+    Execute             ozone sh key put o3://om/vol1/bucket1/debugKey /opt/hadoop/NOTICE.txt
 
 *** Test Cases ***
-Create Volume,Bucket and put key
-   Execute             ozone sh volume create o3://om/vol1 --quota 100TB
-   Execute             ozone sh bucket create o3://om/vol1/bucket1
-   Execute             ozone sh key put o3://om/vol1/bucket1/debugKey /opt/hadoop/NOTICE.txt
-
 Test ozone debug
     ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.[]'
                     Should contain      ${result}       files
     ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.[].files[0]'
-    ${result3} =    Execute             echo "exists"
-    ${result2} =    Execute             test -f ${result} && echo "exists"
-                    Should Be Equal     ${result2}       ${result3}
+                    File Should Exist   ${result}
