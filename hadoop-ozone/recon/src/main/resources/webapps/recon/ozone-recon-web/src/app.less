@@ -126,13 +126,13 @@ body {
   .hexagon-shape(20, 12, @orange-7);
 }
 
-.icon-text(@content) {
+.icon-text(@content, @fontcolor) {
   text-align: center;
   font-size: 12px;
   font-weight: 700;
   position: relative;
   top: -3px;
-  color: #fff;
+  color: @fontcolor;
   &:after {
     content: @content;
     position: absolute;
@@ -140,7 +140,7 @@ body {
     top: 4px;
     width: 10px;
     height: 0;
-    color: white;
+    color: @fontcolor;
     font-size: 12px;
     z-index: 2;
   }
@@ -148,14 +148,23 @@ body {
 
 .icon-text-three-dots {
   // In Unicode, \2026 is the horizontal ellipsis (...)
-  .icon-text("\2026");
+  .icon-text("\2026", #fff);
+}
+
+.icon-text-three-dots-leader {
+  // In Unicode, \2026 is the horizontal ellipsis (...)
+  .icon-text("\2026", #ffde36);
 }
 
 .icon-text-one-dot {
-  .icon-text(".");
+  .icon-text(".", #ffde36);
 }
 
 .replication-icon {
   display: inline-block;
   margin-right: 5px;
+}
+
+.pointer {
+  cursor: pointer;
 }

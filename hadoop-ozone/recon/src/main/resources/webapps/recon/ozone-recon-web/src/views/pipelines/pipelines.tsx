@@ -72,7 +72,10 @@ const COLUMNS = [
       const replicationFactor = record.replicationFactor;
       return (
         <span>
-          <ReplicationIcon replicationFactor={replicationFactor} replicationType={replicationType}/>
+          <ReplicationIcon replicationFactor={replicationFactor}
+                           replicationType={replicationType}
+                           leaderNode={record.leaderNode}
+                           isLeader={false}/>
           {replicationType} ({replicationFactor})
         </span>
       );
