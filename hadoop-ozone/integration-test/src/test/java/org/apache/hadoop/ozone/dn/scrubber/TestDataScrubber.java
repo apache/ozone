@@ -20,7 +20,6 @@
 package org.apache.hadoop.ozone.dn.scrubber;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -64,7 +63,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.io.File;
 
-import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 
 /**
@@ -127,7 +125,7 @@ public class TestDataScrubber {
 
       OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes().length, STAND_ALONE,
-          ONE, new HashMap<>());
+          1, new HashMap<>());
       out.write(value.getBytes());
       out.close();
       OzoneKey key = bucket.getKey(keyName);
@@ -137,7 +135,7 @@ public class TestDataScrubber {
       is.read(fileContent);
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, STAND_ALONE,
-          ONE));
+          1));
       Assert.assertEquals(value, new String(fileContent));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
@@ -193,7 +191,7 @@ public class TestDataScrubber {
 
   private boolean verifyRatisReplication(String volumeName, String bucketName,
                                          String keyName, ReplicationType type,
-                                         ReplicationFactor factor)
+                                         int replication)
       throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -203,14 +201,12 @@ public class TestDataScrubber {
         .build();
     HddsProtos.ReplicationType replicationType =
         HddsProtos.ReplicationType.valueOf(type.toString());
-    HddsProtos.ReplicationFactor replicationFactor =
-        HddsProtos.ReplicationFactor.valueOf(factor.getValue());
     OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
     for (OmKeyLocationInfo info :
         keyInfo.getLatestVersionLocations().getLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
-      if (!container.getReplicationFactor().equals(replicationFactor) || (
+      if (container.getReplication() != replication || (
           container.getReplicationType() != replicationType)) {
         return false;
       }

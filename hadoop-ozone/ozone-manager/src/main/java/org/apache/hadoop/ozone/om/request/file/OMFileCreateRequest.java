@@ -107,10 +107,15 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     boolean useRatis = ozoneManager.shouldUseRatis();
 
-    HddsProtos.ReplicationFactor factor = keyArgs.getFactor();
-    if (factor == null) {
-      factor = useRatis ? HddsProtos.ReplicationFactor.THREE :
-          HddsProtos.ReplicationFactor.ONE;
+    int replication = 0;
+    if (keyArgs.hasReplication()) {
+      replication = keyArgs.getReplication();
+    } else if (keyArgs.hasFactor()) {
+      if (keyArgs.getFactor() == null) {
+        replication = useRatis ? 3 : 1;
+      } else {
+        replication = keyArgs.getFactor().getNumber();
+      }
     }
 
     HddsProtos.ReplicationType type = keyArgs.getType();
@@ -124,15 +129,23 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
         allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), type, factor,
+              ozoneManager.getBlockTokenSecretManager(), type, replication,
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
               ozoneManager.getOMNodeId());
 
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
-        .setModificationTime(Time.now()).setType(type).setFactor(factor)
+        .setModificationTime(Time.now())
+        .setType(type)
+        .setReplication(replication)
         .setDataSize(requestedSize);
+    // TODO(maobaolong): remove this block after clear factor
+    if (replication == 1 || replication == 3) {
+      newKeyArgs.setFactor(
+          HddsProtos.ReplicationFactor.valueOf(replication));
+    }
 
     newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
         .map(OmKeyLocationInfo::getProtobuf).collect(Collectors.toList()));

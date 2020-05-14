@@ -131,7 +131,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setReplication(1).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -165,7 +165,7 @@ public class TestCloseContainerHandlingByClient {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setReplication(1).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -199,7 +199,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setReplication(1).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -259,7 +259,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -303,7 +303,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setReplication(1).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -413,7 +413,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
         setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 
@@ -447,7 +447,7 @@ public class TestCloseContainerHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName(keyName)
+        .setReplication(1).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
 

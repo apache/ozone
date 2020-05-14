@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -101,7 +100,7 @@ public class TestFreonWithDatanodeRestart {
   public void testRestart() throws Exception {
     startFreon();
     cluster.restartHddsDatanode(0, true);
-    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
+    cluster.waitForPipelineTobeReady(3,
             180000);
     startFreon();
   }

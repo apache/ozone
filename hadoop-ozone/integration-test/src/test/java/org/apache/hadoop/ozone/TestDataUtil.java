@@ -23,7 +23,6 @@ import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Scanner;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -75,7 +74,7 @@ public final class TestDataUtil {
       String content) throws IOException {
     try (OutputStream stream = bucket
         .createKey(keyName, content.length(), ReplicationType.STAND_ALONE,
-            ReplicationFactor.ONE, new HashMap<>())) {
+            1, new HashMap<>())) {
       stream.write(content.getBytes());
     }
   }

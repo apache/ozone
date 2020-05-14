@@ -77,7 +77,7 @@ public class TestBlockManager {
   private SCMPipelineManager pipelineManager;
   private BlockManagerImpl blockManager;
   private final static long DEFAULT_BLOCK_SIZE = 128 * MB;
-  private static HddsProtos.ReplicationFactor factor;
+  private static int replication;
   private static HddsProtos.ReplicationType type;
   private EventQueue eventQueue;
   private int numContainerPerOwnerInPipeline;
@@ -148,7 +148,7 @@ public class TestBlockManager {
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, mapping);
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
-    factor = HddsProtos.ReplicationFactor.THREE;
+    replication = 3;
     type = HddsProtos.ReplicationType.RATIS;
 
 
@@ -166,10 +166,10 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlock() throws Exception {
-    pipelineManager.createPipeline(type, factor);
+    pipelineManager.createPipeline(type, replication);
     TestUtils.openAllRatisPipelines(pipelineManager);
     AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-        type, factor, OzoneConsts.OZONE, new ExcludeList());
+        type, replication, OzoneConsts.OZONE, new ExcludeList());
     Assert.assertNotNull(block);
   }
 
@@ -177,26 +177,26 @@ public class TestBlockManager {
   public void testAllocateBlockWithExclusion() throws Exception {
     try {
       while (true) {
-        pipelineManager.createPipeline(type, factor);
+        pipelineManager.createPipeline(type, replication);
       }
     } catch (IOException e) {
     }
     TestUtils.openAllRatisPipelines(pipelineManager);
     ExcludeList excludeList = new ExcludeList();
-    excludeList
-        .addPipeline(pipelineManager.getPipelines(type, factor).get(0).getId());
+    excludeList.addPipeline(
+        pipelineManager.getPipelines(type, replication).get(0).getId());
     AllocatedBlock block = blockManager
-        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+        .allocateBlock(DEFAULT_BLOCK_SIZE, type, replication, OzoneConsts.OZONE,
             excludeList);
     Assert.assertNotNull(block);
     Assert.assertNotEquals(block.getPipeline().getId(),
         excludeList.getPipelineIds().get(0));
 
-    for (Pipeline pipeline : pipelineManager.getPipelines(type, factor)) {
+    for (Pipeline pipeline : pipelineManager.getPipelines(type, replication)) {
       excludeList.addPipeline(pipeline.getId());
     }
     block = blockManager
-        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+        .allocateBlock(DEFAULT_BLOCK_SIZE, type, replication, OzoneConsts.OZONE,
             excludeList);
     Assert.assertNotNull(block);
     Assert.assertTrue(
@@ -218,7 +218,7 @@ public class TestBlockManager {
       CompletableFuture.supplyAsync(() -> {
         try {
           future.complete(blockManager
-              .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+              .allocateBlock(DEFAULT_BLOCK_SIZE, type, replication,
                   OzoneConsts.OZONE,
                   new ExcludeList()));
         } catch (IOException e) {
@@ -242,7 +242,7 @@ public class TestBlockManager {
     long size = 6 * GB;
     thrown.expectMessage("Unsupported block size");
     AllocatedBlock block = blockManager.allocateBlock(size,
-        type, factor, OzoneConsts.OZONE, new ExcludeList());
+        type, replication, OzoneConsts.OZONE, new ExcludeList());
   }
 
 
@@ -254,33 +254,33 @@ public class TestBlockManager {
     thrown.expectMessage("SafeModePrecheck failed for "
         + "allocateBlock");
     blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-        type, factor, OzoneConsts.OZONE, new ExcludeList());
+        type, replication, OzoneConsts.OZONE, new ExcludeList());
   }
 
   @Test
   public void testAllocateBlockSucInSafeMode() throws Exception {
     // Test2: Exit safe mode and then try allocateBock again.
     Assert.assertNotNull(blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-        type, factor, OzoneConsts.OZONE, new ExcludeList()));
+        type, replication, OzoneConsts.OZONE, new ExcludeList()));
   }
 
   @Test(timeout = 10000)
   public void testMultipleBlockAllocation()
       throws IOException, TimeoutException, InterruptedException {
 
-    pipelineManager.createPipeline(type, factor);
-    pipelineManager.createPipeline(type, factor);
+    pipelineManager.createPipeline(type, replication);
+    pipelineManager.createPipeline(type, replication);
     TestUtils.openAllRatisPipelines(pipelineManager);
 
     AllocatedBlock allocatedBlock = blockManager
-        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+        .allocateBlock(DEFAULT_BLOCK_SIZE, type, replication, OzoneConsts.OZONE,
             new ExcludeList());
     // block should be allocated in different pipelines
     GenericTestUtils.waitFor(() -> {
       try {
-        AllocatedBlock block = blockManager
-            .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
-                new ExcludeList());
+        AllocatedBlock block = blockManager.allocateBlock(
+            DEFAULT_BLOCK_SIZE, type, replication,
+            OzoneConsts.OZONE, new ExcludeList());
         return !block.getPipeline().getId()
             .equals(allocatedBlock.getPipeline().getId());
       } catch (IOException e) {
@@ -292,7 +292,8 @@ public class TestBlockManager {
   private boolean verifyNumberOfContainersInPipelines(
       int numContainersPerPipeline) {
     try {
-      for (Pipeline pipeline : pipelineManager.getPipelines(type, factor)) {
+      for (Pipeline pipeline :
+          pipelineManager.getPipelines(type, replication)) {
         if (pipelineManager.getNumberOfContainers(pipeline.getId())
             != numContainersPerPipeline) {
           return false;
@@ -309,9 +310,9 @@ public class TestBlockManager {
       throws IOException, TimeoutException, InterruptedException {
     // create pipelines
     for (int i = 0;
-         i < nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size() / factor
-             .getNumber(); i++) {
-      pipelineManager.createPipeline(type, factor);
+         i < nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size() /
+             replication; i++) {
+      pipelineManager.createPipeline(type, replication);
     }
     TestUtils.openAllRatisPipelines(pipelineManager);
 
@@ -320,9 +321,8 @@ public class TestBlockManager {
     // for each owner
     GenericTestUtils.waitFor(() -> {
       try {
-        blockManager
-            .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
-                new ExcludeList());
+        blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, type, replication,
+            OzoneConsts.OZONE, new ExcludeList());
       } catch (IOException e) {
       }
       return verifyNumberOfContainersInPipelines(
@@ -330,7 +330,7 @@ public class TestBlockManager {
     }, 10, 1000);
 
     // close all the containers in all the pipelines
-    for (Pipeline pipeline : pipelineManager.getPipelines(type, factor)) {
+    for (Pipeline pipeline : pipelineManager.getPipelines(type, replication)) {
       for (ContainerID cid : pipelineManager
           .getContainersInPipeline(pipeline.getId())) {
         eventQueue.fireEvent(SCMEvents.CLOSE_CONTAINER, cid);
@@ -344,9 +344,8 @@ public class TestBlockManager {
     // containers.
     GenericTestUtils.waitFor(() -> {
       try {
-        blockManager
-            .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
-                new ExcludeList());
+        blockManager.allocateBlock(DEFAULT_BLOCK_SIZE, type, replication,
+            OzoneConsts.OZONE, new ExcludeList());
       } catch (IOException e) {
       }
       return verifyNumberOfContainersInPipelines(
@@ -360,9 +359,10 @@ public class TestBlockManager {
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
       pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     }
-    Assert.assertEquals(0, pipelineManager.getPipelines(type, factor).size());
+    Assert.assertEquals(0,
+        pipelineManager.getPipelines(type, replication).size());
     Assert.assertNotNull(blockManager
-        .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
+        .allocateBlock(DEFAULT_BLOCK_SIZE, type, replication, OzoneConsts.OZONE,
             new ExcludeList()));
   }
 

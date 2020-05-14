@@ -31,7 +31,6 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -73,13 +72,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   static final Logger LOG =
       LoggerFactory.getLogger(BasicOzoneClientAdapterImpl.class);
+  private final int replication;
 
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
   private OzoneVolume volume;
   private OzoneBucket bucket;
   private ReplicationType replicationType;
-  private ReplicationFactor replicationFactor;
   private boolean securityEnabled;
   private int configuredDnPort;
 
@@ -174,7 +173,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       this.volume = objectStore.getVolume(volumeStr);
       this.bucket = volume.getBucket(bucketStr);
       this.replicationType = ReplicationType.valueOf(replicationTypeConf);
-      this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);
+      this.replication = replicationCountConf;
       this.configuredDnPort = conf.getInt(
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
           OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
@@ -186,7 +185,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public short getDefaultReplication() {
-    return (short) replicationFactor.getValue();
+    return (short) replication;
   }
 
   @Override
@@ -215,20 +214,18 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public OzoneFSOutputStream createFile(String key, short replication,
+  public OzoneFSOutputStream createFile(String key, short replicationNum,
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED);
     try {
       OzoneOutputStream ozoneOutputStream = null;
-      if (replication == ReplicationFactor.ONE.getValue()
-          || replication == ReplicationFactor.THREE.getValue()) {
-        ReplicationFactor clientReplication = ReplicationFactor
-            .valueOf(replication);
+      if (replicationNum == 1
+          || replicationNum == 3) {
         ozoneOutputStream = bucket.createFile(key, 0, replicationType,
-            clientReplication, overWrite, recursive);
+            replicationNum, overWrite, recursive);
       } else {
         ozoneOutputStream = bucket.createFile(key, 0, replicationType,
-            replicationFactor, overWrite, recursive);
+            this.replication, overWrite, recursive);
       }
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
@@ -445,13 +442,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
       String owner, URI defaultUri, Path workingDir) {
     OmKeyInfo keyInfo = status.getKeyInfo();
-    short replication = (short) keyInfo.getFactor().getNumber();
+    short replicationNum = (short) keyInfo.getReplication();
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
         new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())
             .makeQualified(defaultUri, workingDir),
         status.isDirectory(),
-        replication,
+        replicationNum,
         status.getBlockSize(),
         keyInfo.getModificationTime(),
         keyInfo.getModificationTime(),

@@ -111,7 +111,7 @@ public class TestMiniOzoneCluster {
           .setState(Pipeline.PipelineState.OPEN)
           .setId(PipelineID.randomId())
           .setType(HddsProtos.ReplicationType.STAND_ALONE)
-          .setFactor(HddsProtos.ReplicationFactor.ONE)
+          .setReplication(1)
           .setNodes(dns)
           .build();
 

@@ -91,6 +91,12 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           ExcludeList.getFromProtoBuf(allocateBlockRequest.getExcludeList());
     }
 
+    int replication = 0;
+    if (keyArgs.hasReplication()) {
+      replication = keyArgs.getReplication();
+    } else if (keyArgs.hasFactor()) {
+      replication = keyArgs.getFactor().getNumber();
+    }
     // TODO: Here we are allocating block with out any check for key exist in
     //  open table or not and also with out any authorization checks.
     //  Assumption here is that allocateBlocks with out openKey will be less.
@@ -106,7 +112,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     List<OmKeyLocationInfo> omKeyLocationInfoList =
         allocateBlock(ozoneManager.getScmClient(),
             ozoneManager.getBlockTokenSecretManager(), keyArgs.getType(),
-            keyArgs.getFactor(), excludeList, ozoneManager.getScmBlockSize(),
+            replication, excludeList, ozoneManager.getScmBlockSize(),
             ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId());

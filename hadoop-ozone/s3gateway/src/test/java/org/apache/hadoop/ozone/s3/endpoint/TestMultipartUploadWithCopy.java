@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -77,7 +76,7 @@ public class TestMultipartUploadWithCopy {
     byte[] keyContent = EXISTING_KEY_CONTENT.getBytes();
     try (OutputStream stream = bucket
         .createKey(EXISTING_KEY, keyContent.length, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>())) {
+            3, new HashMap<>())) {
       stream.write(keyContent);
     }
 

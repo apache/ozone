@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -154,7 +153,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes().length, ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE, new HashMap<>())) {
+          1, new HashMap<>())) {
         out.write(value.getBytes());
       }
 
@@ -168,7 +167,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
           keyName, ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE));
+          1));
       Assert.assertEquals(value, new String(fileContent));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
       Assert.assertFalse(key.getModificationTime().isBefore(testStartTime));
@@ -198,7 +197,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes().length, ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE, new HashMap<>())) {
+          1, new HashMap<>())) {
         LambdaTestUtils.intercept(IOException.class, "UNAUTHENTICATED: Fail " +
                 "to find any token ",
             () -> out.write(value.getBytes()));
@@ -214,7 +213,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
   }
 
   private boolean verifyRatisReplication(String volumeName, String bucketName,
-      String keyName, ReplicationType type, ReplicationFactor factor)
+      String keyName, ReplicationType type, int replication)
       throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -224,14 +223,12 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         .build();
     HddsProtos.ReplicationType replicationType =
         HddsProtos.ReplicationType.valueOf(type.toString());
-    HddsProtos.ReplicationFactor replicationFactor =
-        HddsProtos.ReplicationFactor.valueOf(factor.getValue());
     OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
     for (OmKeyLocationInfo info:
         keyInfo.getLatestVersionLocations().getLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
-      if (!container.getReplicationFactor().equals(replicationFactor) || (
+      if (container.getReplication() != replication || (
           container.getReplicationType() != replicationType)) {
         return false;
       }

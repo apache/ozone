@@ -243,7 +243,7 @@ public class ContainerEndpoint {
 
         List<ContainerHistory> datanodes =
             containerSchemaManager.getLatestContainerHistory(
-                containerID, containerInfo.getReplicationFactor().getNumber());
+                containerID, containerInfo.getReplication());
         missingContainers.add(new MissingContainerMetadata(containerID,
             container.getMissingSince(), keyCount, pipelineID, datanodes));
       } catch (IOException ioEx) {

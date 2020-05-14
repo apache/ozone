@@ -117,7 +117,7 @@ public class BenchMarkOMClient {
           .setBucketName(bucketName)
           .setKeyName(key)
           .setDataSize(0)
-          .setFactor(HddsProtos.ReplicationFactor.ONE)
+          .setReplication(1)
           .setType(HddsProtos.ReplicationType.RATIS)
           .build();
       OpenKeySession keySession = ozoneManagerClient.openKey(omKeyArgs);
@@ -152,7 +152,7 @@ public class BenchMarkOMClient {
         .setBucketName(bucketName)
         .setKeyName(key)
         .setDataSize(50)
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setType(HddsProtos.ReplicationType.RATIS)
         .build();
     state.ozoneManagerClient

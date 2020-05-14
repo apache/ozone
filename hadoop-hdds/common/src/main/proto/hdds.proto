@@ -71,11 +71,14 @@ message Pipeline {
     // TODO: remove the state and leaderID from this class
     optional PipelineState state = 2 [default = PIPELINE_ALLOCATED];
     optional ReplicationType type = 3 [default = STAND_ALONE];
+    // deprecated, please use replication instead
     optional ReplicationFactor factor = 4 [default = ONE];
     required PipelineID id = 5;
     optional string leaderID = 6;
     repeated uint32 memberOrders = 7;
     optional uint64 creationTimeStamp = 8;
+    // TODO(maobaolong): when factor is gone, specify 4 as the index of replication
+    optional uint32 replication = 100 [default = 1];
 }
 
 message KeyValue {
@@ -163,8 +166,11 @@ message ContainerInfoProto {
     required string owner = 7;
     optional int64 deleteTransactionId = 8;
     optional int64 sequenceId = 9;
-    required ReplicationFactor replicationFactor  = 10;
+    // deprecated, please use replication instead
+    optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
+    // TODO(maobaolong): when factor is gone, specify 10 as the index of replication and mark as required
+    optional uint32 replication = 100;
 }
 
 message ContainerWithPipeline {

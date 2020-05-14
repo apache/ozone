@@ -27,7 +27,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -87,7 +86,7 @@ class OzoneContract extends AbstractFSContract {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     try {
       cluster.waitForClusterToBeReady();
-      cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
+      cluster.waitForPipelineTobeReady(3,
               180000);
     } catch (Exception e) {
       throw new IOException(e);

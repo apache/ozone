@@ -183,13 +183,13 @@ public class SCMClientProtocolServer implements
 
   @Override
   public ContainerWithPipeline allocateContainer(HddsProtos.ReplicationType
-      replicationType, HddsProtos.ReplicationFactor factor,
+      replicationType, int replication,
       String owner) throws IOException {
     ScmUtils.preCheck(ScmOps.allocateContainer, safeModePrecheck);
     getScm().checkAdminAccess(getRpcRemoteUsername());
 
     final ContainerInfo container = scm.getContainerManager()
-        .allocateContainer(replicationType, factor, owner);
+        .allocateContainer(replicationType, replication, owner);
     final Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
     return new ContainerWithPipeline(container, pipeline);
@@ -249,7 +249,7 @@ public class SCMClientProtocolServer implements
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipeline(
           HddsProtos.ReplicationType.STAND_ALONE,
-          container.getReplicationFactor(),
+          container.getReplication(),
           scm.getContainerManager()
               .getContainerReplicas(cid).stream()
               .map(ContainerReplica::getDatanodeDetails)
@@ -316,7 +316,7 @@ public class SCMClientProtocolServer implements
     try{
       return getScm().getContainerManager()
           .getContainerReplicas(contInfo.containerID())
-          .size() >= contInfo.getReplicationFactor().getNumber();
+          .size() >= contInfo.getReplication();
     } catch (ContainerNotFoundException ex) {
       // getContainerReplicas throws exception if no replica's exist for given
       // container.
@@ -426,9 +426,10 @@ public class SCMClientProtocolServer implements
 
   @Override
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
+      int replication, HddsProtos.NodePool nodePool)
       throws IOException {
-    Pipeline result = scm.getPipelineManager().createPipeline(type, factor);
+    Pipeline result =
+        scm.getPipelineManager().createPipeline(type, replication);
     AUDIT.logWriteSuccess(
         buildAuditMessageForSuccess(SCMAction.CREATE_PIPELINE, null));
     return result;

@@ -427,7 +427,7 @@ public final class TestUtils {
       throws IOException {
     return containerManager
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, "root");
+            3, "root");
 
   }
 
@@ -505,7 +505,7 @@ public final class TestUtils {
     return new ContainerInfo.Builder()
         .setContainerID(RandomUtils.nextLong())
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplication(3)
         .setState(state)
         .setSequenceId(10000L)
         .setOwner("TEST")

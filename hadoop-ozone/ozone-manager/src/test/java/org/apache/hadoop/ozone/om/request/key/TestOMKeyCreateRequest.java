@@ -315,7 +315,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setKeyName(keyName).setIsMultipartKey(isMultipartKey)
-        .setFactor(replicationFactor).setType(replicationType);
+        .setReplication(replication).setType(replicationType);
 
     if (isMultipartKey) {
       keyArgs.setDataSize(dataSize).setMultipartNumber(partNumber);
@@ -342,7 +342,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setFactor(replicationFactor)
+        .setReplication(replication)
         .setType(replicationType)
         .build();
 
@@ -360,7 +360,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Manually add volume, bucket and key to DB table
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
     addKeyToTable(false, false, volumeName, bucketName, keyName, clientID,
-        replicationType, replicationFactor, 1L, omMetadataManager);
+        replicationType, replication, 1L, omMetadataManager);
 
     // Replay the transaction - Execute the createKey request again
     OMClientResponse omClientResponse =

@@ -78,7 +78,7 @@ public class TestRatisPipelineLeader {
   public void testLeaderIdUsedOnFirstCall() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            3);
     Assert.assertFalse(pipelines.isEmpty());
     Pipeline ratisPipeline = pipelines.iterator().next();
     Assert.assertTrue(ratisPipeline.isHealthy());
@@ -110,7 +110,7 @@ public class TestRatisPipelineLeader {
   public void testLeaderIdAfterLeaderChange() throws Exception {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            3);
     Assert.assertFalse(pipelines.isEmpty());
     Pipeline ratisPipeline = pipelines.iterator().next();
     Assert.assertTrue(ratisPipeline.isHealthy());

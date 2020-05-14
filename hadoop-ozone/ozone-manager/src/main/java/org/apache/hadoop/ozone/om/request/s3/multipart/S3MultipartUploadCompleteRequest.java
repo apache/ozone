@@ -256,8 +256,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         // part.
         HddsProtos.ReplicationType type = partKeyInfoMap.lastEntry().getValue()
             .getPartKeyInfo().getType();
-        HddsProtos.ReplicationFactor factor =
-            partKeyInfoMap.lastEntry().getValue().getPartKeyInfo().getFactor();
+        int replication = partKeyInfoMap.lastEntry().getValue()
+            .getPartKeyInfo().getReplication();
 
         if (omKeyInfo == null) {
           // This is a newly added key, it does not have any versions.
@@ -272,7 +272,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           OmKeyInfo.Builder builder =
               new OmKeyInfo.Builder().setVolumeName(volumeName)
               .setBucketName(bucketName).setKeyName(keyName)
-              .setReplicationFactor(factor).setReplicationType(type)
+              .setReplication(replication).setReplicationType(type)
               .setCreationTime(keyArgs.getModificationTime())
               .setModificationTime(keyArgs.getModificationTime())
               .setDataSize(dataSize)

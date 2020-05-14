@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .PartInfo;
 
@@ -33,7 +32,7 @@ public class OmMultipartUploadListParts {
 
   private HddsProtos.ReplicationType replicationType;
 
-  private HddsProtos.ReplicationFactor replicationFactor;
+  private int replication;
 
   //When a list is truncated, this element specifies the last part in the list,
   // as well as the value to use for the part-number-marker request parameter
@@ -48,10 +47,10 @@ public class OmMultipartUploadListParts {
   private final List<OmPartInfo> partInfoList = new ArrayList<>();
 
   public OmMultipartUploadListParts(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor,
+      int replication,
       int nextMarker, boolean truncate) {
     this.replicationType = type;
-    this.replicationFactor = factor;
+    this.replication = replication;
 
     this.nextPartNumberMarker = nextMarker;
     this.truncated = truncate;
@@ -81,8 +80,8 @@ public class OmMultipartUploadListParts {
     return partInfoList;
   }
 
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+  public int getReplication() {
+    return replication;
   }
 
   public void addPartList(List<OmPartInfo> partInfos) {

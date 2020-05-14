@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.scm.pipeline;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -90,7 +89,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
 
     OzoneOutputStream out = bucket
         .createKey(keyName, value.getBytes().length, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
+            3, new HashMap<>());
     out.write(value.getBytes());
     out.close();
 

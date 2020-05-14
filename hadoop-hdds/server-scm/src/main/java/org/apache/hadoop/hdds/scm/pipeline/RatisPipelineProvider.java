@@ -24,7 +24,6 @@ import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -69,70 +68,71 @@ public class RatisPipelineProvider extends PipelineProvider {
         ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
   }
 
-  private boolean exceedPipelineNumberLimit(ReplicationFactor factor) {
-    if (factor != ReplicationFactor.THREE) {
+  private boolean exceedPipelineNumberLimit(int replication) {
+    if (replication != 3) {
       // Only put limits for Factor THREE pipelines.
       return false;
     }
     // Per datanode limit
     if (maxPipelinePerDatanode > 0) {
       return (getPipelineStateManager().getPipelines(
-          ReplicationType.RATIS, factor).size() -
-          getPipelineStateManager().getPipelines(ReplicationType.RATIS, factor,
+          ReplicationType.RATIS, replication).size() -
+          getPipelineStateManager().getPipelines(
+              ReplicationType.RATIS, replication,
               PipelineState.CLOSED).size()) > maxPipelinePerDatanode *
           getNodeManager().getNodeCount(HddsProtos.NodeState.HEALTHY) /
-          factor.getNumber();
+          replication;
     }
 
     // Global limit
     if (pipelineNumberLimit > 0) {
-      return (getPipelineStateManager().getPipelines(ReplicationType.RATIS,
-          ReplicationFactor.THREE).size() -
+      return (getPipelineStateManager().getPipelines(
+          ReplicationType.RATIS, 3).size() -
           getPipelineStateManager().getPipelines(
-              ReplicationType.RATIS, ReplicationFactor.THREE,
+              ReplicationType.RATIS, 3,
               PipelineState.CLOSED).size()) >
           (pipelineNumberLimit - getPipelineStateManager().getPipelines(
-              ReplicationType.RATIS, ReplicationFactor.ONE).size());
+              ReplicationType.RATIS, 1).size());
     }
 
     return false;
   }
 
   @Override
-  public Pipeline create(ReplicationFactor factor) throws IOException {
-    if (exceedPipelineNumberLimit(factor)) {
+  public Pipeline create(int replication) throws IOException {
+    if (exceedPipelineNumberLimit(replication)) {
       throw new SCMException("Ratis pipeline number meets the limit: " +
           pipelineNumberLimit + " factor : " +
-          factor.getNumber(),
+          replication,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
 
     List<DatanodeDetails> dns;
 
-    switch(factor) {
-    case ONE:
-      dns = pickNodesNeverUsed(ReplicationType.RATIS, ReplicationFactor.ONE);
+    switch(replication) {
+    case 1:
+      dns = pickNodesNeverUsed(ReplicationType.RATIS, 1);
       break;
-    case THREE:
+    case 3:
       dns = placementPolicy.chooseDatanodes(null,
-          null, factor.getNumber(), 0);
+          null, 3, 0);
       break;
     default:
-      throw new IllegalStateException("Unknown factor: " + factor.name());
+      throw new IllegalStateException("Unknown factor: " + replication);
     }
 
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.ALLOCATED)
         .setType(ReplicationType.RATIS)
-        .setFactor(factor)
+        .setReplication(replication)
         .setNodes(dns)
         .build();
 
     // Send command to datanodes to create pipeline
     final CreatePipelineCommand createCommand =
         new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
-            factor, dns);
+            replication, dns);
 
     dns.forEach(node -> {
       LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
@@ -145,13 +145,13 @@ public class RatisPipelineProvider extends PipelineProvider {
   }
 
   @Override
-  public Pipeline create(ReplicationFactor factor,
+  public Pipeline create(int replication,
                          List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.ALLOCATED)
         .setType(ReplicationType.RATIS)
-        .setFactor(factor)
+        .setReplication(replication)
         .setNodes(nodes)
         .build();
   }

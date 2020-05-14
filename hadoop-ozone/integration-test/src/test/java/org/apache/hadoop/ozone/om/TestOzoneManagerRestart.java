@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -191,7 +190,7 @@ public class TestOzoneManagerRestart {
 
     String data = "random data";
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
-        data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
+        data.length(), ReplicationType.RATIS, 1,
         new HashMap<>());
 
     ozoneOutputStream.write(data.getBytes(), 0, data.length());

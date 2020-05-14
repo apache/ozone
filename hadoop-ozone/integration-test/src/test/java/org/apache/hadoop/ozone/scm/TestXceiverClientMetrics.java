@@ -89,7 +89,7 @@ public class TestXceiverClientMetrics {
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(
             SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
+            SCMTestUtils.getReplication(conf),
             OzoneConsts.OZONE);
     XceiverClientSpi client = clientManager
         .acquireClient(container.getPipeline());

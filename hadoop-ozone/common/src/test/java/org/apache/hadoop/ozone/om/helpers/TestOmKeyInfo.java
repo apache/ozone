@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -52,7 +51,7 @@ public class TestOmKeyInfo {
         .setCreationTime(123L)
         .setModificationTime(123L)
         .setDataSize(123L)
-        .setReplicationFactor(ReplicationFactor.THREE)
+        .setReplication(3)
         .setReplicationType(ReplicationType.RATIS)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
@@ -73,7 +72,7 @@ public class TestOmKeyInfo {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(100L)
-        .setReplicationFactor(ReplicationFactor.THREE)
+        .setReplication(3)
         .setReplicationType(ReplicationType.RATIS)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
@@ -117,7 +116,7 @@ public class TestOmKeyInfo {
 
   Pipeline getPipeline() {
     return Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setId(PipelineID.randomId())
         .setNodes(Collections.EMPTY_LIST)
         .setState(Pipeline.PipelineState.OPEN)

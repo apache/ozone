@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -283,7 +282,7 @@ public class TestKeyManagerUnit {
         .setBucketName(bucket)
         .setKeyName(key)
         .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplication(3)
         .setAcls(new ArrayList<>())
         .build();
     return omtest.initiateMultipartUpload(key1);
@@ -298,7 +297,7 @@ public class TestKeyManagerUnit {
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
         .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
+        .setReplication(3)
         .setPartKeyInfoList(partKeyInfoMap)
         .build();
 
@@ -339,7 +338,7 @@ public class TestKeyManagerUnit {
     final Pipeline pipelineOne = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplication(3)
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnOne.getUuid())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
@@ -348,7 +347,7 @@ public class TestKeyManagerUnit {
     final Pipeline pipelineTwo = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplication(3)
         .setState(Pipeline.PipelineState.OPEN)
         .setLeaderId(dnFour.getUuid())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
@@ -396,7 +395,7 @@ public class TestKeyManagerUnit {
         .setModificationTime(Time.now())
         .setDataSize(256000)
         .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
+        .setReplication(3)
         .setAcls(Collections.emptyList())
         .build();
     TestOMRequestUtils.addKeyToOM(metadataManager, keyInfo);

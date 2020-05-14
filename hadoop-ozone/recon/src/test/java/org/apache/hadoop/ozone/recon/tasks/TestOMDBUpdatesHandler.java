@@ -225,7 +225,7 @@ public class TestOMDBUpdatesHandler {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
         .setDataSize(new Random().nextLong())
         .build();

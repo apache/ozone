@@ -65,8 +65,7 @@ public class TestContainerOperations {
   @Test
   public void testCreate() throws Exception {
     ContainerWithPipeline container = storageClient.createContainer(HddsProtos
-        .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
-        .ONE, OzoneConsts.OZONE);
+        .ReplicationType.STAND_ALONE, 1, OzoneConsts.OZONE);
     assertEquals(container.getContainerInfo().getContainerID(), storageClient
         .getContainer(container.getContainerInfo().getContainerID())
         .getContainerID());

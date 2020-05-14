@@ -74,7 +74,7 @@ public class BlockOutputStreamEntryPool {
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(OzoneManagerProtocol omClient,
-      int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
+      int chunkSize, String requestId, int replication,
       HddsProtos.ReplicationType type,
       int bufferSize, long bufferFlushSize,
       boolean bufferFlushDelay, long bufferMaxSize,
@@ -87,7 +87,8 @@ public class BlockOutputStreamEntryPool {
     this.omClient = omClient;
     this.keyArgs = new OmKeyArgs.Builder().setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
-        .setType(type).setFactor(factor).setDataSize(info.getDataSize())
+        .setType(type).setReplication(replication)
+        .setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber).build();
     this.xceiverClientManager = xceiverClientManager;

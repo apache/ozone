@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -118,7 +117,7 @@ public class TestReconWithOzoneManagerHA {
     OzoneOutputStream key = objectStore.getVolume(volName)
         .getBucket(volName)
         .createKey(keyPrefix, 1024, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
+            1, new HashMap<>());
     key.write(keyPrefix.getBytes());
     key.flush();
     key.close();

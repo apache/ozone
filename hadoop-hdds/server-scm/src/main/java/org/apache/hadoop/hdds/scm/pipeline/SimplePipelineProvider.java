@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 
@@ -39,14 +38,14 @@ public class SimplePipelineProvider extends PipelineProvider {
   }
 
   @Override
-  public Pipeline create(ReplicationFactor factor) throws IOException {
+  public Pipeline create(int replication) throws IOException {
     List<DatanodeDetails> dns = pickNodesNeverUsed(ReplicationType.STAND_ALONE,
-        factor);
+        replication);
 
-    if (dns.size() < factor.getNumber()) {
+    if (dns.size() < replication) {
       String e = String
           .format("Cannot create pipeline of factor %d using %d nodes.",
-              factor.getNumber(), dns.size());
+              replication, dns.size());
       throw new InsufficientDatanodesException(e);
     }
 
@@ -55,19 +54,19 @@ public class SimplePipelineProvider extends PipelineProvider {
         .setId(PipelineID.randomId())
         .setState(PipelineState.OPEN)
         .setType(ReplicationType.STAND_ALONE)
-        .setFactor(factor)
-        .setNodes(dns.subList(0, factor.getNumber()))
+        .setReplication(replication)
+        .setNodes(dns.subList(0, replication))
         .build();
   }
 
   @Override
-  public Pipeline create(ReplicationFactor factor,
+  public Pipeline create(int replication,
       List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.OPEN)
         .setType(ReplicationType.STAND_ALONE)
-        .setFactor(factor)
+        .setReplication(replication)
         .setNodes(nodes)
         .build();
   }

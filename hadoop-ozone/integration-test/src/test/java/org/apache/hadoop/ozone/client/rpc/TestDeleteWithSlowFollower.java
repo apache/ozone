@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -150,7 +149,7 @@ public class TestDeleteWithSlowFollower {
             .setHbInterval(100)
             .build();
     cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
+    cluster.waitForPipelineTobeReady(3, 60000);
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
@@ -189,7 +188,7 @@ public class TestDeleteWithSlowFollower {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey(keyName, 0, ReplicationType.RATIS,
-                ReplicationFactor.THREE, new HashMap<>());
+                3, new HashMap<>());
     byte[] testData = "ratis".getBytes();
     // First write and flush creates a container in the datanode
     key.write(testData);
@@ -208,8 +207,7 @@ public class TestDeleteWithSlowFollower {
 
     List<Pipeline> pipelineList =
         cluster.getStorageContainerManager().getPipelineManager()
-            .getPipelines(HddsProtos.ReplicationType.RATIS,
-                HddsProtos.ReplicationFactor.THREE);
+            .getPipelines(HddsProtos.ReplicationType.RATIS, 3);
     Assert.assertTrue(pipelineList.size() >= FACTOR_THREE_PIPELINE_COUNT);
     Pipeline pipeline = pipelineList.get(0);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
@@ -243,7 +241,7 @@ public class TestDeleteWithSlowFollower {
             .getStateMachine(leader, pipeline);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
         setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .build();
     OmKeyInfo info = cluster.getOzoneManager().lookupKey(keyArgs);
     BlockID blockID =

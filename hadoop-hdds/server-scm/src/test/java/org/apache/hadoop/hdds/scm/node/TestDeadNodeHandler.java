@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 import java.io.File;
@@ -162,7 +161,7 @@ public class TestDeadNodeHandler {
     LambdaTestUtils.await(120000, 1000,
         () -> {
           pipelineManager.triggerPipelineCreation();
-          return pipelineManager.getPipelines(RATIS, THREE).size() == 3;
+          return pipelineManager.getPipelines(RATIS, 3).size() == 3;
         });
     TestUtils.openAllRatisPipelines(pipelineManager);
 

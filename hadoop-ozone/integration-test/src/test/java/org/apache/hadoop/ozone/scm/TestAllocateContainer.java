@@ -68,7 +68,7 @@ public class TestAllocateContainer {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
             SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
+            SCMTestUtils.getReplication(conf),
             OzoneConsts.OZONE);
     Assert.assertNotNull(container);
     Assert.assertNotNull(container.getPipeline().getFirstNode());
@@ -80,6 +80,6 @@ public class TestAllocateContainer {
     thrown.expect(NullPointerException.class);
     storageContainerLocationClient.allocateContainer(
         SCMTestUtils.getReplicationType(conf),
-        SCMTestUtils.getReplicationFactor(conf), null);
+        SCMTestUtils.getReplication(conf), null);
   }
 }

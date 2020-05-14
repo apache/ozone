@@ -99,7 +99,7 @@ public class TestSCMSafeModeWithPipelineRules {
     pipelineManager = cluster.getStorageContainerManager().getPipelineManager();
     List<Pipeline> pipelineList =
         pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            3);
 
 
     pipelineList.get(0).getNodes().forEach(datanodeDetails -> {
@@ -193,7 +193,7 @@ public class TestSCMSafeModeWithPipelineRules {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+            3, Pipeline.PipelineState.OPEN)
         .size() == numPipelines, 100, 60000);
   }
 
@@ -201,7 +201,7 @@ public class TestSCMSafeModeWithPipelineRules {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, Pipeline.PipelineState.OPEN)
+            1, Pipeline.PipelineState.OPEN)
         .size() == numPipelines, 100, 60000);
   }
 }

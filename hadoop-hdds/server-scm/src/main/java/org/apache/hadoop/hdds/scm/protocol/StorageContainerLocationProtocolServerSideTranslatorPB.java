@@ -273,7 +273,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     ContainerWithPipeline containerWithPipeline = impl
         .allocateContainer(request.getReplicationType(),
-            request.getReplicationFactor(), request.getOwner());
+            request.getReplication(), request.getOwner());
     return ContainerResponseProto.newBuilder()
         .setContainerWithPipeline(containerWithPipeline.getProtobuf())
         .setErrorCode(ContainerResponseProto.Error.success)
@@ -366,7 +366,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       StorageContainerLocationProtocolProtos.PipelineRequestProto request)
       throws IOException {
     Pipeline pipeline = impl.createReplicationPipeline(
-        request.getReplicationType(), request.getReplicationFactor(),
+        request.getReplicationType(), request.getReplication(),
         HddsProtos.NodePool.getDefaultInstance());
     if (pipeline == null) {
       return PipelineResponseProto.newBuilder()

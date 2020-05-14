@@ -108,7 +108,7 @@ public class BenchMarkOMKeyAllocation {
         .setBucketName(bucketName)
         .setKeyName(UUID.randomUUID().toString())
         .setDataSize(0)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplication(3)
         .setType(HddsProtos.ReplicationType.RATIS).build();
     OpenKeySession openKeySession = keyManager.openKey(omKeyArgs);
     // setting location info list

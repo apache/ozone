@@ -182,7 +182,7 @@ public class TestFailureHandlingByClient {
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
@@ -222,7 +222,7 @@ public class TestFailureHandlingByClient {
     // will be discarded and write a new block
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
@@ -282,7 +282,7 @@ public class TestFailureHandlingByClient {
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
@@ -345,7 +345,7 @@ public class TestFailureHandlingByClient {
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
@@ -408,7 +408,7 @@ public class TestFailureHandlingByClient {
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);

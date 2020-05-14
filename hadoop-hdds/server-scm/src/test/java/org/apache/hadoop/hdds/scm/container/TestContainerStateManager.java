@@ -91,7 +91,7 @@ public class TestContainerStateManager {
         .getContainerReplicas(c1.containerID());
 
     Assert.assertEquals(2, replicas.size());
-    Assert.assertEquals(3, c1.getReplicationFactor().getNumber());
+    Assert.assertEquals(3, c1.getReplication());
   }
 
   private void addReplica(ContainerInfo cont, DatanodeDetails node)
@@ -113,15 +113,15 @@ public class TestContainerStateManager {
         Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
             .setId(PipelineID.randomId())
             .setType(HddsProtos.ReplicationType.STAND_ALONE)
-            .setFactor(HddsProtos.ReplicationFactor.THREE)
+            .setReplication(3)
             .setNodes(new ArrayList<>()).build();
 
     when(pipelineManager.createPipeline(HddsProtos.ReplicationType.STAND_ALONE,
-        HddsProtos.ReplicationFactor.THREE)).thenReturn(pipeline);
+        3)).thenReturn(pipeline);
 
     return containerStateManager.allocateContainer(pipelineManager,
         HddsProtos.ReplicationType.STAND_ALONE,
-        HddsProtos.ReplicationFactor.THREE, "root");
+        3, "root");
 
   }
 

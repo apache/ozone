@@ -138,7 +138,7 @@ public class TestCloseContainerEventHandler {
   public void testCloseContainerEventWithValidContainers() throws IOException {
     ContainerInfo container = containerManager
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+            1, OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     DatanodeDetails datanode = pipelineManager
         .getPipeline(container.getPipelineID()).getFirstNode();
@@ -157,7 +157,7 @@ public class TestCloseContainerEventHandler {
         .captureLogs(CloseContainerEventHandler.LOG);
     ContainerInfo container = containerManager
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+            3, OzoneConsts.OZONE);
     ContainerID id = container.containerID();
     int[] closeCount = new int[3];
     eventQueue.fireEvent(CLOSE_CONTAINER, id);

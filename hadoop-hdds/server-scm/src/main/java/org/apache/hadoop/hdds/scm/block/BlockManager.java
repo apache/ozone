@@ -39,14 +39,14 @@ public interface BlockManager extends Closeable,
    * Allocates a new block for a given size.
    * @param size - Block Size
    * @param type Replication Type
-   * @param factor - Replication Factor
+   * @param replication - Replication number
    * @param excludeList List of datanodes/containers to exclude during block
    *                    allocation.
    * @return AllocatedBlock
    * @throws IOException
    */
   AllocatedBlock allocateBlock(long size, HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, String owner,
+      int replication, String owner,
       ExcludeList excludeList) throws IOException;
 
   /**

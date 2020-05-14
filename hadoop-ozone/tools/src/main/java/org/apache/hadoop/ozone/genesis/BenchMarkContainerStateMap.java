@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.genesis;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -70,7 +69,7 @@ public class BenchMarkContainerStateMap {
             .setState(CLOSED)
             .setPipelineID(pipeline.getId())
             .setReplicationType(pipeline.getType())
-            .setReplicationFactor(pipeline.getFactor())
+            .setReplication(pipeline.getReplication())
             .setUsedBytes(0)
             .setNumberOfKeys(0)
             .setStateEnterTime(Time.now())
@@ -90,7 +89,7 @@ public class BenchMarkContainerStateMap {
             .setState(OPEN)
             .setPipelineID(pipeline.getId())
             .setReplicationType(pipeline.getType())
-            .setReplicationFactor(pipeline.getFactor())
+            .setReplication(pipeline.getReplication())
             .setUsedBytes(0)
             .setNumberOfKeys(0)
             .setStateEnterTime(Time.now())
@@ -109,7 +108,7 @@ public class BenchMarkContainerStateMap {
           .setState(OPEN)
           .setPipelineID(pipeline.getId())
           .setReplicationType(pipeline.getType())
-          .setReplicationFactor(pipeline.getFactor())
+          .setReplication(pipeline.getReplication())
           .setUsedBytes(0)
           .setNumberOfKeys(0)
           .setStateEnterTime(Time.now())
@@ -157,7 +156,7 @@ public class BenchMarkContainerStateMap {
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setNodes(dns)
         .build();
     return pipeline;
@@ -178,7 +177,7 @@ public class BenchMarkContainerStateMap {
         .setState(CLOSED)
         .setPipelineID(pipeline.getId())
         .setReplicationType(pipeline.getType())
-        .setReplicationFactor(pipeline.getFactor())
+        .setReplication(pipeline.getReplication())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
         .setStateEnterTime(Time.now())
@@ -195,7 +194,7 @@ public class BenchMarkContainerStateMap {
       state.stateMap.addContainer(getContainerInfo(state));
     }
     bh.consume(state.stateMap
-        .getMatchingContainerIDs(OPEN, OzoneConsts.OZONE, ReplicationFactor.ONE,
+        .getMatchingContainerIDs(OPEN, OzoneConsts.OZONE, 1,
             ReplicationType.STAND_ALONE));
   }
 }

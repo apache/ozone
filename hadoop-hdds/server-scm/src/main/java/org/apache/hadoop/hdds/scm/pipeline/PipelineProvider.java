@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -58,10 +57,10 @@ public abstract class PipelineProvider {
     return stateManager;
   }
 
-  protected abstract Pipeline create(ReplicationFactor factor)
+  protected abstract Pipeline create(int replication)
       throws IOException;
 
-  protected abstract Pipeline create(ReplicationFactor factor,
+  protected abstract Pipeline create(int replication,
       List<DatanodeDetails> nodes);
 
   protected abstract void close(Pipeline pipeline) throws IOException;
@@ -69,9 +68,9 @@ public abstract class PipelineProvider {
   protected abstract void shutdown();
 
   List<DatanodeDetails> pickNodesNeverUsed(ReplicationType type,
-      ReplicationFactor factor) throws SCMException {
+      int replication) throws SCMException {
     Set<DatanodeDetails> dnsUsed = new HashSet<>();
-    stateManager.getPipelines(type, factor).stream().filter(
+    stateManager.getPipelines(type, replication).stream().filter(
         p -> p.getPipelineState().equals(Pipeline.PipelineState.OPEN) ||
             p.getPipelineState().equals(Pipeline.PipelineState.DORMANT) ||
             p.getPipelineState().equals(Pipeline.PipelineState.ALLOCATED))
@@ -82,12 +81,12 @@ public abstract class PipelineProvider {
         .getNodes(HddsProtos.NodeState.HEALTHY)
         .parallelStream()
         .filter(dn -> !dnsUsed.contains(dn))
-        .limit(factor.getNumber())
+        .limit(replication)
         .collect(Collectors.toList());
-    if (dns.size() < factor.getNumber()) {
+    if (dns.size() < replication) {
       String e = String
           .format("Cannot create pipeline of factor %d using %d nodes." +
-                  " Used %d nodes. Healthy nodes %d", factor.getNumber(),
+                  " Used %d nodes. Healthy nodes %d", replication,
               dns.size(), dnsUsed.size(),
               nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size());
       throw new SCMException(e,

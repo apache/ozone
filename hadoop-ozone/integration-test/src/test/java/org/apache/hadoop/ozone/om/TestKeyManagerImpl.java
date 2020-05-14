@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -179,7 +178,7 @@ public class TestKeyManagerImpl {
     Mockito.when(mockScmBlockLocationProtocol
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
             Mockito.any(ReplicationType.class),
-            Mockito.any(ReplicationFactor.class), Mockito.anyString(),
+            Mockito.anyInt(), Mockito.anyString(),
             Mockito.any(ExcludeList.class))).thenThrow(
         new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
@@ -252,7 +251,7 @@ public class TestKeyManagerImpl {
         .setModificationTime(Time.now())
         .setDataSize(0)
         .setReplicationType(keyArgs.getType())
-        .setReplicationFactor(keyArgs.getFactor())
+        .setReplication(keyArgs.getReplication())
         .setFileEncryptionInfo(null).build();
     metadataManager.getOpenKeyTable().put(
         metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
@@ -748,7 +747,7 @@ public class TestKeyManagerImpl {
     Assume.assumeFalse(nodeList.get(0).equals(nodeList.get(2)));
     // create a pipeline using 3 datanodes
     Pipeline pipeline = scm.getPipelineManager().createPipeline(
-        ReplicationType.RATIS, ReplicationFactor.THREE, nodeList);
+        ReplicationType.RATIS, 3, nodeList);
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
     locationInfoList.add(
         new OmKeyLocationInfo.Builder().setPipeline(pipeline)
@@ -804,11 +803,11 @@ public class TestKeyManagerImpl {
         TestOMRequestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKeyInDB + i,
             1000L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, metadataManager);
+            1, metadataManager);
       } else {  // Add to TableCache
         TestOMRequestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            HddsProtos.ReplicationType.RATIS, 1,
             metadataManager);
       }
     }
@@ -875,12 +874,12 @@ public class TestKeyManagerImpl {
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInDB + i,
             1000L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, metadataManager);
+            1, metadataManager);
       } else {  // Add to TableCache
         TestOMRequestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            HddsProtos.ReplicationType.RATIS, 1,
             metadataManager);
       }
     }
@@ -918,12 +917,12 @@ public class TestKeyManagerImpl {
         TestOMRequestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
             1000L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, metadataManager);
+            1, metadataManager);
         existKeySet.add(prefixKey + i);
       } else {
         TestOMRequestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            HddsProtos.ReplicationType.RATIS, 1,
             metadataManager);
 
         String key = metadataManager.getOzoneKey(
@@ -1142,7 +1141,7 @@ public class TestKeyManagerImpl {
 
       OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo("v1",
           "b1", "k1", ReplicationType.RATIS,
-          ReplicationFactor.THREE);
+          3);
 
       // Add block to key.
       List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -1200,7 +1199,7 @@ public class TestKeyManagerImpl {
 
       OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo("v1",
           "b1", "k1", ReplicationType.RATIS,
-          ReplicationFactor.THREE);
+          3);
 
       // Add block to key.
       List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -1237,7 +1236,7 @@ public class TestKeyManagerImpl {
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplication(3)
         .setNodes(new ArrayList<>())
         .build();
   }
@@ -1353,7 +1352,7 @@ public class TestKeyManagerImpl {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     return new OmKeyArgs.Builder()
         .setBucketName(BUCKET_NAME)
-        .setFactor(ReplicationFactor.ONE)
+        .setReplication(1)
         .setDataSize(0)
         .setType(ReplicationType.STAND_ALONE)
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroups(),

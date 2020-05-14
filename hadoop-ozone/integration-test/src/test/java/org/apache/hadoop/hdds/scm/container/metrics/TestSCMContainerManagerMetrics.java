@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.container.metrics;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -80,7 +79,7 @@ public class TestSCMContainerManagerMetrics {
 
     ContainerInfo containerInfo = containerManager.allocateContainer(
         HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+        1, OzoneConsts.OZONE);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     Assert.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
@@ -89,7 +88,7 @@ public class TestSCMContainerManagerMetrics {
     try {
       containerManager.allocateContainer(
           HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+          3, OzoneConsts.OZONE);
       fail("testContainerOpsMetrics failed");
     } catch (IOException ex) {
       // Here it should fail, so it should have the old metric value.
@@ -152,7 +151,7 @@ public class TestSCMContainerManagerMetrics {
         .createBucket(volumeName, bucketName);
     OzoneOutputStream ozoneOutputStream = cluster.getRpcClient()
         .getObjectStore().getClientProxy().createKey(volumeName, bucketName,
-            key, 0, ReplicationType.RATIS, ReplicationFactor.ONE,
+            key, 0, ReplicationType.RATIS, 1,
             new HashMap<>());
 
     String data = "file data";

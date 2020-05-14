@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.junit.Assert.assertEquals;
@@ -55,7 +54,7 @@ public class TestReconContainerManager
             .setContainerID(containerID.getId())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
-            .setReplicationFactor(ONE)
+            .setReplication(1)
             .setOwner("test")
             .setState(OPEN)
             .setReplicationType(STAND_ALONE)

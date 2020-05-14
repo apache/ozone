@@ -90,7 +90,7 @@ public class TestPipelineDatanodesIntersection {
     int createdPipelineCount = 0;
     while (!end && createdPipelineCount <= healthyNodeCount * nodeHeaviness) {
       try {
-        Pipeline pipeline = provider.create(HddsProtos.ReplicationFactor.THREE);
+        Pipeline pipeline = provider.create(3);
         stateManager.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
         List<Pipeline> overlapPipelines = RatisPipelineUtils
@@ -125,7 +125,7 @@ public class TestPipelineDatanodesIntersection {
 
     LOG.info("Among total " +
         stateManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE).size() + " created pipelines" +
+            3).size() + " created pipelines" +
         " with " + healthyNodeCount + " healthy datanodes and " +
         nodeHeaviness + " as node heaviness, " +
         intersectionCount + " pipelines has same set of datanodes.");

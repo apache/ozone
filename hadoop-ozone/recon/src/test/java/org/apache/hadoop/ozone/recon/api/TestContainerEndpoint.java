@@ -41,7 +41,6 @@ import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -110,7 +109,7 @@ public class TestContainerEndpoint {
         new ContainerInfo.Builder()
             .setContainerID(containerID.getId())
             .setNumberOfKeys(keyCount)
-            .setReplicationFactor(ReplicationFactor.THREE)
+            .setReplication(3)
             .setPipelineID(pipelineID)
             .build()
     );

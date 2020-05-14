@@ -495,7 +495,7 @@ public class SQLCLI  extends Configured implements Tool {
     String insertContainerInfo = String.format(
         INSERT_CONTAINER_INFO, containerID,
         containerInfo.getReplicationType(),
-        containerInfo.getReplicationFactor(),
+        containerInfo.getReplication(),
         containerInfo.getUsedBytes(),
         containerInfo.getOwner(),
         containerInfo.getNumberOfKeys());

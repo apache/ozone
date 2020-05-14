@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.NavigableSet;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
@@ -37,10 +36,10 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 public interface PipelineManager extends Closeable, PipelineManagerMXBean,
     EventHandler<SafeModeStatus> {
 
-  Pipeline createPipeline(ReplicationType type, ReplicationFactor factor)
+  Pipeline createPipeline(ReplicationType type, int replication)
       throws IOException;
 
-  Pipeline createPipeline(ReplicationType type, ReplicationFactor factor,
+  Pipeline createPipeline(ReplicationType type, int replication,
       List<DatanodeDetails> nodes);
 
   Pipeline getPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
@@ -52,15 +51,15 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
   List<Pipeline> getPipelines(ReplicationType type);
 
   List<Pipeline> getPipelines(ReplicationType type,
-      ReplicationFactor factor);
+      int replication);
 
   List<Pipeline> getPipelines(ReplicationType type,
       Pipeline.PipelineState state);
 
   List<Pipeline> getPipelines(ReplicationType type,
-      ReplicationFactor factor, Pipeline.PipelineState state);
+      int replication, Pipeline.PipelineState state);
 
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
+  List<Pipeline> getPipelines(ReplicationType type, int replication,
       Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines);
 
@@ -80,7 +79,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
   void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException;
 
-  void scrubPipeline(ReplicationType type, ReplicationFactor factor)
+  void scrubPipeline(ReplicationType type, int replication)
       throws IOException;
 
   void startPipelineCreator();

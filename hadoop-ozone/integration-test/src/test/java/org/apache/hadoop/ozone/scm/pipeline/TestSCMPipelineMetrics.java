@@ -100,7 +100,7 @@ public class TestSCMPipelineMetrics {
     AllocatedBlock block =
         cluster.getStorageContainerManager().getScmBlockManager()
             .allocateBlock(5, HddsProtos.ReplicationType.RATIS,
-                HddsProtos.ReplicationFactor.ONE, "Test", new ExcludeList());
+                1, "Test", new ExcludeList());
     MetricsRecordBuilder metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
     Pipeline pipeline = block.getPipeline();

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -104,7 +103,7 @@ public class TestKeyPurging {
       String keyName = keyBase + "-" + i;
       keys.add(keyName);
       OzoneOutputStream keyStream = TestHelper.createKey(
-          keyName, ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+          keyName, ReplicationType.STAND_ALONE, 1,
           KEY_SIZE, store, volumeName, bucketName);
       keyStream.write(data);
       keyStream.close();

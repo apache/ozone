@@ -50,7 +50,7 @@ public final class OmKeyInfo extends WithObjectID {
   private final long creationTime;
   private long modificationTime;
   private HddsProtos.ReplicationType type;
-  private HddsProtos.ReplicationFactor factor;
+  private int replication;
   private FileEncryptionInfo encInfo;
 
   /**
@@ -63,7 +63,7 @@ public final class OmKeyInfo extends WithObjectID {
       List<OmKeyLocationInfoGroup> versions, long dataSize,
       long creationTime, long modificationTime,
       HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor,
+      int replication,
       Map<String, String> metadata,
       FileEncryptionInfo encInfo, List<OzoneAcl> acls,
       long objectID, long updateID) {
@@ -85,13 +85,13 @@ public final class OmKeyInfo extends WithObjectID {
     this.keyLocationVersions = versions;
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
-    this.factor = factor;
     this.type = type;
     this.metadata = metadata;
     this.encInfo = encInfo;
     this.acls = acls;
     this.objectID = objectID;
     this.updateID = updateID;
+    this.replication = replication;
   }
 
   public String getVolumeName() {
@@ -106,8 +106,8 @@ public final class OmKeyInfo extends WithObjectID {
     return type;
   }
 
-  public HddsProtos.ReplicationFactor getFactor() {
-    return factor;
+  public int getReplication() {
+    return replication;
   }
 
   public String getKeyName() {
@@ -265,7 +265,7 @@ public final class OmKeyInfo extends WithObjectID {
     private long creationTime;
     private long modificationTime;
     private HddsProtos.ReplicationType type;
-    private HddsProtos.ReplicationFactor factor;
+    private int replication;
     private Map<String, String> metadata;
     private FileEncryptionInfo encInfo;
     private List<OzoneAcl> acls;
@@ -324,8 +324,8 @@ public final class OmKeyInfo extends WithObjectID {
       return this;
     }
 
-    public Builder setReplicationFactor(HddsProtos.ReplicationFactor replFact) {
-      this.factor = replFact;
+    public Builder setReplication(int replicationNum) {
+      this.replication = replicationNum;
       return this;
     }
 
@@ -376,7 +376,7 @@ public final class OmKeyInfo extends WithObjectID {
     public OmKeyInfo build() {
       return new OmKeyInfo(
           volumeName, bucketName, keyName, omKeyLocationInfoGroups,
-          dataSize, creationTime, modificationTime, type, factor, metadata,
+          dataSize, creationTime, modificationTime, type, replication, metadata,
           encInfo, acls, objectID, updateID);
     }
   }
@@ -384,12 +384,13 @@ public final class OmKeyInfo extends WithObjectID {
   public KeyInfo getProtobuf() {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
     KeyInfo.Builder kb = KeyInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(dataSize)
-        .setFactor(factor)
+        .setReplication(replication)
         .setType(type)
         .addAllKeyLocationList(keyLocationVersions.stream()
             .map(OmKeyLocationInfoGroup::getProtobuf)
@@ -401,6 +402,11 @@ public final class OmKeyInfo extends WithObjectID {
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
         .setObjectID(objectID)
         .setUpdateID(updateID);
+    // TODO(maobaolong): remove this block after clear factor
+    if (replication == 1 || replication == 3) {
+      kb.setFactor(
+          HddsProtos.ReplicationFactor.valueOf(replication));
+    }
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
@@ -422,7 +428,6 @@ public final class OmKeyInfo extends WithObjectID {
         .setCreationTime(keyInfo.getCreationTime())
         .setModificationTime(keyInfo.getModificationTime())
         .setReplicationType(keyInfo.getType())
-        .setReplicationFactor(keyInfo.getFactor())
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
@@ -433,6 +438,14 @@ public final class OmKeyInfo extends WithObjectID {
     if (keyInfo.hasUpdateID()) {
       builder.setUpdateID(keyInfo.getUpdateID());
     }
+
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
+    if (keyInfo.hasReplication()) {
+      builder.setReplication(keyInfo.getReplication());
+    } else if (keyInfo.hasFactor()) {
+      builder.setReplication(keyInfo.getFactor().getNumber());
+    }
+
     return builder.build();
   }
 
@@ -445,7 +458,7 @@ public final class OmKeyInfo extends WithObjectID {
         ", dataSize='" + dataSize + '\'' +
         ", creationTime='" + creationTime + '\'' +
         ", type='" + type + '\'' +
-        ", factor='" + factor + '\'' +
+        ", replication='" + replication + '\'' +
         '}';
   }
 
@@ -467,7 +480,7 @@ public final class OmKeyInfo extends WithObjectID {
         Objects
             .equals(keyLocationVersions, omKeyInfo.keyLocationVersions) &&
         type == omKeyInfo.type &&
-        factor == omKeyInfo.factor &&
+        replication == omKeyInfo.replication &&
         Objects.equals(metadata, omKeyInfo.metadata) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         objectID == omKeyInfo.objectID &&
@@ -491,7 +504,7 @@ public final class OmKeyInfo extends WithObjectID {
         .setModificationTime(modificationTime)
         .setDataSize(dataSize)
         .setReplicationType(type)
-        .setReplicationFactor(factor)
+        .setReplication(replication)
         .setFileEncryptionInfo(encInfo)
         .setObjectID(objectID).setUpdateID(updateID);
 

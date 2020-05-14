@@ -177,9 +177,9 @@ public class TestContainerPlacement {
       ContainerInfo container = containerManager
           .allocateContainer(
               SCMTestUtils.getReplicationType(conf),
-              SCMTestUtils.getReplicationFactor(conf),
+              SCMTestUtils.getReplication(conf),
               OzoneConsts.OZONE);
-      assertEquals(SCMTestUtils.getReplicationFactor(conf).getNumber(),
+      assertEquals(SCMTestUtils.getReplication(conf),
           containerManager.getContainerReplicas(
               container.containerID()).size());
     } finally {

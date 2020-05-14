@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 public class ContainerQueryKey {
   private final HddsProtos.LifeCycleState state;
   private final String owner;
-  private final HddsProtos.ReplicationFactor factor;
+  private final int replication;
   private final HddsProtos.ReplicationType type;
 
   @Override
@@ -46,7 +46,7 @@ public class ContainerQueryKey {
     return new EqualsBuilder()
         .append(getState(), that.getState())
         .append(getOwner(), that.getOwner())
-        .append(getFactor(), that.getFactor())
+        .append(getReplication(), that.getReplication())
         .append(getType(), that.getType())
         .isEquals();
   }
@@ -56,7 +56,7 @@ public class ContainerQueryKey {
     return new HashCodeBuilder(61, 71)
         .append(getState())
         .append(getOwner())
-        .append(getFactor())
+        .append(getReplication())
         .append(getType())
         .toHashCode();
   }
@@ -65,14 +65,14 @@ public class ContainerQueryKey {
    * Constructor for ContainerQueryKey.
    * @param state LifeCycleState
    * @param owner - Name of the Owner.
-   * @param factor Replication Factor.
+   * @param replication Replication number.
    * @param type - Replication Type.
    */
   public ContainerQueryKey(HddsProtos.LifeCycleState state, String owner,
-      HddsProtos.ReplicationFactor factor, HddsProtos.ReplicationType type) {
+      int replication, HddsProtos.ReplicationType type) {
     this.state = state;
     this.owner = owner;
-    this.factor = factor;
+    this.replication = replication;
     this.type = type;
   }
 
@@ -93,11 +93,11 @@ public class ContainerQueryKey {
   }
 
   /**
-   * Returns the replication factor of containers which this key represents.
-   * @return ReplicationFactor
+   * Returns the replication number of containers which this key represents.
+   * @return Replication
    */
-  public HddsProtos.ReplicationFactor getFactor() {
-    return factor;
+  public int getReplication() {
+    return replication;
   }
 
   /**

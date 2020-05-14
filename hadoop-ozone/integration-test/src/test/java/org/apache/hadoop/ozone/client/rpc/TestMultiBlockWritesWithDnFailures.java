@@ -166,7 +166,7 @@ public class TestMultiBlockWritesWithDnFailures {
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
@@ -217,7 +217,7 @@ public class TestMultiBlockWritesWithDnFailures {
     key.close();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setKeyName(keyName)
+        .setReplication(3).setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);

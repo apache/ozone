@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.slf4j.Logger;
@@ -71,24 +70,24 @@ public class PipelineStateManager {
     return pipelineStateMap.getPipelines(type);
   }
 
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor) {
-    return pipelineStateMap.getPipelines(type, factor);
-  }
-
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
-      PipelineState state) {
-    return pipelineStateMap.getPipelines(type, factor, state);
-  }
-
-  List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
+  List<Pipeline> getPipelines(ReplicationType type, int replication,
       PipelineState state, Collection<DatanodeDetails> excludeDns,
       Collection<PipelineID> excludePipelines) {
     return pipelineStateMap
-        .getPipelines(type, factor, state, excludeDns, excludePipelines);
+        .getPipelines(type, replication, state, excludeDns, excludePipelines);
+  }
+
+  List<Pipeline> getPipelines(ReplicationType type, int replication) {
+    return pipelineStateMap.getPipelines(type, replication);
   }
 
   List<Pipeline> getPipelines(ReplicationType type, PipelineState... states) {
     return pipelineStateMap.getPipelines(type, states);
+  }
+
+  List<Pipeline> getPipelines(ReplicationType type, int replication,
+      PipelineState state) {
+    return pipelineStateMap.getPipelines(type, replication, state);
   }
 
   NavigableSet<ContainerID> getContainers(PipelineID pipelineID)

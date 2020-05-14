@@ -57,7 +57,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationType, replication, omMetadataManager);
 
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
@@ -149,7 +149,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, 1L, omMetadataManager);
+        clientID, replicationType, replication, 1L, omMetadataManager);
 
     // Delete the key manually. Lets say the Delete Requests
     // TransactionLogIndex is 10.
@@ -161,7 +161,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     // Create the same key again with TransactionLogIndex > Delete requests
     // TransactionLogIndex
     TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, 20L, omMetadataManager);
+        clientID, replicationType, replication, 20L, omMetadataManager);
 
     // Replay the original DeleteRequest.
     OMClientResponse omClientResponse = omKeyDeleteRequest

@@ -185,7 +185,7 @@ public class TestPipelinePlacementPolicy {
             .setId(PipelineID.randomId())
             .setState(Pipeline.PipelineState.ALLOCATED)
             .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.THREE)
+            .setReplication(3)
             .setNodes(nodes)
             .build();
         nodeManager.addPipeline(pipeline);

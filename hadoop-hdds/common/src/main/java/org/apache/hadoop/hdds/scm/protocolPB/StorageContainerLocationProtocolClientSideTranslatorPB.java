@@ -130,19 +130,28 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * supports replication factor of either 1 or 3.
    *
    * @param type   - Replication Type
-   * @param factor - Replication Count
+   * @param replication - Replication Count
    */
   @Override
   public ContainerWithPipeline allocateContainer(
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
+      HddsProtos.ReplicationType type, int replication,
       String owner) throws IOException {
 
-    ContainerRequestProto request = ContainerRequestProto.newBuilder()
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
+    ContainerRequestProto.Builder requestBuilder = ContainerRequestProto
+        .newBuilder()
         .setTraceID(TracingUtil.exportCurrentSpan())
-        .setReplicationFactor(factor)
+        .setReplication(replication)
         .setReplicationType(type)
-        .setOwner(owner)
-        .build();
+        .setOwner(owner);
+
+    // TODO(maobaolong): remove this block after clear factor
+    if (replication == 1 || replication == 3) {
+      requestBuilder.setReplicationFactor(
+          HddsProtos.ReplicationFactor.valueOf(replication));
+    }
+
+    ContainerRequestProto request = requestBuilder.build();
 
     ContainerResponseProto response =
         submitRequest(Type.AllocateContainer,
@@ -321,19 +330,27 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    * Creates a replication pipeline of a specified type.
    *
    * @param replicationType - replication type
-   * @param factor          - factor 1 or 3
+   * @param replication          - factor 1 or 3
    * @param nodePool        - optional machine list to build a pipeline.
    */
   @Override
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType
-      replicationType, HddsProtos.ReplicationFactor factor, HddsProtos
+      replicationType, int replication, HddsProtos
       .NodePool nodePool) throws IOException {
-    PipelineRequestProto request = PipelineRequestProto.newBuilder()
+    PipelineRequestProto.Builder requestBuilder =PipelineRequestProto
+        .newBuilder()
         .setTraceID(TracingUtil.exportCurrentSpan())
         .setNodePool(nodePool)
-        .setReplicationFactor(factor)
-        .setReplicationType(replicationType)
-        .build();
+        .setReplication(replication)
+        .setReplicationType(replicationType);
+
+    // TODO(maobaolong): remove this block after clear factor
+    if (replication == 1 || replication == 3) {
+      requestBuilder.setReplicationFactor(
+          HddsProtos.ReplicationFactor.valueOf(replication));
+    }
+
+    PipelineRequestProto request = requestBuilder.build();
 
     PipelineResponseProto response =
         submitRequest(Type.AllocatePipeline,

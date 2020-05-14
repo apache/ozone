@@ -111,7 +111,7 @@ public class TestSCMPipelineManager {
     for (int i = 0; i < pipelineNum; i++) {
       Pipeline pipeline = pipelineManager
           .createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+              3);
       pipelines.add(pipeline);
     }
     pipelineManager.close();
@@ -161,7 +161,7 @@ public class TestSCMPipelineManager {
 
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            3);
     pipelineManager.openPipeline(pipeline.getId());
     pipelineManager
         .addContainerToPipeline(pipeline.getId(), ContainerID.valueof(1));
@@ -203,7 +203,7 @@ public class TestSCMPipelineManager {
     // create a pipeline in allocated state with no dns yet reported
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            3);
 
     Assert
         .assertFalse(pipelineManager.getPipeline(pipeline.getId()).isHealthy());
@@ -274,7 +274,7 @@ public class TestSCMPipelineManager {
     for (int i = 0; i < 5; i++) {
       Pipeline pipeline = pipelineManager
           .createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+              3);
       Assert.assertNotNull(pipeline);
     }
 
@@ -290,7 +290,7 @@ public class TestSCMPipelineManager {
     //This should fail...
     try {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
+          3);
       fail();
     } catch (SCMException ioe) {
       // pipeline creation failed this time.
@@ -326,7 +326,7 @@ public class TestSCMPipelineManager {
 
     final Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            3);
     final PipelineID pid = pipeline.getId();
 
     pipelineManager.openPipeline(pid);
@@ -334,7 +334,7 @@ public class TestSCMPipelineManager {
 
     Assert.assertTrue(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE,
+            3,
             Pipeline.PipelineState.OPEN).contains(pipeline));
 
     Assert.assertEquals(Pipeline.PipelineState.OPEN,
@@ -346,14 +346,14 @@ public class TestSCMPipelineManager {
 
     Assert.assertFalse(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE,
+            3,
             Pipeline.PipelineState.OPEN).contains(pipeline));
 
     pipelineManager.activatePipeline(pid);
 
     Assert.assertTrue(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE,
+            3,
             Pipeline.PipelineState.OPEN).contains(pipeline));
 
     pipelineManager.close();
@@ -375,7 +375,7 @@ public class TestSCMPipelineManager {
         new SCMSafeModeManager.SafeModeStatus(true, true), null);
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            3);
     // close manager
     pipelineManager.close();
     // new pipeline manager loads the pipelines from the db in ALLOCATED state
@@ -438,7 +438,7 @@ public class TestSCMPipelineManager {
 
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            3);
     // At this point, pipeline is not at OPEN stage.
     Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipeline.getPipelineState());
@@ -446,15 +446,15 @@ public class TestSCMPipelineManager {
     // pipeline should be seen in pipelineManager as ALLOCATED.
     Assert.assertTrue(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE,
+            3,
             Pipeline.PipelineState.ALLOCATED).contains(pipeline));
     pipelineManager.scrubPipeline(HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+        3);
 
     // pipeline should be scrubbed.
     Assert.assertFalse(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE,
+            3,
             Pipeline.PipelineState.ALLOCATED).contains(pipeline));
 
     pipelineManager.close();
@@ -482,7 +482,7 @@ public class TestSCMPipelineManager {
     try {
       Pipeline pipeline = pipelineManager
           .createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+              3);
       fail("Pipelines should not have been created");
     } catch (IOException e) {
       // expected
@@ -492,7 +492,7 @@ public class TestSCMPipelineManager {
     // raised.
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE);
+            1);
 
     // Simulate safemode check exiting.
     pipelineManager.onMessage(

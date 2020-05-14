@@ -24,7 +24,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -145,8 +144,7 @@ public class TestContainerStateMachineFailureOnRead {
     // Stop one follower datanode
     List<Pipeline> pipelines =
         cluster.getStorageContainerManager().getPipelineManager().getPipelines(
-            HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            HddsProtos.ReplicationType.RATIS, 3);
     Assert.assertEquals(1, pipelines.size());
     Pipeline ratisPipeline = pipelines.iterator().next();
 
@@ -173,7 +171,7 @@ public class TestContainerStateMachineFailureOnRead {
     OzoneOutputStream key = objectStore.getVolume(volumeName)
         .getBucket(bucketName)
         .createKey("ratis", 1024, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
+            3, new HashMap<>());
     // First write and flush creates a container in the datanode
     key.write("ratis".getBytes());
     key.flush();

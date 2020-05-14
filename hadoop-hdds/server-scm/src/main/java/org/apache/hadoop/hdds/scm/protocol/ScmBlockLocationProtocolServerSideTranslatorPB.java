@@ -157,10 +157,16 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
   public AllocateScmBlockResponseProto allocateScmBlock(
       AllocateScmBlockRequestProto request)
       throws IOException {
+    int replication = 0;
+    if (request.hasReplication()) {
+      replication = request.getReplication();
+    } else if (request.hasFactor()) {
+      replication = request.getFactor().getNumber();
+    }
     List<AllocatedBlock> allocatedBlocks =
         impl.allocateBlock(request.getSize(),
             request.getNumBlocks(), request.getType(),
-            request.getFactor(), request.getOwner(),
+            replication, request.getOwner(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()));
 
     AllocateScmBlockResponseProto.Builder builder =

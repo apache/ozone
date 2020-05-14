@@ -68,18 +68,18 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   @Override
-  public Pipeline create(HddsProtos.ReplicationFactor factor)
+  public Pipeline create(int replication)
       throws IOException {
     if (autoOpenPipeline) {
-      return super.create(factor);
+      return super.create(replication);
     } else {
-      Pipeline initialPipeline = super.create(factor);
+      Pipeline initialPipeline = super.create(replication);
       Pipeline pipeline = Pipeline.newBuilder()
           .setId(initialPipeline.getId())
           // overwrite pipeline state to main ALLOCATED
           .setState(Pipeline.PipelineState.ALLOCATED)
           .setType(initialPipeline.getType())
-          .setFactor(factor)
+          .setReplication(replication)
           .setNodes(initialPipeline.getNodes())
           .build();
       if (isHealthy) {
@@ -98,13 +98,13 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   }
 
   @Override
-  public Pipeline create(HddsProtos.ReplicationFactor factor,
+  public Pipeline create(int replication,
                          List<DatanodeDetails> nodes) {
     return Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(Pipeline.PipelineState.OPEN)
         .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(factor)
+        .setReplication(replication)
         .setNodes(nodes)
         .build();
   }

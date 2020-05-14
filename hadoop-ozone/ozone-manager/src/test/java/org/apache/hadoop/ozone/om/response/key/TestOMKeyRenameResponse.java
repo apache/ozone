@@ -35,7 +35,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   public void testAddToDBBatch() throws Exception {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+        bucketName, keyName, replicationType, replication);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setRenameKeyResponse(
@@ -56,7 +56,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         toKeyName);
 
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationType, replication, omMetadataManager);
 
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
     Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneToKey));
@@ -74,7 +74,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithErrorResponse() throws Exception {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+        bucketName, keyName, replicationType, replication);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setRenameKeyResponse(
@@ -95,7 +95,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         toKeyName);
 
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationType, replication, omMetadataManager);
 
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
     Assert.assertFalse(omMetadataManager.getKeyTable().isExist(ozoneToKey));
@@ -115,7 +115,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithSameKeyName() throws Exception {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+        bucketName, keyName, replicationType, replication);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setRenameKeyResponse(
@@ -133,7 +133,7 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
         keyName);
 
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationType, replication, omMetadataManager);
 
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneFromKey));
 

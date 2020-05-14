@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -113,7 +112,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     ContainerInfo containerInfo = new ContainerInfo.Builder()
         .setContainerID(containerId)
-        .setReplicationFactor(ReplicationFactor.ONE)
+        .setReplication(1)
         .setState(LifeCycleState.OPEN)
         .setOwner("test")
         .setPipelineID(pipeline.getId())
@@ -290,7 +289,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       Assert.assertEquals(1, datanodeMetadata.getPipelines().size());
       Assert.assertEquals(pipelineId,
           datanodeMetadata.getPipelines().get(0).getPipelineID().toString());
-      Assert.assertEquals(pipeline.getFactor().getNumber(),
+      Assert.assertEquals(pipeline.getReplication(),
           datanodeMetadata.getPipelines().get(0).getReplicationFactor());
       Assert.assertEquals(pipeline.getType().toString(),
           datanodeMetadata.getPipelines().get(0).getReplicationType());
@@ -359,7 +358,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assert.assertEquals(1, pipelineMetadata.getDatanodes().size());
     Assert.assertEquals(pipeline.getType().toString(),
         pipelineMetadata.getReplicationType());
-    Assert.assertEquals(pipeline.getFactor().getNumber(),
+    Assert.assertEquals(pipeline.getReplication(),
         pipelineMetadata.getReplicationFactor());
     Assert.assertEquals(datanodeDetails.getHostName(),
         pipelineMetadata.getLeaderNode());

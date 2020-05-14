@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -105,7 +104,7 @@ public class TestHybridPipelineOnDatanode {
     // Write data into a key
     OzoneOutputStream out = bucket
         .createKey(keyName1, data.length, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
+            1, new HashMap<>());
     out.write(value.getBytes());
     out.close();
 
@@ -114,7 +113,7 @@ public class TestHybridPipelineOnDatanode {
     // Write data into a key
     out = bucket
         .createKey(keyName2, data.length, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
+            3, new HashMap<>());
     out.write(value.getBytes());
     out.close();
 
@@ -143,7 +142,8 @@ public class TestHybridPipelineOnDatanode {
     Pipeline pipeline2 =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(pipelineID2);
-    Assert.assertFalse(pipeline1.getFactor().equals(pipeline2.getFactor()));
+    Assert.assertFalse(
+        pipeline1.getReplication() == pipeline2.getReplication());
     Assert.assertTrue(pipeline1.getType() == HddsProtos.ReplicationType.RATIS);
     Assert.assertTrue(pipeline1.getType() == pipeline2.getType());
     // assert that the pipeline Id1 and pipelineId2 are on the same node

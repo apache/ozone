@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -39,7 +38,7 @@ public final class OmKeyArgs implements Auditable {
   private final String keyName;
   private long dataSize;
   private final ReplicationType type;
-  private final ReplicationFactor factor;
+  private int replication;
   private List<OmKeyLocationInfo> locationInfoList;
   private final boolean isMultipartKey;
   private final String multipartUploadID;
@@ -51,7 +50,7 @@ public final class OmKeyArgs implements Auditable {
 
   @SuppressWarnings("parameternumber")
   private OmKeyArgs(String volumeName, String bucketName, String keyName,
-      long dataSize, ReplicationType type, ReplicationFactor factor,
+      long dataSize, ReplicationType type, int replication,
       List<OmKeyLocationInfo> locationInfoList, boolean isMultipart,
       String uploadID, int partNumber,
       Map<String, String> metadataMap, boolean refreshPipeline,
@@ -61,7 +60,7 @@ public final class OmKeyArgs implements Auditable {
     this.keyName = keyName;
     this.dataSize = dataSize;
     this.type = type;
-    this.factor = factor;
+    this.replication = replication;
     this.locationInfoList = locationInfoList;
     this.isMultipartKey = isMultipart;
     this.multipartUploadID = uploadID;
@@ -88,8 +87,8 @@ public final class OmKeyArgs implements Auditable {
     return type;
   }
 
-  public ReplicationFactor getFactor() {
-    return factor;
+  public int getReplication() {
+    return replication;
   }
 
   public List<OzoneAcl> getAcls() {
@@ -150,7 +149,7 @@ public final class OmKeyArgs implements Auditable {
     auditMap.put(OzoneConsts.REPLICATION_TYPE,
         (this.type != null) ? this.type.name() : null);
     auditMap.put(OzoneConsts.REPLICATION_FACTOR,
-        (this.factor != null) ? this.factor.name() : null);
+        String.valueOf(this.replication));
     return auditMap;
   }
 
@@ -171,7 +170,6 @@ public final class OmKeyArgs implements Auditable {
     private String keyName;
     private long dataSize;
     private ReplicationType type;
-    private ReplicationFactor factor;
     private List<OmKeyLocationInfo> locationInfoList;
     private boolean isMultipartKey;
     private String multipartUploadID;
@@ -180,6 +178,7 @@ public final class OmKeyArgs implements Auditable {
     private boolean refreshPipeline;
     private boolean sortDatanodesInPipeline;
     private List<OzoneAcl> acls;
+    private int replication;
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -206,8 +205,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setFactor(ReplicationFactor replicationFactor) {
-      this.factor = replicationFactor;
+    public Builder setReplication(int replicationNum) {
+      this.replication = replicationNum;
       return this;
     }
 
@@ -258,7 +257,7 @@ public final class OmKeyArgs implements Auditable {
 
     public OmKeyArgs build() {
       return new OmKeyArgs(volumeName, bucketName, keyName, dataSize, type,
-          factor, locationInfoList, isMultipartKey, multipartUploadID,
+          replication, locationInfoList, isMultipartKey, multipartUploadID,
           multipartUploadPartNumber, metadata, refreshPipeline, acls,
           sortDatanodesInPipeline);
     }

@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -244,7 +243,7 @@ public class TestOzoneClientRetriesOnException {
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
     return TestHelper
-            .createKey(keyName, type, ReplicationFactor.ONE,
+            .createKey(keyName, type, 1,
                     size, objectStore, volumeName, bucketName);
   }
 

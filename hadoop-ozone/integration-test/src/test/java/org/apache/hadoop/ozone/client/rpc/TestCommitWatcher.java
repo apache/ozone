@@ -162,7 +162,7 @@ public class TestCommitWatcher {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+            3, OzoneConsts.OZONE);
     Pipeline pipeline = container.getPipeline();
     long containerId = container.getContainerInfo().getContainerID();
     XceiverClientSpi xceiverClient = clientManager.acquireClient(pipeline);
@@ -239,7 +239,7 @@ public class TestCommitWatcher {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+            3, OzoneConsts.OZONE);
     Pipeline pipeline = container.getPipeline();
     long containerId = container.getContainerInfo().getContainerID();
     XceiverClientSpi xceiverClient = clientManager.acquireClient(pipeline);

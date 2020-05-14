@@ -47,7 +47,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -151,13 +150,13 @@ public class ObjectEndpoint extends EndpointBase {
         storageTypeDefault = false;
       }
       ReplicationType replicationType = s3StorageType.getType();
-      ReplicationFactor replicationFactor = s3StorageType.getFactor();
+      int replication = s3StorageType.getReplication();
 
       if (copyHeader != null) {
         //Copy object, as copy source available.
         CopyObjectResponse copyObjectResponse = copyObject(
             copyHeader, bucketName, keyPath, replicationType,
-            replicationFactor, storageTypeDefault);
+            replication, storageTypeDefault);
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();
       }
@@ -166,7 +165,7 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneBucket bucket = getBucket(bucketName);
 
       output = bucket.createKey(keyPath, length, replicationType,
-          replicationFactor, new HashMap<>());
+          replication, new HashMap<>());
 
       if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
           .equals(headers.getHeaderString("x-amz-content-sha256"))) {
@@ -427,10 +426,10 @@ public class ObjectEndpoint extends EndpointBase {
         s3StorageType = toS3StorageType(storageType);
       }
       ReplicationType replicationType = s3StorageType.getType();
-      ReplicationFactor replicationFactor = s3StorageType.getFactor();
+      int replication = s3StorageType.getReplication();
 
       OmMultipartInfo multipartInfo = ozoneBucket
-          .initiateMultipartUpload(key, replicationType, replicationFactor);
+          .initiateMultipartUpload(key, replicationType, replication);
 
       MultipartUploadInitiateResponse multipartUploadInitiateResponse = new
           MultipartUploadInitiateResponse();
@@ -603,7 +602,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       listPartsResponse.setStorageClass(S3StorageType.fromReplicationType(
           ozoneMultipartUploadPartListParts.getReplicationType(),
-          ozoneMultipartUploadPartListParts.getReplicationFactor()).toString());
+          ozoneMultipartUploadPartListParts.getReplication()).toString());
 
       if (ozoneMultipartUploadPartListParts.isTruncated()) {
         listPartsResponse.setTruncated(
@@ -641,7 +640,7 @@ public class ObjectEndpoint extends EndpointBase {
                                         String destBucket,
                                         String destkey,
                                         ReplicationType replicationType,
-                                        ReplicationFactor replicationFactor,
+                                        int replication,
                                         boolean storageTypeDefault)
       throws OS3Exception, IOException {
 
@@ -690,7 +689,7 @@ public class ObjectEndpoint extends EndpointBase {
       sourceInputStream = sourceOzoneBucket.readKey(sourceKey);
 
       destOutputStream = destOzoneBucket.createKey(destkey, sourceKeyLen,
-          replicationType, replicationFactor, new HashMap<>());
+          replicationType, replication, new HashMap<>());
 
       IOUtils.copy(sourceInputStream, destOutputStream);
 

@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CreateCont
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
@@ -192,7 +191,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
         .setId(PipelineID.valueOf(UUID.fromString(pipelineId)))
         .setState(PipelineState.OPEN)
         .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setReplication(3)
         .setLeaderId(UUID.fromString(serverId))
         .setNodes(datanodes)
         .build();

@@ -86,9 +86,9 @@ public class TestOneReplicaPipelineSafeModeRule {
         mockRatisProvider);
 
     createPipelines(pipelineFactorThreeCount,
-        HddsProtos.ReplicationFactor.THREE);
+        3);
     createPipelines(pipelineFactorOneCount,
-        HddsProtos.ReplicationFactor.ONE);
+        1);
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(ozoneConfiguration, containers,
@@ -149,8 +149,7 @@ public class TestOneReplicaPipelineSafeModeRule {
             LoggerFactory.getLogger(SCMSafeModeManager.class));
 
     List<Pipeline> pipelines =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE);
+        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS, 1);
     for (int i = 0; i < pipelineCountOne; i++) {
       firePipelineEvent(pipelines.get(i));
     }
@@ -162,8 +161,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     Assert.assertFalse(rule.validate());
 
     pipelines =
-        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+        pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS, 3);
     for (int i = 0; i < pipelineCountThree - 1; i++) {
       firePipelineEvent(pipelines.get(i));
     }
@@ -177,11 +175,10 @@ public class TestOneReplicaPipelineSafeModeRule {
     GenericTestUtils.waitFor(() -> rule.validate(), 1000, 5000);
   }
 
-  private void createPipelines(int count,
-      HddsProtos.ReplicationFactor factor) throws Exception {
+  private void createPipelines(int count, int replication) throws Exception {
     for (int i = 0; i < count; i++) {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-          factor);
+          replication);
     }
   }
 

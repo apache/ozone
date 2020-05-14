@@ -38,7 +38,7 @@ public class TestOmMultipartKeyInfo {
         .setUploadID(UUID.randomUUID().toString())
         .setCreationTime(Time.now())
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplication(3)
         .build();
 
     OmMultipartKeyInfo cloneMultipartKeyInfo = omMultipartKeyInfo.copyObject();
@@ -56,7 +56,7 @@ public class TestOmMultipartKeyInfo {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build());
+        .setReplication(1).build()).build());
 
     Assert.assertEquals(0, cloneMultipartKeyInfo.getPartKeyInfoMap().size());
     Assert.assertEquals(1, omMultipartKeyInfo.getPartKeyInfoMap().size());

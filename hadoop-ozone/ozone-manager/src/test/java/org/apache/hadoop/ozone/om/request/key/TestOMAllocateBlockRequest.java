@@ -66,7 +66,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationType, replication, omMetadataManager);
 
     // Check before calling validateAndUpdateCache. As adding DB entry has
     // not added any blocks, so size should be zero.
@@ -231,7 +231,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setKeyName(keyName)
-        .setFactor(replicationFactor).setType(replicationType)
+        .setReplication(replication).setType(replicationType)
         .build();
 
     AllocateBlockRequest allocateBlockRequest =

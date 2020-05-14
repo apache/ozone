@@ -55,7 +55,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
-import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
@@ -111,7 +110,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes().length, ReplicationType.RATIS,
-        THREE, new HashMap<>())) {
+        3, new HashMap<>())) {
       out.write(value.getBytes());
     }
 
@@ -120,7 +119,7 @@ public class TestSCMContainerPlacementPolicyMetrics {
         cluster.getStorageContainerManager().getPipelineManager();
     List<Pipeline> pipelines = manager.getPipelines().stream().filter(p ->
         p.getType() == HddsProtos.ReplicationType.RATIS &&
-            p.getFactor() == HddsProtos.ReplicationFactor.THREE)
+            p.getReplication() == 3)
         .collect(Collectors.toList());
     Pipeline targetPipeline = pipelines.get(0);
     List<DatanodeDetails> nodes = targetPipeline.getNodes();

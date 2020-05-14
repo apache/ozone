@@ -46,18 +46,18 @@ public class TestPipelineStateManager {
 
   private Pipeline createDummyPipeline(int numNodes) {
     return createDummyPipeline(HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, numNodes);
+        1, numNodes);
   }
 
   private Pipeline createDummyPipeline(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, int numNodes) {
+      int replication, int numNodes) {
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < numNodes; i++) {
       nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
     return Pipeline.newBuilder()
         .setType(type)
-        .setFactor(factor)
+        .setReplication(replication)
         .setNodes(nodes)
         .setState(Pipeline.PipelineState.ALLOCATED)
         .setId(PipelineID.randomId())
@@ -133,18 +133,20 @@ public class TestPipelineStateManager {
         for (int i = 0; i < 5; i++) {
           // 5 pipelines in allocated state for each type and factor
           Pipeline pipeline =
-              createDummyPipeline(type, factor, factor.getNumber());
+              createDummyPipeline(type, factor.getNumber(), factor.getNumber());
           stateManager.addPipeline(pipeline);
           pipelines.add(pipeline);
 
           // 5 pipelines in open state for each type and factor
-          pipeline = createDummyPipeline(type, factor, factor.getNumber());
+          pipeline = createDummyPipeline(type, factor.getNumber(),
+              factor.getNumber());
           stateManager.addPipeline(pipeline);
           stateManager.openPipeline(pipeline.getId());
           pipelines.add(pipeline);
 
           // 5 pipelines in closed state for each type and factor
-          pipeline = createDummyPipeline(type, factor, factor.getNumber());
+          pipeline = createDummyPipeline(type, factor.getNumber(),
+              factor.getNumber());
           stateManager.addPipeline(pipeline);
           stateManager.finalizePipeline(pipeline.getId());
           pipelines.add(pipeline);
@@ -158,11 +160,11 @@ public class TestPipelineStateManager {
           .values()) {
         // verify pipelines received
         List<Pipeline> pipelines1 =
-            stateManager.getPipelines(type, factor);
+            stateManager.getPipelines(type, factor.getNumber());
         Assert.assertEquals(15, pipelines1.size());
         pipelines1.stream().forEach(p -> {
           Assert.assertEquals(type, p.getType());
-          Assert.assertEquals(factor, p.getFactor());
+          Assert.assertEquals(factor.getNumber(), p.getReplication());
         });
       }
     }
@@ -182,18 +184,20 @@ public class TestPipelineStateManager {
       for (int i = 0; i < 5; i++) {
         // 5 pipelines in allocated state for each type and factor
         Pipeline pipeline =
-            createDummyPipeline(type, factor, factor.getNumber());
+            createDummyPipeline(type, factor.getNumber(), factor.getNumber());
         stateManager.addPipeline(pipeline);
         pipelines.add(pipeline);
 
         // 5 pipelines in open state for each type and factor
-        pipeline = createDummyPipeline(type, factor, factor.getNumber());
+        pipeline = createDummyPipeline(type, factor.getNumber(),
+            factor.getNumber());
         stateManager.addPipeline(pipeline);
         stateManager.openPipeline(pipeline.getId());
         pipelines.add(pipeline);
 
         // 5 pipelines in closed state for each type and factor
-        pipeline = createDummyPipeline(type, factor, factor.getNumber());
+        pipeline = createDummyPipeline(type,
+            factor.getNumber(), factor.getNumber());
         stateManager.addPipeline(pipeline);
         stateManager.finalizePipeline(pipeline.getId());
         pipelines.add(pipeline);
@@ -233,25 +237,28 @@ public class TestPipelineStateManager {
         for (int i = 0; i < 5; i++) {
           // 5 pipelines in allocated state for each type and factor
           Pipeline pipeline =
-              createDummyPipeline(type, factor, factor.getNumber());
+              createDummyPipeline(type, factor.getNumber(), factor.getNumber());
           stateManager.addPipeline(pipeline);
           pipelines.add(pipeline);
 
           // 5 pipelines in open state for each type and factor
-          pipeline = createDummyPipeline(type, factor, factor.getNumber());
+          pipeline = createDummyPipeline(type, factor.getNumber(),
+              factor.getNumber());
           stateManager.addPipeline(pipeline);
           stateManager.openPipeline(pipeline.getId());
           pipelines.add(pipeline);
 
           // 5 pipelines in dormant state for each type and factor
-          pipeline = createDummyPipeline(type, factor, factor.getNumber());
+          pipeline = createDummyPipeline(type, factor.getNumber(),
+              factor.getNumber());
           stateManager.addPipeline(pipeline);
           stateManager.openPipeline(pipeline.getId());
           stateManager.deactivatePipeline(pipeline.getId());
           pipelines.add(pipeline);
 
           // 5 pipelines in closed state for each type and factor
-          pipeline = createDummyPipeline(type, factor, factor.getNumber());
+          pipeline = createDummyPipeline(type, factor.getNumber(),
+              factor.getNumber());
           stateManager.addPipeline(pipeline);
           stateManager.finalizePipeline(pipeline.getId());
           pipelines.add(pipeline);
@@ -266,11 +273,11 @@ public class TestPipelineStateManager {
         for (Pipeline.PipelineState state : Pipeline.PipelineState.values()) {
           // verify pipelines received
           List<Pipeline> pipelines1 =
-              stateManager.getPipelines(type, factor, state);
+              stateManager.getPipelines(type, factor.getNumber(), state);
           Assert.assertEquals(5, pipelines1.size());
           pipelines1.forEach(p -> {
             Assert.assertEquals(type, p.getType());
-            Assert.assertEquals(factor, p.getFactor());
+            Assert.assertEquals(factor.getNumber(), p.getReplication());
             Assert.assertEquals(state, p.getPipelineState());
           });
         }
@@ -426,23 +433,23 @@ public class TestPipelineStateManager {
   @Test
   public void testQueryPipeline() throws IOException {
     Pipeline pipeline = createDummyPipeline(HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE, 3);
+        3, 3);
     // pipeline in allocated state should not be reported
     stateManager.addPipeline(pipeline);
     Assert.assertEquals(0, stateManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+            3, Pipeline.PipelineState.OPEN)
         .size());
 
     // pipeline in open state should be reported
     stateManager.openPipeline(pipeline.getId());
     Assert.assertEquals(1, stateManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+            3, Pipeline.PipelineState.OPEN)
         .size());
 
     Pipeline pipeline2 = createDummyPipeline(HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE, 3);
+        3, 3);
     pipeline2 = Pipeline.newBuilder(pipeline2)
         .setState(Pipeline.PipelineState.OPEN)
         .build();
@@ -450,14 +457,14 @@ public class TestPipelineStateManager {
     stateManager.addPipeline(pipeline2);
     Assert.assertEquals(2, stateManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+            3, Pipeline.PipelineState.OPEN)
         .size());
 
     // pipeline in closed state should not be reported
     stateManager.finalizePipeline(pipeline2.getId());
     Assert.assertEquals(1, stateManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+            3, Pipeline.PipelineState.OPEN)
         .size());
 
     // clean up

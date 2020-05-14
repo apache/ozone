@@ -96,13 +96,13 @@ public interface ContainerManager extends Closeable {
   /**
    * Allocates a new container for a given keyName and replication factor.
    *
-   * @param replicationFactor - replication factor of the container.
+   * @param replication - replication number of the container.
    * @param owner
    * @return - ContainerInfo.
    * @throws IOException
    */
   ContainerInfo allocateContainer(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor replicationFactor, String owner)
+      int replication, String owner)
       throws IOException;
 
   /**

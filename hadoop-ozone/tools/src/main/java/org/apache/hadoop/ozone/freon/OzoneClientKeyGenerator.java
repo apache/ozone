@@ -110,9 +110,10 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
   private void createKey(long counter) throws Exception {
     final String key = generateObjectName(counter);
 
+    // TODO(maobaolong): remove factor future
     timer.time(() -> {
       try (OutputStream stream = bucket.createKey(key, keySize,
-              ReplicationType.RATIS, factor, metadata)) {
+              ReplicationType.RATIS, factor.getValue(), metadata)) {
         contentGenerator.write(stream);
         stream.flush();
       }

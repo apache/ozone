@@ -502,10 +502,10 @@ public class TestOmMetadataManager {
     if (i%2== 0) {
       TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
           1000L, HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+          1, omMetadataManager);
     } else {
       TestOMRequestUtils.addKeyToTableCache(volumeName, bucketName, keyName,
-          HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+          HddsProtos.ReplicationType.RATIS, 1,
           omMetadataManager);
     }
   }

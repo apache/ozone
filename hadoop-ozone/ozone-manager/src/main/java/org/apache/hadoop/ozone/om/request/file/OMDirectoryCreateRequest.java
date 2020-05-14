@@ -369,7 +369,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setModificationTime(keyArgs.getModificationTime())
         .setDataSize(0)
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setObjectID(objectId)
         .setUpdateID(objectId);
   }

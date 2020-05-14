@@ -693,8 +693,9 @@ public final class RandomKeyGenerator implements Callable<Void> {
     try {
       try (AutoCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
         long keyCreateStart = System.nanoTime();
+        // TODO(maobaolong): remove factor future
         try (OzoneOutputStream os = bucket.createKey(keyName, keySize, type,
-            factor, new HashMap<>())) {
+            factor.getValue(), new HashMap<>())) {
           long keyCreationDuration = System.nanoTime() - keyCreateStart;
           histograms.get(FreonOps.KEY_CREATE.ordinal())
               .update(keyCreationDuration);

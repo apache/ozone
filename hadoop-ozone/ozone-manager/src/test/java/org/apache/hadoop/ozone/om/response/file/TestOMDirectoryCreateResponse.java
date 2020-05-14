@@ -66,7 +66,7 @@ public class TestOMDirectoryCreateResponse {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(keyName),
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE);
+        HddsProtos.ReplicationType.RATIS, 1);
 
     OMResponse omResponse = OMResponse.newBuilder().setCreateDirectoryResponse(
         OzoneManagerProtocolProtos.CreateDirectoryResponse.getDefaultInstance())

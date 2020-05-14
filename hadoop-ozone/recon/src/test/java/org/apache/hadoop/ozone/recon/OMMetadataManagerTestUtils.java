@@ -143,7 +143,7 @@ public final class OMMetadataManagerTestUtils {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName(key)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setReplication(1)
             .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
             .build());
   }
@@ -168,7 +168,7 @@ public final class OMMetadataManagerTestUtils {
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setReplication(1)
             .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
@@ -188,7 +188,7 @@ public final class OMMetadataManagerTestUtils {
    */
   public static Pipeline getRandomPipeline(DatanodeDetails datanodeDetails) {
     return Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setId(PipelineID.randomId())
         .setNodes(Collections.singletonList(datanodeDetails))
         .setState(Pipeline.PipelineState.OPEN)

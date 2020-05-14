@@ -133,20 +133,24 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    */
   @Override
   public List<AllocatedBlock> allocateBlock(long size, int num,
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
+      HddsProtos.ReplicationType type, int replication,
       String owner, ExcludeList excludeList) throws IOException {
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");
 
-    AllocateScmBlockRequestProto request =
+    AllocateScmBlockRequestProto.Builder requestBuilder =
         AllocateScmBlockRequestProto.newBuilder()
             .setSize(size)
             .setNumBlocks(num)
             .setType(type)
-            .setFactor(factor)
+            .setReplication(replication)
             .setOwner(owner)
-            .setExcludeList(excludeList.getProtoBuf())
-            .build();
-
+            .setExcludeList(excludeList.getProtoBuf());
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
+    if (replication == 1 || replication == 3) {
+      requestBuilder.setFactor(
+          HddsProtos.ReplicationFactor.valueOf(replication));
+    }
+    AllocateScmBlockRequestProto request = requestBuilder.build();
     SCMBlockLocationRequest wrapper = createSCMBlockRequest(
         Type.AllocateScmBlock)
         .setAllocateScmBlockRequest(request)

@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -61,7 +60,7 @@ public class PutKeyHandler extends KeyHandler {
   @Option(names = {"-r", "--replication"},
       description = "Replication factor of the new key. (use ONE or THREE) "
           + "Default is specified in the cluster-wide config.")
-  private ReplicationFactor replicationFactor;
+  private int replication;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -80,9 +79,9 @@ public class PutKeyHandler extends KeyHandler {
       }
     }
 
-    if (replicationFactor == null) {
-      replicationFactor = ReplicationFactor.valueOf(
-          getConf().getInt(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
+    if (replication == 0) {
+      replication =
+          getConf().getInt(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT);
     }
 
     ReplicationType replicationType = ReplicationType.valueOf(
@@ -100,7 +99,7 @@ public class PutKeyHandler extends KeyHandler {
         OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
     try (InputStream input = new FileInputStream(dataFile);
          OutputStream output = bucket.createKey(keyName, dataFile.length(),
-             replicationType, replicationFactor, keyMetadata)) {
+             replicationType, replication, keyMetadata)) {
       IOUtils.copyBytes(input, output, chunkSize);
     }
   }

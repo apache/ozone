@@ -149,14 +149,21 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // also like this, even when key exists in a bucket, user can still
       // initiate MPU.
 
-      multipartKeyInfo = new OmMultipartKeyInfo.Builder()
-          .setUploadID(keyArgs.getMultipartUploadID())
-          .setCreationTime(keyArgs.getModificationTime())
-          .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
-          .setObjectID(objectID)
-          .setUpdateID(transactionLogIndex)
-          .build();
+      // TODO(maobaolong): remove this block after clear factor
+      int replication = 0;
+      if (keyArgs.hasReplication()) {
+        replication = keyArgs.getReplication();
+      } else if (keyArgs.hasFactor()) {
+        replication = keyArgs.getFactor().getNumber();
+      }
+      multipartKeyInfo =
+          new OmMultipartKeyInfo.Builder()
+              .setUploadID(keyArgs.getMultipartUploadID())
+              .setCreationTime(keyArgs.getModificationTime())
+              .setReplicationType(keyArgs.getType())
+              .setReplication(replication).setObjectID(objectID)
+              .setUpdateID(transactionLogIndex)
+              .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
@@ -165,7 +172,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
           .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
+          .setReplication(replication)
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
           .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))

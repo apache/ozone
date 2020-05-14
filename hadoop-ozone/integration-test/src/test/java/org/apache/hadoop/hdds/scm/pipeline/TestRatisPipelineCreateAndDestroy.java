@@ -80,11 +80,11 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
     Assert.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
         HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
+        1).size());
 
     List<Pipeline> pipelines = pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+            3, Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
       pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     }
@@ -102,11 +102,11 @@ public class TestRatisPipelineCreateAndDestroy {
     // No Factor ONE pipeline is auto created.
     Assert.assertEquals(0, pipelineManager.getPipelines(
         HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
+        1).size());
 
     List<Pipeline> pipelines = pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
+            3, Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
       pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
     }
@@ -126,7 +126,7 @@ public class TestRatisPipelineCreateAndDestroy {
 
     List<Pipeline> pipelines =
         pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE);
+            3);
     for (HddsDatanodeService dn : dns) {
       cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
     }
@@ -134,7 +134,7 @@ public class TestRatisPipelineCreateAndDestroy {
     // try creating another pipeline now
     try {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
+          3);
       Assert.fail("pipeline creation should fail after shutting down pipeline");
     } catch (IOException ioe) {
       // As now all datanodes are shutdown, they move to stale state, there
@@ -157,7 +157,7 @@ public class TestRatisPipelineCreateAndDestroy {
 
     if (cluster.getStorageContainerManager()
         .getScmNodeManager().getNodeCount(HddsProtos.NodeState.HEALTHY) >=
-        HddsProtos.ReplicationFactor.THREE.getNumber()) {
+        3) {
       // make sure pipelines is created after node start
       pipelineManager.triggerPipelineCreation();
       waitForPipelines(1);
@@ -168,7 +168,7 @@ public class TestRatisPipelineCreateAndDestroy {
       throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
+            3, Pipeline.PipelineState.OPEN)
         .size() >= numPipelines, 100, 40000);
   }
 }

@@ -38,7 +38,6 @@ import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -637,12 +636,12 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneOutputStream createKey(
       String volumeName, String bucketName, String keyName, long size,
-      ReplicationType type, ReplicationFactor factor,
+      ReplicationType type, int replication,
       Map<String, String> metadata)
       throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    HddsClientUtils.checkNotNull(keyName, type, factor);
+    HddsClientUtils.checkNotNull(keyName, type, replication);
     String requestId = UUID.randomUUID().toString();
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
@@ -651,7 +650,7 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setDataSize(size)
         .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
-        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+        .setReplication(replication)
         .addAllMetadata(metadata)
         .setAcls(getAclList());
 
@@ -671,7 +670,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
-    return createOutputStream(openKey, requestId, type, factor);
+    return createOutputStream(openKey, requestId, type, replication);
   }
 
   private KeyProvider.KeyVersion getDEK(FileEncryptionInfo feInfo)
@@ -747,7 +746,7 @@ public class RpcClient implements ClientProtocol {
         key.getCreationTime(),
         key.getModificationTime(),
         ReplicationType.valueOf(key.getType().toString()),
-        key.getFactor().getNumber()))
+        key.getReplication()))
         .collect(Collectors.toList());
   }
 
@@ -794,7 +793,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), ozoneKeyLocations, ReplicationType
         .valueOf(keyInfo.getType().toString()), keyInfo.getMetadata(),
-        keyInfo.getFileEncryptionInfo(), keyInfo.getFactor().getNumber());
+        keyInfo.getFileEncryptionInfo(), keyInfo.getReplication());
   }
 
   @Override
@@ -808,17 +807,17 @@ public class RpcClient implements ClientProtocol {
                                                 String bucketName,
                                                 String keyName,
                                                 ReplicationType type,
-                                                ReplicationFactor factor)
+                                                int replication)
       throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    HddsClientUtils.checkNotNull(keyName, type, factor);
+    HddsClientUtils.checkNotNull(keyName, type, replication);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
-        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+        .setReplication(replication)
         .setAcls(getAclList())
         .build();
     OmMultipartInfo multipartInfo = ozoneManagerClient
@@ -862,7 +861,7 @@ public class RpcClient implements ClientProtocol {
             .setChunkSize(chunkSize)
             .setRequestID(requestId)
             .setType(openKey.getKeyInfo().getType())
-            .setFactor(openKey.getKeyInfo().getFactor())
+            .setReplication(openKey.getKeyInfo().getReplication())
             .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferMaxSize(streamBufferMaxSize)
@@ -943,8 +942,7 @@ public class RpcClient implements ClientProtocol {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         new OzoneMultipartUploadPartListParts(ReplicationType
             .fromProto(omMultipartUploadListParts.getReplicationType()),
-            ReplicationFactor
-                .fromProto(omMultipartUploadListParts.getReplicationFactor()),
+            omMultipartUploadListParts.getReplication(),
             omMultipartUploadListParts.getNextPartNumberMarker(),
             omMultipartUploadListParts.isTruncated());
 
@@ -972,7 +970,7 @@ public class RpcClient implements ClientProtocol {
             upload.getUploadId(),
             upload.getCreationTime(),
             ReplicationType.fromProto(upload.getReplicationType()),
-            ReplicationFactor.fromProto(upload.getReplicationFactor())))
+            upload.getReplication()))
         .collect(Collectors.toList());
     OzoneMultipartUploadList result = new OzoneMultipartUploadList(uploads);
     return result;
@@ -1042,7 +1040,7 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public OzoneOutputStream createFile(String volumeName, String bucketName,
-      String keyName, long size, ReplicationType type, ReplicationFactor factor,
+      String keyName, long size, ReplicationType type, int replication,
       boolean overWrite, boolean recursive) throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -1050,13 +1048,13 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .setDataSize(size)
         .setType(HddsProtos.ReplicationType.valueOf(type.name()))
-        .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+        .setReplication(replication)
         .setAcls(getAclList())
         .build();
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
     return createOutputStream(keySession, UUID.randomUUID().toString(), type,
-        factor);
+        replication);
   }
 
   @Override
@@ -1158,7 +1156,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   private OzoneOutputStream createOutputStream(OpenKeySession openKey,
-      String requestId, ReplicationType type, ReplicationFactor factor)
+      String requestId, ReplicationType type, int replication)
       throws IOException {
     KeyOutputStream keyOutputStream =
         new KeyOutputStream.Builder()
@@ -1168,7 +1166,7 @@ public class RpcClient implements ClientProtocol {
             .setChunkSize(chunkSize)
             .setRequestID(requestId)
             .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
-            .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+            .setReplication(replication)
             .setStreamBufferSize(streamBufferSize)
             .setStreamBufferFlushSize(streamBufferFlushSize)
             .setStreamBufferFlushDelay(streamBufferFlushDelay)

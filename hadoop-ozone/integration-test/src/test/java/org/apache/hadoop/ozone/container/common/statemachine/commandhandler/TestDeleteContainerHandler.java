@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -219,7 +218,7 @@ public class TestDeleteContainerHandler {
     OzoneOutputStream key = objectStore.getVolume(volumeName)
         .getBucket(bucketName)
         .createKey(keyName, 1024, ReplicationType.STAND_ALONE,
-            ReplicationFactor.ONE, new HashMap<>());
+            1, new HashMap<>());
     key.write("test".getBytes());
     key.close();
   }
@@ -235,7 +234,7 @@ public class TestDeleteContainerHandler {
         new OmKeyArgs.Builder().setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setType(HddsProtos.ReplicationType.STAND_ALONE)
-            .setFactor(HddsProtos.ReplicationFactor.ONE)
+            .setReplication(1)
             .setKeyName(keyName)
             .setRefreshPipeline(true)
             .build();

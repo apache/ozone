@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
@@ -59,7 +58,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.Assert.assertFalse;
@@ -143,7 +141,7 @@ public class TestScmSafeMode {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    bucket.createKey(keyName, 1000, RATIS, ONE, new HashMap<>());
+    bucket.createKey(keyName, 1000, RATIS, 1, new HashMap<>());
 
     cluster.stop();
 
@@ -169,7 +167,7 @@ public class TestScmSafeMode {
 // As cluster is restarted with out datanodes restart
     LambdaTestUtils.intercept(IOException.class,
         "SafeModePrecheck failed for allocateBlock",
-        () -> bucket1.createKey(keyName, 1000, RATIS, ONE,
+        () -> bucket1.createKey(keyName, 1000, RATIS, 1,
             new HashMap<>()));
   }
 
@@ -300,7 +298,7 @@ public class TestScmSafeMode {
         "SafeModePrecheck failed for allocateContainer", () -> {
           scm.getClientProtocolServer()
               .allocateContainer(ReplicationType.STAND_ALONE,
-                  ReplicationFactor.ONE, "");
+                  1, "");
         });
 
     cluster.startHddsDatanodes();

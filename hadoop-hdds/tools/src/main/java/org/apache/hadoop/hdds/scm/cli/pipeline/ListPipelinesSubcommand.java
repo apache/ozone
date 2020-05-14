@@ -39,10 +39,10 @@ public class ListPipelinesSubcommand implements Callable<Void> {
   private PipelineCommands parent;
 
   @CommandLine.Option(names = {"-ffc", "--filterByFactor"},
-      description = "Filter listed pipelines by Factor(ONE/one)",
+      description = "Filter listed pipelines by replication(1)",
       defaultValue = "",
       required = false)
-  private String factor;
+  private String replication;
 
   @CommandLine.Option(names = {"-fst", "--filterByState"},
       description = "Filter listed pipelines by State(OPEN/CLOSE)",
@@ -54,12 +54,13 @@ public class ListPipelinesSubcommand implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      if (Strings.isNullOrEmpty(factor) && Strings.isNullOrEmpty(state)) {
+      if (Strings.isNullOrEmpty(replication) && Strings.isNullOrEmpty(state)) {
         scmClient.listPipelines().forEach(System.out::println);
       } else {
         scmClient.listPipelines().stream()
-            .filter(p -> ((Strings.isNullOrEmpty(factor) ||
-                (p.getFactor().toString().compareToIgnoreCase(factor) == 0))
+            .filter(p -> ((Strings.isNullOrEmpty(replication) ||
+                (String.valueOf(p.getReplication())
+                    .compareToIgnoreCase(replication) == 0))
                 && (Strings.isNullOrEmpty(state) ||
                 (p.getPipelineState().toString().compareToIgnoreCase(state)
                     == 0))))

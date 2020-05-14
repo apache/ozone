@@ -131,10 +131,13 @@ enum Type {
 */
 message ContainerRequestProto {
   // Ozone only support replication of either 1 or 3.
-  required ReplicationFactor replicationFactor = 2;
+  // deprecated, please use replication instead
+  optional ReplicationFactor replicationFactor = 2;
   required ReplicationType  replicationType = 3;
   required string owner = 4;
   optional string traceID = 5;
+  // TODO(maobaolong): when factor is gone, specify 4 as the index of replication, and mark as required
+  optional uint32 replication = 100;
 }
 
 /**
@@ -229,13 +232,16 @@ message NodeQueryResponseProto {
  */
 message PipelineRequestProto {
   required ReplicationType replicationType = 1;
-  required ReplicationFactor replicationFactor = 2;
+  // deprecated, please use replication instead
+  optional ReplicationFactor replicationFactor = 2;
 
   // if datanodes are specified then pipelines are created using those
   // datanodes.
   optional NodePool nodePool = 3;
   optional string pipelineID = 4;
   optional string traceID = 5;
+  // TODO(maobaolong): when factor is gone, specify 2 as the index of replication and mark as required
+  optional uint32 replication = 100;
 }
 
 message  PipelineResponseProto {

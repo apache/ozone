@@ -54,7 +54,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationType, replication, omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
         new OMKeyRenameRequest(modifiedOmRequest);
@@ -211,7 +211,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
+        keyName, clientID, replicationType, replication, 1L,
         omMetadataManager);
 
     // Execute RenameRequest
@@ -249,7 +249,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, 1L, omMetadataManager);
+        clientID, replicationType, replication, 1L, omMetadataManager);
 
     // Execute RenameRequest
     OMKeyRenameRequest omKeyRenameRequest =
@@ -270,7 +270,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     // Replay CreateKey request for fromKey
     TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, 1L, omMetadataManager);
+        clientID, replicationType, replication, 1L, omMetadataManager);
 
     // Verify fromKey exists in DB
     String fromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,

@@ -103,7 +103,7 @@ public class ListInfoSubcommand implements Callable<Void> {
         relatedPipelineNum = relatedPipelines.size();
         relatedPipelines.stream().forEach(
             p -> pipelineListInfo.append(p.getId().getId().toString())
-                .append("/").append(p.getFactor().toString()).append("/")
+                .append("/").append(p.getReplication()).append("/")
                 .append(p.getType().toString()).append("/")
                 .append(p.getPipelineState().toString()).append("/")
                 .append(datanode.getUuid().equals(p.getLeaderId()) ?

@@ -680,6 +680,7 @@ message KeyArgs {
     required string keyName = 3;
     optional uint64 dataSize = 4;
     optional hadoop.hdds.ReplicationType type = 5;
+    // deprecated, please use replication instead
     optional hadoop.hdds.ReplicationFactor factor = 6;
     repeated KeyLocation keyLocations = 7;
     optional bool isMultipartKey = 8;
@@ -695,6 +696,8 @@ message KeyArgs {
 
     // This will be set by leader OM in HA and update the original request.
     optional FileEncryptionInfoProto fileEncryptionInfo = 15;
+    // TODO(maobaolong): when factor is gone, specify 6 as the index of replication
+    optional uint32 replication = 100;
 }
 
 message KeyLocation {
@@ -725,7 +728,7 @@ message KeyInfo {
     required string keyName = 3;
     required uint64 dataSize = 4;
     required hadoop.hdds.ReplicationType type = 5;
-    required hadoop.hdds.ReplicationFactor factor = 6;
+    optional hadoop.hdds.ReplicationFactor factor = 6;
     repeated KeyLocationList keyLocationList = 7;
     required uint64 creationTime = 8;
     required uint64 modificationTime = 9;
@@ -735,6 +738,8 @@ message KeyInfo {
     repeated OzoneAclInfo acls = 13;
     optional uint64 objectID = 14;
     optional uint64 updateID = 15;
+    // TODO(maobaolong): when factor is gone, specify 6 as the index of replication and mark as required
+    optional uint32 replication = 100;
 }
 
 message RepeatedKeyInfo {
@@ -988,10 +993,12 @@ message MultipartKeyInfo {
     required string uploadID = 1;
     required uint64 creationTime = 2;
     required hadoop.hdds.ReplicationType type = 3;
-    required hadoop.hdds.ReplicationFactor factor = 4;
+    optional hadoop.hdds.ReplicationFactor factor = 4;
     repeated PartKeyInfo partKeyInfoList = 5;
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
+    // TODO(maobaolong): when factor is gone, specify 4 as the index of replication and mark as required
+    optional uint32 replication = 100;
 }
 
 message PartKeyInfo {
@@ -1049,6 +1056,8 @@ message MultipartUploadListPartsResponse {
     optional uint32 nextPartNumberMarker = 4;
     optional bool isTruncated = 5;
     repeated PartInfo partsList = 6;
+    // TODO(maobaolong): when factor is gone, specify 3 as the index of replication
+    optional uint32 replication = 100;
 
 }
 
@@ -1070,8 +1079,9 @@ message MultipartUploadInfo {
     required string uploadId = 4;
     required uint64 creationTime = 5;
     required hadoop.hdds.ReplicationType type = 6;
-    required hadoop.hdds.ReplicationFactor factor = 7;
-
+    optional hadoop.hdds.ReplicationFactor factor = 7;
+    // TODO(maobaolong): when factor is gone, specify 7 as the index of replication and mark as required
+    optional uint32 replication = 100;
 }
 
 message PartInfo {

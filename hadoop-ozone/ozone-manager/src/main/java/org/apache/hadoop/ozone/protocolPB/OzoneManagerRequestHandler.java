@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -481,7 +482,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     omPartInfoList.forEach(partInfo -> partInfoList.add(partInfo.getProto()));
 
     response.setType(omMultipartUploadListParts.getReplicationType());
-    response.setFactor(omMultipartUploadListParts.getReplicationFactor());
+    response.setReplication(omMultipartUploadListParts.getReplication());
+    // TODO(maobaolong): remove this block after clear factor
+    if (omMultipartUploadListParts.getReplication() == 1 ||
+        omMultipartUploadListParts.getReplication() == 3) {
+      response.setFactor(HddsProtos.ReplicationFactor.valueOf(
+          omMultipartUploadListParts.getReplication()));
+    }
+
     response.setNextPartNumberMarker(
         omMultipartUploadListParts.getNextPartNumberMarker());
     response.setIsTruncated(omMultipartUploadListParts.isTruncated());
@@ -502,15 +510,22 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()
         .stream()
-        .map(upload -> MultipartUploadInfo.newBuilder()
-            .setVolumeName(upload.getVolumeName())
-            .setBucketName(upload.getBucketName())
-            .setKeyName(upload.getKeyName())
-            .setUploadId(upload.getUploadId())
-            .setType(upload.getReplicationType())
-            .setFactor(upload.getReplicationFactor())
-            .setCreationTime(upload.getCreationTime().toEpochMilli())
-            .build())
+        .map(upload -> {
+          MultipartUploadInfo.Builder builder = MultipartUploadInfo.newBuilder()
+              .setVolumeName(upload.getVolumeName())
+              .setBucketName(upload.getBucketName())
+              .setKeyName(upload.getKeyName())
+              .setUploadId(upload.getUploadId())
+              .setType(upload.getReplicationType())
+              .setReplication(upload.getReplication())
+              .setCreationTime(upload.getCreationTime().toEpochMilli());
+          // TODO(maobaolong): remove line after clear factor
+          if (upload.getReplication() == 1 || upload.getReplication() == 3) {
+            builder.setFactor(
+                HddsProtos.ReplicationFactor.valueOf(upload.getReplication()));
+          }
+          return builder.build();
+        })
         .collect(Collectors.toList());
 
     ListMultipartUploadsResponse response =

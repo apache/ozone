@@ -275,7 +275,7 @@ public class TestContainerKeyMapperTask {
         .setBucketName(bucket)
         .setVolumeName(volume)
         .setKeyName(key)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
         .setOmKeyLocationInfos(Collections.singletonList(
             omKeyLocationInfoGroup))

@@ -30,9 +30,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto
-        .HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto
         .HddsProtos.ReplicationType.RATIS;
 
@@ -71,10 +68,10 @@ public class TestSCMRestart {
     pipelineManager = scm.getPipelineManager();
     ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-        RATIS, THREE, "Owner1").getPipelineID());
+        RATIS, 3, "Owner1").getPipelineID());
     ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-        RATIS, ONE, "Owner2").getPipelineID());
+        RATIS, 1, "Owner2").getPipelineID());
     // At this stage, there should be 2 pipeline one with 1 open container
     // each. Try restarting the SCM and then discover that pipeline are in
     // correct state.
@@ -109,7 +106,7 @@ public class TestSCMRestart {
     // Try creating a new container, it should be from the same pipeline
     // as was before restart
     ContainerInfo containerInfo = newContainerManager
-        .allocateContainer(RATIS, THREE, "Owner1");
+        .allocateContainer(RATIS, 3, "Owner1");
     Assert.assertEquals(containerInfo.getPipelineID(), ratisPipeline1.getId());
   }
 }

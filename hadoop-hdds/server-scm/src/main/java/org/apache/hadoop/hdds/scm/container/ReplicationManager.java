@@ -397,9 +397,9 @@ public class ReplicationManager
   private boolean isContainerUnderReplicated(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     boolean misReplicated = !getPlacementStatus(
-        replicas, container.getReplicationFactor().getNumber())
+        replicas, container.getReplication())
         .isPolicySatisfied();
-    return container.getReplicationFactor().getNumber() >
+    return container.getReplication() >
         getReplicaCount(container.containerID(), replicas) || misReplicated;
   }
 
@@ -412,7 +412,7 @@ public class ReplicationManager
    */
   private boolean isContainerOverReplicated(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
-    return container.getReplicationFactor().getNumber() <
+    return container.getReplication() <
         getReplicaCount(container.containerID(), replicas);
   }
 
@@ -443,7 +443,7 @@ public class ReplicationManager
       final Set<ContainerReplica> replicas) {
     Preconditions.assertTrue(container.getState() ==
         LifeCycleState.QUASI_CLOSED);
-    final int replicationFactor = container.getReplicationFactor().getNumber();
+    final int replicationFactor = container.getReplication();
     final long uniqueQuasiClosedReplicaCount = replicas.stream()
         .filter(r -> r.getState() == State.QUASI_CLOSED)
         .map(ContainerReplica::getOriginDatanodeId)
@@ -521,8 +521,7 @@ public class ReplicationManager
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
       if (source.size() > 0) {
-        final int replicationFactor = container
-            .getReplicationFactor().getNumber();
+        final int replicationFactor = container.getReplication();
         // Want to check if the container is mis-replicated after considering
         // inflight add and delete.
         // Create a new list from source (healthy replicas minus pending delete)
@@ -596,7 +595,7 @@ public class ReplicationManager
       final Set<ContainerReplica> replicas) {
 
     final ContainerID id = container.containerID();
-    final int replicationFactor = container.getReplicationFactor().getNumber();
+    final int replicationFactor = container.getReplication();
     // Dont consider inflight replication while calculating excess here.
     int excess = replicas.size() - replicationFactor -
         inflightDeletion.getOrDefault(id, Collections.emptyList()).size();

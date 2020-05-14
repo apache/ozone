@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -562,7 +561,7 @@ public class TestBlockOutputStreamWithFailures {
   public void testWatchForCommitWithSingleNodeRatis() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, 0, ReplicationFactor.ONE);
+        createKey(keyName, ReplicationType.RATIS, 0, 1);
     int dataLength = maxFlushSize + 50;
     // write data more than 1 chunk
     byte[] data1 =
@@ -653,7 +652,7 @@ public class TestBlockOutputStreamWithFailures {
   public void testDatanodeFailureWithSingleNodeRatis() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, 0, ReplicationFactor.ONE);
+        createKey(keyName, ReplicationType.RATIS, 0, 1);
     int dataLength = maxFlushSize + 50;
     // write data more than 1 chunk
     byte[] data1 =
@@ -747,7 +746,7 @@ public class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 3 * blockSize,
-            ReplicationFactor.ONE);
+            1);
     int dataLength = maxFlushSize + 50;
     // write data more than 1 chunk
     byte[] data1 =
@@ -837,13 +836,13 @@ public class TestBlockOutputStreamWithFailures {
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
       long size) throws Exception {
-    return createKey(keyName, type, size, ReplicationFactor.THREE);
+    return createKey(keyName, type, size, 3);
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
-      long size, ReplicationFactor factor) throws Exception {
+      long size, int replication) throws Exception {
     return TestHelper
-        .createKey(keyName, type, factor, size, objectStore, volumeName,
+        .createKey(keyName, type, replication, size, objectStore, volumeName,
             bucketName);
   }
 

@@ -49,25 +49,25 @@ public class TestSimplePipelineProvider {
 
   @Test
   public void testCreatePipelineWithFactor() throws IOException {
-    HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
-    Pipeline pipeline = provider.create(factor);
+    int replication = 3;
+    Pipeline pipeline = provider.create(replication);
     stateManager.addPipeline(pipeline);
     Assert.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(pipeline.getFactor(), factor);
+    Assert.assertEquals(pipeline.getReplication(), replication);
     Assert.assertEquals(pipeline.getPipelineState(),
         Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    Assert.assertEquals(pipeline.getNodes().size(), replication);
 
-    factor = HddsProtos.ReplicationFactor.ONE;
-    Pipeline pipeline1 = provider.create(factor);
+    replication = 1;
+    Pipeline pipeline1 = provider.create(replication);
     stateManager.addPipeline(pipeline1);
     Assert.assertEquals(pipeline1.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(pipeline1.getFactor(), factor);
+    Assert.assertEquals(pipeline1.getReplication(), replication);
     Assert.assertEquals(pipeline1.getPipelineState(),
         Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline1.getNodes().size(), factor.getNumber());
+    Assert.assertEquals(pipeline1.getNodes().size(), replication);
   }
 
   private List<DatanodeDetails> createListOfNodes(int nodeCount) {
@@ -80,23 +80,23 @@ public class TestSimplePipelineProvider {
 
   @Test
   public void testCreatePipelineWithNodes() throws IOException {
-    HddsProtos.ReplicationFactor factor = HddsProtos.ReplicationFactor.THREE;
+    int replication = 3;
     Pipeline pipeline =
-        provider.create(factor, createListOfNodes(factor.getNumber()));
+        provider.create(replication, createListOfNodes(replication));
     Assert.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(pipeline.getFactor(), factor);
+    Assert.assertEquals(pipeline.getReplication(), replication);
     Assert.assertEquals(pipeline.getPipelineState(),
         Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    Assert.assertEquals(pipeline.getNodes().size(), replication);
 
-    factor = HddsProtos.ReplicationFactor.ONE;
-    pipeline = provider.create(factor, createListOfNodes(factor.getNumber()));
+    replication = 1;
+    pipeline = provider.create(replication, createListOfNodes(replication));
     Assert.assertEquals(pipeline.getType(),
         HddsProtos.ReplicationType.STAND_ALONE);
-    Assert.assertEquals(pipeline.getFactor(), factor);
+    Assert.assertEquals(pipeline.getReplication(), replication);
     Assert.assertEquals(pipeline.getPipelineState(),
         Pipeline.PipelineState.OPEN);
-    Assert.assertEquals(pipeline.getNodes().size(), factor.getNumber());
+    Assert.assertEquals(pipeline.getNodes().size(), replication);
   }
 }

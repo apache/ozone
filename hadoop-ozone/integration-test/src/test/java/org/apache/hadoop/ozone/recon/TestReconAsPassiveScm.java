@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
@@ -105,7 +104,7 @@ public class TestReconAsPassiveScm {
     // Verify we can never create a pipeline in Recon.
     LambdaTestUtils.intercept(UnsupportedOperationException.class,
         "Trying to create pipeline in Recon, which is prohibited!",
-        () -> reconPipelineManager.createPipeline(RATIS, ONE));
+        () -> reconPipelineManager.createPipeline(RATIS, 1));
 
     ContainerManager scmContainerManager = scm.getContainerManager();
     assertTrue(scmContainerManager.getContainerIDs().isEmpty());
@@ -119,7 +118,7 @@ public class TestReconAsPassiveScm {
     // Create container
     ContainerManager reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(RATIS, ONE, "test");
+        scmContainerManager.allocateContainer(RATIS, 1, "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
@@ -158,7 +157,7 @@ public class TestReconAsPassiveScm {
 
     // Create container in SCM.
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(RATIS, ONE, "test");
+        scmContainerManager.allocateContainer(RATIS, 1, "test");
     long containerID = containerInfo.getContainerID();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     Pipeline pipeline =
@@ -169,7 +168,7 @@ public class TestReconAsPassiveScm {
 
     // Close a pipeline
     Optional<Pipeline> pipelineToClose = scmPipelineManager
-        .getPipelines(RATIS, ONE)
+        .getPipelines(RATIS, 1)
         .stream()
         .filter(p -> !p.getId().equals(containerInfo.getPipelineID()))
         .findFirst();

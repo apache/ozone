@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.states.ContainerState;
@@ -240,36 +239,36 @@ public class ContainerStateManager {
    *
    * @param pipelineManager -- Pipeline Manager class.
    * @param type -- Replication type.
-   * @param replicationFactor - Replication replicationFactor.
+   * @param replication - Replication number.
    * @return ContainerWithPipeline
    * @throws IOException  on Failure.
    */
   ContainerInfo allocateContainer(final PipelineManager pipelineManager,
       final HddsProtos.ReplicationType type,
-      final HddsProtos.ReplicationFactor replicationFactor, final String owner)
+      final int replication, final String owner)
       throws IOException {
     final List<Pipeline> pipelines = pipelineManager
-        .getPipelines(type, replicationFactor, Pipeline.PipelineState.OPEN);
+        .getPipelines(type, replication, Pipeline.PipelineState.OPEN);
     Pipeline pipeline;
 
-    boolean bgCreateOne = (type == ReplicationType.RATIS) && replicationFactor
-        == ReplicationFactor.ONE && autoCreateRatisOne;
-    boolean bgCreateThree = (type == ReplicationType.RATIS) && replicationFactor
-        == ReplicationFactor.THREE;
+    boolean bgCreateOne = (type == ReplicationType.RATIS) && replication
+        == 1 && autoCreateRatisOne;
+    boolean bgCreateThree = (type == ReplicationType.RATIS) && replication
+        == 3;
 
     if (!pipelines.isEmpty() && (bgCreateOne || bgCreateThree)) {
       // let background create Ratis pipelines.
       pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
     } else {
       try {
-        pipeline = pipelineManager.createPipeline(type, replicationFactor);
+        pipeline = pipelineManager.createPipeline(type, replication);
         pipelineManager.waitPipelineReady(pipeline.getId(), 0);
       } catch (IOException e) {
 
         if (pipelines.isEmpty()) {
           throw new IOException("Could not allocate container. Cannot get any" +
               " matching pipeline for Type:" + type +
-              ", Factor:" + replicationFactor + ", State:PipelineState.OPEN");
+              ", Factor:" + replication + ", State:PipelineState.OPEN");
         }
         pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
       }
@@ -309,7 +308,7 @@ public class ContainerStateManager {
         .setOwner(owner)
         .setContainerID(containerID)
         .setDeleteTransactionId(0)
-        .setReplicationFactor(pipeline.getFactor())
+        .setReplication(pipeline.getReplication())
         .setReplicationType(pipeline.getType())
         .build();
     addContainerInfo(containerID, containerInfo, pipelineManager, pipeline);
@@ -473,15 +472,15 @@ public class ContainerStateManager {
    *
    * @param owner  Owner of the Containers.
    * @param type - Replication Type of the containers
-   * @param factor - Replication factor of the containers.
+   * @param replication - Replication number of the containers.
    * @param state - Current State, like Open, Close etc.
    * @return Set of containers that match the specific query parameters.
    */
   NavigableSet<ContainerID> getMatchingContainerIDs(final String owner,
-      final ReplicationType type, final ReplicationFactor factor,
+      final ReplicationType type, final int replication,
       final LifeCycleState state) {
     return containers.getMatchingContainerIDs(state, owner,
-        factor, type);
+        replication, type);
   }
 
   /**

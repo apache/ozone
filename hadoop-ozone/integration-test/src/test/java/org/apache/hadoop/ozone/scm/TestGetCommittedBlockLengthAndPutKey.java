@@ -84,7 +84,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
     ContainerProtos.GetCommittedBlockLengthResponseProto response;
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(SCMTestUtils.getReplicationType(ozoneConfig),
-            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+            1, OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);
@@ -117,7 +117,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
   public void testGetCommittedBlockLengthForInvalidBlock() throws Exception {
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(SCMTestUtils.getReplicationType(ozoneConfig),
-            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+            1, OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
@@ -142,7 +142,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
     ContainerProtos.PutBlockResponseProto response;
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+            1, OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);

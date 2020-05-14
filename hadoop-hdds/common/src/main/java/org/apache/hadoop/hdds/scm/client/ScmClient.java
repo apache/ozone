@@ -133,12 +133,12 @@ public interface ScmClient extends Closeable {
   /**
    * Creates a Container on SCM and returns the pipeline.
    * @param type - Replication Type.
-   * @param replicationFactor - Replication Factor
+   * @param replication - Replication number
    * @return ContainerInfo
    * @throws IOException - in case of error.
    */
   ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor replicationFactor,
+      int replication,
       String owner) throws IOException;
 
   /**
@@ -155,12 +155,12 @@ public interface ScmClient extends Closeable {
   /**
    * Creates a specified replication pipeline.
    * @param type - Type
-   * @param factor - Replication factor
+   * @param replication - Replication factor
    * @param nodePool - Set of machines.
    * @throws IOException
    */
   Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
+      int replication, HddsProtos.NodePool nodePool)
       throws IOException;
 
   /**

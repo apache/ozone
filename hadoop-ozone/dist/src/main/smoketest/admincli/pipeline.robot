@@ -27,8 +27,8 @@ Test Timeout        5 minutes
 Run list pipeline
     ${output} =         Execute          ozone admin pipeline list
                         Should contain   ${output}   Type:
-                        Should contain   ${output}   Factor:ONE, State:
+                        Should contain   ${output}   Factor:1, State:
 
 Run create pipeline
     ${output} =         Execute          ozone admin pipeline create
-                        Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE
+                        Should contain   ${output}   is created. Factor: 1, Type: STAND_ALONE

@@ -66,7 +66,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationType, replication, omMetadataManager);
 
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
@@ -215,7 +215,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omMetadataManager);
     // Manually add Key to OpenKey table in DB
     TestOMRequestUtils.addKeyToTable(true, false, volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
+        keyName, clientID, replicationType, replication, 1L,
         omMetadataManager);
 
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
@@ -252,7 +252,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         omMetadataManager);
     // Manually add Key to OpenKey table in DB
     TestOMRequestUtils.addKeyToTable(true, false, volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
+        keyName, clientID, replicationType, replication, 1L,
         omMetadataManager);
 
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
@@ -265,7 +265,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     // Replay the Key Create request - add Key to OpenKey table manually again
     TestOMRequestUtils.addKeyToTable(true, true, volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
+        keyName, clientID, replicationType, replication, 1L,
         omMetadataManager);
 
     // Key should be present in OpenKey table
@@ -342,7 +342,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     KeyArgs keyArgs =
         KeyArgs.newBuilder().setDataSize(dataSize).setVolumeName(volumeName)
             .setKeyName(keyName).setBucketName(bucketName)
-            .setType(replicationType).setFactor(replicationFactor)
+            .setType(replicationType).setReplication(replication)
             .addAllKeyLocations(getKeyLocation()).build();
 
     CommitKeyRequest commitKeyRequest =

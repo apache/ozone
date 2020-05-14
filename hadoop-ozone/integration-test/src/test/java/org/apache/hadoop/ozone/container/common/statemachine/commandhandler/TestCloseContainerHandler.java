@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 import java.util.HashMap;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -82,7 +81,7 @@ public class TestCloseContainerHandler {
     objectStore.getVolume("test").createBucket("test");
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("test", 1024, ReplicationType.STAND_ALONE,
-            ReplicationFactor.ONE, new HashMap<>());
+            1, new HashMap<>());
     key.write("test".getBytes());
     key.close();
 
@@ -90,7 +89,7 @@ public class TestCloseContainerHandler {
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
             .setType(HddsProtos.ReplicationType.STAND_ALONE)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplication(1).setDataSize(1024)
             .setKeyName("test")
             .setRefreshPipeline(true)
             .build();

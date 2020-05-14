@@ -50,7 +50,6 @@ import org.junit.rules.Timeout;
 import org.apache.log4j.Logger;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -450,7 +449,7 @@ public class TestOzoneManagerHA {
       throws Exception {
 
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createFile(keyName,
-        data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
+        data.length(), ReplicationType.RATIS, 1,
         overwrite, recursive);
 
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
@@ -541,7 +540,7 @@ public class TestOzoneManagerHA {
     OmMultipartInfo omMultipartInfo =
         ozoneBucket.initiateMultipartUpload(keyName,
             ReplicationType.RATIS,
-            ReplicationFactor.ONE);
+            1);
 
     String uploadID = omMultipartInfo.getUploadID();
     Assert.assertTrue(uploadID != null);
@@ -606,7 +605,7 @@ public class TestOzoneManagerHA {
       String value = "random data";
       OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
           value.length(), ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE, new HashMap<>());
+          1, new HashMap<>());
       ozoneOutputStream.write(value.getBytes(), 0, value.length());
       ozoneOutputStream.close();
 
@@ -1194,7 +1193,7 @@ public class TestOzoneManagerHA {
     String data = "data" + RandomStringUtils.randomNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
         data.length(), ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, new HashMap<>());
+        1, new HashMap<>());
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
     ozoneOutputStream.close();
     return keyName;

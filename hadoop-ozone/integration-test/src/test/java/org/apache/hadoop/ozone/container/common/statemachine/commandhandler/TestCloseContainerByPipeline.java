@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -105,7 +104,7 @@ public class TestCloseContainerByPipeline {
   public void testIfCloseContainerCommandHandlerIsInvoked() throws Exception {
     String keyName = "testIfCloseContainerCommandHandlerIsInvoked";
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey(keyName, 1024, ReplicationType.RATIS, ReplicationFactor.ONE,
+        .createKey(keyName, 1024, ReplicationType.RATIS, 1,
             new HashMap<>());
     key.write(keyName.getBytes());
     key.close();
@@ -114,7 +113,7 @@ public class TestCloseContainerByPipeline {
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
             .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplication(1).setDataSize(1024)
             .setKeyName(keyName).setRefreshPipeline(true).build();
     OmKeyLocationInfo omKeyLocationInfo =
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
@@ -160,7 +159,7 @@ public class TestCloseContainerByPipeline {
 
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("standalone", 1024, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
+            1, new HashMap<>());
     key.write("standalone".getBytes());
     key.close();
 
@@ -168,7 +167,7 @@ public class TestCloseContainerByPipeline {
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
             .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplication(1).setDataSize(1024)
             .setKeyName("standalone")
             .setRefreshPipeline(true)
             .build();
@@ -216,14 +215,14 @@ public class TestCloseContainerByPipeline {
 
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("ratis", 1024, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
+            3, new HashMap<>());
     key.write("ratis".getBytes());
     key.close();
 
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName("test").
         setBucketName("test").setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setDataSize(1024)
+        .setReplication(3).setDataSize(1024)
         .setKeyName("ratis").setRefreshPipeline(true).build();
 
     OmKeyLocationInfo omKeyLocationInfo =
@@ -277,14 +276,14 @@ public class TestCloseContainerByPipeline {
     String keyName = "testQuasiCloseTransitionViaRatis";
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey(keyName, 1024, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
+            1, new HashMap<>());
     key.write(keyName.getBytes());
     key.close();
 
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
             .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setReplication(1).setDataSize(1024)
             .setKeyName(keyName)
             .setRefreshPipeline(true)
             .build();

@@ -70,7 +70,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
     oldPipelineIDSet = pipelineManager.getPipelines(
         HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE)
+        3)
         .stream().map(p -> p.getId()).collect(Collectors.toSet());
     int totalPipelineCount = oldPipelineIDSet.size();
 
@@ -101,7 +101,7 @@ public class OneReplicaPipelineSafeModeRule extends
   protected void process(Pipeline pipeline) {
     Preconditions.checkNotNull(pipeline);
     if (pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-        pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE &&
+        pipeline.getReplication() == 3 &&
         !reportedPipelineIDSet.contains(pipeline.getId())) {
       if (oldPipelineIDSet.contains(pipeline.getId())) {
         getSafeModeMetrics()

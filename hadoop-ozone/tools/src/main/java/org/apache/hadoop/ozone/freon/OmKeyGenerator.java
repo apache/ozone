@@ -108,7 +108,7 @@ public class OmKeyGenerator extends BaseFreonGenerator
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
         .setType(ReplicationType.RATIS)
-        .setFactor(factor)
+        .setReplication(factor.getNumber())
         .setKeyName(generateObjectName(counter))
         .setLocationInfoList(new ArrayList<>())
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroups(),

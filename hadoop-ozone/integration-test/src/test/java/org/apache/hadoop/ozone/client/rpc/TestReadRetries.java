@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -135,7 +134,7 @@ public class TestReadRetries {
 
     OzoneOutputStream out = bucket
         .createKey(keyName, value.getBytes().length, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
+            3, new HashMap<>());
     KeyOutputStream groupOutputStream =
         (KeyOutputStream) out.getOutputStream();
     XceiverClientManager manager = groupOutputStream.getXceiverClientManager();

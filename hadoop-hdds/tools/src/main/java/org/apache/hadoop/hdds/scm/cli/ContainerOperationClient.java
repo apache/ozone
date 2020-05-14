@@ -67,7 +67,7 @@ public class ContainerOperationClient implements ScmClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerOperationClient.class);
   private final long containerSizeB;
-  private final HddsProtos.ReplicationFactor replicationFactor;
+  private final int replication;
   private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
@@ -87,10 +87,10 @@ public class ContainerOperationClient implements ScmClient {
         ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY,
         ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
     if (useRatis) {
-      replicationFactor = HddsProtos.ReplicationFactor.THREE;
+      replication = 3;
       replicationType = HddsProtos.ReplicationType.RATIS;
     } else {
-      replicationFactor = HddsProtos.ReplicationFactor.ONE;
+      replication = 1;
       replicationType = HddsProtos.ReplicationType.STAND_ALONE;
     }
   }
@@ -144,7 +144,7 @@ public class ContainerOperationClient implements ScmClient {
     try {
       ContainerWithPipeline containerWithPipeline =
           storageContainerLocationClient.
-              allocateContainer(replicationType, replicationFactor, owner);
+              allocateContainer(replicationType, replication, owner);
 
       Pipeline pipeline = containerWithPipeline.getPipeline();
       client = xceiverClientManager.acquireClient(pipeline);
@@ -234,12 +234,12 @@ public class ContainerOperationClient implements ScmClient {
 
   @Override
   public ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, String owner) throws IOException {
+      int replicationNum, String owner) throws IOException {
     XceiverClientSpi client = null;
     try {
       // allocate container on SCM.
       ContainerWithPipeline containerWithPipeline =
-          storageContainerLocationClient.allocateContainer(type, factor,
+          storageContainerLocationClient.allocateContainer(type, replicationNum,
               owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
@@ -276,10 +276,10 @@ public class ContainerOperationClient implements ScmClient {
    */
   @Override
   public Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
+      int replicationNum, HddsProtos.NodePool nodePool)
       throws IOException {
     return storageContainerLocationClient.createReplicationPipeline(type,
-        factor, nodePool);
+        replicationNum, nodePool);
   }
 
   @Override

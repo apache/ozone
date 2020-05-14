@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
@@ -33,7 +33,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
   private final String uploadID;
   private final long creationTime;
   private final ReplicationType replicationType;
-  private final ReplicationFactor replicationFactor;
+  private final int replication;
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
 
   /**
@@ -41,12 +41,12 @@ public class OmMultipartKeyInfo extends WithObjectID {
    * information for a key.
    */
   public OmMultipartKeyInfo(String id, long creationTime,
-      ReplicationType replicationType, ReplicationFactor replicationFactor,
+      ReplicationType replicationType, int replication,
       Map<Integer, PartKeyInfo> list, long objectID, long updateID) {
     this.uploadID = id;
     this.creationTime = creationTime;
     this.replicationType = replicationType;
-    this.replicationFactor = replicationFactor;
+    this.replication = replication;
     this.partKeyInfoList = new TreeMap<>(list);
     this.objectID = objectID;
     this.updateID = updateID;
@@ -80,8 +80,8 @@ public class OmMultipartKeyInfo extends WithObjectID {
     return replicationType;
   }
 
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+  public int getReplication() {
+    return replication;
   }
 
   /**
@@ -91,7 +91,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
     private String uploadID;
     private long creationTime;
     private ReplicationType replicationType;
-    private ReplicationFactor replicationFactor;
+    private int replication;
     private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
     private long objectID;
     private long updateID;
@@ -115,8 +115,8 @@ public class OmMultipartKeyInfo extends WithObjectID {
       return this;
     }
 
-    public Builder setReplicationFactor(ReplicationFactor replFactor) {
-      this.replicationFactor = replFactor;
+    public Builder setReplication(int repl) {
+      this.replication = repl;
       return this;
     }
 
@@ -146,7 +146,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
 
     public OmMultipartKeyInfo build() {
       return new OmMultipartKeyInfo(uploadID, creationTime, replicationType,
-          replicationFactor, partKeyInfoList, objectID, updateID);
+          replication, partKeyInfoList, objectID, updateID);
     }
   }
 
@@ -162,7 +162,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
         list.put(partKeyInfo.getPartNumber(), partKeyInfo));
     return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
         multipartKeyInfo.getCreationTime(), multipartKeyInfo.getType(),
-        multipartKeyInfo.getFactor(), list, multipartKeyInfo.getObjectID(),
+        multipartKeyInfo.getReplication(), list, multipartKeyInfo.getObjectID(),
         multipartKeyInfo.getUpdateID());
   }
 
@@ -175,9 +175,14 @@ public class OmMultipartKeyInfo extends WithObjectID {
         .setUploadID(uploadID)
         .setCreationTime(creationTime)
         .setType(replicationType)
-        .setFactor(replicationFactor)
+        .setReplication(replication)
         .setObjectID(objectID)
         .setUpdateID(updateID);
+    // TODO(maobaolong): remove this block after clear factor
+    if (replication == 1 || replication == 3) {
+      builder.setFactor(
+          HddsProtos.ReplicationFactor.valueOf(replication));
+    }
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
   }
@@ -205,7 +210,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
     // For partKeyInfoList we can do shallow copy here, as the PartKeyInfo is
     // immutable here.
     return new OmMultipartKeyInfo(uploadID, creationTime, replicationType,
-        replicationFactor, new TreeMap<>(partKeyInfoList), objectID, updateID);
+        replication, new TreeMap<>(partKeyInfoList), objectID, updateID);
   }
 
 }

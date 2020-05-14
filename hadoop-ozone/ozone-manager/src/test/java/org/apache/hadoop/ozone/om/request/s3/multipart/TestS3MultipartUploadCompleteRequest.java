@@ -83,7 +83,7 @@ public class TestS3MultipartUploadCompleteRequest
     // Add key to open key table.
     TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName,
         keyName, clientID, HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        1, omMetadataManager);
 
     s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
         2L, ozoneManagerDoubleBufferHelper);

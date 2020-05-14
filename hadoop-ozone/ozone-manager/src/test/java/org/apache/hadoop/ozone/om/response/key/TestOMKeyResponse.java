@@ -47,7 +47,7 @@ public class TestOMKeyResponse {
   protected String volumeName;
   protected String bucketName;
   protected String keyName;
-  protected HddsProtos.ReplicationFactor replicationFactor;
+  protected int replication;
   protected HddsProtos.ReplicationType replicationType;
   protected long clientID;
 
@@ -62,7 +62,7 @@ public class TestOMKeyResponse {
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
     keyName = UUID.randomUUID().toString();
-    replicationFactor = HddsProtos.ReplicationFactor.ONE;
+    replication = 1;
     replicationType = HddsProtos.ReplicationType.RATIS;
     clientID = 1000L;
   }

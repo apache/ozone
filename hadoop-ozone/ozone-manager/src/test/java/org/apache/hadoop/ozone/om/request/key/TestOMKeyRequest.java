@@ -78,7 +78,7 @@ public class TestOMKeyRequest {
   protected String bucketName;
   protected String keyName;
   protected HddsProtos.ReplicationType replicationType;
-  protected HddsProtos.ReplicationFactor replicationFactor;
+  protected int replication;
   protected long clientID;
   protected long scmBlockSize = 1000L;
   protected long dataSize;
@@ -123,7 +123,7 @@ public class TestOMKeyRequest {
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setNodes(new ArrayList<>())
         .build();
 
@@ -138,14 +138,14 @@ public class TestOMKeyRequest {
 
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
         any(HddsProtos.ReplicationType.class),
-        any(HddsProtos.ReplicationFactor.class),
+        anyInt(),
         anyString(), any(ExcludeList.class))).thenReturn(allocatedBlocks);
 
 
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
     keyName = UUID.randomUUID().toString();
-    replicationFactor = HddsProtos.ReplicationFactor.ONE;
+    replication = 1;
     replicationType = HddsProtos.ReplicationType.RATIS;
     clientID = Time.now();
     dataSize = 1000L;

@@ -93,7 +93,7 @@ public class PipelineEndpoint {
           .setDatanodes(datanodes)
           .setDuration(duration)
           .setStatus(pipeline.getPipelineState())
-          .setReplicationFactor(pipeline.getFactor().getNumber())
+          .setReplicationFactor(pipeline.getReplication())
           .setReplicationType(pipeline.getType().toString())
           .build();
 

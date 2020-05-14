@@ -148,14 +148,14 @@ public final class GenesisUtil {
     conf.setInt(ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY, numHandlers);
   }
 
-  static void addPipelines(HddsProtos.ReplicationFactor factor,
+  static void addPipelines(int replication,
       int numPipelines, ConfigurationSource conf) throws Exception {
     DBStore dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
 
     Table<PipelineID, Pipeline> pipelineTable =
         SCMDBDefinition.PIPELINES.getTable(dbStore);
     List<DatanodeDetails> nodes = new ArrayList<>();
-    for (int i = 0; i < factor.getNumber(); i++) {
+    for (int i = 0; i < replication; i++) {
       nodes
           .add(GenesisUtil.createDatanodeDetails(UUID.randomUUID().toString()));
     }
@@ -165,7 +165,7 @@ public final class GenesisUtil {
               .setState(Pipeline.PipelineState.OPEN)
               .setId(PipelineID.randomId())
               .setType(HddsProtos.ReplicationType.RATIS)
-              .setFactor(factor)
+              .setReplication(replication)
               .setNodes(nodes)
               .build();
       pipelineTable.put(pipeline.getId(),

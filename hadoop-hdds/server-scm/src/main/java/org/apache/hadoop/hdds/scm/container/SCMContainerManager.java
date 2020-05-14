@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
@@ -249,14 +248,14 @@ public class SCMContainerManager implements ContainerManager {
   /**
    * Allocates a new container.
    *
-   * @param replicationFactor - replication factor of the container.
+   * @param replication - replication number of the container.
    * @param owner - The string name of the Service that owns this container.
    * @return - Pipeline that makes up this container.
    * @throws IOException - Exception
    */
   @Override
   public ContainerInfo allocateContainer(final ReplicationType type,
-      final ReplicationFactor replicationFactor, final String owner)
+      final int replication, final String owner)
       throws IOException {
     try {
       lock.lock();
@@ -264,7 +263,7 @@ public class SCMContainerManager implements ContainerManager {
       try {
         containerInfo =
             containerStateManager.allocateContainer(pipelineManager, type,
-              replicationFactor, owner);
+                replication, owner);
       } catch (IOException ex) {
         scmContainerManagerMetrics.incNumFailureCreateContainers();
         throw ex;

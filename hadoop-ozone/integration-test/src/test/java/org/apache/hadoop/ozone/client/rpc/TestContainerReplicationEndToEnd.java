@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -147,7 +146,7 @@ public class TestContainerReplicationEndToEnd {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey(keyName, 0, ReplicationType.RATIS,
-                ReplicationFactor.THREE, new HashMap<>());
+                3, new HashMap<>());
     byte[] testData = "ratis".getBytes();
     // First write and flush creates a container in the datanode
     key.write(testData);

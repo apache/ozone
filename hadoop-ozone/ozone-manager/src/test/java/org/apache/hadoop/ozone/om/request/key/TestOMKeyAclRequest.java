@@ -41,7 +41,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     TestOMRequestUtils.addKeyToTable(false, false, volumeName, bucketName,
-        keyName, clientID, replicationType, replicationFactor, 1L,
+        keyName, clientID, replicationType, replication, 1L,
         omMetadataManager);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");

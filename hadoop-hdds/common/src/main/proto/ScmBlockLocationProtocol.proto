@@ -123,9 +123,12 @@ message AllocateScmBlockRequestProto {
   required uint64 size = 1;
   required uint32 numBlocks = 2;
   required ReplicationType type = 3;
-  required hadoop.hdds.ReplicationFactor factor = 4;
+  // deprecated, please use replication instead
+  optional hadoop.hdds.ReplicationFactor factor = 4;
   required string owner = 5;
   optional ExcludeListProto excludeList = 7;
+  // TODO(maobaolong): when factor is gone, specify 4 as the index of replication and mark as required
+  optional uint32 replication = 100;
 }
 
 /**

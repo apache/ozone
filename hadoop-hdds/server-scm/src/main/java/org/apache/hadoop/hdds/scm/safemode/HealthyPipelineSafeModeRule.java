@@ -77,7 +77,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
     // We want to wait for RATIS THREE factor write pipelines
     int pipelineCount = pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
+        HddsProtos.ReplicationType.RATIS, 3,
         Pipeline.PipelineState.ALLOCATED).size();
 
     // This value will be zero when pipeline count is 0.
@@ -120,7 +120,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     // create new pipelines.
     Preconditions.checkNotNull(pipeline);
     if (pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
-        pipeline.getFactor() == HddsProtos.ReplicationFactor.THREE &&
+        pipeline.getReplication() == 3 &&
         pipeline.isHealthy() &&
         !processedPipelineIDs.contains(pipeline.getId())) {
       getSafeModeMetrics().incCurrentHealthyPipelinesCount();

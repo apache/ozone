@@ -43,7 +43,6 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.junit.Assert.fail;
 
 /**
@@ -98,7 +97,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes().length, ReplicationType.RATIS,
-        THREE, new HashMap<>())) {
+        3, new HashMap<>())) {
       out.write(value.getBytes());
     }
 

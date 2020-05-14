@@ -39,7 +39,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
   public void testAddToDBBatch() throws Exception {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+        bucketName, keyName, replicationType, replication);
 
     OMResponse omResponse = OMResponse.newBuilder().setCreateKeyResponse(
                 CreateKeyResponse.getDefaultInstance())
@@ -64,7 +64,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+        bucketName, keyName, replicationType, replication);
 
     OMResponse omResponse = OMResponse.newBuilder().setCreateKeyResponse(
         CreateKeyResponse.getDefaultInstance())

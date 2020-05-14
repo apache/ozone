@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.util.Time;
@@ -50,7 +49,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   private HddsProtos.LifeCycleState state;
   @JsonIgnore
   private PipelineID pipelineID;
-  private ReplicationFactor replicationFactor;
+  private int replication;
   private ReplicationType replicationType;
   private long usedBytes;
   private long numberOfKeys;
@@ -82,7 +81,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       String owner,
       long deleteTransactionId,
       long sequenceId,
-      ReplicationFactor replicationFactor,
+      int replication,
       ReplicationType repType) {
     this.containerID = containerID;
     this.pipelineID = pipelineID;
@@ -94,7 +93,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.owner = owner;
     this.deleteTransactionId = deleteTransactionId;
     this.sequenceId = sequenceId;
-    this.replicationFactor = replicationFactor;
+    this.replication = replication;
     this.replicationType = repType;
   }
 
@@ -105,8 +104,14 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   }
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    return builder.setPipelineID(
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
+    int replication = 0;
+    if (info.hasReplication()) {
+      replication = info.getReplication();
+    } else if (info.hasReplicationFactor()) {
+      replication = info.getReplicationFactor().getNumber();
+    }
+    return new ContainerInfo.Builder().setPipelineID(
         PipelineID.getFromProtobuf(info.getPipelineID()))
         .setUsedBytes(info.getUsedBytes())
         .setNumberOfKeys(info.getNumberOfKeys())
@@ -115,8 +120,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setOwner(info.getOwner())
         .setContainerID(info.getContainerID())
         .setDeleteTransactionId(info.getDeleteTransactionId())
-        .setReplicationFactor(info.getReplicationFactor())
         .setReplicationType(info.getReplicationType())
+        .setReplication(replication)
         .build();
   }
 
@@ -136,8 +141,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return stateEnterTime;
   }
 
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+  public int getReplication() {
+    return replication;
   }
 
   public PipelineID getPipelineID() {
@@ -202,17 +207,23 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     HddsProtos.ContainerInfoProto.Builder builder =
         HddsProtos.ContainerInfoProto.newBuilder();
     Preconditions.checkState(containerID > 0);
-    return builder.setContainerID(getContainerID())
+
+    builder.setContainerID(getContainerID())
         .setUsedBytes(getUsedBytes())
         .setNumberOfKeys(getNumberOfKeys()).setState(getState())
         .setStateEnterTime(getStateEnterTime().toEpochMilli())
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setPipelineID(getPipelineID().getProtobuf())
-        .setReplicationFactor(getReplicationFactor())
         .setReplicationType(getReplicationType())
-        .setOwner(getOwner())
-        .build();
+        .setReplication(getReplication())
+        .setOwner(getOwner());
+    // TODO(maobaolong): remove this block after clear factor
+    if (replication == 1 || replication == 3) {
+      builder.setReplicationFactor(
+          HddsProtos.ReplicationFactor.valueOf(replication));
+    }
+    return builder.build();
   }
 
   public String getOwner() {
@@ -375,8 +386,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private long deleteTransactionId;
     private long sequenceId;
     private PipelineID pipelineID;
-    private ReplicationFactor replicationFactor;
     private ReplicationType replicationType;
+    private int replication;
 
     public Builder setReplicationType(
         ReplicationType repType) {
@@ -389,8 +400,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
-    public Builder setReplicationFactor(ReplicationFactor repFactor) {
-      this.replicationFactor = repFactor;
+    public Builder setReplication(int replica) {
+      this.replication = replica;
       return this;
     }
 
@@ -438,7 +449,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     public ContainerInfo build() {
       return new ContainerInfo(containerID, state, pipelineID,
           used, keys, stateEnterTime, owner, deleteTransactionId,
-          sequenceId, replicationFactor, replicationType);
+          sequenceId, replication, replicationType);
     }
   }
 

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.s3.util;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 
 /**
@@ -27,21 +26,21 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 
 public enum S3StorageType {
 
-  REDUCED_REDUNDANCY(ReplicationType.RATIS, ReplicationFactor.ONE),
-  STANDARD(ReplicationType.RATIS, ReplicationFactor.THREE);
+  REDUCED_REDUNDANCY(ReplicationType.RATIS, 1),
+  STANDARD(ReplicationType.RATIS, 3);
 
   private final ReplicationType type;
-  private final ReplicationFactor factor;
+  private final int replication;
 
   S3StorageType(
       ReplicationType type,
-      ReplicationFactor factor) {
+      int replication) {
     this.type = type;
-    this.factor = factor;
+    this.replication = replication;
   }
 
-  public ReplicationFactor getFactor() {
-    return factor;
+  public int getReplication() {
+    return replication;
   }
 
   public ReplicationType getType() {
@@ -53,9 +52,9 @@ public enum S3StorageType {
   }
 
   public static S3StorageType fromReplicationType(
-      ReplicationType replicationType, ReplicationFactor factor) {
+      ReplicationType replicationType, int replication) {
     if ((replicationType == ReplicationType.STAND_ALONE) ||
-        (factor == ReplicationFactor.ONE)) {
+        (replication == 1)) {
       return S3StorageType.REDUCED_REDUNDANCY;
     } else {
       return S3StorageType.STANDARD;

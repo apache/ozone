@@ -77,7 +77,7 @@ public class TestS3MultipartResponse {
         .setUploadID(multipartUploadID)
         .setCreationTime(Time.now())
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .build();
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
@@ -87,7 +87,7 @@ public class TestS3MultipartResponse {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .build();
@@ -140,6 +140,6 @@ public class TestS3MultipartResponse {
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
             .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
+            .setReplication(1).build()).build();
   }
 }

@@ -352,7 +352,7 @@ public class TestReconWithOzoneManager {
 
   private static Pipeline getRandomPipeline() {
     return Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setReplication(1)
         .setId(PipelineID.randomId())
         .setNodes(Collections.EMPTY_LIST)
         .setState(Pipeline.PipelineState.OPEN)
@@ -381,7 +381,7 @@ public class TestReconWithOzoneManager {
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+            .setReplication(1)
             .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());

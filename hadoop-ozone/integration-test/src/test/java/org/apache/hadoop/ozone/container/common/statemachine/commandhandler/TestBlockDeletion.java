@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -145,7 +144,7 @@ public class TestBlockDeletion {
     String keyName = UUID.randomUUID().toString();
 
     OzoneOutputStream out = bucket.createKey(keyName, value.getBytes().length,
-        ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
+        ReplicationType.RATIS, 3, new HashMap<>());
     for (int i = 0; i < 100; i++) {
       out.write(value.getBytes());
     }
@@ -154,7 +153,7 @@ public class TestBlockDeletion {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
         .setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplication(3)
         .setRefreshPipeline(true)
         .build();
     List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =

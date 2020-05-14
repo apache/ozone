@@ -23,7 +23,6 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -321,7 +320,7 @@ public class TestBucketManagerImpl {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_one")
-            .setReplicationFactor(ReplicationFactor.ONE)
+            .setReplication(1)
             .setReplicationType(ReplicationType.STAND_ALONE)
             .build());
     metaMgr.getKeyTable().put("/sampleVol/bucketOne/key_two",
@@ -329,7 +328,7 @@ public class TestBucketManagerImpl {
             .setBucketName("bucketOne")
             .setVolumeName("sampleVol")
             .setKeyName("key_two")
-            .setReplicationFactor(ReplicationFactor.ONE)
+            .setReplication(1)
             .setReplicationType(ReplicationType.STAND_ALONE)
             .build());
     try {

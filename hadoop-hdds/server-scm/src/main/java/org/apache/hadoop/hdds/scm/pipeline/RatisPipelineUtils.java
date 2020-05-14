@@ -111,7 +111,7 @@ public final class RatisPipelineUtils {
       PipelineStateManager stateManager, Pipeline pipeline) {
     return stateManager.getPipelines(
         HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE)
+        3)
         .stream().filter(p -> !p.getId().equals(pipeline.getId()) &&
             (p.getPipelineState() != Pipeline.PipelineState.CLOSED &&
                 p.sameDatanodes(pipeline)))

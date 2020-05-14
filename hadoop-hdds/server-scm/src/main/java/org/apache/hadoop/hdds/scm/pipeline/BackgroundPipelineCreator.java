@@ -118,7 +118,7 @@ class BackgroundPipelineCreator {
 
       if (!pipelineManager.getSafeModeStatus()) {
         try {
-          pipelineManager.scrubPipeline(type, factor);
+          pipelineManager.scrubPipeline(type, factor.getNumber());
         } catch (IOException e) {
           LOG.error("Error while scrubbing pipelines {}", e);
         }
@@ -129,7 +129,7 @@ class BackgroundPipelineCreator {
           if (scheduler.isClosed()) {
             break;
           }
-          pipelineManager.createPipeline(type, factor);
+          pipelineManager.createPipeline(type, factor.getNumber());
         } catch (IOException ioe) {
           break;
         } catch (Throwable t) {

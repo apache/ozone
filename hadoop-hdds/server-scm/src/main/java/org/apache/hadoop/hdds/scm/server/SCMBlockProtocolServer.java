@@ -170,12 +170,12 @@ public class SCMBlockProtocolServer implements
 
   @Override
   public List<AllocatedBlock> allocateBlock(long size, int num,
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
+      HddsProtos.ReplicationType type, int replication,
       String owner, ExcludeList excludeList) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("type", type.name());
-    auditMap.put("factor", factor.name());
+    auditMap.put("factor", String.valueOf(replication));
     auditMap.put("owner", owner);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
     boolean auditSuccess = true;
@@ -187,7 +187,7 @@ public class SCMBlockProtocolServer implements
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, type, factor, owner, excludeList);
+            .allocateBlock(size, type, replication, owner, excludeList);
         if (block != null) {
           blocks.add(block);
         }

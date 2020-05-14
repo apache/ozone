@@ -23,7 +23,6 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto
@@ -109,7 +108,7 @@ public class PipelineReportHandler implements
 
     if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Pipeline {} {} reported by {}", pipeline.getFactor(),
+        LOGGER.debug("Pipeline {} {} reported by {}", pipeline.getReplication(),
             pipeline.getId(), dn);
       }
       if (pipeline.isHealthy()) {
@@ -132,7 +131,7 @@ public class PipelineReportHandler implements
                                      DatanodeDetails dn) {
     // ONE replica pipeline doesn't have leader flag
     if (report.getIsLeader() ||
-        pipeline.getFactor() == HddsProtos.ReplicationFactor.ONE) {
+        pipeline.getReplication() == 1) {
       pipeline.setLeaderId(dn.getUuid());
       metrics.incNumPipelineBytesWritten(pipeline, report.getBytesWritten());
     }

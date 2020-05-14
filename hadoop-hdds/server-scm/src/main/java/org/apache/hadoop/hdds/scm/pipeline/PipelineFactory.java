@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -58,14 +57,14 @@ public class PipelineFactory {
     providers.put(replicationType, provider);
   }
 
-  public Pipeline create(ReplicationType type, ReplicationFactor factor)
+  public Pipeline create(ReplicationType type, int replication)
       throws IOException {
-    return providers.get(type).create(factor);
+    return providers.get(type).create(replication);
   }
 
-  public Pipeline create(ReplicationType type, ReplicationFactor factor,
+  public Pipeline create(ReplicationType type, int replication,
       List<DatanodeDetails> nodes) {
-    return providers.get(type).create(factor, nodes);
+    return providers.get(type).create(replication, nodes);
   }
 
   public void close(ReplicationType type, Pipeline pipeline)

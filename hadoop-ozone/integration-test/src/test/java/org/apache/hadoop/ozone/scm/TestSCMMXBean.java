@@ -143,7 +143,7 @@ public class TestSCMMXBean {
     List<ContainerInfo> containerInfoList = new ArrayList<>();
     for (int i=0; i < 10; i++) {
       containerInfoList.add(scmContainerManager.allocateContainer(HddsProtos
-          .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor.ONE,
+          .ReplicationType.STAND_ALONE, 1,
           UUID.randomUUID().toString()));
     }
     long containerID;

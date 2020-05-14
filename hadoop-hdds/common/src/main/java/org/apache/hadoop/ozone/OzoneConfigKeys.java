@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
@@ -181,8 +180,7 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT = 5000;
 
   public static final String OZONE_REPLICATION = "ozone.replication";
-  public static final int OZONE_REPLICATION_DEFAULT =
-      ReplicationFactor.THREE.getValue();
+  public static final int OZONE_REPLICATION_DEFAULT = 3;
 
   public static final String OZONE_REPLICATION_TYPE = "ozone.replication.type";
   public static final String OZONE_REPLICATION_TYPE_DEFAULT =

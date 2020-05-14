@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -769,8 +770,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     }
 
-    if (args.getFactor() != null) {
-      keyArgs.setFactor(args.getFactor());
+    keyArgs.setReplication(args.getReplication());
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
+    if (args.getReplication() == 1 || args.getReplication() == 3) {
+      keyArgs.setFactor(
+          HddsProtos.ReplicationFactor.valueOf(args.getReplication()));
     }
 
     if (args.getType() != null) {
@@ -828,8 +832,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize());
 
-    if (args.getFactor() != null) {
-      keyArgs.setFactor(args.getFactor());
+    keyArgs.setReplication(args.getReplication());
+    // TODO(maobaolong): remove this block after clear factor
+    if (args.getReplication() == 1 || args.getReplication() == 3) {
+      keyArgs.setFactor(
+          HddsProtos.ReplicationFactor.valueOf(args.getReplication()));
     }
 
     if (args.getType() != null) {
@@ -1025,10 +1032,16 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(omKeyArgs.getVolumeName())
         .setBucketName(omKeyArgs.getBucketName())
         .setKeyName(omKeyArgs.getKeyName())
-        .setFactor(omKeyArgs.getFactor())
+        .setReplication(omKeyArgs.getReplication())
         .addAllAcls(omKeyArgs.getAcls().stream().map(a ->
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
         .setType(omKeyArgs.getType());
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
+    if (omKeyArgs.getReplication() == 1 || omKeyArgs.getReplication() == 3) {
+      keyArgs.setFactor(
+          HddsProtos.ReplicationFactor.valueOf(omKeyArgs.getReplication()));
+    }
+
     multipartInfoInitiateRequest.setKeyArgs(keyArgs.build());
 
     OMRequest omRequest = createOMRequest(
@@ -1158,7 +1171,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
 
     OmMultipartUploadListParts omMultipartUploadListParts =
-        new OmMultipartUploadListParts(response.getType(), response.getFactor(),
+        new OmMultipartUploadListParts(
+            response.getType(), response.getReplication(),
             response.getNextPartNumberMarker(), response.getIsTruncated());
     omMultipartUploadListParts.addProtoPartList(response.getPartsListList());
 
@@ -1194,7 +1208,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                 proto.getUploadId(),
                 Instant.ofEpochMilli(proto.getCreationTime()),
                 proto.getType(),
-                proto.getFactor()
+                proto.getReplication()
             ))
             .collect(Collectors.toList());
 
@@ -1527,16 +1541,22 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public OpenKeySession createFile(OmKeyArgs args,
       boolean overWrite, boolean recursive) throws IOException {
-    KeyArgs keyArgs = KeyArgs.newBuilder()
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
+    KeyArgs.Builder keyArgsBuilder = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
         .setType(args.getType())
-        .setFactor(args.getFactor())
+        .setReplication(args.getReplication())
         .addAllAcls(args.getAcls().stream().map(a ->
-            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
-        .build();
+            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
+    // TODO(maobaolong): remove this compatible purpose block after clear factor
+    if (args.getReplication() == 1 || args.getReplication() == 3) {
+      keyArgsBuilder.setFactor(
+          HddsProtos.ReplicationFactor.valueOf(args.getReplication()));
+    }
+    KeyArgs keyArgs = keyArgsBuilder.build();
     CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()
             .setKeyArgs(keyArgs)
             .setIsOverwrite(overWrite)

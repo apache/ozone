@@ -54,7 +54,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 /**
@@ -89,7 +88,7 @@ public class TestPipelineClose {
     containerManager = scm.getContainerManager();
     pipelineManager = scm.getPipelineManager();
     ContainerInfo containerInfo = containerManager
-        .allocateContainer(RATIS, THREE, "testOwner");
+        .allocateContainer(RATIS, 3, "testOwner");
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));
     pipelineManager = scm.getPipelineManager();
@@ -201,7 +200,7 @@ public class TestPipelineClose {
         ArgumentCaptor.forClass(PipelineActionsFromDatanode.class);
 
     ContainerInfo containerInfo = containerManager
-        .allocateContainer(RATIS, THREE, "testOwner");
+        .allocateContainer(RATIS, 3, "testOwner");
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo,
             pipelineManager.getPipeline(containerInfo.getPipelineID()));

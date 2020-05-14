@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.fsck;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -84,7 +83,7 @@ public class TestContainerMapper {
       String key = UUID.randomUUID().toString();
       keyList.add(key);
       OzoneOutputStream out = bucket.createKey(key, data.length,
-          ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+          ReplicationType.STAND_ALONE, 1,
           new HashMap<String, String>());
       out.write(data, 0, data.length);
       out.close();

@@ -127,13 +127,13 @@ public class TestHealthyPipelineSafeModeRule {
       // Create 3 pipelines
       Pipeline pipeline1 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+              3);
       Pipeline pipeline2 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+              3);
       Pipeline pipeline3 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+              3);
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(
           config, containers, pipelineManager, eventQueue);
@@ -204,13 +204,13 @@ public class TestHealthyPipelineSafeModeRule {
       // Create 3 pipelines
       Pipeline pipeline1 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE);
+              1);
       Pipeline pipeline2 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+              3);
       Pipeline pipeline3 =
           pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
+              3);
 
 
       SCMSafeModeManager scmSafeModeManager = new SCMSafeModeManager(

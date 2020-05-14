@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -112,14 +111,14 @@ public class TestBCSID {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024, ReplicationType.RATIS,
-                ReplicationFactor.ONE, new HashMap<>());
+                1, new HashMap<>());
     key.write("ratis".getBytes());
     key.close();
 
     // get the name of a valid container.
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).
         setBucketName(bucketName).setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setKeyName("ratis")
+        .setReplication(1).setKeyName("ratis")
         .setRefreshPipeline(true)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);

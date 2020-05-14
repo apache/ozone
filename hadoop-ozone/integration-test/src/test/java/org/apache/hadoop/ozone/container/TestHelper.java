@@ -101,21 +101,19 @@ public final class TestHelper {
   public static OzoneOutputStream createKey(String keyName,
       ReplicationType type, long size, ObjectStore objectStore,
       String volumeName, String bucketName) throws Exception {
-    org.apache.hadoop.hdds.client.ReplicationFactor factor =
-        type == ReplicationType.STAND_ALONE ?
-            org.apache.hadoop.hdds.client.ReplicationFactor.ONE :
-            org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+    int replication =
+        type == ReplicationType.STAND_ALONE ? 1 : 3;
     return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, type, factor, new HashMap<>());
+        .createKey(keyName, size, type, replication, new HashMap<>());
   }
 
   public static OzoneOutputStream createKey(String keyName,
       ReplicationType type,
-      org.apache.hadoop.hdds.client.ReplicationFactor factor, long size,
+      int replication, long size,
       ObjectStore objectStore, String volumeName, String bucketName)
       throws Exception {
     return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, type, factor, new HashMap<>());
+        .createKey(keyName, size, type, replication, new HashMap<>());
   }
 
   public static void validateData(String keyName, byte[] data,

@@ -29,7 +29,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -89,7 +88,7 @@ public class BenchMarkOzoneManager {
         GenesisUtil.configureOM(conf, 20);
         conf.setInt(OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             numContainersPerPipeline);
-        GenesisUtil.addPipelines(ReplicationFactor.THREE, numPipelines, conf);
+        GenesisUtil.addPipelines(3, numPipelines, conf);
 
         scm = GenesisUtil.getScm(conf, new SCMConfigurator());
         scm.start();
@@ -99,7 +98,7 @@ public class BenchMarkOzoneManager {
         // prepare SCM
         PipelineManager pipelineManager = scm.getPipelineManager();
         for (Pipeline pipeline : pipelineManager
-            .getPipelines(ReplicationType.RATIS, ReplicationFactor.THREE)) {
+            .getPipelines(ReplicationType.RATIS, 3)) {
           pipelineManager.openPipeline(pipeline.getId());
         }
         scm.getEventQueue().fireEvent(SCMEvents.SAFE_MODE_STATUS,
@@ -128,7 +127,7 @@ public class BenchMarkOzoneManager {
           .setBucketName(bucketName)
           .setKeyName(key)
           .setDataSize(0)
-          .setFactor(HddsProtos.ReplicationFactor.THREE)
+          .setReplication(3)
           .setType(HddsProtos.ReplicationType.RATIS)
           .build();
       OpenKeySession keySession = om.getKeyManager().openKey(omKeyArgs);
@@ -167,7 +166,7 @@ public class BenchMarkOzoneManager {
         .setBucketName(bucketName)
         .setKeyName(key)
         .setDataSize(50)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplication(3)
         .setType(HddsProtos.ReplicationType.RATIS)
         .build();
     state.om.allocateBlock(omKeyArgs, clientIDs.get(index), new ExcludeList());
@@ -183,7 +182,7 @@ public class BenchMarkOzoneManager {
         .setBucketName(bucketName)
         .setKeyName(key)
         .setDataSize(50)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setReplication(3)
         .setType(HddsProtos.ReplicationType.RATIS)
         .build();
     OpenKeySession openKeySession = state.om.openKey(omKeyArgs);

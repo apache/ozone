@@ -80,7 +80,7 @@ public class TestS3MultipartUploadCommitPartRequest
     // Add key to open key table.
     TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName,
         keyName, clientID, HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        1, omMetadataManager);
 
     omClientResponse =
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
@@ -125,7 +125,7 @@ public class TestS3MultipartUploadCommitPartRequest
     // Add key to open key table.
     TestOMRequestUtils.addKeyToTable(true, volumeName, bucketName,
         keyName, clientID, HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        1, omMetadataManager);
 
     OMClientResponse omClientResponse =
         s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,

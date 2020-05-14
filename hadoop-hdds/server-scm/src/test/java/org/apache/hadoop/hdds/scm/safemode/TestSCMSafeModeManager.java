@@ -366,7 +366,7 @@ public class TestSCMSafeModeManager {
 
     for (int i=0; i < pipelineCount; i++) {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
+          3);
     }
 
     for (ContainerInfo container : containers) {
@@ -584,7 +584,7 @@ public class TestSCMSafeModeManager {
 
       Pipeline pipeline = pipelineManager.createPipeline(
           HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
+          3);
 
       scmSafeModeManager = new SCMSafeModeManager(
           config, containers, pipelineManager, queue);
@@ -668,7 +668,7 @@ public class TestSCMSafeModeManager {
     pipelineManager.allowPipelineCreation();
     Pipeline pipeline = pipelineManager.createPipeline(
         HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+        3);
     firePipelineEvent(pipelineManager, pipeline);
 
     queue.processAll(5000);

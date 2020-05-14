@@ -41,7 +41,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatch() throws Exception {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+        bucketName, keyName, replicationType, replication);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
@@ -57,7 +57,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
         keyName);
 
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationType, replication, omMetadataManager);
 
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
     omKeyDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
@@ -77,7 +77,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+        bucketName, keyName, replicationType, replication);
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -86,7 +86,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
         .setState(Pipeline.PipelineState.OPEN)
         .setId(PipelineID.randomId())
         .setType(replicationType)
-        .setFactor(replicationFactor)
+        .setReplication(replication)
         .setNodes(new ArrayList<>())
         .build();
 
@@ -132,7 +132,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
+        bucketName, keyName, replicationType, replication);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
@@ -148,7 +148,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
         keyName);
 
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager);
+        clientID, replicationType, replication, omMetadataManager);
 
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
 

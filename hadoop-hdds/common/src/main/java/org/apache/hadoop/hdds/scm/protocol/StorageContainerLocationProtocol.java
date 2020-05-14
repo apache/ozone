@@ -51,7 +51,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   ContainerWithPipeline allocateContainer(
       HddsProtos.ReplicationType replicationType,
-      HddsProtos.ReplicationFactor factor, String owner)
+      int replication, String owner)
       throws IOException;
 
   /**
@@ -135,12 +135,12 @@ public interface StorageContainerLocationProtocol extends Closeable {
   /**
    * Creates a replication pipeline of a specified type.
    * @param type - replication type
-   * @param factor - factor 1 or 3
+   * @param replication - factor 1 or 3
    * @param nodePool - optional machine list to build a pipeline.
    * @throws IOException
    */
   Pipeline createReplicationPipeline(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, HddsProtos.NodePool nodePool)
+      int replication, HddsProtos.NodePool nodePool)
       throws IOException;
 
   /**

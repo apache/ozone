@@ -74,7 +74,7 @@ public class TestNodeFailure {
     pipelineManager = scm.getPipelineManager();
     ratisPipelines = pipelineManager.getPipelines(
         HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
+        3);
 
     timeForFailure = (int) conf.getObject(DatanodeRatisServerConfig.class)
         .getFollowerSlownessTimeout();

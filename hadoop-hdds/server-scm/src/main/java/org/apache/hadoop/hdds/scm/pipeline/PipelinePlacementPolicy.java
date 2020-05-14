@@ -92,7 +92,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         continue;
       }
       if (pipeline != null &&
-          pipeline.getFactor().getNumber() == nodesRequired &&
+          pipeline.getReplication() == nodesRequired &&
           pipeline.getType() == HddsProtos.ReplicationType.RATIS &&
           pipeline.getPipelineState() == Pipeline.PipelineState.CLOSED) {
         pipelineNumDeductable++;

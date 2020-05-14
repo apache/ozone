@@ -25,7 +25,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Port;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
@@ -55,7 +54,7 @@ public class FakeClusterTopology {
         if ((i + 1) % 3 == 0) {
           pipelines.add(Pipeline.newBuilder()
               .setId(PipelineID.randomId().getProtobuf())
-              .setFactor(ReplicationFactor.THREE)
+              .setReplication(3)
               .setType(ReplicationType.RATIS)
               .addMembers(getDatanode(i - 2))
               .addMembers(getDatanode(i - 1))
