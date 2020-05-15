@@ -84,6 +84,32 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </resources>
     <plugins>
       <plugin>
+        <groupId>org.xolstice.maven.plugins</groupId>
+        <artifactId>protobuf-maven-plugin</artifactId>
+        <version>${protobuf-maven-plugin.version}</version>
+        <extensions>true</extensions>
+        <executions>
+          <execution>
+            <id>compile-protoc</id>
+            <goals>
+              <goal>compile</goal>
+              <goal>test-compile</goal>
+            </goals>
+            <configuration>
+              <additionalProtoPathElements>
+                <param>
+                  ${basedir}/../../hadoop-hdds/common/src/main/proto/
+                </param>
+                <param>${basedir}/src/main/proto</param>
+              </additionalProtoPathElements>
+              <protocArtifact>
+                com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
+              </protocArtifact>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-maven-plugins</artifactId>
         <executions>
@@ -99,29 +125,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <includes>
                   <include>*/src/main/java/**/*.java</include>
                   <include>*/src/main/proto/*.proto</include>
-                </includes>
-              </source>
-            </configuration>
-          </execution>
-          <execution>
-            <id>compile-protoc</id>
-            <goals>
-              <goal>protoc</goal>
-            </goals>
-            <configuration>
-              <protocVersion>${protobuf.version}</protocVersion>
-              <protocCommand>${protoc.path}</protocCommand>
-              <imports>
-                <param>
-                  ${basedir}/../../hadoop-hdds/common/src/main/proto/
-                </param>
-                <param>${basedir}/src/main/proto</param>
-              </imports>
-              <source>
-                <directory>${basedir}/src/main/proto</directory>
-                <includes>
-                  <include>FSProtos.proto</include>
-                  <include>OzoneManagerProtocol.proto</include>
                 </includes>
               </source>
             </configuration>
