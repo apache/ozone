@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone.contract.rooted.ha;
 
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
@@ -31,9 +32,12 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 
 /**
@@ -41,7 +45,8 @@ import org.junit.Assert;
  */
 class RootedHAOzoneContract extends AbstractFSContract {
 
-  private static MiniOzoneCluster cluster;
+  private static MiniOzoneHAClusterImpl cluster;
+  private static final String omServiceId = "omservice";
   private static final String CONTRACT_XML = "contract/ozone.xml";
 
   RootedHAOzoneContract(Configuration conf) {
@@ -61,6 +66,7 @@ class RootedHAOzoneContract extends AbstractFSContract {
   }
 
   public static void createCluster() throws IOException {
+    // Init HA cluster
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
@@ -79,13 +85,24 @@ class RootedHAOzoneContract extends AbstractFSContract {
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY + "." +
                     "watch.request.timeout",
             10, TimeUnit.SECONDS);
+    // Ref: TestReconWithOzoneManagerHA#setup
+    conf.set(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, Boolean.TRUE.toString());
+    // Sync to disk enabled
+    conf.set("hadoop.hdds.db.rocksdb.writeoption.sync",
+        Boolean.TRUE.toString());
     conf.addResource(CONTRACT_XML);
 
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
+    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
+        .setClusterId(UUID.randomUUID().toString())
+        .setScmId(UUID.randomUUID().toString())
+        .setOMServiceId(omServiceId)
+        .setNumDatanodes(1)
+        .setNumOfOzoneManagers(3)
+        .includeRecon(false)
+        .build();
     try {
       cluster.waitForClusterToBeReady();
-      cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
-              180000);
+      // TODO: Wait for leader to be elected?
     } catch (Exception e) {
       throw new IOException(e);
     }
@@ -100,15 +117,26 @@ class RootedHAOzoneContract extends AbstractFSContract {
     //assumes cluster is not null
     Assert.assertNotNull("cluster not created", cluster);
 
-    String uri = String.format("%s://localhost:%s/",
-        OzoneConsts.OZONE_OFS_URI_SCHEME,
-        cluster.getOzoneManager().getRpcPort());
+    String uri = String.format("%s://%s/",
+        OzoneConsts.OZONE_OFS_URI_SCHEME, omServiceId);
     getConf().set("fs.defaultFS", uri);
 
     // Note: FileSystem#loadFileSystems doesn't load OFS class because
     //  META-INF points to org.apache.hadoop.fs.ozone.OzoneFileSystem
     getConf().set("fs.ofs.impl",
         "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+
+    // Copy HA configs
+    copyClusterConfigs(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
+    copyClusterConfigs(OMConfigKeys.OZONE_OM_NODES_KEY + "." + omServiceId);
+    // TODO: Decode OMConfigKeys.OZONE_OM_NODES_KEY + "." + omServiceId
+    //  instead of hardcoding
+    copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY + "." +
+        omServiceId + ".omNode-1");
+    copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY + "." +
+        omServiceId + ".omNode-2");
+    copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY + "." +
+        omServiceId + ".omNode-3");
 
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY);
     copyClusterConfigs(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
