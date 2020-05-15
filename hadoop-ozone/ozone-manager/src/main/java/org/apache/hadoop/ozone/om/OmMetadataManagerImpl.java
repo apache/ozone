@@ -121,7 +121,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |  multipartInfoTable| /volumeName/bucketName/keyName/uploadId ->...   |
    * |----------------------------------------------------------------------|
    * |----------------------------------------------------------------------|
-   * |  ratislogTable | #TRANSACTIONINFO -> OMTransactionInfo               |
+   * |  transactionInfoTable | #TRANSACTIONINFO -> OMTransactionInfo        |
    * |----------------------------------------------------------------------|
    */
 
