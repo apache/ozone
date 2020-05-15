@@ -327,7 +327,7 @@ public class TestOzoneManagerConfiguration {
     } catch (OzoneIllegalArgumentException e) {
       // Expect error message
       Assert.assertTrue(e.getMessage().contains(
-          "OM Rpc Address should be set for all node"));
+          "OM RPC Address should be set for all node"));
     }
   }
 
