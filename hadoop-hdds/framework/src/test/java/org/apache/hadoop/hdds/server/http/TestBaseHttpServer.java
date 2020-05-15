@@ -89,9 +89,9 @@ public class TestBaseHttpServer {
         .getBindAddress("bindhostkey", "addresskey",
             "default", 65).toString());
 
-    conf.set("bindhostkey", "0.0.0.0");
+    conf.set("bindhostkey", "1.2.3.4");
 
-    Assert.assertEquals("/0.0.0.0:1234", baseHttpServer
+    Assert.assertEquals("/1.2.3.4:1234", baseHttpServer
         .getBindAddress("bindhostkey", "addresskey",
             "default", 65).toString());
   }

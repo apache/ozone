@@ -110,7 +110,7 @@ public class TestDefaultProfile {
       PKCSException, OperatorCreationException {
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
-        .addIpAddress("0.0.0.0")
+        .addIpAddress("8.8.8.8")
         .addServiceName("OzoneMarketingCluster001")
         .setCA(false)
         .setClusterID("ClusterID")
@@ -143,7 +143,7 @@ public class TestDefaultProfile {
         newKeyPair.getPrivate());
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
-        .addIpAddress("0.0.0.0")
+        .addIpAddress("8.8.8.8")
         .setCA(false)
         .setClusterID("ClusterID")
         .setScmID("SCMID")
@@ -167,7 +167,7 @@ public class TestDefaultProfile {
   public void testExtensions() throws SCMSecurityException {
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
-        .addIpAddress("0.0.0.0")
+        .addIpAddress("192.10.234.6")
         .setCA(false)
         .setClusterID("ClusterID")
         .setScmID("SCMID")
@@ -189,7 +189,7 @@ public class TestDefaultProfile {
   public void testInvalidExtensionsWithCA() throws SCMSecurityException {
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
-        .addIpAddress("0.0.0.0")
+        .addIpAddress("192.10.234.6")
         .setCA(true)
         .setClusterID("ClusterID")
         .setScmID("SCMID")

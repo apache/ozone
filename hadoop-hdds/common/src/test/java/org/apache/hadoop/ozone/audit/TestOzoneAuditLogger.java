@@ -51,7 +51,7 @@ public class TestOzoneAuditLogger {
   private static final Map<String, String> PARAMS =
       new DummyEntity().toAuditMap();
 
-  private static final String IP_ADDRESS = "0.0.0.0";
+  private static final String IP_ADDRESS = "192.168.0.1";
   private static final String USER = "john";
 
   private static final AuditMessage WRITE_FAIL_MSG =

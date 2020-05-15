@@ -72,17 +72,17 @@ public class HddsServerUtilTest {
 
     // First try a client address with just a host name. Verify it falls
     // back to the default port.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4");
     InetSocketAddress addr = HddsServerUtil.getScmAddressForDataNodes(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("1.2.3.4"));
     assertThat(addr.getPort(), is(
         ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
 
     // Next try a client address with just a host name and port.
     // Verify the port is ignored and the default DataNode port is used.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:100");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
     addr = HddsServerUtil.getScmAddressForDataNodes(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("1.2.3.4"));
     assertThat(addr.getPort(), is(
         ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
 
@@ -90,11 +90,11 @@ public class HddsServerUtilTest {
     // OZONE_SCM_DATANODE_ADDRESS_KEY.
     // Verify that the latter overrides and the port number is still the
     // default.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:100");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "5.6.7.8");
     addr =
         HddsServerUtil.getScmAddressForDataNodes(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("5.6.7.8"));
     assertThat(addr.getPort(), is(
         ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
 
@@ -102,10 +102,10 @@ public class HddsServerUtilTest {
     // OZONE_SCM_DATANODE_ADDRESS_KEY.
     // Verify that the latter overrides and the port number from the latter is
     // used.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:100");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0:200");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "5.6.7.8:200");
     addr = HddsServerUtil.getScmAddressForDataNodes(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("5.6.7.8"));
     assertThat(addr.getPort(), is(200));
   }
 
@@ -120,7 +120,7 @@ public class HddsServerUtilTest {
 
     // The bind host should be 0.0.0.0 unless OZONE_SCM_CLIENT_BIND_HOST_KEY
     // is set differently.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4");
     InetSocketAddress addr = HddsServerUtil.getScmClientBindAddress(conf);
     assertThat(addr.getHostString(), is("0.0.0.0"));
     assertThat(addr.getPort(), is(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT));
@@ -128,8 +128,8 @@ public class HddsServerUtilTest {
     // The bind host should be 0.0.0.0 unless OZONE_SCM_CLIENT_BIND_HOST_KEY
     // is set differently. The port number from OZONE_SCM_CLIENT_ADDRESS_KEY
     // should be respected.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:100");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0:200");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "1.2.3.4:200");
     addr = HddsServerUtil.getScmClientBindAddress(conf);
     assertThat(addr.getHostString(), is("0.0.0.0"));
     assertThat(addr.getPort(), is(100));
@@ -137,22 +137,22 @@ public class HddsServerUtilTest {
     // OZONE_SCM_CLIENT_BIND_HOST_KEY should be respected.
     // Port number should be default if none is specified via
     // OZONE_SCM_DATANODE_ADDRESS_KEY.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0");
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "0.0.0.0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "1.2.3.4");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "5.6.7.8");
     addr = HddsServerUtil.getScmClientBindAddress(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("5.6.7.8"));
     assertThat(addr.getPort(), is(
         ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT));
 
     // OZONE_SCM_CLIENT_BIND_HOST_KEY should be respected.
     // Port number from OZONE_SCM_CLIENT_ADDRESS_KEY should be
     // respected.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:100");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0:200");
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "0.0.0.0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "1.2.3.4:200");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "5.6.7.8");
     addr = HddsServerUtil.getScmClientBindAddress(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("5.6.7.8"));
     assertThat(addr.getPort(), is(100));
   }
 
@@ -166,7 +166,7 @@ public class HddsServerUtilTest {
 
     // The bind host should be 0.0.0.0 unless OZONE_SCM_DATANODE_BIND_HOST_KEY
     // is set differently.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4");
     InetSocketAddress addr = HddsServerUtil.getScmDataNodeBindAddress(conf);
     assertThat(addr.getHostString(), is("0.0.0.0"));
     assertThat(addr.getPort(), is(
@@ -175,8 +175,8 @@ public class HddsServerUtilTest {
     // The bind host should be 0.0.0.0 unless OZONE_SCM_DATANODE_BIND_HOST_KEY
     // is set differently. The port number from OZONE_SCM_DATANODE_ADDRESS_KEY
     // should be respected.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:100");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0:200");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "1.2.3.4:200");
     addr = HddsServerUtil.getScmDataNodeBindAddress(conf);
     assertThat(addr.getHostString(), is("0.0.0.0"));
     assertThat(addr.getPort(), is(200));
@@ -184,22 +184,22 @@ public class HddsServerUtilTest {
     // OZONE_SCM_DATANODE_BIND_HOST_KEY should be respected.
     // Port number should be default if none is specified via
     // OZONE_SCM_DATANODE_ADDRESS_KEY.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:100");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "0.0.0.0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "1.2.3.4");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "5.6.7.8");
     addr = HddsServerUtil.getScmDataNodeBindAddress(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("5.6.7.8"));
     assertThat(addr.getPort(), is(
         ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT));
 
     // OZONE_SCM_DATANODE_BIND_HOST_KEY should be respected.
     // Port number from OZONE_SCM_DATANODE_ADDRESS_KEY should be
     // respected.
-    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:100");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0:200");
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "0.0.0.0");
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "1.2.3.4:200");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "5.6.7.8");
     addr = HddsServerUtil.getScmDataNodeBindAddress(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("5.6.7.8"));
     assertThat(addr.getPort(), is(200));
   }
 
@@ -213,11 +213,11 @@ public class HddsServerUtilTest {
     Iterator<InetSocketAddress> it = null;
 
     // Verify valid IP address setup
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "0.0.0.0");
+    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "1.2.3.4");
     addresses = getSCMAddresses(conf);
     assertThat(addresses.size(), is(1));
     addr = addresses.iterator().next();
-    assertThat(addr.getHostName(), is("0.0.0.0"));
+    assertThat(addr.getHostName(), is("1.2.3.4"));
     assertThat(addr.getPort(), is(ScmConfigKeys.OZONE_SCM_DEFAULT_PORT));
 
     // Verify valid hostname setup

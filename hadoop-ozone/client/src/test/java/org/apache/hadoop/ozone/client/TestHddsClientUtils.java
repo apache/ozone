@@ -76,16 +76,16 @@ public class TestHddsClientUtils {
 
     // First try a client address with just a host name. Verify it falls
     // back to the default port.
-    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0");
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4");
     InetSocketAddress addr = HddsUtils.getScmAddressForClients(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("1.2.3.4"));
     assertThat(addr.getPort(), is(OZONE_SCM_CLIENT_PORT_DEFAULT));
 
     // Next try a client address with a host name and port. Verify both
     // are used correctly.
-    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:100");
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
     addr = HddsUtils.getScmAddressForClients(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("1.2.3.4"));
     assertThat(addr.getPort(), is(100));
   }
 
@@ -95,16 +95,16 @@ public class TestHddsClientUtils {
 
     // First try a client address with just a host name. Verify it falls
     // back to the default port.
-    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "0.0.0.0");
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "1.2.3.4");
     InetSocketAddress addr = OmUtils.getOmAddress(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("1.2.3.4"));
     assertThat(addr.getPort(), is(OMConfigKeys.OZONE_OM_PORT_DEFAULT));
 
     // Next try a client address with just a host name and port. Verify the port
     // is ignored and the default OM port is used.
-    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "0.0.0.0:100");
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "1.2.3.4:100");
     addr = OmUtils.getOmAddress(conf);
-    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getHostString(), is("1.2.3.4"));
     assertThat(addr.getPort(), is(100));
 
     // Assert the we are able to use default configs if no value is specified.
@@ -234,7 +234,7 @@ public class TestHddsClientUtils {
     HddsClientUtils.verifyResourceName(shortestValidName);
 
     // various kinds of invalid names
-    final String ipaddr = "0.0.0.0";
+    final String ipaddr = "192.68.1.1";
     final String dotDash = "not.-a-name";
     final String dashDot = "not-a-.name";
     final String dotDot = "not..a-name";

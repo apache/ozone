@@ -226,7 +226,7 @@ public class DefaultProfile implements PKIProfile {
     case GeneralName.iPAddress:
 
       // We need DatatypeConverter conversion, since the original CSR encodes
-      // an IP address int a Hex String, for example 0.0.0.0 is encoded as
+      // an IP address int a Hex String, for example 8.8.8.8 is encoded as
       // #08080808. Value string is always preceded by "#", we will strip
       // that before passing it on.
 

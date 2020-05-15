@@ -146,7 +146,7 @@ public class TestDefaultCAServer {
         new HDDSKeyGenerator(conf).generateKey();
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
-        .addIpAddress("0.0.0.0")
+        .addIpAddress("8.8.8.8")
         .addServiceName("OzoneMarketingCluster002")
         .setCA(false)
         .setClusterID(clusterId)
@@ -190,7 +190,7 @@ public class TestDefaultCAServer {
         new HDDSKeyGenerator(conf).generateKey();
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
-        .addIpAddress("0.0.0.0")
+        .addIpAddress("8.8.8.8")
         .setCA(false)
         .setSubject("Ozone Cluster")
         .setConfiguration(conf)
@@ -220,7 +220,7 @@ public class TestDefaultCAServer {
         new HDDSKeyGenerator(conf).generateKey();
     PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
         .addDnsName("hadoop.apache.org")
-        .addIpAddress("0.0.0.0")
+        .addIpAddress("8.8.8.8")
         .setCA(false)
         .setScmID("wrong one")
         .setClusterID("223432rf")
