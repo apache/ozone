@@ -30,4 +30,4 @@ weight: 5
 如果你想要深入理解 Ozone 的安全架构，请查看 <a href="https://issues.apache.org/jira/secure/attachment/12911638/HadoopStorageLayerSecurity.pdf">Ozone 安全架构</a>。
 </div>
 
-根据不同需求，安全化 Ozone 有多种可选的步骤。
+根据不同的需求，安全化 Ozone 有多种可选的步骤。
