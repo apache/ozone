@@ -382,11 +382,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       }
     }
     RenameIterator iterator = new RenameIterator(src, dst);
-    boolean result = iterator.iterate();
-    if (result) {
-      createFakeParentDirectory(src);
-    }
-    return result;
+    return iterator.iterate();
   }
 
   private class DeleteIterator extends OzoneListingIterator {
@@ -470,59 +466,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       result = adapter.deleteObject(key);
     }
 
-    if (result) {
-      // If this delete operation removes all files/directories from the
-      // parent directory, then an empty parent directory must be created.
-      createFakeParentDirectory(f);
-    }
-
     return result;
-  }
-
-  /**
-   * Create a fake parent directory key if it does not already exist and no
-   * other child of this parent directory exists.
-   *
-   * @param f path to the fake parent directory
-   * @throws IOException
-   */
-  private void createFakeParentDirectory(Path f) throws IOException {
-    Path parent = f.getParent();
-    if (parent != null && !parent.isRoot()) {
-      createFakeDirectoryIfNecessary(parent);
-    }
-  }
-
-  /**
-   * Create a fake directory key if it does not already exist.
-   *
-   * @param f path to the fake directory
-   * @throws IOException
-   */
-  private void createFakeDirectoryIfNecessary(Path f) throws IOException {
-    String key = pathToKey(f);
-    if (!key.isEmpty() && !o3Exists(f)) {
-      LOG.debug("Creating new fake directory at {}", f);
-      String dirKey = addTrailingSlashIfNeeded(key);
-      adapter.createDirectory(dirKey);
-    }
-  }
-
-  /**
-   * Check if a file or directory exists corresponding to given path.
-   *
-   * @param f path to file/directory.
-   * @return true if it exists, false otherwise.
-   * @throws IOException
-   */
-  private boolean o3Exists(final Path f) throws IOException {
-    Path path = makeQualified(f);
-    try {
-      getFileStatus(path);
-      return true;
-    } catch (FileNotFoundException ex) {
-      return false;
-    }
   }
 
   @Override
