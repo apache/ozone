@@ -28,7 +28,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -36,8 +35,6 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 
 /**
@@ -46,7 +43,7 @@ import org.junit.Assert;
 class RootedHAOzoneContract extends AbstractFSContract {
 
   private static MiniOzoneHAClusterImpl cluster;
-  private static final String omServiceId = "omservice";
+  private static final String OM_SERVICE_ID = "omservice";
   private static final String CONTRACT_XML = "contract/ozone.xml";
 
   RootedHAOzoneContract(Configuration conf) {
@@ -95,7 +92,7 @@ class RootedHAOzoneContract extends AbstractFSContract {
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
         .setScmId(UUID.randomUUID().toString())
-        .setOMServiceId(omServiceId)
+        .setOMServiceId(OM_SERVICE_ID)
         .setNumDatanodes(1)
         .setNumOfOzoneManagers(3)
         .includeRecon(false)
@@ -118,7 +115,7 @@ class RootedHAOzoneContract extends AbstractFSContract {
     Assert.assertNotNull("cluster not created", cluster);
 
     String uri = String.format("%s://%s/",
-        OzoneConsts.OZONE_OFS_URI_SCHEME, omServiceId);
+        OzoneConsts.OZONE_OFS_URI_SCHEME, OM_SERVICE_ID);
     getConf().set("fs.defaultFS", uri);
 
     // Note: FileSystem#loadFileSystems doesn't load OFS class because
@@ -128,16 +125,16 @@ class RootedHAOzoneContract extends AbstractFSContract {
 
     // Copy HA configs
     copyClusterConfigs(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY);
-    copyClusterConfigs(OMConfigKeys.OZONE_OM_NODES_KEY + "." + omServiceId);
+    copyClusterConfigs(OMConfigKeys.OZONE_OM_NODES_KEY + "." + OM_SERVICE_ID);
     // TODO: Decode OMConfigKeys.OZONE_OM_NODES_KEY + "." + omServiceId
     //  instead of hardcoding
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY + "." +
-        omServiceId + ".omNode-1");
+        OM_SERVICE_ID + ".omNode-1");
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY + "." +
-        omServiceId + ".omNode-2");
+        OM_SERVICE_ID + ".omNode-2");
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY + "." +
-        omServiceId + ".omNode-3");
-
+        OM_SERVICE_ID + ".omNode-3");
+    // TODO: REMOVE
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY);
     copyClusterConfigs(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
     return FileSystem.get(getConf());

@@ -30,7 +30,8 @@ import org.junit.BeforeClass;
 /**
  * Ozone contract tests covering deletes.
  */
-public class ITestRootedHAOzoneContractDelete extends AbstractContractDeleteTest {
+public class ITestRootedHAOzoneContractDelete
+    extends AbstractContractDeleteTest {
 
   @BeforeClass
   public static void createCluster() throws IOException {

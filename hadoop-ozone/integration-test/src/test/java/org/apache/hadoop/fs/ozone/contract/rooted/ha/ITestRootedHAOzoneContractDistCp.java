@@ -32,7 +32,8 @@ import org.junit.BeforeClass;
  * Uses the block output stream, buffered to disk. This is the
  * recommended output mechanism for DistCP due to its scalability.
  */
-public class ITestRootedHAOzoneContractDistCp extends AbstractContractDistCpTest {
+public class ITestRootedHAOzoneContractDistCp
+    extends AbstractContractDistCpTest {
 
   @BeforeClass
   public static void createCluster() throws IOException {

@@ -30,7 +30,8 @@ import org.junit.BeforeClass;
 /**
  * Ozone contract tests creating files.
  */
-public class ITestRootedHAOzoneContractCreate extends AbstractContractCreateTest {
+public class ITestRootedHAOzoneContractCreate
+    extends AbstractContractCreateTest {
 
   @BeforeClass
   public static void createCluster() throws IOException {
