@@ -101,6 +101,20 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <build>
     <plugins>
       <plugin>
+        <groupId>com.salesforce.servicelibs</groupId>
+        <artifactId>proto-backwards-compatibility</artifactId>
+        <configuration>
+          <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>backwards-compatibility-check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-maven-plugins</artifactId>
         <executions>

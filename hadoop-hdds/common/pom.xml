@@ -203,6 +203,20 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </extensions>
     <plugins>
       <plugin>
+        <groupId>com.salesforce.servicelibs</groupId>
+        <artifactId>proto-backwards-compatibility</artifactId>
+        <configuration>
+          <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>backwards-compatibility-check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
         <version>${protobuf-maven-plugin.version}</version>
