@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.VolumeManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,6 +86,12 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
           "configured to work with OzoneObjInfo type only.", INVALID_REQUEST);
     }
 
+    // by pass all checks for admin
+    boolean isAdmin = isAdmin(context.getClientUgi());
+    if (isAdmin) {
+      return true;
+    }
+
     boolean isListAllVolume = ((context.getAclRights() == ACLType.LIST) &&
         objInfo.getVolumeName().equals(OzoneConsts.OZONE_ROOT));
 
@@ -107,7 +114,8 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     case VOLUME:
       LOG.trace("Checking access for volume: {}", objInfo);
       if (isACLTypeCreate || isListAllVolume) {
-        return checkAdmin(context.getClientUgi().getUserName());
+        // only admin is allowed to create volume and list all volumes
+        return false;
       }
       return volumeManager.checkAccess(objInfo, context);
     case BUCKET:
@@ -167,16 +175,17 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     return this.ozAdmins;
   }
 
-  private boolean checkAdmin(String caller) {
-    if (getOzoneAdmins() == null) {
+  private boolean isAdmin(UserGroupInformation callerUgi) {
+    if (ozAdmins == null) {
       return false;
     }
 
-    if (!getOzoneAdmins().contains(OZONE_ADMINISTRATORS_WILDCARD)
-        && !getOzoneAdmins().contains(caller)){
-      return false;
+    if (ozAdmins.contains(callerUgi.getShortUserName()) ||
+        ozAdmins.contains(callerUgi.getUserName()) ||
+        ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD)) {
+      return true;
     }
 
-    return true;
+    return false;
   }
 }

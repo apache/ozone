@@ -3289,7 +3289,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     Collection<String> ozAdmins =
         conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
-    String omSPN = UserGroupInformation.getCurrentUser().getUserName();
+    String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
     if (!ozAdmins.contains(omSPN)) {
       ozAdmins.add(omSPN);
     }
