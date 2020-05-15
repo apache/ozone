@@ -23,11 +23,11 @@ weight: 5
     -->
 
 {{<jumbotron title="安全化 Ozone">}}
-          Ozone 是一个企业级的安全存储系统，提供了很多可配置的安全特性，以下页面讨论了如何利用安全性配置来使 Ozone 安全化。
+          Ozone 是一个企业级的安全存储系统，它提供了很多可配置的安全功能，以下页面讨论了如何配置和使用 Ozone 的安全功能。
 {{</jumbotron>}}
 
 <div class="alert alert-warning" role="alert">
 如果你想要深入理解 Ozone 的安全架构，请查看 <a href="https://issues.apache.org/jira/secure/attachment/12911638/HadoopStorageLayerSecurity.pdf">Ozone 安全架构</a>。
 </div>
 
-根据需求不同，安全化 Ozone 有多种可选的步骤。
+根据不同需求，安全化 Ozone 有多种可选的步骤。
