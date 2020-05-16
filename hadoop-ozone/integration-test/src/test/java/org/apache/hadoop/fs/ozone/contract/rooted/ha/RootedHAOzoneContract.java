@@ -93,7 +93,7 @@ class RootedHAOzoneContract extends AbstractFSContract {
         .setClusterId(UUID.randomUUID().toString())
         .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(OM_SERVICE_ID)
-        .setNumDatanodes(1)
+        .setNumDatanodes(3)
         .setNumOfOzoneManagers(3)
         .includeRecon(false)
         .build();
