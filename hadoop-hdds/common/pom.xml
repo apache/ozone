@@ -209,7 +209,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc</id>
+            <id>compile-protoc-3</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
@@ -233,7 +233,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             </configuration>
           </execution>
           <execution>
-            <id>compile-protoc2</id>
+            <id>compile-protoc-2</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
