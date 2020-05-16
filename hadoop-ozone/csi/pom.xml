@@ -148,7 +148,7 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>apache-rat-plugin</artifactId>
         <configuration>
           <excludes>
-            <exclude>${basedir}/src/main/proto/proto.lock</exclude>
+            <exclude>src/main/proto/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>
