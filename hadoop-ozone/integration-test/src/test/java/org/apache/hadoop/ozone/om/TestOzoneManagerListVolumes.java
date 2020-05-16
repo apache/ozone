@@ -57,7 +57,7 @@ import org.junit.rules.Timeout;
 public class TestOzoneManagerListVolumes {
 
   @Rule
-  public Timeout timeout = new Timeout(120_000_0000);
+  public Timeout timeout = new Timeout(120_000);
 
   private UserGroupInformation adminUser =
       UserGroupInformation.createUserForTesting("om", new String[]{"ozone"});
