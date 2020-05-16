@@ -105,6 +105,9 @@ class BackgroundPipelineCreator {
     HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
         conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
             OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
+    int autoCreateLimit = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT_DEFAULT);
     boolean autoCreateFactorOne = conf.getBoolean(
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
@@ -127,6 +130,12 @@ class BackgroundPipelineCreator {
       while (true) {
         try {
           if (scheduler.isClosed()) {
+            break;
+          }
+          int currentAvailablePipelineCount =
+              pipelineManager.getPipelines(type, factor,
+                  Pipeline.PipelineState.OPEN).size();
+          if (currentAvailablePipelineCount >= autoCreateLimit) {
             break;
           }
           pipelineManager.createPipeline(type, factor);
