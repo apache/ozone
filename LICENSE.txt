@@ -224,6 +224,7 @@ hadoop-hdds/framework/src/main/resources/webapps/static/d3-3.5.17.min.js
 hadoop-hdfs-project/hadoop-hdfs/src/main/webapps/static/d3-3.5.17.min.js
 hadoop-hdds/docs/themes/ozonedoc/static/fonts/glyphicons-*
 hadoop-hdds/docs/themes/ozonedoc/static/js/bootstrap.min.js
+com.salesforce.servicelibs:proto-backwards-compatibility maven plugin
 
 MIT License
 -----------
