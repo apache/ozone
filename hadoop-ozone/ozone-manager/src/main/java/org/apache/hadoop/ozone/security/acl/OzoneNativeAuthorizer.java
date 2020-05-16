@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Objects;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
@@ -172,7 +173,7 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
   }
 
   public Collection<String> getOzoneAdmins() {
-    return this.ozAdmins;
+    return Collections.unmodifiableCollection(this.ozAdmins);
   }
 
   private boolean isAdmin(UserGroupInformation callerUgi) {

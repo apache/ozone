@@ -58,17 +58,20 @@ import org.junit.rules.Timeout;
 public class TestOzoneManagerListVolumes {
 
   @Rule
-  public Timeout timeout = new Timeout(120_000);
+  public Timeout timeout = new Timeout(120_000_0000);
 
-  private UserGroupInformation loginUser;
+  private UserGroupInformation adminUser =
+      UserGroupInformation.createUserForTesting("om", new String[]{"ozone"});
   private UserGroupInformation user1 =
-      UserGroupInformation.createRemoteUser("user1");  // Admin user
+      UserGroupInformation.createUserForTesting("user1", new String[]{"test"});
   private UserGroupInformation user2 =
-      UserGroupInformation.createRemoteUser("user2");  // Non-admin user
+      UserGroupInformation.createUserForTesting("user2", new String[]{"test"});
 
   @Before
   public void init() throws Exception {
-    loginUser = UserGroupInformation.getLoginUser();
+    // loginUser is the user running this test.
+    // Implication: loginUser is automatically added to the OM admin list.
+    UserGroupInformation.setLoginUser(adminUser);
   }
 
   /**
@@ -82,7 +85,6 @@ public class TestOzoneManagerListVolumes {
     String scmId = UUID.randomUUID().toString();
     String omId = UUID.randomUUID().toString();
     conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
-    conf.set(OZONE_ADMINISTRATORS, "user1");
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
 
     // Use native impl here, default impl doesn't do actual checks
@@ -95,9 +97,6 @@ public class TestOzoneManagerListVolumes {
         .setClusterId(clusterId).setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
 
-    // loginUser is the user running this test.
-    // Implication: loginUser is automatically added to the OM admin list.
-    UserGroupInformation.setLoginUser(loginUser);
     // Create volumes with non-default owners and ACLs
     OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
@@ -154,7 +153,7 @@ public class TestOzoneManagerListVolumes {
 
     // `ozone sh volume list` shall return volumes with LIST permission of user.
     Iterator<? extends OzoneVolume> it = objectStore.listVolumesByUser(
-        null, "", "");
+        user.getUserName(), "", "");
     Set<String> accessibleVolumes = new HashSet<>();
     while (it.hasNext()) {
       OzoneVolume vol = it.next();
@@ -200,6 +199,8 @@ public class TestOzoneManagerListVolumes {
         true);
     checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
         true);
+    checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
+        "volume4", "volume5"), true);
     stopCluster(cluster);
   }
 
@@ -208,9 +209,11 @@ public class TestOzoneManagerListVolumes {
     // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = false
     MiniOzoneCluster cluster = startCluster(true, false);
     checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
-        true);
+        false);
     checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
         false);
+    checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
+        "volume4", "volume5"), true);
     stopCluster(cluster);
   }
 

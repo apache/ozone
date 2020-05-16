@@ -80,7 +80,7 @@ public class TestOzoneAdministrators {
 
     nativeAuthorizer.setOzoneAdmins(
         Arrays.asList(new String[]{"testuser2", "testuser3"}));
-    Assert.assertTrue("mismatching admins are not allowed perform " +
+    Assert.assertFalse("mismatching admins are not allowed perform " +
         "admin operations", nativeAuthorizer.checkAccess(obj, context));
   }
 
