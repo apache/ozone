@@ -348,15 +348,10 @@ public class TestOzoneNativeAuthorizer {
   private void resetAclsAndValidateAccess(OzoneObj obj,
       ACLIdentityType accessType, IOzoneAcl aclImplementor)
       throws IOException {
-
     List<OzoneAcl> acls;
-    String user = "";
-    String group = "";
-
-    user = testUgi.getUserName();
-    if (testUgi.getGroups().size() > 0) {
-      group = testUgi.getGroups().get(0);
-    }
+    String user = testUgi.getUserName();
+    String group = (testUgi.getGroups().size() > 0) ?
+        testUgi.getGroups().get(0): "";
 
     RequestContext.Builder builder = new RequestContext.Builder()
         .setClientUgi(testUgi)
@@ -405,12 +400,12 @@ public class TestOzoneNativeAuthorizer {
       String msg = "Acl to check:" + a1 + " accessType:" +
           accessType + " path:" + obj.getPath();
       if (a1.equals(CREATE) && obj.getResourceType().equals(VOLUME)) {
-          assertEquals(msg, nativeAuthorizer.getOzoneAdmins().contains(user),
-              nativeAuthorizer.checkAccess(obj,
-                  builder.setAclRights(a1).build()));
-        } else {
-          assertEquals(msg, expectedAclResult, nativeAuthorizer.checkAccess(obj,
-              builder.setAclRights(a1).build()));
+        assertEquals(msg, nativeAuthorizer.getOzoneAdmins().contains(user),
+            nativeAuthorizer.checkAccess(obj,
+                builder.setAclRights(a1).build()));
+      } else {
+        assertEquals(msg, expectedAclResult, nativeAuthorizer.checkAccess(obj,
+            builder.setAclRights(a1).build()));
       }
       List<ACLType> aclsToBeValidated =
           Arrays.stream(ACLType.values()).collect(Collectors.toList());
