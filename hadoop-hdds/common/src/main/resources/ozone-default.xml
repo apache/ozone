@@ -1435,16 +1435,6 @@
   </property>
 
   <property>
-    <name>ozone.s3g.authentication.kerberos.principal</name>
-    <value/>
-    <tag>OZONE, S3GATEWAY</tag>
-    <description>The server principal used by Ozone S3Gateway server. This is
-      typically set to
-      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
-      HTTP/ by convention.</description>
-  </property>
-
-  <property>
     <name>ozone.s3g.domain.name</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
@@ -1500,7 +1490,17 @@
   </property>
 
   <property>
-    <name>ozone.s3g.keytab.file</name>
+    <name>ozone.s3g.http.auth.kerberos.principal</name>
+    <value/>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The server principal used by Ozone S3Gateway server. This is
+      typically set to
+      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
+      HTTP/ by convention.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.http.auth.kerberos.keytab</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
     <description>The keytab file used by the S3Gateway server to login as its
@@ -1785,14 +1785,14 @@
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
   <property>
-    <name>ozone.om.http.kerberos.principal</name>
+    <name>ozone.om.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <description>
       OzoneManager http server kerberos principal.
     </description>
   </property>
   <property>
-    <name>ozone.om.http.kerberos.keytab</name>
+    <name>ozone.om.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <description>
       OzoneManager http server kerberos keytab.
@@ -2024,7 +2024,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.kerberos.principal</name>
+    <name>ozone.freon.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <tag>SECURITY</tag>
     <description>
@@ -2032,7 +2032,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.kerberos.keytab</name>
+    <name>ozone.freon.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <tag>SECURITY</tag>
     <description>
@@ -2086,7 +2086,7 @@
   </property>
 
   <property>
-    <name>hdds.datanode.http.kerberos.principal</name>
+    <name>hdds.datanode.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <tag>HDDS, SECURITY, MANAGEMENT</tag>
     <description>
@@ -2094,7 +2094,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.http.kerberos.keytab</name>
+    <name>hdds.datanode.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <tag>HDDS, SECURITY, MANAGEMENT</tag>
     <description>
@@ -2220,16 +2220,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.keytab.file</name>
-    <value/>
-    <tag>RECON, SECURITY</tag>
-    <description>
-      DEPRECATED. Use "ozone.recon.http.kerberos.keytab.file" instead.
-      The keytab file for HTTP Kerberos authentication in Recon.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.http.kerberos.keytab.file</name>
+    <name>ozone.recon.http.auth.kerberos.keytab</name>
     <value/>
     <tag>RECON, SECURITY</tag>
     <description>
@@ -2237,12 +2228,52 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.authentication.kerberos.principal</name>
+    <name>ozone.recon.http.auth.kerberos.principal</name>
     <value/>
     <tag>RECON</tag>
     <description>The server principal used by Ozone Recon server. This is
       typically set to HTTP/_HOST@REALM.TLD The SPNEGO server principal
       begins with the prefix HTTP/ by convention.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.http.auth.type </name>
+    <value>simple</value>
+    <tag>DATANODE, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.freon.http.auth.type </name>
+    <value>simple</value>
+    <tag>FREON, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.http.auth.type </name>
+    <value>simple</value>
+    <tag>OM, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.http.auth.type </name>
+    <value>simple</value>
+    <tag>RECON, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.http.auth.type </name>
+    <value>simple</value>
+    <tag>S3G, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
     </description>
   </property>
   <property>

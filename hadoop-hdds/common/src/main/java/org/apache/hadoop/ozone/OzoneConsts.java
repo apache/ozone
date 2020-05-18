@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
@@ -138,6 +139,25 @@ public final class OzoneConsts {
   public static final String DELETED_KEY_PREFIX = "#deleted#";
   public static final String DELETE_TRANSACTION_KEY_PREFIX = "#delTX#";
   public static final String BLOCK_COMMIT_SEQUENCE_ID_PREFIX = "#BCSID";
+
+  public static final String BLOCK_COUNT = "#BLOCKCOUNT";
+  public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
+  public static final String PENDING_DELETE_BLOCK_COUNT =
+      "#PENDINGDELETEBLOCKCOUNT";
+
+
+  public static final byte[] DB_BLOCK_COUNT_KEY =
+      DFSUtil.string2Bytes(OzoneConsts.BLOCK_COUNT);
+  public static final byte[] DB_CONTAINER_BYTES_USED_KEY =
+      DFSUtil.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
+  public static final byte[] DB_PENDING_DELETE_BLOCK_COUNT_KEY =
+      DFSUtil.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
+  public static final byte[] DB_CONTAINER_DELETE_TRANSACTION_KEY =
+      DFSUtil.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
+  public static final byte[] DB_BLOCK_COMMIT_SEQUENCE_ID_KEY =
+      DFSUtil.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+
+
 
   /**
    * OM LevelDB prefixes.

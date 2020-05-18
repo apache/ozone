@@ -96,7 +96,7 @@ public class XceiverClientMetrics {
     containerOpsLatency[type.ordinal()].add(latencyNanos);
   }
 
-  public long getContainerOpsMetrics(ContainerProtos.Type type) {
+  public long getPendingContainerOpCountMetrics(ContainerProtos.Type type) {
     return pendingOpsArray[type.ordinal()].value();
   }
 

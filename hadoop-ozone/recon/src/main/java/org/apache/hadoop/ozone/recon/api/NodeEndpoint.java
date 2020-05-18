@@ -38,9 +38,11 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.slf4j.Logger;
@@ -81,31 +83,44 @@ public class NodeEndpoint {
       String hostname = datanode.getHostName();
       Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanode);
       List<DatanodePipeline> pipelines = new ArrayList<>();
+      AtomicInteger leaderCount = new AtomicInteger();
+      DatanodeMetadata.Builder builder = DatanodeMetadata.newBuilder();
       pipelineIDs.forEach(pipelineID -> {
         try {
           Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
+          String leaderNode = pipeline.getLeaderNode().getHostName();
           DatanodePipeline datanodePipeline = new DatanodePipeline(
               pipelineID.getId(),
               pipeline.getType().toString(),
-              pipeline.getFactor().getNumber()
+              pipeline.getFactor().getNumber(),
+              leaderNode
           );
           pipelines.add(datanodePipeline);
+          if (pipeline.getLeaderId().equals(datanode.getUuid())) {
+            leaderCount.getAndIncrement();
+          }
         } catch (PipelineNotFoundException ex) {
           LOG.warn("Cannot get pipeline {} for datanode {}, pipeline not found",
               pipelineID.getId(), hostname, ex);
+        } catch (IOException ioEx) {
+          LOG.warn("Cannot get leader node of pipeline with id {}.",
+              pipelineID.getId(), ioEx);
         }
       });
-      int containers;
       try {
-        containers = nodeManager.getContainers(datanode).size();
+        int containers = nodeManager.getContainers(datanode).size();
+        builder.withContainers(containers);
       } catch (NodeNotFoundException ex) {
-        containers = 0;
         LOG.warn("Cannot get containers, datanode {} not found.",
             datanode.getUuid(), ex);
       }
-      long heartbeat = nodeManager.getLastHeartbeat(datanode);
-      datanodes.add(new DatanodeMetadata(hostname, nodeState, heartbeat,
-          storageReport, pipelines, containers));
+      datanodes.add(builder.withHostname(hostname)
+          .withDatanodeStorageReport(storageReport)
+          .withLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
+          .withState(nodeState)
+          .withPipelines(pipelines)
+          .withLeaderCount(leaderCount.get())
+          .build());
     });
 
     DatanodesResponse datanodesResponse =

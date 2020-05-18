@@ -66,6 +66,7 @@ public final class FileStatusAdapter {
     this.blockLocations = locations.clone();
   }
 
+
   public Path getPath() {
     return path;
   }

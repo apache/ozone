@@ -31,6 +31,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
@@ -112,7 +113,7 @@ public class TestOzoneManagerServiceProviderImpl {
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
     InputStream inputStream = new FileInputStream(tarFile);
     ReconUtils reconUtilsMock = getMockReconUtils();
-    when(reconUtilsMock.makeHttpCall(any(), anyString()))
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenReturn(inputStream);
 
     ReconTaskController reconTaskController = getMockTaskController();
@@ -163,7 +164,7 @@ public class TestOzoneManagerServiceProviderImpl {
     File tarFile = createTarFile(checkpointDir.toPath());
     InputStream fileInputStream = new FileInputStream(tarFile);
     ReconUtils reconUtilsMock = getMockReconUtils();
-    when(reconUtilsMock.makeHttpCall(any(), anyString()))
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
         .thenReturn(fileInputStream);
 
     ReconOMMetadataManager reconOMMetadataManager =

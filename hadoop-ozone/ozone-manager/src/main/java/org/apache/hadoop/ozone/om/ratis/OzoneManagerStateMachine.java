@@ -85,6 +85,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final OMRatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
+  private final boolean isTracingEnabled;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are recived through applyTransaction.
@@ -97,16 +98,21 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       new ConcurrentSkipListMap<>();
 
 
-  public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer) {
+  public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
+      boolean isTracingEnabled) {
     this.omRatisServer = ratisServer;
+    this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = omRatisServer.getOzoneManager();
 
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     updateLastAppliedIndexWithSnaphsotIndex();
 
-    this.ozoneManagerDoubleBuffer =
-        new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
-            this::updateLastAppliedIndex);
+    this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(ozoneManager.getMetadataManager())
+        .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+        .enableRatis(true)
+        .enableTracing(isTracingEnabled)
+        .build();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
@@ -318,8 +324,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       long newLastAppliedSnapShotTermIndex) {
     getLifeCycle().startAndTransition(() -> {
       this.ozoneManagerDoubleBuffer =
-          new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
-              this::updateLastAppliedIndex);
+          new OzoneManagerDoubleBuffer.Builder()
+              .setOmMetadataManager(ozoneManager.getMetadataManager())
+              .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+              .enableRatis(true)
+              .enableTracing(isTracingEnabled)
+              .build();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
       this.setLastAppliedTermIndex(TermIndex.newTermIndex(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));

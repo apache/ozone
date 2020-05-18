@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.container;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
@@ -379,7 +381,8 @@ public class ReplicationManager
    */
   private boolean isContainerHealthy(final ContainerInfo container,
                                      final Set<ContainerReplica> replicas) {
-    return container.getReplicationFactor().getNumber() == replicas.size() &&
+    return !isContainerUnderReplicated(container, replicas) &&
+        !isContainerOverReplicated(container, replicas) &&
         replicas.stream().allMatch(
             r -> compareState(container.getState(), r.getState()));
   }
@@ -393,8 +396,11 @@ public class ReplicationManager
    */
   private boolean isContainerUnderReplicated(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
+    boolean misReplicated = !getPlacementStatus(
+        replicas, container.getReplicationFactor().getNumber())
+        .isPolicySatisfied();
     return container.getReplicationFactor().getNumber() >
-        getReplicaCount(container.containerID(), replicas);
+        getReplicaCount(container.containerID(), replicas) || misReplicated;
   }
 
   /**
@@ -501,6 +507,11 @@ public class ReplicationManager
           .stream()
           .map(action -> action.datanode)
           .collect(Collectors.toList());
+      final List<DatanodeDetails> replicationInFlight = inflightReplication
+          .getOrDefault(id, Collections.emptyList())
+          .stream()
+          .map(action -> action.datanode)
+          .collect(Collectors.toList());
       final List<DatanodeDetails> source = replicas.stream()
           .filter(r ->
               r.getState() == State.QUASI_CLOSED ||
@@ -512,25 +523,56 @@ public class ReplicationManager
       if (source.size() > 0) {
         final int replicationFactor = container
             .getReplicationFactor().getNumber();
-        final int delta = replicationFactor - getReplicaCount(id, replicas);
+        // Want to check if the container is mis-replicated after considering
+        // inflight add and delete.
+        // Create a new list from source (healthy replicas minus pending delete)
+        List<DatanodeDetails> targetReplicas = new ArrayList<>(source);
+        // Then add any pending additions
+        targetReplicas.addAll(replicationInFlight);
+
+        int delta = replicationFactor - getReplicaCount(id, replicas);
+        final ContainerPlacementStatus placementStatus =
+            containerPlacement.validateContainerPlacement(
+                targetReplicas, replicationFactor);
+        final int misRepDelta = placementStatus.misReplicationCount();
+        final int replicasNeeded
+            = delta < misRepDelta ? misRepDelta : delta;
+
         final List<DatanodeDetails> excludeList = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
-        List<InflightAction> actionList = inflightReplication.get(id);
-        if (actionList != null) {
-          actionList.stream().map(r -> r.datanode)
-              .forEach(excludeList::add);
-        }
+        excludeList.addAll(replicationInFlight);
         final List<DatanodeDetails> selectedDatanodes = containerPlacement
-            .chooseDatanodes(excludeList, null, delta,
+            .chooseDatanodes(excludeList, null, replicasNeeded,
                 container.getUsedBytes());
-
-        LOG.info("Container {} is under replicated. Expected replica count" +
-                " is {}, but found {}.", id, replicationFactor,
-            replicationFactor - delta);
-
-        for (DatanodeDetails datanode : selectedDatanodes) {
-          sendReplicateCommand(container, datanode, source);
+        if (delta > 0) {
+          LOG.info("Container {} is under replicated. Expected replica count" +
+                  " is {}, but found {}.", id, replicationFactor,
+              replicationFactor - delta);
+        }
+        int newMisRepDelta = misRepDelta;
+        if (misRepDelta > 0) {
+          LOG.info("Container: {}. {}",
+              id, placementStatus.misReplicatedReason());
+          // Check if the new target nodes (original plus newly selected nodes)
+          // makes the placement policy valid.
+          targetReplicas.addAll(selectedDatanodes);
+          newMisRepDelta = containerPlacement.validateContainerPlacement(
+              targetReplicas, replicationFactor).misReplicationCount();
+        }
+        if (delta > 0 || newMisRepDelta < misRepDelta) {
+          // Only create new replicas if we are missing a replicas or
+          // the number of pending mis-replication has improved. No point in
+          // creating new replicas for mis-replicated containers unless it
+          // improves things.
+          for (DatanodeDetails datanode : selectedDatanodes) {
+            sendReplicateCommand(container, datanode, source);
+          }
+        } else {
+          LOG.warn("Container {} is mis-replicated, requiring {} additional " +
+              "replicas. After selecting new nodes, mis-replication has not " +
+              "improved. No additional replicas will be scheduled",
+              id, misRepDelta);
         }
       } else {
         LOG.warn("Cannot replicate container {}, no healthy replica found.",
@@ -556,7 +598,7 @@ public class ReplicationManager
     final ContainerID id = container.containerID();
     final int replicationFactor = container.getReplicationFactor().getNumber();
     // Dont consider inflight replication while calculating excess here.
-    final int excess = replicas.size() - replicationFactor -
+    int excess = replicas.size() - replicationFactor -
         inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
 
     if (excess > 0) {
@@ -582,15 +624,69 @@ public class ReplicationManager
           .filter(r -> !compareState(container.getState(), r.getState()))
           .collect(Collectors.toList());
 
-      //Move the unhealthy replicas to the front of eligible replicas to delete
-      eligibleReplicas.removeAll(unhealthyReplicas);
-      eligibleReplicas.addAll(0, unhealthyReplicas);
-
-      for (int i = 0; i < excess; i++) {
-        sendDeleteCommand(container,
-            eligibleReplicas.get(i).getDatanodeDetails(), true);
+      // If there are unhealthy replicas, then we should remove them even if it
+      // makes the container violate the placement policy, as excess unhealthy
+      // containers are not really useful. It will be corrected later as a
+      // mis-replicated container will be seen as under-replicated.
+      for (ContainerReplica r : unhealthyReplicas) {
+        if (excess > 0) {
+          sendDeleteCommand(container, r.getDatanodeDetails(), true);
+          excess -= 1;
+        }
+        break;
+      }
+      // After removing all unhealthy replicas, if the container is still over
+      // replicated then we need to check if it is already mis-replicated.
+      // If it is, we do no harm by removing excess replicas. However, if it is
+      // not mis-replicated, then we can only remove replicas if they don't
+      // make the container become mis-replicated.
+      if (excess > 0) {
+        eligibleReplicas.removeAll(unhealthyReplicas);
+        Set<ContainerReplica> replicaSet = new HashSet<>(eligibleReplicas);
+        boolean misReplicated =
+            getPlacementStatus(replicaSet, replicationFactor)
+                .isPolicySatisfied();
+        for (ContainerReplica r : eligibleReplicas) {
+          if (excess <= 0) {
+            break;
+          }
+          // First remove the replica we are working on from the set, and then
+          // check if the set is now mis-replicated.
+          replicaSet.remove(r);
+          boolean nowMisRep = getPlacementStatus(replicaSet, replicationFactor)
+              .isPolicySatisfied();
+          if (misReplicated || !nowMisRep) {
+            // Remove the replica if the container was already mis-replicated
+            // OR if losing this replica does not make it become mis-replicated
+            sendDeleteCommand(container, r.getDatanodeDetails(), true);
+            excess -= 1;
+            continue;
+          }
+          // If we decided not to remove this replica, put it back into the set
+          replicaSet.add(r);
+        }
+        if (excess > 0) {
+          LOG.info("The container {} is over replicated with {} excess " +
+              "replica. The excess replicas cannot be removed without " +
+              "violating the placement policy", container, excess);
+        }
       }
     }
+  }
+
+  /**
+   * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
+   * and then check if the list meets the container placement policy.
+   * @param replicas List of containerReplica
+   * @param replicationFactor Expected Replication Factor of the containe
+   * @return ContainerPlacementStatus indicating if the policy is met or not
+   */
+  private ContainerPlacementStatus getPlacementStatus(
+      Set<ContainerReplica> replicas, int replicationFactor) {
+    List<DatanodeDetails> replicaDns = replicas.stream()
+        .map(c -> c.getDatanodeDetails()).collect(Collectors.toList());
+    return containerPlacement.validateContainerPlacement(
+        replicaDns, replicationFactor);
   }
 
   /**
