@@ -66,11 +66,11 @@ public abstract class TestOzoneManagerHA {
   private String clusterId;
   private String scmId;
   private String omServiceId;
-  protected static int numOfOMs = 3;
-  protected static final long SNAPSHOT_THRESHOLD = 50;
-  protected static final int LOG_PURGE_GAP = 50;
+  private static int numOfOMs = 3;
+  private static final long SNAPSHOT_THRESHOLD = 50;
+  private static final int LOG_PURGE_GAP = 50;
   /* Reduce max number of retries to speed up unit test. */
-  protected static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
+  private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
   private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
 
   @Rule
@@ -93,6 +93,22 @@ public abstract class TestOzoneManagerHA {
 
   public String getOmServiceId() {
     return omServiceId;
+  }
+
+  public static int getLogPurgeGap() {
+    return LOG_PURGE_GAP;
+  }
+
+  public static long getSnapshotThreshold() {
+    return SNAPSHOT_THRESHOLD;
+  }
+
+  public static int getNumOfOMs() {
+    return numOfOMs;
+  }
+
+  public static int getOzoneClientFailoverMaxAttempts() {
+    return OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS;
   }
 
   /**

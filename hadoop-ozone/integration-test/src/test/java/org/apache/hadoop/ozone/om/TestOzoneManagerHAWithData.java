@@ -433,7 +433,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // triggers a snapshot on the state machine.
 
     long appliedLogIndex = 0;
-    while (appliedLogIndex <= SNAPSHOT_THRESHOLD) {
+    while (appliedLogIndex <= getSnapshotThreshold()) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
           .getLastAppliedTermIndex().getIndex();
@@ -457,7 +457,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
         smLastAppliedIndex >= ratisSnapshotIndex);
 
     // Add more transactions to Ratis to trigger another snapshot
-    while (appliedLogIndex <= (smLastAppliedIndex + SNAPSHOT_THRESHOLD)) {
+    while (appliedLogIndex <= (smLastAppliedIndex + getSnapshotThreshold())) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
           .getLastAppliedTermIndex().getIndex();
@@ -522,7 +522,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // the logs corresponding to atleast some of the missed transactions
     // should be purged. This will force the OM to install snapshot when
     // restarted.
-    long minNewTxIndex = lastAppliedTxOnFollowerOM + (LOG_PURGE_GAP * 10);
+    long minNewTxIndex = lastAppliedTxOnFollowerOM + (getLogPurgeGap() * 10);
     long leaderOMappliedLogIndex = leaderOM.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex();
 

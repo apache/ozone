@@ -147,9 +147,9 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     List<OMProxyInfo> omProxies =
         omFailoverProxyProvider.getOMProxyInfos();
 
-    Assert.assertEquals(numOfOMs, omProxies.size());
+    Assert.assertEquals(getNumOfOMs(), omProxies.size());
 
-    for (int i = 0; i < numOfOMs; i++) {
+    for (int i = 0; i < getNumOfOMs(); i++) {
       InetSocketAddress omRpcServerAddr =
           getCluster().getOzoneManager(i).getOmRpcServerAddr();
       boolean omClientProxyExists = false;
@@ -237,8 +237,9 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
   @Test
   public void testOMRetryProxy() throws Exception {
+    int maxFailoverAttempts = getOzoneClientFailoverMaxAttempts();
     // Stop all the OMs.
-    for (int i = 0; i < numOfOMs; i++) {
+    for (int i = 0; i < getNumOfOMs(); i++) {
       getCluster().stopOzoneManager(i);
     }
 
@@ -254,11 +255,11 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     } catch (ConnectException e) {
       Assert.assertEquals(1,
           appender.countLinesWithMessage("Failed to connect to OMs:"));
-      Assert.assertEquals(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS,
+      Assert.assertEquals(maxFailoverAttempts,
           appender.countLinesWithMessage("Trying to failover"));
       Assert.assertEquals(1,
           appender.countLinesWithMessage("Attempted " +
-              OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS + " failovers."));
+              maxFailoverAttempts + " failovers."));
     }
   }
 
@@ -274,7 +275,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
         .getCurrentProxyOMNodeId();
 
     // A read request from any proxy should failover to the current leader OM
-    for (int i = 0; i < numOfOMs; i++) {
+    for (int i = 0; i < getNumOfOMs(); i++) {
       // Failover OMFailoverProxyProvider to OM at index i
       OzoneManager ozoneManager = getCluster().getOzoneManager(i);
 
