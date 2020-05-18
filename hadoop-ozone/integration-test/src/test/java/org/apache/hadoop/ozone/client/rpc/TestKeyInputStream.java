@@ -45,8 +45,6 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -56,11 +54,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
  */
 public class TestKeyInputStream {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout globalTimeout = new Timeout(300000);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
