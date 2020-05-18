@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -61,6 +62,8 @@ import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
 
 /**
  * The minimal Ozone Filesystem implementation.
@@ -84,6 +87,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private String userName;
   private Path workingDir;
   private OzoneClientAdapter adapter;
+  private BasicRootedOzoneClientAdapterImpl adapterImpl;
 
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
@@ -149,6 +153,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           createAdapter(source,
               omHostOrServiceId, omPort,
               isolatedClassloader);
+      this.adapterImpl = (BasicRootedOzoneClientAdapterImpl) this.adapter;
 
       try {
         this.userName =
@@ -388,7 +393,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   private class DeleteIterator extends OzoneListingIterator {
-    private boolean recursive;
+    final private boolean recursive;
     private final OzoneBucket bucket;
     private final BasicRootedOzoneClientAdapterImpl adapterImpl;
 
@@ -409,12 +414,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
 
     @Override
-    boolean processKeyPath(String keyPath) throws IOException {
+    boolean processKeyPath(String keyPath) {
       if (keyPath.equals("")) {
         LOG.trace("Skipping deleting root directory");
         return true;
       } else {
-        LOG.trace("deleting key path:" + keyPath);
+        LOG.trace("Deleting: {}", keyPath);
         boolean succeed = adapterImpl.deleteObject(this.bucket, keyPath);
         // if recursive delete is requested ignore the return value of
         // deleteObject and issue deletes for other keys.
@@ -457,19 +462,73 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       return false;
     }
 
+    if (status == null) {
+      return false;
+    }
+
     String key = pathToKey(f);
     boolean result;
 
     if (status.isDirectory()) {
       LOG.debug("delete: Path is a directory: {}", f);
-      key = addTrailingSlashIfNeeded(key);
+      OFSPath ofsPath = new OFSPath(key);
 
-      if (key.equals("/")) {
-        LOG.warn("Cannot delete root directory.");
+      // Handle rm root
+      if (ofsPath.isRoot()) {
+        // Intentionally drop support for rm root
+        // because it is too dangerous and doesn't provide much value
+        LOG.warn("delete: OFS does not support rm root. "
+            + "To wipe the cluster, please re-init OM instead.");
         return false;
       }
 
+      // Handle delete volume
+      if (ofsPath.isVolume()) {
+        String volumeName = ofsPath.getVolumeName();
+        if (recursive) {
+          // Delete all buckets first
+          OzoneVolume volume =
+              adapterImpl.getObjectStore().getVolume(volumeName);
+          Iterator<? extends OzoneBucket> it = volume.listBuckets("");
+          String prefixVolumePathStr = addTrailingSlashIfNeeded(f.toString());
+          while (it.hasNext()) {
+            OzoneBucket bucket = it.next();
+            String nextBucket = prefixVolumePathStr + bucket.getName();
+            delete(new Path(nextBucket), true);
+          }
+        }
+        try {
+          adapterImpl.getObjectStore().deleteVolume(volumeName);
+          return true;
+        } catch (OMException ex) {
+          // volume is not empty
+          if (ex.getResult() == VOLUME_NOT_EMPTY) {
+            throw new PathIsNotEmptyDirectoryException(f.toString());
+          } else {
+            throw ex;
+          }
+        }
+      }
+
       result = innerDelete(f, recursive);
+
+      // Handle delete bucket
+      if (ofsPath.isBucket()) {
+        OzoneVolume volume =
+            adapterImpl.getObjectStore().getVolume(ofsPath.getVolumeName());
+        try {
+          volume.deleteBucket(ofsPath.getBucketName());
+          return result;
+        } catch (OMException ex) {
+          // bucket is not empty
+          if (ex.getResult() == BUCKET_NOT_EMPTY) {
+            throw new PathIsNotEmptyDirectoryException(f.toString());
+          } else {
+            throw ex;
+          }
+        }
+      }
+
     } else {
       LOG.debug("delete: Path is a file: {}", f);
       result = adapter.deleteObject(key);
@@ -477,7 +536,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     if (result) {
       // If this delete operation removes all files/directories from the
-      // parent direcotry, then an empty parent directory must be created.
+      // parent directory, then an empty parent directory must be created.
       createFakeParentDirectory(f);
     }
 
