@@ -243,11 +243,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>com.salesforce.servicelibs</groupId>
-        <artifactId>proto-backwards-compatibility</artifactId>
-        <version>${proto-backwards-compatibility.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.squareup.okhttp</groupId>
         <artifactId>okhttp</artifactId>
         <version>${okhttp.version}</version>
