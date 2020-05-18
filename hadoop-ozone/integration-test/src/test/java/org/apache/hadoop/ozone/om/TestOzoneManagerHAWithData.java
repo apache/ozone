@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import java.io.IOException;
 import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,23 +25,14 @@ import java.util.UUID;
 
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -52,23 +42,11 @@ import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
-    .IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
-    .IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY;
-
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl
     .NODE_FAILURE_TIMEOUT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -77,74 +55,7 @@ import static org.junit.Assert.fail;
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-public class TestOzoneManagerHAWithData {
-
-  private MiniOzoneHAClusterImpl cluster = null;
-  private ObjectStore objectStore;
-  private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omServiceId;
-  private int numOfOMs = 3;
-  private static final long SNAPSHOT_THRESHOLD = 50;
-  private static final int LOG_PURGE_GAP = 50;
-  /* Reduce max number of retries to speed up unit test. */
-  private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
-  private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
-
-  @Rule
-  public Timeout timeout = new Timeout(300_000);
-
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
-  @Before
-  public void init() throws Exception {
-    conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omServiceId = "om-service-test1";
-    conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
-        OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
-    conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
-        OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS);
-    conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
-        IPC_CLIENT_CONNECT_MAX_RETRIES);
-    /* Reduce IPC retry interval to speed up unit test. */
-    conf.setInt(IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY, 200);
-    conf.setLong(
-        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        SNAPSHOT_THRESHOLD);
-    conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOMServiceId(omServiceId)
-        .setNumOfOzoneManagers(numOfOMs)
-        .build();
-    cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
-  }
-
-  /**
-   * Shutdown MiniDFSCluster.
-   */
-  @After
-  public void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-  }
+public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   /**
    * Test a client request when all OM nodes are running. The request should
@@ -184,34 +95,6 @@ public class TestOzoneManagerHAWithData {
 
     createKeyTest(false);
 
-  }
-
-  private OzoneBucket setupBucket() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-
-    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-        .setOwner(userName)
-        .setAdmin(adminName)
-        .build();
-
-    objectStore.createVolume(volumeName, createVolumeArgs);
-    OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
-
-    Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
-    Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
-    Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
-
-    String bucketName = UUID.randomUUID().toString();
-    retVolumeinfo.createBucket(bucketName);
-
-    OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
-
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
-    Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
-
-    return ozoneBucket;
   }
 
   @Test
@@ -522,47 +405,6 @@ public class TestOzoneManagerHAWithData {
     }
   }
 
-  /**
-   * Create a volume and test its attribute.
-   */
-  private void createVolumeTest(boolean checkSuccess) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-
-    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-        .setOwner(userName)
-        .setAdmin(adminName)
-        .build();
-
-    try {
-      objectStore.createVolume(volumeName, createVolumeArgs);
-
-      OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
-
-      if (checkSuccess) {
-        Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
-        Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
-        Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
-      } else {
-        // Verify that the request failed
-        fail("There is no quorum. Request should have failed");
-      }
-    } catch (ConnectException | RemoteException e) {
-      if (!checkSuccess) {
-        // If the last OM to be tried by the RetryProxy is down, we would get
-        // ConnectException. Otherwise, we would get a RemoteException from the
-        // last running OM as it would fail to get a quorum.
-        if (e instanceof RemoteException) {
-          GenericTestUtils.assertExceptionContains(
-              "OMNotLeaderException", e);
-        }
-      } else {
-        throw e;
-      }
-    }
-  }
-
   @Test
   public void testOMRatisSnapshot() throws Exception {
     String userName = "user" + RandomStringUtils.randomNumeric(5);
@@ -631,21 +473,6 @@ public class TestOzoneManagerHAWithData {
     Assert.assertTrue("Latest snapshot index must be greater than previous " +
         "snapshot indices", ratisSnapshotIndexNew > ratisSnapshotIndex);
 
-  }
-
-  /**
-   * Create a key in the bucket.
-   * @return the key name.
-   */
-  static String createKey(OzoneBucket ozoneBucket) throws IOException {
-    String keyName = "key" + RandomStringUtils.randomNumeric(5);
-    String data = "data" + RandomStringUtils.randomNumeric(5);
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-        data.length(), ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, new HashMap<>());
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
-    ozoneOutputStream.close();
-    return keyName;
   }
 
   @Test
@@ -768,23 +595,6 @@ public class TestOzoneManagerHAWithData {
 
     validateListParts(ozoneBucket, keyName, uploadID, partsMap);
 
-  }
-
-  /**
-   * Stop the current leader OM.
-   * @throws Exception
-   */
-  private void stopLeaderOM() {
-    //Stop the leader OM.
-    OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
-
-    // The OMFailoverProxyProvider will point to the current leader OM node.
-    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
-
-    // Stop one of the ozone manager, to see when the OM leader changes
-    // multipart upload is happening successfully or not.
-    cluster.stopOzoneManager(leaderOMNodeId);
   }
 
   /**

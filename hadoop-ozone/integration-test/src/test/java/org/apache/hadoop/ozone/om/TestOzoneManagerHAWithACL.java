@@ -17,44 +17,19 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.junit.After;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 import java.util.BitSet;
 import java.util.Collections;
-import java.util.HashMap;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
@@ -62,103 +37,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 /**
  * Test Ozone Manager ACL operation in distributed handler scenario.
  */
-public class TestOzoneManagerHAWithACL {
-
-  private MiniOzoneHAClusterImpl cluster = null;
-  private ObjectStore objectStore;
-  private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omServiceId;
-  private int numOfOMs = 3;
-  private static final long SNAPSHOT_THRESHOLD = 50;
-  private static final int LOG_PURGE_GAP = 50;
-  /* Reduce max number of retries to speed up unit test. */
-  private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
-  private static final int IPC_CLIENT_CONNECT_MAX_RETRIES = 4;
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
-
-  @Rule
-  public Timeout timeout = new Timeout(300_000);
-
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
-  @Before
-  public void init() throws Exception {
-    conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omServiceId = "om-service-test1";
-    conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
-        OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
-    conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
-        OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS);
-    conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
-        IPC_CLIENT_CONNECT_MAX_RETRIES);
-    /* Reduce IPC retry interval to speed up unit test. */
-    conf.setInt(IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY, 200);
-    conf.setLong(
-        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        SNAPSHOT_THRESHOLD);
-    conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOMServiceId(omServiceId)
-        .setNumOfOzoneManagers(numOfOMs)
-        .setNumDatanodes(1)
-        .build();
-    cluster.waitForClusterToBeReady();
-    objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)
-        .getObjectStore();
-  }
-
-  /**
-   * Shutdown MiniDFSCluster.
-   */
-  @After
-  public void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-  }
-
-  private OzoneBucket setupBucket() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-
-    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-        .setOwner(userName)
-        .setAdmin(adminName)
-        .build();
-
-    objectStore.createVolume(volumeName, createVolumeArgs);
-    OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
-
-    Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
-    Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
-    Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
-
-    String bucketName = UUID.randomUUID().toString();
-    retVolumeinfo.createBucket(bucketName);
-
-    OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
-
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
-    Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
-
-    return ozoneBucket;
-  }
+public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
   @Test
   public void testAddBucketAcl() throws Exception {
@@ -441,20 +320,5 @@ public class TestOzoneManagerHAWithACL {
 
     removeAcl = objectStore.removeAcl(ozoneObj, userAcl);
     Assert.assertTrue(removeAcl);
-  }
-
-  /**
-   * Create a key in the bucket.
-   * @return the key name.
-   */
-  static String createKey(OzoneBucket ozoneBucket) throws IOException {
-    String keyName = "key" + RandomStringUtils.randomNumeric(5);
-    String data = "data" + RandomStringUtils.randomNumeric(5);
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-        data.length(), ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, new HashMap<>());
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
-    ozoneOutputStream.close();
-    return keyName;
   }
 }
