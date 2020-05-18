@@ -53,14 +53,13 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 import static org.junit.Assert.fail;
 
 /**
