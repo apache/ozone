@@ -1141,6 +1141,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("OM HttpServer failed to start.", ex);
     }
     registerMXBean();
+
+    startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
   }
@@ -1194,10 +1196,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     registerMXBean();
 
-    // Start jvm monitor
-    jvmPauseMonitor = new JvmPauseMonitor();
-    jvmPauseMonitor.init(configuration);
-    jvmPauseMonitor.start();
+    startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
   }
@@ -3307,5 +3306,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public boolean isRunning() {
     return omState == State.RUNNING;
+  }
+
+  private void startJVMPauseMonitor() {
+    // Start jvm monitor
+    jvmPauseMonitor = new JvmPauseMonitor();
+    jvmPauseMonitor.init(configuration);
+    jvmPauseMonitor.start();
   }
 }
