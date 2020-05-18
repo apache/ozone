@@ -659,6 +659,19 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   /**
+   * Get the root directory of Trash for a path in OFS.
+   * Returns /<volumename>/<bucketname>/.Trash/<username>
+   * Caller appends either Current or checkpoint timestamp for trash destination
+   * @param path the trash root of the path to be determined.
+   * @return trash root
+   */
+  @Override
+  public Path getTrashRoot(Path path) {
+    OFSPath ofsPath = new OFSPath(path);
+    return ofsPath.getTrashRoot();
+  }
+
+  /**
    * Creates a directory. Directory is represented using a key with no value.
    *
    * @param path directory path to be created

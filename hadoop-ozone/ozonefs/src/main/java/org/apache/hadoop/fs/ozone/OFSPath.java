@@ -24,6 +24,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.ParseException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.http.client.utils.URIBuilder;
 
 import java.math.BigInteger;
 import java.net.URI;
@@ -34,6 +35,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.StringTokenizer;
 
+import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
@@ -42,6 +45,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 class OFSPath {
+  private String authority = "";
   /**
    * Here is a table illustrating what each name variable is given an input path
    * Assuming /tmp is mounted to /tempVol/tempBucket
@@ -66,7 +70,13 @@ class OFSPath {
   static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
 
   OFSPath(Path path) {
-    String pathStr = path.toUri().getPath();
+    URI uri = path.toUri();
+    // scheme is case-insensitive
+    if (!uri.getScheme().toLowerCase().equals(OZONE_OFS_URI_SCHEME)) {
+      throw new ParseException("Can't parse schemes other than ofs://.");
+    }
+    authority = uri.getAuthority();
+    String pathStr = uri.getPath();
     initOFSPath(pathStr);
   }
 
@@ -78,8 +88,8 @@ class OFSPath {
     // pathStr should not have authority
     try {
       URI uri = new URI(pathStr);
-      String authority = uri.getAuthority();
-      if (authority != null && !authority.isEmpty()) {
+      String auth = uri.getAuthority();
+      if (auth != null && !auth.isEmpty()) {
         throw new ParseException("Invalid path " + pathStr +
             ". Shouldn't contain authority.");
       }
@@ -237,5 +247,24 @@ class OFSPath {
   static String getTempMountBucketNameOfCurrentUser() throws IOException {
     String username = UserGroupInformation.getCurrentUser().getUserName();
     return getTempMountBucketName(username);
+  }
+
+  /**
+   * Return trash root for the given path.
+   * @return trash root for the given path
+   */
+  public Path getTrashRoot() {
+    try {
+      String username = UserGroupInformation.getCurrentUser().getUserName();
+      URI uri = new URIBuilder().setScheme(OZONE_OFS_URI_SCHEME)
+          .setHost(authority).setPath(OZONE_URI_DELIMITER + volumeName +
+              OZONE_URI_DELIMITER + bucketName +
+              OZONE_URI_DELIMITER + TRASH_PREFIX +
+              OZONE_URI_DELIMITER + username)
+          .build();
+      return new Path(uri);
+    } catch (Exception ex) {
+      throw new RuntimeException("getTrashRoot failed.", ex);
+    }
   }
 }
