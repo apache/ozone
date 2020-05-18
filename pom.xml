@@ -1609,6 +1609,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <plugin>
           <groupId>com.salesforce.servicelibs</groupId>
           <artifactId>proto-backwards-compatibility</artifactId>
+          <version>${proto-backwards-compatibility.version}</version>
           <configuration>
             <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
           </configuration>
