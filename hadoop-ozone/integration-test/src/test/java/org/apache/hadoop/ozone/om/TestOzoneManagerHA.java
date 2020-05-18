@@ -60,13 +60,13 @@ import static org.junit.Assert.fail;
  */
 public abstract class TestOzoneManagerHA {
 
-  protected MiniOzoneHAClusterImpl cluster = null;
-  protected ObjectStore objectStore;
-  protected OzoneConfiguration conf;
+  private MiniOzoneHAClusterImpl cluster = null;
+  private ObjectStore objectStore;
+  private OzoneConfiguration conf;
   private String clusterId;
   private String scmId;
-  protected String omServiceId;
-  protected int numOfOMs = 3;
+  private String omServiceId;
+  protected static int numOfOMs = 3;
   protected static final long SNAPSHOT_THRESHOLD = 50;
   protected static final int LOG_PURGE_GAP = 50;
   /* Reduce max number of retries to speed up unit test. */
@@ -78,6 +78,22 @@ public abstract class TestOzoneManagerHA {
 
   @Rule
   public Timeout timeout = new Timeout(300_000);
+
+  public MiniOzoneHAClusterImpl getCluster() {
+    return cluster;
+  }
+
+  public ObjectStore getObjectStore() {
+    return objectStore;
+  }
+
+  public OzoneConfiguration getConf() {
+    return conf;
+  }
+
+  public String getOmServiceId() {
+    return omServiceId;
+  }
 
   /**
    * Create a MiniDFSCluster for testing.

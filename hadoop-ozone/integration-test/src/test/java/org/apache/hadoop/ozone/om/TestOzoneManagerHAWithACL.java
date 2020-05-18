@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -204,6 +205,8 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
         .setBucketName(ozoneBucket.getName())
         .setPrefixName(prefixName).build();
 
+    ObjectStore objectStore = getObjectStore();
+
     boolean result = objectStore.addAcl(ozoneObj, userAcl);
     Assert.assertTrue(result);
 
@@ -245,6 +248,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
       OzoneAcl userAcl) throws Exception {
     // As by default create will add some default acls in RpcClient.
 
+    ObjectStore objectStore = getObjectStore();
     if (!ozoneObj.getResourceType().name().equals(
         OzoneObj.ResourceType.PREFIX.name())) {
       List<OzoneAcl> acls = objectStore.getAcl(ozoneObj);
@@ -272,6 +276,7 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
 
   private void testAddAcl(String remoteUserName, OzoneObj ozoneObj,
       OzoneAcl userAcl) throws Exception {
+    ObjectStore objectStore = getObjectStore();
     boolean addAcl = objectStore.addAcl(ozoneObj, userAcl);
     Assert.assertTrue(addAcl);
 
@@ -291,8 +296,9 @@ public class TestOzoneManagerHAWithACL extends TestOzoneManagerHA {
   }
 
   private void testRemoveAcl(String remoteUserName, OzoneObj ozoneObj,
-      OzoneAcl userAcl)
-      throws Exception{
+      OzoneAcl userAcl) throws Exception{
+    ObjectStore objectStore = getObjectStore();
+
     // As by default create will add some default acls in RpcClient.
     List<OzoneAcl> acls = objectStore.getAcl(ozoneObj);
 

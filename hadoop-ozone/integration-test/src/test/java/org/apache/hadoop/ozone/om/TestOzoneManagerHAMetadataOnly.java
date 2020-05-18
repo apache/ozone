@@ -69,6 +69,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
         .setAdmin(adminName)
         .build();
 
+    ObjectStore objectStore = getObjectStore();
     objectStore.createVolume(volumeName, createVolumeArgs);
 
     OzoneVolume retVolume = objectStore.getVolume(volumeName);
@@ -86,6 +87,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     createAndCheckVolume(volumeName);
 
+    ObjectStore objectStore = getObjectStore();
     objectStore.deleteVolume(volumeName);
 
     OzoneTestUtils.expectOmException(OMException.ResultCodes.VOLUME_NOT_FOUND,
@@ -139,7 +141,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
    */
   @Test
   public void testOMProxyProviderInitialization() throws Exception {
-    OzoneClient rpcClient = cluster.getRpcClient();
+    OzoneClient rpcClient = getCluster().getRpcClient();
     OMFailoverProxyProvider omFailoverProxyProvider =
         rpcClient.getObjectStore().getClientProxy().getOMProxyProvider();
     List<OMProxyInfo> omProxies =
@@ -149,7 +151,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     for (int i = 0; i < numOfOMs; i++) {
       InetSocketAddress omRpcServerAddr =
-          cluster.getOzoneManager(i).getOmRpcServerAddr();
+          getCluster().getOzoneManager(i).getOmRpcServerAddr();
       boolean omClientProxyExists = false;
       for (OMProxyInfo omProxyInfo : omProxies) {
         if (omProxyInfo.getAddress().equals(omRpcServerAddr)) {
@@ -158,7 +160,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
         }
       }
       Assert.assertTrue("There is no OM Client Proxy corresponding to OM " +
-              "node" + cluster.getOzoneManager(i).getOMNodeId(),
+              "node" + getCluster().getOzoneManager(i).getOMNodeId(),
           omClientProxyExists);
     }
   }
@@ -170,6 +172,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   @Test
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
+    ObjectStore objectStore = getObjectStore();
     OMFailoverProxyProvider omFailoverProxyProvider =
         objectStore.getClientProxy().getOMProxyProvider();
     String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -178,7 +181,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     // On stopping the current OM Proxy, the next connection attempt should
     // failover to a another OM proxy.
-    cluster.stopOzoneManager(firstProxyNodeId);
+    getCluster().stopOzoneManager(firstProxyNodeId);
     Thread.sleep(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT * 4);
 
     // Next request to the proxy provider should result in a failover
@@ -200,6 +203,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
    */
   @Test
   public void testOMProxyProviderFailoverToCurrentLeader() throws Exception {
+    ObjectStore objectStore = getObjectStore();
     OMFailoverProxyProvider omFailoverProxyProvider =
         objectStore.getClientProxy().getOMProxyProvider();
 
@@ -235,7 +239,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   public void testOMRetryProxy() throws Exception {
     // Stop all the OMs.
     for (int i = 0; i < numOfOMs; i++) {
-      cluster.stopOzoneManager(i);
+      getCluster().stopOzoneManager(i);
     }
 
     final LogVerificationAppender appender = new LogVerificationAppender();
@@ -261,6 +265,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   @Test
   public void testReadRequest() throws Exception {
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    ObjectStore objectStore = getObjectStore();
     objectStore.createVolume(volumeName);
 
     OMFailoverProxyProvider omFailoverProxyProvider =
@@ -271,11 +276,11 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     // A read request from any proxy should failover to the current leader OM
     for (int i = 0; i < numOfOMs; i++) {
       // Failover OMFailoverProxyProvider to OM at index i
-      OzoneManager ozoneManager = cluster.getOzoneManager(i);
+      OzoneManager ozoneManager = getCluster().getOzoneManager(i);
 
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
       final ObjectStore store = OzoneClientFactory.getRpcClient(
-          omServiceId, conf).getObjectStore();
+          getOmServiceId(), getConf()).getObjectStore();
       final OMFailoverProxyProvider proxyProvider =
           store.getClientProxy().getOMProxyProvider();
 
@@ -298,6 +303,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   public void testListVolumes() throws Exception {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
     String adminName = userName;
+    ObjectStore objectStore = getObjectStore();
 
     Set<String> expectedVolumes = new TreeSet<>();
     for (int i=0; i < 100; i++) {
@@ -324,7 +330,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   public void testJMXMetrics() throws Exception {
     // Verify any one ratis metric is exposed by JMX MBeanServer
     OzoneManagerRatisServer ratisServer =
-        cluster.getOzoneManager(0).getOmRatisServer();
+        getCluster().getOzoneManager(0).getOmRatisServer();
     ObjectName oname = new ObjectName(RATIS_APPLICATION_NAME_METRICS, "name",
         RATIS_APPLICATION_NAME_METRICS + ".log_worker." +
             ratisServer.getRaftPeerId().toString() + ".flushCount");
@@ -337,6 +343,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
   private void validateVolumesList(String userName,
       Set<String> expectedVolumes) throws Exception {
+    ObjectStore objectStore = getObjectStore();
 
     int expectedCount = 0;
     Iterator<? extends OzoneVolume> volumeIterator =

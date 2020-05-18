@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
 
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl
     .NODE_FAILURE_TIMEOUT;
@@ -73,7 +74,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
    */
   @Test
   public void testOneOMNodeDown() throws Exception {
-    cluster.stopOzoneManager(1);
+    getCluster().stopOzoneManager(1);
     Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
 
     createVolumeTest(true);
@@ -87,8 +88,8 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   @Ignore("This test is failing randomly. It will be enabled after fixing it.")
   @Test
   public void testTwoOMNodesDown() throws Exception {
-    cluster.stopOzoneManager(1);
-    cluster.stopOzoneManager(2);
+    getCluster().stopOzoneManager(1);
+    getCluster().stopOzoneManager(2);
     Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
 
     createVolumeTest(false);
@@ -258,14 +259,14 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // multipart upload is happening successfully or not.
 
     OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+        getObjectStore().getClientProxy().getOMProxyProvider();
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.
-    cluster.stopOzoneManager(leaderOMNodeId);
+    getCluster().stopOzoneManager(leaderOMNodeId);
     Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
 
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
@@ -287,16 +288,16 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
    */
   @Test
   public void testIncrementalWaitTimeWithSameNodeFailover() throws Exception {
-    long waitBetweenRetries = conf.getLong(
+    long waitBetweenRetries = getConf().getLong(
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
     OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+        getObjectStore().getClientProxy().getOMProxyProvider();
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
-    cluster.stopOzoneManager(leaderOMNodeId);
+    getCluster().stopOzoneManager(leaderOMNodeId);
     Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
     createKeyTest(true); // failover should happen to new node
 
@@ -360,9 +361,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
         .build();
 
     try {
-      objectStore.createVolume(volumeName, createVolumeArgs);
+      getObjectStore().createVolume(volumeName, createVolumeArgs);
 
-      OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
+      OzoneVolume retVolumeinfo = getObjectStore().getVolume(volumeName);
 
       Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
       Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
@@ -417,6 +418,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
         .setAdmin(adminName)
         .build();
 
+    ObjectStore objectStore = getObjectStore();
     objectStore.createVolume(volumeName, createVolumeArgs);
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
 
@@ -425,7 +427,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
         .getCurrentProxyOMNodeId();
-    OzoneManager ozoneManager = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManager ozoneManager = getCluster().getOzoneManager(leaderOMNodeId);
 
     // Send commands to ratis to increase the log index so that ratis
     // triggers a snapshot on the state machine.
@@ -477,15 +479,16 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
   @Test
   public void testOMRestart() throws Exception {
+    ObjectStore objectStore = getObjectStore();
     // Get the leader OM
     String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
         .getCurrentProxyOMNodeId();
-    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManager leaderOM = getCluster().getOzoneManager(leaderOMNodeId);
 
     // Get follower OMs
-    OzoneManager followerOM1 = cluster.getOzoneManager(
+    OzoneManager followerOM1 = getCluster().getOzoneManager(
         leaderOM.getPeerNodes().get(0).getOMNodeId());
-    OzoneManager followerOM2 = cluster.getOzoneManager(
+    OzoneManager followerOM2 = getCluster().getOzoneManager(
         leaderOM.getPeerNodes().get(1).getOMNodeId());
 
     // Do some transactions so that the log index increases
