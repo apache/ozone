@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.hdds.scm.cli.pipeline;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
+import java.io.IOException;
 import java.util.concurrent.Callable;
 
 /**
@@ -38,14 +40,59 @@ public class ClosePipelineSubcommand implements Callable<Void> {
   @CommandLine.ParentCommand
   private PipelineCommands parent;
 
-  @CommandLine.Parameters(description = "ID of the pipeline to close")
+  @CommandLine.Parameters(description = "ID of the pipeline to close,"
+      + "'ALL' means all pipeline")
   private String pipelineId;
+
+  @CommandLine.Option(names = {"-ffc", "--filterByFactor"},
+      description = "Filter listed pipelines by Factor(ONE/one)",
+      defaultValue = "",
+      required = false)
+  private String factor;
+
+  @CommandLine.Option(names = {"-fst", "--filterByState"},
+      description = "Filter listed pipelines by State(OPEN/CLOSE)",
+      defaultValue = "",
+      required = false)
+  private String state;
 
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      scmClient.closePipeline(
-          HddsProtos.PipelineID.newBuilder().setId(pipelineId).build());
+      if (pipelineId.equalsIgnoreCase("ALL")) {
+        if (Strings.isNullOrEmpty(factor) && Strings.isNullOrEmpty(state)) {
+          scmClient.listPipelines().forEach(pipeline -> {
+            try {
+              scmClient.closePipeline(
+                  HddsProtos.PipelineID.newBuilder()
+                      .setId(pipeline.getId().getId().toString()).build());
+            } catch (IOException e) {
+              throw new IllegalStateException(
+                  "met a exception while closePipeline", e);
+            }
+          });
+        } else {
+          scmClient.listPipelines().stream()
+              .filter(p -> ((Strings.isNullOrEmpty(factor) ||
+                  (p.getFactor().toString().compareToIgnoreCase(factor) == 0))
+                  && (Strings.isNullOrEmpty(state) ||
+                  (p.getPipelineState().toString().compareToIgnoreCase(state)
+                      == 0))))
+              .forEach(pipeline -> {
+                try {
+                  scmClient.closePipeline(
+                      HddsProtos.PipelineID.newBuilder()
+                          .setId(pipeline.getId().getId().toString()).build());
+                } catch (IOException e) {
+                  throw new IllegalStateException(
+                      "met a exception while closePipeline", e);
+                }
+              });
+        }
+      } else {
+        scmClient.closePipeline(
+            HddsProtos.PipelineID.newBuilder().setId(pipelineId).build());
+      }
       return null;
     }
   }
