@@ -42,7 +42,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.*;
 import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
@@ -70,11 +69,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 public class TestOzoneContainerWithTLS {
   private final static Logger LOG = LoggerFactory.getLogger(
       TestOzoneContainerWithTLS.class);
-  /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public Timeout testTimeout = new Timeout(300000);
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();

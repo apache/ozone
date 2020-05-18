@@ -74,8 +74,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import static org.apache.ratis.rpc.SupportedRpcType.NETTY;
@@ -87,11 +85,6 @@ import static org.mockito.Mockito.mock;
 @Ignore("Takes too long to run this test. Ignoring for time being.")
 public class TestContainerServer {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = new Timeout(300000);
   static final String TEST_DIR = GenericTestUtils.getTestDir("dfs")
       .getAbsolutePath() + File.separator;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();

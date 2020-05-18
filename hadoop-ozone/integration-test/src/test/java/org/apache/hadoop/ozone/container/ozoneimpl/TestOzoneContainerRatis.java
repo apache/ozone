@@ -31,9 +31,7 @@ import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.CollectionUtils;
 import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,11 +44,6 @@ import java.util.List;
 public class TestOzoneContainerRatis {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneContainerRatis.class);
-  /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public Timeout testTimeout = new Timeout(300000);
 
   static OzoneConfiguration newOzoneConfiguration() {
     return new OzoneConfiguration();

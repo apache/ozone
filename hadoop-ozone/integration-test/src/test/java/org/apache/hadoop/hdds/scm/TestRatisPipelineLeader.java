@@ -43,9 +43,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.Timeout;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -54,11 +52,6 @@ import org.slf4j.LoggerFactory;
 @Ignore("HDDS-3265")
 public class TestRatisPipelineLeader {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static final org.slf4j.Logger LOG =

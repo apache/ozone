@@ -55,8 +55,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -66,12 +64,6 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
  */
 @Ignore("HDDS-2961")
 public class TestSCMContainerPlacementPolicyMetrics {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster;
   private MetricsRecordBuilder metrics;
