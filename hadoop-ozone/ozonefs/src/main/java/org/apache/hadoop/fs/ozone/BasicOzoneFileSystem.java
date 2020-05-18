@@ -467,6 +467,13 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * OFS supports volume and bucket deletion, recursive or non-recursive.
+   * e.g. delete(new Path("/volume1"), true)
+   * But root deletion is explicitly disallowed for safety concerns.
+   */
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
     incrementCounter(Statistic.INVOCATION_DELETE);

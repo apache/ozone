@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -65,6 +66,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
@@ -764,6 +766,111 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(1, fileStatusesInDir1.length);
     Assert.assertEquals("/tmp/dir1/file1",
         fileStatusesInDir1[0].getPath().toUri().getPath());
+  }
+
+  /**
+   * Helper function. Check Ozone volume existence.
+   * @param volumeStr Name of the volume
+   * @return true if volume exists, false if not
+   */
+  private boolean volumeExist(String volumeStr) throws IOException {
+    try {
+      objectStore.getVolume(volumeStr);
+    } catch (OMException ex) {
+      if (ex.getResult() == VOLUME_NOT_FOUND) {
+        return false;
+      } else {
+        throw ex;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Helper function. Delete a path non-recursively and expect failure.
+   * @param f Path to delete.
+   * @throws IOException
+   */
+  private void deleteNonRecursivelyAndFail(Path f) throws IOException {
+    try {
+      fs.delete(f, false);
+      Assert.fail("Should have thrown PathIsNotEmptyDirectoryException!");
+    } catch (PathIsNotEmptyDirectoryException ignored) {
+    }
+  }
+
+  @Test
+  public void testDeleteEmptyVolume() throws IOException {
+    // Create volume
+    String volumeStr1 = getRandomNonExistVolumeName();
+    Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
+    fs.mkdirs(volumePath1);
+    // Check volume creation
+    OzoneVolume volume1 = objectStore.getVolume(volumeStr1);
+    Assert.assertEquals(volumeStr1, volume1.getName());
+    // Delete empty volume non-recursively
+    Assert.assertTrue(fs.delete(volumePath1, false));
+    // Verify the volume is deleted
+    Assert.assertFalse(volumeStr1 + " should have been deleted!",
+        volumeExist(volumeStr1));
+  }
+
+  @Test
+  public void testDeleteVolumeAndBucket() throws IOException {
+    // Create volume and bucket
+    String volumeStr2 = getRandomNonExistVolumeName();
+    Path volumePath2 = new Path(OZONE_URI_DELIMITER + volumeStr2);
+    String bucketStr2 = "bucket2";
+    Path bucketPath2 = new Path(volumePath2, bucketStr2);
+    fs.mkdirs(bucketPath2);
+    // Check volume and bucket creation
+    OzoneVolume volume2 = objectStore.getVolume(volumeStr2);
+    Assert.assertEquals(volumeStr2, volume2.getName());
+    OzoneBucket bucket2 = volume2.getBucket(bucketStr2);
+    Assert.assertEquals(bucketStr2, bucket2.getName());
+    // Delete volume non-recursively should fail since it is not empty
+    deleteNonRecursivelyAndFail(volumePath2);
+    // Delete bucket first, then volume
+    Assert.assertTrue(fs.delete(bucketPath2, false));
+    Assert.assertTrue(fs.delete(volumePath2, false));
+    // Verify the volume is deleted
+    Assert.assertFalse(volumeExist(volumeStr2));
+  }
+
+  @Test
+  public void testDeleteVolumeBucketAndKey() throws IOException {
+    // Create test volume, bucket and key
+    String volumeStr3 = getRandomNonExistVolumeName();
+    Path volumePath3 = new Path(OZONE_URI_DELIMITER + volumeStr3);
+    String bucketStr3 = "bucket3";
+    Path bucketPath3 = new Path(volumePath3, bucketStr3);
+    String dirStr3 = "dir3";
+    Path dirPath3 = new Path(bucketPath3, dirStr3);
+    fs.mkdirs(dirPath3);
+    // Delete volume or bucket non-recursively, should fail
+    deleteNonRecursivelyAndFail(volumePath3);
+    deleteNonRecursivelyAndFail(bucketPath3);
+    // Delete key first, then bucket, then volume
+    Assert.assertTrue(fs.delete(dirPath3, false));
+    Assert.assertTrue(fs.delete(bucketPath3, false));
+    Assert.assertTrue(fs.delete(volumePath3, false));
+    // Verify the volume is deleted
+    Assert.assertFalse(volumeExist(volumeStr3));
+
+    // Test recursively delete volume
+    // Create test volume, bucket and key
+    fs.mkdirs(dirPath3);
+    // Delete volume recursively
+    Assert.assertTrue(fs.delete(volumePath3, true));
+    // Verify the volume is deleted
+    Assert.assertFalse(volumeExist(volumeStr3));
+  }
+
+  @Test
+  public void testFailToDeleteRoot() throws IOException {
+    // rm root should always fail for OFS
+    Assert.assertFalse(fs.delete(new Path("/"), false));
+    Assert.assertFalse(fs.delete(new Path("/"), true));
   }
 
 }

@@ -307,6 +307,9 @@ public class BasicRootedOzoneClientAdapterImpl
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED);
     OFSPath ofsPath = new OFSPath(pathStr);
+    if (ofsPath.isRoot() || ofsPath.isVolume() || ofsPath.isBucket()) {
+      throw new IOException("Cannot create file under root or volume.");
+    }
     String key = ofsPath.getKeyName();
     try {
       // Hadoop CopyCommands class always sets recursive to true
@@ -658,6 +661,10 @@ public class BasicRootedOzoneClientAdapterImpl
     token.setKind(OzoneTokenIdentifier.KIND_NAME);
     return token;
 
+  }
+
+  public ObjectStore getObjectStore() {
+    return objectStore;
   }
 
   @Override
