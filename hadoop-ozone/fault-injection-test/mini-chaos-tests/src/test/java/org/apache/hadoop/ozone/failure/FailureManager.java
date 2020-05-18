@@ -53,23 +53,20 @@ public class FailureManager {
     failures = new ArrayList<>();
     for (Class<? extends Failures> clazz : clazzes) {
       Failures f = ReflectionUtils.newInstance(clazz, conf);
-      f.validateFailure(cluster.getOzoneManagersList(),
-          cluster.getStorageContainerManager(),
-          cluster.getHddsDatanodes());
+      f.validateFailure(cluster);
       failures.add(f);
     }
 
   }
 
-
   // Fail nodes randomly at configured timeout period.
   private void fail() {
+    Failures f = failures.get(getBoundedRandomIndex(failures.size()));
     try {
-      Failures f = failures.get(getBoundedRandomIndex(failures.size()));
       LOG.info("time failure with {}", f.getName());
       f.fail(cluster);
     } catch (Throwable t) {
-      LOG.info("failing with ", t);
+      LOG.info("Caught exception while inducing failure:{}", f.getName(), t);
       System.exit(-2);
     }
 
@@ -98,20 +95,5 @@ public class FailureManager {
 
   public static int getBoundedRandomIndex(int size) {
     return RandomUtils.nextInt(0, size);
-  }
-
-  // Should the selected node be stopped or started.
-  public static boolean shouldStop() {
-    return RandomUtils.nextBoolean();
-  }
-
-  // Get the number of datanodes to fail in the cluster.
-  public static int getNumberOfDnToFail() {
-    return RandomUtils.nextBoolean() ? 1 : 2;
-  }
-
-  // Get the number of datanodes to fail in the cluster.
-  public static int getNumberOfOmToFail() {
-    return 1;
   }
 }

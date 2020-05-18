@@ -19,14 +19,12 @@
 package org.apache.hadoop.ozone.failure;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneChaosCluster;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
+import java.util.Set;
 
 /**
  * Implementation of all the failures.
@@ -41,19 +39,15 @@ public abstract class Failures {
 
   public abstract void fail(MiniOzoneChaosCluster cluster);
 
-  public abstract void validateFailure(List<OzoneManager> ozoneManagers,
-                                       StorageContainerManager scm,
-                                       List<HddsDatanodeService> hddsDatanodes);
+  public abstract void validateFailure(MiniOzoneChaosCluster cluster);
 
   /**
    * Ozone Manager failures.
    */
   public abstract static class OzoneFailures extends Failures {
     @Override
-    public void validateFailure(List<OzoneManager> ozoneManagers,
-                                StorageContainerManager scm,
-                                List<HddsDatanodeService> hddsDatanodes) {
-      if (ozoneManagers.size() < 3) {
+    public void validateFailure(MiniOzoneChaosCluster cluster) {
+      if (cluster.getOzoneManagersList().size() < 3) {
         throw new IllegalArgumentException("Not enough number of " +
             "OzoneManagers to test chaos on OzoneManagers. Set number of " +
             "OzoneManagers to at least 3");
@@ -67,7 +61,7 @@ public abstract class Failures {
   public static class OzoneManagerRestartFailure extends OzoneFailures {
     public void fail(MiniOzoneChaosCluster cluster) {
       boolean failureMode = FailureManager.isFastRestart();
-      List<OzoneManager> oms = cluster.omToFail();
+      Set<OzoneManager> oms = cluster.omToFail();
       oms.parallelStream().forEach(om -> {
         try {
           cluster.shutdownOzoneManager(om);
@@ -87,7 +81,7 @@ public abstract class Failures {
     public void fail(MiniOzoneChaosCluster cluster) {
       // Get the number of OzoneManager to fail in the cluster.
       boolean shouldStop = cluster.shouldStop();
-      List<OzoneManager> oms = cluster.omToFail();
+      Set<OzoneManager> oms = cluster.omToFail();
       oms.parallelStream().forEach(om -> {
         try {
           if (shouldStop) {
@@ -108,9 +102,7 @@ public abstract class Failures {
    */
   public abstract static class DatanodeFailures extends Failures {
     @Override
-    public void validateFailure(List<OzoneManager> ozoneManagers,
-                                StorageContainerManager scm,
-                                List<HddsDatanodeService> hddsDatanodes) {
+    public void validateFailure(MiniOzoneChaosCluster cluster) {
       // Nothing to do here.
     }
   }
@@ -121,7 +113,7 @@ public abstract class Failures {
   public static class DatanodeRestartFailure extends DatanodeFailures {
     public void fail(MiniOzoneChaosCluster cluster) {
       boolean failureMode = FailureManager.isFastRestart();
-      List<DatanodeDetails> dns = cluster.dnToFail();
+      Set<DatanodeDetails> dns = cluster.dnToFail();
       dns.parallelStream().forEach(dn -> {
         try {
           cluster.restartHddsDatanode(dn, failureMode);
@@ -138,11 +130,10 @@ public abstract class Failures {
   public static class DatanodeStartStopFailure extends DatanodeFailures {
     public void fail(MiniOzoneChaosCluster cluster) {
       // Get the number of datanodes to fail in the cluster.
-      boolean shouldStop = FailureManager.shouldStop();
-      List<DatanodeDetails> dns = cluster.dnToFail();
+      Set<DatanodeDetails> dns = cluster.dnToFail();
       dns.parallelStream().forEach(dn -> {
         try {
-          if (shouldStop) {
+          if (cluster.shouldStop(dn)) {
             cluster.shutdownHddsDatanode(dn);
           } else {
             cluster.restartHddsDatanode(dn, true);
