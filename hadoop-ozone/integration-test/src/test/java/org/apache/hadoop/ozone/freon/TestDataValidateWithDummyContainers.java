@@ -24,7 +24,9 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +37,12 @@ import org.slf4j.LoggerFactory;
  */
 public class TestDataValidateWithDummyContainers
     extends TestDataValidate {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDataValidateWithDummyContainers.class);
 

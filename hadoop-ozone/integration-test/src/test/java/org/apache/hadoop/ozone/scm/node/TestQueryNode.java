@@ -53,6 +53,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_STALENODE_INTERVAL;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -60,6 +62,12 @@ import static org.junit.Assert.assertEquals;
  */
 @Ignore
 public class TestQueryNode {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static int numOfDatanodes = 5;
   private MiniOzoneCluster cluster;
 

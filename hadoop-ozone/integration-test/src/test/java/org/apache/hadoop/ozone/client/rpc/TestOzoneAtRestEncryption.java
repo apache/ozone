@@ -62,13 +62,21 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
 @Ignore
 public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster = null;
   private static MiniKMS miniKMS;

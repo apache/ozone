@@ -49,12 +49,20 @@ import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Tests for ContainerStateManager.
  */
 @Ignore
 public class TestContainerStateManagerIntegration {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerStateManagerIntegration.class);

@@ -38,12 +38,20 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
 /**
  * Test OzoneFSInputStream by reading through multiple interfaces.
  */
 public class TestOzoneFSInputStream {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster = null;
   private static FileSystem fs;
   private static Path filePath = null;

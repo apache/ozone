@@ -63,12 +63,20 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.UUID;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
 public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
