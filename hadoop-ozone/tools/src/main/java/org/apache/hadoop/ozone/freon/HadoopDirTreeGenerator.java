@@ -65,10 +65,10 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
   private int fileCount;
 
   @Option(names = {"-g", "--fileSize"},
-      description = "Generated data size(in KB) of each file to be written" +
-              " in each directory",
+      description = "Generated data size(in bytes) of each file to be " +
+              "written in each directory",
       defaultValue = "1")
-  private int fileSize;
+  private int fileSizeInBytes;
 
   @Option(names = {"-s", "--span"},
       description =
@@ -195,13 +195,12 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
       FSDataOutputStream out =
               fileSystem.create(new Path(fileName), true);
-      int fSizeInBytes = fileSize * 1024;
-      if (fSizeInBytes > 0) {
+      if (fileSizeInBytes > 0) {
         int bufferLen = 1024;
         int seed = 0;
         byte[] toWrite = new byte[bufferLen];
         Random rb = new Random(seed);
-        long bytesToWrite = fSizeInBytes;
+        long bytesToWrite = fileSizeInBytes;
         while (bytesToWrite > 0) {
           rb.nextBytes(toWrite);
           int bytesToWriteNext = (bufferLen < bytesToWrite) ? bufferLen
