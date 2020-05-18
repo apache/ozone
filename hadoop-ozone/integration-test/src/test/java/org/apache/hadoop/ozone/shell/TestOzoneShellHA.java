@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.shell;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.shell.s3.S3Shell;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.ToolRunner;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -53,6 +55,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.junit.Assert.fail;
 
 /**
@@ -442,6 +446,27 @@ public class TestOzoneShellHA {
     Assert.assertEquals(0, getNumOfBuckets("bucket"));
   }
 
+  @Test
+  public void testDeleteToTrash() throws Exception {
+    OzoneConfiguration confcli = new OzoneConfiguration(conf);
+    confcli.setInt(FS_TRASH_INTERVAL_KEY, 60);
+    confcli.set("fs.ofs.impl",
+        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    OzoneFsShell shell = new OzoneFsShell(confcli);
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    final String dirPrefix = hostPrefix + "/volumed2t/bucket1/dir1";
+    int res;
+    try {
+      res = ToolRunner.run(shell, new String[]{"-mkdir", "-p", dirPrefix});
+      Assert.assertEquals(0, res);
+      res = ToolRunner.run(shell, new String[]{"-touch", dirPrefix + "/key1"});
+      Assert.assertEquals(0, res);
+      res = ToolRunner.run(shell, new String[]{"-rm", dirPrefix + "/key1"});
+      Assert.assertEquals(0, res);
+    } finally {
+      shell.close();
+    }
+  }
 
   @Test
   public void testS3PathCommand() throws Exception {
