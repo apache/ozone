@@ -211,7 +211,8 @@ class PipelineStateMap {
 
     if (state == PipelineState.OPEN) {
       return Collections.unmodifiableList(
-          query2OpenPipelines.get(new PipelineQuery(type, factor)));
+          query2OpenPipelines.getOrDefault(
+              new PipelineQuery(type, factor), Collections.EMPTY_LIST));
     }
     return pipelineMap.values().stream().filter(
         pipeline -> pipeline.getType() == type
