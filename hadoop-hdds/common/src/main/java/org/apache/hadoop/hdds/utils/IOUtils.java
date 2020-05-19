@@ -20,7 +20,13 @@ package org.apache.hadoop.hdds.utils;
 
 import org.slf4j.Logger;
 
-public class IOUtils {
+/**
+ * Static helper utilities for IO / Closable classes.
+ */
+public final class IOUtils {
+
+  private IOUtils() {
+  }
 
   /**
    * Close the Closeable objects and <b>ignore</b> any {@link Throwable} or
