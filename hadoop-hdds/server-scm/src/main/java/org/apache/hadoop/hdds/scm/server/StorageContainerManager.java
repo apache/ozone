@@ -386,6 +386,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Create an SCM instance based on the supplied configuration.
    *
    * @param conf        HDDS configuration
+   * @param configurator SCM configurator
    * @return SCM instance
    * @throws IOException, AuthenticationException
    */
@@ -410,12 +411,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public static StorageContainerManager createSCM(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    StorageContainerManager scm = new StorageContainerManager(conf);
-    if (SCMHAUtils.isSCMHAEnabled(conf) && scm.getScmRatisServer() == null) {
-      SCMRatisServer scmRatisServer = initializeRatisServer(conf, scm);
-      scm.setScmRatisServer(scmRatisServer);
-    }
-    return scm;
+    return createSCM(conf, new SCMConfigurator());
   }
 
   /**
@@ -1168,7 +1164,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (scmRatisServer != null) {
       LOG.info("SCM Ratis server initialized at port {}",
           scmRatisServer.getServerPort());
-    }
+    } // TODO error handling for scmRatisServer creation failure
     return scmRatisServer;
   }
 
