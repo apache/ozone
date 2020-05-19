@@ -40,17 +40,15 @@ public enum ChunkLayOutVersion {
 
   FILE_PER_CHUNK(1, "One file per chunk") {
     @Override
-    public File getChunkFile(ContainerData containerData, BlockID blockID,
+    public File getChunkFile(File chunkDir, BlockID blockID,
         ChunkInfo info) throws StorageContainerException {
-      File chunksLoc = verifyChunkDirExists(containerData);
-      return chunksLoc.toPath().resolve(info.getChunkName()).toFile();
+      return chunkDir.toPath().resolve(info.getChunkName()).toFile();
     }
   },
   FILE_PER_BLOCK(2, "One file per block") {
     @Override
-    public File getChunkFile(ContainerData containerData, BlockID blockID,
+    public File getChunkFile(File chunkDir, BlockID blockID,
         ChunkInfo info) throws StorageContainerException {
-      File chunkDir = verifyChunkDirExists(containerData);
       return new File(chunkDir, blockID.getLocalID() + ".block");
     }
   };
@@ -118,8 +116,14 @@ public enum ChunkLayOutVersion {
     return description;
   }
 
-  public abstract File getChunkFile(ContainerData containerData,
+  public abstract File getChunkFile(File chunkDir,
       BlockID blockID, ChunkInfo info) throws StorageContainerException;
+
+  public File getChunkFile(ContainerData containerData, BlockID blockID,
+      ChunkInfo info) throws StorageContainerException {
+    File chunksLoc = verifyChunkDirExists(containerData);
+    return getChunkFile(chunksLoc, blockID, info);
+  }
 
   @Override
   public String toString() {
