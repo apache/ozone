@@ -121,7 +121,7 @@ public class TopologySubcommand implements Callable<Void> {
     for (int i = 0; i < ports.size(); i++) {
       HddsProtos.Port port = ports.get(i);
       sb.append(port.getName() + "=" + port.getValue());
-      if (i < ports.size() -1) {
+      if (i < ports.size() - 1) {
         sb.append(",");
       }
     }
