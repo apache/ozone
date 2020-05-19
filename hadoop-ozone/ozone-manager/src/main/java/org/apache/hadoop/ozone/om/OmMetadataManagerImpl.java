@@ -124,7 +124,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String KEY_TABLE = "keyTable";
   public static final String DELETED_TABLE = "deletedTable";
   public static final String OPEN_KEY_TABLE = "openKeyTable";
-  public static final String S3_TABLE = "s3Table";
   public static final String MULTIPARTINFO_TABLE = "multipartInfoTable";
   public static final String S3_SECRET_TABLE = "s3SecretTable";
   public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
@@ -269,7 +268,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(KEY_TABLE)
         .addTable(DELETED_TABLE)
         .addTable(OPEN_KEY_TABLE)
-        .addTable(S3_TABLE)
         .addTable(MULTIPARTINFO_TABLE)
         .addTable(DELEGATION_TOKEN_TABLE)
         .addTable(S3_SECRET_TABLE)
