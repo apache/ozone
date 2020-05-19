@@ -2392,6 +2392,22 @@
     </description>
   </property>
   <property>
+    <name>ozone.trash.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+        Globally enable trash ability of buckets.
+    </description>
+  </property>
+  <property>
+    <name>ozone.trash.recover.window</name>
+    <value>0MIN</value>
+    <tag>OZONE, OM</tag>
+    <description>
+        Window of recovering trash, default is 0 for trash-disabled.
+    </description>
+  </property>
+  <property>
     <name>ozone.http.basedir</name>
     <value></value>
     <tag>OZONE, OM, SCM, MANAGEMENT</tag>

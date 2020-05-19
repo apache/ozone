@@ -440,6 +440,13 @@ public final class OzoneConfigKeys {
       "ozone.client.list.trash.keys.max";
   public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
 
+  public static final String OZONE_TRASH_ENABLED_KEY = "ozone.trash.enabled";
+  public static final boolean OZONE_TRASH_ENABLED_KEY_DEFAULT = false;
+  public static final String OZONE_TRASH_RECOVER_WINDOW =
+      "ozone.trash.recover.window";
+  // Default is disabled.
+  public static final String OZONE_TRASH_RECOVER_WINDOW_DEFAULT = "0MIN";
+
   public static final String OZONE_HTTP_BASEDIR = "ozone.http.basedir";
 
   public static final String OZONE_HTTP_POLICY_KEY =

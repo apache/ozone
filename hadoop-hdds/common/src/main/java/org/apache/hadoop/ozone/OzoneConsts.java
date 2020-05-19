@@ -114,7 +114,7 @@ public final class OzoneConsts {
   public static final long TB = GB * 1024L;
 
   // Used by Ozone Recover-Window.
-  public static final long MIN = 60L;
+  public static final long MIN = 60L * 1000L; // 60 seconds
   public static final long HR = MIN * 60L;
   public static final long DAY = HR * 24L;
 
