@@ -152,7 +152,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- ProtocolBuffer version, used to verify the protoc version and -->
     <!-- define the protobuf JAR version                               -->
     <protobuf.version>2.5.0</protobuf.version>
-    <protoc.path>${env.HADOOP_PROTOC_PATH}</protoc.path>
 
     <findbugs.version>3.0.0</findbugs.version>
     <spotbugs.version>3.1.12</spotbugs.version>
